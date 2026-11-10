@@ -4055,20 +4055,20 @@ def run : IO Unit := do
   rejectedByInference "uint256 is not Word" ["function bad(x: uint256) returns (Word) { return x; }"]
   rejectedByInference "uint8 is not uint16" ["function bad(x: uint8) returns (uint16) { return x; }"]
   rejectedByInference "int8 is not uint8" ["function bad(x: int8) returns (uint8) { return x; }"]
-  rejectedByInference "no operator on uint8 yet" ["function bad(x: uint8) returns (uint8) { return x + x; }"]
+  rejectedByInference "no `/` on uint8 yet" ["function bad(x: uint8) returns (uint8) { return x / x; }"]
   rejectedByInference "no literal at uint8 yet" ["function bad() returns (uint8) { return 5; }"]
-  IO.println "SOURCE_CORE_FIXED_TYPES_PASS: the twelve fixed-width integer types as parameters, results, locals and mapping elements hold canonical words, a missing element is zero, non-canonical arguments are rejected before the body runs, the types are distinct from each other and from Word, and operators and literals at them are not yet accepted"
+  IO.println "SOURCE_CORE_FIXED_TYPES_PASS: the twelve fixed-width integer types as parameters, results, locals and mapping elements hold canonical words, a missing element is zero, non-canonical arguments are rejected before the body runs, the types are distinct from each other and from Word, and `/` and literals at them are not yet accepted"
 
 end Tests.SourceCoreFixedIntegerTypes
 end
 
 section
 /-! The operators on the twelve fixed-width integer types, through the public
-source API: `==`, `!=`, `& | ^` and `< > <= >=` on every type, and `~`. The
-orderings compare signed on the signed types, and `~` keeps the low `N` bits on
-the unsigned types below 256 bits, so the results stay canonical. Checked
-arithmetic and the compound forms come with the next steps and are still
-rejected. -/
+source API: `==`, `!=`, `& | ^`, `< > <= >=`, `~` and checked `+ - *`. The
+orderings compare signed on the signed types, `~` keeps the low `N` bits on
+the unsigned types below 256 bits, and checked arithmetic panics with
+`Panic(0x11)` outside the type's range, so the results stay canonical. The
+compound forms come with the next step and are still rejected. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreFixedIntegerOperators
 open Solcore Solcore.Frontend SourceCoreExecution
@@ -4109,13 +4109,24 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function le32s(x: int32, y: int32) returns (bool) { return x <= y; }",
   "function not8u(x: uint8) returns (uint8) { return ~x; }",
   "function not16u(x: uint16) returns (uint16) { return ~x; }",
-  "function not128u(x: uint128) returns (uint128) { return ~x; }"
+  "function not128u(x: uint128) returns (uint128) { return ~x; }",
+  "function add8u(x: uint8, y: uint8) returns (uint8) { return x + y; }",
+  "function sub16u(x: uint16, y: uint16) returns (uint16) { return x - y; }",
+  "function mul32u(x: uint32, y: uint32) returns (uint32) { return x * y; }",
+  "function add256u(x: uint256, y: uint256) returns (uint256) { return x + y; }",
+  "function mul256u(x: uint256, y: uint256) returns (uint256) { return x * y; }",
+  "function add8s(x: int8, y: int8) returns (int8) { return x + y; }",
+  "function sub8s(x: int8, y: int8) returns (int8) { return x - y; }",
+  "function mul8s(x: int8, y: int8) returns (int8) { return x * y; }",
+  "function sub256s(x: int256, y: int256) returns (int256) { return x - y; }",
+  "function mul256s(x: int256, y: int256) returns (int256) { return x * y; }"
 ]
 
 private def names : List String :=
   ["eq8", "ne16", "lt32", "le64", "gt128", "ge256", "and8", "or16", "xor32", "eqSigned", "mixed",
     "and8s", "or16s", "xor256s", "not8s", "not256s", "not256u", "lt8s", "ge16s", "gt256s", "le32s",
-    "not8u", "not16u", "not128u"]
+    "not8u", "not16u", "not128u", "add8u", "sub16u", "mul32u", "add256u", "mul256u", "add8s", "sub8s",
+    "mul8s", "sub256s", "mul256s"]
 
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
   match program.signatures.functions.filter (·.name == name) with
@@ -4130,6 +4141,26 @@ private def execute {artifact : Artifact} (session : Session artifact) (key : Ke
   | .ok (.failed reason _) => throw (IO.userError s!"fixed-width operator failure: {reprStr reason}")
   | .ok (.outOfFuel _) => throw (IO.userError "fixed-width operator execution exhausted")
   | .error error => throw (IO.userError s!"fixed-width operator invocation: {reprStr error}")
+/-- A run that fails with `Panic(0x11)`: the reason is the panic's, the
+diagnostic decodes it, and the revert data is upstream's. -/
+private def panics {artifact : Artifact} (session : Session artifact) (key : Key) (arguments : List Value)
+    (label : String) : IO (Session artifact) := do
+  let executed ← session.runWithReceipt key arguments {executionFuel := 300000}
+  match executed.val with
+  | .ok (.failed reason next) =>
+      let code := SourceCorePanics.arithmetic
+      require (SourceCorePanics.code? reason == some code) s!"{label} failed with {reprStr reason}"
+      match session.diagnostic key reason with
+      | .ok (some diagnostic) =>
+          require (decide (diagnostic.error = .panic code)) s!"{label} decoded {reprStr diagnostic.error}"
+      | other => throw (IO.userError s!"{label} decoded {reprStr other}")
+      let data := ((SourceCorePanics.code? reason).map SourceCorePanics.revertData).map ByteArray.toList
+      require (data == some ([0x4e, 0x48, 0x7b, 0x71] ++ List.replicate 31 0 ++ [0x11]))
+        s!"{label} revert data {reprStr data}"
+      pure next
+  | .ok (.succeeded result) => throw (IO.userError s!"{label} gave {reprStr result.value}")
+  | .ok _ => throw (IO.userError s!"{label} did not fail")
+  | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def boot (artifact : Artifact) : IO (Session artifact) := do
   let fresh ← artifact.bootstrapWithReceipt
   match fresh.val.resume 300000 with
@@ -4177,19 +4208,35 @@ def run : IO Unit := do
     (20, [word (modulus - 5), word (modulus - 5)], boolean true), (20, [word 5, word (modulus - 5)], boolean false),
     (21, [word 0], word 255), (21, [word 255], word 0), (21, [word 0x0F], word 0xF0),
     (22, [word 0x1234], word 0xEDCB),
-    (23, [word 0], word (2 ^ 128 - 1)), (23, [word (2 ^ 128 - 1)], word 0)]
+    (23, [word 0], word (2 ^ 128 - 1)), (23, [word (2 ^ 128 - 1)], word 0),
+    (24, [word 200, word 55], word 255), (25, [word 5, word 3], word 2),
+    (26, [word 65536, word 65535], word 4294901760),
+    (27, [word (modulus - 1), word 0], word (modulus - 1)),
+    (28, [word (2 ^ 128), word (2 ^ 128 - 1)], word (modulus - 2 ^ 128)),
+    (29, [word 127, word 0], word 127), (29, [word (modulus - 100), word (modulus - 28)], word (modulus - 128)),
+    (30, [word (modulus - 1), word 127], word (modulus - 128)),
+    (31, [word (modulus - 64), word 2], word (modulus - 128)),
+    (32, [word 5, word 7], word (modulus - 2)),
+    (33, [word (2 ^ 127), word (2 ^ 127)], word (2 ^ 254)), (33, [word (modulus - 1), word (modulus - 1)], word 1)]
+  let panicCases : List (Nat × List Value) := [
+    (24, [word 200, word 56]), (25, [word 3, word 5]), (26, [word 65536, word 65536]),
+    (27, [word (modulus - 1), word 1]), (28, [word (2 ^ 128), word (2 ^ 128)]),
+    (29, [word 127, word 1]), (29, [word (modulus - 128), word (modulus - 1)]),
+    (30, [word (modulus - 128), word 1]), (30, [word 0, word (modulus - 128)]),
+    (31, [word (modulus - 128), word (modulus - 1)]), (32, [word (2 ^ 255), word 1]),
+    (33, [word (modulus - 1), word (2 ^ 255)])]
   for (index, arguments, expected) in cases do
     let completed ← execute session (← key index) arguments
     require (completed.value == expected)
       s!"{names[index]?} on {reprStr arguments} gave {reprStr completed.value}"
     session := completed.session
-  rejectedByInference "checked arithmetic is not yet a builtin"
-    ["function bad(x: uint8, y: uint8) returns (uint8) { return x + y; }"]
+  for (index, arguments) in panicCases do
+    session ← panics session (← key index) arguments s!"{names[index]?} on {reprStr arguments}"
   rejectedByInference "operands of different types"
     ["function bad(x: uint8, y: uint16) returns (bool) { return x == y; }"]
   rejectedByInference "compound assignment is not yet defined"
     ["function bad(x: uint8, y: uint8) returns (uint8) { x &= y; return x; }"]
-  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= and ~ on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, with canonical results, and checked arithmetic, compound assignment and mixed operand types still rejected"
+  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic panicking with 0x11 outside the range, with canonical results, and compound assignment and mixed operand types still rejected"
 
 end Tests.SourceCoreFixedIntegerOperators
 end

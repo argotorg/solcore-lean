@@ -1320,6 +1320,7 @@ private theorem binary_native {definitions : DataEnvironment} {context : Core.Co
     | word => exact SourceCorePrimitive.binary_hasType first second
     | integer => exact SourceCoreInteger.binary_hasType first second
     | signed => exact SourceCorePrimitive.signedBinary_hasType first second
+    | checked _ => exact SourceCorePrimitive.checkedBinary_hasType first second
 
 variable {fuel : Nat} {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
   {context : SourceSemantics.Context} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}

@@ -480,6 +480,7 @@ private theorem tail_short (profile : BinaryProfile operator operand result mode
   | fixedComparison kind => cases circuit <;> cases kind
   | fixedBitwise kind => cases circuit <;> cases kind
   | fixedSigned kind => cases circuit <;> cases kind
+  | fixedChecked kind => cases circuit <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -510,6 +511,7 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
   | fixedComparison kind => cases kind <;> exact bind_failed child evaluated
   | fixedBitwise kind => cases kind <;> exact bind_failed child evaluated
   | fixedSigned kind => cases kind <;> exact bind_failed child evaluated
+  | fixedChecked kind => cases kind <;> exact bind_failed child evaluated
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
@@ -532,7 +534,7 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
         exact evaluation_deterministic branch child
 
 private theorem tail_outcome_primitive (profile : BinaryProfile operator operand result mode)
-    (notSigned : mode ≠ .signed)
+    (notSigned : mode ≠ .signed) (notChecked : mode.checkedType? = none)
     (leftRep : ValueRep checked rawRegistry model mapping world operand a x (mode.operandType operator))
     (rightRep : ValueRep checked rawRegistry model mapping world operand b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
@@ -659,6 +661,7 @@ private theorem tail_outcome_primitive (profile : BinaryProfile operator operand
         obtain ⟨rfl, rfl⟩ := evaluation_deterministic branch child
         exact ⟨_, _, .logicalOr false b, .bool b, rfl, rfl⟩
   | fixedSigned => exact absurd rfl notSigned
+  | fixedChecked => simp [Mode.checkedType?] at notChecked
 
 private theorem tail_outcome {lookup : Option TypeSystem.Ty} (profile : BinaryProfile operator operand result mode)
     (leftRep : ValueRep checked rawRegistry model mapping world operand a x (mode.operandType operator))
@@ -670,7 +673,7 @@ private theorem tail_outcome {lookup : Option TypeSystem.Ty} (profile : BinaryPr
     (∃ output native, Dynamic.BinaryValueApplies lookup operator a b output ∧
       ValueRep checked rawRegistry model mapping world result output native (mode.resultType operator) ∧
       value = .inRight .word native ∧ finalStore = middle) ∨
-    (∃ code, Dynamic.BinaryPrimitivePanics operator a b code ∧
+    (∃ code, Dynamic.BinaryValuePanics lookup operator a b code ∧
       value = .inLeft (mode.resultType operator) (.word (SourceCorePanics.reason code)) ∧ finalStore = middle) := by
   by_cases signedMode : mode = .signed
   · subst signedMode
@@ -689,11 +692,32 @@ private theorem tail_outcome {lookup : Option TypeSystem.Ty} (profile : BinaryPr
         obtain ⟨rfl, rfl⟩ := evaluation_deterministic actual (pure _ _)
         refine ⟨_, _, .fixed operandEq applied, ?_, rfl, rfl⟩
         cases kind <;> exact represented
-  · rcases tail_outcome_primitive profile signedMode leftRep rightRep continues child evaluated with
-      ⟨output, native, applied, represented, valueEq, storeEq⟩ | panicked
-    · exact .inl ⟨output, native, .primitive (operandEq ▸ profile.word_meaning signedMode) applied, represented,
-        valueEq, storeEq⟩
-    · exact .inr panicked
+  · cases checkedMode : mode.checkedType? with
+    | some type =>
+      obtain rfl : mode = .checked type := by
+        cases mode <;> simp_all [Mode.checkedType?]
+      cases profile with
+      | fixedChecked kind =>
+        obtain ⟨a, rfl, rfl, _, _⟩ := fixed_fields leftRep rfl
+        obtain ⟨b, rfl, rfl, _, _⟩ := fixed_fields rightRep rfl
+        have resultEq : (Mode.checked type).resultType operator = .word := by cases kind <;> rfl
+        have body : Evaluates (.word b :: .word a :: environment) middle
+            (SourceCorePrimitive.checkedBody type operator) value finalStore := by
+          cases kind <;> exact (LanguageResult.bind_success_iff child).mp evaluated
+        rw [resultEq]
+        by_cases inRange : Dynamic.FixedInRange type
+            (Dynamic.checkedResult operator (Dynamic.fixedValue type a) (Dynamic.fixedValue type b))
+        · obtain ⟨rfl, rfl⟩ := evaluation_deterministic body (checked_body_success kind inRange)
+          exact .inl ⟨_, _, .fixed operandEq (.checked kind a b inRange),
+            .fixed _ (Dynamic.fixed_canonical_ofInt inRange.1 inRange.2), rfl, rfl⟩
+        · obtain ⟨rfl, rfl⟩ := evaluation_deterministic body (checked_body_panic kind inRange)
+          exact .inr ⟨_, .fixed operandEq (.overflow kind a b inRange), rfl, rfl⟩
+    | none =>
+      rcases tail_outcome_primitive profile signedMode checkedMode leftRep rightRep continues child evaluated with
+        ⟨output, native, applied, represented, valueEq, storeEq⟩ | ⟨code, panics, valueEq, storeEq⟩
+      · exact .inl ⟨output, native, .primitive (operandEq ▸ profile.word_meaning signedMode checkedMode) applied,
+          represented, valueEq, storeEq⟩
+      · exact .inr ⟨code, .primitive panics, valueEq, storeEq⟩
 end Tail
 
 include sameSource uninitialized in

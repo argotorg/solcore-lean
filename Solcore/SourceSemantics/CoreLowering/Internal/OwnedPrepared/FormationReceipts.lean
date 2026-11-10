@@ -2773,20 +2773,31 @@ theorem profiled_binary_children {operator : Syntax.BinaryOp} {operand result : 
     RawTyped nativeContext left definitions ∧ RawTyped nativeContext right definitions := by
   cases profile with
   | word strict =>
-    rw [Mode.binary_strict .word strict] at typed
+    rw [Mode.binary_strict .word strict rfl] at typed
     exact binary_children typed
   | integer strict =>
-    rw [Mode.binary_strict .integer strict.toStrict] at typed
+    rw [Mode.binary_strict .integer strict.toStrict rfl] at typed
     exact binary_children typed
   | fixedComparison kind =>
-    rw [Mode.binary_strict .word kind.strict] at typed
+    rw [Mode.binary_strict .word kind.strict rfl] at typed
     exact binary_children typed
   | fixedBitwise kind =>
-    rw [Mode.binary_strict .word kind.strict] at typed
+    rw [Mode.binary_strict .word kind.strict rfl] at typed
     exact binary_children typed
   | fixedSigned kind =>
-    rw [Mode.binary_strict .signed kind.strict] at typed
+    rw [Mode.binary_strict .signed kind.strict rfl] at typed
     exact binary_children typed
+  | @fixedChecked _ type kind =>
+    -- Checked `+ - *` bind both operands before the checked body.
+    have shape : (Mode.checked type).binary operator left right =
+        LanguageResult.bind .word left
+          (LanguageResult.bind .word (right.weakenAt 0) (SourceCorePrimitive.checkedBody type operator)) := by
+      cases kind <;> rfl
+    rw [shape] at typed
+    cases typed with
+    | caseE first failure remaining =>
+      cases remaining with
+      | caseE second failure returned => exact ⟨⟨_, first⟩, ⟨_, remove_front second⟩⟩
   | panicking panicking =>
     -- Unchecked `/` and `%` bind both operands before the checked body.
     have shape : Mode.word.binary operator left right =

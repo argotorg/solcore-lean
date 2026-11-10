@@ -761,12 +761,14 @@ private theorem unary_fault_excluded
 private theorem binary_fault_excluded
     {program : Program} {context : Context} {evidence : Dynamic.EvidenceEnvironment}
     {before after : Dynamic.Heap} {operator : Syntax.BinaryOp} {left right output : Dynamic.Value}
-    {reason : Dynamic.SemanticFault}
+    {reason : Dynamic.SemanticFault} {lookup : Option TypeSystem.Ty}
     (applied : Dynamic.BinaryPrimitiveApplies operator left right output)
-    (fault : Dynamic.BinaryOperationFaults program context evidence before operator [] left right reason after) : False := by
+    (plain : Dynamic.BinaryWordMeaning lookup operator)
+    (fault : Dynamic.BinaryOperationFaults program context evidence before operator lookup [] left right reason after) :
+    False := by
   cases fault with
   | primitive invalid => exact invalid.excludes_application ⟨output, applied⟩
-  | panic panics => exact panics.excludes_application applied
+  | panic panics => exact panics.excludes_value (.primitive plain applied)
   | requirement fault => cases fault
   | method _ selected _ => cases selected
 
@@ -876,7 +878,7 @@ theorem source_fault
           obtain ⟨rfl, left, rfl, leftTyped, _⟩ := source_success leftTree unique environments heaps leftEvaluation
           obtain ⟨rfl, right, rfl, rightTyped, _⟩ := source_success rightTree unique environments heaps rightEvaluation
           obtain ⟨output, applied⟩ := typed_binary_applies operator left right total leftTyped rightTyped
-          exact False.elim (binary_fault_excluded applied operationFault)
+          exact False.elim (binary_fault_excluded applied (leftTree.word_meaning _) operationFault)
   | group metadata form _ ih =>
       have raw := expression_fault_raw unique metadata.contains (by simp [form]) metadata.coercions fault
       rw [form] at raw

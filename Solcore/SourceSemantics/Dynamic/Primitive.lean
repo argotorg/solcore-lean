@@ -487,9 +487,53 @@ fixed-width integer types read their canonical words. -/
 def wordSigned (word : Core.Word) : Int :=
   if word.val < 2 ^ 255 then word.val else (word.val : Int) - 2 ^ 256
 
+/-- The integer a canonical word of a fixed-width integer type stands for. -/
+def fixedValue (type : TypeSystem.FixedInteger) (word : Core.Word) : Int :=
+  if type.signed then wordSigned word else word.val
+
+/-- The exact result of checked `+`, `-` or `*`. -/
+def checkedResult : Syntax.BinaryOp → Int → Int → Int
+  | .add, left, right => left + right
+  | .subtract, left, right => left - right
+  | _, left, right => left * right
+
+/-- Whether an integer lies in a fixed-width integer type's range. -/
+def FixedInRange (type : TypeSystem.FixedInteger) (value : Int) : Prop :=
+  type.min ≤ value ∧ value ≤ type.max
+
+instance (type : TypeSystem.FixedInteger) (value : Int) : Decidable (FixedInRange type value) :=
+  inferInstanceAs (Decidable (_ ∧ _))
+
+/-- The binary operators whose meaning on a fixed-width integer type differs
+from Word's on its canonical words: the orderings on the signed types and
+checked `+ - *` on every type. -/
+inductive FixedBinaryOwn (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → Prop where
+  | less (signed : type.signed = true) : FixedBinaryOwn type .less
+  | greater (signed : type.signed = true) : FixedBinaryOwn type .greater
+  | lessEqual (signed : type.signed = true) : FixedBinaryOwn type .lessEqual
+  | greaterEqual (signed : type.signed = true) : FixedBinaryOwn type .greaterEqual
+  | add : FixedBinaryOwn type .add
+  | subtract : FixedBinaryOwn type .subtract
+  | multiply : FixedBinaryOwn type .multiply
+
+theorem _root_.Solcore.SourceSemantics.FixedSignedComparison.own {type : TypeSystem.FixedInteger}
+    {operator : Syntax.BinaryOp} (kind : FixedSignedComparison type operator) :
+    FixedBinaryOwn type operator := by
+  cases kind with
+  | less signed => exact .less signed
+  | greater signed => exact .greater signed
+  | lessEqual signed => exact .lessEqual signed
+  | greaterEqual signed => exact .greaterEqual signed
+
+theorem _root_.Solcore.SourceSemantics.FixedCheckedArithmetic.own {type : TypeSystem.FixedInteger}
+    {operator : Syntax.BinaryOp} (kind : FixedCheckedArithmetic operator) :
+    FixedBinaryOwn type operator := by
+  cases kind <;> constructor
+
 /-- Binary operators whose meaning on a fixed-width integer type differs from
 Word's on its canonical words. The orderings on the signed types compare the
-integers the words stand for. -/
+integers the words stand for, and checked `+ - *` give the exact result, as a
+canonical word, when it lies in the type's range. -/
 inductive FixedBinaryApplies (type : TypeSystem.FixedInteger) :
     Syntax.BinaryOp → Value → Value → Value → Prop where
   | signedLess (signed : type.signed = true) (left right : Core.Word) :
@@ -504,6 +548,10 @@ inductive FixedBinaryApplies (type : TypeSystem.FixedInteger) :
   | signedGreaterEqual (signed : type.signed = true) (left right : Core.Word) :
       FixedBinaryApplies type .greaterEqual (.word left) (.word right)
         (.bool (decide (wordSigned left ≥ wordSigned right)))
+  | checked {operator : Syntax.BinaryOp} (kind : FixedCheckedArithmetic operator) (left right : Core.Word)
+      (inRange : FixedInRange type (checkedResult operator (fixedValue type left) (fixedValue type right))) :
+      FixedBinaryApplies type operator (.word left) (.word right)
+        (.word (Core.Word.ofIntModulo (checkedResult operator (fixedValue type left) (fixedValue type right))))
 
 namespace FixedBinaryApplies
 
@@ -512,24 +560,46 @@ theorem functional {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
     (firstApplication : FixedBinaryApplies type operator left right first)
     (secondApplication : FixedBinaryApplies type operator left right second) :
     first = second := by
-  cases firstApplication <;> cases secondApplication <;> rfl
+  cases firstApplication with
+  | checked kind =>
+    cases secondApplication with
+    | checked => rfl
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
+  | signedLess =>
+    cases secondApplication with
+    | signedLess => rfl
+    | checked kind => cases kind
+  | signedGreater =>
+    cases secondApplication with
+    | signedGreater => rfl
+    | checked kind => cases kind
+  | signedLessEqual =>
+    cases secondApplication with
+    | signedLessEqual => rfl
+    | checked kind => cases kind
+  | signedGreaterEqual =>
+    cases secondApplication with
+    | signedGreaterEqual => rfl
+    | checked kind => cases kind
 
-/-- The operators with a fixed-width meaning are exactly the signed orderings. -/
+/-- The operators with a fixed-width meaning are those of `FixedBinaryOwn`. -/
 theorem kind {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
     {left right output : Value}
     (applies : FixedBinaryApplies type operator left right output) :
-    FixedSignedComparison type operator := by
+    FixedBinaryOwn type operator := by
   cases applies with
   | signedLess signed => exact .less signed
   | signedGreater signed => exact .greater signed
   | signedLessEqual signed => exact .lessEqual signed
   | signedGreaterEqual signed => exact .greaterEqual signed
+  | checked kind => exact kind.own
 
 theorem strict {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
     {left right output : Value}
     (applies : FixedBinaryApplies type operator left right output) :
     StrictBinaryOperator operator := by
-  cases applies <;> constructor
+  have own := applies.kind
+  cases own <;> constructor
 
 end FixedBinaryApplies
 
@@ -565,7 +635,7 @@ theorem signedGt_eq_wordSigned (left right : Core.Word) :
 applies unless the operands' static type is a fixed-width integer type on which
 the operator's meaning differs (`FixedBinaryApplies`). -/
 def BinaryWordMeaning (operandType : Option TypeSystem.Ty) (operator : Syntax.BinaryOp) : Prop :=
-  ∀ type, operandType = some (.fixed type) → ¬ FixedSignedComparison type operator
+  ∀ type, operandType = some (.fixed type) → ¬ FixedBinaryOwn type operator
 
 /-- A strict binary operator applied to evaluated operands whose static type is
 `operandType`: its primitive meaning, or the fixed-width meaning where that
@@ -603,10 +673,10 @@ theorem word_meaning_of_not_fixed {operandType : Option TypeSystem.Ty} {operator
     (notFixed : ∀ type, operandType ≠ some (.fixed type)) : BinaryWordMeaning operandType operator :=
   fun type operand => absurd operand (notFixed type)
 
-/-- Word's meaning applies to every operator that is not an ordering. -/
-theorem word_meaning_of_not_ordering {operandType : Option TypeSystem.Ty} {operator : Syntax.BinaryOp}
-    (notOrdering : ∀ type, ¬ FixedSignedComparison type operator) : BinaryWordMeaning operandType operator :=
-  fun type _ => notOrdering type
+/-- Word's meaning applies to every operator without a fixed-width meaning. -/
+theorem word_meaning_of_not_own {operandType : Option TypeSystem.Ty} {operator : Syntax.BinaryOp}
+    (notOwn : ∀ type, ¬ FixedBinaryOwn type operator) : BinaryWordMeaning operandType operator :=
+  fun type _ => notOwn type
 
 end BinaryValueApplies
 
@@ -616,7 +686,75 @@ theorem BinaryPrimitivePanics.excludes_value {operandType : Option TypeSystem.Ty
     (applies : BinaryValueApplies operandType operator left right result) : False := by
   cases applies with
   | primitive _ applies => exact panics.excludes_application applies
-  | fixed _ applies => cases panics <;> cases applies
+  | fixed _ applies =>
+    have own := applies.kind
+    cases panics <;> cases own
+
+/-- Checked `+ - *` on a fixed-width integer type panic with `Panic(0x11)` when
+the exact result lies outside the type's range. -/
+inductive FixedBinaryPanics (type : TypeSystem.FixedInteger) :
+    Syntax.BinaryOp → Value → Value → UInt8 → Prop where
+  | overflow {operator : Syntax.BinaryOp} (kind : FixedCheckedArithmetic operator) (left right : Core.Word)
+      (outside : ¬ FixedInRange type (checkedResult operator (fixedValue type left) (fixedValue type right))) :
+      FixedBinaryPanics type operator (.word left) (.word right) 0x11
+
+theorem FixedBinaryPanics.excludes_application {type : TypeSystem.FixedInteger}
+    {operator : Syntax.BinaryOp} {left right result : Value} {code : UInt8}
+    (panics : FixedBinaryPanics type operator left right code)
+    (applies : FixedBinaryApplies type operator left right result) : False := by
+  cases panics with
+  | overflow kind left right outside =>
+    cases applies
+    all_goals first
+      | exact outside (by assumption)
+      | cases kind
+
+/-- A strict binary operator panicking on evaluated operands whose static type
+is `operandType`: an unchecked `/` or `%` by zero, or checked arithmetic out of
+the fixed-width type's range. -/
+inductive BinaryValuePanics (operandType : Option TypeSystem.Ty) (operator : Syntax.BinaryOp)
+    (left right : Value) (code : UInt8) : Prop where
+  | primitive (panics : BinaryPrimitivePanics operator left right code)
+  | fixed {type : TypeSystem.FixedInteger} (operand : operandType = some (.fixed type))
+      (panics : FixedBinaryPanics type operator left right code)
+
+namespace BinaryValuePanics
+
+theorem excludes_value {operandType : Option TypeSystem.Ty}
+    {operator : Syntax.BinaryOp} {left right result : Value} {code : UInt8}
+    (panics : BinaryValuePanics operandType operator left right code)
+    (applies : BinaryValueApplies operandType operator left right result) : False := by
+  cases panics with
+  | primitive panics => exact panics.excludes_value applies
+  | fixed operand panics =>
+    cases applies with
+    | primitive plain _ =>
+      cases panics with
+      | overflow kind => exact plain _ operand kind.own
+    | fixed other applies =>
+      rw [operand] at other
+      cases Option.some.inj other
+      exact panics.excludes_application applies
+
+theorem functional {operandType : Option TypeSystem.Ty}
+    {operator : Syntax.BinaryOp} {left right : Value} {first second : UInt8}
+    (firstPanic : BinaryValuePanics operandType operator left right first)
+    (secondPanic : BinaryValuePanics operandType operator left right second) : first = second := by
+  cases firstPanic with
+  | primitive firstPanic =>
+    cases secondPanic with
+    | primitive secondPanic => exact firstPanic.functional secondPanic
+    | fixed _ secondPanic =>
+      cases secondPanic with
+      | overflow kind => cases kind <;> cases firstPanic
+  | fixed _ firstPanic =>
+    cases firstPanic with
+    | overflow kind =>
+      cases secondPanic with
+      | primitive secondPanic => cases kind <;> cases secondPanic
+      | fixed _ secondPanic => cases secondPanic; rfl
+
+end BinaryValuePanics
 
 /-- The word that keeps the low `N` bits of a word, for a fixed-width integer
 type of `N` bits. -/

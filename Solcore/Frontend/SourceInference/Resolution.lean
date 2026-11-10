@@ -454,14 +454,16 @@ def binaryBuiltinType : Syntax.BinaryOp → Ty
   | _ => .word
 
 /-- The binary operators that are builtins on a fixed-width integer type, with
-both operands of that type: `==`, `!=`, `& | ^` and the orderings. On canonical
-words they are Word's, except the orderings on the signed types, which compare
-the integers the words stand for. -/
+both operands of that type: `==`, `!=`, `& | ^`, the orderings and checked
+`+ - *`. On canonical words they are Word's, except the orderings on the signed
+types, which compare the integers the words stand for, and the checked
+arithmetic, which panics outside the type's range. -/
 def fixedBinaryOperator (operator : Syntax.BinaryOp) : Ty → Bool
   | .constructor (.builtin (.fixed _)) =>
       match operator with
       | .equal | .notEqual | .bitAnd | .bitXor | .bitOr
-      | .less | .greater | .lessEqual | .greaterEqual => true
+      | .less | .greater | .lessEqual | .greaterEqual
+      | .add | .subtract | .multiply => true
       | _ => false
   | _ => false
 
@@ -555,8 +557,8 @@ def binaryOperatorTail (context : Context) (operator : Syntax.BinaryOp) (left : 
     (hasOpenLiteralOperand : Bool) (state : State) :
     Except Error OperatorInferenceResult := do
   let operand := state.resolve left
-  -- The twelve fixed-width integer types take `==`, `!=`, `& | ^` and the
-  -- orderings as builtins (`fixedBinaryOperator`).
+  -- The twelve fixed-width integer types take `==`, `!=`, `& | ^`, the
+  -- orderings and checked `+ - *` as builtins (`fixedBinaryOperator`).
   if fixedBinaryOperator operator operand then
     pure {
       type := if binaryResultIsBool operator then .bool else operand

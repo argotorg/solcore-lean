@@ -565,10 +565,88 @@ theorem preserves
 
 end BinaryPrimitiveApplies
 
+namespace PrimitiveBinaryHasType
+
+/-- Every primitive typing of an ordering gives a Boolean. -/
+theorem ordering_result {operator : Syntax.BinaryOp} {operand result : Ty}
+    {type : TypeSystem.FixedInteger}
+    (typing : PrimitiveBinaryHasType operator operand result)
+    (kind : FixedSignedComparison type operator) : result = .bool := by
+  cases kind <;> cases typing <;> first | rfl | (rename_i other; cases other)
+
+/-- The primitive typings of `+ - *` are Word's and Integer's. -/
+theorem arithmetic_result {operator : Syntax.BinaryOp} {operand result : Ty}
+    (typing : PrimitiveBinaryHasType operator operand result)
+    (kind : FixedCheckedArithmetic operator) :
+    (operand = .word ∧ result = .word) ∨ (operand = .integer ∧ result = .integer) := by
+  cases kind <;> cases typing <;>
+    first | exact .inl ⟨rfl, rfl⟩ | exact .inr ⟨rfl, rfl⟩ | (rename_i other; cases other)
+
+end PrimitiveBinaryHasType
+
+/-- `Word.ofIntModulo` of an integer in `[0, 2^256)` is that integer. -/
+theorem ofIntModulo_val_of_nonneg (value : Int) (lower : 0 ≤ value) (upper : value < 2 ^ 256) :
+    (Core.Word.ofIntModulo value).val = value.toNat := by
+  obtain ⟨n, rfl⟩ := Int.eq_ofNat_of_zero_le lower
+  simp only [Core.Word.ofIntModulo, Core.Word.ofNatModulo, Core.wordModulus, Int.toNat_natCast]
+  exact Nat.mod_eq_of_lt (by omega)
+
+/-- A negative integer above `-2^256` becomes the word `2^256 + value`. -/
+theorem ofIntModulo_val_of_neg (value : Int) (lower : -(2 ^ 256) ≤ value) (upper : value < 0) :
+    ((Core.Word.ofIntModulo value).val : Int) = 2 ^ 256 + value := by
+  obtain ⟨n, hn⟩ : ∃ n : Nat, value = Int.negSucc n := ⟨(-value - 1).toNat, by omega⟩
+  subst hn
+  simp only [Core.Word.ofIntModulo, Core.Word.ofNatModulo, Core.wordModulus]
+  have small : n + 1 ≤ 2 ^ 256 := by omega
+  rw [Int.negSucc_eq]
+  rcases Nat.lt_or_eq_of_le small with strict | equal
+  · rw [Nat.mod_eq_of_lt strict, Nat.mod_eq_of_lt (by omega : 2 ^ 256 - (n + 1) < 2 ^ 256)]
+    have : ((2 ^ 256 - (n + 1) : Nat) : Int) = 2 ^ 256 - ((n : Int) + 1) := by omega
+    omega
+  · have : (n : Int) + 1 = 2 ^ 256 := by exact_mod_cast equal
+    rw [equal, Nat.mod_self]
+    simp
+    omega
+
+theorem signed_canonical_range {type : TypeSystem.FixedInteger}
+    (signed : type.signed = true) (n : Nat) :
+    type.canonical n = true ↔
+      (n < 2 ^ (type.width.bits - 1) ∨ 2 ^ 256 - 2 ^ (type.width.bits - 1) ≤ n) := by
+  unfold TypeSystem.FixedInteger.canonical
+  simp [signed]
+
+/-- An integer in a fixed-width integer type's range becomes a canonical word
+of the type. -/
+theorem fixed_canonical_ofInt {type : TypeSystem.FixedInteger} {value : Int}
+    (lower : type.min ≤ value) (upper : value ≤ type.max) :
+    type.canonical (Core.Word.ofIntModulo value).val = true := by
+  obtain ⟨signed, width⟩ := type
+  cases signed
+  · rw [unsigned_canonical_iff rfl]
+    simp only [TypeSystem.FixedInteger.min, TypeSystem.FixedInteger.max, Bool.false_eq_true,
+      ↓reduceIte] at lower upper
+    have result := ofIntModulo_val_of_nonneg value (by omega) (by
+      cases width <;> simp only [TypeSystem.IntegerWidth.bits, Nat.reducePow] at upper ⊢ <;> omega)
+    cases width <;> simp only [TypeSystem.IntegerWidth.bits, Nat.reducePow] at upper ⊢ <;> omega
+  · rw [signed_canonical_range rfl]
+    simp only [TypeSystem.FixedInteger.min, TypeSystem.FixedInteger.max, ↓reduceIte] at lower upper
+    by_cases negative : value < 0
+    · have result := ofIntModulo_val_of_neg value (by
+        cases width <;> simp only [TypeSystem.IntegerWidth.bits, Nat.reduceSub, Nat.reducePow] at lower <;>
+          omega) negative
+      cases width <;> simp only [TypeSystem.IntegerWidth.bits, Nat.reduceSub, Nat.reducePow] at lower upper ⊢ <;>
+        omega
+    · have result := ofIntModulo_val_of_nonneg value (by omega) (by
+        cases width <;> simp only [TypeSystem.IntegerWidth.bits, Nat.reduceSub, Nat.reducePow] at upper <;>
+          omega)
+      cases width <;> simp only [TypeSystem.IntegerWidth.bits, Nat.reduceSub, Nat.reducePow] at lower upper ⊢ <;>
+        omega
+
 namespace BinaryValueApplies
 
 /-- The operation at the operands' static type keeps the primitive typing: the
-signed orderings, like every ordering, give a Boolean. -/
+signed orderings, like every ordering, give a Boolean, and checked arithmetic
+is only typed by Word's and Integer's arithmetic among the primitive typings. -/
 theorem preserves
     {context : Context} {heap : Heap} {operator : Syntax.BinaryOp}
     {left right result : Value} {operandType resultType : Ty} {lookup : Option Ty}
@@ -580,15 +658,32 @@ theorem preserves
   cases application with
   | primitive _ applies => exact applies.preserves typing left_typed right_typed
   | fixed _ applies =>
-      have ordering := applies.kind
-      have output_bool : ∃ flag, result = .bool flag := by
-        cases applies <;> exact ⟨_, rfl⟩
-      obtain ⟨flag, rfl⟩ := output_bool
-      cases typing with
-      | wordComparison | integerComparison | fixedComparison | fixedSignedComparison => exact .bool _
-      | wordArithmetic kind | integerArithmetic kind | wordShift kind | wordUnchecked kind
-      | fixedBitwise kind => cases ordering <;> cases kind
-      | booleanAnd | booleanOr => cases ordering
+      cases applies with
+      | signedLess signed => obtain rfl := typing.ordering_result (.less signed); exact .bool _
+      | signedGreater signed => obtain rfl := typing.ordering_result (.greater signed); exact .bool _
+      | signedLessEqual signed => obtain rfl := typing.ordering_result (.lessEqual signed); exact .bool _
+      | signedGreaterEqual signed => obtain rfl := typing.ordering_result (.greaterEqual signed); exact .bool _
+      | checked kind =>
+          rcases typing.arithmetic_result kind with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+          · exact .word _
+          · cases left_typed
+
+/-- Checked `+ - *` keep their result canonical at the operands' static type. -/
+theorem preserves_checked
+    {context : Context} {heap : Heap} {operator : Syntax.BinaryOp}
+    {left right result : Value} {type : TypeSystem.FixedInteger} {lookup : Option Ty}
+    (kind : FixedCheckedArithmetic operator)
+    (lookupEq : lookup = some (.fixed type))
+    (application : BinaryValueApplies lookup operator left right result) :
+    ValueHasType context heap result (.fixed type) := by
+  cases application with
+  | primitive plain _ => exact absurd kind.own (plain type lookupEq)
+  | fixed operandEq applies =>
+    rw [lookupEq] at operandEq
+    cases Option.some.inj operandEq
+    cases applies with
+    | checked _ left right inRange => exact .fixed _ (fixed_canonical_ofInt inRange.1 inRange.2)
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
 
 end BinaryValueApplies
 
@@ -2335,6 +2430,7 @@ def BinaryOperationExecutionPreserves
     ValueHasType context before right operandType ->
     BinaryOperatorHasType context operator operandType operandType resultType
       requirements ->
+    lookup = some operandType ->
     BinaryOperationApplies program context evidence before operator lookup
       requirements left right output after ->
     ValueHasType context after output resultType /\
@@ -2624,7 +2720,8 @@ theorem preservesWith
               right_evaluates with
             ⟨right_typed, right_heap_typed, right_extension⟩
           rcases binary_preserves _ _ _ _ _ _ _ _ _ _ right_heap_typed
-              (left_typed.mono right_extension) right_typed operator_type applies with
+              (left_typed.mono right_extension) right_typed operator_type
+              (operandType?_of_typing graph.nodeOccurrencesUnique left_type) applies with
             ⟨result_typed, after_typed, operation_extension⟩
           exact ⟨result_typed, after_typed,
             (left_extension.trans right_extension).trans operation_extension⟩

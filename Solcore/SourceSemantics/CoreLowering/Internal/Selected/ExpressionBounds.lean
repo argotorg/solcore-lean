@@ -2775,6 +2775,9 @@ private theorem binary_result_typed {operator : Syntax.BinaryOp} {operand result
     exact .fixed word canonical
   | fixedSigned kind => cases kind <;>
     (obtain ⟨flag, rfl, _⟩ := bool_fields represented; exact .bool flag)
+  | fixedChecked kind =>
+    obtain ⟨word, rfl, _, _, canonical⟩ := fixed_fields represented rfl
+    exact .fixed word canonical
   | logicalAnd | logicalOr =>
     obtain ⟨flag, rfl, _⟩ := bool_fields represented
     exact .bool flag
@@ -2932,7 +2935,7 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] (budget size : N
             rw [rightType] at rightPayload
             have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
             exact ⟨_, finalStore, finalMap, finalWorld,
-              by rw [Mode.binary_rename]; exact profile.right_panic leftPayload rightPayload continues first second panics,
+              by rw [Mode.binary_rename]; exact profile.right_panic leftPayload rightPayload continues first second panics (Dynamic.operandType?_of_found leftFound leftType),
               .fault (RecursiveStageMeaning.FaultTokens.panic _), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
               firstFrame.trans frame, firstMetadata.trans heapMetadata, ⟨reached, callerProtocol.trans firstRelated related, panicked bridge post⟩⟩
       | invalid firstTrace continues secondTrace failed firstSmaller secondSmaller =>
@@ -2953,7 +2956,7 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] (budget size : N
             rcases profile.right_outcome leftPayload rightPayload continues first second (Dynamic.operandType?_of_found leftFound leftType) with
               ⟨_, _, applied, _, _⟩ | ⟨_, panics, _⟩
             · exact False.elim (failed.excludes_value applied)
-            · exact False.elim (failed.excludes_panic panics)
+            · exact False.elim (failed.excludes_value_panic panics)
 
     | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
       have same := Option.some.inj (metadata.found.symm.trans found)

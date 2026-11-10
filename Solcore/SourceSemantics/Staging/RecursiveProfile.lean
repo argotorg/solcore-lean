@@ -609,7 +609,7 @@ mutual
         (first : Expression program registry scope context environment before left (.value a) middle)
         (continues : EvaluatesRightOperand operator a)
         (second : Expression program registry scope context environment middle right (.value b) after)
-        (panics : BinaryPrimitivePanics operator a b code) :
+        (panics : BinaryValuePanics (operandType? scope.source left) operator a b code) :
         Expression program registry scope context environment before id (.fault (.semantic (.panic code))) after
     | unaryMethod {scope context environment before argumentsHeap bound after id operator operand input
           requirements traitName methodName bodyInstance dictionary roots child parameterTypes bodyContext finalContext bodyEnvironment outcome result}

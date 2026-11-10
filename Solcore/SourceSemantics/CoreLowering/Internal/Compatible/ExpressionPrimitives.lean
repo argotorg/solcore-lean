@@ -451,21 +451,27 @@ inductive Mode where
   | word
   | integer
   | signed
+  | checked (type : TypeSystem.FixedInteger)
   deriving DecidableEq
+
+/-- The fixed-width integer type of the checked mode. -/
+def Mode.checkedType? : Mode → Option TypeSystem.FixedInteger
+  | .checked type => some type
+  | _ => none
 
 def Mode.operandType (mode : Mode) (operator : Syntax.BinaryOp) : Ty :=
   match mode with
-  | .word | .signed => SourceCorePrimitive.binaryOperandType operator
+  | .word | .signed | .checked _ => SourceCorePrimitive.binaryOperandType operator
   | .integer => SourceCoreInteger.binaryOperandType operator
 
 def Mode.resultType (mode : Mode) (operator : Syntax.BinaryOp) : Ty :=
   match mode with
-  | .word | .signed => SourceCorePrimitive.binaryResultType operator
+  | .word | .signed | .checked _ => SourceCorePrimitive.binaryResultType operator
   | .integer => SourceCoreInteger.binaryResultType operator
 
 def Mode.body (mode : Mode) (operator : Syntax.BinaryOp) : Expr :=
   match mode with
-  | .word => SourceCorePrimitive.strictBinaryBody operator
+  | .word | .checked _ => SourceCorePrimitive.strictBinaryBody operator
   | .integer => SourceCoreInteger.strictBinaryBody operator
   | .signed => SourceCorePrimitive.signedStrictBinaryBody operator
 
@@ -474,6 +480,7 @@ def Mode.binary (mode : Mode) (operator : Syntax.BinaryOp) (left right : Expr) :
   | .word => SourceCorePrimitive.binary operator left right
   | .integer => SourceCoreInteger.binary operator left right
   | .signed => SourceCorePrimitive.signedBinary operator left right
+  | .checked type => SourceCorePrimitive.checkedBinary type operator left right
 
 def scalarSource : Ty → TypeSystem.Ty
   | .bool => .bool
@@ -506,6 +513,10 @@ inductive BinaryProfile : Syntax.BinaryOp → TypeSystem.Ty → TypeSystem.Ty �
   | fixedSigned {operator} {type : TypeSystem.FixedInteger}
       (kind : FixedSignedComparison type operator) :
       BinaryProfile operator (.fixed type) .bool .signed
+  /-- Checked `+ - *` on a fixed-width integer type. -/
+  | fixedChecked {operator} {type : TypeSystem.FixedInteger}
+      (kind : FixedCheckedArithmetic operator) :
+      BinaryProfile operator (.fixed type) (.fixed type) (.checked type)
 
 theorem BinaryProfile.of_typing {context : SourceSemantics.Context} {operator : Syntax.BinaryOp}
     {operand result : TypeSystem.Ty} (typed : BinaryOperatorHasType context operator operand operand result []) :
@@ -523,13 +534,18 @@ theorem BinaryProfile.of_typing {context : SourceSemantics.Context} {operator : 
   | fixedComparison kind => exact ⟨_, .fixedComparison kind⟩
   | fixedBitwise kind => exact ⟨_, .fixedBitwise kind⟩
   | fixedSignedComparison kind => exact ⟨_, .fixedSigned kind⟩
+  | fixedArithmetic kind => exact ⟨_, .fixedChecked kind⟩
   | trait _ profile evidence => cases profile; cases evidence
 
+/-- Outside the checked mode, a strict operator lowers through `binaryWith`. -/
 theorem Mode.binary_strict {operator : Syntax.BinaryOp} (mode : Mode)
-    (strict : Dynamic.StrictBinaryOperator operator) (left right : Expr) :
+    (strict : Dynamic.StrictBinaryOperator operator) (notChecked : mode.checkedType? = none)
+    (left right : Expr) :
     mode.binary operator left right = LocalPrimitiveResults.binaryWith
       (mode.resultType operator) left right (mode.body operator) := by
-  cases mode <;> cases strict <;> rfl
+  cases mode with
+  | checked => simp [Mode.checkedType?] at notChecked
+  | _ => cases strict <;> rfl
 
 theorem Mode.body_rename (mode : Mode) (operator : Syntax.BinaryOp) (ξ : Renaming) :
     (mode.body operator).rename (Renaming.lift (Renaming.lift ξ)) = mode.body operator := by
@@ -783,7 +799,8 @@ inductive BinaryTrace (program : Program) (context : SourceSemantics.Context)
       (first : Dynamic.ExpressionEvaluates program context evidence source environment before left a middle)
       (continues : Dynamic.EvaluatesRightOperand operator a)
       (second : Dynamic.ExpressionEvaluates program context evidence source environment middle right b operated)
-      (failed : Dynamic.BinaryOperationFaults program context evidence operated operator [] a b reason after) :
+      (failed : Dynamic.BinaryOperationFaults program context evidence operated operator
+        (Dynamic.operandType? source left) [] a b reason after) :
       BinaryTrace program context evidence source environment before left right operator (.fault reason) after
 
 theorem binary_inv {operator : Syntax.BinaryOp} {left right : ExpressionId}
@@ -857,7 +874,8 @@ theorem binary_intro {operator : Syntax.BinaryOp} {left right : ExpressionId}
 theorem binary_fault_excluded {operator : Syntax.BinaryOp} {left right output : Dynamic.Value} {reason : Dynamic.SemanticFault}
     {lookup : Option TypeSystem.Ty}
     (applied : Dynamic.BinaryValueApplies lookup operator left right output)
-    (fault : Dynamic.BinaryOperationFaults program context evidence before operator [] left right reason after) : False := by
+    (fault : Dynamic.BinaryOperationFaults program context evidence before operator lookup [] left right reason after) :
+    False := by
   cases fault with
   | primitive invalid => exact invalid.excludes_value applied
   | panic panics => exact panics.excludes_value applied
@@ -866,12 +884,12 @@ theorem binary_fault_excluded {operator : Syntax.BinaryOp} {left right output : 
 
 /-- A fault of an operation that panics is that panic. -/
 theorem binary_fault_panic {operator : Syntax.BinaryOp} {left right : Dynamic.Value} {code : UInt8}
-    {reason : Dynamic.SemanticFault}
-    (panics : Dynamic.BinaryPrimitivePanics operator left right code)
-    (fault : Dynamic.BinaryOperationFaults program context evidence before operator [] left right reason after) :
+    {reason : Dynamic.SemanticFault} {lookup : Option TypeSystem.Ty}
+    (panics : Dynamic.BinaryValuePanics lookup operator left right code)
+    (fault : Dynamic.BinaryOperationFaults program context evidence before operator lookup [] left right reason after) :
     reason = .panic code ∧ after = before := by
   cases fault with
-  | primitive invalid => exact (invalid.excludes_panic panics).elim
+  | primitive invalid => exact (invalid.excludes_value_panic panics).elim
   | panic other => exact ⟨by rw [panics.functional other], rfl⟩
   | requirement failed => cases failed
   | method _ selected _ => cases selected
@@ -883,7 +901,7 @@ theorem binary_panic_fault {operator : Syntax.BinaryOp} {left right : Expression
     (first : Dynamic.ExpressionEvaluates program context evidence source environment before left a middle)
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (second : Dynamic.ExpressionEvaluates program context evidence source environment middle right b operated)
-    (panics : Dynamic.BinaryPrimitivePanics operator a b code) :
+    (panics : Dynamic.BinaryValuePanics (Dynamic.operandType? source left) operator a b code) :
     Dynamic.ExpressionFaults program context evidence source environment before id (.panic code) operated := by
   apply Dynamic.ExpressionFaults.form (lookupExpression?_sound metadata.found)
   rw [form, metadata.requirements, metadata.coercions]
@@ -1400,7 +1418,10 @@ Words, the divisor check before it. -/
 def Mode.continuation (mode : Mode) (operator : Syntax.BinaryOp) : Expr :=
   match mode, operator with
   | .word, .uncheckedDivide | .word, .uncheckedModulo
-  | .signed, .uncheckedDivide | .signed, .uncheckedModulo => SourceCorePrimitive.panickingBody operator
+  | .signed, .uncheckedDivide | .signed, .uncheckedModulo
+  | .checked _, .uncheckedDivide | .checked _, .uncheckedModulo => SourceCorePrimitive.panickingBody operator
+  | .checked type, .add | .checked type, .subtract | .checked type, .multiply =>
+      SourceCorePrimitive.checkedBody type operator
   | _, _ => LanguageResult.success (mode.body operator)
 
 def Mode.tail (mode : Mode) (operator : Syntax.BinaryOp) (right : Expr) : Expr :=
@@ -1412,12 +1433,13 @@ def Mode.tail (mode : Mode) (operator : Syntax.BinaryOp) (right : Expr) : Expr :
 theorem Mode.binary_eq (mode : Mode) (operator : Syntax.BinaryOp) (left right : Expr) :
     mode.binary operator left right = .caseE left
       (.inLeft (mode.resultType operator) (.var 0)) (mode.tail operator right) := by
-  cases mode <;> cases operator <;> simp [Mode.binary, Mode.tail, Mode.continuation, Mode.resultType, Mode.body, SourceCorePrimitive.signedStrictBinaryBody, SourceCorePrimitive.binaryResultType, SourceCoreInteger.binaryResultType, SourceCorePrimitive.binary, SourceCorePrimitive.signedBinary, SourceCorePrimitive.binaryPanicking, SourceCoreInteger.binary, LocalPrimitiveResults.logicalAnd, LocalPrimitiveResults.logicalOr, LocalPrimitiveResults.binaryWith, LocalControl.choose, LanguageResult.bind, LanguageResult.success, Expr.weakenAt]
+  cases mode <;> cases operator <;> simp [Mode.binary, Mode.tail, Mode.continuation, Mode.resultType, Mode.body, SourceCorePrimitive.signedStrictBinaryBody, SourceCorePrimitive.binaryResultType, SourceCoreInteger.binaryResultType, SourceCorePrimitive.binary, SourceCorePrimitive.signedBinary, SourceCorePrimitive.checkedBinary, SourceCorePrimitive.binaryPanicking, SourceCoreInteger.binary, LocalPrimitiveResults.logicalAnd, LocalPrimitiveResults.logicalOr, LocalPrimitiveResults.binaryWith, LocalControl.choose, LanguageResult.bind, LanguageResult.success, Expr.weakenAt]
 
 theorem Mode.binary_rename (mode : Mode) (operator : Syntax.BinaryOp) (left right : Expr) (ξ : Renaming) :
     (mode.binary operator left right).rename ξ = mode.binary operator (left.rename ξ) (right.rename ξ) := by
   cases mode <;> cases operator <;>
     simp [Mode.binary, SourceCorePrimitive.binary, SourceCorePrimitive.signedBinary,
+      SourceCorePrimitive.checkedBinary, SourceCorePrimitive.checkedBody_rename,
       SourceCorePrimitive.binaryPanicking, SourceCoreInteger.binary,
       LocalPrimitiveResults.binaryWith, LocalPrimitiveResults.logicalAnd, LocalPrimitiveResults.logicalOr,
       LocalControl.choose, LanguageResult.bind, LanguageResult.success, LanguageResult.failure, Expr.rename,
@@ -1473,18 +1495,82 @@ theorem signed_body {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp
     rw [← decide_not]
     exact decide_eq_decide.mpr Int.not_lt
 
-/-- Outside the signed mode, Word's (Integer's, Boolean's) meaning applies at
-the profile's operand type. -/
+theorem _root_.Solcore.SourceSemantics.FixedCheckedArithmetic.strict {operator : Syntax.BinaryOp}
+    (kind : FixedCheckedArithmetic operator) : Dynamic.StrictBinaryOperator operator := by
+  cases kind <;> constructor
+
+/-- A canonical word of a fixed-width integer type, read as the Integer it stands
+for. -/
+theorem fixed_integer {environment : Environment} {store : Store} {k : Nat} {word : Word}
+    (type : TypeSystem.FixedInteger) (found : environment[k]? = some (.word word)) :
+    Evaluates environment store (SourceCorePrimitive.fixedInteger type.signed (.var k))
+      (.integer (Dynamic.fixedValue type word)) store := by
+  unfold SourceCorePrimitive.fixedInteger Dynamic.fixedValue
+  cases signed : type.signed
+  · simp only [Bool.false_eq_true, ↓reduceIte]
+    exact .unary (.var found) rfl
+  · simp only [↓reduceIte]
+    unfold Dynamic.wordSigned
+    by_cases small : word.val < 2 ^ 255
+    · simp only [small, ↓reduceIte]
+      exact .letE (.unary (.var found) rfl)
+        (.ifTrue (.binary (.var rfl) .integer (by simp [BinaryOp.apply]; omega)) (.var rfl))
+    · simp only [small, ↓reduceIte]
+      exact .letE (.unary (.var found) rfl)
+        (.ifFalse (.binary (.var rfl) .integer (by simp [BinaryOp.apply]; omega))
+          (.binary (.var rfl) .integer rfl))
+
+theorem checked_operator {operator : Syntax.BinaryOp} (kind : FixedCheckedArithmetic operator)
+    (left right : Int) :
+    (SourceCorePrimitive.checkedOperator operator).apply (.integer left) (.integer right) =
+      some (.integer (Dynamic.checkedResult operator left right)) := by
+  cases kind <;> rfl
+
+/-- In the type's range, the checked body gives the result's word. -/
+theorem checked_body_success {environment : Environment} {store : Store}
+    {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp} {left right : Word}
+    (kind : FixedCheckedArithmetic operator)
+    (inRange : Dynamic.FixedInRange type
+      (Dynamic.checkedResult operator (Dynamic.fixedValue type left) (Dynamic.fixedValue type right))) :
+    Evaluates (.word right :: .word left :: environment) store (SourceCorePrimitive.checkedBody type operator)
+      (.inRight .word (.word (Word.ofIntModulo
+        (Dynamic.checkedResult operator (Dynamic.fixedValue type left) (Dynamic.fixedValue type right))))) store :=
+  .letE (.binary (fixed_integer type rfl) (fixed_integer type rfl) (checked_operator kind _ _))
+    (.ifFalse (.binary (.var rfl) .integer (by simp [BinaryOp.apply]; exact inRange.1))
+      (.ifFalse (.binary .integer (.var rfl) (by simp [BinaryOp.apply]; exact inRange.2))
+        (.inRight (.unary (.var rfl) rfl))))
+
+/-- Outside the type's range, the checked body fails with `Panic(0x11)`. -/
+theorem checked_body_panic {environment : Environment} {store : Store}
+    {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp} {left right : Word}
+    (kind : FixedCheckedArithmetic operator)
+    (outside : ¬ Dynamic.FixedInRange type
+      (Dynamic.checkedResult operator (Dynamic.fixedValue type left) (Dynamic.fixedValue type right))) :
+    Evaluates (.word right :: .word left :: environment) store (SourceCorePrimitive.checkedBody type operator)
+      (.inLeft .word (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) store := by
+  unfold Dynamic.FixedInRange at outside
+  by_cases low : Dynamic.checkedResult operator (Dynamic.fixedValue type left) (Dynamic.fixedValue type right) <
+      type.min
+  · exact .letE (.binary (fixed_integer type rfl) (fixed_integer type rfl) (checked_operator kind _ _))
+      (.ifTrue (.binary (.var rfl) .integer (by simp [BinaryOp.apply]; exact low)) (.inLeft .word))
+  · exact .letE (.binary (fixed_integer type rfl) (fixed_integer type rfl) (checked_operator kind _ _))
+      (.ifFalse (.binary (.var rfl) .integer (by simp [BinaryOp.apply]; omega))
+        (.ifTrue (.binary .integer (.var rfl) (by simp [BinaryOp.apply]; omega)) (.inLeft .word)))
+
+/-- Outside the signed and checked modes, Word's (Integer's, Boolean's) meaning
+applies at the profile's operand type. -/
 theorem BinaryProfile.word_meaning (profile : BinaryProfile operator operand result mode)
-    (notSigned : mode ≠ .signed) : Dynamic.BinaryWordMeaning (some operand) operator := by
-  intro type operandEq signedKind
+    (notSigned : mode ≠ .signed) (notChecked : mode.checkedType? = none) :
+    Dynamic.BinaryWordMeaning (some operand) operator := by
+  intro type operandEq own
   cases profile with
   | word | integer | panicking | logicalAnd | logicalOr => cases operandEq
   | fixedComparison kind =>
     cases operandEq
-    cases kind <;> cases signedKind <;> simp_all
-  | fixedBitwise kind => cases kind <;> cases signedKind
+    cases kind <;> cases own <;> simp_all
+  | fixedBitwise kind => cases kind <;> cases own
   | fixedSigned => exact notSigned rfl
+  | fixedChecked => simp [Mode.checkedType?] at notChecked
 
 
 theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand result mode)
@@ -1497,6 +1583,7 @@ theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand re
   | fixedComparison kind => exact .inr (.strict kind.strict)
   | fixedBitwise kind => exact .inr (.strict kind.strict)
   | fixedSigned kind => exact .inr (.strict kind.strict)
+  | fixedChecked kind => exact .inr (.strict kind.strict)
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases boolean
@@ -1519,6 +1606,7 @@ theorem BinaryProfile.left_valid (profile : BinaryProfile operator operand resul
   | fixedComparison kind => cases invalid <;> cases kind
   | fixedBitwise kind => cases invalid <;> cases kind
   | fixedSigned kind => cases invalid <;> cases kind
+  | fixedChecked kind => cases invalid <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases invalid with | logicalAnd invalid => exact invalid trivial
@@ -1535,6 +1623,9 @@ theorem Mode.left_failure {environment : Environment} {before after : Store} {le
     | exact LocalPrimitiveResults.logicalOr_failure evaluated
     | exact LocalPrimitiveResults.binaryWith_left_failure evaluated
     | exact SourceCorePrimitive.binaryPanicking_left_failure evaluated
+    | exact SourceCorePrimitive.checkedBinary_left_failure (.inl rfl) evaluated
+    | exact SourceCorePrimitive.checkedBinary_left_failure (.inr (.inl rfl)) evaluated
+    | exact SourceCorePrimitive.checkedBinary_left_failure (.inr (.inr rfl)) evaluated
 
 theorem BinaryProfile.short {environment : Environment} {before after : Store} {left right : Expr} {output : Dynamic.Value}
     (profile : BinaryProfile operator operand result mode)
@@ -1550,6 +1641,7 @@ theorem BinaryProfile.short {environment : Environment} {before after : Store} {
   | fixedComparison kind => cases circuit <;> cases kind
   | fixedBitwise kind => cases circuit <;> cases kind
   | fixedSigned kind => cases circuit <;> cases kind
+  | fixedChecked kind => cases circuit <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -1568,14 +1660,19 @@ theorem BinaryProfile.right_failure {environment : Environment} {before middle a
     (second : Evaluates (x :: environment) middle (right.weakenAt 0) (.inLeft (mode.operandType operator) (.word reason)) after) :
     Evaluates environment before (mode.binary operator left right) (.inLeft (mode.resultType operator) (.word reason)) after := by
   cases profile with
-  | word strict => rw [Mode.binary_strict _ strict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
-  | integer strict => rw [Mode.binary_strict _ strict.toStrict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
+  | word strict => rw [Mode.binary_strict _ strict rfl]; exact LocalPrimitiveResults.binaryWith_right_failure first second
+  | integer strict => rw [Mode.binary_strict _ strict.toStrict rfl]; exact LocalPrimitiveResults.binaryWith_right_failure first second
   | fixedComparison kind =>
-    rw [Mode.binary_strict _ kind.strict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
+    rw [Mode.binary_strict _ kind.strict rfl]; exact LocalPrimitiveResults.binaryWith_right_failure first second
   | fixedBitwise kind =>
-    rw [Mode.binary_strict _ kind.strict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
+    rw [Mode.binary_strict _ kind.strict rfl]; exact LocalPrimitiveResults.binaryWith_right_failure first second
   | fixedSigned kind =>
-    rw [Mode.binary_strict _ kind.strict]; exact LocalPrimitiveResults.binaryWith_right_failure first second
+    rw [Mode.binary_strict _ kind.strict rfl]; exact LocalPrimitiveResults.binaryWith_right_failure first second
+  | fixedChecked kind =>
+    cases kind
+    · exact SourceCorePrimitive.checkedBinary_right_failure (.inl rfl) first second
+    · exact SourceCorePrimitive.checkedBinary_right_failure (.inr (.inl rfl)) first second
+    · exact SourceCorePrimitive.checkedBinary_right_failure (.inr (.inr rfl)) first second
   | panicking panicking =>
     cases panicking <;> exact SourceCorePrimitive.binaryPanicking_right_failure first second
   | logicalAnd =>
@@ -1595,6 +1692,7 @@ panics. -/
 theorem BinaryProfile.right_outcome_primitive {environment : Environment} {before middle after : Store}
     {left right : Expr}
     (profile : BinaryProfile operator operand result mode) (notSigned : mode ≠ .signed)
+    (notChecked : mode.checkedType? = none)
     (leftRep : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
     (rightRep : ValueRep checked registry functions mapping world operand b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
@@ -1631,7 +1729,7 @@ theorem BinaryProfile.right_outcome_primitive {environment : Environment} {befor
     obtain ⟨sourceResult, coreResult, applied, represented, body⟩ := word_body (functions := functions) (registry := registry)
       (mapping := mapping) (world := world) strict a b
     exact ⟨sourceResult, coreResult, applied, represented, by
-      rw [Mode.binary_strict _ strict]
+      rw [Mode.binary_strict _ strict rfl]
       exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
   | integer strict =>
     refine .inl ?_
@@ -1641,7 +1739,7 @@ theorem BinaryProfile.right_outcome_primitive {environment : Environment} {befor
     obtain ⟨sourceResult, coreResult, applied, represented, body⟩ := integer_body (functions := functions) (registry := registry)
       (mapping := mapping) (world := world) strict a b
     exact ⟨sourceResult, coreResult, applied, represented, by
-      rw [Mode.binary_strict _ strict.toStrict]
+      rw [Mode.binary_strict _ strict.toStrict rfl]
       exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
   | fixedComparison kind =>
     refine .inl ?_
@@ -1652,7 +1750,7 @@ theorem BinaryProfile.right_outcome_primitive {environment : Environment} {befor
     obtain ⟨sourceResult, coreResult, applied, represented, body⟩ := word_body (functions := functions) (registry := registry)
       (mapping := mapping) (world := world) strict a b
     refine ⟨sourceResult, coreResult, applied, ?_, by
-      rw [Mode.binary_strict _ strict]
+      rw [Mode.binary_strict _ strict rfl]
       exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
     cases kind <;> exact represented
   | fixedBitwise kind =>
@@ -1663,7 +1761,7 @@ theorem BinaryProfile.right_outcome_primitive {environment : Environment} {befor
     obtain ⟨sourceResult, coreResult, applied, represented, body⟩ := word_body (functions := functions) (registry := registry)
       (mapping := mapping) (world := world) strict a b
     refine ⟨sourceResult, coreResult, applied, ?_, by
-      rw [Mode.binary_strict _ strict]
+      rw [Mode.binary_strict _ strict rfl]
       exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
     cases kind with
     | bitAnd =>
@@ -1693,6 +1791,36 @@ theorem BinaryProfile.right_outcome_primitive {environment : Environment} {befor
     | strict strict | panicking strict => cases strict
     | orFalse => exact ⟨_, _, .logicalOr false b, .bool b, LocalPrimitiveResults.logicalOr_right first second⟩
   | fixedSigned => exact absurd rfl notSigned
+  | fixedChecked => simp [Mode.checkedType?] at notChecked
+
+/-- Checked `+ - *` after both operands: the result's word in the type's range,
+`Panic(0x11)` outside it. -/
+theorem checked_outcome {environment : Environment} {before middle after : Store} {left right : Expr}
+    {type : TypeSystem.FixedInteger} {lookup : Option TypeSystem.Ty} {a b : Word}
+    (kind : FixedCheckedArithmetic operator) (operandEq : lookup = some (.fixed type))
+    (first : Evaluates environment before left (.inRight .word (.word a)) middle)
+    (second : Evaluates (.word a :: environment) middle (right.weakenAt 0) (.inRight .word (.word b)) after) :
+    (∃ sourceResult coreResult, Dynamic.BinaryValueApplies lookup operator (.word a) (.word b) sourceResult ∧
+      ValueRep checked registry functions mapping world (.fixed type) sourceResult coreResult
+        ((Mode.checked type).resultType operator) ∧
+      Evaluates environment before ((Mode.checked type).binary operator left right) (.inRight .word coreResult)
+        after) ∨
+    (∃ code, Dynamic.BinaryValuePanics lookup operator (.word a) (.word b) code ∧
+      Evaluates environment before ((Mode.checked type).binary operator left right)
+        (.inLeft ((Mode.checked type).resultType operator) (.word (SourceCorePanics.reason code))) after) := by
+  have resultEq : (Mode.checked type).resultType operator = .word := by cases kind <;> rfl
+  have binaryEq : (Mode.checked type).binary operator left right =
+      LanguageResult.bind .word left
+        (LanguageResult.bind .word (right.weakenAt 0) (SourceCorePrimitive.checkedBody type operator)) := by
+    cases kind <;> rfl
+  rw [resultEq, binaryEq]
+  by_cases inRange : Dynamic.FixedInRange type
+      (Dynamic.checkedResult operator (Dynamic.fixedValue type a) (Dynamic.fixedValue type b))
+  · exact .inl ⟨_, _, .fixed operandEq (.checked kind a b inRange),
+      .fixed _ (Dynamic.fixed_canonical_ofInt inRange.1 inRange.2),
+      LanguageResult.bind_success _ first (LanguageResult.bind_success _ second (checked_body_success kind inRange))⟩
+  · exact .inr ⟨_, .fixed operandEq (.overflow kind a b inRange),
+      LanguageResult.bind_success _ first (LanguageResult.bind_success _ second (checked_body_panic kind inRange))⟩
 
 /-- After both operands, the operation at the operands' static type `lookup`
 either applies or, for unchecked `/` and `%` with a zero divisor, panics. -/
@@ -1708,7 +1836,7 @@ theorem BinaryProfile.right_outcome {environment : Environment} {before middle a
     (∃ sourceResult coreResult, Dynamic.BinaryValueApplies lookup operator a b sourceResult ∧
       ValueRep checked registry functions mapping world result sourceResult coreResult (mode.resultType operator) ∧
       Evaluates environment before (mode.binary operator left right) (.inRight .word coreResult) after) ∨
-    (∃ code, Dynamic.BinaryPrimitivePanics operator a b code ∧
+    (∃ code, Dynamic.BinaryValuePanics lookup operator a b code ∧
       Evaluates environment before (mode.binary operator left right)
         (.inLeft (mode.resultType operator) (.word (SourceCorePanics.reason code))) after) := by
   by_cases signedMode : mode = .signed
@@ -1722,14 +1850,24 @@ theorem BinaryProfile.right_outcome {environment : Environment} {before middle a
       obtain ⟨sourceResult, coreResult, applied, represented, body⟩ := signed_body (functions := functions)
         (registry := registry) (mapping := mapping) (world := world) kind a b
       refine ⟨sourceResult, coreResult, .fixed operandEq applied, ?_, by
-        rw [Mode.binary_strict _ strict]
+        rw [Mode.binary_strict _ strict rfl]
         exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
       cases kind <;> exact represented
-  · rcases profile.right_outcome_primitive signedMode leftRep rightRep continues first second with
-      ⟨sourceResult, coreResult, applied, represented, evaluated⟩ | panicked
-    · exact .inl ⟨sourceResult, coreResult, .primitive (operandEq ▸ profile.word_meaning signedMode) applied,
-        represented, evaluated⟩
-    · exact .inr panicked
+  · cases checkedMode : mode.checkedType? with
+    | some type =>
+      obtain rfl : mode = .checked type := by
+        cases mode <;> simp_all [Mode.checkedType?]
+      cases profile with
+      | fixedChecked kind =>
+        obtain ⟨a, rfl, rfl, _, _⟩ := fixed_fields leftRep rfl
+        obtain ⟨b, rfl, rfl, _, _⟩ := fixed_fields rightRep rfl
+        exact checked_outcome kind operandEq first second
+    | none =>
+      rcases profile.right_outcome_primitive signedMode checkedMode leftRep rightRep continues first second with
+        ⟨sourceResult, coreResult, applied, represented, evaluated⟩ | ⟨code, panicked, evaluated⟩
+      · exact .inl ⟨sourceResult, coreResult,
+          .primitive (operandEq ▸ profile.word_meaning signedMode checkedMode) applied, represented, evaluated⟩
+      · exact .inr ⟨code, .primitive panicked, evaluated⟩
 
 /-- An operation that the source applies also completes in Core. -/
 theorem BinaryProfile.right_success {environment : Environment} {before middle after : Store} {left right : Expr}
@@ -1752,17 +1890,18 @@ theorem BinaryProfile.right_success {environment : Environment} {before middle a
 
 /-- A source panic is the same Core panic. -/
 theorem BinaryProfile.right_panic {environment : Environment} {before middle after : Store} {left right : Expr}
-    {code : UInt8}
+    {code : UInt8} {lookup : Option TypeSystem.Ty}
     (profile : BinaryProfile operator operand result mode)
     (leftRep : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
     (rightRep : ValueRep checked registry functions mapping world operand b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (first : Evaluates environment before left (.inRight .word x) middle)
     (second : Evaluates (x :: environment) middle (right.weakenAt 0) (.inRight .word y) after)
-    (panics : Dynamic.BinaryPrimitivePanics operator a b code) :
+    (panics : Dynamic.BinaryValuePanics lookup operator a b code)
+    (operandEq : lookup = some operand) :
     Evaluates environment before (mode.binary operator left right)
       (.inLeft (mode.resultType operator) (.word (SourceCorePanics.reason code))) after := by
-  rcases profile.right_outcome (lookup := some operand) leftRep rightRep continues first second rfl with
+  rcases profile.right_outcome leftRep rightRep continues first second operandEq with
     ⟨_, _, applies, _⟩ | ⟨other, panicked, ran⟩
   · exact (panics.excludes_value applies).elim
   · rwa [panics.functional panicked]
@@ -1783,6 +1922,7 @@ theorem BinaryProfile.right_evaluated {environment : Environment} {before after 
   | fixedComparison kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | fixedBitwise kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | fixedSigned kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
+  | fixedChecked kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
@@ -2374,6 +2514,7 @@ private def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) (lookup : O
 private def selectedMode : SourceCorePrimitive.BinaryLowering → Mode
   | .integer => .integer
   | .signed => .signed
+  | .checked type => .checked type
   | .word => .word
 
 private theorem UnaryProfile.selected {catalog : SourceCoreCompatibleCatalog.Catalog}
@@ -2394,13 +2535,13 @@ private theorem BinaryProfile.selected {catalog : SourceCoreCompatibleCatalog.Ca
     {lookup : Option TypeSystem.Ty}
     (profile : BinaryProfile operator operand result mode) (projected : catalog.project operand = .ok type)
     (lookupEq : lookup = some operand) :
-    selectedMode (SourceCorePrimitive.binaryLowering type (SourceCorePrimitive.signedOrdering lookup operator)) = mode := by
+    selectedMode (SourceCorePrimitive.binaryLowering type lookup operator) = mode := by
   subst lookupEq
   cases profile <;> cases projected
   all_goals first
     | rfl
     | (rename_i kind; cases kind <;> simp_all [selectedMode, SourceCorePrimitive.binaryLowering,
-        SourceCorePrimitive.signedOrdering, TypeSystem.Ty.fixed])
+        SourceCorePrimitive.signedOrdering, SourceCorePrimitive.checkedArithmetic, TypeSystem.Ty.fixed])
     | (rename_i strict; cases strict <;> rfl)
 
 private inductive Compound : ExpressionForm → Prop where
@@ -2422,13 +2563,13 @@ private inductive Step (policy : SourceCoreFunctions.Policy) (body : SourceCoreF
         ⟨(selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).resultType, (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).lower child.expression⟩
   | binary {operator left right first second}
       (form : node.form = .binary left operator right)
-      (metadata : Metadata values.checked source id node ((selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).resultType operator))
+      (metadata : Metadata values.checked source id node ((selectedMode (SourceCorePrimitive.binaryLowering first.type ((source.lookupExpression? left).map (·.type)) operator)).resultType operator))
       (firstGenerated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope left reasonAt = .ok first)
       (secondGenerated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope right reasonAt = .ok second)
-      (leftType : (selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).operandType operator = first.type)
-      (rightType : (selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).operandType operator = second.type) :
+      (leftType : (selectedMode (SourceCorePrimitive.binaryLowering first.type ((source.lookupExpression? left).map (·.type)) operator)).operandType operator = first.type)
+      (rightType : (selectedMode (SourceCorePrimitive.binaryLowering first.type ((source.lookupExpression? left).map (·.type)) operator)).operandType operator = second.type) :
       Step policy body fuel context values source scope reasonAt id node
-        ⟨(selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).resultType operator, (selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).binary operator first.expression second.expression⟩
+        ⟨(selectedMode (SourceCorePrimitive.binaryLowering first.type ((source.lookupExpression? left).map (·.type)) operator)).resultType operator, (selectedMode (SourceCorePrimitive.binaryLowering first.type ((source.lookupExpression? left).map (·.type)) operator)).binary operator first.expression second.expression⟩
   | group {inner lowered}
       (form : node.form = .group inner) (metadata : Metadata values.checked source id node lowered.type)
       (generated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope inner reasonAt = .ok lowered) :

@@ -16501,6 +16501,9 @@ theorem binaryFixedWord_hasType
           | exact .fixedBitwise .bitAnd
           | exact .fixedBitwise .bitXor
           | exact .fixedBitwise .bitOr
+          | exact .fixedArithmetic .add
+          | exact .fixedArithmetic .subtract
+          | exact .fixedArithmetic .multiply
           | skip
         all_goals cases signed : fixed.signed
         all_goals first

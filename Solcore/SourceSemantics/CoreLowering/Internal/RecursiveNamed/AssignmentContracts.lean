@@ -901,7 +901,8 @@ inductive BinaryTrace (program : Program) (size : Nat) (context : SourceSemantic
       (first : SourceExecutionSize.ExpressionEvaluates program firstSize context evidence source environment before left a middle)
       (continues : Dynamic.EvaluatesRightOperand operator a)
       (second : SourceExecutionSize.ExpressionEvaluates program secondSize context evidence source environment middle right b operated)
-      (failed : Dynamic.BinaryOperationFaults program context evidence operated operator [] a b reason after)
+      (failed : Dynamic.BinaryOperationFaults program context evidence operated operator
+        (Dynamic.operandType? source left) [] a b reason after)
       (firstSizeSmaller : firstSize < size)
       (secondSizeSmaller : secondSize < size) :
       BinaryTrace program size context evidence source environment before left right operator (.fault reason) after
@@ -999,6 +1000,7 @@ theorem right_evaluated {registry : SourceCoreRawMetadata.Registry}
   | fixedComparison kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | fixedBitwise kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | fixedSigned kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
+  | fixedChecked kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with

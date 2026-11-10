@@ -2052,7 +2052,7 @@ theorem preserves_at_selected [RecursiveStageMeaning.FaultTokens faults] (budget
             rw [rightType] at rightPayload
             have leftPayload := ValueRep.extend payload (.refl registry) maps worlds
             exact ⟨_, finalStore, finalMap, finalWorld,
-              by rw [Mode.binary_rename]; exact profile.right_panic leftPayload rightPayload continues first second panics,
+              by rw [Mode.binary_rename]; exact profile.right_panic leftPayload rightPayload continues first second panics (Dynamic.operandType?_of_found leftFound leftType),
               .fault (RecursiveStageMeaning.FaultTokens.panic _), finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds,
               firstFrame.trans frame, firstMetadata.trans heapMetadata, firstEffect.trans effect, ⟨reached, callerProtocol.trans firstRelated related⟩⟩
       | invalid firstTrace continues secondTrace failed firstSmaller secondSmaller =>
@@ -2073,7 +2073,7 @@ theorem preserves_at_selected [RecursiveStageMeaning.FaultTokens faults] (budget
             rcases profile.right_outcome leftPayload rightPayload continues first second (Dynamic.operandType?_of_found leftFound leftType) with
               ⟨_, _, applied, _, _⟩ | ⟨_, panics, _⟩
             · exact False.elim (failed.excludes_value applied)
-            · exact False.elim (failed.excludes_panic panics)
+            · exact False.elim (failed.excludes_value_panic panics)
 
     | @conditional node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree =>
       have same := Option.some.inj (metadata.found.symm.trans found)

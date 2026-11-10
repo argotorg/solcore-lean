@@ -973,10 +973,13 @@ theorem excludes_value
   cases applies with
   | primitive _ applies => exact invalid.excludes_application ⟨output, applies⟩
   | fixed _ applies =>
-    cases applies <;> cases invalid with
+    have strict := applies.strict
+    obtain ⟨l, r, rfl, rfl⟩ : ∃ l r, left = .word l ∧ right = .word r := by
+      cases applies <;> exact ⟨_, _, rfl, rfl⟩
+    cases invalid with
     | numeric _ invalid_pair => exact invalid_pair trivial
-    | word operator_class => cases operator_class
-    | logical operator_class => cases operator_class
+    | word _ invalid_pair => exact invalid_pair trivial
+    | logical operator_class => cases operator_class <;> cases strict
 
 /-- A panicking pair is well shaped, so it is not an invalid one. -/
 theorem excludes_panic
@@ -987,6 +990,21 @@ theorem excludes_panic
   | numeric operator_class => cases operator_class
   | word _ invalid_pair => exact invalid_pair trivial
   | logical operator_class => cases operator_class
+
+/-- A pair that panics at any static operand type is not an invalid one. -/
+theorem excludes_value_panic
+    {operandType : Option TypeSystem.Ty} {operator : Syntax.BinaryOp} {left right : Value} {code : UInt8}
+    (invalid : BinaryPrimitiveOperandsInvalid operator left right)
+    (panics : BinaryValuePanics operandType operator left right code) : False := by
+  cases panics with
+  | primitive panics => exact invalid.excludes_panic panics
+  | fixed _ panics =>
+    cases panics with
+    | overflow kind =>
+      cases invalid with
+      | numeric _ invalid_pair => exact invalid_pair trivial
+      | word _ invalid_pair => exact invalid_pair trivial
+      | logical operator_class => cases operator_class <;> cases kind
 
 end BinaryPrimitiveOperandsInvalid
 
@@ -1230,7 +1248,7 @@ mutual
         (right_evaluates : ExpressionEvaluates program context evidence source
           environment leftHeap right rightValue rightHeap)
         (fault : BinaryOperationFaults program context evidence rightHeap operator
-          owned leftValue rightValue reason after) :
+          (operandType? source left) owned leftValue rightValue reason after) :
         ExpressionFormFaults program context evidence source environment before
           (.binary left operator right) requirements coercions reason after
     | conditionalCondition
@@ -1557,34 +1575,36 @@ mutual
         UnaryOperationFaults program context evidence before operator requirements
           input reason after
 
-  /-- Primitive/method-selected strict binary application fault. -/
+  /-- Primitive/method-selected strict binary application fault. The operands'
+  static type (`operandType? source left`) chooses the panics of checked
+  arithmetic on the fixed-width integer types. -/
   inductive BinaryOperationFaults (program : Program) :
-      Context → EvidenceEnvironment → Heap → Syntax.BinaryOp →
+      Context → EvidenceEnvironment → Heap → Syntax.BinaryOp → Option TypeSystem.Ty →
         List RequirementId → Value → Value → SemanticFault → Heap → Prop where
     | primitive
-        {context evidence heap operator left right}
+        {context evidence heap operator operandType left right}
         (invalid : BinaryPrimitiveOperandsInvalid operator left right) :
-        BinaryOperationFaults program context evidence heap operator [] left right
+        BinaryOperationFaults program context evidence heap operator operandType [] left right
           (.invalidBinaryOperands operator) heap
     | panic
-        {context evidence heap operator left right code}
-        (panics : BinaryPrimitivePanics operator left right code) :
-        BinaryOperationFaults program context evidence heap operator [] left right
+        {context evidence heap operator operandType left right code}
+        (panics : BinaryValuePanics operandType operator left right code) :
+        BinaryOperationFaults program context evidence heap operator operandType [] left right
           (.panic code) heap
     | requirement
-        {context evidence heap operator requirements left right failed}
+        {context evidence heap operator operandType requirements left right failed}
         (fault : RequirementListFaults context evidence requirements failed) :
-        BinaryOperationFaults program context evidence heap operator requirements
+        BinaryOperationFaults program context evidence heap operator operandType requirements
           left right (.unsatisfiedRequirement failed) heap
     | method
-        {context evidence before after operator requirements left right traitName
+        {context evidence before after operator operandType requirements left right traitName
           methodName bodyInstance calleeEvidence reason}
         (dispatch : BinaryTraitDispatch operator traitName methodName)
         (selected : OperatorMethodSelected program context evidence traitName
           methodName requirements bodyInstance calleeEvidence)
         (fault : BodyFaults program bodyInstance calleeEvidence before [left, right]
           reason after) :
-        BinaryOperationFaults program context evidence before operator requirements
+        BinaryOperationFaults program context evidence before operator operandType requirements
           left right reason after
 
   /-- Fault in one evidence-checked coercion edge. -/

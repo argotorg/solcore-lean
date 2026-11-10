@@ -218,7 +218,7 @@ theorem while_fault_induction {program : Program}
     (motive_2 := fun _ _ _ _ _ _ _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ _ _ => True)
     (motive_4 := fun _ _ _ _ _ _ _ _ _ => True)
-    (motive_5 := fun _ _ _ _ _ _ _ _ _ _ => True)
+    (motive_5 := fun _ _ _ _ _ _ _ _ _ _ _ => True)
     (motive_6 := fun _ _ _ _ _ _ _ _ => True)
     (motive_7 := fun _ _ _ _ _ _ _ _ => True)
     (motive_8 := fun _ _ _ _ _ _ _ _ _ => True)

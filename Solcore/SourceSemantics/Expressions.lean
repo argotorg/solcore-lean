@@ -352,6 +352,15 @@ inductive FixedSignedComparison (type : TypeSystem.FixedInteger) : Syntax.Binary
   | lessEqual (signed : type.signed = true) : FixedSignedComparison type .lessEqual
   | greaterEqual (signed : type.signed = true) : FixedSignedComparison type .greaterEqual
 
+/-- Checked `+`, `-` and `*` on the fixed-width integer types: the exact result,
+or `Panic(0x11)` when it lies outside the type's range. Their meaning differs
+from Word's wrapping operations, and the evaluation rules choose it from the
+left operand's static type. -/
+inductive FixedCheckedArithmetic : Syntax.BinaryOp → Prop where
+  | add : FixedCheckedArithmetic .add
+  | subtract : FixedCheckedArithmetic .subtract
+  | multiply : FixedCheckedArithmetic .multiply
+
 /-- The fixed-width integer types on which `~` is Word's: the signed ones, whose
 canonical words stay sign-extended, and `uint256`. On the other unsigned types
 `~` keeps only the low `N` bits. -/
@@ -477,6 +486,10 @@ inductive BinaryOperatorHasType (context : Context) :
   | fixedSignedComparison {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
       (kind : FixedSignedComparison type operator) :
       BinaryOperatorHasType context operator (.fixed type) (.fixed type) .bool []
+  /-- Checked `+ - *` on the fixed-width integer types. -/
+  | fixedArithmetic {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
+      (kind : FixedCheckedArithmetic operator) :
+      BinaryOperatorHasType context operator (.fixed type) (.fixed type) (.fixed type) []
   | booleanAnd :
       BinaryOperatorHasType context .logicalAnd .bool .bool .bool []
   | booleanOr :
@@ -516,8 +529,8 @@ theorem requirements_valid
     RequirementIdsValid context requirements := by
   cases typing with
   | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison |
-      integerComparison | fixedComparison | fixedBitwise | fixedSignedComparison | booleanAnd |
-      booleanOr =>
+      integerComparison | fixedComparison | fixedBitwise | fixedSignedComparison | fixedArithmetic |
+      booleanAnd | booleanOr =>
       simp [RequirementIdsValid]
   | trait _ _ evidence => exact evidence.ids_valid
 

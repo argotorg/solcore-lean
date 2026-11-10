@@ -2453,7 +2453,7 @@ mutual
         (right_evaluates : ExpressionEvaluates program size_right_evaluates context evidence source
           environment leftHeap right rightValue rightHeap)
         (fault : BinaryOperationFaults program size_fault context evidence rightHeap operator
-          owned leftValue rightValue reason after) :
+          (operandType? source left) owned leftValue rightValue reason after) :
         ExpressionFormFaults program (stepSize [size_left_evaluates, size_right_evaluates, size_fault]) context evidence source environment before
           (.binary left operator right) requirements coercions reason after
     | conditionalCondition
@@ -2806,34 +2806,34 @@ mutual
           input reason after
 
   inductive BinaryOperationFaults (program : Program) : Nat →
-      Context → EvidenceEnvironment → Heap → Syntax.BinaryOp →
+      Context → EvidenceEnvironment → Heap → Syntax.BinaryOp → Option TypeSystem.Ty →
         List RequirementId → Value → Value → SemanticFault → Heap → Prop where
     | primitive
-        {context evidence heap operator left right}
+        {context evidence heap operator operandType left right}
         (invalid : BinaryPrimitiveOperandsInvalid operator left right) :
-        BinaryOperationFaults program (stepSize []) context evidence heap operator [] left right
+        BinaryOperationFaults program (stepSize []) context evidence heap operator operandType [] left right
           (.invalidBinaryOperands operator) heap
     | panic
-        {context evidence heap operator left right code}
-        (panics : BinaryPrimitivePanics operator left right code) :
-        BinaryOperationFaults program (stepSize []) context evidence heap operator [] left right
+        {context evidence heap operator operandType left right code}
+        (panics : BinaryValuePanics operandType operator left right code) :
+        BinaryOperationFaults program (stepSize []) context evidence heap operator operandType [] left right
           (.panic code) heap
     | requirement
-        {context evidence heap operator requirements left right failed}
+        {context evidence heap operator operandType requirements left right failed}
         (fault : RequirementListFaults context evidence requirements failed) :
-        BinaryOperationFaults program (stepSize []) context evidence heap operator requirements
+        BinaryOperationFaults program (stepSize []) context evidence heap operator operandType requirements
           left right (.unsatisfiedRequirement failed) heap
     | method
         {size_fault : Nat}
-        {context evidence before after operator requirements left right traitName
+        {context evidence before after operator operandType requirements left right traitName
           methodName bodyInstance calleeEvidence reason}
         (dispatch : BinaryTraitDispatch operator traitName methodName)
         (selected : OperatorMethodSelected program context evidence traitName
           methodName requirements bodyInstance calleeEvidence)
         (fault : BodyFaults program size_fault bodyInstance calleeEvidence before [left, right]
           reason after) :
-        BinaryOperationFaults program (stepSize [size_fault]) context evidence before operator requirements
-          left right reason after
+        BinaryOperationFaults program (stepSize [size_fault]) context evidence before operator operandType
+          requirements left right reason after
 
   inductive CoercionStepFaults (program : Program) : Nat →
       Context → EvidenceEnvironment → Heap → CoercionStep → Value →
@@ -3805,8 +3805,8 @@ theorem UnaryOperationFaults.sound {program : Program} {size : Nat} {a0 : Contex
     exact .method dispatch selected (BodyFaults.sound fault)
 termination_by structural trace
 
-theorem BinaryOperationFaults.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : SemanticFault} {a8 : Heap}
-    (trace : BinaryOperationFaults program size a0 a1 a2 a3 a4 a5 a6 a7 a8) : Dynamic.BinaryOperationFaults program a0 a1 a2 a3 a4 a5 a6 a7 a8 := by
+theorem BinaryOperationFaults.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : SemanticFault} {a8 : Heap}
+    (trace : BinaryOperationFaults program size a0 a1 a2 a3 aT a4 a5 a6 a7 a8) : Dynamic.BinaryOperationFaults program a0 a1 a2 a3 aT a4 a5 a6 a7 a8 := by
   match trace with
   | .primitive invalid =>
     exact .primitive invalid
@@ -4231,8 +4231,8 @@ theorem UnaryOperationFaults.has_size {program : Program} {a0 : Context} {a1 : E
     exact ⟨_, .method dispatch selected fault⟩
 termination_by structural trace
 
-theorem BinaryOperationFaults.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : SemanticFault} {a8 : Heap}
-    (trace : Dynamic.BinaryOperationFaults program a0 a1 a2 a3 a4 a5 a6 a7 a8) : ∃ size, BinaryOperationFaults program size a0 a1 a2 a3 a4 a5 a6 a7 a8 := by
+theorem BinaryOperationFaults.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : SemanticFault} {a8 : Heap}
+    (trace : Dynamic.BinaryOperationFaults program a0 a1 a2 a3 aT a4 a5 a6 a7 a8) : ∃ size, BinaryOperationFaults program size a0 a1 a2 a3 aT a4 a5 a6 a7 a8 := by
   match trace with
   | .primitive invalid =>
     exact ⟨_, .primitive invalid⟩
@@ -4724,16 +4724,16 @@ theorem UnaryOperationFaults.children_below {program : Program} {size : Nat} {a0
   | @method size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩
 
-theorem BinaryOperationFaults.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : SemanticFault} {a8 : Heap}
-    (trace : BinaryOperationFaults program size a0 a1 a2 a3 a4 a5 a6 a7 a8) : 0 < size := by
+theorem BinaryOperationFaults.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : SemanticFault} {a8 : Heap}
+    (trace : BinaryOperationFaults program size a0 a1 a2 a3 aT a4 a5 a6 a7 a8) : 0 < size := by
   cases trace <;> exact stepSize_positive _
 
-theorem BinaryOperationFaults.iff_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : SemanticFault} {a8 : Heap} :
-    Dynamic.BinaryOperationFaults program a0 a1 a2 a3 a4 a5 a6 a7 a8 ↔ ∃ size, BinaryOperationFaults program size a0 a1 a2 a3 a4 a5 a6 a7 a8 :=
+theorem BinaryOperationFaults.iff_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : SemanticFault} {a8 : Heap} :
+    Dynamic.BinaryOperationFaults program a0 a1 a2 a3 aT a4 a5 a6 a7 a8 ↔ ∃ size, BinaryOperationFaults program size a0 a1 a2 a3 aT a4 a5 a6 a7 a8 :=
   ⟨BinaryOperationFaults.has_size, fun ⟨_, sized⟩ => sized.sound⟩
 
-theorem BinaryOperationFaults.children_below {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : SemanticFault} {a8 : Heap}
-    (trace : BinaryOperationFaults program size a0 a1 a2 a3 a4 a5 a6 a7 a8) :
+theorem BinaryOperationFaults.children_below {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : Heap} {a3 : Syntax.BinaryOp} {aT : Option TypeSystem.Ty} {a4 : List RequirementId} {a5 : Value} {a6 : Value} {a7 : SemanticFault} {a8 : Heap}
+    (trace : BinaryOperationFaults program size a0 a1 a2 a3 aT a4 a5 a6 a7 a8) :
     ∃ children : List Nat, size = stepSize children ∧ ∀ child ∈ children, child < size := by
   cases trace with
   | @primitive _ _ _ _ _ _ _ =>

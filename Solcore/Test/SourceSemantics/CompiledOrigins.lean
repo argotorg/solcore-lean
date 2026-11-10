@@ -1714,11 +1714,12 @@ variable {program : Program} {registry : Registry} {scope origin : Scope} {conte
 
 theorem word_add {a b : Core.Word} (occurrence : Occurrence scope id (.binary left .add right))
     (first : Expression program registry scope context environment before left (.value (.word a)) middle)
-    (second : Expression program registry scope context environment middle right (.value (.word b)) after) :
+    (second : Expression program registry scope context environment middle right (.value (.word b)) after)
+    (notFixed : ∀ type, Dynamic.operandType? scope.source left ≠ some (.fixed type)) :
     Expression program registry scope context environment before id (.value (.word (a.add b))) after ∧
       ExpressionEvaluates program context scope.evidence scope.source environment before id (.word (a.add b)) after := by
   have trace := Expression.binary occurrence first (.strict .add) second
-    (.primitive (fun _ _ kind => by cases kind) (.wordAdd a b))
+    (.primitive (Dynamic.BinaryValueApplies.word_meaning_of_not_fixed notFixed) (.wordAdd a b))
   exact ⟨trace, trace.value_plain⟩
 
 theorem integer_not {operand : ExpressionId} {a : Int} (occurrence : Occurrence scope id (.unary .bitNot operand))

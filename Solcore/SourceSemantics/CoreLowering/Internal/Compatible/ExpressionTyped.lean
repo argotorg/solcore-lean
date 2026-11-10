@@ -41,6 +41,7 @@ private def selectedUnary (operator : Syntax.UnaryOp) (operand : Ty) (lookup : O
 private def selectedMode : SourceCorePrimitive.BinaryLowering → Mode
   | .integer => .integer
   | .signed => .signed
+  | .checked type => .checked type
   | .word => .word
 
 private theorem unary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
@@ -61,13 +62,13 @@ private theorem binary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
     {lookup : Option TypeSystem.Ty}
     (profile : BinaryProfile operator operand result mode) (projected : catalog.project operand = .ok type)
     (lookupEq : lookup = some operand) :
-    selectedMode (SourceCorePrimitive.binaryLowering type (SourceCorePrimitive.signedOrdering lookup operator)) = mode := by
+    selectedMode (SourceCorePrimitive.binaryLowering type lookup operator) = mode := by
   subst lookupEq
   cases profile <;> cases projected
   all_goals first
     | rfl
     | (rename_i kind; cases kind <;> simp_all [selectedMode, SourceCorePrimitive.binaryLowering,
-        SourceCorePrimitive.signedOrdering, TypeSystem.Ty.fixed])
+        SourceCorePrimitive.signedOrdering, SourceCorePrimitive.checkedArithmetic, TypeSystem.Ty.fixed])
     | (rename_i strict; cases strict <;> rfl)
 
 private inductive Compound : ExpressionForm → Prop where
@@ -90,13 +91,13 @@ private inductive Step (policy : SourceCoreFunctions.Policy) (body : SourceCoreF
         ⟨(selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).resultType, (selectedUnary operator child.type ((source.lookupExpression? operand).map (·.type))).lower child.expression⟩
   | binary {operator left right first second}
       (form : node.form = .binary left operator right)
-      (metadata : Metadata values.checked source id node ((selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).resultType operator))
+      (metadata : Metadata values.checked source id node ((selectedMode (SourceCorePrimitive.binaryLowering first.type ((source.lookupExpression? left).map (·.type)) operator)).resultType operator))
       (firstGenerated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope left reasonAt = .ok first)
       (secondGenerated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope right reasonAt = .ok second)
-      (leftType : (selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).operandType operator = first.type)
-      (rightType : (selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).operandType operator = second.type) :
+      (leftType : (selectedMode (SourceCorePrimitive.binaryLowering first.type ((source.lookupExpression? left).map (·.type)) operator)).operandType operator = first.type)
+      (rightType : (selectedMode (SourceCorePrimitive.binaryLowering first.type ((source.lookupExpression? left).map (·.type)) operator)).operandType operator = second.type) :
       Step policy body fuel context values source scope reasonAt id node
-        ⟨(selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).resultType operator, (selectedMode (SourceCorePrimitive.binaryLowering first.type (SourceCorePrimitive.signedOrdering ((source.lookupExpression? left).map (·.type)) operator))).binary operator first.expression second.expression⟩
+        ⟨(selectedMode (SourceCorePrimitive.binaryLowering first.type ((source.lookupExpression? left).map (·.type)) operator)).resultType operator, (selectedMode (SourceCorePrimitive.binaryLowering first.type ((source.lookupExpression? left).map (·.type)) operator)).binary operator first.expression second.expression⟩
   | group {inner lowered}
       (form : node.form = .group inner) (metadata : Metadata values.checked source id node lowered.type)
       (generated : SourceCoreFunctions.lowerExpressionWithPolicy policy body fuel context source scope inner reasonAt = .ok lowered) :

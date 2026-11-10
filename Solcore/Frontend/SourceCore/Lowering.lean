@@ -1221,17 +1221,143 @@ def signedOrdering : Option TypeSystem.Ty → Syntax.BinaryOp → Bool
   | some (.constructor (.builtin (.fixed type))), .greaterEqual => type.signed
   | _, _ => false
 
+/-- The fixed-width integer type at which a binary operator on operands of the
+given static type is checked arithmetic, if any. -/
+def checkedArithmetic : Option TypeSystem.Ty → Syntax.BinaryOp → Option TypeSystem.FixedInteger
+  | some (.constructor (.builtin (.fixed type))), .add
+  | some (.constructor (.builtin (.fixed type))), .subtract
+  | some (.constructor (.builtin (.fixed type))), .multiply => some type
+  | _, _ => none
+
 /-- How a requirement-free binary node lowers: Integer's operations when its
-left operand is an Integer, the signed orderings on a signed fixed-width integer
-type, and Word's otherwise. -/
+left operand is an Integer, checked arithmetic and the signed orderings on the
+fixed-width integer types, and Word's otherwise. -/
 inductive BinaryLowering where
   | word
   | integer
   | signed
+  | checked (type : TypeSystem.FixedInteger)
   deriving DecidableEq, Repr
 
-def binaryLowering (operand : Core.Ty) (signed : Bool) : BinaryLowering :=
-  if operand = .integer then .integer else if signed then .signed else .word
+/-- The compiler's choice from the left operand's Core type and static type. -/
+def binaryLowering (operand : Core.Ty) (lookup : Option TypeSystem.Ty) (operator : Syntax.BinaryOp) :
+    BinaryLowering :=
+  if operand = .integer then .integer
+  else match checkedArithmetic lookup operator with
+    | some type => .checked type
+    | none => if signedOrdering lookup operator then .signed else .word
+
+/-- The Integer a canonical word of a fixed-width integer type stands for: its
+value, or for a signed type its two's complement reading. -/
+def fixedInteger (signed : Bool) (word : Core.Expr) : Core.Expr :=
+  if signed then
+    .letE (.unary .wordToInteger word)
+      (.ifE (.binary .integerLt (.var 0) (.integer (2 ^ 255))) (.var 0)
+        (.binary .integerSub (.var 0) (.integer (2 ^ 256))))
+  else .unary .wordToInteger word
+
+/-- Core's Integer operation for checked `+`, `-` and `*`. -/
+def checkedOperator : Syntax.BinaryOp → Core.BinaryOp
+  | .add => .integerAdd
+  | .subtract => .integerSub
+  | _ => .integerMul
+
+/-- Checked `+ - *` on a fixed-width integer type, under the right payload, the
+left payload and the outer scope: the exact result as a Core Integer,
+`Panic(0x11)` outside the type's range, and its word otherwise. -/
+def checkedBody (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) : Core.Expr :=
+  .letE (.binary (checkedOperator operator) (fixedInteger type.signed (.var 1))
+      (fixedInteger type.signed (.var 0)))
+    (.ifE (.binary .integerLt (.var 0) (.integer type.min))
+      (Core.LanguageResult.failure .word (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)))
+      (.ifE (.binary .integerLt (.integer type.max) (.var 0))
+        (Core.LanguageResult.failure .word (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)))
+        (Core.LanguageResult.success (.unary .integerToWord (.var 0)))))
+
+/-- Checked `+ - *` evaluate both operands, then run the checked body; every
+other operator lowers as Word's. -/
+def checkedBinary (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) (left right : Core.Expr) :
+    Core.Expr :=
+  match operator with
+  | .add | .subtract | .multiply =>
+      Core.LanguageResult.bind .word left
+        (Core.LanguageResult.bind .word (right.weakenAt 0) (checkedBody type operator))
+  | _ => binary operator left right
+
+theorem fixedInteger_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    {signed : Bool} {word : Core.Expr} (typed : Core.HasType scope word .word definitions) :
+    Core.HasType scope (fixedInteger signed word) .integer definitions := by
+  unfold fixedInteger
+  split
+  · exact .letE (.unary typed) (.ifE (.binary (.var rfl) .integer) (.var rfl) (.binary (.var rfl) .integer))
+  · exact .unary typed
+
+theorem checkedBody_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) :
+    Core.HasType (.word :: .word :: scope) (checkedBody type operator)
+      (Core.LanguageResult.resultType .word) definitions := by
+  have rest : Core.HasType (.integer :: .word :: .word :: scope)
+      (.ifE (.binary .integerLt (.var 0) (.integer type.min))
+        (Core.LanguageResult.failure .word (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)))
+        (.ifE (.binary .integerLt (.integer type.max) (.var 0))
+          (Core.LanguageResult.failure .word (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)))
+          (Core.LanguageResult.success (.unary .integerToWord (.var 0)))))
+      (Core.LanguageResult.resultType .word) definitions :=
+    .ifE (.binary (.var rfl) .integer) (Core.LanguageResult.failure_hasType .word .word)
+      (.ifE (.binary .integer (.var rfl)) (Core.LanguageResult.failure_hasType .word .word)
+        (Core.LanguageResult.success_hasType (.unary (.var rfl))))
+  unfold checkedBody
+  cases operator <;>
+    exact .letE (.binary (fixedInteger_hasType (.var rfl)) (fixedInteger_hasType (.var rfl))) rest
+
+theorem checkedBinary_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp} {left right : Core.Expr}
+    (leftTyped : Core.HasType scope left (Core.LanguageResult.resultType (binaryOperandType operator)) definitions)
+    (rightTyped : Core.HasType scope right (Core.LanguageResult.resultType (binaryOperandType operator)) definitions) :
+    Core.HasType scope (checkedBinary type operator left right)
+      (Core.LanguageResult.resultType (binaryResultType operator)) definitions := by
+  have checked : ∀ {operator : Syntax.BinaryOp},
+      Core.HasType scope left (Core.LanguageResult.resultType .word) definitions →
+      Core.HasType scope right (Core.LanguageResult.resultType .word) definitions →
+      Core.HasType scope (Core.LanguageResult.bind .word left
+        (Core.LanguageResult.bind .word (right.weakenAt 0) (checkedBody type operator)))
+        (Core.LanguageResult.resultType .word) definitions := by
+    intro operator leftWord rightWord
+    apply Core.LanguageResult.bind_hasType .word leftWord
+    apply Core.LanguageResult.bind_hasType .word
+    · simpa [Core.Context.insertAt] using rightWord.weakenAt (inserted := .word) 0
+    · exact checkedBody_hasType type operator
+  cases operator <;> first
+    | exact checked leftTyped rightTyped
+    | exact binary_hasType leftTyped rightTyped
+
+/-- Renaming leaves the checked body alone: it reads only its two payloads. -/
+theorem checkedBody_rename (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp)
+    (ξ : Core.Renaming) :
+    (checkedBody type operator).rename (Core.Renaming.lift (Core.Renaming.lift ξ)) = checkedBody type operator := by
+  unfold checkedBody fixedInteger
+  cases type.signed <;> rfl
+
+theorem checkedBinary_left_failure {environment : Core.Environment}
+    {before after : Core.Store} {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+    {left right : Core.Expr} {reason : Core.Word}
+    (checked : operator = .add ∨ operator = .subtract ∨ operator = .multiply)
+    (evaluation : Core.Evaluates environment before left (.inLeft .word (.word reason)) after) :
+    Core.Evaluates environment before (checkedBinary type operator left right)
+      (.inLeft .word (.word reason)) after := by
+  rcases checked with rfl | rfl | rfl <;> exact Core.LanguageResult.bind_failure _ evaluation
+
+theorem checkedBinary_right_failure {environment : Core.Environment}
+    {before middle after : Core.Store} {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+    {left right : Core.Expr} {leftValue : Core.Value} {reason : Core.Word}
+    (checked : operator = .add ∨ operator = .subtract ∨ operator = .multiply)
+    (leftEvaluation : Core.Evaluates environment before left (.inRight .word leftValue) middle)
+    (rightEvaluation : Core.Evaluates (leftValue :: environment) middle (right.weakenAt 0)
+      (.inLeft .word (.word reason)) after) :
+    Core.Evaluates environment before (checkedBinary type operator left right)
+      (.inLeft .word (.word reason)) after := by
+  rcases checked with rfl | rfl | rfl <;>
+    exact Core.LanguageResult.bind_success _ leftEvaluation (Core.LanguageResult.bind_failure _ rightEvaluation)
 
 theorem signedStrictBinaryBody_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
     (operator : Syntax.BinaryOp) :
@@ -2369,11 +2495,10 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
               SourceCoreBasic.ensureType site lowering.resultType type
               pure ⟨type, lowering.lower operand.expression⟩
           | .binary left operator right =>
-              let signed := SourceCorePrimitive.signedOrdering
-                ((source.lookupExpression? left).map (·.type)) operator
+              let lookup := (source.lookupExpression? left).map (·.type)
               let left ← lowerExpressionWithPolicy policy lowerBody fuel context source scope left reasonAt
               let right ← lowerExpressionWithPolicy policy lowerBody fuel context source scope right reasonAt
-              match SourceCorePrimitive.binaryLowering left.type signed with
+              match SourceCorePrimitive.binaryLowering left.type lookup operator with
               | .integer =>
                 SourceCoreBasic.ensureType site (SourceCoreInteger.binaryOperandType operator) left.type
                 SourceCoreBasic.ensureType site (SourceCoreInteger.binaryOperandType operator) right.type
@@ -2385,6 +2510,12 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
                 SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryOperandType operator) right.type
                 SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryResultType operator) type
                 pure ⟨type, SourceCorePrimitive.signedBinary operator left.expression right.expression⟩
+              | .checked fixedType =>
+                -- Checked `+ - *` on the fixed-width integer types.
+                SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryOperandType operator) left.type
+                SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryOperandType operator) right.type
+                SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryResultType operator) type
+                pure ⟨type, SourceCorePrimitive.checkedBinary fixedType operator left.expression right.expression⟩
               | .word =>
                 SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryOperandType operator) left.type
                 SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryOperandType operator) right.type
