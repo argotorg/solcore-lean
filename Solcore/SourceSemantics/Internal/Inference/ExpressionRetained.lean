@@ -153,33 +153,37 @@ namespace Solcore.SourceSemantics.SourceInferenceSoundness
 open Frontend Frontend.SourceInference TypeSystem
 open ExecutableCoercionInterfaces
 
-/-- Later coercion attachment preserves the original operator dispatch and
-its complete ordinary requirement prefix at the same source identity. -/
+/-- Later coercion attachment preserves the original operator form, its
+dispatch and its complete ordinary requirement prefix at the same source
+identity. The prefix may be empty: a builtin operator, such as an unchecked
+one that waited for a literal operand, owns no requirement. -/
 def ExpressionOperatorSiteRetainedAt
     (before after : TypedSource) (id : ExpressionId) : Prop :=
   ∀ {node}, ContainsExpression before id node →
-    ∀ primary companions name,
-      node.requirements = (primary :: companions) ++ node.coercions.flatMap CoercionStep.requirements →
+    ∀ own name,
+      node.requirements = own ++ node.coercions.flatMap CoercionStep.requirements →
       operatorDispatch node name →
       ∃ finalNode, ContainsExpression after id finalNode ∧
-        finalNode.requirements = (primary :: companions) ++ finalNode.coercions.flatMap CoercionStep.requirements ∧
-        operatorDispatch finalNode name
+        finalNode.requirements = own ++ finalNode.coercions.flatMap CoercionStep.requirements ∧
+        operatorDispatch finalNode name ∧ finalNode.form = node.form
 
 namespace ExpressionOperatorSiteRetainedAt
 
 theorem refl (source : TypedSource) (id : ExpressionId) :
     ExpressionOperatorSiteRetainedAt source source id := by
-  intro node found primary companions name layout dispatch
-  exact ⟨node, found, layout, dispatch⟩
+  intro node found own name layout dispatch
+  exact ⟨node, found, layout, dispatch, rfl⟩
 
 theorem trans {before middle after : TypedSource} {id : ExpressionId}
     (first : ExpressionOperatorSiteRetainedAt before middle id)
     (second : ExpressionOperatorSiteRetainedAt middle after id) :
     ExpressionOperatorSiteRetainedAt before after id := by
-  intro node found primary companions name layout dispatch
-  obtain ⟨middleNode, middleFound, middleLayout, middleDispatch⟩ :=
-    first found primary companions name layout dispatch
-  exact second middleFound primary companions name middleLayout middleDispatch
+  intro node found own name layout dispatch
+  obtain ⟨middleNode, middleFound, middleLayout, middleDispatch, middleForm⟩ :=
+    first found own name layout dispatch
+  obtain ⟨finalNode, finalFound, finalLayout, finalDispatch, finalForm⟩ :=
+    second middleFound own name middleLayout middleDispatch
+  exact ⟨finalNode, finalFound, finalLayout, finalDispatch, finalForm.trans middleForm⟩
 
 theorem monoBefore {before middle after : TypedSource} {id : ExpressionId}
     (extension : TypingSourceExtends before middle)
@@ -194,6 +198,12 @@ private theorem dispatch_substitution (substitution : Substitution) (node : Expr
   cases form : node.form <;>
     simp [operatorDispatch, ExpressionNode.applySubstitution, ExpressionForm.applySubstitution, form]
 
+private theorem form_substitution_of_dispatch (substitution : Substitution)
+    {node : ExpressionNode} {name : String} (dispatch : operatorDispatch node name) :
+    (node.applySubstitution substitution).form = node.form := by
+  cases form : node.form <;>
+    simp_all [operatorDispatch, ExpressionNode.applySubstitution, ExpressionForm.applySubstitution]
+
 private theorem coercion_ids_substitution (substitution : Substitution) (steps : List CoercionStep) :
     (steps.map (CoercionStep.applySubstitution substitution)).flatMap CoercionStep.requirements =
       steps.flatMap CoercionStep.requirements := by
@@ -206,9 +216,10 @@ theorem ofExpressionNodesPreservedAt {before after : TypedSource} {id : Expressi
     (preserved : ExpressionNodesPreservedAt [id]
       (before.applySubstitution substitution) after) :
     ExpressionOperatorSiteRetainedAt before after id := by
-  intro node found primary companions name layout dispatch
+  intro node found own name layout dispatch
   refine ⟨node.applySubstitution substitution,
-    preserved (by simp) (FlexibleSubstitution.ContainsExpression.applySubstitution substitution found), ?_, ?_⟩
+    preserved (by simp) (FlexibleSubstitution.ContainsExpression.applySubstitution substitution found), ?_, ?_,
+    form_substitution_of_dispatch substitution dispatch⟩
   · simpa only [ExpressionNode.applySubstitution, coercion_ids_substitution] using layout
   · simpa only [dispatch_substitution] using dispatch
 
@@ -225,9 +236,9 @@ theorem ofAttachExpressionCoercions
     (unique : (entries.map (·.expression)).Nodup) (member : entry ∈ entries) :
     ExpressionOperatorSiteRetainedAt (state.toTypedSource roots)
       ((Detail.attachExpressionCoercions state entries).toTypedSource roots) entry.expression := by
-  intro node found primary companions name layout dispatch
+  intro node found own name layout dispatch
   refine ⟨Detail.appendExpressionCoercions node entry.coercions,
-    attachExpressionCoercions_containsExpression state entries entry node roots unique member found, ?_, ?_⟩
+    attachExpressionCoercions_containsExpression state entries entry node roots unique member found, ?_, ?_, rfl⟩
   · simp only [Detail.appendExpressionCoercions, layout, Detail.coercionRequirements, List.flatMap_append, List.append_assoc]
   · exact dispatch
 
@@ -243,8 +254,8 @@ theorem traitName {signatures : ProgramSignatures} {requirements : List SolvedRe
     (identity : solved.id = primary)
     {trait : Resolved.DeclarationId} (selected : solved.predicate.trait = .declaration trait) :
     (signatures.trait? trait).map (·.name) = some name := by
-  obtain ⟨finalNode, finalFound, finalLayout, finalDispatch⟩ :=
-    retained found primary companions name layout dispatch
+  obtain ⟨finalNode, finalFound, finalLayout, finalDispatch, _⟩ :=
+    retained found (primary :: companions) name layout dispatch
   obtain ⟨actual, actualTrait, unique, actualSelected, actualName⟩ :=
     interfaces.operators finalNode finalFound.1 primary companions name finalLayout finalDispatch
   have present : solved ∈ requirements.filter (fun row => decide (row.id = primary)) :=
@@ -256,6 +267,31 @@ theorem traitName {signatures : ProgramSignatures} {requirements : List SolvedRe
   simpa only [sameTrait] using actualName
 
 end ExpressionOperatorSiteRetainedAt
+
+/-- An unchecked operator recorded with no requirement of its own keeps its
+form and that shape through later coercion attachment, so finalization's check
+of the finalized occurrence covers its left operand. -/
+theorem SourceUncheckedOperandsFit.of_operatorSite
+    {before source : TypedSource} {id left right : ExpressionId}
+    {operator : Syntax.BinaryOp} {node leftNode : ExpressionNode}
+    (fits : SourceUncheckedOperandsFit source)
+    (retained : ExpressionOperatorSiteRetainedAt before source id)
+    (contains : ContainsExpression before id node)
+    (form : node.form = .binary left operator right)
+    (unchecked : Detail.isUncheckedOperator operator = true)
+    (requirements : node.requirements = Detail.coercionRequirements node.coercions)
+    (leftContains : ContainsExpression source left leftNode) :
+    leftNode.type ≠ .integer := by
+  obtain ⟨name, method, dispatchEq⟩ :
+      ∃ name method, Detail.binaryOperatorDispatch operator = .traitMethod name method := by
+    cases operator <;> first | exact ⟨_, _, rfl⟩ | simp [Detail.isUncheckedOperator] at unchecked
+  have dispatch : operatorDispatch node name := by
+    simp only [operatorDispatch, form]
+    exact ⟨method, dispatchEq⟩
+  obtain ⟨finalNode, finalFound, finalLayout, _, finalForm⟩ :=
+    retained contains [] name (by simpa [Detail.coercionRequirements] using requirements) dispatch
+  exact fits finalFound (finalForm.trans form) unchecked
+    (by simpa [Detail.coercionRequirements] using finalLayout) leftContains
 end Solcore.SourceSemantics.SourceInferenceSoundness
 end
 

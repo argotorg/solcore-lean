@@ -1735,26 +1735,25 @@ theorem inferBinaryOperator_private {protectedVars : List TypeVarId}
     have operandSafe := unifiedPrivacy _ leftSafe
     have unifiedLive := live.unify leftSafe rightSafe unified
     apply prepend_unify leftSafe rightSafe unified
-    rcases prepare with preparedEq | wordResult
+    rcases prepare with preparedEq | ⟨expectedType, expectedEq, fitted⟩
     · rw [preparedEq] at tailSuccess
       exact finishBinary_private catalog unifiedReady operandSafe unifiedLive
-        (show finishBinary context operator left false unifiedState = .ok result from tailSuccess)
-    · have wordSafe : Safe protectedVars unifiedState .word := by
-        intro metavariable member
-        simp [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve, TypeSystem.Ty.word,
-          TypeSystem.Ty.freeVariables] at member
+        (show finishBinary context operator left _ unifiedState = .ok result from tailSuccess)
+    · subst expectedEq
+      have expectedBelow := (expectedBelow expectedType (by simp)).weaken unifiedProgress.next_le
+      have expectedSafe := unifiedPrivacy _ (expectedSafe expectedType (by simp))
       have operandBelow := unifiedReady.solved.variablesBelow_apply
         (leftBelow.weaken unifiedProgress.next_le)
-      have preparedReady := Detail.unify_preserves_inferenceReady unifiedReady operandBelow
-        (TypeSystem.Ty.variablesBelow_constructor _ _) wordResult
+      have fittedReady := Detail.unify_preserves_inferenceReady unifiedReady operandBelow expectedBelow fitted
       have resolvedSafe := safe_resolved unifiedReady operandSafe
-      have preparedPrivacy := ProtectedVariables.unify resolvedSafe wordSafe wordResult
-      have preparedLive := unifiedLive.unify resolvedSafe wordSafe wordResult
-      exact prepend_unify resolvedSafe wordSafe wordResult
-        (finishBinary_private catalog preparedReady (preparedPrivacy _ operandSafe) preparedLive
-          (show finishBinary context operator left false prepared = .ok result from tailSuccess))
+      have fittedPrivacy := ProtectedVariables.unify resolvedSafe expectedSafe fitted
+      have fittedLive := unifiedLive.unify resolvedSafe expectedSafe fitted
+      exact prepend_unify resolvedSafe expectedSafe fitted
+        (finishBinary_private catalog fittedReady (fittedPrivacy _ operandSafe) fittedLive
+          (show finishBinary context operator left _ prepared = .ok result from tailSuccess))
   unfold Detail.inferBinaryOperator Detail.binaryOperatorTail at accepted
-  rw [if_neg shift, if_neg unchecked] at accepted
+  rw [if_neg shift] at accepted
+  simp only [Detail.binaryDefers_of_not_unchecked unchecked] at accepted
   cases unified : Detail.unify state left right with
   | error error => simp [unified, bind, Except.bind] at accepted
   | ok unifiedState =>

@@ -2518,21 +2518,31 @@ theorem inferBinaryOperator_unchecked_result {context : Context}
     (success : inferBinaryOperator context operator left right expected
       integerLiterals state = .ok result) :
     ∃ unified prepared, unify state left right = .ok unified ∧
-      (prepared = unified ∨ unify unified (unified.resolve left) .word = .ok prepared) ∧
-      binaryOperatorTail context operator left false prepared = .ok result := by
+      (prepared = unified ∨ ∃ expectedType, expected = some expectedType ∧
+        unify unified (unified.resolve left) expectedType = .ok prepared) ∧
+      binaryOperatorTail context operator left
+        (binaryDefers operator
+          (isOpenIntegerLiteralTarget state integerLiterals left ||
+            isOpenIntegerLiteralTarget state integerLiterals right)
+          prepared (prepared.resolve left)) prepared = .ok result := by
   unfold inferBinaryOperator at success
-  rw [if_neg (by simp [isShiftOperator_of_unchecked unchecked]), if_pos unchecked] at success
+  rw [if_neg (by simp [isShiftOperator_of_unchecked unchecked])] at success
   cases unifyResult : unify state left right with
   | error error => simp [unifyResult, bind, Except.bind] at success
   | ok unified =>
-      by_cases literal : isOpenIntegerLiteralTarget unified integerLiterals left = true
-      · cases wordResult : unify unified (unified.resolve left) .word with
-        | error error => simp [unifyResult, literal, wordResult, bind, Except.bind] at success
-        | ok prepared =>
-            exact ⟨unified, prepared, rfl, .inr wordResult, by
-              simpa [unifyResult, literal, wordResult, bind, Except.bind] using success⟩
-      · exact ⟨unified, unified, rfl, .inl rfl, by
-          simpa [unifyResult, literal, bind, Except.bind, pure, Except.pure] using success⟩
+      simp only [unifyResult, bind, Except.bind] at success
+      cases expected with
+      | none =>
+          exact ⟨unified, unified, rfl, .inl rfl, by simpa [pure, Except.pure] using success⟩
+      | some expectedType =>
+          simp only [pure, Except.pure] at success
+          split at success
+          · exact ⟨unified, unified, rfl, .inl rfl, success⟩
+          · cases second : unify unified (unified.resolve left) expectedType with
+            | error error => simp [second] at success
+            | ok prepared =>
+                exact ⟨unified, prepared, rfl, .inr ⟨expectedType, rfl, second⟩, by
+                  simpa [second] using success⟩
 
 /-- A projection of the inference state that unification and the operator
 tail without open literals preserve is also preserved by an unchecked
@@ -2543,8 +2553,8 @@ theorem inferBinaryOperator_unchecked_projection {α : Type} {context : Context}
     {result : OperatorInferenceResult} (projection : State → α)
     (unified : ∀ {before after : State} {first second : Ty},
       unify before first second = .ok after → projection after = projection before)
-    (tail : ∀ {before : State} {finished : OperatorInferenceResult},
-      binaryOperatorTail context operator left false before = .ok finished →
+    (tail : ∀ {defers : Bool} {before : State} {finished : OperatorInferenceResult},
+      binaryOperatorTail context operator left defers before = .ok finished →
         projection finished.state = projection before)
     (unchecked : isUncheckedOperator operator = true)
     (success : inferBinaryOperator context operator left right expected
@@ -2553,9 +2563,9 @@ theorem inferBinaryOperator_unchecked_projection {α : Type} {context : Context}
   obtain ⟨middle, prepared, unifyResult, prepare, tailResult⟩ :=
     inferBinaryOperator_unchecked_result unchecked success
   rw [tail tailResult]
-  rcases prepare with rfl | wordResult
+  rcases prepare with rfl | ⟨_, _, expectedResult⟩
   · exact unified unifyResult
-  · rw [unified wordResult, unified unifyResult]
+  · rw [unified expectedResult, unified unifyResult]
 
 end Solcore.Frontend.SourceInference.Detail
 end

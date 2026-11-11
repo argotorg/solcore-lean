@@ -1474,8 +1474,8 @@ theorem OperatorNamesAt.of_retained
     (dispatchAt : ∀ name, dispatch name → operatorDispatch node name) :
     OperatorNamesAt signatures solved requirements dispatch := by
   intro primary companions name headEq selected
-  obtain ⟨finalNode, finalFound, finalLayout, finalDispatch⟩ :=
-    retained found primary companions name (by simpa only [headEq] using layout) (dispatchAt name selected)
+  obtain ⟨finalNode, finalFound, finalLayout, finalDispatch, _⟩ :=
+    retained found (primary :: companions) name (by simpa only [headEq] using layout) (dispatchAt name selected)
   exact interfaces.operators finalNode finalFound.1 primary companions name finalLayout finalDispatch
 
 theorem operatorTraitPredicates_primary
@@ -1911,36 +1911,35 @@ theorem inferBinaryOperator
     have leftAtUnified :
         left.VariablesBelow unifiedState.inference.next :=
       leftBelow.weaken unifyProgress.next_le
-    rcases prepare with preparedEq | wordResult
+    rcases prepare with preparedEq | ⟨expectedType, expectedEq, fittedResult⟩
     · rw [preparedEq] at tailSuccess
       have tailProperties := finishBinaryOperator_supported
         unifiedReady (transport left leftSupported)
-        (show finishBinaryOperator context operator left false unifiedState = .ok result
+        (show finishBinaryOperator context operator left _ unifiedState = .ok result
           from tailSuccess)
       exact ⟨transport.trans tailProperties.1, tailProperties.2⟩
-    · have wordResolved : ∀ any : State, Resolved cutoff roots any .word := by
-        intro any metavariable member
-        simp [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve, TypeSystem.Ty.word,
-          TypeSystem.Ty.freeVariables] at member
+    · subst expectedEq
+      have expectedTypeBelow : expectedType.VariablesBelow unifiedState.inference.next :=
+        (expectedBelow expectedType (by simp)).weaken unifyProgress.next_le
       have resolvedLeftBelow :
           (unifiedState.resolve left).VariablesBelow
             unifiedState.inference.next :=
         unifiedReady.solved.variablesBelow_apply leftAtUnified
-      have secondTransport := unify unifiedReady resolvedLeftBelow
-        (TypeSystem.Ty.variablesBelow_constructor _ _)
+      have secondTransport := unify unifiedReady resolvedLeftBelow expectedTypeBelow
         (resolved_normalized unifiedReady (transport left leftSupported))
-        (wordResolved unifiedState) wordResult
+        (transport expectedType (expectedSupported expectedType (by simp))) fittedResult
       have preparedReady := unify_preserves_inferenceReady
-        unifiedReady resolvedLeftBelow (TypeSystem.Ty.variablesBelow_constructor _ _) wordResult
+        unifiedReady resolvedLeftBelow expectedTypeBelow fittedResult
       have tailProperties :=
         finishBinaryOperator_supported preparedReady
           (secondTransport left (transport left leftSupported))
-          (show finishBinaryOperator context operator left false prepared = .ok result
+          (show finishBinaryOperator context operator left _ prepared = .ok result
             from tailSuccess)
       exact ⟨transport.trans (secondTransport.trans tailProperties.1),
         tailProperties.2⟩
   unfold Detail.inferBinaryOperator Detail.binaryOperatorTail at success
-  rw [if_neg shift, if_neg unchecked] at success
+  rw [if_neg shift] at success
+  simp only [Detail.binaryDefers_of_not_unchecked unchecked] at success
   cases unifyResult : Detail.unify state left right with
   | error error =>
       simp [unifyResult, bind, Except.bind] at success

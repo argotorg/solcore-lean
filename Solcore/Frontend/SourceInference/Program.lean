@@ -592,8 +592,33 @@ def validateForItemAssignmentTargets (state : State) :
       validateForItemAssignmentTargets state rest
   | _ :: rest => validateForItemAssignmentTargets state rest
 
-/-- Check the value assignments of one node: an assignment statement's, or a
-`for` loop's header items. -/
+/-- The name a binary operator's diagnostics give it: its trait's, or its
+function's. -/
+def binaryOperatorName (operator : Syntax.BinaryOp) : String :=
+  match binaryOperatorDispatch operator with
+  | .traitMethod name _ => name
+  | .function name => name
+
+/-- An unchecked operator that waited for an open literal operand (it owns no
+requirement besides its coercions') never takes `integer`, for which upstream
+defines no unchecked instance: once the defaults are in, its left operand's
+type must not be `integer`. One that dispatched to a program's own trait owns
+that trait's requirement and is not checked here. -/
+def validateUncheckedOperand (state : State) (node : ExpressionNode) : Except Error Unit :=
+  match node.form with
+  | .binary left operator _ =>
+      if isUncheckedOperator operator && decide (node.requirements = coercionRequirements node.coercions) &&
+          state.nodes.any (fun candidate => match candidate with
+            | .expression candidateNode =>
+                decide (candidateNode.id = left) && decide (state.resolve candidateNode.type = .integer)
+            | .statement _ => false) then
+        throw (.operatorNotSupported (binaryOperatorName operator) .integer)
+      else .ok ()
+  | _ => .ok ()
+
+/-- The finalization checks of one node: an assignment statement's value
+assignment, a `for` loop's header items, and an unchecked operator's operand
+type. -/
 def validateAssignmentTargetNode (state : State) : Node → Except Error Unit
   | .statement node =>
       match node.form with
@@ -603,11 +628,12 @@ def validateAssignmentTargetNode (state : State) : Node → Except Error Unit
           validateForItemAssignmentTargets state initializer
           validateForItemAssignmentTargets state post
       | _ => .ok ()
-  | .expression _ => .ok ()
+  | .expression node => validateUncheckedOperand state node
 
-/-- Check every value assignment's target type. An open compound target waits
-for its type (`compoundOperandType`), so a literal it holds may default to
-`uint256` first. -/
+/-- Check every value assignment's target type, and every unchecked operator
+that waited for a literal operand. An open compound target or operand waits for
+its type (`compoundOperandType`, `binaryDefers`), so a literal it holds may
+default to `uint256` first. -/
 def validateAssignmentTargets (state : State) : List Node → Except Error Unit
   | [] => .ok ()
   | node :: rest => do

@@ -1695,6 +1695,8 @@ theorem binaryOperatorInferenceCase_hasType_in_active
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ integerLiterals →
         (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
+    (uncheckedFits : Detail.isUncheckedOperator operator = true → result.requirements = [] →
+      later.inference.substitution.apply left ≠ .integer)
     (catalog : SignatureCatalogWellFormed active.signatures)
     (signaturesEq : active.signatures = inferenceContext.signatures)
     (operatorNames : OperatorNamesAt inferenceContext.signatures solved result.requirements
@@ -1875,6 +1877,109 @@ theorem binaryOperatorInferenceCase_hasType_in_active
         have typing := binaryInteger_hasType active operator stagedFacts.1 notShift notUnchecked
         simpa only [leftInteger, rightInteger, resultInteger,
           requirementsEq] using typing
+  | uncheckedFallback requirementsEq operandsEq typeEq deferred unchecked =>
+      have finalOperandsEq :
+          later.inference.substitution.apply left =
+            later.inference.substitution.apply right := by
+        calc
+          later.inference.substitution.apply left =
+              later.inference.substitution.apply
+                (result.state.resolve left) := resolvedLeftEq.symm
+          _ = later.inference.substitution.apply
+                (result.state.resolve right) :=
+            congrArg later.inference.substitution.apply operandsEq
+          _ = later.inference.substitution.apply right := resolvedRightEq
+      have resultTypeEq :
+          later.inference.substitution.apply result.type =
+            if Detail.binaryResultIsBool operator then .bool
+            else later.inference.substitution.apply left := by
+        have notBool : Detail.binaryResultIsBool operator = false := by
+          cases operator <;> simp_all [Detail.isUncheckedOperator, Detail.binaryResultIsBool]
+        rw [typeEq]
+        simp [notBool, resolvedLeftEq]
+      have deferredFacts :
+          Detail.binaryBuiltinType operator = .word ∧
+            (Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
+              Detail.isOpenIntegerLiteralTarget initial integerLiterals
+                right) = true := by
+        refine ⟨by cases operator <;> simp_all [Detail.isUncheckedOperator, Detail.binaryBuiltinType], ?_⟩
+        unfold Detail.isDeferredBuiltinOperatorTarget Detail.binaryDefers at deferred
+        split at deferred <;> simp_all
+      have openEither := Bool.or_eq_true_iff.mp deferredFacts.2
+      obtain ⟨origin, originMember, originResolveEq⟩ :
+          ∃ origin, origin ∈ integerLiterals ∧
+            (initial.resolve (.variable origin.metavariable) =
+                initial.resolve left ∨
+              initial.resolve (.variable origin.metavariable) =
+                initial.resolve right) := by
+        rcases openEither with leftOpen | rightOpen
+        · obtain ⟨_, origin, _, member, equal⟩ :=
+            Detail.isOpenIntegerLiteralTarget_true_witness leftOpen
+          exact ⟨origin, member, .inl equal⟩
+        · obtain ⟨_, origin, _, member, equal⟩ :=
+            Detail.isOpenIntegerLiteralTarget_true_witness rightOpen
+          exact ⟨origin, member, .inr equal⟩
+      have originOperandEq :
+          later.inference.substitution.apply
+              (.variable origin.metavariable) =
+            later.inference.substitution.apply left := by
+        rcases originResolveEq with leftEq | rightEq
+        · calc
+            later.inference.substitution.apply
+                  (.variable origin.metavariable) =
+                later.inference.substitution.apply
+                  (initial.resolve (.variable origin.metavariable)) :=
+              (TypeSystem.InferState.apply_resolve_eq_apply
+                laterExtendsInitial (.variable origin.metavariable)).symm
+            _ = later.inference.substitution.apply
+                  (initial.resolve left) :=
+              congrArg later.inference.substitution.apply leftEq
+            _ = later.inference.substitution.apply left :=
+              TypeSystem.InferState.apply_resolve_eq_apply
+                laterExtendsInitial left
+        · calc
+            later.inference.substitution.apply
+                  (.variable origin.metavariable) =
+                later.inference.substitution.apply
+                  (initial.resolve (.variable origin.metavariable)) :=
+              (TypeSystem.InferState.apply_resolve_eq_apply
+                laterExtendsInitial (.variable origin.metavariable)).symm
+            _ = later.inference.substitution.apply
+                  (initial.resolve right) :=
+              congrArg later.inference.substitution.apply rightEq
+            _ = later.inference.substitution.apply right :=
+              TypeSystem.InferState.apply_resolve_eq_apply
+                laterExtendsInitial right
+            _ = later.inference.substitution.apply left :=
+              finalOperandsEq.symm
+      have supported := integerLiteralTargetsSupported origin
+        originMember
+      rcases supported with originWord | originInteger | ⟨fixed, originFixed⟩
+      · have leftWord : later.inference.substitution.apply left = .word :=
+          originOperandEq.symm.trans originWord
+        have rightWord : later.inference.substitution.apply right = .word :=
+          finalOperandsEq.symm.trans leftWord
+        have resultWord : later.inference.substitution.apply result.type =
+            if Detail.binaryResultIsBool operator then .bool
+            else .word := by
+          rw [resultTypeEq, leftWord]
+        have typing := binaryBuiltin_hasType active operator
+        rw [deferredFacts.1] at typing
+        simpa only [leftWord, rightWord, resultWord, requirementsEq] using
+          typing
+      · exact absurd (originOperandEq.symm.trans originInteger) (uncheckedFits unchecked requirementsEq)
+      · have leftFixed : later.inference.substitution.apply left = .fixed fixed :=
+          originOperandEq.symm.trans originFixed
+        have rightFixed : later.inference.substitution.apply right = .fixed fixed :=
+          finalOperandsEq.symm.trans leftFixed
+        have resultFixed : later.inference.substitution.apply result.type =
+            if Detail.binaryResultIsBool operator then .bool
+            else .fixed fixed := by
+          rw [resultTypeEq, leftFixed]
+        have typing := binaryFixedWord_hasType active operator (.fixed fixed) (by
+          cases operator <;> simp_all [Detail.isUncheckedOperator, Detail.fixedBinaryOperator,
+            TypeSystem.Ty.fixed])
+        simpa only [leftFixed, rightFixed, resultFixed, requirementsEq] using typing
   | @trait trait traitName methodName predicates operandsEq dispatch selected
       profile corresponds =>
       obtain ⟨companions, predicateEq⟩ := operatorTraitPredicates_primary profile
@@ -2097,6 +2202,8 @@ theorem inferBinaryOperator_recordExpressionWithExpected_typing_from_interfaces
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ integerLiterals →
         (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
+    (uncheckedFits : Detail.isUncheckedOperator operator = true → inferred.requirements = [] →
+      later.inference.substitution.apply left.type ≠ .integer)
     (substitutionExtends :
       later.inference.substitution.SemanticallyExtends
         result.2.inference.substitution)
@@ -2171,7 +2278,7 @@ theorem inferBinaryOperator_recordExpressionWithExpected_typing_from_interfaces
     binaryOperatorInferenceCase_hasType_in_active inferenceCase
       operatorProperties.1 inferredSubstitutionExtends
       inferredRequirementsSubset
-      integerLiteralTargetsSupported activeCatalog signaturesEq
+      integerLiteralTargetsSupported uncheckedFits activeCatalog signaturesEq
       operatorNames solveSuccess solvedEq ledger ownership
       activeSignaturesEq activeRequirementsEq assumptionsMono covered
       operatorRequirementsOccur

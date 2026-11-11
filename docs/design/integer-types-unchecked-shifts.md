@@ -477,8 +477,11 @@ the operator and panic plumbing first.
     `UncheckedMul`, `UncheckedDiv` and `UncheckedMod`.
   - On `integer` inference rejects them, since upstream defines no unchecked
     instance for it.
-  - A literal operand is a `word` at once rather than deferred: with `integer`
-    excluded, `word` is the only literal target left.
+  - A literal operand was a `word` at once rather than deferred, while `word`
+    was the only literal target left. Since row 1's step 8c it waits for its
+    type as a checked operator's does, and finalization rejects one that
+    becomes `integer` ([row 1's unchecked literal
+    operands](#row-1s-unchecked-literal-operands-they-wait-and-never-take-integer)).
   - Since row 1's step 8a they are builtins on the twelve types too, where they
     wrap to the type's width ([row 1's unchecked
     arithmetic](#row-1s-unchecked-arithmetic-wrapped-to-the-types-width)).
@@ -1069,8 +1072,9 @@ Made on 2026-11-12, during step 8a.
   (`Detail.fixedBinaryOperator`, `BinaryOperatorHasType.fixedUnchecked`), as
   upstream's `UncheckedAdd` … `UncheckedMod` instances for the twelve types
   are. A literal operand takes the other operand's type, on either side. Two
-  open literal operands are still a `word` at once, until step 8c. `integer`
-  takes none of them, as before.
+  open literal operands wait for their type since step 8c ([row 1's unchecked
+  literal operands](#row-1s-unchecked-literal-operands-they-wait-and-never-take-integer)).
+  `integer` takes none of them, as before.
 - **Meaning.** The exact result of the operands' values wrapped to the type's
   width (`Dynamic.fixedWrap`: the residue modulo `2^N`, read in two's
   complement on a signed type), as a canonical word
@@ -1141,6 +1145,37 @@ Made on 2026-11-12, during step 8b.
   Fixed-width compound targets stay outside the meaning proofs, as step 3d's
   are.
 
+### Row 1's unchecked literal operands: they wait, and never take `integer`
+
+Made on 2026-11-12, during step 8c.
+
+- **Typing.** An unchecked operator with an open literal operand waits for the
+  literal's type, as a checked operator does, instead of making it a `word` at
+  once: `inferBinaryOperator` has no unchecked branch any more, and
+  `Detail.binaryDefers` lets the operator wait unless its operand is already
+  `integer`. The literal then takes its type from a later use or the return
+  type, or defaults to `uint256` as an operator use ([row 1's `uint256`
+  default](#row-1s-uint256-default-chosen-by-the-literals-uses)), so
+  `unchecked { let a = 200 + 100; let b: uint8 = a; return b; }` is 44, and
+  `let a = 0 - 1;` in a block wraps at `uint256`. On an `integer` operand the
+  operator never waits: it dispatches as on any closed type, to a program's
+  own `UncheckedAdd` … `UncheckedMod`, or is rejected with
+  `operatorNotSupported`, as before.
+- **Finalization.** An operator that waited owns no requirement besides its
+  coercions'. Once the defaults are in, one whose left operand became
+  `integer` is rejected with `operatorNotSupported` and its trait's name
+  (`"UncheckedAdd"` …), the diagnostic of an `integer` operand, in step 7b's
+  pass over the nodes (`Detail.validateUncheckedOperand`), so
+  `unchecked { let a = 1 + 2; let b: integer = a; }` is rejected.
+- **Proofs.** `BinaryOperatorInferenceCase.uncheckedFallback` is the waiting
+  case. At `word` and the twelve types it types as the builtin does, and at
+  `integer` the finalization fact
+  (`FinalInferenceResources.unchecked_operands_fit`) excludes it. The binary
+  typing theorems take that fact as `uncheckedFits`, and their callers read it
+  at the operator's node in the finalized source. A call may attach coercions
+  to that node later, so `ExpressionOperatorSiteRetainedAt` now keeps any own
+  requirement prefix, the empty one included, and the node's form.
+
 ### Row 1: steps
 
 Row 1 is committed in steps, each through the full gate, so that each can be
@@ -1209,7 +1244,10 @@ first planned after the literals and moved before them for this reason
    - 8b. **Unchecked compound assignments** on fixed-width and open targets
      ([row 1's unchecked compound
      assignments](#row-1s-unchecked-compound-assignments-the-wrap-belongs-to-the-leaf)).
-   - 8c. The `uint256` default for the literal operands of unchecked operators.
+   - 8c. **The literal operands of unchecked operators** wait for their type
+     and default to `uint256`, and finalization rejects one that becomes
+     `integer` ([row 1's unchecked literal
+     operands](#row-1s-unchecked-literal-operands-they-wait-and-never-take-integer)).
    - 8d. Shifts on the twelve types, with their compound forms and literal
      operands.
    - 8e. Ports of the upstream fixtures.

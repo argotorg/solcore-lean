@@ -4509,14 +4509,20 @@ private def uncheckedWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function udivAssign256s(x: int256, y: int256) returns (int256) { let r: int256 = x; unchecked { r /= y; } return r; }",
   "function utableAdd16s(x: int16, y: int16) returns (int16) { let table: mapping(Word => int16); table[3] = x; unchecked { table[3] += y; } return table[3]; }",
   "function uopenAssign8u() returns (uint8) { let x = 200; unchecked { x += 100; } return x; }",
-  "function uabsentAdd8u(y: uint8) returns (uint8) { let r: uint8; unchecked { r += y; } return r; }"]
+  "function uabsentAdd8u(y: uint8) returns (uint8) { let r: uint8; unchecked { r += y; } return r; }",
+  "function uopenLits8u() returns (uint8) { unchecked { let a = 200 + 100; let b: uint8 = a; return b; } }",
+  "function uopenReturn256() returns (uint256) { unchecked { return 1 + 2; } }",
+  "function uopenUnused() returns (Word) { unchecked { let a = 1 + 2; } return 0; }",
+  "function uopenDefaultCompare() returns (bool) { unchecked { let a = 0 - 1; return a > 5; } }",
+  "function uopenWord() returns (Word) { unchecked { let a = 0 - 1; let b: Word = a; return b; } }"]
 
 private def uncheckedNames : List String := [
   "uadd8u", "usub8u", "umul16u", "uadd256u", "usub256u", "uadd8s", "usub8s", "umul8s", "umul256s", "uadd64s",
   "udiv8u", "umod8u", "udiv8s", "umod8s", "udiv256s", "umod256u", "uneg8s", "uneg8u", "uneg256u", "uinc8u",
   "ulitLeft8s", "uletTyped16u", "uassign8u", "ucompare8s", "uscope8u", "uaddAssign8u", "usubAssign8u",
   "umulAssign8s", "udivAssign8s", "umodAssign8s", "udivAssign8u", "uaddAssign256s", "usubAssign256u",
-  "udivAssign256s", "utableAdd16s", "uopenAssign8u", "uabsentAdd8u"]
+  "udivAssign256s", "utableAdd16s", "uopenAssign8u", "uabsentAdd8u", "uopenLits8u", "uopenReturn256",
+  "uopenUnused", "uopenDefaultCompare", "uopenWord"]
 
 /-- Step 8a, unchecked `+ - * / %` on the twelve types, through the public API:
 the exact result wrapped to the type's width, `MIN / -1` giving `MIN`, and
@@ -4572,7 +4578,11 @@ def runUnchecked : IO Unit := do
     (31, [word (2 ^ 255 - 1), word 1], word (2 ^ 255)), (32, [word 0, word 1], word (modulus - 1)),
     (33, [word (2 ^ 255), word (modulus - 1)], word (2 ^ 255)),
     -- At a mapping element, and on an open target that a later use types `uint8`.
-    (34, [word 32767, word 1], word (modulus - 32768)), (35, [], word 44)]
+    (34, [word 32767, word 1], word (modulus - 32768)), (35, [], word 44),
+    -- Step 8c: two open literal operands wait for their type, from a later use, the return type
+    -- or the `uint256` default, and wrap there; at `Word` they are Word's.
+    (37, [], word 44), (38, [], word 3), (39, [], word 0), (40, [], boolean true),
+    (41, [], word (modulus - 1))]
   for (index, arguments, expected) in cases do
     let completed ← execute session (← key index) arguments
     require (completed.value == expected)
@@ -4605,10 +4615,16 @@ def runUnchecked : IO Unit := do
         s!"an integer unchecked compound target named {reprStr operator} and {reprStr type}"
   | .ok _ => throw (IO.userError "an integer unchecked compound target was accepted")
   | .error errors => throw (IO.userError s!"an integer unchecked compound target gave {reprStr errors}")
-  -- Not yet: two open literal operands, which are still Words at once.
-  rejectedByInference "two open literals in an unchecked + at uint8"
-    ["function bad() returns (uint8) { unchecked { let a = 200 + 100; let b: uint8 = a; return b; } }"]
-  IO.println "SOURCE_CORE_FIXED_UNCHECKED_PASS: unchecked + - * wrapping modulo 2^N on the unsigned types and in two's complement on the signed ones with canonical results, unchecked / % rounding toward zero with MIN / -1 giving MIN and MIN % -1 giving 0, a zero divisor panicking with 0x12, -x in a block as unchecked 0 - x, literal operands typed by the other operand on either side, checked arithmetic again after the block, mixed operand types rejected, unchecked += -= *= /= %= on fixed-width locals, a mapping element and an open target typed later wrapping alike, with 0x12 on a zero divisor and its own diagnostic for an absent operand, an integer target rejected, and two open literal operands not yet accepted"
+  -- An unchecked operator's open literal operands never take `integer`: finalization rejects
+  -- one that a later use makes `integer`, with the diagnostic of an `integer` operand.
+  match checkProgram (workspaceOf
+      ["function bad() returns (Word) { unchecked { let a = 1 + 2; let b: integer = a; } return 0; }"]) with
+  | .error [.inference ⟨_, .operatorNotSupported name type⟩] =>
+      require (name == "UncheckedAdd" && decide (type = TypeSystem.Ty.integer))
+        s!"an integer unchecked operand named {name} and {reprStr type}"
+  | .ok _ => throw (IO.userError "an integer unchecked operand was accepted")
+  | .error errors => throw (IO.userError s!"an integer unchecked operand gave {reprStr errors}")
+  IO.println "SOURCE_CORE_FIXED_UNCHECKED_PASS: unchecked + - * wrapping modulo 2^N on the unsigned types and in two's complement on the signed ones with canonical results, unchecked / % rounding toward zero with MIN / -1 giving MIN and MIN % -1 giving 0, a zero divisor panicking with 0x12, -x in a block as unchecked 0 - x, literal operands typed by the other operand on either side, checked arithmetic again after the block, mixed operand types rejected, unchecked += -= *= /= %= on fixed-width locals, a mapping element and an open target typed later wrapping alike, with 0x12 on a zero divisor and its own diagnostic for an absent operand, an integer target rejected, two open literal operands typed by a later use, the return type or the uint256 default and wrapping there, and open literal operands that a later use makes integer rejected"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)

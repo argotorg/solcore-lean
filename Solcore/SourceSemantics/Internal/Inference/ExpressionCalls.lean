@@ -2154,6 +2154,21 @@ theorem ordinaryBinary_expressionTypingBase_under_ambient_bounded
       resources.finalState.inference.substitution closedVariables
       sourceContext active := by
     simpa only [← resources.substitution_eq] using contextValid
+  have uncheckedFits : Detail.isUncheckedOperator operator.value = true →
+      inferred.requirements = [] →
+        resources.finalState.inference.substitution.apply leftResult.type ≠ .integer := by
+    intro unchecked empty
+    obtain ⟨coercions, recordedContains⟩ :=
+      recordExpressionWithExpected_success_containsExpression recordSuccess roots
+    have finalContains := parentToSemantic.containsExpression
+      (FlexibleSubstitution.ContainsExpression.applySubstitution finalized.substitution recordedContains)
+    obtain ⟨leftNode, leftContains, leftNodeType⟩ := leftType.stored_type
+    have fits := resources.unchecked_operands_fit finalContains rfl unchecked
+      (by simp [ExpressionNode.applySubstitution, empty, Detail.coercionRequirements,
+        CoercionStep.applySubstitution, CoercionStep.requirements, List.flatMap_map])
+      leftContains
+    rw [leftNodeType] at fits
+    simpa only [← resources.substitution_eq] using fits
   simpa only [← resources.substitution_eq] using
     (inferBinaryOperator_recordExpressionWithExpected_success_expressionTypingBase_scoped_of_retained
       (later := resources.finalState)
@@ -2162,7 +2177,7 @@ theorem ordinaryBinary_expressionTypingBase_under_ambient_bounded
       (by simpa only [← resources.substitution_eq] using leftType)
       (by simpa only [← resources.substitution_eq] using rightType)
       rightReady leftBelow rightBelow expectedBelow integerLiteralsSubset
-      integerLiteralTargetsSupported finalSubstitutionExtends
+      integerLiteralTargetsSupported uncheckedFits finalSubstitutionExtends
       finalRequirementsSubset retained activeCatalog activeBinders
       traitSuccess profileSuccess catalog finalContextValid signaturesEq
       selectedTraitName traitName resources.solve_success

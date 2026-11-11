@@ -660,6 +660,23 @@ def isUncheckedOperator : Syntax.BinaryOp → Bool
   | .uncheckedModulo => true
   | _ => false
 
+/-- Whether a binary operator with an open literal operand may wait for its
+operands' type (or take the staged `integer` path). An unchecked operator
+never takes `integer`, since upstream defines no unchecked instance for it:
+on an `integer` operand it dispatches as on any other closed type, and an open
+operand that later becomes `integer` is rejected by finalization
+(`validateUncheckedOperand`). -/
+def binaryDefers (operator : Syntax.BinaryOp) (hasOpenLiteralOperand : Bool) (state : State)
+    (operand : Ty) : Bool :=
+  hasOpenLiteralOperand && !(isUncheckedOperator operator && state.resolve operand == .integer)
+
+/-- Away from the unchecked operators every open literal operand defers. -/
+theorem binaryDefers_of_not_unchecked {operator : Syntax.BinaryOp}
+    (notUnchecked : ¬ isUncheckedOperator operator = true) (hasOpenLiteralOperand : Bool)
+    (state : State) (operand : Ty) :
+    binaryDefers operator hasOpenLiteralOperand state operand = hasOpenLiteralOperand := by
+  simp [binaryDefers, Bool.eq_false_iff.mpr notUnchecked]
+
 /-- Select a binary operator's builtin, deferred or trait meaning once its
 operands share a type. -/
 def binaryOperatorTail (context : Context) (operator : Syntax.BinaryOp) (left : Ty)
@@ -736,18 +753,6 @@ def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
     let state ← unify state left .word
     let state ← unify state right .word
     return { type := .word, requirements := [], state }
-  if isUncheckedOperator operator then
-    -- Upstream's `UncheckedAdd` … `UncheckedMod` traits cover `word`, the
-    -- twelve fixed-width integer types and the declared types that implement
-    -- them, never `integer`. A literal operand takes the other operand's type;
-    -- one that is still open is a Word at once, and the operator never waits
-    -- for its operands' type as the checked ones may.
-    let state ← unify state left right
-    let state ← if isOpenIntegerLiteralTarget state integerLiterals left then
-        unify state (state.resolve left) .word
-      else
-        pure state
-    return ← binaryOperatorTail context operator left false state
   let hasOpenLiteralOperand :=
     isOpenIntegerLiteralTarget state integerLiterals left ||
       isOpenIntegerLiteralTarget state integerLiterals right
@@ -761,7 +766,8 @@ def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
         else
           unify state operand expected
     | none => pure state
-  binaryOperatorTail context operator left hasOpenLiteralOperand state
+  binaryOperatorTail context operator left
+    (binaryDefers operator hasOpenLiteralOperand state (state.resolve left)) state
 
 def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
     (operandType : Ty) (expected : Option Ty)

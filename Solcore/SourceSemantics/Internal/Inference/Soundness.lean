@@ -16701,6 +16701,23 @@ inductive BinaryOperatorInferenceCase
       (not_unchecked : Detail.isUncheckedOperator operator = false) :
       BinaryOperatorInferenceCase inferenceContext semanticContext initial
         operator left right integerLiterals result
+  /-- An unchecked operator waiting for its open literal operand, which never
+  takes the staged `integer` path (`Detail.binaryDefers`); finalization rejects
+  one whose operand became `integer`. -/
+  | uncheckedFallback
+      (requirements_eq : result.requirements = [])
+      (operands_eq : result.state.resolve left = result.state.resolve right)
+      (type_eq : result.type = result.state.resolve left)
+      (deferred :
+        Detail.isDeferredBuiltinOperatorTarget result.state
+            (Detail.binaryDefers operator
+              (Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
+                Detail.isOpenIntegerLiteralTarget initial integerLiterals right)
+              result.state (result.state.resolve left))
+            .word (result.state.resolve left) = true)
+      (unchecked : Detail.isUncheckedOperator operator = true) :
+      BinaryOperatorInferenceCase inferenceContext semanticContext initial
+        operator left right integerLiterals result
   | trait
       {trait : Resolved.DeclarationId} {traitName methodName : String}
       {predicates : List ProgramPredicate}
@@ -17095,8 +17112,9 @@ theorem shiftBinaryOperator_of_isShiftOperator {operator : Syntax.BinaryOp}
     ShiftBinaryOperator operator := by
   cases operator <;> simp [Detail.isShiftOperator] at shift <;> constructor
 
-/-- An unchecked operator never waits for an open literal: its tail is a
-direct builtin or a selected trait profile. -/
+/-- An unchecked operator's tail is a direct builtin, a selected trait profile,
+or a wait for its open literal operand; it never takes the staged `integer`
+path (`Detail.binaryDefers`). -/
 private theorem uncheckedBinaryOperator_success_case
     {inferenceContext : Frontend.SourceInference.Context}
     {semanticContext : SourceSemantics.Context}
@@ -17104,10 +17122,19 @@ private theorem uncheckedBinaryOperator_success_case
     {integerLiterals : List IntegerLiteralOrigin}
     {initial state : Frontend.SourceInference.State}
     {result : Detail.OperatorInferenceResult}
+    (unchecked : Detail.isUncheckedOperator operator = true)
     (operands_eq : state.resolve left = state.resolve right)
-    (success : Detail.binaryOperatorTail inferenceContext operator left false state = .ok result) :
+    (success : Detail.binaryOperatorTail inferenceContext operator left
+      (Detail.binaryDefers operator
+        (Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
+          Detail.isOpenIntegerLiteralTarget initial integerLiterals right)
+        state (state.resolve left)) state = .ok result) :
     BinaryOperatorInferenceCase inferenceContext semanticContext initial
       operator left right integerLiterals result := by
+  have builtinWord : Detail.binaryBuiltinType operator = .word := by
+    cases operator <;> simp_all [Detail.isUncheckedOperator, Detail.binaryBuiltinType]
+  have notBool : Detail.binaryResultIsBool operator = false := by
+    cases operator <;> simp_all [Detail.isUncheckedOperator, Detail.binaryResultIsBool]
   unfold Detail.binaryOperatorTail at success
   simp only [pure, Pure.pure, Except.pure, bind, Except.bind] at success
   by_cases fixed : Detail.fixedBinaryOperator operator (state.resolve left) = true
@@ -17126,8 +17153,8 @@ private theorem uncheckedBinaryOperator_success_case
       exact binaryBuiltin_hasType semanticContext operator)
   · cases dispatch_eq : Detail.binaryOperatorDispatch operator with
     | function name =>
-        simp [operand_builtin, dispatch_eq, Detail.isDeferredBuiltinOperatorTarget,
-          Detail.isStagedIntegerOperatorTarget] at success
+        exfalso
+        cases operator <;> simp [Detail.isUncheckedOperator, Detail.binaryOperatorDispatch] at unchecked dispatch_eq
     | traitMethod traitName methodName =>
         simp only [operand_builtin, ↓reduceIte, dispatch_eq] at success
         cases selected : Detail.operatorTrait? inferenceContext traitName with
@@ -17135,8 +17162,27 @@ private theorem uncheckedBinaryOperator_success_case
         | ok selection =>
             cases selection with
             | none =>
-                simp [selected, Detail.isDeferredBuiltinOperatorTarget,
-                  Detail.isStagedIntegerOperatorTarget] at success
+                rw [builtinWord] at success
+                by_cases deferred : Detail.isDeferredBuiltinOperatorTarget state
+                    (Detail.binaryDefers operator
+                      (Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
+                        Detail.isOpenIntegerLiteralTarget initial integerLiterals right)
+                      state (state.resolve left))
+                    .word (state.resolve left) = true
+                · simp only [selected, deferred, Bool.true_or, ↓reduceIte] at success
+                  cases success
+                  exact .uncheckedFallback rfl operands_eq (by simp [notBool]) deferred unchecked
+                · have notStaged : Detail.isStagedIntegerOperatorTarget state
+                      (Detail.binaryDefers operator
+                        (Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
+                          Detail.isOpenIntegerLiteralTarget initial integerLiterals right)
+                        state (state.resolve left))
+                      .word (state.resolve left) = false := by
+                    unfold Detail.isStagedIntegerOperatorTarget Detail.binaryDefers
+                    simp [unchecked]
+                    intro integer _
+                    exact integer
+                  simp [selected, deferred, notStaged] at success
             | some trait =>
                 cases profile : Detail.operatorTraitPredicates inferenceContext
                     trait methodName (state.resolve left)
@@ -17191,14 +17237,15 @@ theorem inferBinaryOperator_success_case
   · obtain ⟨unified, prepared, unifyResult, prepare, tailSuccess⟩ :=
       Detail.inferBinaryOperator_unchecked_result unchecked success
     have unified_eq := Detail.unify_resolve_eq unifyResult
-    rcases prepare with rfl | wordResult
-    · exact uncheckedBinaryOperator_success_case unified_eq tailSuccess
-    · exact uncheckedBinaryOperator_success_case
-        (Detail.unify_preserves_resolve_eq unified_eq wordResult) tailSuccess
+    rcases prepare with rfl | ⟨_, _, expectedResult⟩
+    · exact uncheckedBinaryOperator_success_case unchecked unified_eq tailSuccess
+    · exact uncheckedBinaryOperator_success_case unchecked
+        (Detail.unify_preserves_resolve_eq unified_eq expectedResult) tailSuccess
   have not_unchecked : Detail.isUncheckedOperator operator = false :=
     Bool.eq_false_iff.mpr unchecked
   unfold Detail.inferBinaryOperator at success
-  rw [if_neg shift, if_neg unchecked] at success
+  rw [if_neg shift] at success
+  simp only [Detail.binaryDefers_of_not_unchecked unchecked] at success
   simp only [bind, Except.bind] at success
   cases first_unify : Detail.unify initial left right with
   | error error => simp [first_unify] at success
@@ -18571,6 +18618,8 @@ theorem binaryOperatorInferenceCase_hasType_afterFinalization_scoped
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ later.integerLiterals →
         (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
+    (uncheckedFits : Detail.isUncheckedOperator operator = true → result.requirements = [] →
+      later.inference.substitution.apply left ≠ .integer)
     (catalog : SignatureCatalogWellFormed sourceContext.signatures)
     (contextValid : FlexibleSubstitution.ContextSubstitutionValid
       later.inference.substitution closedVariables sourceContext active)
@@ -18757,6 +18806,109 @@ theorem binaryOperatorInferenceCase_hasType_afterFinalization_scoped
         have typing := binaryInteger_hasType active operator stagedFacts.1 notShift notUnchecked
         simpa only [leftInteger, rightInteger, resultInteger,
           requirementsEq] using typing
+  | uncheckedFallback requirementsEq operandsEq typeEq deferred unchecked =>
+      have finalOperandsEq :
+          later.inference.substitution.apply left =
+            later.inference.substitution.apply right := by
+        calc
+          later.inference.substitution.apply left =
+              later.inference.substitution.apply
+                (result.state.resolve left) := resolvedLeftEq.symm
+          _ = later.inference.substitution.apply
+                (result.state.resolve right) :=
+            congrArg later.inference.substitution.apply operandsEq
+          _ = later.inference.substitution.apply right := resolvedRightEq
+      have resultTypeEq :
+          later.inference.substitution.apply result.type =
+            if Detail.binaryResultIsBool operator then .bool
+            else later.inference.substitution.apply left := by
+        have notBool : Detail.binaryResultIsBool operator = false := by
+          cases operator <;> simp_all [Detail.isUncheckedOperator, Detail.binaryResultIsBool]
+        rw [typeEq]
+        simp [notBool, resolvedLeftEq]
+      have deferredFacts :
+          Detail.binaryBuiltinType operator = .word ∧
+            (Detail.isOpenIntegerLiteralTarget initial integerLiterals left ||
+              Detail.isOpenIntegerLiteralTarget initial integerLiterals
+                right) = true := by
+        refine ⟨by cases operator <;> simp_all [Detail.isUncheckedOperator, Detail.binaryBuiltinType], ?_⟩
+        unfold Detail.isDeferredBuiltinOperatorTarget Detail.binaryDefers at deferred
+        split at deferred <;> simp_all
+      have openEither := Bool.or_eq_true_iff.mp deferredFacts.2
+      obtain ⟨origin, originMember, originResolveEq⟩ :
+          ∃ origin, origin ∈ integerLiterals ∧
+            (initial.resolve (.variable origin.metavariable) =
+                initial.resolve left ∨
+              initial.resolve (.variable origin.metavariable) =
+                initial.resolve right) := by
+        rcases openEither with leftOpen | rightOpen
+        · obtain ⟨_, origin, _, member, equal⟩ :=
+            Detail.isOpenIntegerLiteralTarget_true_witness leftOpen
+          exact ⟨origin, member, .inl equal⟩
+        · obtain ⟨_, origin, _, member, equal⟩ :=
+            Detail.isOpenIntegerLiteralTarget_true_witness rightOpen
+          exact ⟨origin, member, .inr equal⟩
+      have originOperandEq :
+          later.inference.substitution.apply
+              (.variable origin.metavariable) =
+            later.inference.substitution.apply left := by
+        rcases originResolveEq with leftEq | rightEq
+        · calc
+            later.inference.substitution.apply
+                  (.variable origin.metavariable) =
+                later.inference.substitution.apply
+                  (initial.resolve (.variable origin.metavariable)) :=
+              (TypeSystem.InferState.apply_resolve_eq_apply
+                laterExtendsInitial (.variable origin.metavariable)).symm
+            _ = later.inference.substitution.apply
+                  (initial.resolve left) :=
+              congrArg later.inference.substitution.apply leftEq
+            _ = later.inference.substitution.apply left :=
+              TypeSystem.InferState.apply_resolve_eq_apply
+                laterExtendsInitial left
+        · calc
+            later.inference.substitution.apply
+                  (.variable origin.metavariable) =
+                later.inference.substitution.apply
+                  (initial.resolve (.variable origin.metavariable)) :=
+              (TypeSystem.InferState.apply_resolve_eq_apply
+                laterExtendsInitial (.variable origin.metavariable)).symm
+            _ = later.inference.substitution.apply
+                  (initial.resolve right) :=
+              congrArg later.inference.substitution.apply rightEq
+            _ = later.inference.substitution.apply right :=
+              TypeSystem.InferState.apply_resolve_eq_apply
+                laterExtendsInitial right
+            _ = later.inference.substitution.apply left :=
+              finalOperandsEq.symm
+      have supported := integerLiteralTargetsSupported origin
+        (integerLiteralsSubset originMember)
+      rcases supported with originWord | originInteger | ⟨fixed, originFixed⟩
+      · have leftWord : later.inference.substitution.apply left = .word :=
+          originOperandEq.symm.trans originWord
+        have rightWord : later.inference.substitution.apply right = .word :=
+          finalOperandsEq.symm.trans leftWord
+        have resultWord : later.inference.substitution.apply result.type =
+            if Detail.binaryResultIsBool operator then .bool
+            else .word := by
+          rw [resultTypeEq, leftWord]
+        have typing := binaryBuiltin_hasType active operator
+        rw [deferredFacts.1] at typing
+        simpa only [leftWord, rightWord, resultWord, requirementsEq] using
+          typing
+      · exact absurd (originOperandEq.symm.trans originInteger) (uncheckedFits unchecked requirementsEq)
+      · have leftFixed : later.inference.substitution.apply left = .fixed fixed :=
+          originOperandEq.symm.trans originFixed
+        have rightFixed : later.inference.substitution.apply right = .fixed fixed :=
+          finalOperandsEq.symm.trans leftFixed
+        have resultFixed : later.inference.substitution.apply result.type =
+            if Detail.binaryResultIsBool operator then .bool
+            else .fixed fixed := by
+          rw [resultTypeEq, leftFixed]
+        have typing := binaryFixedWord_hasType active operator (.fixed fixed) (by
+          cases operator <;> simp_all [Detail.isUncheckedOperator, Detail.fixedBinaryOperator,
+            TypeSystem.Ty.fixed])
+        simpa only [leftFixed, rightFixed, resultFixed, requirementsEq] using typing
   | @trait trait traitName methodName predicates operandsEq dispatch selected
       profile corresponds =>
       have finalOperandsEq :
@@ -24078,6 +24230,8 @@ theorem inferBinaryOperator_recordExpressionWithExpected_success_expressionTypin
     (integerLiteralTargetsSupported : ∀ origin,
       origin ∈ later.integerLiterals →
         (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
+    (uncheckedFits : Detail.isUncheckedOperator operator = true → inferred.requirements = [] →
+      later.inference.substitution.apply left.type ≠ .integer)
     (substitutionExtends :
       later.inference.substitution.SemanticallyExtends
         result.2.inference.substitution)
@@ -24159,7 +24313,7 @@ theorem inferBinaryOperator_recordExpressionWithExpected_success_expressionTypin
     binaryOperatorInferenceCase_hasType_afterFinalization_scoped inferenceCase
       operatorProperties.1 inferredSubstitutionExtends
       inferredRequirementsSubset integerLiteralsSubset
-      integerLiteralTargetsSupported catalog contextValid signaturesEq
+      integerLiteralTargetsSupported uncheckedFits catalog contextValid signaturesEq
       selectedTraitName solveSuccess solvedEq ledger ownership
       activeSignaturesEq activeRequirementsEq assumptionsMono covered
       operatorRequirementsOccur
@@ -25739,6 +25893,75 @@ theorem finalize_assignmentTargetsFit
       exact statementAssignmentTargetsFit_of_validate
         (validateAssignmentTargets_member witness.assignmentValidation rawMember)
 
+/-- An unchecked operator that waited for an open literal operand (it owns no
+requirement besides its coercions') has a left operand that is not `integer`,
+for which upstream defines no unchecked instance. Finalization establishes it
+for the finalized source (`FinalInferenceResources.unchecked_operands_fit`). -/
+def SourceUncheckedOperandsFit (source : TypedSource) : Prop :=
+  ∀ {id left right : ExpressionId} {operator : Syntax.BinaryOp}
+    {node leftNode : ExpressionNode},
+    ContainsExpression source id node → node.form = .binary left operator right →
+    Detail.isUncheckedOperator operator = true →
+    node.requirements = Detail.coercionRequirements node.coercions →
+    ContainsExpression source left leftNode → leftNode.type ≠ .integer
+
+/-- One successful check of an unchecked operator gives its left operand's fit
+under the checked state's substitution. -/
+theorem uncheckedOperandFits_of_validate {state : Frontend.SourceInference.State}
+    {node leftNode : ExpressionNode} {left right : ExpressionId} {operator : Syntax.BinaryOp}
+    (success : Detail.validateUncheckedOperand state node = .ok ())
+    (form : node.form = .binary left operator right)
+    (unchecked : Detail.isUncheckedOperator operator = true)
+    (requirements : node.requirements = Detail.coercionRequirements node.coercions)
+    (member : Node.expression leftNode ∈ state.nodes) (leftId : leftNode.id = left) :
+    state.inference.substitution.apply leftNode.type ≠ .integer := by
+  intro integer
+  simp [Detail.validateUncheckedOperand, form, unchecked, requirements] at success
+  have absent := success (.expression leftNode) member
+  simp [leftId, Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve,
+    integer] at absent
+
+/-- Finalization checks every unchecked operator that waited for a literal
+operand, so its left operand in the finalized source is not `integer`. -/
+theorem finalize_uncheckedOperandsFit
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    SourceUncheckedOperandsFit result.typedSource := by
+  let witness := Detail.finalize_success_witness success
+  have sourceEq : result.typedSource =
+      (witness.finalState.toTypedSource roots).applySubstitution
+        witness.finalState.inference.substitution :=
+    congrArg Frontend.SourceInference.Result.typedSource witness.result_eq
+  intro id left right operator node leftNode contains form unchecked requirements leftContains
+  rw [sourceEq] at contains leftContains
+  obtain ⟨raw, rawMember, rawEq⟩ := List.mem_map.mp contains.1
+  obtain ⟨rawLeft, rawLeftMember, rawLeftEq⟩ := List.mem_map.mp leftContains.1
+  cases raw with
+  | statement _ => cases rawEq
+  | expression rawNode =>
+    cases rawLeft with
+    | statement _ => cases rawLeftEq
+    | expression rawLeftNode =>
+      simp only [Node.applySubstitution, Node.expression.injEq] at rawEq rawLeftEq
+      subst rawEq rawLeftEq
+      have check := validateAssignmentTargets_member witness.assignmentValidation rawMember
+      simp only [Detail.validateAssignmentTargetNode] at check
+      have formRaw : rawNode.form = .binary left operator right := by
+        cases rawForm : rawNode.form <;>
+          simp_all [ExpressionNode.applySubstitution, ExpressionForm.applySubstitution]
+      have requirementsRaw :
+          rawNode.requirements = Detail.coercionRequirements rawNode.coercions := by
+        simpa [ExpressionNode.applySubstitution, Detail.coercionRequirements,
+          CoercionStep.applySubstitution, CoercionStep.requirements, List.flatMap_map] using requirements
+      have leftIdRaw : rawLeftNode.id = left := by
+        simpa [ExpressionNode.applySubstitution] using leftContains.2
+      simpa [ExpressionNode.applySubstitution] using
+        uncheckedOperandFits_of_validate check formRaw unchecked requirementsRaw rawLeftMember leftIdRaw
+
 /-- The reusable whole-body resources exposed by one successful finalization.
 
 The hidden post-defaulting state is retained so recursive inference proofs can
@@ -25793,6 +26016,9 @@ structure FinalInferenceResources
       Detail.LocalBinderInstantiationNoCapture result.substitution binder
   /-- Every value assignment's final target type takes its operator. -/
   assignment_targets_fit : SourceAssignmentTargetsFit result.typedSource
+  /-- Every unchecked operator that waited for a literal operand has a left
+  operand that is not `integer`. -/
+  unchecked_operands_fit : SourceUncheckedOperandsFit result.typedSource
 
 namespace FinalInferenceResources
 
@@ -25845,6 +26071,7 @@ def ofFinalize
     local_no_capture :=
       Detail.finalize_localBinderInstantiationNoCapture success
     assignment_targets_fit := finalize_assignmentTargetsFit success
+    unchecked_operands_fit := finalize_uncheckedOperandsFit success
   }
   · intro ready
     have originsBelow := Detail.finalize_numericOriginsBelowNext success

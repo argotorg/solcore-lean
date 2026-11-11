@@ -1264,13 +1264,14 @@ theorem inferBinaryOperator_normalized_issuance
   by_cases unchecked : Detail.isUncheckedOperator operator = true
   · obtain ⟨unifiedState, prepared, unified, prepare, tailSuccess⟩ :=
       Detail.inferBinaryOperator_unchecked_result unchecked accepted
-    have tail := finish (show finishBinary context operator left false prepared = .ok result
+    have tail := finish (show finishBinary context operator left _ prepared = .ok result
       from tailSuccess)
-    rcases prepare with rfl | wordResult
+    rcases prepare with rfl | ⟨_, _, expectedResult⟩
     · simpa only [unify_requirements unified] using tail
-    · simpa only [unify_requirements unified, unify_requirements wordResult] using tail
+    · simpa only [unify_requirements unified, unify_requirements expectedResult] using tail
   unfold Detail.inferBinaryOperator Detail.binaryOperatorTail at accepted
-  rw [if_neg shift, if_neg unchecked] at accepted
+  rw [if_neg shift] at accepted
+  simp only [Detail.binaryDefers_of_not_unchecked unchecked] at accepted
   cases unified : Detail.unify state left right with
   | error error => simp [unified, bind, Except.bind] at accepted
   | ok unifiedState =>

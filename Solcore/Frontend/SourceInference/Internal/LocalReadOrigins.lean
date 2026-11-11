@@ -560,11 +560,12 @@ theorem inferBinaryOperator_preserves {relation : State → State → Prop}
   · obtain ⟨_, prepared, unifyResult, prepare, tailResult⟩ :=
       inferBinaryOperator_unchecked_result unchecked success
     have tail := binaryOperatorTail_preserves refl added tailResult
-    rcases prepare with rfl | wordResult
+    rcases prepare with rfl | ⟨_, _, expectedResult⟩
     · exact trans (unified unifyResult) tail
-    · exact trans (unified unifyResult) (trans (unified wordResult) tail)
+    · exact trans (unified unifyResult) (trans (unified expectedResult) tail)
   unfold inferBinaryOperator at success
-  rw [if_neg shift, if_neg unchecked] at success
+  rw [if_neg shift] at success
+  simp only [binaryDefers_of_not_unchecked unchecked] at success
   cases unifyResult : unify state left right with
   | error error => simp [unifyResult, bind, Except.bind] at success
   | ok unifiedState =>

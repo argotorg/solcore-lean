@@ -1064,14 +1064,15 @@ theorem inferBinaryOperator
   · obtain ⟨unifiedState, prepared, unifyResult, prepare, tailSuccess⟩ :=
       Detail.inferBinaryOperator_unchecked_result unchecked success
     have tail := finishBinaryOperatorLedger_evolution
-      (show finishBinaryOperatorLedger context operator left false prepared = .ok result
+      (show finishBinaryOperatorLedger context operator left _ prepared = .ok result
         from tailSuccess)
-    rcases prepare with rfl | wordResult
+    rcases prepare with rfl | ⟨_, _, expectedResult⟩
     · exact (LedgerEvolution.trans (.unify unifyResult) tail).preserve tracked
     · exact (LedgerEvolution.trans (.unify unifyResult)
-        (LedgerEvolution.trans (.unify wordResult) tail)).preserve tracked
+        (LedgerEvolution.trans (.unify expectedResult) tail)).preserve tracked
   unfold Detail.inferBinaryOperator Detail.binaryOperatorTail at success
-  rw [if_neg shift, if_neg unchecked] at success
+  rw [if_neg shift] at success
+  simp only [Detail.binaryDefers_of_not_unchecked unchecked] at success
   cases unifyResult : Detail.unify state left right with
   | error error =>
       simp [unifyResult, bind, Except.bind] at success

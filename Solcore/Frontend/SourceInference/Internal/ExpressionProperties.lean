@@ -3504,23 +3504,26 @@ theorem inferBinaryOperator_inferenceProperties
     have tailProperties (preparedReady : prepared.InferenceReady)
         (leftAtPrepared : left.VariablesBelow prepared.inference.next) :=
       finishBinaryOperator_inferenceProperties preparedReady leftAtPrepared
-        (show finishBinaryOperator context operator left false prepared = .ok result
+        (show finishBinaryOperator context operator left _ prepared = .ok result
           from tailSuccess)
-    rcases prepare with rfl | wordResult
+    rcases prepare with rfl | ⟨expectedType, rfl, expectedResult⟩
     · exact ⟨unifyProgress.trans (tailProperties unifiedReady leftAtUnified).1,
         (tailProperties unifiedReady leftAtUnified).2⟩
     · have resolvedLeftBelow :
           (unifiedState.resolve left).VariablesBelow unifiedState.inference.next :=
         unifiedReady.solved.variablesBelow_apply leftAtUnified
-      have wordProgress := unify_inferenceProgress unifiedReady.solved
-        resolvedLeftBelow (Ty.variablesBelow_constructor _ _) wordResult
-      have wordReady := unify_preserves_inferenceReady unifiedReady
-        resolvedLeftBelow (Ty.variablesBelow_constructor _ _) wordResult
-      have properties := tailProperties wordReady
-        (leftAtUnified.weaken wordProgress.next_le)
-      exact ⟨unifyProgress.trans (wordProgress.trans properties.1), properties.2⟩
+      have expectedAtUnified : expectedType.VariablesBelow unifiedState.inference.next :=
+        (expectedBelow expectedType (by simp)).weaken unifyProgress.next_le
+      have expectedProgress := unify_inferenceProgress unifiedReady.solved
+        resolvedLeftBelow expectedAtUnified expectedResult
+      have expectedReady := unify_preserves_inferenceReady unifiedReady
+        resolvedLeftBelow expectedAtUnified expectedResult
+      have properties := tailProperties expectedReady
+        (leftAtUnified.weaken expectedProgress.next_le)
+      exact ⟨unifyProgress.trans (expectedProgress.trans properties.1), properties.2⟩
   unfold inferBinaryOperator binaryOperatorTail at success
-  rw [if_neg shift, if_neg unchecked] at success
+  rw [if_neg shift] at success
+  simp only [binaryDefers_of_not_unchecked unchecked] at success
   cases unifyResult : unify state left right with
   | error error =>
       simp [unifyResult, bind, Except.bind] at success

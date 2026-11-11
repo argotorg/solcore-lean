@@ -201,12 +201,35 @@ theorem actualInferExprFuelRetainedSoundness_binary_operator {fuel : Nat}
     intro origin member
     have present : origin ∈ rightState.integerLiterals := (List.mem_filter.mp member).1
     simpa only [finalSubstitution] using resources.integer_literal_target_supported origin (rightLiterals present)
+  have uncheckedFits : Detail.isUncheckedOperator operator.value = true →
+      operatorResult.requirements = [] →
+        resources.finalState.inference.substitution.apply left.type ≠ .integer := by
+    intro unchecked empty
+    -- The left operand's typing in the finalized source, beside `leftTyped`'s in `semanticSource`.
+    have leftFinal := actualInferExprFuelFinalSubtreeSoundness_of_retainedSoundness recursive
+      leftSuccess resources interfaces leftExtension signaturesEq ownerEq typeParametersEq assumptionsEq
+      signatureFormation functionsCanonical catalog canonical allocatedInvariant actual allocatedOperational
+      (by simp) (by simp) ((finalPreserved.childSubtree leftEdge).monoBefore leftToParent)
+      ((finalPreserved.childSubtree leftEdge).monoBefore leftToParent)
+      ((rawProper.childSubtree leftEdge).monoBefore leftToParent).proper
+      ((Detail.inferExprFuel_integerPatterns_subset rightSuccess).trans rightPatterns)
+      ((Detail.inferExprFuel_integerLiterals_subset rightSuccess).trans rightLiterals)
+      ((Detail.inferExprFuel_requirements_subset rightSuccess).trans rightRequirements)
+      (covered.expressionChild resources.graph_closed (childrenRetained leftEdge))
+      (actualCovered.directChild (childrenRetained leftEdge))
+    obtain ⟨leftNode, leftContains, leftNodeType⟩ := leftFinal.stored_type
+    -- In explicit mode, so that the field keeps its `SourceUncheckedOperandsFit` type.
+    have fits := SourceUncheckedOperandsFit.of_operatorSite
+      (@FinalInferenceResources.unchecked_operands_fit _ _ _ _ _ resources) operatorsRetained contains rfl
+      unchecked (by simp [empty]) leftContains
+    rw [leftNodeType] at fits
+    simpa only [finalSubstitution] using fits
   simpa only [finalSubstitution] using
     (inferBinaryOperator_recordExpressionWithExpected_typing_from_interfaces
       (later := resources.finalState) (base := finalizedRequirementContext wholeContext finalized)
       operatorSuccess recorded (by simpa only [finalSubstitution] using leftTyped)
       (by simpa only [finalSubstitution] using rightTyped)
-      rightProperties.2.1 leftBelow rightProperties.2.2 rightExpected targets
+      rightProperties.2.1 leftBelow rightProperties.2.2 rightExpected targets uncheckedFits
       (by simpa only [finalSubstitution] using resultSubstitutionExtension)
       finalRequirements retained (by simpa only [signaturesEq] using interfaces) coercionsRetained operatorsRetained
       activeCatalog (invariant.typeParameterBinders wholeCanonical) activeSignatures
