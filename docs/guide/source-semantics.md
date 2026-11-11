@@ -208,7 +208,9 @@ changes; each exhaustive `cases` over operators gains a case, and the build find
    `ExpressionLedgers`, `LedgerFamilies`, `StatementResources`), `Internal/Formation`
    (`NormalizedCalls`, `NormalizedCoercions`), `Internal/Privacy` (`ProtectedFrames`,
    `ProtectedInference`, `SelectedReferences`, `SelectedInference`) and `Internal/Selected`
-   (`Operators`, `OperatorMetadata`, `State`, `Statements`).
+   (`Operators`, `OperatorMetadata`, `State`, `Statements`). An open compound target waits for its
+   type until finalization checks it, so `inferAssignedValueFuel_success_sound` takes
+   `AssignmentTargetFits`, which its callers get from `FinalInferenceResources.assignment_targets_fit`.
 6. **Core lowering and tests**: see [Core lowering](core-lowering.md#making-changes). Each commit
    added a public-API test with the probe's results (`Tests.SourceCoreShiftExecution`,
    `Tests.SourceCoreUncheckedExecution`), registered in [Tests/Main.lean](../../Tests/Main.lean).

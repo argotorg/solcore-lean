@@ -51,9 +51,9 @@ artifact. `SourceCoreExecution.prepare` turns that artifact into the recipe that
 | [`TraitResolution`](../../Solcore/Frontend/TraitResolution.lean) | The tabled trait search and its typed instance: `TraitResolution.Evidence`, `TypedTraitResolution.Evidence` |
 | [`SourceInference/TypedIR`](../../Solcore/Frontend/SourceInference/TypedIR.lean) | The typed IR: `TypedSource`, `ExpressionNode`, `ExpressionForm`, `TypedBinder` |
 | [`SourceInference/Types`](../../Solcore/Frontend/SourceInference/Types.lean) | `State`, `Context`, `CheckedFunction`, `SolvedRequirement`, `Error` |
-| [`SourceInference/Resolution`](../../Solcore/Frontend/SourceInference/Resolution.lean) | Operator, overload and trait selection: `binaryOperatorDispatch`, `inferBinaryOperator`, `withExpected` |
+| [`SourceInference/Resolution`](../../Solcore/Frontend/SourceInference/Resolution.lean) | Operator, overload and trait selection: `binaryOperatorDispatch`, `inferBinaryOperator`, `withExpected`; `compoundOperandType`, which gives an open compound target's own type to its operand for `compoundTakesTargetType` |
 | [`SourceInference/Expression`](../../Solcore/Frontend/SourceInference/Expression.lean) | The traversal `inferExprFuel`, `inferStatementFuel`, `inferStatementsFuel`, with the shift and unchecked branches |
-| [`SourceInference/Program`](../../Solcore/Frontend/SourceInference/Program.lean) | `checkFunctionBody`, `finalize`, which defaults an open numeric pattern to `uint256`, defaults an open literal to `uint256` where an operator, a comparison, a requirement or a minus sign uses it and rejects it as ambiguous otherwise (`Detail.literalDefaultsToUint256`), and rejects a literal outside its fixed-width integer type's range, checked with the literal's sign (`Detail.signedLiteralFitsTarget`), and a `uint256` pattern above `uint256`'s greatest value; `inferExpression`, whose own type stays open, leaves a lone open literal ambiguous where upstream's root rule gives it `uint256` |
+| [`SourceInference/Program`](../../Solcore/Frontend/SourceInference/Program.lean) | `checkFunctionBody`, `finalize`, which defaults an open numeric pattern to `uint256`, defaults an open literal to `uint256` where an operator, a compound assignment, a comparison, a requirement or a minus sign uses it and rejects it as ambiguous otherwise (`Detail.literalDefaultsToUint256`), and rejects a literal outside its fixed-width integer type's range, checked with the literal's sign (`Detail.signedLiteralFitsTarget`), and a `uint256` pattern above `uint256`'s greatest value, and rejects a compound assignment whose target type, known only then, does not take its operator, such as `integer` or a lambda parameter that local generalization quantified (`Detail.validateAssignmentTargets`, `Detail.compoundTargetFits`); `inferExpression`, whose own type stays open, leaves a lone open literal ambiguous where upstream's root rule gives it `uint256` |
 | [`SourceInference`](../../Solcore/Frontend/SourceInference.lean) | The inference umbrella, which also imports five of its proof files |
 | [`ProgramChecking`](../../Solcore/Frontend/ProgramChecking.lean) | `checkProgram`, `CheckedProgram`, `ProgramCheckError` |
 | **Staging and specialization** | |
@@ -190,8 +190,10 @@ the layout refactor; [Conventions](conventions.md#following-older-notes) says ho
 2. **Typed IR.** A new operator needs none: `ExpressionForm` carries `Syntax.BinaryOp` and
    `Syntax.ValueAssignOp`. A new form needs a constructor in `SourceInference/TypedIR`.
 3. **Inference**, in `SourceInference/Resolution`: the dispatch (`binaryOperatorDispatch`) and the
-   typing rule (`inferBinaryOperator`, whose shift branch runs before any dispatch). A new form also
-   needs its arm in `inferExprFuel` (`SourceInference/Expression`).
+   typing rule (`inferBinaryOperator`, whose shift branch runs before any dispatch). A compound form
+   that takes a fixed-width target's type also needs its case in `compoundOperandConstructor` and
+   `compoundTakesTargetType`; finalization checks the target's final type with `compoundTargetFits`.
+   A new form also needs its arm in `inferExprFuel` (`SourceInference/Expression`).
 4. **Inference proofs**: the new branch's lemmas next to it (`inferBinaryOperator_shift_result` in
    `SourceInference/Expression`), then every case analysis in
    `SourceInference/Internal/ExpressionProperties`. `unchecked` also touched `RequirementProperties`,
