@@ -152,6 +152,10 @@ depends on the change.
   other files only add that case to their case splits over `Literal`. Negative literals (53bb5d5a8)
   added three cases in the same way (`resolvedNegativeWord`, `resolvedNegativeInteger` and
   `resolvedNegativeFixed`), and the numeric branch chooses among them by the literal's sign.
+  Numeric patterns at `uint256` (cd1907db3) took the pattern side: both literal matchers compile
+  one as a Core word test after `validateFixedIntegerLiteral`, and both pattern-leaf codes gain
+  `LiteralCode.uint256` with its construction (`constructs_uint256` in `DataPatternLeaves`,
+  `constructs_uint256_with_requirement` in `CompatiblePatternLeaves`).
 - **A changed rule** (7ac75aea3, closures by value). Theorems whose statements mention the old
   premise are restated over the new one. Most changes were in `Owned/`, `CellAware/`, `OwnedStaged/`,
   `OwnedPrepared/`, `Callable/`, `Statements/`, `Generalized/`, `Selected/` and `Foundations/`.
