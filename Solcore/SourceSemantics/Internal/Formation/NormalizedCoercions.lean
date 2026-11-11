@@ -1146,8 +1146,10 @@ private abbrev finishUnary (context : SourceInference.Context) (operator : Synta
   let operand := state.resolve operandType
   if Detail.fixedUnaryOperator operator operand then
     pure { type := operand, requirements := [], state }
+  else if operator = .negate then
+    throw (.operatorNotSupported "-" operand)
   else
-    let builtin := match operator with | .logicalNot => Ty.bool | .bitNot => Ty.word
+    let builtin := match operator with | .logicalNot => Ty.bool | .bitNot | .negate => Ty.word
     finishOperator context (Detail.unaryOperatorDispatch operator) operand builtin builtin
       (if operator == Syntax.UnaryOp.logicalNot then .bool else operand) [operand] openLiteral state
 
@@ -1202,8 +1204,10 @@ theorem inferUnaryOperator_normalized_issuance
     · intro row member fresh
       rw [← Except.ok.inj accepted] at member
       exact absurd member fresh
-    · exact finishOperator_formation catalog signatures
-        (fun extension => (extension operandType).symm ▸ operandFormed) continuation accepted
+    · split at accepted
+      · cases accepted
+      · exact finishOperator_formation catalog signatures
+          (fun extension => (extension operandType).symm ▸ operandFormed) continuation accepted
   let openLiteral := Detail.isOpenIntegerLiteralTarget state integerLiterals operandType
   unfold Detail.inferUnaryOperator at accepted
   cases expected with

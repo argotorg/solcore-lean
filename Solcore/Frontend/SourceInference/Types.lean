@@ -101,9 +101,10 @@ inductive Error where
       (metavariable : TypeVarId) (next : Nat)
   | unsupportedIntegerLiteralTarget
       (expression : ExpressionId) (type : Ty)
-  /-- A literal greater than the greatest value of its fixed-width type. -/
+  /-- A literal outside the range of its fixed-width type, with its value:
+negative for a negative literal. -/
   | integerLiteralOutOfRange
-      (expression : ExpressionId) (type : Ty) (value : Nat)
+      (expression : ExpressionId) (type : Ty) (value : Int)
   | missingIntegerLiteralRequirement
       (expression : ExpressionId) (requirement : RequirementId)
   | integerLiteralRequirementPredicateMismatch

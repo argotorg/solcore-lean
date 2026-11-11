@@ -168,6 +168,40 @@ inductive ResolvedIntegerLiteralConstructs (context : Context) :
       ResolvedIntegerLiteralConstructs context source
         { rawValue := raw, targetType := .fixed type, requirement := requirement }
         (.word (Core.Word.ofNatModulo raw))
+  /-- A negative literal at Word wraps: its word is the magnitude negated
+  modulo `2^256`, so `-1` is `2^256 - 1`. -/
+  | negativeWord
+      {source : Syntax.CoreLiteralValue} {raw : Nat}
+      {requirement : RequirementId}
+      (meaning : NegativeLiteralDenotes source raw)
+      (evidence : RequirementProves context requirement
+        (ProgramSignatures.builtinIntPredicate .word)) :
+      ResolvedIntegerLiteralConstructs context source
+        { rawValue := raw, targetType := .word, requirement := requirement }
+        (.word (negativeLiteralWord raw))
+  /-- A negative literal at Integer is exact. -/
+  | negativeInteger
+      {source : Syntax.CoreLiteralValue} {raw : Nat}
+      {requirement : RequirementId}
+      (meaning : NegativeLiteralDenotes source raw)
+      (evidence : RequirementProves context requirement
+        (ProgramSignatures.builtinIntPredicate .integer)) :
+      ResolvedIntegerLiteralConstructs context source
+        { rawValue := raw, targetType := .integer, requirement := requirement }
+        (.integer (-(Int.ofNat raw)))
+  /-- A negative literal at a fixed-width integer type is its word in two's
+  complement. Its magnitude is at most that of the type's least value, so the
+  word is canonical, and only `-0` constructs at an unsigned type. -/
+  | negativeFixed
+      {source : Syntax.CoreLiteralValue} {raw : Nat}
+      {requirement : RequirementId} {type : TypeSystem.FixedInteger}
+      (meaning : NegativeLiteralDenotes source raw)
+      (fits : raw ≤ type.minMagnitude)
+      (evidence : RequirementProves context requirement
+        (ProgramSignatures.builtinIntPredicate (.fixed type))) :
+      ResolvedIntegerLiteralConstructs context source
+        { rawValue := raw, targetType := .fixed type, requirement := requirement }
+        (.word (negativeLiteralWord raw))
 
 namespace LiteralConstructs
 
@@ -194,6 +228,9 @@ theorem valid
   | word meaning evidence => exact .word meaning rfl evidence
   | integer meaning evidence => exact .integer meaning rfl evidence
   | fixed meaning _ evidence => exact .fixed meaning rfl evidence
+  | negativeWord meaning evidence => exact .negative meaning (.inl rfl) evidence
+  | negativeInteger meaning evidence => exact .negative meaning (.inr (.inl rfl)) evidence
+  | negativeFixed meaning _ evidence => exact .negative meaning (.inr (.inr ⟨_, rfl⟩)) evidence
 
 theorem functional
     {context : Context} {source : Syntax.CoreLiteralValue}
@@ -203,9 +240,47 @@ theorem functional
     (rightConstruction :
       ResolvedIntegerLiteralConstructs context source resolution right) :
     left = right := by
-  cases leftConstruction <;> cases rightConstruction <;> rfl
+  cases leftConstruction <;> cases rightConstruction <;>
+    first
+    | rfl
+    | exact absurd ‹NumericLiteralDenotes _ _›
+        (NegativeLiteralDenotes.not_numeric ‹NegativeLiteralDenotes _ _›)
 
 end ResolvedIntegerLiteralConstructs
+
+/-- A negative literal's word is canonical for a fixed-width type when its
+magnitude is at most that of the type's least value. -/
+theorem negativeLiteralWord_canonical {type : TypeSystem.FixedInteger} {raw : Nat}
+    (fits : raw ≤ type.minMagnitude) :
+    type.canonical (negativeLiteralWord raw).val = true := by
+  have bits := type.width.bits_le
+  have halfLe : 2 ^ (type.width.bits - 1) ≤ 2 ^ 255 :=
+    Nat.pow_le_pow_right (by decide) (by omega)
+  have halfPositive := Nat.two_pow_pos (type.width.bits - 1)
+  have fullPositive := Nat.two_pow_pos type.width.bits
+  have modulus : Core.wordModulus = 2 ^ 256 := rfl
+  show type.canonical ((Core.wordModulus - raw % Core.wordModulus) % Core.wordModulus) = true
+  unfold TypeSystem.FixedInteger.minMagnitude at fits
+  unfold TypeSystem.FixedInteger.canonical
+  rw [modulus]
+  split
+  · next signed =>
+      simp only [signed, if_true] at fits
+      have small : raw < 2 ^ 256 := by omega
+      rw [Nat.mod_eq_of_lt small]
+      by_cases zero : raw = 0
+      · subst zero
+        simp [halfPositive]
+      · have below : 2 ^ 256 - raw < 2 ^ 256 := by omega
+        rw [Nat.mod_eq_of_lt below]
+        simp only [Bool.or_eq_true, decide_eq_true_eq]
+        right
+        omega
+  · next unsigned =>
+      simp only [unsigned, Bool.false_eq_true, if_false] at fits
+      have zero : raw = 0 := by omega
+      subst zero
+      simp [fullPositive]
 
 /-- Infinite two's-complement conjunction on mathematical integers. -/
 def integerBitAnd : Int → Int → Int

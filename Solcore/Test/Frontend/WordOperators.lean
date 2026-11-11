@@ -894,7 +894,8 @@ def frontendParsedWordAdditionTests : IO Unit := do
       checkRejected selected content false
   checkShapes
   checkParameterPositions
-  for content in ["+1", "-1", "1 +", "1 + 2 3", "1 + 2 trailing", "l += r"] do
+  -- A prefix `-` is an operator (row 1, step 6); a lone `-` has no operand.
+  for content in ["+1", "-", "1 +", "1 + 2 3", "1 + 2 trailing", "l += r"] do
     assertTrue (← parsed? Syntax.Parser.expression content).isNone
       s!"{content}: malformed, unsupported prefix, or unconsumed source accepted"
   assertTrue (← parsed? (Syntax.Parser.functionDecl .module)
@@ -1103,7 +1104,8 @@ def frontendParsedWordArithmeticTests : IO Unit := do
   for content in ["l(c)", "r(c)"] do
     checkRejected_variant supplied content false
   checkShapes_variant
-  for content in ["-1", "+1", "8 -", "2 *", "8 - 3 2", "2 * 3 trailing", "l -= r", "l *= r"] do
+  -- A prefix `-` is an operator (row 1, step 6); a lone `-` has no operand.
+  for content in ["-", "+1", "8 -", "2 *", "8 - 3 2", "2 * 3 trailing", "l -= r", "l *= r"] do
     assertTrue (← parsed_variant? Syntax.Parser.expression content).isNone
       s!"{content}: malformed, unsupported prefix, or unconsumed source accepted"
   assertTrue (← parsed_variant? (Syntax.Parser.functionDecl .module)
@@ -1484,7 +1486,7 @@ def frontendParsedWordDivisionTests : IO Unit := do
   checkEntry "function guard(l: Word,r: Word) returns (Word){if(l / r > r){return l % r;}else{return l;}}"
     (.ifE (.binary .wordGt (.binary .wordDiv (.var 1) (.var 0)) (.var 0))
       (.binary .wordMod (.var 1) (.var 0)) (.var 1)) .word [.word, .word] 16 guardCases
-  for content in ["7 /", "7 %", "7 / 3 trailing", "7 % 3 2", "-7 / 3", "7 / -3", "l /= r", "l %= r"] do
+  for content in ["7 /", "7 %", "7 / 3 trailing", "7 % 3 2", "- / 3", "7 / -", "l /= r", "l %= r"] do
     assertTrue (← parsed_variant2? Syntax.Parser.expression content).isNone "malformed, signed-prefix, or unconsumed expression accepted"
   assertTrue (← parsed_variant2? (Syntax.Parser.functionDecl .module)
     "function f() returns (Word){return 7 % 0;} trailing").isNone "function parser accepted only a valid prefix"
@@ -1740,7 +1742,7 @@ def frontendParsedWordEqualityTests : IO Unit := do
   checkParameterPositions_variant2
   checkReturnContract
   checkArithmeticEntry
-  for content in ["l == r == l", "l ==", "-1 == 0", "+1 == 0", "l == r trailing", "l == r 0"] do
+  for content in ["l == r == l", "l ==", "- == 0", "+1 == 0", "l == r trailing", "l == r 0"] do
     assertTrue (← parsed_variant3? Syntax.Parser.expression content).isNone
       s!"{content}: non-associative, prefix, incomplete, or unconsumed source accepted"
   assertTrue (← parsed_variant3? (Syntax.Parser.functionDecl .module)
@@ -1943,7 +1945,7 @@ def frontendParsedWordGreaterTests : IO Unit := do
     checkRejected_variant4 supplied content false
   checkParameterPositions_variant3
   checkReturnContract_variant
-  for content in ["l > r > l", "-1 > 0", "+1 > 0", "l >", "l > r trailing", "l > r 0"] do
+  for content in ["l > r > l", "- > 0", "+1 > 0", "l >", "l > r trailing", "l > r 0"] do
     assertTrue (← parsed_variant4? Syntax.Parser.expression content).isNone
       s!"{content}: non-associative, prefix, incomplete, or unconsumed source accepted"
   assertTrue (← parsed_variant4? (Syntax.Parser.functionDecl .module)
@@ -2205,7 +2207,7 @@ def frontendParsedWordGreaterEqualTests : IO Unit := do
   checkParameterPositions_variant4
   checkReturnContract_variant2
   checkArithmeticEntry_variant
-  for content in ["l >= r >= l", "l >= r > l", "l <= r >= l", "l >= r <= l", "l >=", "-1 >= 0", "+1 >= 0",
+  for content in ["l >= r >= l", "l >= r > l", "l <= r >= l", "l >= r <= l", "l >=", "- >= 0", "+1 >= 0",
       "l >= r trailing", "l >= r 0"] do
     assertTrue (← parsed_variant5? Syntax.Parser.expression content).isNone "non-associative or incomplete source accepted"
   assertTrue (← parsed_variant5? (Syntax.Parser.functionDecl .module)
@@ -2450,7 +2452,7 @@ def frontendParsedWordInequalityTests : IO Unit := do
   checkParameterPositions_variant5
   checkReturnContract_variant3
   checkArithmeticEntry_variant2
-  for content in ["l != r != l", "l != r == l", "l == r != l", "l !=", "-1 != 0", "+1 != 0",
+  for content in ["l != r != l", "l != r == l", "l == r != l", "l !=", "- != 0", "+1 != 0",
       "l != r trailing", "l != r 0"] do
     assertTrue (← parsed_variant6? Syntax.Parser.expression content).isNone "non-associative or incomplete source accepted"
   assertTrue (← parsed_variant6? (Syntax.Parser.functionDecl .module)
@@ -2689,7 +2691,7 @@ def frontendParsedWordLessTests : IO Unit := do
   checkParameterPositions_variant6
   checkReturnContract_variant4
   checkArithmeticEntry_variant3
-  for content in ["l < r < l", "l < r > l", "l <= r < l", "l < r <= l", "l <", "-1 < 0", "+1 < 0",
+  for content in ["l < r < l", "l < r > l", "l <= r < l", "l < r <= l", "l <", "- < 0", "+1 < 0",
       "l < r trailing", "l < r 0"] do
     assertTrue (← parsed_variant7? Syntax.Parser.expression content).isNone "non-associative or incomplete source accepted"
   assertTrue (← parsed_variant7? (Syntax.Parser.functionDecl .module)
@@ -2942,7 +2944,7 @@ def frontendParsedWordLessEqualTests : IO Unit := do
   checkParameterPositions_variant7
   checkReturnContract_variant5
   checkArithmeticEntry_variant4
-  for content in ["l <= r <= l", "l <= r > l", "l > r <= l", "l <=", "-1 <= 0", "+1 <= 0",
+  for content in ["l <= r <= l", "l <= r > l", "l > r <= l", "l <=", "- <= 0", "+1 <= 0",
       "l <= r trailing", "l <= r 0"] do
     assertTrue (← parsed_variant8? Syntax.Parser.expression content).isNone "non-associative or incomplete source accepted"
   assertTrue (← parsed_variant8? (Syntax.Parser.functionDecl .module)

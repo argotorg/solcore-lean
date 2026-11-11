@@ -440,7 +440,7 @@ theorem inferExprFuel_success_numericLiteral_expressionTypingBase_scoped_of_reta
     {closedVariables : List TypeSystem.TypeVarId}
     (expression_eq : expression.value = .literal literal)
     (literal_eq : literal.value = source)
-    (decoded : Frontend.numericLiteralValue? source = some rawValue)
+    (decoded : Frontend.literalMagnitude? source = some rawValue)
     (allocation_eq : initial.allocateExpressionId = (id, allocated))
     (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
       expected initial = .ok inferred)

@@ -277,6 +277,8 @@ theorem postfix_failure_after_prefix_preserves_only_prior_events (prior : List P
   refine ⟨reject_of_trace (input := state rejectSuffix 0 prior) rejection_trace, ?_, rfl⟩
   simp only [failedState, State.diagnostics, List.reverse_cons, List.reverse_reverse]
 
+private def plusInput (prior : List ParseDiagnostic) : State :=
+  { state [] 0 prior with tokens := #[sym 0 1 .plus, sym 1 2 .bang], window := { endIndex := 2, endByte := 99 } }
 private def minusInput (prior : List ParseDiagnostic) : State :=
   { state [] 0 prior with tokens := #[sym 0 1 .minus, sym 1 2 .bang], window := { endIndex := 2, endByte := 99 } }
 private def hiddenInput (prior : List ParseDiagnostic) : State :=
@@ -284,14 +286,20 @@ private def hiddenInput (prior : List ParseDiagnostic) : State :=
 private def missingInput (prior : List ParseDiagnostic) : State :=
   { state [] 0 prior with tokens := #[], window := { endIndex := 3, endByte := 99 } }
 
-/-- Leading minus is not a canonical unary token, so it and the following bang
+/-- Leading plus is not a canonical unary token, so it and the following bang
 remain untouched. The independent absent guard drives the exact silent result. -/
-theorem minus_stops_prefix_scanning (prior : List ParseDiagnostic) :
-    unaryOperators 3 [] (minusInput prior) = .ok [] (minusInput prior) ∧
-    (minusInput prior).peek? = some (sym 0 1 .minus) ∧
-    (minusInput prior).tokens[1]? = some (sym 1 2 .bang) := by
-  refine ⟨unaryOperators_trace_success_complete (input := minusInput prior) (.done ?_), rfl, rfl⟩
-  simp [UnaryOperatorAbsentAt, TokenKindAbsentAt, TokenAt, minusInput, state, State.declarativeRemainder, sym]
+theorem plus_stops_prefix_scanning (prior : List ParseDiagnostic) :
+    unaryOperators 3 [] (plusInput prior) = .ok [] (plusInput prior) ∧
+    (plusInput prior).peek? = some (sym 0 1 .plus) ∧
+    (plusInput prior).tokens[1]? = some (sym 1 2 .bang) := by
+  refine ⟨unaryOperators_trace_success_complete (input := plusInput prior) (.done ?_), rfl, rfl⟩
+  simp [UnaryOperatorAbsentAt, TokenKindAbsentAt, TokenAt, plusInput, state, State.declarativeRemainder, sym]
+
+/-- A leading minus is the prefix `negate`, read before the following bang. -/
+theorem minus_reads_as_negate (prior : List ParseDiagnostic) :
+    unaryOperators 3 [] (minusInput prior) =
+      .ok [⟨span 0 1, .negate⟩, ⟨span 1 2, .logicalNot⟩] { minusInput prior with cursor := 2 } := by
+  rfl
 
 theorem hidden_and_missing_prefixes_are_silent (prior : List ParseDiagnostic) :
     unaryOperators 1 [] (hiddenInput prior) = .ok [] (hiddenInput prior) ∧

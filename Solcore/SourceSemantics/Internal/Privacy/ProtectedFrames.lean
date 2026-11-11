@@ -2277,8 +2277,10 @@ private abbrev finishUnary (context : SourceInference.Context) (operator : Synta
   let operand := state.resolve operandType
   if Detail.fixedUnaryOperator operator operand then
     pure { type := operand, requirements := [], state }
+  else if operator = .negate then
+    throw (.operatorNotSupported "-" operand)
   else
-    let builtin := match operator with | .logicalNot => Ty.bool | .bitNot => Ty.word
+    let builtin := match operator with | .logicalNot => Ty.bool | .bitNot | .negate => Ty.word
     finishOperator context (Detail.unaryOperatorDispatch operator) operand builtin builtin
       (if operator == Syntax.UnaryOp.logicalNot then .bool else operand) [operand] hasOpenLiteralOperand state
 
@@ -2350,7 +2352,9 @@ private theorem finishUnary_fixes_protected {protectedVars : List TypeVarId}
   split at accepted
   · cases Except.ok.inj accepted
     exact fixed
-  · exact finishOperator_fixes_protected fixed accepted
+  · split at accepted
+    · cases accepted
+    · exact finishOperator_fixes_protected fixed accepted
 
 /-- The binary tail: the fixed-width integer types' builtin operators keep the
 state, and every other operator goes through `finishOperator`. -/

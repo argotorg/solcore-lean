@@ -121,7 +121,7 @@ theorem inferExprFuel_success_numericLiteral_record
     {id : ExpressionId} {result : InferredExpression × State}
     (expressionEq : expression.value = .literal literal)
     (literalEq : literal.value = source)
-    (decoded : Frontend.numericLiteralValue? source = some rawValue)
+    (decoded : Frontend.literalMagnitude? source = some rawValue)
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (success : inferExprFuel (fuel + 1) context expression expected initial =
       .ok result) :
@@ -186,7 +186,7 @@ theorem inferExprFuel_success_numericLiteral_record
         requirementMember⟩
   cases source with
   | string spelling =>
-      simp [Frontend.numericLiteralValue?] at decoded
+      simp [Frontend.literalMagnitude?_string] at decoded
   | decimal spelling =>
       have recordSuccess : recordExpressionWithExpected context expression id
           rawType (.integerLiteral (.decimal spelling) {
@@ -3271,10 +3271,12 @@ private abbrev finishUnaryOperator (context : Context)
   let operand := state.resolve operandType
   if fixedUnaryOperator operator operand then
     pure { type := operand, requirements := [], state }
+  else if operator = .negate then
+    throw (.operatorNotSupported "-" operand)
   else
     let builtin := match operator with
       | .logicalNot => Ty.bool
-      | .bitNot => Ty.word
+      | .bitNot | .negate => Ty.word
     finishOperator context (unaryOperatorDispatch operator) operand builtin
       builtin (if operator == Syntax.UnaryOp.logicalNot then .bool else operand)
       [operand] hasOpenLiteralOperand state
@@ -3296,7 +3298,7 @@ private theorem finishUnaryOperator_inferenceProperties
   have builtinBelow :
       (match operator with
         | .logicalNot => Ty.bool
-        | .bitNot => Ty.word).VariablesBelow state.inference.next := by
+        | .bitNot | .negate => Ty.word).VariablesBelow state.inference.next := by
     cases operator <;>
       exact Ty.variablesBelow_constructor state.inference.next _
   have resultTypeBelow :
@@ -3315,8 +3317,10 @@ private theorem finishUnaryOperator_inferenceProperties
   · injection success with resultEq
     subst result
     exact ⟨.refl ready.solved, ready, resolvedOperandBelow⟩
-  · exact finishOperator_inferenceProperties ready builtinBelow resultTypeBelow
-      success
+  · split at success
+    · cases success
+    · exact finishOperator_inferenceProperties ready builtinBelow resultTypeBelow
+        success
 
 private abbrev finishBinaryOperator (context : Context)
     (operator : Syntax.BinaryOp) (left : Ty)

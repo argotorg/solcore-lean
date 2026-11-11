@@ -107,6 +107,9 @@ theorem hasType
         show type.canonical (raw % Core.wordModulus) = true
         rw [Nat.mod_eq_of_lt small]
         exact TypeSystem.FixedInteger.canonical_of_le_maxNat fits)
+  | negativeWord => exact .word _
+  | negativeInteger => exact .integer _
+  | negativeFixed _ fits _ => exact .fixed _ (negativeLiteralWord_canonical fits)
 
 end ResolvedIntegerLiteralConstructs
 

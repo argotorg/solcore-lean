@@ -1576,7 +1576,9 @@ mutual
       | .literal literal =>
           match literal.value with
           | value@(.decimal _) | value@(.hexadecimal _) => do
-              let rawValue ← match numericLiteralValue? value with
+              -- A negative literal (`-128`, folded by `Syntax.Unchecked.mark`)
+              -- keeps its sign in the spelling and its magnitude here.
+              let rawValue ← match literalMagnitude? value with
                 | some rawValue => pure rawValue
                 | none => throw (.unsupportedLiteral "malformed integer")
               let (type, state) := state.fresh

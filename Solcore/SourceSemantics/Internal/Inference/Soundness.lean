@@ -16569,6 +16569,7 @@ theorem unaryFixedWord_hasType
       | fixed fixed =>
         cases operator with
         | logicalNot => simp at accepted
+        | negate => simp [Detail.fixedUnaryOperator] at accepted
         | bitNot =>
           by_cases word : fixed.signed = true ∨ fixed.width = .w256
           · rcases word with signed | full
@@ -18037,25 +18038,32 @@ theorem localIdentifierBranchExpressionHasType_afterProgress
       rw [FlexibleSubstitution.coercionRequirementIds_applySubstitution]
       rfl)
 
+/-- A positively decoded spelling (a numeric pattern) has that magnitude. -/
+private theorem literalMagnitude?_of_numeric {source : Syntax.CoreLiteralValue} {value : Nat}
+    (decoded : Frontend.numericLiteralValue? source = some value) :
+    Frontend.literalMagnitude? source = some value := by
+  simp [Frontend.literalMagnitude?, decoded]
+
 /-- Decoding, a supported closed target, and exact retained evidence are the
 minimal semantic ingredients of integer-literal validity. -/
 theorem integerLiteralValid_of_evidence
     {semanticContext : SourceSemantics.Context}
     {source : Syntax.CoreLiteralValue}
     {resolution : IntegerLiteralResolution}
-    (decoded : Frontend.numericLiteralValue? source = some resolution.rawValue)
+    (decoded : Frontend.literalMagnitude? source = some resolution.rawValue)
     (target_supported : resolution.targetType.IntegerLiteralCarrier)
     (evidence : RequirementProves semanticContext resolution.requirement
       resolution.predicate) :
     IntegerLiteralValid semanticContext source resolution := by
-  have meaning : Frontend.NumericLiteralDenotes source resolution.rawValue :=
-    Frontend.numericLiteralValue?_sound decoded
-  rcases target_supported with target_eq | target_eq | ⟨fixed, target_eq⟩
-  · exact .word meaning target_eq
-      (by simpa [IntegerLiteralResolution.predicate] using evidence)
-  · exact .integer meaning target_eq
-      (by simpa [IntegerLiteralResolution.predicate] using evidence)
-  · exact .fixed meaning target_eq
+  rcases Frontend.literalMagnitude?_sound decoded with meaning | meaning
+  · rcases target_supported with target_eq | target_eq | ⟨fixed, target_eq⟩
+    · exact .word meaning target_eq
+        (by simpa [IntegerLiteralResolution.predicate] using evidence)
+    · exact .integer meaning target_eq
+        (by simpa [IntegerLiteralResolution.predicate] using evidence)
+    · exact .fixed meaning target_eq
+        (by simpa [IntegerLiteralResolution.predicate] using evidence)
+  · exact .negative meaning target_supported
       (by simpa [IntegerLiteralResolution.predicate] using evidence)
 
 /-- Decoding, final carrier closure, exact ledger ownership, and solver
@@ -18068,7 +18076,7 @@ theorem integerLiteralValid_of_solved
     {semanticContext : SourceSemantics.Context}
     {source : Syntax.CoreLiteralValue}
     {resolution : IntegerLiteralResolution}
-    (decoded : Frontend.numericLiteralValue? source = some resolution.rawValue)
+    (decoded : Frontend.literalMagnitude? source = some resolution.rawValue)
     (target_supported :
       (resolution.applySubstitution state.inference.substitution).targetType.IntegerLiteralCarrier)
     (requirement_mem :
@@ -25907,7 +25915,7 @@ theorem integerLiteralValidAt
     {source : Syntax.CoreLiteralValue}
     {resolution : IntegerLiteralResolution}
     {origin : IntegerLiteralOrigin}
-    (decoded : Frontend.numericLiteralValue? source = some resolution.rawValue)
+    (decoded : Frontend.literalMagnitude? source = some resolution.rawValue)
     (resolution_target : resolution.targetType =
       .variable origin.metavariable)
     (resolution_requirement : resolution.requirement = origin.requirement)
@@ -25970,7 +25978,7 @@ theorem inferExprFuel_success_numericLiteral_expressionTypingBase
     {closedVariables : List TypeSystem.TypeVarId}
     (expression_eq : expression.value = .literal literal)
     (literal_eq : literal.value = source)
-    (decoded : Frontend.numericLiteralValue? source = some rawValue)
+    (decoded : Frontend.literalMagnitude? source = some rawValue)
     (allocation_eq : initial.allocateExpressionId = (id, allocated))
     (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
       expected initial = .ok inferred)
@@ -26163,7 +26171,7 @@ theorem integerPatternValidAt
       IntegerLiteralResolution.predicate, resolution_target,
       resolution_requirement, ProgramSignatures.builtinIntPredicate,
       TypedTraitResolution.applySubstitution] using evidence
-  exact integerLiteralValid_of_evidence decoded
+  exact integerLiteralValid_of_evidence (literalMagnitude?_of_numeric decoded)
     (closedSupported.elim (fun word => .inl word) (fun integer => .inr (.inl integer)))
     closedEvidence
 

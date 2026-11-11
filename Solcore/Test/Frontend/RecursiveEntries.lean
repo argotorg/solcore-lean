@@ -700,6 +700,7 @@ private def statics (ctx : Resolved.Context) (s : Syntax.Expr) : IO (Static ctx 
       match which : op with
       | .logicalNot => if same : a.type=.bool then return ⟨.unary .boolNot a.core,.bool,by rw [shape,which]; exact .logicalNot (same ▸ a.elaboration),by rw [shape,which]; exact .logicalNot (same ▸ a.typing)⟩ else throw (IO.userError "Bool operand")
       | .bitNot => if same : a.type=.word then return ⟨.unary .wordNot a.core,.word,by rw [shape,which]; exact .bitNot (same ▸ a.elaboration),by rw [shape,which]; exact .bitNot (same ▸ a.typing)⟩ else throw (IO.userError "Word operand")
+      | .negate => throw (IO.userError "no prefix minus reaches elaboration")
   | ⟨span,.call fn ⟨argsSpan,[arg]⟩⟩ =>
       check (span.contains fn.span && span.contains argsSpan && argsSpan.contains arg.span) "original call children"
       let f ← statics ctx fn; let a ← statics ctx arg
@@ -1375,6 +1376,7 @@ private def statics (ctx : Resolved.Context) (s : Syntax.Expr) : IO (Static ctx 
       match which : op with
       | .logicalNot => if same : a.type=.bool then return ⟨.unary .boolNot a.core,.bool,by rw [shape,which]; exact .logicalNot (same ▸ a.elaboration),by rw [shape,which]; exact .logicalNot (same ▸ a.typing)⟩ else throw (IO.userError "Bool operand")
       | .bitNot => if same : a.type=.word then return ⟨.unary .wordNot a.core,.word,by rw [shape,which]; exact .bitNot (same ▸ a.elaboration),by rw [shape,which]; exact .bitNot (same ▸ a.typing)⟩ else throw (IO.userError "Word operand")
+      | .negate => throw (IO.userError "no prefix minus reaches elaboration")
   | ⟨span,.call fn ⟨argsSpan,[arg]⟩⟩ =>
       check (span.contains fn.span && span.contains argsSpan && argsSpan.contains arg.span) "original call children"
       let f ← statics ctx fn; let a ← statics ctx arg

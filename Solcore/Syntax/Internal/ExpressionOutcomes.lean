@@ -1187,7 +1187,10 @@ private theorem unaryAbsent_conflicts_parsed
       exact absent.1 ⟨span, by
         simpa [UnaryOperatorParses, UnaryOp.symbol] using parsed.1⟩
   | bitNot =>
-      exact absent.2 ⟨span, by
+      exact absent.2.1 ⟨span, by
+        simpa [UnaryOperatorParses, UnaryOp.symbol] using parsed.1⟩
+  | negate =>
+      exact absent.2.2 ⟨span, by
         simpa [UnaryOperatorParses, UnaryOp.symbol] using parsed.1⟩
 
 private theorem binaryAbsent_conflicts_parsed
@@ -1442,7 +1445,8 @@ theorem UnaryOperatorAbsentAt.not_parses
   rcases operator with ⟨span, value⟩
   cases value with
   | logicalNot => exact absent.1 ⟨span, parsed.1⟩
-  | bitNot => exact absent.2 ⟨span, parsed.1⟩
+  | bitNot => exact absent.2.1 ⟨span, parsed.1⟩
+  | negate => exact absent.2.2 ⟨span, parsed.1⟩
 
 /-- A precedence-filtered binary token fixes its operator, span, and remainder. -/
 theorem BinaryOperatorAtPrecedenceParses.result_unique

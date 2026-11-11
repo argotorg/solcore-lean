@@ -781,7 +781,8 @@ private def wordNode (source : TypedSource) (node : ExpressionNode) : IO (WordNo
   let ⟨target⟩ ← observed_variant (resolution.targetType = .word) "Word target"
   let ⟨requirements⟩ ← observed_variant (node.requirements = [resolution.requirement]) "Word requirements"
   let ⟨coercions⟩ ← observed_variant (node.coercions = []) "Word coercions"
-  return ⟨node,literal,resolution,found,form,target,requirements,coercions⟩
+  let ⟨positive⟩ ← observed_variant (Frontend.isNegativeLiteral literal = false) "Word sign"
+  return ⟨node,literal,resolution,found,form,target,requirements,coercions,positive⟩
 
 def observeShape (source : TypedSource) : IO (Shape source) := do
   let [flag] := source.inputs | throw (IO.userError "imperative input")
@@ -1835,7 +1836,8 @@ mutual
             let ⟨requirements⟩ ← observe (node.requirements = [resolution.requirement]) "mixed integer requirements"
             let ⟨coercions⟩ ← observe (node.coercions = []) "mixed integer coercions"
             let ⟨typeEq⟩ ← observe (node.type = .word) "mixed integer type"
-            let ⟨typed⟩ ← word ⟨node,literal,resolution,foundAt,form,target,requirements,coercions⟩ context
+            let ⟨positive⟩ ← observe (Frontend.isNegativeLiteral literal = false) "mixed integer sign"
+            let ⟨typed⟩ ← word ⟨node,literal,resolution,foundAt,form,target,requirements,coercions,positive⟩ context
             return ⟨typeEq.symm ▸ typed⟩
           | .unary .logicalNot operand =>
             let ⟨child⟩ ← expression fuel source context operand .bool

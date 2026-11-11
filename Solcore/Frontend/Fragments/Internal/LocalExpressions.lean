@@ -589,6 +589,7 @@ theorem resolveLocalExpression?_sound {table : LocalNameTable}
             obtain ⟨resolvedOperand, operandResult, same⟩ := result
             cases same
             exact .bitNot (resolveLocalExpression?_sound operandResult)
+        | negate => simp [resolveLocalExpression?] at result
       case binary left operator right =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue <;> try simp only [resolveLocalExpression?] at result

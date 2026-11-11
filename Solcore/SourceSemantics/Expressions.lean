@@ -213,6 +213,17 @@ inductive IntegerLiteralValid (context : Context) :
       (evidence : RequirementProves context resolution.requirement
         (ProgramSignatures.builtinIntPredicate resolution.targetType)) :
       IntegerLiteralValid context source resolution
+  /-- A negative literal (`-128`, folded by `Syntax.Unchecked.mark`): its
+  spelling is `-` and a numeric spelling that denotes its magnitude, the
+  resolution's raw value, at any literal carrier. -/
+  | negative
+      {source : Syntax.CoreLiteralValue}
+      {resolution : IntegerLiteralResolution}
+      (meaning : NegativeLiteralDenotes source resolution.rawValue)
+      (carrier : resolution.targetType.IntegerLiteralCarrier)
+      (evidence : RequirementProves context resolution.requirement
+        (ProgramSignatures.builtinIntPredicate resolution.targetType)) :
+      IntegerLiteralValid context source resolution
 
 namespace IntegerLiteralValid
 
@@ -222,7 +233,8 @@ theorem requirement_valid
     (valid : IntegerLiteralValid context source resolution) :
     RequirementValid context resolution.requirement := by
   cases valid with
-  | word _ _ evidence | integer _ _ evidence | fixed _ _ evidence => exact ⟨_, evidence⟩
+  | word _ _ evidence | integer _ _ evidence | fixed _ _ evidence | negative _ _ evidence =>
+      exact ⟨_, evidence⟩
 
 theorem target_supported
     {context : Context} {source : Syntax.CoreLiteralValue}
@@ -233,6 +245,7 @@ theorem target_supported
   | word _ target_eq _ => exact .inl target_eq
   | integer _ target_eq _ => exact .inr (.inl target_eq)
   | fixed _ target_eq _ => exact .inr (.inr ⟨_, target_eq⟩)
+  | negative _ carrier _ => exact carrier
 
 /-- Every declaratively valid integer-literal resolution selects an
 admissible primitive target type. -/
@@ -252,6 +265,11 @@ theorem target_type_admissible
   | fixed _ targetEq _ =>
       rw [targetEq]
       exact TypeAdmissible.fixed binders _
+  | negative _ carrier _ =>
+      rcases carrier with targetEq | targetEq | ⟨_, targetEq⟩ <;> rw [targetEq]
+      · exact TypeAdmissible.word binders
+      · exact TypeAdmissible.integer binders
+      · exact TypeAdmissible.fixed binders _
 
 /-- Literal validity is stable under lexical-context growth when the target
 retains the same signature catalog and solved requirement ledger. -/
@@ -275,6 +293,9 @@ theorem transportContext
         (evidence.transportContext signatures_eq solved_eq assumptions_mono)
   | fixed meaning target_eq evidence =>
       exact .fixed meaning target_eq
+        (evidence.transportContext signatures_eq solved_eq assumptions_mono)
+  | negative meaning carrier evidence =>
+      exact .negative meaning carrier
         (evidence.transportContext signatures_eq solved_eq assumptions_mono)
 
 end IntegerLiteralValid

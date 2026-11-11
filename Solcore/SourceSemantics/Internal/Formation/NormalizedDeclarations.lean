@@ -188,7 +188,7 @@ theorem inferExprFuel_numeric_normalized_formation
     (formation : FormationContext semantic context outer)
     (binders : TypeParameterBindersWellFormed semantic)
     (form : expression.value = .literal literal) (literalForm : literal.value = spelling)
-    (decoded : Frontend.numericLiteralValue? spelling = some rawValue)
+    (decoded : Frontend.literalMagnitude? spelling = some rawValue)
     (allocation : initial.allocateExpressionId = (id, allocated))
     (expectedFormed : ∀ type ∈ expected, TypeAdmissible semantic (outer.apply type))
     (continuation : outer.SemanticallyExtends result.2.inference.substitution)

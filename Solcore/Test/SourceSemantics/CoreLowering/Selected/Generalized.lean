@@ -1582,8 +1582,10 @@ def observeShape (source : TypedSource) : IO (Shape source) := do
   let ⟨literalTarget⟩ ← observed (resolution.targetType = .word) "generalized literal Word"
   let ⟨literalRequirements⟩ ← observed (literalNode.requirements = [resolution.requirement]) "generalized literal requirements"
   let ⟨literalCoercions⟩ ← observed (literalNode.coercions = []) "generalized literal coercions"
+  let ⟨literalPositive⟩ ← observed (Frontend.isNegativeLiteral raw = false) "generalized literal sign"
   let literal : WordNode source :=
-    ⟨literalNode,raw,resolution,literalFound,literalForm,literalTarget,literalRequirements,literalCoercions⟩
+    ⟨literalNode,raw,resolution,literalFound,literalForm,literalTarget,literalRequirements,literalCoercions,
+      literalPositive⟩
   let wordCall ← observeCall source binder literalNode.id .word wordCallee first
   let boolCall ← observeCall source binder flagRead.node.id .bool boolCallee second
   let ⟨inputs⟩ ← observed (source.inputs = [flag]) "generalized original inputs"

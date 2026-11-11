@@ -1386,6 +1386,8 @@ private theorem product_projection {fuel : Nat} {values : ValuesContext} {source
     | resolvedWord _ metadata => rw [metadata.nodeType]; rfl
     | resolvedInteger _ metadata => rw [metadata.nodeType]; rfl
     | resolvedFixed _ metadata => rw [metadata.nodeType]; rfl
+    | resolvedNegativeWord _ metadata | resolvedNegativeInteger _ metadata | resolvedNegativeFixed _ metadata =>
+      rw [metadata.nodeType]; rfl
   | read receipt =>
     obtain ⟨certificate, typeEq, _⟩ := receipt
     have same := Option.some.inj (certificate.metadata.found.symm.trans found)

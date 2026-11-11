@@ -9,6 +9,13 @@ block statement starting at the recorded `{` and every other span is
 unchanged. `mark` then gives the block's arithmetic its unchecked operators.
 Neither the parser nor inference gains a statement form.
 
+`mark` also removes every prefix `-` (row 1's unary minus). A `-` applied to a
+numeric literal, through groups and repeated, folds into that literal, whose
+spelling gains or loses a leading `-` and which then spans the negation:
+`-128`, `-(128)` and `- -5` are literals. Any other `-e` reads as `0 - e`, as
+upstream reads it: `subtract`, or `uncheckedSubtract` in a block, with the `0`
+and the operator at the `-`. So inference never meets `negate`.
+
 A block reaches every expression and statement written in it, including
 nested blocks, conditions, loop headers and match arms, but no lambda body:
 a lambda body starts outside any block and may hold its own. Patterns are not
@@ -100,6 +107,28 @@ def assignOperator (inside : Bool) (operator : Located ValueAssignOp) : Located 
 def binaryOperator (inside : Bool) (operator : Located BinaryOp) : Located BinaryOp :=
   if inside then { operator with value := BinaryOp.unchecked operator.value } else operator
 
+/-- The numeric literal an already folded operand is, through groups. -/
+def literalUnder? : Nat → Located ExprValue → Option CoreLiteralValue
+  | 0, _ => none
+  | fuel + 1, written =>
+      match written.value with
+      | .literal literal => if literal.value.isNumeric then some literal.value else none
+      | .group inner => literalUnder? fuel inner
+      | _ => none
+
+/-- A prefix operator over its folded operand. A `-` over a numeric literal
+folds into the literal, which spans the negation; any other `-e` is `0 - e`. -/
+def unaryOperator (fuel : Nat) (inside : Bool) (span : SourceSpan) (operator : Located UnaryOp)
+    (operand : Located ExprValue) : ExprValue :=
+  match operator.value with
+  | .negate =>
+      match literalUnder? fuel operand with
+      | some literal => .literal { span, value := literal.negated }
+      | none =>
+          .binary { span := operator.span, value := .literal { span := operator.span, value := .decimal "0" } }
+            (binaryOperator inside { span := operator.span, value := .subtract }) operand
+  | _ => .unary operator operand
+
 mutual
 
 def expression : Nat → Bool → Located ExprValue → M (Located ExprValue)
@@ -110,7 +139,8 @@ def expression : Nat → Bool → Located ExprValue → M (Located ExprValue)
             pure (.dotConstructor dot name (some (← delimited fuel inside arguments)))
         | .lambda keyword parameters returnType body =>
             pure (.lambda keyword parameters returnType (← block fuel false body))
-        | .unary operator operand => pure (.unary operator (← expression fuel inside operand))
+        | .unary operator operand =>
+            pure (unaryOperator fuel inside written.span operator (← expression fuel inside operand))
         | .binary left operator right =>
             pure (.binary (← expression fuel inside left) (binaryOperator inside operator)
               (← expression fuel inside right))

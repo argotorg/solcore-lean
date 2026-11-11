@@ -37,7 +37,7 @@ theorem expressionRetained_literal {literal : Syntax.CoreLiteral}
   cases literalForm : literal.value with
   | string _ => simp [Detail.inferExprFuel, expressionEq, literalForm] at success
   | decimal spelling | hexadecimal spelling =>
-    cases decoded : numericLiteralValue? literal.value with
+    cases decoded : literalMagnitude? literal.value with
     | none =>
       unfold Detail.inferExprFuel at success
       simp only [allocationEq, expressionEq] at success

@@ -4089,11 +4089,13 @@ theorem evaluateLocalExpressionWithCost?_sound {table : LocalNameTable}
           simp only [evaluateLocalExpressionWithCost?, bind, Option.bind_eq_some_iff] at accepted
         all_goals
           obtain ⟨⟨actual, childCost⟩, child, result⟩ := accepted
-          cases actual <;> simp only [pure, reduceCtorEq, Option.some.injEq, Prod.mk.injEq] at result
-          obtain ⟨rfl, rfl⟩ := result
-          first
-          | exact .logicalNot (evaluateLocalExpressionWithCost?_sound child store)
-          | exact .bitNot (evaluateLocalExpressionWithCost?_sound child store)
+          all_goals
+            cases actual <;> simp only [pure, reduceCtorEq, Option.some.injEq, Prod.mk.injEq] at result
+            all_goals
+              obtain ⟨rfl, rfl⟩ := result
+              first
+              | exact .logicalNot (evaluateLocalExpressionWithCost?_sound child store)
+              | exact .bitNot (evaluateLocalExpressionWithCost?_sound child store)
       case binary left operator right =>
         rcases operator with ⟨operatorSpan, operatorValue⟩
         cases operatorValue

@@ -1977,6 +1977,8 @@ private theorem simultaneous_step (budget : Nat) :
               obtain ⟨rfl, rfl⟩ := result
               rw [evaluateClosedSourceExpression?]
               simp only [ih.1 _ _ _ _ _ _ _ child, bind, Option.bind_some, pure]
+          | negate =>
+              simp [evaluateClosedSourceExpression?, sourceUnaryLambdaShape?] at accepted
         case binary left operator right =>
           rcases operator with ⟨operatorSpan, operator⟩
           cases operator
@@ -2386,7 +2388,9 @@ private theorem simultaneous (budget : Nat) :
             Option.map_none]
       case unary operator operand =>
         rcases operator with ⟨operatorSpan,operator⟩
-        cases operator <;> simp only [evaluateClosedSourceExpression?,ih.1]
+        cases operator
+        case negate => simp [evaluateClosedSourceExpression?, sourceUnaryLambdaShape?]
+        all_goals simp only [evaluateClosedSourceExpression?,ih.1]
         all_goals
           cases first : evaluateClosedSourceExpression? n owner names captured store operand with
           | none => simp only [Option.map_none,bind,Option.bind_none]
@@ -2581,6 +2585,8 @@ private theorem simultaneous_sound (budget : Nat) :
                 simp only [reduceCtorEq, pure, Option.some.injEq, Prod.mk.injEq] at result
               obtain ⟨rfl, rfl⟩ := result
               exact .bitNot (ih.1 _ _ _ _ _ _ _ child)
+          | negate =>
+              simp [evaluateClosedSourceExpression?, sourceUnaryLambdaShape?] at accepted
         case binary left operator right =>
           rcases operator with ⟨operatorSpan, operator⟩
           cases operator
@@ -2983,6 +2989,8 @@ private theorem simultaneous_replay (budget : Nat) :
               obtain ⟨rfl, rfl⟩ := result
               rw [evaluateClosedSourceExpression?]
               simp only [ih.1 _ _ _ _ _ _ _ replacement child, bind, Option.bind_some, pure]
+          | negate =>
+              simp [evaluateClosedSourceExpression?, sourceUnaryLambdaShape?] at accepted
         case binary left operator right =>
           rcases operator with ⟨operatorSpan, operator⟩
           cases operator

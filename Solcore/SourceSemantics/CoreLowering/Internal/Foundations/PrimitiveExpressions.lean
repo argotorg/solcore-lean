@@ -79,15 +79,19 @@ namespace Solcore.SourceSemantics.CoreLowering.PrimitiveExpressions
 open Frontend Frontend.SourceInference TypeSystem LocalCell
 
 theorem unary_value (operator : Syntax.UnaryOp) (value : SourceStagedValue.Value)
-    (typed : SourceStagedValue.coreType value = (SourceCorePrimitive.unaryOperator operator).operandType) :
+    (typed : SourceStagedValue.coreType value = (SourceCorePrimitive.unaryOperator operator).operandType)
+    (supported : operator ≠ .negate) :
     ∃ result : SourceStagedValue.Value,
       SourceStagedValue.coreType result = (SourceCorePrimitive.unaryOperator operator).resultType ∧
       Dynamic.UnaryPrimitiveApplies operator (StagedValue.toSource value) (StagedValue.toSource result) ∧
       (SourceCorePrimitive.unaryOperator operator).apply (SourceStagedValue.toCore value) =
         some (SourceStagedValue.toCore result) := by
-  cases operator <;> cases value <;>
-    simp only [SourceCorePrimitive.unaryOperator, Core.UnaryOp.operandType, SourceStagedValue.coreType] at typed <;>
-    try contradiction
+  cases operator
+  case negate => exact absurd rfl supported
+  all_goals
+    cases value <;>
+      simp only [SourceCorePrimitive.unaryOperator, Core.UnaryOp.operandType, SourceStagedValue.coreType] at typed <;>
+      try contradiction
   · exact ⟨.bool _, rfl, .logicalNot _, rfl⟩
   · exact ⟨.word _, rfl, .wordBitNot _, rfl⟩
 
@@ -247,7 +251,8 @@ inductive Tree (compilation : SourceCorePrimitive.Context) (source : TypedSource
       (metadata : Metadata source id node (SourceCorePrimitive.unaryOperator operator).resultType)
       (form : node.form = .unary operator operand)
       (child : Tree compilation source scope reasonAt operand
-        (SourceCorePrimitive.unaryOperator operator).operandType operandCode operandDepth) :
+        (SourceCorePrimitive.unaryOperator operator).operandType operandCode operandDepth)
+      (supported : operator ≠ .negate) :
       Tree compilation source scope reasonAt id (SourceCorePrimitive.unaryOperator operator).resultType
         (Core.LocalPrimitiveResults.unary (SourceCorePrimitive.unaryOperator operator) operandCode) (operandDepth + 1)
   | binary {id left right node leftCode rightCode leftDepth rightDepth}
@@ -296,7 +301,7 @@ theorem Tree.hasType {compilation : SourceCorePrimitive.Context} {source : Typed
   induction tree with
   | control tree => exact tree.hasType
   | integerLiteral => exact Core.LanguageResult.success_hasType .word
-  | unary _ _ _ _ ih => exact Core.LocalPrimitiveResults.unary_hasType ih
+  | unary _ _ _ _ _ ih => exact Core.LocalPrimitiveResults.unary_hasType ih
   | binary _ _ _ _ _ _ left right => exact SourceCorePrimitive.binary_hasType left right
   | group _ _ _ ih => exact ih
   | pair _ _ leftTree rightTree left right =>
@@ -587,7 +592,7 @@ theorem Tree.preserves {compilation : SourceCorePrimitive.Context} {source : Typ
       · rw [form, metadata.requirements, metadata.coercions]
         exact .integerLiteral rfl constructs
       · rw [metadata.coercions]; exact .nil
-  | @unary id operand node operandCode operandDepth operator metadata form child ih =>
+  | @unary id operand node operandCode operandDepth operator metadata form child supported ih =>
       obtain ⟨outcome, coreValue, sourceEvaluation, related, coreEvaluation⟩ := ih
       cases related with
       | uninitialized site location provenance =>
@@ -597,7 +602,7 @@ theorem Tree.preserves {compilation : SourceCorePrimitive.Context} {source : Typ
       | value staged typed =>
           cases sourceEvaluation with
           | value sourceEvaluation =>
-              obtain ⟨result, resultTyped, sourceApplied, coreApplied⟩ := unary_value operator staged typed
+              obtain ⟨result, resultTyped, sourceApplied, coreApplied⟩ := unary_value operator staged typed supported
               refine ⟨_, _, .value ?_, .value result resultTyped,
                 Core.LocalPrimitiveResults.unary_success coreEvaluation coreApplied⟩
               apply Dynamic.ExpressionEvaluates.intro metadata.contains
@@ -868,6 +873,9 @@ theorem tree_of_lowerExpression
               cases form : selected.form with
               | unary operator operand =>
                   simp only [form] at accepted
+                  split at accepted
+                  · simp [throw, throwThe, MonadExceptOf.throw] at accepted
+                  next supported =>
                   obtain ⟨operand, operandAccepted, accepted⟩ := bind_ok accepted
                   obtain ⟨checkedUnit, operandChecked, accepted⟩ := bind_ok accepted
                   cases checkedUnit
@@ -878,7 +886,7 @@ theorem tree_of_lowerExpression
                   rw [← ensureType_ok operandChecked] at operandTree
                   rw [← ensureType_ok resultChecked]
                   exact ⟨operandDepth + 1, by omega,
-                    .unary operator ((ensureType_ok resultChecked).symm ▸ metadata) form operandTree⟩
+                    .unary operator ((ensureType_ok resultChecked).symm ▸ metadata) form operandTree supported⟩
               | binary left operator right =>
                   simp only [form] at accepted
                   split at accepted

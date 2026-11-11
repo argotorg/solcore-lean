@@ -860,6 +860,56 @@ Made on 2026-11-10, during step 5.
     `NumericLiteralEvidenceReceipts.fixed` and `literalImplementation`.
   - Numeric patterns at the twelve types stay rejected.
 
+### Row 1's unary minus: folded or read as `0 - e` before inference
+
+Made on 2026-11-11, during step 6.
+
+- **Parser.** `UnaryOp.negate` is a prefix `-`, read by the prefix-unary layer
+  with `!` and `~`.
+- **No `negate` reaches inference.** `Syntax.Unchecked.mark`, which every
+  loaded file goes through, removes each one:
+  - A `-` over a numeric literal, through groups and repeated, folds into the
+    literal: its spelling gains or loses a leading `-`, and the literal spans
+    the negation. So `-128`, `(-128)`, `-(128)` and `- -5` are literals.
+  - Any other `-e` reads as `0 - e`, as upstream reads it: `subtract`, or
+    `uncheckedSubtract` in a block, with the `0` and the operator at the `-`.
+
+  So the checked `0 - a` of step 3c gives `-a` on the twelve types, with
+  `Panic(0x11)` for `MIN` and any nonzero unsigned value, inside the meaning
+  proofs. On `word` it wraps. A declared type is rejected: the `0` would need
+  `Int` of that type, which is builtin. Inference still rejects a `negate`
+  (`operatorNotSupported`), so that its soundness holds for every syntax tree,
+  and the primitive lowering refuses one.
+- **Negative literals.**
+  - The sign is the spelling's (`Frontend.isNegativeLiteral`), and the
+    resolution's raw value is the magnitude (`literalMagnitude?`,
+    `NegativeLiteralDenotes`).
+  - Finalization checks the range with the sign (`signedLiteralFitsTarget`):
+    at a fixed-width type the magnitude is at most that of the least value
+    (`FixedInteger.minMagnitude`), so only `-0` fits an unsigned type.
+    `Error.integerLiteralOutOfRange` names the negative value, and the compiler
+    checks the range again.
+  - At `word` a negative literal wraps (`negativeLiteralWord`), so
+    `let w: word = -1` is `2^256 - 1`; at `integer` it is exact; at a
+    fixed-width type it is the canonical word in two's complement.
+  - Semantics: `IntegerLiteralValid.negative`, and the constructions
+    `negativeWord`, `negativeInteger` and `negativeFixed`.
+  - Lowering: the numeric branch chooses by the sign
+    (`validateNegativeWordIntegerLiteral`, `validateNegativeNativeIntegerLiteral`,
+    `validateNegativeFixedIntegerLiteral`). The meaning proofs cover them with
+    `Literal.resolvedNegativeWord`, `resolvedNegativeInteger` and
+    `resolvedNegativeFixed`.
+- **Choices.**
+  - On `integer`, a negated literal is exact, and `-x` is `0 - x`, so it is
+    staged as integer subtraction is: typed next to the literal `0` and
+    rejected by Core lowering outside staged code.
+  - In an unchecked block before step 8, `-x` is unchecked `0 - x`: it wraps on
+    `word`, and the twelve types and `integer` reject it as they reject the
+    block's other arithmetic. Negated literals fold in a block too.
+  - An open negative literal keeps the `word` default until step 7, so
+    `let k = -1;` is `2^256 - 1`. Upstream rejects it (`SC0411`) through the
+    `uint256` default, which step 7 brings.
+
 ### Row 1: steps
 
 Row 1 is committed in steps, each through the full gate, so that each can be
@@ -906,7 +956,8 @@ first planned after the literals and moved before them for this reason
    ([row 1's literals](#row-1s-literals-checked-by-inference-and-the-compiler)).
    Open literals keep the `word` default.
 6. **Unary minus.** A negation out of range panics with `0x11`, and a unary
-   `-` on a literal folds into the literal.
+   `-` on a literal folds into the literal
+   ([row 1's unary minus](#row-1s-unary-minus-folded-or-read-as-0---e-before-inference)).
 7. **The `uint256` default.** Open literals default to `uint256`, and an open
    literal in no operator, comparison or requirement is rejected as
    ambiguous. The existing tests that relied on the `word` default change in

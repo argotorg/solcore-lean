@@ -2221,6 +2221,8 @@ private theorem sound {table : LocalNameTable} {context : Resolved.Context}
         case bitNot =>
           obtain ⟨childCore, child, rfl, rfl⟩ := (unary_children (Or.inr ⟨rfl, rfl⟩)).mp accepted
           exact .bitNot (sound child)
+        case negate =>
+          exact pure_sound (by simpa [elaborateRecursiveLocalComputation?] using accepted)
     case conditional condition question thenBranch colon elseBranch =>
       obtain ⟨conditionCore, thenCore, elseCore, conditionAccepted, thenAccepted, elseAccepted, rfl⟩ :=
         conditional_children.mp accepted

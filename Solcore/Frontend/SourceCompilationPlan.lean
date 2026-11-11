@@ -1817,7 +1817,8 @@ private def literalEvidenceIsBuiltin (function : CheckedFunction)
 private def validateLiteralResolution (function : CheckedFunction)
     (source : Syntax.CoreLiteralValue)
     (resolution : IntegerLiteralResolution) : Except RuntimeError Unit := do
-  unless numericLiteralValue? source = some resolution.rawValue &&
+  -- A negative literal keeps its sign in the spelling and its magnitude here.
+  unless literalMagnitude? source = some resolution.rawValue &&
       literalEvidenceIsBuiltin function resolution do
     throw (.invalidLiteralEvidence resolution.requirement)
 
@@ -1901,6 +1902,8 @@ private def validateUnaryOperatorRequirementLayout
     let operand ← exactExpression specialized.function.typedBody operandId
     let expectedInput := match operator with
       | .logicalNot => Ty.bool
+      -- Unreachable: inference rejects a prefix `-`.
+      | .negate => Ty.word
       | .bitNot =>
           if operand.type = Ty.integer then Ty.integer
           else if SourceInference.Detail.fixedUnaryOperator operator operand.type then

@@ -2316,7 +2316,7 @@ theorem wrong_missing_zero_and_nested_mismatch
   · intro op budget
     cases op <;> rcases budget with _ | (_ | budget) <;>
       simp only [one, evaluateClosedSourceExpression?_logicalNot, evaluateClosedSourceExpression?_bitNot] <;>
-      simp [missingRef, ref, evaluateClosedSourceExpression?, LocalNameTable.lookup?]
+      simp [missingRef, ref, evaluateClosedSourceExpression?, LocalNameTable.lookup?, sourceUnaryLambdaShape?]
 
 end Tests.ClosedSourceUnaryBoundary
 end
@@ -4638,6 +4638,7 @@ private theorem primitive_original {captured store operand value result}
       cases value <;> simp only [primitive?, reduceCtorEq] at applied
       cases Option.some.inj applied
       exact .bitNot child
+  | negate => simp [primitive?] at applied
 
 private theorem primitive_image {captured store operand value result}
     (span operatorSpan : Syntax.SourceSpan) (op : Syntax.UnaryOp)
@@ -4670,6 +4671,7 @@ private theorem primitive_image {captured store operand value result}
         exact ⟨same,sameStore⟩
       · rintro ⟨rfl,rfl⟩
         exact closedSourceExpressionEvaluates_bitNot_iff.mpr ⟨_,child,rfl⟩
+  | negate => simp [primitive?] at applied
 
 private theorem primitive_rejected {captured store operand value}
     (span operatorSpan : Syntax.SourceSpan) (op : Syntax.UnaryOp)
@@ -4686,6 +4688,7 @@ private theorem primitive_rejected {captured store operand value}
       obtain ⟨w,ev,_⟩ := closedSourceExpressionEvaluates_bitNot_iff.mp evaluated
       rw [← (ev.deterministic child).1] at applied
       cases applied
+  | negate => cases evaluated with | creation shape => cases shape
 
 private theorem child_rejected {captured store operand}
     (span operatorSpan : Syntax.SourceSpan) (op : Syntax.UnaryOp)
@@ -4699,6 +4702,7 @@ private theorem child_rejected {captured store operand}
   | bitNot =>
       obtain ⟨w,ev,_⟩ := closedSourceExpressionEvaluates_bitNot_iff.mp evaluated
       exact rejected _ _ ev
+  | negate => cases evaluated with | creation shape => cases shape
 
 private def certificate (file : Syntax.SourceFile) (captured : Resolved.LocalScope RuntimeValue)
     (store : List RuntimeValue) (src : Syntax.Expr) : IO (Outcome captured store src) := do
@@ -4740,7 +4744,7 @@ private def certificate (file : Syntax.SourceFile) (captured : Resolved.LocalSco
         op.span.length == 1 && op.span.endByte == operand.span.startByte &&
         span == Syntax.SourceSpan.cover op.span operand.span) "original unary ranges"
       check (file.content.toByteArray.data[op.span.startByte]? ==
-        some (match op.value with | .logicalNot => 33 | .bitNot => 126)) "original operator byte"
+        some (match op.value with | .logicalNot => 33 | .bitNot => 126 | .negate => 45)) "original operator byte"
       let h ← certificate file captured store operand
       match h with
       | .failure kind depth rejected =>
@@ -4761,6 +4765,7 @@ private def certificate (file : Syntax.SourceFile) (captured : Resolved.LocalSco
               match op.value with
               | .logicalNot => proof (evaluateClosedSourceExpression?_logicalNot depth owner names captured store span op.span operand)
               | .bitNot => proof (evaluateClosedSourceExpression?_bitNot depth owner names captured store span op.span operand)
+              | .negate => throw (IO.userError "no prefix minus reaches the closed source")
               return .success result (depth+1) original (by
                 rw [shape]; exact primitive_image span op.span op.value child applied)
   | _ => throw (IO.userError "unexpected boundary source shape")

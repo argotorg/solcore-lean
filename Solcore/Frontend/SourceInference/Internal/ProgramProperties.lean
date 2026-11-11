@@ -1156,7 +1156,7 @@ theorem literalNodesFit_member {state : State} {expression : ExpressionId} {type
     {resolution : IntegerLiteralResolution}
     (member : Node.expression node ∈ state.nodes) (identity : node.id = expression)
     (form : node.form = .integerLiteral source resolution) :
-    literalFitsTarget type resolution.rawValue = true := by
+    signedLiteralFitsTarget source type resolution.rawValue = true := by
   have each := List.all_eq_true.mp fits _ member
   simpa [form, identity] using each
 
@@ -1217,7 +1217,7 @@ private theorem validateIntegerLiteralNode_success_correspondence
     {resolution : IntegerLiteralResolution}
     (form_eq : node.form = .integerLiteral source resolution)
     (success : validateIntegerLiteralNode state (.expression node) = .ok ()) :
-    Frontend.numericLiteralValue? source = some resolution.rawValue ∧
+    Frontend.literalMagnitude? source = some resolution.rawValue ∧
       ∃ origin, origin ∈ state.integerLiterals ∧
         origin.expression = node.id ∧
         resolution.targetType = .variable origin.metavariable ∧
@@ -1288,7 +1288,7 @@ private theorem validateIntegerLiteralNodes_success_correspondence
     ∀ node source resolution,
       Node.expression node ∈ nodes →
       node.form = .integerLiteral source resolution →
-      Frontend.numericLiteralValue? source = some resolution.rawValue ∧
+      Frontend.literalMagnitude? source = some resolution.rawValue ∧
         ∃ origin, origin ∈ state.integerLiterals ∧
           origin.expression = node.id ∧
           resolution.targetType = .variable origin.metavariable ∧
@@ -2571,7 +2571,7 @@ theorem finalize_integerLiteral_fits
         {resolution : IntegerLiteralResolution},
         Node.expression node ∈ state.nodes → node.id = origin.expression →
         node.form = .integerLiteral source resolution →
-        literalFitsTarget (result.substitution.apply (.variable origin.metavariable))
+        signedLiteralFitsTarget source (result.substitution.apply (.variable origin.metavariable))
           resolution.rawValue = true := by
   obtain ⟨patternState, finalState, _, _, _, _, _, patternResult,
       literalResult, _, literalValidation, _, _, _, resultEq⟩ :=
@@ -2723,7 +2723,8 @@ theorem finalize_typedSource_inputComptime
   simp [State.toTypedSource]
 
 /-- Every integer-literal node of the finalized source fits its closed carrier:
-at a fixed-width type it is at most the type's greatest value. -/
+at a fixed-width type a literal is at most the type's greatest value, and a
+negative literal's magnitude at most that of its least value. -/
 theorem finalize_typedSource_integerLiteral_fits
     {context : Context} {type : Ty} {state : State}
     {roots : List NodeId} {result : Result}
@@ -2732,7 +2733,7 @@ theorem finalize_typedSource_integerLiteral_fits
       {resolution : IntegerLiteralResolution},
       Node.expression node ∈ result.typedSource.nodes →
       node.form = .integerLiteral source resolution →
-      literalFitsTarget resolution.targetType resolution.rawValue = true := by
+      signedLiteralFitsTarget source resolution.targetType resolution.rawValue = true := by
   have ledger := finalize_integerLiteralLedgerCorrespondence success
   have fits := finalize_integerLiteral_fits success
   intro node source resolution member form

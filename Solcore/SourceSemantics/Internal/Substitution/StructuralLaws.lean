@@ -3220,6 +3220,16 @@ theorem IntegerLiteralValid.applyParameters
           ProgramPredicate.applyParameters] using
           (StructuralSubstitution.RequirementProves.applyParameters contextValid
             evidence)
+  | negative meaning carrier evidence =>
+      refine .negative meaning ?_ ?_
+      · rcases carrier with targetEq | targetEq | ⟨type, targetEq⟩ <;>
+          simp [applyIntegerLiteralResolution, targetEq, TypeSystem.Ty.IntegerLiteralCarrier,
+            TypeSystem.Ty.fixed]
+      · simpa [applyIntegerLiteralResolution,
+          ProgramSignatures.builtinIntPredicate,
+          ProgramPredicate.applyParameters] using
+          (StructuralSubstitution.RequirementProves.applyParameters contextValid
+            evidence)
 
 theorem ReferenceHasRawType.applyParameters
     {substitution : ParameterSubstitution} {context : Context}
@@ -9350,6 +9360,13 @@ theorem IntegerLiteralValid.applySubstitution
   | @fixed type meaning targetEq evidence =>
       refine .fixed (type := type) meaning ?_ ?_
       · simp [targetEq, TypeSystem.Ty.fixed]
+      · simpa [ProgramSignatures.builtinIntPredicate,
+          TypedTraitResolution.applySubstitution] using
+          (RequirementProves.applySubstitution contextValid evidence)
+  | negative meaning carrier evidence =>
+      refine .negative meaning ?_ ?_
+      · rcases carrier with targetEq | targetEq | ⟨type, targetEq⟩ <;>
+          simp [targetEq, TypeSystem.Ty.IntegerLiteralCarrier, TypeSystem.Ty.fixed]
       · simpa [ProgramSignatures.builtinIntPredicate,
           TypedTraitResolution.applySubstitution] using
           (RequirementProves.applySubstitution contextValid evidence)

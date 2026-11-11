@@ -1702,7 +1702,7 @@ private theorem finishOperator_supported
 
 private def unaryBuiltin : Syntax.UnaryOp → Ty
   | .logicalNot => .bool
-  | .bitNot => .word
+  | .bitNot | .negate => .word
 
 private abbrev finishUnaryOperator (context : Frontend.SourceInference.Context)
     (operator : Syntax.UnaryOp) (operandType : Ty)
@@ -1711,6 +1711,8 @@ private abbrev finishUnaryOperator (context : Frontend.SourceInference.Context)
   let operand := state.resolve operandType
   if fixedUnaryOperator operator operand then
     pure { type := operand, requirements := [], state }
+  else if operator = .negate then
+    throw (.operatorNotSupported "-" operand)
   else
     let builtin := unaryBuiltin operator
     finishOperator context (unaryOperatorDispatch operator) operand builtin
@@ -1758,7 +1760,9 @@ private theorem finishUnaryOperator_supported
   · injection success with resultEq
     subst result
     exact ⟨.refl _ _ _, resolved_normalized ready supported⟩
-  · exact finishOperator_supported builtin output success
+  · split at success
+    · cases success
+    · exact finishOperator_supported builtin output success
 
 private theorem finishBinaryOperator_supported
     {cutoff : Nat} {roots : List Ty} {context : Frontend.SourceInference.Context} {operator : Syntax.BinaryOp}

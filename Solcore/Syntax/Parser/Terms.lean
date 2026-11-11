@@ -341,6 +341,7 @@ namespace ExpressionInternals
 def unaryOp? : TokenKind → Option UnaryOp
   | .symbol .bang => some .logicalNot
   | .symbol .tilde => some .bitNot
+  | .symbol .minus => some .negate
   | _ => none
 
 end ExpressionInternals

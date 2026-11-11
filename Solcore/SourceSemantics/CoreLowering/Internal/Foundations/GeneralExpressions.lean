@@ -732,7 +732,7 @@ theorem readOnly {compilation : SourceCorePrimitive.Context} {source : TypedSour
   induction tree with
   | control tree => exact Control.readOnly tree
   | integerLiteral => exact .inRight .word
-  | unary _ _ _ _ operand => exact bind_readOnly _ operand (.inRight (.unary .var))
+  | unary _ _ _ _ _ operand => exact bind_readOnly _ operand (.inRight (.unary .var))
   | binary operator _ _ _ _ _ left right => exact binary_readOnly operator left right
   | group _ _ _ ih => exact ih
   | pair _ _ _ _ left right => exact pair_readOnly _ _ left right
@@ -825,7 +825,7 @@ theorem preserves {compilation : SourceCorePrimitive.Context} {source : TypedSou
       · rw [form, metadata.requirements, metadata.coercions]
         exact .integerLiteral rfl constructs
       · rw [metadata.coercions]; exact .nil
-  | @unary id operand node operandCode operandDepth operator metadata form child ih =>
+  | @unary id operand node operandCode operandDepth operator metadata form child supported ih =>
       obtain ⟨outcome, coreValue, sourceEvaluation, related, coreEvaluation⟩ := ih
       cases related with
       | uninitialized site location provenance =>
@@ -835,7 +835,7 @@ theorem preserves {compilation : SourceCorePrimitive.Context} {source : TypedSou
       | value staged typed =>
           cases sourceEvaluation with
           | value sourceEvaluation =>
-              obtain ⟨result, resultTyped, sourceApplied, coreApplied⟩ := unary_value operator staged typed
+              obtain ⟨result, resultTyped, sourceApplied, coreApplied⟩ := unary_value operator staged typed supported
               refine ⟨_, _, .value ?_, .value result resultTyped,
                 Core.LocalPrimitiveResults.unary_success coreEvaluation coreApplied⟩
               apply Dynamic.ExpressionEvaluates.intro metadata.contains

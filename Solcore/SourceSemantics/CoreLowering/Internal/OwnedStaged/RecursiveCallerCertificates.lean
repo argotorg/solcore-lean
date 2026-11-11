@@ -2531,7 +2531,7 @@ private theorem literal_syntax {solved : List SolvedRequirement}
   | word value form _type _requirements _coercions _meaning =>
     rw [form]
     exact .word _
-  | resolvedWord form _metadata | resolvedInteger form _metadata | resolvedFixed form _metadata =>
+  | resolvedWord form _metadata | resolvedInteger form _metadata | resolvedFixed form _metadata | resolvedNegativeWord form _metadata | resolvedNegativeInteger form _metadata | resolvedNegativeFixed form _metadata =>
     rw [form]
     exact .integer _ _
 

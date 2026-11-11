@@ -95,6 +95,11 @@ and `2^(N-1) - 1` for `intN`. -/
 def maxNat (type : FixedInteger) : Nat :=
   if type.signed then 2 ^ (type.width.bits - 1) - 1 else 2 ^ type.width.bits - 1
 
+/-- The greatest magnitude of a negative value of the type, which bounds a
+negative literal: `2^(N-1)` for `intN` and 0 for `uintN`. -/
+def minMagnitude (type : FixedInteger) : Nat :=
+  if type.signed then 2 ^ (type.width.bits - 1) else 0
+
 theorem maxNat_lt (type : FixedInteger) : type.maxNat < 2 ^ 256 := by
   have bits := type.width.bits_le
   have full : 2 ^ type.width.bits ≤ 2 ^ 256 := Nat.pow_le_pow_right (by decide) bits

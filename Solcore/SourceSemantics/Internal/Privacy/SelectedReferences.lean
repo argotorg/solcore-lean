@@ -1547,8 +1547,10 @@ private abbrev finishUnary (context : SourceInference.Context) (operator : Synta
   let operand := state.resolve operandType
   if Detail.fixedUnaryOperator operator operand then
     pure { type := operand, requirements := [], state }
+  else if operator = .negate then
+    throw (.operatorNotSupported "-" operand)
   else
-    let builtin := match operator with | .logicalNot => Ty.bool | .bitNot => Ty.word
+    let builtin := match operator with | .logicalNot => Ty.bool | .bitNot | .negate => Ty.word
     finishOperator context (Detail.unaryOperatorDispatch operator) operand builtin builtin
       (if operator == Syntax.UnaryOp.logicalNot then .bool else operand) [operand] hasOpenLiteralOperand state
 
@@ -1588,6 +1590,8 @@ private theorem finishUnary_private {protectedVars : List TypeVarId}
   split at accepted
   · cases Except.ok.inj accepted
     exact ⟨.refl _ _, resolvedSafe, live, fun _ member fresh => (fresh member).elim⟩
+  split at accepted
+  · cases accepted
   apply finishOperator_private catalog resolvedSafe _ _ live accepted
   · cases operator <;> exact safe_closed _ _ (by simp [Ty.VariablesBelow, Ty.bool, Ty.word, Ty.freeVariables])
   · split

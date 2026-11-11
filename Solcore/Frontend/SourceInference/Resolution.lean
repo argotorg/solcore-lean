@@ -443,6 +443,9 @@ def binaryOperatorDispatch : Syntax.BinaryOp → OperatorDispatch
 def unaryOperatorDispatch : Syntax.UnaryOp → OperatorDispatch
   | .logicalNot => .function "not"
   | .bitNot => .traitMethod "BitNot" "bnot"
+  -- No loaded program keeps a prefix `-` (`Syntax.Unchecked.mark`), and
+  -- `inferUnaryOperator` rejects one; no declaration is named `-`.
+  | .negate => .function "-"
 
 def binaryResultIsBool : Syntax.BinaryOp → Bool
   | .less | .greater | .lessEqual | .greaterEqual
@@ -474,7 +477,7 @@ def fixedUnaryOperator (operator : Syntax.UnaryOp) : Ty → Bool
   | .constructor (.builtin (.fixed _)) =>
       match operator with
       | .bitNot => true
-      | .logicalNot => false
+      | .logicalNot | .negate => false
   | _ => false
 
 @[simp] theorem fixedUnaryOperator_logicalNot (operand : Ty) :
@@ -701,10 +704,14 @@ def inferUnaryOperator (context : Context) (operator : Syntax.UnaryOp)
   -- (`fixedUnaryOperator`) is a builtin too.
   if fixedUnaryOperator operator operand then
     pure { type := operand, requirements := [], state }
+  -- A prefix `-` reaches no typing rule: `Syntax.Unchecked.mark` folds it into
+  -- a literal or reads it as `0 - e` before inference.
+  else if operator = .negate then
+    throw (.operatorNotSupported "-" operand)
   else
     let builtin := match operator with
       | .logicalNot => Ty.bool
-      | .bitNot => Ty.word
+      | .bitNot | .negate => Ty.word
     if operand = builtin then
       pure { type := builtin, requirements := [], state }
     else

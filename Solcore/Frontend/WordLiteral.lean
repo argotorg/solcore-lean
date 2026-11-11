@@ -471,5 +471,116 @@ theorem moduloWordLiteralDenotes_span (payload : Syntax.CoreLiteralValue)
     ModuloWordLiteralDenotes ⟨span, payload⟩ word ↔
       ModuloWordLiteralDenotes ⟨otherSpan, payload⟩ word := Iff.rfl
 
+/-! Negative literals (row 1's unary minus). `Syntax.Unchecked.mark` folds a
+prefix `-` into the numeric literal under it, so a negative literal's spelling
+is `-` followed by a numeric spelling, which denotes its magnitude. -/
+
+/-- The spelling of a negative numeric literal without its `-`. -/
+def positiveSpelling? : Syntax.CoreLiteralValue → Option Syntax.CoreLiteralValue
+  | .decimal spelling =>
+      match spelling.toList with
+      | '-' :: rest => some (.decimal (String.ofList rest))
+      | _ => none
+  | .hexadecimal spelling =>
+      match spelling.toList with
+      | '-' :: rest => some (.hexadecimal (String.ofList rest))
+      | _ => none
+  | .string _ => none
+
+/-- Whether a literal's spelling is negative. -/
+def isNegativeLiteral (source : Syntax.CoreLiteralValue) : Bool :=
+  (positiveSpelling? source).isSome
+
+/-- The magnitude of a negative numeric literal. -/
+def negativeLiteralMagnitude? (source : Syntax.CoreLiteralValue) : Option Nat :=
+  (positiveSpelling? source).bind numericLiteralValue?
+
+/-- The magnitude of a numeric literal of either sign. -/
+def literalMagnitude? (source : Syntax.CoreLiteralValue) : Option Nat :=
+  match numericLiteralValue? source with
+  | some value => some value
+  | none => negativeLiteralMagnitude? source
+
+/-- A negative literal: its spelling is `-` and a numeric spelling that denotes
+its magnitude. -/
+def NegativeLiteralDenotes (source : Syntax.CoreLiteralValue) (magnitude : Nat) : Prop :=
+  ∃ inner, positiveSpelling? source = some inner ∧ NumericLiteralDenotes inner magnitude
+
+/-- The word of a negative literal: its magnitude negated modulo `2^256`. -/
+def negativeLiteralWord (magnitude : Nat) : Core.Word :=
+  Core.Word.ofNatModulo (Core.wordModulus - magnitude % Core.wordModulus)
+
+theorem negativeLiteralMagnitude?_sound {source : Syntax.CoreLiteralValue} {magnitude : Nat}
+    (decoded : negativeLiteralMagnitude? source = some magnitude) :
+    NegativeLiteralDenotes source magnitude := by
+  unfold negativeLiteralMagnitude? at decoded
+  cases inner : positiveSpelling? source with
+  | none => simp [inner] at decoded
+  | some stripped =>
+      simp only [inner, Option.bind_some] at decoded
+      exact ⟨stripped, inner, numericLiteralValue?_sound decoded⟩
+
+theorem negativeLiteralMagnitude?_complete {source : Syntax.CoreLiteralValue} {magnitude : Nat}
+    (meaning : NegativeLiteralDenotes source magnitude) :
+    negativeLiteralMagnitude? source = some magnitude := by
+  obtain ⟨stripped, inner, denotes⟩ := meaning
+  simp [negativeLiteralMagnitude?, inner, numericLiteralValue?_complete denotes]
+
+theorem NegativeLiteralDenotes.value_unique {source : Syntax.CoreLiteralValue}
+    {left right : Nat} (leftMeaning : NegativeLiteralDenotes source left)
+    (rightMeaning : NegativeLiteralDenotes source right) : left = right :=
+  Option.some.inj ((negativeLiteralMagnitude?_complete leftMeaning).symm.trans
+    (negativeLiteralMagnitude?_complete rightMeaning))
+
+theorem NegativeLiteralDenotes.negative {source : Syntax.CoreLiteralValue} {magnitude : Nat}
+    (meaning : NegativeLiteralDenotes source magnitude) : isNegativeLiteral source = true := by
+  obtain ⟨stripped, inner, _⟩ := meaning
+  simp [isNegativeLiteral, inner]
+
+/-- A numeric spelling begins with a digit, so it is not negative. -/
+theorem NumericLiteralDenotes.not_negative {source : Syntax.CoreLiteralValue} {value : Nat}
+    (meaning : NumericLiteralDenotes source value) : isNegativeLiteral source = false := by
+  cases meaning with
+  | @decimal spelling _ nonempty digits =>
+      unfold isNegativeLiteral positiveSpelling?
+      cases shape : spelling.toList with
+      | nil => exact absurd shape nonempty
+      | cons first rest =>
+          rw [shape] at digits
+          by_cases minus : first = '-'
+          · subst minus
+            cases digits with
+            | cons head _ =>
+                cases head with
+                | decimal _ code =>
+                    have : ('-' : Char).toNat = 45 := rfl
+                    omega
+          · split <;> simp_all
+  | @hexadecimal spelling characters _ spellingEq _ _ =>
+      simp [isNegativeLiteral, positiveSpelling?, spellingEq]
+
+theorem NegativeLiteralDenotes.not_numeric {source : Syntax.CoreLiteralValue} {magnitude value : Nat}
+    (meaning : NegativeLiteralDenotes source magnitude) : ¬ NumericLiteralDenotes source value :=
+  fun numeric => by
+    have negative := meaning.negative
+    rw [numeric.not_negative] at negative
+    cases negative
+
+@[simp] theorem literalMagnitude?_string (spelling : String) :
+    literalMagnitude? (.string spelling) = none := rfl
+
+theorem literalMagnitude?_sound {source : Syntax.CoreLiteralValue} {magnitude : Nat}
+    (decoded : literalMagnitude? source = some magnitude) :
+    NumericLiteralDenotes source magnitude ∨ NegativeLiteralDenotes source magnitude := by
+  unfold literalMagnitude? at decoded
+  cases positive : numericLiteralValue? source with
+  | some value =>
+      simp only [positive, Option.some.injEq] at decoded
+      subst decoded
+      exact .inl (numericLiteralValue?_sound positive)
+  | none =>
+      simp only [positive] at decoded
+      exact .inr (negativeLiteralMagnitude?_sound decoded)
+
 end Solcore.Frontend
 end

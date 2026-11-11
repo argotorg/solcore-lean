@@ -1780,6 +1780,9 @@ private theorem literal_success {context : Context} {literal : Syntax.CoreLitera
     cases code with
     | word target => cases target
     | integer target => cases target
+  | negativeWord meaning _ | negativeInteger meaning _ | negativeFixed meaning _ _ =>
+    cases code with
+    | word _ numeric _ | integer _ numeric _ => exact absurd numeric meaning.not_numeric
 
 def TreeSuccess (context : Context) (type : TypeSystem.Ty) (instructions : List MatchPatternInstruction)
     (pattern : Pattern) (rest : List MatchPatternInstruction) : Prop :=

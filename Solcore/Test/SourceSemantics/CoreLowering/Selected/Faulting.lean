@@ -331,6 +331,7 @@ structure WordNode (source : TypedSource) where
   target : resolution.targetType = .word
   requirements : node.requirements = [resolution.requirement]
   coercions : node.coercions = []
+  positive : Frontend.isNegativeLiteral literal = false
 
 theorem WordNode.evaluates {source : TypedSource} (node : WordNode source)
     {program : SourceSemantics.Program} {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment)
@@ -356,6 +357,7 @@ theorem WordNode.evaluates {source : TypedSource} (node : WordNode source)
         exact .word meaning evidence
     | integer _ target _ => rw [node.target] at target; cases target
     | fixed _ target _ => rw [node.target] at target; cases target
+    | negative meaning _ _ => exact absurd meaning.negative (by rw [node.positive]; decide)
   apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound node.found)
   · rw [node.form]; exact .integerLiteral (by rw [node.requirements,node.coercions]; rfl) constructs
   · rw [node.coercions]; exact .nil
@@ -582,8 +584,10 @@ def observeShape (source : TypedSource) : IO (Shape source) := do
   let ⟨literalTarget⟩ ← observed (resolution.targetType = .word) "generalized literal Word"
   let ⟨literalRequirements⟩ ← observed (literalNode.requirements = [resolution.requirement]) "generalized literal requirements"
   let ⟨literalCoercions⟩ ← observed (literalNode.coercions = []) "generalized literal coercions"
+  let ⟨literalPositive⟩ ← observed (Frontend.isNegativeLiteral raw = false) "generalized literal sign"
   let literal : WordNode source :=
-    ⟨literalNode,raw,resolution,literalFound,literalForm,literalTarget,literalRequirements,literalCoercions⟩
+    ⟨literalNode,raw,resolution,literalFound,literalForm,literalTarget,literalRequirements,literalCoercions,
+      literalPositive⟩
   let wordCall ← observeCall source binder literalNode.id .word wordCallee first
   let boolCall ← observeCall source binder flagRead.node.id .bool boolCallee second
   let ⟨inputs⟩ ← observed (source.inputs = [flag]) "generalized original inputs"
@@ -1344,7 +1348,7 @@ private def originalCall {source : TypedSource} {binder : TypedBinder} {argument
 private def originalWord {source : TypedSource} (shape : WordNode source) :
     Tests.SourceCoreSelectedGeneralizedLocal.WordNode source :=
   ⟨shape.node, shape.literal, shape.resolution, shape.found, shape.form, shape.target,
-    shape.requirements, shape.coercions⟩
+    shape.requirements, shape.coercions, shape.positive⟩
 
 def observeBodyTyping (signatures : ProgramSignatures) (function : CheckedFunction)
     (signature : ProgramFunctionSignature) : IO (BodyTyping signatures function signature) := do
@@ -2335,6 +2339,7 @@ structure WordNode (source : TypedSource) where
   target : resolution.targetType = .word
   requirements : node.requirements = [resolution.requirement]
   coercions : node.coercions = []
+  positive : Frontend.isNegativeLiteral literal = false
 
 theorem WordNode.evaluates {source : TypedSource} (node : WordNode source)
     {program : SourceSemantics.Program} {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment)
@@ -2360,6 +2365,7 @@ theorem WordNode.evaluates {source : TypedSource} (node : WordNode source)
         exact .word meaning evidence
     | integer _ target _ => rw [node.target] at target; cases target
     | fixed _ target _ => rw [node.target] at target; cases target
+    | negative meaning _ _ => exact absurd meaning.negative (by rw [node.positive]; decide)
   apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound node.found)
   · rw [node.form]; exact .integerLiteral (by rw [node.requirements,node.coercions]; rfl) constructs
   · rw [node.coercions]; exact .nil
@@ -2669,7 +2675,8 @@ def observeWord (source : TypedSource) (id : ExpressionId) : IO (WordNode source
   let ⟨target⟩ ← observed (resolution.targetType = .word) "general key RHS target"
   let ⟨requirements⟩ ← observed (node.requirements = [resolution.requirement]) "general key RHS requirement identity"
   let ⟨coercions⟩ ← observed (node.coercions = []) "general key RHS coercions"
-  return ⟨node,literal,resolution,found,form,target,requirements,coercions⟩
+  let ⟨positive⟩ ← observed (Frontend.isNegativeLiteral literal = false) "general key RHS sign"
+  return ⟨node,literal,resolution,found,form,target,requirements,coercions,positive⟩
 
 private def observeSimple (key : Key) : IO (PLift key.Simple) :=
   match key with

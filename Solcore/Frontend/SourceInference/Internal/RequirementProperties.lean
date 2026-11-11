@@ -523,7 +523,7 @@ def IntegerLiteralLedgerCorrespondence (state : State) : Prop :=
   ∀ node source resolution,
     Node.expression node ∈ state.nodes →
     node.form = .integerLiteral source resolution →
-    Frontend.numericLiteralValue? source = some resolution.rawValue ∧
+    Frontend.literalMagnitude? source = some resolution.rawValue ∧
       ∃ origin, origin ∈ state.integerLiterals ∧
         origin.expression = node.id ∧
         resolution.targetType = .variable origin.metavariable ∧

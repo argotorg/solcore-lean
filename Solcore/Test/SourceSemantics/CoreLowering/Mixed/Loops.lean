@@ -396,7 +396,8 @@ private def wordNode (source : TypedSource) (node : ExpressionNode) : IO (WordNo
   let ⟨target⟩ ← observed_variant (resolution.targetType = .word) "Word target"
   let ⟨requirements⟩ ← observed_variant (node.requirements = [resolution.requirement]) "Word requirements"
   let ⟨coercions⟩ ← observed_variant (node.coercions = []) "Word coercions"
-  return ⟨node,literal,resolution,found,form,target,requirements,coercions⟩
+  let ⟨positive⟩ ← observed_variant (Frontend.isNegativeLiteral literal = false) "Word sign"
+  return ⟨node,literal,resolution,found,form,target,requirements,coercions,positive⟩
 
 private def booleanNode (source : TypedSource) (node : ExpressionNode) (value : Bool) :
     IO (BooleanAt source value) := do
@@ -1890,7 +1891,8 @@ private def wordNode (source : TypedSource) (node : ExpressionNode) : IO (WordNo
   let ⟨target⟩ ← observed_variant (resolution.targetType = .word) "Word target"
   let ⟨requirements⟩ ← observed_variant (node.requirements = [resolution.requirement]) "Word requirements"
   let ⟨coercions⟩ ← observed_variant (node.coercions = []) "Word coercions"
-  return ⟨node,literal,resolution,found,form,target,requirements,coercions⟩
+  let ⟨positive⟩ ← observed_variant (Frontend.isNegativeLiteral literal = false) "Word sign"
+  return ⟨node,literal,resolution,found,form,target,requirements,coercions,positive⟩
 
 private def booleanNode (source : TypedSource) (node : ExpressionNode) (value : Bool) :
     IO (BooleanAt source value) := do

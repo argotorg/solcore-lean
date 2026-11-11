@@ -118,8 +118,9 @@ inductive ErrorReason where
       (expected actual : ProgramImplId)
   | integerLiteralPremiseCountMismatch
       (requirement : RequirementId) (expected actual : Nat)
-  /-- A literal greater than the greatest value of its fixed-width type. -/
-  | integerLiteralOutOfRange (type : TypeSystem.FixedInteger) (value : Nat)
+  /-- A literal outside the range of its fixed-width type, with its value:
+  negative for a negative literal. -/
+  | integerLiteralOutOfRange (type : TypeSystem.FixedInteger) (value : Int)
   | builtinFunctionCalleeNotReference (function : BuiltinFunctionId)
   | builtinFunctionCalleeIdentityMismatch
       (expected actual : BuiltinFunctionId)
@@ -599,7 +600,8 @@ private def validateIntegerLiteralResolutionWith {error : Type}
     (source : Syntax.CoreLiteralValue)
     (resolution : IntegerLiteralResolution)
     (expectedImplementation : ProgramImplId)
-    (checkTarget : Ty → Except error Unit) :
+    (checkTarget : Ty → Except error Unit)
+    (decode : Syntax.CoreLiteralValue → Option Nat := numericLiteralValue?) :
     Except error ValidatedIntegerLiteral := do
   if resolution.targetType != nodeType then
     failWith lift site
@@ -609,7 +611,7 @@ private def validateIntegerLiteralResolutionWith {error : Type}
       (.integerLiteralRequirementsMismatch [resolution.requirement]
         attachedRequirements)
   else
-    let decoded ← match numericLiteralValue? source with
+    let decoded ← match decode source with
       | none => failWith lift site (.invalidIntegerLiteralSource source)
       | some value => pure value
     if decoded != resolution.rawValue then
@@ -731,6 +733,60 @@ def validateFixedIntegerLiteral
            consumedRequirements := validated.consumedRequirements }
   else
     fail (.occurrence node.id.occurrence) (.integerLiteralOutOfRange type validated.rawValue)
+
+/-- A negative literal at Word (`-1`), folded by `Syntax.Unchecked.mark`: the
+same spelling, attachment and builtin evidence checks as a Word literal, with
+the magnitude decoded after the `-`. Its word is the magnitude negated modulo
+`2^256`. -/
+def validateNegativeWordIntegerLiteral
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution) :
+    Except Error WordIntegerLiteral := do
+  unless node.coercions.isEmpty do
+    fail (.occurrence node.id.occurrence) (.coercionsPresent node.coercions)
+  let validated ← validateIntegerLiteralResolutionWith id (.occurrence node.id.occurrence)
+    solvedRequirements node.type node.requirements source resolution (.builtin .intWord)
+    (fun target => ensureTypeWith id (.occurrence node.id.occurrence) .word target)
+    negativeLiteralMagnitude?
+  pure { value := negativeLiteralWord validated.rawValue,
+         consumedRequirements := validated.consumedRequirements }
+
+/-- A negative literal at Integer is exact. -/
+def validateNegativeNativeIntegerLiteral
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution) :
+    Except Error NativeIntegerLiteral := do
+  unless node.coercions.isEmpty do
+    fail (.occurrence node.id.occurrence) (.coercionsPresent node.coercions)
+  let validated ← validateIntegerLiteralResolutionWith id (.occurrence node.id.occurrence)
+    solvedRequirements node.type node.requirements source resolution (.builtin .intInteger)
+    (fun target => if target = Ty.integer then pure ()
+      else fail (.occurrence node.id.occurrence) (.unsupportedType target))
+    negativeLiteralMagnitude?
+  pure { value := -(Int.ofNat validated.rawValue),
+         consumedRequirements := validated.consumedRequirements }
+
+/-- A negative literal at one of the twelve types: its magnitude is at most
+that of the type's least value, which the compiler checks again, so its word
+in two's complement is canonical. -/
+def validateNegativeFixedIntegerLiteral
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution)
+    (type : TypeSystem.FixedInteger) :
+    Except Error FixedIntegerLiteral := do
+  unless node.coercions.isEmpty do
+    fail (.occurrence node.id.occurrence) (.coercionsPresent node.coercions)
+  let validated ← validateIntegerLiteralResolutionWith id (.occurrence node.id.occurrence)
+    solvedRequirements node.type node.requirements source resolution (.builtin (.intFixed type))
+    (fun target => if target = Ty.fixed type then pure ()
+      else fail (.occurrence node.id.occurrence) (.unsupportedType target))
+    negativeLiteralMagnitude?
+  if validated.rawValue ≤ type.minMagnitude then
+    pure { value := negativeLiteralWord validated.rawValue,
+           consumedRequirements := validated.consumedRequirements }
+  else
+    fail (.occurrence node.id.occurrence)
+      (.integerLiteralOutOfRange type (-(Int.ofNat validated.rawValue)))
 
 /-- Expression and pattern carriers share the same Word evidence validator. -/
 private def lowerIntegerLiteralResolutionWith {error : Type}
@@ -1682,7 +1738,8 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
             pure {
               resolved := match operator with
                 | .logicalNot => .unary .boolNot operand.resolved
-                | .bitNot => .unary .wordNot operand.resolved
+                -- `negate` is unreachable: inference rejects a prefix `-`.
+                | .bitNot | .negate => .unary .wordNot operand.resolved
               consumedRequirements := operand.consumedRequirements
             }
       else do
@@ -2789,7 +2846,7 @@ private def evaluateStagedValueNodeWith {error : Type}
             let value ← if execute then do
                 let coreOperator := match operator with
                   | .logicalNot => Core.UnaryOp.boolNot
-                  | .bitNot => Core.UnaryOp.wordNot
+                  | .bitNot | .negate => Core.UnaryOp.wordNot
                 let coreValue ← match coreOperator.apply
                     (SourceStagedValue.toCore evaluated.value) with
                   | some value => pure value
@@ -4095,6 +4152,263 @@ theorem validateFixedIntegerLiteral_sound
                             have solvedMember := exactIntegerLiteralRequirementWith_member found
                             exact ⟨targetFixed, targetEq ▸ targetFixed, attached, emptyCoercions,
                               numericLiteralValue?_sound (rawEq ▸ decodedEq), by simpa using inRange, rfl, rfl,
+                              ⟨solved, solvedMember.1, solvedMember.2, predicateEq⟩⟩
+              · simp [targetFixed, fail] at checked
+    · simp [inRange, fail] at accepted
+
+/-- The negative Word validator establishes the Word validator's metadata
+facts, with the `-` spelling and the negated word. -/
+structure NegativeWordIntegerLiteralCertificate
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution)
+    (validated : WordIntegerLiteral) : Prop where
+  targetType : resolution.targetType = .word
+  nodeType : node.type = .word
+  requirements : node.requirements = [resolution.requirement]
+  coercions : node.coercions = []
+  meaning : NegativeLiteralDenotes source resolution.rawValue
+  value : validated.value = negativeLiteralWord resolution.rawValue
+  consumedRequirements : validated.consumedRequirements = [resolution.requirement]
+  solved : ∃ solved ∈ solvedRequirements, solved.id = resolution.requirement ∧
+    solved.predicate = ProgramSignatures.builtinIntPredicate .word
+
+theorem validateNegativeWordIntegerLiteral_sound
+    {solvedRequirements : List SolvedRequirement} {node : ExpressionNode}
+    {source : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {validated : WordIntegerLiteral}
+    (accepted : validateNegativeWordIntegerLiteral solvedRequirements node source resolution = .ok validated) :
+    NegativeWordIntegerLiteralCertificate solvedRequirements node source resolution validated := by
+  have emptyCoercions : node.coercions = [] := by
+    by_cases empty : node.coercions = []
+    · exact empty
+    · simp [validateNegativeWordIntegerLiteral, empty, fail, bind, Except.bind] at accepted
+  simp only [validateNegativeWordIntegerLiteral, emptyCoercions, List.isEmpty_nil, ↓reduceIte] at accepted
+  cases checked : validateIntegerLiteralResolutionWith id (.occurrence node.id.occurrence)
+      solvedRequirements node.type node.requirements source resolution (.builtin .intWord)
+      (fun target => ensureTypeWith id (.occurrence node.id.occurrence) .word target)
+      negativeLiteralMagnitude? with
+  | error err => simp [checked, bind, Except.bind] at accepted
+  | ok rawValidated =>
+    simp only [checked, bind, Except.bind, pure, Pure.pure, Except.pure,
+      Except.ok.injEq] at accepted
+    subst validated
+    unfold validateIntegerLiteralResolutionWith at checked
+    split at checked
+    · simp [failWith] at checked
+    · rename_i target
+      split at checked
+      · simp [failWith] at checked
+      · rename_i requirements
+        cases decodedEq : negativeLiteralMagnitude? source with
+        | none => simp [decodedEq, failWith, bind, Except.bind] at checked
+        | some decoded =>
+          simp only [decodedEq, bind, Except.bind, pure, Pure.pure, Except.pure] at checked
+          split at checked
+          · simp [failWith] at checked
+          · rename_i raw
+            cases lowered : lowerType (.occurrence node.id.occurrence) resolution.targetType with
+            | error err => simp [ensureTypeWith, lowered, Except.mapError, bind, Except.bind] at checked
+            | ok coreType =>
+              by_cases wordType : coreType = .word
+              · subst coreType
+                simp only [ensureTypeWith, lowered, Except.mapError, ↓reduceIte,
+                  bind, Except.bind, pure, Pure.pure, Except.pure] at checked
+                cases found : exactIntegerLiteralRequirementWith id (.occurrence node.id.occurrence)
+                    solvedRequirements resolution.requirement with
+                | error err => simp [found] at checked
+                | ok solved =>
+                  simp only [found] at checked
+                  split at checked
+                  · simp [failWith] at checked
+                  · rename_i predicate
+                    split at checked
+                    · simp [failWith] at checked
+                    · rename_i goal
+                      split at checked
+                      · simp [failWith] at checked
+                      · split at checked
+                        · simp [failWith] at checked
+                        · split at checked
+                          · simp [failWith] at checked
+                          · simp only [Except.ok.injEq] at checked
+                            subst rawValidated
+                            have targetWord := lowerType_word_source lowered
+                            have targetEq : resolution.targetType = node.type := by simpa using target
+                            have attached : node.requirements = [resolution.requirement] := by simpa using requirements
+                            have rawEq : decoded = resolution.rawValue := by simpa using raw
+                            have predicateEq : solved.predicate = ProgramSignatures.builtinIntPredicate .word :=
+                              builtinWordPredicate_of_beq (by simpa [bne, IntegerLiteralResolution.predicate, targetWord] using predicate)
+                            have solvedMember := exactIntegerLiteralRequirementWith_member found
+                            exact ⟨targetWord, targetEq ▸ targetWord, attached, emptyCoercions,
+                              negativeLiteralMagnitude?_sound (rawEq ▸ decodedEq), rfl, rfl,
+                              ⟨solved, solvedMember.1, solvedMember.2, predicateEq⟩⟩
+              · simp [ensureTypeWith, lowered, wordType, Except.mapError, failWith, bind, Except.bind] at checked
+
+/-- The negative Integer validator establishes the Integer validator's
+metadata facts, with the `-` spelling and the negated integer. -/
+structure NegativeNativeIntegerLiteralCertificate
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution)
+    (validated : NativeIntegerLiteral) : Prop where
+  targetType : resolution.targetType = .integer
+  nodeType : node.type = .integer
+  requirements : node.requirements = [resolution.requirement]
+  coercions : node.coercions = []
+  meaning : NegativeLiteralDenotes source resolution.rawValue
+  value : validated.value = -(Int.ofNat resolution.rawValue)
+  consumedRequirements : validated.consumedRequirements = [resolution.requirement]
+  solved : ∃ solved ∈ solvedRequirements, solved.id = resolution.requirement ∧
+    solved.predicate = ProgramSignatures.builtinIntPredicate .integer
+
+theorem validateNegativeNativeIntegerLiteral_sound
+    {solvedRequirements : List SolvedRequirement} {node : ExpressionNode}
+    {source : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {validated : NativeIntegerLiteral}
+    (accepted : validateNegativeNativeIntegerLiteral solvedRequirements node source resolution = .ok validated) :
+    NegativeNativeIntegerLiteralCertificate solvedRequirements node source resolution validated := by
+  have emptyCoercions : node.coercions = [] := by
+    by_cases empty : node.coercions = []
+    · exact empty
+    · simp [validateNegativeNativeIntegerLiteral, empty, fail, bind, Except.bind] at accepted
+  simp only [validateNegativeNativeIntegerLiteral, emptyCoercions, List.isEmpty_nil, ↓reduceIte] at accepted
+  cases checked : validateIntegerLiteralResolutionWith id (.occurrence node.id.occurrence)
+      solvedRequirements node.type node.requirements source resolution (.builtin .intInteger)
+      (fun target => if target = Ty.integer then pure ()
+        else fail (.occurrence node.id.occurrence) (.unsupportedType target))
+      negativeLiteralMagnitude? with
+  | error err => simp [checked, bind, Except.bind] at accepted
+  | ok rawValidated =>
+    simp only [pure, Pure.pure, Except.pure] at checked
+    simp only [checked, bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
+    subst validated
+    unfold validateIntegerLiteralResolutionWith at checked
+    split at checked
+    · simp [failWith] at checked
+    · rename_i target
+      split at checked
+      · simp [failWith] at checked
+      · rename_i requirements
+        cases decodedEq : negativeLiteralMagnitude? source with
+        | none => simp [decodedEq, failWith, bind, Except.bind] at checked
+        | some decoded =>
+          simp only [decodedEq, bind, Except.bind, pure, Pure.pure, Except.pure] at checked
+          split at checked
+          · simp [failWith] at checked
+          · rename_i raw
+            by_cases targetInteger : resolution.targetType = Ty.integer
+            · simp only [targetInteger, ↓reduceIte] at checked
+              cases found : exactIntegerLiteralRequirementWith id (.occurrence node.id.occurrence)
+                  solvedRequirements resolution.requirement with
+              | error err => simp [found] at checked
+              | ok solved =>
+                simp only [found] at checked
+                split at checked
+                · simp [failWith] at checked
+                · rename_i predicate
+                  split at checked
+                  · simp [failWith] at checked
+                  · split at checked
+                    · simp [failWith] at checked
+                    · split at checked
+                      · simp [failWith] at checked
+                      · split at checked
+                        · simp [failWith] at checked
+                        · simp only [Except.ok.injEq] at checked
+                          subst rawValidated
+                          have targetEq : resolution.targetType = node.type := by simpa using target
+                          have attached : node.requirements = [resolution.requirement] := by simpa using requirements
+                          have rawEq : decoded = resolution.rawValue := by simpa using raw
+                          have predicateEq : solved.predicate = ProgramSignatures.builtinIntPredicate .integer :=
+                            builtinIntegerPredicate_of_beq (by simpa [bne, IntegerLiteralResolution.predicate, targetInteger] using predicate)
+                          have solvedMember := exactIntegerLiteralRequirementWith_member found
+                          exact ⟨targetInteger, targetEq ▸ targetInteger, attached, emptyCoercions,
+                            negativeLiteralMagnitude?_sound (rawEq ▸ decodedEq), rfl, rfl,
+                            ⟨solved, solvedMember.1, solvedMember.2, predicateEq⟩⟩
+            · simp [targetInteger, fail] at checked
+
+/-- The negative fixed-width validator establishes the fixed-width
+validator's metadata facts, with the `-` spelling, the bound on the magnitude
+and the negated word. -/
+structure NegativeFixedIntegerLiteralCertificate
+    (solvedRequirements : List SolvedRequirement) (node : ExpressionNode)
+    (source : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution)
+    (type : TypeSystem.FixedInteger) (validated : FixedIntegerLiteral) : Prop where
+  targetType : resolution.targetType = .fixed type
+  nodeType : node.type = .fixed type
+  requirements : node.requirements = [resolution.requirement]
+  coercions : node.coercions = []
+  meaning : NegativeLiteralDenotes source resolution.rawValue
+  fits : resolution.rawValue ≤ type.minMagnitude
+  value : validated.value = negativeLiteralWord resolution.rawValue
+  consumedRequirements : validated.consumedRequirements = [resolution.requirement]
+  solved : ∃ solved ∈ solvedRequirements, solved.id = resolution.requirement ∧
+    solved.predicate = ProgramSignatures.builtinIntPredicate (.fixed type)
+
+theorem validateNegativeFixedIntegerLiteral_sound
+    {solvedRequirements : List SolvedRequirement} {node : ExpressionNode}
+    {source : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    {type : TypeSystem.FixedInteger} {validated : FixedIntegerLiteral}
+    (accepted : validateNegativeFixedIntegerLiteral solvedRequirements node source resolution type = .ok validated) :
+    NegativeFixedIntegerLiteralCertificate solvedRequirements node source resolution type validated := by
+  have emptyCoercions : node.coercions = [] := by
+    by_cases empty : node.coercions = []
+    · exact empty
+    · simp [validateNegativeFixedIntegerLiteral, empty, fail, bind, Except.bind] at accepted
+  simp only [validateNegativeFixedIntegerLiteral, emptyCoercions, List.isEmpty_nil, ↓reduceIte] at accepted
+  cases checked : validateIntegerLiteralResolutionWith id (.occurrence node.id.occurrence)
+      solvedRequirements node.type node.requirements source resolution (.builtin (.intFixed type))
+      (fun target => if target = Ty.fixed type then pure ()
+        else fail (.occurrence node.id.occurrence) (.unsupportedType target))
+      negativeLiteralMagnitude? with
+  | error err => simp [checked, bind, Except.bind] at accepted
+  | ok rawValidated =>
+    simp only [pure, Pure.pure, Except.pure] at checked
+    simp only [checked, bind, Except.bind, pure, Pure.pure, Except.pure] at accepted
+    by_cases inRange : rawValidated.rawValue ≤ type.minMagnitude
+    · simp only [inRange, ↓reduceIte, Except.ok.injEq] at accepted
+      subst validated
+      unfold validateIntegerLiteralResolutionWith at checked
+      split at checked
+      · simp [failWith] at checked
+      · rename_i target
+        split at checked
+        · simp [failWith] at checked
+        · rename_i requirements
+          cases decodedEq : negativeLiteralMagnitude? source with
+          | none => simp [decodedEq, failWith, bind, Except.bind] at checked
+          | some decoded =>
+            simp only [decodedEq, bind, Except.bind, pure, Pure.pure, Except.pure] at checked
+            split at checked
+            · simp [failWith] at checked
+            · rename_i raw
+              by_cases targetFixed : resolution.targetType = Ty.fixed type
+              · simp only [targetFixed, ↓reduceIte] at checked
+                cases found : exactIntegerLiteralRequirementWith id (.occurrence node.id.occurrence)
+                    solvedRequirements resolution.requirement with
+                | error err => simp [found] at checked
+                | ok solved =>
+                  simp only [found] at checked
+                  split at checked
+                  · simp [failWith] at checked
+                  · rename_i predicate
+                    split at checked
+                    · simp [failWith] at checked
+                    · split at checked
+                      · simp [failWith] at checked
+                      · split at checked
+                        · simp [failWith] at checked
+                        · split at checked
+                          · simp [failWith] at checked
+                          · simp only [Except.ok.injEq] at checked
+                            subst rawValidated
+                            have targetEq : resolution.targetType = node.type := by simpa using target
+                            have attached : node.requirements = [resolution.requirement] := by simpa using requirements
+                            have rawEq : decoded = resolution.rawValue := by simpa using raw
+                            have predicateEq : solved.predicate = ProgramSignatures.builtinIntPredicate (.fixed type) :=
+                              builtinFixedPredicate_of_beq (by simpa [bne, IntegerLiteralResolution.predicate, targetFixed] using predicate)
+                            have solvedMember := exactIntegerLiteralRequirementWith_member found
+                            exact ⟨targetFixed, targetEq ▸ targetFixed, attached, emptyCoercions,
+                              negativeLiteralMagnitude?_sound (rawEq ▸ decodedEq), by simpa using inRange, rfl, rfl,
                               ⟨solved, solvedMember.1, solvedMember.2, predicateEq⟩⟩
               · simp [targetFixed, fail] at checked
     · simp [inRange, fail] at accepted

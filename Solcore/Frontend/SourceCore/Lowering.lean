@@ -1003,7 +1003,9 @@ structure Context where
 
 def unaryOperator : Syntax.UnaryOp → Core.UnaryOp
   | .logicalNot => .boolNot
-  | .bitNot => .wordNot
+  -- `negate` is unreachable: inference rejects a prefix `-`, which
+  -- `Syntax.Unchecked.mark` has already folded or read as `0 - e`.
+  | .bitNot | .negate => .wordNot
 
 def binaryOperandType : Syntax.BinaryOp → Core.Ty
   | .logicalAnd | .logicalOr => .bool
@@ -1870,6 +1872,8 @@ def lowerExpressionWithReasons : Nat → Context → TypedSource → Scope → E
           let site := SourceCoreElaboration.ErrorSite.occurrence id.occurrence
           match node.form with
           | .unary operator operand =>
+              -- This profile has no prefix `-`, which inference never leaves.
+              if operator = .negate then throw (.unsupportedExpression id node.form) else
               let operand ← lowerExpressionWithReasons fuel context source scope operand reasonAt
               let coreOperator := unaryOperator operator
               SourceCoreBasic.ensureType site coreOperator.operandType operand.type
@@ -2099,6 +2103,8 @@ def lowerExpressionWithReasons : Nat → Context → TypedSource → Scope → E
               pure ⟨type, call signature (scope.length + context.administrativePrefix + globalIndex)
                 packed.expression context.internalReason⟩
           | .unary operator operand =>
+              -- This profile has no prefix `-`, which inference never leaves.
+              if operator = .negate then throw (.unsupportedExpression id node.form) else
               let operand ← lowerExpressionWithReasons fuel context source scope operand reasonAt
               let coreOperator := SourceCorePrimitive.unaryOperator operator
               (SourceCoreBasic.ensureType site coreOperator.operandType operand.type)
@@ -2787,7 +2793,26 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
       if let some lowered := special then return lowered
       match node.form with
       | .integerLiteral literal resolution =>
-          if node.type = TypeSystem.Ty.integer then
+          -- A negative literal (`-128`), which `Syntax.Unchecked.mark` folded
+          -- from a prefix `-`: the negated integer or its word.
+          if Frontend.isNegativeLiteral literal then
+            if node.type = TypeSystem.Ty.integer then
+              let validated ← (SourceCoreElaboration.validateNegativeNativeIntegerLiteral
+                context.solvedRequirements node literal resolution).mapError
+                  SourceCoreBasic.Error.literalEvidence
+              pure ⟨.integer, Core.LanguageResult.success (.integer validated.value)⟩
+            else match node.type.fixedInteger? with
+              | some type =>
+                  let validated ← (SourceCoreElaboration.validateNegativeFixedIntegerLiteral
+                    context.solvedRequirements node literal resolution type).mapError
+                      SourceCoreBasic.Error.literalEvidence
+                  pure ⟨.word, Core.LanguageResult.success (.word validated.value)⟩
+              | none =>
+                  let validated ← (SourceCoreElaboration.validateNegativeWordIntegerLiteral
+                    context.solvedRequirements node literal resolution).mapError
+                      SourceCoreBasic.Error.literalEvidence
+                  pure ⟨.word, Core.LanguageResult.success (.word validated.value)⟩
+          else if node.type = TypeSystem.Ty.integer then
             let validated ← (SourceCoreElaboration.validateNativeIntegerLiteral context.solvedRequirements
               node literal resolution).mapError SourceCoreBasic.Error.literalEvidence
             pure ⟨.integer, Core.LanguageResult.success (.integer validated.value)⟩

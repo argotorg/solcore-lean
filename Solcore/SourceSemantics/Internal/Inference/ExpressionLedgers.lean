@@ -922,10 +922,12 @@ private abbrev finishUnaryOperatorLedger
   let operand := state.resolve operandType
   if Detail.fixedUnaryOperator operator operand then
     pure { type := operand, requirements := [], state }
+  else if operator = .negate then
+    throw (.operatorNotSupported "-" operand)
   else
     let builtin := match operator with
       | .logicalNot => Ty.bool
-      | .bitNot => Ty.word
+      | .bitNot | .negate => Ty.word
     finishOperatorLedger context (Detail.unaryOperatorDispatch operator)
       operand builtin builtin
       (if operator == Syntax.UnaryOp.logicalNot then .bool else operand)
@@ -944,7 +946,9 @@ private theorem finishUnaryOperatorLedger_evolution
   · injection success with resultEq
     subst result
     exact .refl state
-  · exact finishOperatorLedger_evolution success
+  · split at success
+    · cases success
+    · exact finishOperatorLedger_evolution success
 
 private abbrev finishBinaryOperatorLedger
     (context : Frontend.SourceInference.Context)

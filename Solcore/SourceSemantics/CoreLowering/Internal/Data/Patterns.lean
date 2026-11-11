@@ -958,6 +958,9 @@ private theorem literal_success {compilation : Compilation} {context : Context}
     cases code with
     | word target => cases target
     | integer target => cases target
+  | negativeWord meaning _ | negativeInteger meaning _ | negativeFixed meaning _ _ =>
+    cases code with
+    | word _ numeric _ | integer _ numeric _ => exact absurd numeric meaning.not_numeric
 
 /-- A successful source prefix can be consumed only over the same suffix as
 the compiler certificate. The binder bundle remains ordered and unmodified. -/

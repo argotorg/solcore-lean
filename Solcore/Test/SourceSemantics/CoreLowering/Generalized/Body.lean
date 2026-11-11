@@ -396,7 +396,8 @@ private def wordNode (source : TypedSource) (node : ExpressionNode) : IO (WordNo
   let ⟨target⟩ ← observed (resolution.targetType = .word) "Word target"
   let ⟨requirements⟩ ← observed (node.requirements = [resolution.requirement]) "Word requirements"
   let ⟨coercions⟩ ← observed (node.coercions = []) "Word coercions"
-  return ⟨node,literal,resolution,found,form,target,requirements,coercions⟩
+  let ⟨positive⟩ ← observed (Frontend.isNegativeLiteral literal = false) "Word sign"
+  return ⟨node,literal,resolution,found,form,target,requirements,coercions,positive⟩
 
 
 def observeShape (source : TypedSource) : IO (Shape source) := do
@@ -520,7 +521,8 @@ def substituteWord {source : TypedSource} (word : WordNode source) (substitution
   form := by simp [ExpressionNode.applySubstitution,word.form,ExpressionForm.applySubstitution]
   target := by simp [word.target]
   requirements := by simp [ExpressionNode.applySubstitution,word.requirements]
-  coercions := by simp [ExpressionNode.applySubstitution,word.coercions] }
+  coercions := by simp [ExpressionNode.applySubstitution,word.coercions]
+  positive := word.positive }
 
 def LambdaShape.descriptor {source : TypedSource} (shape : LambdaShape source)
     (context : SourceSemantics.Context) (environment : Dynamic.Environment) : Dynamic.GeneralizedClosure :=
@@ -1977,7 +1979,8 @@ private def wordNode (source : TypedSource) (node : ExpressionNode) : IO (WordNo
   let ⟨target⟩ ← observed (resolution.targetType = .word) "Word target"
   let ⟨requirements⟩ ← observed (node.requirements = [resolution.requirement]) "Word requirements"
   let ⟨coercions⟩ ← observed (node.coercions = []) "Word coercions"
-  return ⟨node,literal,resolution,found,form,target,requirements,coercions⟩
+  let ⟨positive⟩ ← observed (Frontend.isNegativeLiteral literal = false) "Word sign"
+  return ⟨node,literal,resolution,found,form,target,requirements,coercions,positive⟩
 
 
 def observeShape (source : TypedSource) : IO (Shape source) := do
@@ -2132,7 +2135,8 @@ def substituteWord {source : TypedSource} (word : WordNode source) (substitution
   form := by simp [ExpressionNode.applySubstitution,word.form,ExpressionForm.applySubstitution]
   target := by simp [word.target]
   requirements := by simp [ExpressionNode.applySubstitution,word.requirements]
-  coercions := by simp [ExpressionNode.applySubstitution,word.coercions] }
+  coercions := by simp [ExpressionNode.applySubstitution,word.coercions]
+  positive := word.positive }
 
 def LambdaShape.descriptor {source : TypedSource} (shape : LambdaShape source)
     (context : SourceSemantics.Context) (environment : Dynamic.Environment) : Dynamic.GeneralizedClosure :=

@@ -312,6 +312,24 @@ inductive Literal (solved : List SolvedRequirement) (node : ExpressionNode) :
       (form : node.form = .integerLiteral literal resolution)
       (metadata : SourceCoreElaboration.FixedIntegerLiteralCertificate solved node literal resolution type validated) :
       Literal solved node .word (LanguageResult.success (.word validated.value))
+  /-- A negative literal at Word (`-1`): its word wraps. -/
+  | resolvedNegativeWord {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+      {validated : SourceCoreElaboration.WordIntegerLiteral}
+      (form : node.form = .integerLiteral literal resolution)
+      (metadata : SourceCoreElaboration.NegativeWordIntegerLiteralCertificate solved node literal resolution validated) :
+      Literal solved node .word (LanguageResult.success (.word validated.value))
+  /-- A negative literal at Integer is exact. -/
+  | resolvedNegativeInteger {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+      {validated : SourceCoreElaboration.NativeIntegerLiteral}
+      (form : node.form = .integerLiteral literal resolution)
+      (metadata : SourceCoreElaboration.NegativeNativeIntegerLiteralCertificate solved node literal resolution validated) :
+      Literal solved node .integer (LanguageResult.success (.integer validated.value))
+  /-- A negative literal at one of the twelve types: its canonical word. -/
+  | resolvedNegativeFixed {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+      {type : TypeSystem.FixedInteger} {validated : SourceCoreElaboration.FixedIntegerLiteral}
+      (form : node.form = .integerLiteral literal resolution)
+      (metadata : SourceCoreElaboration.NegativeFixedIntegerLiteralCertificate solved node literal resolution type validated) :
+      Literal solved node .word (LanguageResult.success (.word validated.value))
 
 def Certificate (solved : List SolvedRequirement) (source : TypedSource)
     (id : ExpressionId) (lowered : SourceCoreBasic.LoweredExpr) : Prop :=
@@ -466,6 +484,34 @@ theorem of_functions
         | integer literal resolution =>
           simp only [form] at accepted
           split at accepted
+          · split at accepted
+            · cases validated : SourceCoreElaboration.validateNegativeNativeIntegerLiteral context.solvedRequirements node literal resolution with
+              | error error => simp [validated, Except.mapError, bind, Except.bind] at accepted
+              | ok output =>
+                simp only [validated, Except.mapError, bind, Except.bind, pure, Except.pure, Except.ok.injEq] at accepted
+                subst lowered
+                exact ⟨node, found, .resolvedNegativeInteger form
+                  (SourceCoreElaboration.validateNegativeNativeIntegerLiteral_sound validated)⟩
+            · cases fixedType : node.type.fixedInteger? with
+              | some type =>
+                simp only [fixedType] at accepted
+                cases validated : SourceCoreElaboration.validateNegativeFixedIntegerLiteral context.solvedRequirements node literal resolution type with
+                | error error => simp [validated, Except.mapError, bind, Except.bind] at accepted
+                | ok output =>
+                  simp only [validated, Except.mapError, bind, Except.bind, pure, Except.pure, Except.ok.injEq] at accepted
+                  subst lowered
+                  exact ⟨node, found, .resolvedNegativeFixed form
+                    (SourceCoreElaboration.validateNegativeFixedIntegerLiteral_sound validated)⟩
+              | none =>
+                simp only [fixedType] at accepted
+                cases validated : SourceCoreElaboration.validateNegativeWordIntegerLiteral context.solvedRequirements node literal resolution with
+                | error error => simp [validated, Except.mapError, bind, Except.bind] at accepted
+                | ok output =>
+                  simp only [validated, Except.mapError, bind, Except.bind, pure, Except.pure, Except.ok.injEq] at accepted
+                  subst lowered
+                  exact ⟨node, found, .resolvedNegativeWord form
+                    (SourceCoreElaboration.validateNegativeWordIntegerLiteral_sound validated)⟩
+          split at accepted
           · cases validated : SourceCoreElaboration.validateNativeIntegerLiteral context.solvedRequirements node literal resolution with
             | error error => simp [validated, Except.mapError, bind, Except.bind] at accepted
             | ok output =>
@@ -550,7 +596,7 @@ private theorem ContextValid.numeric {solved : List SolvedRequirement} {context 
   | unit other _ _ _ => rw [other] at form; cases form
   | bool _ other _ _ _ => rw [other] at form; cases form
   | word _ other _ _ _ _ => rw [other] at form; cases form
-  | resolvedWord other metadata | resolvedInteger other metadata | resolvedFixed other metadata =>
+  | resolvedWord other metadata | resolvedInteger other metadata | resolvedFixed other metadata | resolvedNegativeWord other metadata | resolvedNegativeInteger other metadata | resolvedNegativeFixed other metadata =>
     have same := other.symm.trans form
     cases same
     have proves := valid.proves metadata.solved
@@ -578,12 +624,12 @@ private theorem Literal.atomic {solved node type code} (literal : Literal solved
   | unit form _ _ _ => rw [form]; exact .unit
   | bool value form _ _ _ => rw [form]; exact .bool _ _
   | word value form _ _ _ _ => rw [form]; exact .word _
-  | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ => rw [form]; exact .integer _ _
+  | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ | resolvedNegativeWord form _ | resolvedNegativeInteger form _ | resolvedNegativeFixed form _ => rw [form]; exact .integer _ _
 
 private theorem Literal.coercions {solved node type code} (literal : Literal solved node type code) : node.coercions = [] := by
   cases literal with
   | unit _ _ _ empty | bool _ _ _ _ empty | word _ _ _ _ empty _ => exact empty
-  | resolvedWord _ metadata | resolvedInteger _ metadata | resolvedFixed _ metadata => exact metadata.coercions
+  | resolvedWord _ metadata | resolvedInteger _ metadata | resolvedFixed _ metadata | resolvedNegativeWord _ metadata | resolvedNegativeInteger _ metadata | resolvedNegativeFixed _ metadata => exact metadata.coercions
 
 private theorem evaluation_raw
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
@@ -646,7 +692,7 @@ private theorem Literal.form_unique {solved : List SolvedRequirement} {node : Ex
     rw [form] at first second
     cases first with | literal _ first =>
       cases second with | literal _ second => exact ⟨first.functional second, rfl⟩
-  | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ =>
+  | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ | resolvedNegativeWord form _ | resolvedNegativeInteger form _ | resolvedNegativeFixed form _ =>
     rw [form] at first second
     cases first with | integerLiteral _ first =>
       cases second with | integerLiteral _ second => exact ⟨first.functional second, rfl⟩
@@ -662,7 +708,7 @@ private theorem Literal.excludes_fault_with_evidence {solved : List SolvedRequir
     rw [form] at fault
     cases fault with | tuple _ failed => cases failed
   | bool value form _ _ _ | word value form _ _ _ _ => rw [form] at fault; cases fault
-  | resolvedWord form metadata | resolvedInteger form metadata | resolvedFixed form metadata =>
+  | resolvedWord form metadata | resolvedInteger form metadata | resolvedFixed form metadata | resolvedNegativeWord form metadata | resolvedNegativeInteger form metadata | resolvedNegativeFixed form metadata =>
     rw [form] at fault
     cases fault with | integerRequirement _ unavailable =>
       exact (valid _ _ form).2 unavailable
@@ -682,8 +728,9 @@ theorem Literal.hasType {solved node type code} (literal : Literal solved node t
   cases literal with
   | unit => exact .inRight .word .unit
   | bool => exact .inRight .word .bool
-  | word | resolvedWord | resolvedFixed => exact .inRight .word .word
-  | resolvedInteger => exact .inRight .word .integer
+  | word | resolvedWord | resolvedFixed | resolvedNegativeWord | resolvedNegativeFixed =>
+      exact .inRight .word .word
+  | resolvedInteger | resolvedNegativeInteger => exact .inRight .word .integer
 
 /-- Each static literal constructs a source value and a native value directly.
 The environment renaming and both heaps are arbitrary. -/
@@ -742,6 +789,38 @@ theorem Literal.evaluates_with_evidence {solved : List SolvedRequirement} {node 
       exact TypeSystem.FixedInteger.canonical_of_le_maxNat fits
     rw [form, metadata.nodeType, metadata.requirements, metadata.coercions, metadata.value]
     exact ⟨_, _, .integerLiteral rfl constructs, .fixed _ canonical, .inRight .word⟩
+  | @resolvedNegativeWord value resolution validated form metadata =>
+    have constructs : Dynamic.ResolvedIntegerLiteralConstructs context value resolution
+        (.word (Frontend.negativeLiteralWord resolution.rawValue)) := by
+      cases resolution with | mk raw target requirement =>
+        have targetEq := metadata.targetType
+        dsimp only at targetEq
+        subst target
+        exact .negativeWord metadata.meaning (valid _ _ form).1
+    rw [form, metadata.nodeType, metadata.requirements, metadata.coercions, metadata.value]
+    exact ⟨_, _, .integerLiteral rfl constructs, .word _, .inRight .word⟩
+  | @resolvedNegativeInteger value resolution validated form metadata =>
+    have constructs : Dynamic.ResolvedIntegerLiteralConstructs context value resolution
+        (.integer (-(Int.ofNat resolution.rawValue))) := by
+      cases resolution with | mk raw target requirement =>
+        have targetEq := metadata.targetType
+        dsimp only at targetEq
+        subst target
+        exact .negativeInteger metadata.meaning (valid _ _ form).1
+    rw [form, metadata.nodeType, metadata.requirements, metadata.coercions, metadata.value]
+    exact ⟨_, _, .integerLiteral rfl constructs, .integer _, .inRight .integer⟩
+  | @resolvedNegativeFixed value resolution type validated form metadata =>
+    have fits := metadata.fits
+    have constructs : Dynamic.ResolvedIntegerLiteralConstructs context value resolution
+        (.word (Frontend.negativeLiteralWord resolution.rawValue)) := by
+      cases resolution with | mk raw target requirement =>
+        have targetEq := metadata.targetType
+        dsimp only at targetEq
+        subst target
+        exact .negativeFixed metadata.meaning fits (valid _ _ form).1
+    rw [form, metadata.nodeType, metadata.requirements, metadata.coercions, metadata.value]
+    exact ⟨_, _, .integerLiteral rfl constructs, .fixed _ (Dynamic.negativeLiteralWord_canonical fits),
+      .inRight .word⟩
 
 theorem Literal.evaluates {solved : List SolvedRequirement} {node : ExpressionNode} {type code}
     (literal : Literal solved node type code)
@@ -2494,7 +2573,7 @@ theorem of_typed {source : TypedSource} {context : SourceSemantics.Context}
     | integerLiteral valid =>
       have proves : RequirementProves context resolution.requirement resolution.predicate := by
         cases valid with
-        | word _ _ proves | integer _ _ proves | fixed _ _ proves => exact proves
+        | word _ _ proves | integer _ _ proves | fixed _ _ proves | negative _ _ proves => exact proves
       obtain ⟨closed, produced⟩ := Dynamic.RequirementProves.produces_of_covers covers proves
       exact ⟨proves, produced.excludes_unavailable idsUnique⟩
 

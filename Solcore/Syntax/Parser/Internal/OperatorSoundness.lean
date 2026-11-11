@@ -23,7 +23,7 @@ namespace Solcore.Syntax.Parser.ExpressionInternals
 private theorem unaryOperatorAbsentAt_of_peek?_eq_none {input : State}
     (found : input.peek? = none) :
     DeclarativeGrammar.UnaryOperatorAbsentAt input.declarativeRemainder := by
-  constructor <;> rintro ⟨span, inside, tokenFound⟩
+  refine ⟨?_, ?_, ?_⟩ <;> rintro ⟨span, inside, tokenFound⟩
   all_goals
     have cursorInside : input.cursor < input.window.endIndex := by
       simpa [State.declarativeRemainder] using inside
@@ -38,7 +38,7 @@ private theorem unaryOperatorAbsentAt_of_unaryOp?_eq_none
     (found : input.peek? = some token)
     (decoded : unaryOp? token.value = none) :
     DeclarativeGrammar.UnaryOperatorAbsentAt input.declarativeRemainder := by
-  constructor
+  refine ⟨?_, ?_, ?_⟩
   · rintro ⟨span, _inside, tokenFound⟩
     have currentFound := (tokenAt_of_peek?_eq_some found).2
     have same : token = { span, value := TokenKind.symbol .bang } :=
@@ -48,6 +48,12 @@ private theorem unaryOperatorAbsentAt_of_unaryOp?_eq_none
   · rintro ⟨span, _inside, tokenFound⟩
     have currentFound := (tokenAt_of_peek?_eq_some found).2
     have same : token = { span, value := TokenKind.symbol .tilde } :=
+      Option.some.inj (currentFound.symm.trans tokenFound)
+    subst token
+    simp [unaryOp?] at decoded
+  · rintro ⟨span, _inside, tokenFound⟩
+    have currentFound := (tokenAt_of_peek?_eq_some found).2
+    have same : token = { span, value := TokenKind.symbol .minus } :=
       Option.some.inj (currentFound.symm.trans tokenFound)
     subst token
     simp [unaryOp?] at decoded

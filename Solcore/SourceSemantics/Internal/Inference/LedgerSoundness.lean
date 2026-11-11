@@ -56,7 +56,7 @@ theorem inferExprFuelLedgerPreservation_step
     cases literalForm : literal.value with
     | string _ => simp [Detail.inferExprFuel, allocation, form, literalForm] at accepted
     | decimal spelling | hexadecimal spelling =>
-      cases decoded : numericLiteralValue? literal.value with
+      cases decoded : literalMagnitude? literal.value with
       | none =>
         unfold Detail.inferExprFuel at accepted
         simp only [allocation, form] at accepted

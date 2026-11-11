@@ -8,10 +8,14 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax
 
-/-- Prefix operators accepted by canonical Core expressions. -/
+/-- Prefix operators accepted by canonical Core expressions. A prefix `-`
+(`negate`) is parsed, but no loaded program keeps it:
+`Syntax.Unchecked.mark` folds a negated literal into the literal and reads any
+other negation as `0 - e`. -/
 inductive UnaryOp where
   | logicalNot
   | bitNot
+  | negate
   deriving Repr, BEq, DecidableEq
 
 namespace UnaryOp
@@ -19,6 +23,7 @@ namespace UnaryOp
 def symbol : UnaryOp → Symbol
   | .logicalNot => .bang
   | .bitNot => .tilde
+  | .negate => .minus
 
 end UnaryOp
 

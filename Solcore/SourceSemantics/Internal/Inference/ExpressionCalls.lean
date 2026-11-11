@@ -3141,7 +3141,7 @@ theorem
     {active : SourceSemantics.Context}
     (expressionEq : expression.value = .literal literal)
     (literalEq : literal.value = source)
-    (decoded : Frontend.numericLiteralValue? source = some rawValue)
+    (decoded : Frontend.literalMagnitude? source = some rawValue)
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
       expected initial = .ok (inferred, resultState))

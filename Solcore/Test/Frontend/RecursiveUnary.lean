@@ -248,6 +248,7 @@ private def overlap (text : String) (a : Core.Ty) (v : Core.Value) : IO Unit := 
                   (fun store => by rw [same.2,shape,named]; exact .pure (.bitNot (val ▸ q.evidence store)))
               else throw (IO.userError "complement overlap type/value")
           | _ => throw (IO.userError "complement overlap payload")
+      | .negate => throw (IO.userError "no prefix minus reaches elaboration")
   | _ => throw (IO.userError "overlap root")
 private def sourceCalls : Nat → String | 0 => "x" | n+1 => "f("++sourceCalls n++")"
 private def coreCalls : Nat → Core.Expr | 0 => .var 0 | n+1 => .apply (.var 4) (coreCalls n)

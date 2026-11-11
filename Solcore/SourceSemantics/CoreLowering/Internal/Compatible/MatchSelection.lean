@@ -2339,7 +2339,8 @@ private theorem Tree.numeric_typed
       cases typed with
       | integerLiteral valid =>
           cases valid with
-          | word _ _ evidence | integer _ _ evidence | fixed _ _ evidence => exact evidence
+          | word _ _ evidence | integer _ _ evidence | fixed _ _ evidence | negative _ _ evidence =>
+              exact evidence
   | @tuple expected type count types instructions rest children coreTypes resolution projection unpacked tree projected child ih =>
       intro context sourceType requirements binders sourceRest typed
       cases typed with

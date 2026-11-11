@@ -3443,7 +3443,8 @@ def frontendParsedLocalExpressionEvaluatorTests : IO Unit := do
   for payload in [Syntax.CoreLiteralValue.decimal "", .decimal "-1", .decimal "1_0", .decimal "٤",
       .hexadecimal "0x", .hexadecimal "0X1", .hexadecimal "0xg", .string "7", .decimal (toString Core.wordModulus)] do
     raw [] [] (manual payload) none
-  for content in ["", "l +", "c ? l", "c ? l :", "7 8", "0x", "0Xff", "1_000", "0x1g", "-1", "٤"] do
+  -- A prefix `-` is an operator (row 1, step 6); a lone `-` has no operand.
+  for content in ["", "l +", "c ? l", "c ? l :", "7 8", "0x", "0Xff", "1_000", "0x1g", "-", "٤"] do
     assertTrue (← parsed? content).isNone s!"malformed complete source parsed: {content}"
 
 end Tests

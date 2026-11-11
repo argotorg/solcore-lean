@@ -4070,8 +4070,10 @@ signed on the signed types, `~` keeps the low `N` bits on the unsigned types
 below 256 bits, checked arithmetic panics with `Panic(0x11)` outside the type's
 range, and `/ %` panic with `Panic(0x12)` on a zero divisor and round toward
 zero, so the results stay canonical. A literal takes the type its uses give it,
-and one above the type's greatest value is rejected. Shifts, unchecked
-arithmetic and in-place `~` are still rejected. -/
+and one above the type's greatest value is rejected. A prefix `-` on a literal
+folds into it, through groups and repeated, and the range is checked with the
+sign; any other `-e` reads as `0 - e`. Shifts, unchecked arithmetic and
+in-place `~` are still rejected. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreFixedIntegerOperators
 open Solcore Solcore.Frontend SourceCoreExecution
@@ -4172,7 +4174,29 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function tableLit8u() returns (uint8) { let table: mapping(uint8 => uint8); table[3] = 200; return table[3]; }",
   "function tableLit8s(k: Word) returns (int8) { let table: mapping(Word => int8); table[k] = 127; return table[k]; }",
   "function mask16u(x: uint16) returns (uint16) { return x & 255; }",
-  "function deferredAdd8u() returns (uint8) { let a = 200 + 100; let b: uint8 = a; return b; }"
+  "function deferredAdd8u() returns (uint8) { let a = 200 + 100; let b: uint8 = a; return b; }",
+  "function negLit8s() returns (int8) { return -128; }",
+  "function negGroup8s() returns (int8) { return (-128); }",
+  "function negOfGroup8s() returns (int8) { return -(128); }",
+  "function doubleNeg8s() returns (int8) { return - -5; }",
+  "function negLit256s() returns (int256) { return -57896044618658097711785492504343953926634992332820282019728792003956564819968; }",
+  "function negZero8u() returns (uint8) { return -0; }",
+  "function negOneWord() returns (Word) { let w: Word = -1; return w; }",
+  "function openNegative() returns (Word) { let k = -1; return k; }",
+  "function neg8s(x: int8) returns (int8) { return -x; }",
+  "function neg8u(x: uint8) returns (uint8) { return -x; }",
+  "function neg256s(x: int256) returns (int256) { return -x; }",
+  "function neg256u(x: uint256) returns (uint256) { return -x; }",
+  "function negWord(w: Word) returns (Word) { return -w; }",
+  "function addNegLit8s(x: int8) returns (int8) { return x + -1; }",
+  "function mulNegLit256s(x: int256) returns (int256) { return x * -2; }",
+  "function compoundNeg8s(x: int8) returns (int8) { let r: int8 = x; r += -5; return r; }",
+  "function compoundNeg256s(x: int256) returns (int256) { let r: int256 = x; r -= -1; return r; }",
+  "function nestedNeg8s(x: int8) returns (int8) { return - -x; }",
+  "function nestedNegGroup8s(x: int8) returns (int8) { return -(-x); }",
+  "function blockNegWord(w: Word) returns (Word) { unchecked { let r: Word = -w; return r; } }",
+  "function belowNegLit8s(x: int8) returns (bool) { return x < -100; }",
+  "function tableNeg8s() returns (int8) { let table: mapping(Word => int8); table[1] = -128; return table[1]; }"
 ]
 
 private def names : List String :=
@@ -4186,7 +4210,9 @@ private def names : List String :=
     "modAssign8u", "divAssign8s", "modAssign8s", "divAssign256s", "modAssign256u", "tableDiv8s", "lit8u",
     "lit256u", "lit8s", "lit256s", "zero8s", "inc8u", "inc256s", "below8s", "isZero256u", "doubleAssign8u",
     "half8s", "tenthAssign256u", "deferredDiv8u", "deferredMod8s", "tableLit8u", "tableLit8s", "mask16u",
-    "deferredAdd8u"]
+    "deferredAdd8u", "negLit8s", "negGroup8s", "negOfGroup8s", "doubleNeg8s", "negLit256s", "negZero8u",
+    "negOneWord", "openNegative", "neg8s", "neg8u", "neg256s", "neg256u", "negWord",
+    "addNegLit8s", "mulNegLit256s", "compoundNeg8s", "compoundNeg256s", "nestedNeg8s", "nestedNegGroup8s", "blockNegWord", "belowNegLit8s", "tableNeg8s"]
 
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
   match program.signatures.functions.filter (·.name == name) with
@@ -4253,7 +4279,7 @@ private def rejectedByInference (label : String) (lines : List String) : IO Unit
 
 /-- Inference rejects a literal above its fixed-width type's greatest value,
 and the diagnostic names the type and the literal's value. -/
-private def rejectedOutOfRange (label : String) (name : String) (value : Nat) (lines : List String) :
+private def rejectedOutOfRange (label : String) (name : String) (value : Int) (lines : List String) :
     IO Unit := do
   let type ← match TypeSystem.FixedInteger.ofName? name with
     | some type => pure type | none => throw (IO.userError s!"{name} missing")
@@ -4358,7 +4384,35 @@ def run : IO Unit := do
     -- A deferred operator takes the literal's later type.
     (78, [], word 3), (79, [], word 3),
     -- A literal key and element of a mapping.
-    (80, [], word 200), (81, [word 9], word 127), (82, [word 0x1234], word 0x34)]
+    (80, [], word 200), (81, [word 9], word 127), (82, [word 0x1234], word 0x34),
+    -- Unary minus: a negated literal folds into the literal, through groups and repeated.
+    (84, [], word (modulus - 128)), (85, [], word (modulus - 128)),
+    (86, [], word (modulus - 128)), (87, [], word 5),
+    (88, [], word (2 ^ 255)), (89, [], word 0),
+    -- A negative Word literal wraps, and an open one is still a Word until step 7.
+    (90, [], word (modulus - 1)), (91, [], word (modulus - 1)),
+    -- `-x` reads as checked `0 - x` on the twelve types and wraps on Word.
+    (92, [word 5], word (modulus - 5)), (92, [word (modulus - 7)], word 7),
+    (92, [word 0], word 0), (92, [word 127], word (modulus - 127)),
+    (93, [word 0], word 0),
+    (94, [word 1], word (modulus - 1)), (94, [word (modulus - 1)], word 1),
+    (94, [word (2 ^ 255 - 1)], word (2 ^ 255 + 1)),
+    (95, [word 0], word 0),
+    (96, [word 1], word (modulus - 1)), (96, [word 0], word 0),
+    (96, [word (2 ^ 255)], word (2 ^ 255)),
+    -- A negated literal as an operand, in a compound assignment and in a comparison.
+    (97, [word 5], word 4), (97, [word 0], word (modulus - 1)),
+    (98, [word 3], word (modulus - 6)), (98, [word (2 ^ 254)], word (2 ^ 255)),
+    (99, [word 5], word 0), (99, [word 127], word 122),
+    (100, [word 0], word 1), (100, [word (modulus - 1)], word 0),
+    -- A nested negation of a variable is `0 - (0 - x)`.
+    (101, [word 5], word 5), (101, [word (modulus - 127)], word (modulus - 127)),
+    (102, [word 5], word 5),
+    -- In an unchecked block `-w` on Word wraps.
+    (103, [word 1], word (modulus - 1)),
+    (104, [word (modulus - 128)], boolean true), (104, [word 0], boolean false),
+    (104, [word (modulus - 100)], boolean false),
+    (105, [], word (modulus - 128))]
   let panicCases : List (Nat × List Value) := [
     (24, [word 200, word 56]), (25, [word 3, word 5]), (26, [word 65536, word 65536]),
     (27, [word (modulus - 1), word 1]), (28, [word (2 ^ 128), word (2 ^ 128)]),
@@ -4381,7 +4435,14 @@ def run : IO Unit := do
     (61, [word (modulus - 128), word (modulus - 1)]), (63, [word (2 ^ 255), word (modulus - 1)]),
     (65, [word (modulus - 128), word (modulus - 1)]),
     -- Checked arithmetic with a literal operand, and a deferred `+` at `uint8` past its range.
-    (71, [word 255]), (72, [word (2 ^ 255 - 1)]), (75, [word 128]), (83, [])]
+    (71, [word 255]), (72, [word (2 ^ 255 - 1)]), (75, [word 128]), (83, []),
+    -- `-x` panics for MIN and for any nonzero unsigned value, as do negated-literal operands
+    -- leaving the range and the inner negation of `- -MIN`.
+    (92, [word (modulus - 128)]), (93, [word 5]), (93, [word 255]),
+    (94, [word (2 ^ 255)]), (95, [word 1]), (95, [word (modulus - 1)]),
+    (97, [word (modulus - 128)]), (98, [word (2 ^ 254 + 1)]),
+    (99, [word (modulus - 124)]), (100, [word (2 ^ 255 - 1)]),
+    (101, [word (modulus - 128)])]
   -- A zero divisor panics with `Panic(0x12)`, `MIN / 0` too.
   let zeroCases : List (Nat × List Value) := [
     (51, [word 7, word 0]), (52, [word 7, word 0]), (53, [word 1, word 0]), (54, [word (modulus - 1), word 0]),
@@ -4420,7 +4481,24 @@ def run : IO Unit := do
     ["function bad() returns (int256) { return 57896044618658097711785492504343953926634992332820282019728792003956564819968; }"]
   rejectedOutOfRange "an operand of 256 at uint8" "uint8" 256
     ["function bad(x: uint8) returns (uint8) { return x + 256; }"]
-  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * / % on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= /= %= panicking with 0x11 outside the range (MIN / -1 among them, MIN % -1 not), / % /= %= panicking with 0x12 on a zero divisor and rounding toward zero, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, literals at their range edges and as operands, deferred operators and mapping elements, one past each range rejected naming the type, <<= and in-place ~ still rejected"
+  -- A negated literal's range is checked with its sign, and the diagnostic names the negative value.
+  rejectedOutOfRange "-129 at int8" "int8" (-129) ["function bad() returns (int8) { return -129; }"]
+  rejectedOutOfRange "-2^255 - 1 at int256" "int256" (-57896044618658097711785492504343953926634992332820282019728792003956564819969)
+    ["function bad() returns (int256) { return -57896044618658097711785492504343953926634992332820282019728792003956564819969; }"]
+  rejectedOutOfRange "-1 at uint8" "uint8" (-1) ["function bad() returns (uint8) { return -1; }"]
+  rejectedOutOfRange "-1 at uint256" "uint256" (-1) ["function bad() returns (uint256) { return -1; }"]
+  rejectedOutOfRange "an operand of -129 at int8" "int8" (-129)
+    ["function bad(x: int8) returns (int8) { return x + -129; }"]
+  -- `-e` reads as `0 - e`: a declared type has no builtin `Int` for the `0`, so it is rejected
+  -- even with `Sub`; in a block `-x` is unchecked, which the twelve types reject until step 8.
+  rejectedByInference "unary minus on a declared type"
+    ["enum Token { Token(Word) }", "trait Sub<T> {", "  function sub(left: T, right: T) returns (T);", "}",
+     "impl Sub<Token> {", "  function sub(left: Token, right: Token) returns (Token) {", "    return left;", "  }", "}",
+     "function bad(t: Token) returns (Token) { return -t; }"]
+  rejectedByInference "unchecked unary minus on uint8"
+    ["function bad(x: uint8) returns (uint8) { unchecked { return -x; } }"]
+  rejectedByInference "unary minus on Bool" ["function bad(b: Bool) returns (Bool) { return -b; }"]
+  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * / % on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= /= %= panicking with 0x11 outside the range (MIN / -1 among them, MIN % -1 not), / % /= %= panicking with 0x12 on a zero divisor and rounding toward zero, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, literals at their range edges and as operands, deferred operators and mapping elements, one past each range rejected naming the type, negated literals folded through groups and repeated with their range checked by sign, -x as checked 0 - x panicking for MIN and nonzero unsigned values and wrapping on Word, negated-literal operands and compound forms, unary minus rejected on declared types, Bool and unchecked fixed-width operands, <<= and in-place ~ still rejected"
 
 end Tests.SourceCoreFixedIntegerOperators
 end

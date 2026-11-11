@@ -422,26 +422,46 @@ def literalFitsTarget (type : Ty) (raw : Nat) : Bool :=
   | .constructor (.builtin (.fixed fixed)) => decide (raw ≤ fixed.maxNat)
   | _ => true
 
+/-- A negative literal's magnitude fits its target: at a fixed-width integer
+type it is at most the magnitude of the type's least value, so only `-0` fits
+an unsigned type, and the other carriers take every negative literal. -/
+def negativeLiteralFitsTarget (type : Ty) (magnitude : Nat) : Bool :=
+  match type with
+  | .constructor (.builtin (.fixed fixed)) => decide (magnitude ≤ fixed.minMagnitude)
+  | _ => true
+
+/-- A literal of either sign fits its target. The sign is the spelling's
+(`Frontend.isNegativeLiteral`), and `raw` is the magnitude. -/
+def signedLiteralFitsTarget (source : Syntax.CoreLiteralValue) (type : Ty) (raw : Nat) : Bool :=
+  if Frontend.isNegativeLiteral source then negativeLiteralFitsTarget type raw
+  else literalFitsTarget type raw
+
+/-- A literal's value: its magnitude, negated for a negative spelling. -/
+def signedLiteralValue (source : Syntax.CoreLiteralValue) (raw : Nat) : Int :=
+  if Frontend.isNegativeLiteral source then -(raw : Int) else raw
+
 /-- Every integer-literal node at one expression identity fits the target. -/
 def literalNodesFit (state : State) (expression : ExpressionId) (type : Ty) : Bool :=
   state.nodes.all fun node =>
     match node with
     | .expression node =>
         match node.form with
-        | .integerLiteral _ resolution =>
-            !(decide (node.id = expression)) || literalFitsTarget type resolution.rawValue
+        | .integerLiteral source resolution =>
+            !(decide (node.id = expression)) ||
+              signedLiteralFitsTarget source type resolution.rawValue
         | _ => true
     | .statement _ => true
 
-/-- The raw value of the integer-literal node at one expression identity, for
+/-- The value of the integer-literal node at one expression identity, for
 diagnostics. -/
-def literalValueAt? (state : State) (expression : ExpressionId) : Option Nat :=
+def literalValueAt? (state : State) (expression : ExpressionId) : Option Int :=
   state.nodes.findSome? fun node =>
     match node with
     | .expression node =>
         match node.form with
-        | .integerLiteral _ resolution =>
-            if node.id = expression then some resolution.rawValue else none
+        | .integerLiteral source resolution =>
+            if node.id = expression then some (signedLiteralValue source resolution.rawValue)
+            else none
         | _ => none
     | .statement _ => none
 
@@ -467,7 +487,7 @@ def validateIntegerLiteralNode (state : State) : Node → Except Error Unit
   | .expression node =>
       match node.form with
       | .integerLiteral source resolution =>
-          if Frontend.numericLiteralValue? source = some resolution.rawValue then
+          if Frontend.literalMagnitude? source = some resolution.rawValue then
             match state.integerLiterals.find? fun origin =>
                 decide (origin.expression = node.id ∧
                   resolution.targetType = .variable origin.metavariable ∧

@@ -496,10 +496,11 @@ def UnaryOperatorParses (input : Remainder)
     (operator : Located UnaryOp) (output : Remainder) : Prop :=
   ExactTokenParses (.symbol operator.value.symbol) input operator.span output
 
-/-- Neither canonical prefix unary operator occurs at this cursor. -/
+/-- No canonical prefix unary operator occurs at this cursor. -/
 def UnaryOperatorAbsentAt (input : Remainder) : Prop :=
   TokenKindAbsentAt input.tokens input.endIndex input.cursor (.symbol .bang) ∧
-    TokenKindAbsentAt input.tokens input.endIndex input.cursor (.symbol .tilde)
+    TokenKindAbsentAt input.tokens input.endIndex input.cursor (.symbol .tilde) ∧
+    TokenKindAbsentAt input.tokens input.endIndex input.cursor (.symbol .minus)
 
 /-- Maximal source-order sequence of prefix unary operators. -/
 inductive UnaryOperatorsParses :

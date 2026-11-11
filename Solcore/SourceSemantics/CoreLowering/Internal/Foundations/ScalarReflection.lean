@@ -639,8 +639,9 @@ theorem source_success
       | integerLiteral _ construction =>
           cases construction with
           | word => exact ⟨rfl, .word _, rfl, rfl, .inRight .word⟩
-          | integer | fixed => cases metadata.target
-  | unary operator metadata form child ih =>
+          | integer | fixed | negativeInteger | negativeFixed => cases metadata.target
+          | negativeWord meaning _ => exact absurd metadata.meaning meaning.not_numeric
+  | unary operator metadata form child supported ih =>
       have raw := expression_evaluation_raw unique metadata.contains
         (by simp [form]) metadata.coercions evaluated
       rw [form, metadata.requirements, metadata.coercions] at raw
@@ -650,7 +651,7 @@ theorem source_success
           subst_vars
           obtain ⟨rfl, staged, rfl, typed, core⟩ := ih childEvaluation
           obtain ⟨rfl, primitiveApplied⟩ := unary_primitive applied (child.unary_word_meaning _)
-          obtain ⟨result, resultTyped, sourceApplied, coreApplied⟩ := unary_value operator staged typed
+          obtain ⟨result, resultTyped, sourceApplied, coreApplied⟩ := unary_value operator staged typed supported
           exact ⟨rfl, result, Dynamic.UnaryPrimitiveApplies.functional primitiveApplied sourceApplied,
             resultTyped, Core.LocalPrimitiveResults.unary_success core coreApplied⟩
   | binary operator metadata form total leftTree rightTree leftIH rightIH =>
@@ -826,7 +827,7 @@ theorem source_fault
             exact ⟨solved, ⟨contains, identifier⟩, predicate, valid.valid.entriesValid solved contains⟩
           obtain ⟨closed, produced⟩ := Dynamic.RequirementProves.produces_of_covers covers proves
           exact False.elim (produced.excludes_unavailable valid.valid.idsUnique unavailable)
-  | unary operator metadata form child ih =>
+  | unary operator metadata form child supported ih =>
       have raw := expression_fault_raw unique metadata.contains (by simp [form]) metadata.coercions fault
       rw [form, metadata.requirements, metadata.coercions] at raw
       cases raw with
@@ -838,7 +839,7 @@ theorem source_fault
           have ownedEmpty := no_owned layout
           subst_vars
           obtain ⟨rfl, staged, rfl, typed, _⟩ := source_success child unique environments heaps childEvaluation
-          obtain ⟨result, _, applied, _⟩ := unary_value operator staged typed
+          obtain ⟨result, _, applied, _⟩ := unary_value operator staged typed supported
           exact False.elim (unary_fault_excluded applied operationFault)
   | binary operator metadata form total leftTree rightTree leftIH rightIH =>
       have raw := expression_fault_raw unique metadata.contains (by simp [form]) metadata.coercions fault

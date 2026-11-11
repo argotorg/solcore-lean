@@ -1718,20 +1718,20 @@ private theorem literal_atomic {solved node type code}
   | unit form _ _ _ => rw [form]; exact .unit
   | bool value form _ _ _ => rw [form]; exact .reference _ _
   | word value form _ _ _ _ => rw [form]; exact .literal _
-  | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ => rw [form]; exact .integerLiteral _ _
+  | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ | resolvedNegativeWord form _ | resolvedNegativeInteger form _ | resolvedNegativeFixed form _ => rw [form]; exact .integerLiteral _ _
 
 private theorem literal_coercions {solved node type code}
     (literal : CompatibleExpressionLiterals.Literal solved node type code) : node.coercions = [] := by
   cases literal with
   | unit _ _ _ empty | bool _ _ _ _ empty | word _ _ _ _ empty _ => exact empty
-  | resolvedWord _ metadata | resolvedInteger _ metadata | resolvedFixed _ metadata => exact metadata.coercions
+  | resolvedWord _ metadata | resolvedInteger _ metadata | resolvedFixed _ metadata | resolvedNegativeWord _ metadata | resolvedNegativeInteger _ metadata | resolvedNegativeFixed _ metadata => exact metadata.coercions
 
 private theorem literal_nonlocal {solved node type code}
     (literal : CompatibleExpressionLiterals.Literal solved node type code) :
     ∀ name binder, node.form ≠ .reference name (.local binder) := by
   cases literal with
   | unit form _ _ _ | bool _ form _ _ _ | word _ form _ _ _ _
-  | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ => intros; simp [form]
+  | resolvedWord form _ | resolvedInteger form _ | resolvedFixed form _ | resolvedNegativeWord form _ | resolvedNegativeInteger form _ | resolvedNegativeFixed form _ => intros; simp [form]
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
