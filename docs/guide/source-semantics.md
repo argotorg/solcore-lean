@@ -181,23 +181,24 @@ changes; each exhaustive `cases` over operators gains a case, and the build find
    [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean); `WordBinaryOperator` and
    `AssignmentOperatorBinary` in [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean), so that a
    wrong operand faults. An operator whose meaning at a fixed-width integer type differs from Word's
-   on canonical words, as the signed orderings' and checked `+ - * / %`'s do, also goes into
+   on canonical words, as the signed orderings', checked `+ - * / %`'s and unchecked `+ - * / %`'s
+   (which wrap to the type's width, `Dynamic.fixedWrap`) do, also goes into
    `FixedBinaryApplies` at that type and into `FixedBinaryOwn`, which `BinaryWordMeaning` excludes;
    its panics, if it has any, go into `FixedBinaryPanics`. The binary rules read the left
    operand's static type (`operandType?`) and apply `BinaryValueApplies`, which takes one meaning or
    the other, and their fault rules apply `BinaryValuePanics` the same way. A unary operator has the
    same three: `FixedUnaryApplies`, `UnaryWordMeaning` and `UnaryValueApplies`. Compound assignment
-   reads the target's static type: `CompoundAssignmentApplies` takes `FixedBinaryApplies` for checked
-   `+= -= *= /= %=` at a fixed-width target and `AssignmentValueApplies` elsewhere, and
-   `AssignmentOperandsPanic` applies `BinaryValuePanics` at that type.
+   reads the target's static type: `CompoundAssignmentApplies` takes `FixedBinaryApplies` for
+   `+= -= *= /= %=`, checked or unchecked, at a fixed-width target and `AssignmentValueApplies`
+   elsewhere, and `AssignmentOperandsPanic` applies `BinaryValuePanics` at that type.
 3. **Preservation**: `PrimitiveBinaryHasType` and its cases in `PrimitiveBinaryHasType.sourceTyping`,
    `BinaryPrimitiveApplies.preserves` and `AssignmentValueApplies.wordCompoundPreserves`, which
    `CompoundAssignmentApplies.preserves` extends to fixed-width targets, then the binary case of
    `preserveBinaryRec`. Where Word's result would leave a fixed-width type's range,
-   as for checked `+ - * / %` and for `~` on the narrower unsigned types, the proof needs the
-   looked-up type to be the operand's typed type (`BinaryValueApplies.preserves_checked` and
-   `preserves_division`, `UnaryValueApplies.preserves_narrow`); `Dynamic.operandType?_of_typing`
-   gives it from the source's unique node occurrences.
+   as for checked and unchecked `+ - * / %` and for `~` on the narrower unsigned types, the proof
+   needs the looked-up type to be the operand's typed type (`BinaryValueApplies.preserves_checked`,
+   `preserves_division` and `preserves_unchecked`, `UnaryValueApplies.preserves_narrow`);
+   `Dynamic.operandType?_of_typing` gives it from the source's unique node occurrences.
 4. **Substitution and staging**: `StructuralSubstitution.BinaryOperatorHasType.applyParameters`,
    `BinaryOperatorHasType.result_type_admissible` and
    `FlexibleSubstitution.BinaryOperatorHasType.applySubstitution` in `StructuralLaws`; the
