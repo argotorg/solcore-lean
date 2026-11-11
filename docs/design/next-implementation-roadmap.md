@@ -11831,18 +11831,21 @@ An unchecked compound on an open target takes the target's type as a checked
 one does, so `let x = 200; unchecked { x += 100; }` gives 44 when a later use
 makes `x` a `uint8`, and `x` is `uint256` otherwise ([row 1's unchecked
 compound assignments](integer-types-unchecked-shifts.md#row-1s-unchecked-compound-assignments-the-wrap-belongs-to-the-leaf)).
+An unchecked operator's open literal operands wait for their type as a checked
+operator's do, so `unchecked { let a = 200 + 100; let b: uint8 = a; }` gives 44;
+with no later use they default to `uint256` and wrap there, and finalization
+rejects one that a later use makes `integer` ([row 1's unchecked literal
+operands](integer-types-unchecked-shifts.md#row-1s-unchecked-literal-operands-they-wait-and-never-take-integer)).
 Three differences from upstream remain. Shifts, compound ones included, make an
-open literal operand or target `word` at once until step 8d, and so do unchecked
-`+ - * / %` whose operands are both open until step 8c, so
-`unchecked { let a = 200 + 100; let b: uint8 = a; }` is rejected. A `where`
-clause cannot name the builtin `Int`, a gap older than row 1, so upstream's
+open literal operand or target `word` at once until step 8d. A `where` clause
+cannot name the builtin `Int`, a gap older than row 1, so upstream's
 `poly_int_defaulting` stops at its signature in Lean, where upstream reports the
 literal as ambiguous. And Lean generalizes a local lambda at its `let`, where
 upstream keeps a closure monomorphic and types its parameters from its calls, so
 a compound assignment on a parameter that neither the lambda's body nor a
 literal types, as in `lam(acc, step) { acc += step; return acc; }`, is rejected
-in Lean, as `acc + step` already was
-([upstream's semantics](integer-types-unchecked-shifts.md#upstreams-semantics-at-e2eef194)).
+in Lean, as `acc + step` already was ([upstream's
+semantics](integer-types-unchecked-shifts.md#upstreams-semantics-at-e2eef194)).
 Numeric patterns at the other eleven types, in-place `~`, and shifts at the
 types are still rejected.
 The

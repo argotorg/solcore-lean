@@ -212,6 +212,10 @@ changes; each exhaustive `cases` over operators gains a case, and the build find
    (`Operators`, `OperatorMetadata`, `State`, `Statements`). An open compound target waits for its
    type until finalization checks it, so `inferAssignedValueFuel_success_sound` takes
    `AssignmentTargetFits`, which its callers get from `FinalInferenceResources.assignment_targets_fit`.
+   An unchecked operator's open literal operand waits in the same way, so the binary typing theorems
+   take `uncheckedFits`, which their callers get from
+   `FinalInferenceResources.unchecked_operands_fit`, and
+   `BinaryOperatorInferenceCase.uncheckedFallback` is its case.
 6. **Core lowering and tests**: see [Core lowering](core-lowering.md#making-changes). Each commit
    added a public-API test with the probe's results (`Tests.SourceCoreShiftExecution`,
    `Tests.SourceCoreUncheckedExecution`), registered in [Tests/Main.lean](../../Tests/Main.lean).
