@@ -38,7 +38,7 @@ derivation, that each derivation is a result, and that the AST is unique.
 | [`Declaration`](../../Solcore/Syntax/Declaration.lean) | `ParsedFile`, `TopItem`, `FunctionDecl`, `EnumDecl`, `TraitDecl`, `ImplDecl`, `ContractDecl`, `TypeAliasDecl`, `DeriveAttribute` |
 | [`Module`](../../Solcore/Syntax/Module.lean) | `ModulePath`, `ImportDecl`, `ExportDecl`, `PragmaDecl` |
 | [`Trivia`](../../Solcore/Syntax/Trivia.lean) | `attachTopItemComments`: comments attached to items |
-| [`Unchecked`](../../Solcore/Syntax/Unchecked.lean) | `prepare` and `mark`, the pass around the parser for `unchecked` blocks |
+| [`Unchecked`](../../Solcore/Syntax/Unchecked.lean) | `prepare` and `mark`, the pass around the parser for `unchecked` blocks and the prefix `-` |
 
 ### Lexer
 
@@ -151,10 +151,10 @@ or `Basics` file holds what was mixed with one parser's definitions before the l
 | Definition | Reading | Used by |
 | --- | --- | --- |
 | `Parser.parse`, `ParseOutput` | The total parse of one file, with its diagnostics | `parseWorkspaceFile` in `Frontend/ProgramInterfaces` |
-| `Unchecked.prepare`, `Unchecked.mark`, `Unchecked.Error` | The pass around `parse` for `unchecked` blocks | The same function; its errors become `ProgramLoadError.uncheckedBlock` |
+| `Unchecked.prepare`, `Unchecked.mark`, `Unchecked.Error` | The pass around `parse` for `unchecked` blocks and the prefix `-` | The same function; its errors become `ProgramLoadError.uncheckedBlock` |
 | The AST: `ParsedFile`, `TopItem`, `FunctionDecl`, `TypeExpr`, `Expr`, `Statement`, `Block`, `Pattern`, `ForItem` | What the parser produces | The frontend's loading, signatures and inference; the source semantics and core lowering through the typed IR |
 | `UnaryOp`, `BinaryOp`, `ValueAssignOp`, `BinaryOp.precedence`, `ValueAssignOp.wordOnly` | The operators; `wordOnly` marks the compound assignments that take Words only | The typed IR, `SourceInference.Detail.binaryOperatorDispatch`, the lowering, the source semantics, and the assignment premises of core lowering theorems |
-| `CoreLiteral` | Literal spellings | `Frontend/WordLiteral` |
+| `CoreLiteral` | Literal spellings; the parser never writes a leading `-`, and `Unchecked.mark` does for a negative literal | `Frontend/WordLiteral` |
 
 **What the area proves.** The Syntax tests name these theorems, and a change must keep them proved.
 
@@ -181,8 +181,8 @@ These rest on three contracts, which a new construct extends:
 
 ## Making changes
 
-Two language changes have reached Syntax since the parser was built: shifts went through the grammar
-and its proofs, and `unchecked` blocks went around the parser. Their commits name the paths from
+Three language changes have reached Syntax since the parser was built: shifts went through the
+grammar and its proofs, `unchecked` blocks went around the parser, and unary minus took both routes. Their commits name the paths from
 before the layout refactor; [Conventions](conventions.md#following-older-notes) says how to map
 them. [Adding a language feature](adding-a-feature.md) follows a change through every layer.
 
@@ -229,6 +229,13 @@ Worked example: e8d28e957, `unchecked { … }` blocks.
   [the integer design note](../design/integer-types-unchecked-shifts.md#unchecked-blocks-as-implemented).
 - Tests: `Tests.SourceCoreUncheckedExecution`, in the same test file, includes programs that the
   pass rejects while loading.
+
+Row 1's unary minus (53bb5d5a8) took both routes:
+- The parser reads a prefix `-` as `UnaryOp.negate`, in the grammar's prefix layer with `!` and `~`.
+- `mark` removes every `negate`. One over a numeric literal, through groups and repeated, folds into
+  the literal (`CoreLiteralValue.negated`). Any other `-e` becomes `0 - e`, with
+  `uncheckedSubtract` in a block.
+- Inference still rejects a `negate`, so its proofs cover every syntax tree.
 
 ### A new expression, statement or declaration form
 

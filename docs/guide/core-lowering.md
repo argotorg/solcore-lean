@@ -149,7 +149,9 @@ depends on the change.
   (`validateFixedIntegerLiteral`). `CompatibleExpressionLiterals.Literal` gains a case built from the
   validator's certificate (`resolvedFixed`, from `FixedIntegerLiteralCertificate`), and
   `NumericLiteralEvidenceReceipts` gains its construction (`fixed_constructs`, `fixed_raw`). The
-  other files only add that case to their case splits over `Literal`.
+  other files only add that case to their case splits over `Literal`. Negative literals (53bb5d5a8)
+  added three cases in the same way (`resolvedNegativeWord`, `resolvedNegativeInteger` and
+  `resolvedNegativeFixed`), and the numeric branch chooses among them by the literal's sign.
 - **A changed rule** (7ac75aea3, closures by value). Theorems whose statements mention the old
   premise are restated over the new one. Most changes were in `Owned/`, `CellAware/`, `OwnedStaged/`,
   `OwnedPrepared/`, `Callable/`, `Statements/`, `Generalized/`, `Selected/` and `Foundations/`.
