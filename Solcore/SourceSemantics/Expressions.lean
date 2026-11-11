@@ -415,6 +415,58 @@ theorem FixedCheckedArithmetic.not_division {operator : Syntax.BinaryOp}
     (arithmetic : FixedCheckedArithmetic operator) (division : FixedCheckedDivision operator) : False := by
   cases arithmetic <;> cases division
 
+/-- Unchecked `+`, `-` and `*` on the fixed-width integer types: the exact
+result wrapped to the type's width. On the types below 256 bits their meaning
+differs from Word's wrapping, and the evaluation rules choose it from the left
+operand's static type, as for the checked operators. -/
+inductive FixedUncheckedArithmetic : Syntax.BinaryOp → Prop where
+  | uncheckedAdd : FixedUncheckedArithmetic .uncheckedAdd
+  | uncheckedSubtract : FixedUncheckedArithmetic .uncheckedSubtract
+  | uncheckedMultiply : FixedUncheckedArithmetic .uncheckedMultiply
+
+/-- Unchecked `/` and `%` on the fixed-width integer types: the quotient rounded
+toward zero and the remainder with the dividend's sign, wrapped to the type's
+width, so `MIN / -1` gives `MIN`, and `Panic(0x12)` on a zero divisor. -/
+inductive FixedUncheckedDivision : Syntax.BinaryOp → Prop where
+  | uncheckedDivide : FixedUncheckedDivision .uncheckedDivide
+  | uncheckedModulo : FixedUncheckedDivision .uncheckedModulo
+
+/-- Unchecked arithmetic and unchecked division are different operators. -/
+theorem FixedUncheckedArithmetic.not_division {operator : Syntax.BinaryOp}
+    (arithmetic : FixedUncheckedArithmetic operator) (division : FixedUncheckedDivision operator) : False := by
+  cases arithmetic <;> cases division
+
+/-- Unchecked arithmetic is unchecked. -/
+theorem FixedUncheckedArithmetic.unchecked {operator : Syntax.BinaryOp}
+    (kind : FixedUncheckedArithmetic operator) : UncheckedBinaryOperator operator := by
+  cases kind <;> constructor
+
+/-- Unchecked division is unchecked. -/
+theorem FixedUncheckedDivision.unchecked {operator : Syntax.BinaryOp}
+    (kind : FixedUncheckedDivision operator) : UncheckedBinaryOperator operator := by
+  cases kind <;> constructor
+
+/-- No checked arithmetic operator is unchecked. -/
+theorem FixedCheckedArithmetic.not_unchecked {operator : Syntax.BinaryOp}
+    (kind : FixedCheckedArithmetic operator) (unchecked : UncheckedBinaryOperator operator) : False := by
+  cases kind <;> cases unchecked
+
+/-- No checked division operator is unchecked. -/
+theorem FixedCheckedDivision.not_unchecked {operator : Syntax.BinaryOp}
+    (kind : FixedCheckedDivision operator) (unchecked : UncheckedBinaryOperator operator) : False := by
+  cases kind <;> cases unchecked
+
+/-- Every unchecked operator is unchecked arithmetic or unchecked division. -/
+theorem UncheckedBinaryOperator.cases_fixed {operator : Syntax.BinaryOp}
+    (kind : UncheckedBinaryOperator operator) :
+    FixedUncheckedArithmetic operator ∨ FixedUncheckedDivision operator := by
+  cases kind
+  · exact .inl .uncheckedAdd
+  · exact .inl .uncheckedSubtract
+  · exact .inl .uncheckedMultiply
+  · exact .inr .uncheckedDivide
+  · exact .inr .uncheckedModulo
+
 /-- The fixed-width integer types on which `~` is Word's: the signed ones, whose
 canonical words stay sign-extended, and `uint256`. On the other unsigned types
 `~` keeps only the low `N` bits. -/
@@ -548,6 +600,10 @@ inductive BinaryOperatorHasType (context : Context) :
   | fixedDivision {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
       (kind : FixedCheckedDivision operator) :
       BinaryOperatorHasType context operator (.fixed type) (.fixed type) (.fixed type) []
+  /-- Unchecked `+ - * / %` on the fixed-width integer types. -/
+  | fixedUnchecked {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
+      (kind : UncheckedBinaryOperator operator) :
+      BinaryOperatorHasType context operator (.fixed type) (.fixed type) (.fixed type) []
   | booleanAnd :
       BinaryOperatorHasType context .logicalAnd .bool .bool .bool []
   | booleanOr :
@@ -588,7 +644,7 @@ theorem requirements_valid
   cases typing with
   | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison |
       integerComparison | fixedComparison | fixedBitwise | fixedSignedComparison | fixedArithmetic |
-      fixedDivision | booleanAnd | booleanOr =>
+      fixedDivision | fixedUnchecked | booleanAnd | booleanOr =>
       simp [RequirementIdsValid]
   | trait _ _ evidence => exact evidence.ids_valid
 

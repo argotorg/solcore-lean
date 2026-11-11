@@ -1073,6 +1073,9 @@ theorem right_evaluated {registry : SourceCoreRawMetadata.Registry}
   | fixedSigned kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | fixedChecked kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | fixedDivision kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
+  | fixedUnchecked kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
+  | fixedUncheckedDivision kind =>
+    cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with

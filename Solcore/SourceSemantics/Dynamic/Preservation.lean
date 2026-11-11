@@ -600,6 +600,14 @@ theorem division_result {operator : Syntax.BinaryOp} {operand result : Ty}
   cases kind <;> cases typing <;>
     first | exact .inl ⟨rfl, rfl⟩ | exact .inr ⟨rfl, rfl⟩ | (rename_i other; cases other)
 
+/-- The primitive typing of unchecked `+ - * / %` is Word's. -/
+theorem unchecked_result {operator : Syntax.BinaryOp} {operand result : Ty}
+    (typing : PrimitiveBinaryHasType operator operand result)
+    (kind : UncheckedBinaryOperator operator) :
+    operand = .word ∧ result = .word := by
+  cases kind <;> cases typing <;>
+    first | exact ⟨rfl, rfl⟩ | (rename_i other; cases other)
+
 end PrimitiveBinaryHasType
 
 /-- `Word.ofIntModulo` of an integer in `[0, 2^256)` is that integer. -/
@@ -689,6 +697,12 @@ theorem preserves
           rcases typing.division_result kind with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
           · exact .word _
           · cases left_typed
+      | unchecked kind =>
+          obtain ⟨rfl, rfl⟩ := typing.unchecked_result kind.unchecked
+          exact .word _
+      | uncheckedDivision kind =>
+          obtain ⟨rfl, rfl⟩ := typing.unchecked_result kind.unchecked
+          exact .word _
 
 /-- Checked `+ - *` keep their result canonical at the operands' static type. -/
 theorem preserves_checked
@@ -706,6 +720,8 @@ theorem preserves_checked
     cases applies with
     | checked _ left right inRange => exact .fixed _ (fixed_canonical_ofInt inRange.1 inRange.2)
     | division other => exact (kind.not_division other).elim
+    | unchecked other => exact (kind.not_unchecked other.unchecked).elim
+    | uncheckedDivision other => exact (kind.not_unchecked other.unchecked).elim
     | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
 
 /-- Checked `/ %` keep their result canonical at the operands' static type. -/
@@ -724,6 +740,34 @@ theorem preserves_division
     cases applies with
     | division _ left right _ inRange => exact .fixed _ (fixed_canonical_ofInt inRange.1 inRange.2)
     | checked other => exact (other.not_division kind).elim
+    | unchecked other => exact (kind.not_unchecked other.unchecked).elim
+    | uncheckedDivision other => exact (kind.not_unchecked other.unchecked).elim
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
+
+/-- Unchecked `+ - * / %` keep their result canonical at the operands' static
+type: the exact result wrapped to the type's width lies in its range. -/
+theorem preserves_unchecked
+    {context : Context} {heap : Heap} {operator : Syntax.BinaryOp}
+    {left right result : Value} {type : TypeSystem.FixedInteger} {lookup : Option Ty}
+    (kind : UncheckedBinaryOperator operator)
+    (lookupEq : lookup = some (.fixed type))
+    (application : BinaryValueApplies lookup operator left right result) :
+    ValueHasType context heap result (.fixed type) := by
+  cases application with
+  | primitive plain _ =>
+    rcases kind.cases_fixed with arithmetic | division
+    · exact absurd arithmetic.own (plain type lookupEq)
+    · exact absurd division.own (plain type lookupEq)
+  | fixed operandEq applies =>
+    rw [lookupEq] at operandEq
+    cases Option.some.inj operandEq
+    cases applies with
+    | unchecked _ left right =>
+      exact .fixed _ (fixed_canonical_ofInt (fixedWrap_inRange _ _).1 (fixedWrap_inRange _ _).2)
+    | uncheckedDivision _ left right _ =>
+      exact .fixed _ (fixed_canonical_ofInt (fixedWrap_inRange _ _).1 (fixedWrap_inRange _ _).2)
+    | checked other => exact (other.not_unchecked kind).elim
+    | division other => exact (other.not_unchecked kind).elim
     | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
 
 end BinaryValueApplies
@@ -956,12 +1000,12 @@ theorem preserves
           cases target
           cases applies with
           | checked _ _ _ inRange => exact .fixed _ (fixed_canonical_ofInt inRange.1 inRange.2)
-          | division kind => cases kind
+          | division kind | unchecked kind | uncheckedDivision kind => cases kind
       | divide target applies | modulo target applies =>
           cases target
           cases applies with
           | division _ _ _ _ inRange => exact .fixed _ (fixed_canonical_ofInt inRange.1 inRange.2)
-          | checked kind => cases kind
+          | checked kind | unchecked kind | uncheckedDivision kind => cases kind
 
 end CompoundAssignmentApplies
 

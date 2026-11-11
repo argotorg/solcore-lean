@@ -1264,6 +1264,8 @@ mutual
             exact ⟨applies.preserves_checked kind lookupEq, before_typed, .refl before⟩
         | fixedDivision kind =>
             exact ⟨applies.preserves_division kind lookupEq, before_typed, .refl before⟩
+        | fixedUnchecked kind =>
+            exact ⟨applies.preserves_unchecked kind lookupEq, before_typed, .refl before⟩
         | booleanAnd =>
             exact ⟨applies.preserves .booleanAnd left_typed right_typed,
               before_typed, .refl before⟩
@@ -1286,6 +1288,7 @@ mutual
         | fixedSignedComparison kind => cases selected
         | fixedArithmetic kind => cases selected
         | fixedDivision kind => cases selected
+        | fixedUnchecked kind => cases selected
         | booleanAnd => cases selected
         | booleanOr => cases selected
         | trait static_dispatch profile requirements_prove =>

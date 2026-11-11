@@ -479,6 +479,9 @@ the operator and panic plumbing first.
     instance for it.
   - A literal operand is a `word` at once rather than deferred: with `integer`
     excluded, `word` is the only literal target left.
+  - Since row 1's step 8a they are builtins on the twelve types too, where they
+    wrap to the type's width ([row 1's unchecked
+    arithmetic](#row-1s-unchecked-arithmetic-wrapped-to-the-types-width)).
 - **Division and remainder.** `/`, `%`, `/=` and `%=` in a block panic with
   `0x12` on a zero divisor: see [panics as implemented](#panics-as-implemented).
   Until panics existed they were a load error.
@@ -943,9 +946,10 @@ Made on 2026-11-11, during step 6.
   - On `integer`, a negated literal is exact, and `-x` is `0 - x`, so it is
     staged as integer subtraction is: typed next to the literal `0` and
     rejected by Core lowering outside staged code.
-  - In an unchecked block before step 8, `-x` is unchecked `0 - x`: it wraps on
-    `word`, and the twelve types and `integer` reject it as they reject the
-    block's other arithmetic. Negated literals fold in a block too.
+  - In an unchecked block, `-x` is unchecked `0 - x`: it wraps on `word` and,
+    since step 8a, on the twelve types, where `-MIN` is `MIN` and `-x` on
+    `uintN` is `2^N - x` for a nonzero `x`. `integer` rejects it as it rejects
+    the block's other arithmetic. Negated literals fold in a block too.
   - An open negative literal keeps the `word` default until step 7, so
     `let k = -1;` is `2^256 - 1`. Upstream rejects it (`SC0411`) through the
     `uint256` default, which step 7 brings.
@@ -1056,6 +1060,41 @@ Made on 2026-11-11, during step 7.
   rejected; and the tests that relied on the `word` default change, as the
   hand-over note lists.
 
+### Row 1's unchecked arithmetic: wrapped to the type's width
+
+Made on 2026-11-12, during step 8a.
+
+- **Typing.** In an `unchecked` block, `+ - * / %` on one of the twelve types,
+  with both operands of that type, are builtins without requirements
+  (`Detail.fixedBinaryOperator`, `BinaryOperatorHasType.fixedUnchecked`), as
+  upstream's `UncheckedAdd` … `UncheckedMod` instances for the twelve types
+  are. A literal operand takes the other operand's type, on either side. Two
+  open literal operands are still a `word` at once, until step 8c. `integer`
+  takes none of them, as before.
+- **Meaning.** The exact result of the operands' values wrapped to the type's
+  width (`Dynamic.fixedWrap`: the residue modulo `2^N`, read in two's
+  complement on a signed type), as a canonical word
+  (`FixedBinaryApplies.unchecked` and `uncheckedDivision`). `/` rounds toward
+  zero and `%` takes the dividend's sign, as checked `/ %` do, so `MIN / -1`
+  wraps to `MIN` and `MIN % -1` is 0. A zero divisor panics with `0x12` by
+  `BinaryPrimitivePanics`, which applies at any operand type. The five
+  operators are in `FixedBinaryOwn` on all twelve types, `uint256` included,
+  where the wrapped result is Word's, so the evaluation rules choose the
+  meaning from the operands' static type alone, as for checked arithmetic.
+  They are not all strict: unchecked `/ %` may panic, so
+  `FixedBinaryApplies.strict` became `evaluatesBoth` (strict, or
+  `PanickingBinaryOperator`).
+- **Lowering.** `BinaryLowering.checked type` is the type's own arithmetic and
+  covers the unchecked operators too (`checkedArithmetic`, `checkedBinary`):
+  both operands, then `uncheckedBody` (the exact result as a Core Integer,
+  wrapped by `fixedWrapInteger`, then `integerToWord`) or
+  `uncheckedDivisionBody` (the zero test, `truncatedDivision`, the wrap). The
+  meaning proofs cover both (`BinaryProfile.fixedUnchecked` and
+  `fixedUncheckedDivision`).
+- **Not yet.** Unchecked `+= -= *= /= %=` on a fixed-width target are still
+  rejected: the place lowering's modifier applies one Core operation, and
+  wrapping below 256 bits takes a second one (step 8b).
+
 ### Row 1: steps
 
 Row 1 is committed in steps, each through the full gate, so that each can be
@@ -1118,3 +1157,11 @@ first planned after the literals and moved before them for this reason
      is still evaluated once. Compound shifts stay `word`-only until step 8.
 8. **Unchecked operators and shifts on the twelve types**, and ports of the
    upstream fixtures.
+   - 8a. **Unchecked `+ - * / %`** on the twelve types, and `-x` in a block
+     ([row 1's unchecked
+     arithmetic](#row-1s-unchecked-arithmetic-wrapped-to-the-types-width)).
+   - 8b. Unchecked compound assignments on fixed-width and open targets.
+   - 8c. The `uint256` default for the literal operands of unchecked operators.
+   - 8d. Shifts on the twelve types, with their compound forms and literal
+     operands.
+   - 8e. Ports of the upstream fixtures.

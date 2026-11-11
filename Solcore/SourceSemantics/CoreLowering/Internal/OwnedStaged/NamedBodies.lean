@@ -176,7 +176,7 @@ private theorem primary_admissible
           generalize targetEq : receipt.node.type = target at path
           cases path
           cases operatorTyped with
-          | wordArithmetic _ | integerArithmetic _ | wordShift _ | wordUnchecked _ | wordComparison _ | integerComparison _ | fixedComparison _ | fixedBitwise _ | fixedSignedComparison _ | fixedArithmetic _ | fixedDivision _ | booleanAnd
+          | wordArithmetic _ | integerArithmetic _ | wordShift _ | wordUnchecked _ | wordComparison _ | integerComparison _ | fixedComparison _ | fixedBitwise _ | fixedSignedComparison _ | fixedArithmetic _ | fixedDivision _ | fixedUnchecked _ | booleanAnd
           | booleanOr =>
             exact False.elim (receipt.operator.nonempty ownedEq)
           | trait dispatch profile proves =>

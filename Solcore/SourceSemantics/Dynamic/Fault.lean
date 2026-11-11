@@ -1014,13 +1014,16 @@ theorem excludes_value
   cases applies with
   | primitive _ applies => exact invalid.excludes_application ⟨output, applies⟩
   | fixed _ applies =>
-    have strict := applies.strict
+    have both := applies.evaluatesBoth
     obtain ⟨l, r, rfl, rfl⟩ : ∃ l r, left = .word l ∧ right = .word r := by
       cases applies <;> exact ⟨_, _, rfl, rfl⟩
     cases invalid with
     | numeric _ invalid_pair => exact invalid_pair trivial
     | word _ invalid_pair => exact invalid_pair trivial
-    | logical operator_class => cases operator_class <;> cases strict
+    | logical operator_class =>
+      rcases both with strict | panicking
+      · cases operator_class <;> cases strict
+      · cases operator_class <;> cases panicking
 
 /-- A panicking pair is well shaped, so it is not an invalid one. -/
 theorem excludes_panic

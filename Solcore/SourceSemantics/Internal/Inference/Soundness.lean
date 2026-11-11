@@ -16760,6 +16760,11 @@ theorem binaryFixedWord_hasType
           | exact .fixedArithmetic .multiply
           | exact .fixedDivision .divide
           | exact .fixedDivision .modulo
+          | exact .fixedUnchecked .uncheckedAdd
+          | exact .fixedUnchecked .uncheckedSubtract
+          | exact .fixedUnchecked .uncheckedMultiply
+          | exact .fixedUnchecked .uncheckedDivide
+          | exact .fixedUnchecked .uncheckedModulo
           | skip
         all_goals cases signed : fixed.signed
         all_goals first

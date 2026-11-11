@@ -1224,18 +1224,25 @@ def signedOrdering : Option TypeSystem.Ty → Syntax.BinaryOp → Bool
   | _, _ => false
 
 /-- The fixed-width integer type at which a binary operator on operands of the
-given static type is checked arithmetic, if any: `+ - * / %`. -/
+given static type is the type's own arithmetic, if any: checked `+ - * / %`, and
+unchecked `+ - * / %`, which wrap to the type's width. -/
 def checkedArithmetic : Option TypeSystem.Ty → Syntax.BinaryOp → Option TypeSystem.FixedInteger
   | some (.constructor (.builtin (.fixed type))), .add
   | some (.constructor (.builtin (.fixed type))), .subtract
   | some (.constructor (.builtin (.fixed type))), .multiply
   | some (.constructor (.builtin (.fixed type))), .divide
-  | some (.constructor (.builtin (.fixed type))), .modulo => some type
+  | some (.constructor (.builtin (.fixed type))), .modulo
+  | some (.constructor (.builtin (.fixed type))), .uncheckedAdd
+  | some (.constructor (.builtin (.fixed type))), .uncheckedSubtract
+  | some (.constructor (.builtin (.fixed type))), .uncheckedMultiply
+  | some (.constructor (.builtin (.fixed type))), .uncheckedDivide
+  | some (.constructor (.builtin (.fixed type))), .uncheckedModulo => some type
   | _, _ => none
 
 /-- How a requirement-free binary node lowers: Integer's operations when its
-left operand is an Integer, checked arithmetic and the signed orderings on the
-fixed-width integer types, and Word's otherwise. -/
+left operand is an Integer, the arithmetic of a fixed-width integer type
+(`checked`: checked `+ - * / %` and unchecked `+ - * / %`, which wrap) and the
+signed orderings on the fixed-width integer types, and Word's otherwise. -/
 inductive BinaryLowering where
   | word
   | integer
@@ -1278,6 +1285,43 @@ def checkedBody (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) : 
         (Core.LanguageResult.failure .word (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)))
         (Core.LanguageResult.success (.unary .integerToWord (.var 0)))))
 
+/-- Core's Integer operation for unchecked `+`, `-` and `*`. -/
+def uncheckedOperator : Syntax.BinaryOp → Core.BinaryOp
+  | .uncheckedAdd => .integerAdd
+  | .uncheckedSubtract => .integerSub
+  | _ => .integerMul
+
+/-- A Core Integer wrapped to a fixed-width integer type's width `N`, as a Core
+Integer: Core's Euclidean residue modulo `2^N`, offset by `2^(N-1)` before and
+after on a signed type, so that the result lies in the type's range. -/
+def fixedWrapInteger (type : TypeSystem.FixedInteger) (value : Core.Expr) : Core.Expr :=
+  if type.signed then
+    .binary .integerSub
+      (.binary .integerMod (.binary .integerAdd value (.integer (2 ^ (type.width.bits - 1) : Nat)))
+        (.integer (2 ^ type.width.bits : Nat)))
+      (.integer (2 ^ (type.width.bits - 1) : Nat))
+  else .binary .integerMod value (.integer (2 ^ type.width.bits : Nat))
+
+/-- The Integer `fixedWrapInteger` computes from an Integer. -/
+def fixedWrapIntegerValue (type : TypeSystem.FixedInteger) (value : Int) : Int :=
+  if type.signed then
+    (value + (2 ^ (type.width.bits - 1) : Nat)) % (2 ^ type.width.bits : Nat) - (2 ^ (type.width.bits - 1) : Nat)
+  else value % (2 ^ type.width.bits : Nat)
+
+/-- Unchecked `+ - *` on a fixed-width integer type, under the right payload,
+the left payload and the outer scope: the exact result as a Core Integer,
+wrapped to the type's width, and its word. -/
+def uncheckedBody (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) : Core.Expr :=
+  Core.LanguageResult.success (.unary .integerToWord (fixedWrapInteger type
+    (.binary (uncheckedOperator operator) (fixedInteger type.signed (.var 1))
+      (fixedInteger type.signed (.var 0)))))
+
+/-- The checked division operator with an unchecked one's exact result, which
+`truncatedDivision` takes: `%` for unchecked `%`, `/` otherwise. -/
+def uncheckedDivisionOperator : Syntax.BinaryOp → Syntax.BinaryOp
+  | .uncheckedModulo => .modulo
+  | _ => .divide
+
 /-- Whether a checked operator divides: `/` and `%`, which panic with
 `Panic(0x12)` on a zero divisor. -/
 def checkedDivision : Syntax.BinaryOp → Bool
@@ -1317,8 +1361,23 @@ def divisionBody (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) :
               (Core.LanguageResult.failure .word (.word (SourceCorePanics.reason SourceCorePanics.arithmetic)))
               (Core.LanguageResult.success (.unary .integerToWord (.var 0))))))))
 
-/-- Checked `+ - * / %` evaluate both operands, then run the checked body or the
-division body; every other operator lowers as Word's. -/
+/-- Unchecked `/ %` on a fixed-width integer type, under the right payload, the
+left payload and the outer scope: a zero divisor fails with `Panic(0x12)`;
+otherwise the exact quotient or remainder as a Core Integer, wrapped to the
+type's width (only `MIN / -1` leaves the range, and it gives `MIN`), and its
+word. -/
+def uncheckedDivisionBody (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) : Core.Expr :=
+  .ifE (.binary .wordEq (.var 0) (.word Core.Word.zero))
+    (Core.LanguageResult.failure .word (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)))
+    (.letE (fixedInteger type.signed (.var 1))
+      (.letE (fixedInteger type.signed (.var 1))
+        (.letE (truncatedDivision (uncheckedDivisionOperator operator))
+          (Core.LanguageResult.success (.unary .integerToWord (fixedWrapInteger type (.var 0)))))))
+
+/-- The arithmetic of a fixed-width integer type evaluates both operands, then
+runs its body: checked `+ - *` the checked body, checked `/ %` the division
+body, and unchecked `+ - * / %` the wrapping bodies; every other operator lowers
+as Word's. -/
 def checkedBinary (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) (left right : Core.Expr) :
     Core.Expr :=
   match operator with
@@ -1328,6 +1387,12 @@ def checkedBinary (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) 
   | .divide | .modulo =>
       Core.LanguageResult.bind .word left
         (Core.LanguageResult.bind .word (right.weakenAt 0) (divisionBody type operator))
+  | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply =>
+      Core.LanguageResult.bind .word left
+        (Core.LanguageResult.bind .word (right.weakenAt 0) (uncheckedBody type operator))
+  | .uncheckedDivide | .uncheckedModulo =>
+      Core.LanguageResult.bind .word left
+        (Core.LanguageResult.bind .word (right.weakenAt 0) (uncheckedDivisionBody type operator))
   | _ => binary operator left right
 
 theorem fixedInteger_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
@@ -1385,6 +1450,35 @@ theorem divisionBody_hasType {definitions : Core.DataEnvironment} {scope : Core.
             (.ifE (.binary .integer (.var rfl)) (Core.LanguageResult.failure_hasType .word .word)
               (Core.LanguageResult.success_hasType (.unary (.var rfl))))))))
 
+theorem fixedWrapInteger_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    {type : TypeSystem.FixedInteger} {value : Core.Expr} (typed : Core.HasType scope value .integer definitions) :
+    Core.HasType scope (fixedWrapInteger type value) .integer definitions := by
+  unfold fixedWrapInteger
+  split
+  · exact .binary (.binary (.binary typed .integer) .integer) .integer
+  · exact .binary typed .integer
+
+theorem uncheckedBody_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) :
+    Core.HasType (.word :: .word :: scope) (uncheckedBody type operator)
+      (Core.LanguageResult.resultType .word) definitions := by
+  have exact : Core.HasType (.word :: .word :: scope)
+      (.binary (uncheckedOperator operator) (fixedInteger type.signed (.var 1))
+        (fixedInteger type.signed (.var 0))) .integer definitions := by
+    unfold uncheckedOperator
+    split <;> exact .binary (fixedInteger_hasType (.var rfl)) (fixedInteger_hasType (.var rfl))
+  exact Core.LanguageResult.success_hasType (.unary (fixedWrapInteger_hasType exact))
+
+theorem uncheckedDivisionBody_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) :
+    Core.HasType (.word :: .word :: scope) (uncheckedDivisionBody type operator)
+      (Core.LanguageResult.resultType .word) definitions :=
+  .ifE (.binary (.var rfl) .word) (Core.LanguageResult.failure_hasType .word .word)
+    (.letE (fixedInteger_hasType (.var rfl))
+      (.letE (fixedInteger_hasType (.var rfl))
+        (.letE (truncatedDivision_hasType _)
+          (Core.LanguageResult.success_hasType (.unary (fixedWrapInteger_hasType (.var rfl)))))))
+
 theorem checkedBinary_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
     {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp} {left right : Core.Expr}
     (leftTyped : Core.HasType scope left (Core.LanguageResult.resultType (binaryOperandType operator)) definitions)
@@ -1413,9 +1507,33 @@ theorem checkedBinary_hasType {definitions : Core.DataEnvironment} {scope : Core
     apply Core.LanguageResult.bind_hasType .word
     · simpa [Core.Context.insertAt] using rightWord.weakenAt (inserted := .word) 0
     · exact divisionBody_hasType type operator
+  have unchecked : ∀ {operator : Syntax.BinaryOp},
+      Core.HasType scope left (Core.LanguageResult.resultType .word) definitions →
+      Core.HasType scope right (Core.LanguageResult.resultType .word) definitions →
+      Core.HasType scope (Core.LanguageResult.bind .word left
+        (Core.LanguageResult.bind .word (right.weakenAt 0) (uncheckedBody type operator)))
+        (Core.LanguageResult.resultType .word) definitions := by
+    intro operator leftWord rightWord
+    apply Core.LanguageResult.bind_hasType .word leftWord
+    apply Core.LanguageResult.bind_hasType .word
+    · simpa [Core.Context.insertAt] using rightWord.weakenAt (inserted := .word) 0
+    · exact uncheckedBody_hasType type operator
+  have uncheckedDivision : ∀ {operator : Syntax.BinaryOp},
+      Core.HasType scope left (Core.LanguageResult.resultType .word) definitions →
+      Core.HasType scope right (Core.LanguageResult.resultType .word) definitions →
+      Core.HasType scope (Core.LanguageResult.bind .word left
+        (Core.LanguageResult.bind .word (right.weakenAt 0) (uncheckedDivisionBody type operator)))
+        (Core.LanguageResult.resultType .word) definitions := by
+    intro operator leftWord rightWord
+    apply Core.LanguageResult.bind_hasType .word leftWord
+    apply Core.LanguageResult.bind_hasType .word
+    · simpa [Core.Context.insertAt] using rightWord.weakenAt (inserted := .word) 0
+    · exact uncheckedDivisionBody_hasType type operator
   cases operator <;> first
     | exact checked leftTyped rightTyped
     | exact division leftTyped rightTyped
+    | exact unchecked leftTyped rightTyped
+    | exact uncheckedDivision leftTyped rightTyped
     | exact binary_hasType leftTyped rightTyped
 
 /-- Renaming leaves the checked body alone: it reads only its two payloads. -/
@@ -1431,6 +1549,49 @@ theorem divisionBody_rename (type : TypeSystem.FixedInteger) (operator : Syntax.
     (divisionBody type operator).rename (Core.Renaming.lift (Core.Renaming.lift ξ)) = divisionBody type operator := by
   unfold divisionBody truncatedDivision magnitude fixedInteger
   cases type.signed <;> cases operator <;> rfl
+
+/-- Renaming leaves the unchecked body alone: it reads only its two payloads. -/
+theorem uncheckedBody_rename (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp)
+    (ξ : Core.Renaming) :
+    (uncheckedBody type operator).rename (Core.Renaming.lift (Core.Renaming.lift ξ)) =
+      uncheckedBody type operator := by
+  unfold uncheckedBody fixedWrapInteger fixedInteger
+  cases type.signed <;> rfl
+
+/-- Renaming leaves the unchecked division body alone: it reads only its two
+payloads. -/
+theorem uncheckedDivisionBody_rename (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp)
+    (ξ : Core.Renaming) :
+    (uncheckedDivisionBody type operator).rename (Core.Renaming.lift (Core.Renaming.lift ξ)) =
+      uncheckedDivisionBody type operator := by
+  unfold uncheckedDivisionBody uncheckedDivisionOperator truncatedDivision magnitude fixedWrapInteger fixedInteger
+  cases type.signed <;> cases operator <;> rfl
+
+/-- An operand that fails first makes unchecked `+ - * / %` fail the same way. -/
+theorem checkedBinary_left_failure_unchecked {environment : Core.Environment}
+    {before after : Core.Store} {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+    {left right : Core.Expr} {reason : Core.Word}
+    (unchecked : operator = .uncheckedAdd ∨ operator = .uncheckedSubtract ∨ operator = .uncheckedMultiply ∨
+      operator = .uncheckedDivide ∨ operator = .uncheckedModulo)
+    (evaluation : Core.Evaluates environment before left (.inLeft .word (.word reason)) after) :
+    Core.Evaluates environment before (checkedBinary type operator left right)
+      (.inLeft .word (.word reason)) after := by
+  rcases unchecked with rfl | rfl | rfl | rfl | rfl <;> exact Core.LanguageResult.bind_failure _ evaluation
+
+/-- A right operand that fails after the left one makes unchecked `+ - * / %`
+fail the same way. -/
+theorem checkedBinary_right_failure_unchecked {environment : Core.Environment}
+    {before middle after : Core.Store} {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+    {left right : Core.Expr} {leftValue : Core.Value} {reason : Core.Word}
+    (unchecked : operator = .uncheckedAdd ∨ operator = .uncheckedSubtract ∨ operator = .uncheckedMultiply ∨
+      operator = .uncheckedDivide ∨ operator = .uncheckedModulo)
+    (leftEvaluation : Core.Evaluates environment before left (.inRight .word leftValue) middle)
+    (rightEvaluation : Core.Evaluates (leftValue :: environment) middle (right.weakenAt 0)
+      (.inLeft .word (.word reason)) after) :
+    Core.Evaluates environment before (checkedBinary type operator left right)
+      (.inLeft .word (.word reason)) after := by
+  rcases unchecked with rfl | rfl | rfl | rfl | rfl <;>
+    exact Core.LanguageResult.bind_success _ leftEvaluation (Core.LanguageResult.bind_failure _ rightEvaluation)
 
 theorem checkedBinary_left_failure {environment : Core.Environment}
     {before after : Core.Store} {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
@@ -1538,6 +1699,32 @@ theorem fixedInteger_evaluates {environment : Core.Environment} {store : Core.St
       exact .letE (.unary (.var found) rfl)
         (.ifFalse (.binary (.var rfl) .integer (by simp [Core.BinaryOp.apply]; omega))
           (.binary (.var rfl) .integer rfl))
+
+/-- A power of two is a nonzero Integer. -/
+theorem twoPow_ne_zero (bits : Nat) : ((2 ^ bits : Nat) : Int) ≠ 0 := by
+  have positive := Nat.two_pow_pos bits
+  omega
+
+/-- An Integer wrapped to a fixed-width integer type's width, as
+`fixedWrapInteger` computes it. -/
+theorem fixedWrapInteger_evaluates {environment : Core.Environment} {store : Core.Store}
+    {type : TypeSystem.FixedInteger} {value : Core.Expr} {integer : Int}
+    (evaluated : Core.Evaluates environment store value (.integer integer) store) :
+    Core.Evaluates environment store (fixedWrapInteger type value)
+      (.integer (fixedWrapIntegerValue type integer)) store := by
+  unfold fixedWrapInteger fixedWrapIntegerValue
+  cases type.signed
+  · simp only [Bool.false_eq_true, ↓reduceIte]
+    exact .binary evaluated .integer
+      (by simp only [Core.BinaryOp.apply, Core.Integer.modulo_nonzero _ _ (twoPow_ne_zero _)])
+  · simp only [↓reduceIte]
+    have modded : Core.Evaluates environment store
+        (.binary .integerMod (.binary .integerAdd value (.integer (2 ^ (type.width.bits - 1) : Nat)))
+          (.integer (2 ^ type.width.bits : Nat)))
+        (.integer ((integer + (2 ^ (type.width.bits - 1) : Nat)) % (2 ^ type.width.bits : Nat))) store :=
+      .binary (.binary evaluated .integer rfl) .integer
+        (by simp only [Core.BinaryOp.apply, Core.Integer.modulo_nonzero _ _ (twoPow_ne_zero _)])
+    exact .binary modded .integer rfl
 
 theorem checkedOperator_apply {operator : Syntax.BinaryOp} (notDivision : checkedDivision operator = false)
     (left right : Int) :
@@ -2947,7 +3134,8 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
                 SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryResultType operator) type
                 pure ⟨type, SourceCorePrimitive.signedBinary operator left.expression right.expression⟩
               | .checked fixedType =>
-                -- Checked `+ - *` on the fixed-width integer types.
+                -- The arithmetic of the fixed-width integer types: checked and
+                -- unchecked `+ - * / %`.
                 SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryOperandType operator) left.type
                 SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryOperandType operator) right.type
                 SourceCoreBasic.ensureType site (SourceCorePrimitive.binaryResultType operator) type

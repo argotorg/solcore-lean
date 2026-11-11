@@ -482,6 +482,8 @@ private theorem tail_short (profile : BinaryProfile operator operand result mode
   | fixedSigned kind => cases circuit <;> cases kind
   | fixedChecked kind => cases circuit <;> cases kind
   | fixedDivision kind => cases circuit <;> cases kind
+  | fixedUnchecked kind => cases circuit <;> cases kind
+  | fixedUncheckedDivision kind => cases circuit <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -514,6 +516,8 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
   | fixedSigned kind => cases kind <;> exact bind_failed child evaluated
   | fixedChecked kind => cases kind <;> exact bind_failed child evaluated
   | fixedDivision kind => cases kind <;> exact bind_failed child evaluated
+  | fixedUnchecked kind => cases kind <;> exact bind_failed child evaluated
+  | fixedUncheckedDivision kind => cases kind <;> exact bind_failed child evaluated
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
@@ -663,7 +667,8 @@ private theorem tail_outcome_primitive (profile : BinaryProfile operator operand
         obtain ⟨rfl, rfl⟩ := evaluation_deterministic branch child
         exact ⟨_, _, .logicalOr false b, .bool b, rfl, rfl⟩
   | fixedSigned => exact absurd rfl notSigned
-  | fixedChecked | fixedDivision => simp [Mode.checkedType?] at notChecked
+  | fixedChecked | fixedDivision | fixedUnchecked | fixedUncheckedDivision =>
+    simp [Mode.checkedType?] at notChecked
 
 private theorem tail_outcome {lookup : Option TypeSystem.Ty} (profile : BinaryProfile operator operand result mode)
     (leftRep : ValueRep checked rawRegistry model mapping world operand a x (mode.operandType operator))
@@ -733,6 +738,38 @@ private theorem tail_outcome {lookup : Option TypeSystem.Ty} (profile : BinaryPr
               .fixed _ (Dynamic.fixed_canonical_ofInt inRange.1 inRange.2), rfl, rfl⟩
           · obtain ⟨rfl, rfl⟩ := evaluation_deterministic body (division_body_overflow kind zero inRange)
             exact .inr ⟨_, .fixed operandEq (.divisionOverflow kind a b zero inRange), rfl, rfl⟩
+      | fixedUnchecked kind =>
+        obtain ⟨a, rfl, rfl, _, _⟩ := fixed_fields leftRep rfl
+        obtain ⟨b, rfl, rfl, _, _⟩ := fixed_fields rightRep rfl
+        have resultEq : (Mode.checked type).resultType operator = .word := by cases kind <;> rfl
+        have body : Evaluates (.word b :: .word a :: environment) middle
+            (SourceCorePrimitive.uncheckedBody type operator) value finalStore := by
+          cases kind <;> exact (LanguageResult.bind_success_iff child).mp evaluated
+        rw [resultEq]
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic body (unchecked_body kind)
+        exact .inl ⟨_, _, .fixed operandEq (.unchecked kind a b),
+          .fixed _ (Dynamic.fixed_canonical_ofInt (Dynamic.fixedWrap_inRange _ _).1
+            (Dynamic.fixedWrap_inRange _ _).2), rfl, rfl⟩
+      | fixedUncheckedDivision kind =>
+        obtain ⟨a, rfl, rfl, _, _⟩ := fixed_fields leftRep rfl
+        obtain ⟨b, rfl, rfl, _, _⟩ := fixed_fields rightRep rfl
+        have resultEq : (Mode.checked type).resultType operator = .word := by cases kind <;> rfl
+        have body : Evaluates (.word b :: .word a :: environment) middle
+            (SourceCorePrimitive.uncheckedDivisionBody type operator) value finalStore := by
+          cases kind <;> exact (LanguageResult.bind_success_iff child).mp evaluated
+        rw [resultEq]
+        by_cases zero : b = Word.zero
+        · subst zero
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic body unchecked_division_body_zero
+          have panics : Dynamic.BinaryPrimitivePanics operator (.word a) (.word Word.zero) 0x12 := by
+            cases kind
+            · exact .wordUncheckedDivide a
+            · exact .wordUncheckedModulo a
+          exact .inr ⟨_, .primitive panics, rfl, rfl⟩
+        · obtain ⟨rfl, rfl⟩ := evaluation_deterministic body (unchecked_division_body_success kind zero)
+          exact .inl ⟨_, _, .fixed operandEq (.uncheckedDivision kind a b zero),
+            .fixed _ (Dynamic.fixed_canonical_ofInt (Dynamic.fixedWrap_inRange _ _).1
+              (Dynamic.fixedWrap_inRange _ _).2), rfl, rfl⟩
     | none =>
       rcases tail_outcome_primitive profile signedMode checkedMode leftRep rightRep continues child evaluated with
         ⟨output, native, applied, represented, valueEq, storeEq⟩ | ⟨code, panics, valueEq, storeEq⟩

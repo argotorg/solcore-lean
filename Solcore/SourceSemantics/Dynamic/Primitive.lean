@@ -599,9 +599,41 @@ def FixedInRange (type : TypeSystem.FixedInteger) (value : Int) : Prop :=
 instance (type : TypeSystem.FixedInteger) (value : Int) : Decidable (FixedInRange type value) :=
   inferInstanceAs (Decidable (_ ∧ _))
 
+/-- The exact result of unchecked `+`, `-` or `*`. -/
+def uncheckedResult : Syntax.BinaryOp → Int → Int → Int
+  | .uncheckedAdd, left, right => left + right
+  | .uncheckedSubtract, left, right => left - right
+  | _, left, right => left * right
+
+/-- The exact result of unchecked `/` or `%`, as of checked `/` and `%`: the
+quotient rounded toward zero, or the remainder with the dividend's sign. -/
+def uncheckedDivisionResult : Syntax.BinaryOp → Int → Int → Int
+  | .uncheckedModulo, left, right => left.tmod right
+  | _, left, right => left.tdiv right
+
+/-- An integer wrapped to a fixed-width integer type's width `N`: its residue
+modulo `2^N`, read in two's complement on a signed type. Unchecked arithmetic on
+the type gives its exact result wrapped so. -/
+def fixedWrap (type : TypeSystem.FixedInteger) (value : Int) : Int :=
+  if type.signed then
+    (value + (2 ^ (type.width.bits - 1) : Nat)) % (2 ^ type.width.bits : Nat) - (2 ^ (type.width.bits - 1) : Nat)
+  else value % (2 ^ type.width.bits : Nat)
+
+/-- A wrapped integer lies in the type's range. -/
+theorem fixedWrap_inRange (type : TypeSystem.FixedInteger) (value : Int) :
+    FixedInRange type (fixedWrap type value) := by
+  obtain ⟨signed, width⟩ := type
+  cases signed <;> cases width <;>
+    simp only [FixedInRange, fixedWrap, TypeSystem.FixedInteger.min, TypeSystem.FixedInteger.max,
+      TypeSystem.IntegerWidth.bits, Bool.false_eq_true, ↓reduceIte, Nat.reduceSub, Nat.reducePow] <;>
+    omega
+
 /-- The binary operators whose meaning on a fixed-width integer type differs
-from Word's on its canonical words: the orderings on the signed types and
-checked `+ - * / %` on every type. -/
+from Word's on its canonical words: the orderings on the signed types, checked
+`+ - * / %` on every type, and unchecked `+ - * / %` on every type, which wrap
+to the type's width. On `uint256`, and for `+ - *` on `int256`, the unchecked
+meaning is Word's; it is the type's all the same, so the evaluation rules choose
+it from the operands' static type alone. -/
 inductive FixedBinaryOwn (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → Prop where
   | less (signed : type.signed = true) : FixedBinaryOwn type .less
   | greater (signed : type.signed = true) : FixedBinaryOwn type .greater
@@ -612,6 +644,11 @@ inductive FixedBinaryOwn (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → 
   | multiply : FixedBinaryOwn type .multiply
   | divide : FixedBinaryOwn type .divide
   | modulo : FixedBinaryOwn type .modulo
+  | uncheckedAdd : FixedBinaryOwn type .uncheckedAdd
+  | uncheckedSubtract : FixedBinaryOwn type .uncheckedSubtract
+  | uncheckedMultiply : FixedBinaryOwn type .uncheckedMultiply
+  | uncheckedDivide : FixedBinaryOwn type .uncheckedDivide
+  | uncheckedModulo : FixedBinaryOwn type .uncheckedModulo
 
 theorem _root_.Solcore.SourceSemantics.FixedSignedComparison.own {type : TypeSystem.FixedInteger}
     {operator : Syntax.BinaryOp} (kind : FixedSignedComparison type operator) :
@@ -632,11 +669,22 @@ theorem _root_.Solcore.SourceSemantics.FixedCheckedDivision.own {type : TypeSyst
     FixedBinaryOwn type operator := by
   cases kind <;> constructor
 
+theorem _root_.Solcore.SourceSemantics.FixedUncheckedArithmetic.own {type : TypeSystem.FixedInteger}
+    {operator : Syntax.BinaryOp} (kind : FixedUncheckedArithmetic operator) :
+    FixedBinaryOwn type operator := by
+  cases kind <;> constructor
+
+theorem _root_.Solcore.SourceSemantics.FixedUncheckedDivision.own {type : TypeSystem.FixedInteger}
+    {operator : Syntax.BinaryOp} (kind : FixedUncheckedDivision operator) :
+    FixedBinaryOwn type operator := by
+  cases kind <;> constructor
+
 /-- Binary operators whose meaning on a fixed-width integer type differs from
 Word's on its canonical words. The orderings on the signed types compare the
 integers the words stand for, and checked `+ - *`, and `/ %` by a nonzero
 divisor, give the exact result, as a canonical word, when it lies in the type's
-range. -/
+range. Unchecked `+ - *`, and `/ %` by a nonzero divisor, give the exact result
+wrapped to the type's width (`fixedWrap`), so `MIN / -1` gives `MIN`. -/
 inductive FixedBinaryApplies (type : TypeSystem.FixedInteger) :
     Syntax.BinaryOp → Value → Value → Value → Prop where
   | signedLess (signed : type.signed = true) (left right : Core.Word) :
@@ -660,6 +708,15 @@ inductive FixedBinaryApplies (type : TypeSystem.FixedInteger) :
       (inRange : FixedInRange type (divisionResult operator (fixedValue type left) (fixedValue type right))) :
       FixedBinaryApplies type operator (.word left) (.word right)
         (.word (Core.Word.ofIntModulo (divisionResult operator (fixedValue type left) (fixedValue type right))))
+  | unchecked {operator : Syntax.BinaryOp} (kind : FixedUncheckedArithmetic operator) (left right : Core.Word) :
+      FixedBinaryApplies type operator (.word left) (.word right)
+        (.word (Core.Word.ofIntModulo
+          (fixedWrap type (uncheckedResult operator (fixedValue type left) (fixedValue type right)))))
+  | uncheckedDivision {operator : Syntax.BinaryOp} (kind : FixedUncheckedDivision operator)
+      (left right : Core.Word) (nonzero : right ≠ Core.Word.zero) :
+      FixedBinaryApplies type operator (.word left) (.word right)
+        (.word (Core.Word.ofIntModulo
+          (fixedWrap type (uncheckedDivisionResult operator (fixedValue type left) (fixedValue type right)))))
 
 namespace FixedBinaryApplies
 
@@ -673,28 +730,42 @@ theorem functional {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
     cases secondApplication with
     | checked => rfl
     | division other => exact (kind.not_division other).elim
+    | unchecked other | uncheckedDivision other => cases kind <;> cases other
     | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
   | division kind =>
     cases secondApplication with
     | division => rfl
     | checked other => exact (other.not_division kind).elim
+    | unchecked other | uncheckedDivision other => cases kind <;> cases other
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
+  | unchecked kind =>
+    cases secondApplication with
+    | unchecked => rfl
+    | uncheckedDivision other => exact (kind.not_division other).elim
+    | checked other | division other => cases kind <;> cases other
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
+  | uncheckedDivision kind =>
+    cases secondApplication with
+    | uncheckedDivision => rfl
+    | unchecked other => exact (other.not_division kind).elim
+    | checked other | division other => cases kind <;> cases other
     | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
   | signedLess =>
     cases secondApplication with
     | signedLess => rfl
-    | checked kind | division kind => cases kind
+    | checked kind | division kind | unchecked kind | uncheckedDivision kind => cases kind
   | signedGreater =>
     cases secondApplication with
     | signedGreater => rfl
-    | checked kind | division kind => cases kind
+    | checked kind | division kind | unchecked kind | uncheckedDivision kind => cases kind
   | signedLessEqual =>
     cases secondApplication with
     | signedLessEqual => rfl
-    | checked kind | division kind => cases kind
+    | checked kind | division kind | unchecked kind | uncheckedDivision kind => cases kind
   | signedGreaterEqual =>
     cases secondApplication with
     | signedGreaterEqual => rfl
-    | checked kind | division kind => cases kind
+    | checked kind | division kind | unchecked kind | uncheckedDivision kind => cases kind
 
 /-- The operators with a fixed-width meaning are those of `FixedBinaryOwn`. -/
 theorem kind {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
@@ -708,13 +779,20 @@ theorem kind {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
   | signedGreaterEqual signed => exact .greaterEqual signed
   | checked kind => exact kind.own
   | division kind => exact kind.own
+  | unchecked kind => exact kind.own
+  | uncheckedDivision kind => exact kind.own
 
-theorem strict {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+/-- The operators with a fixed-width meaning evaluate both operands: they are
+strict, or unchecked `/` and `%`, which may panic. -/
+theorem evaluatesBoth {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
     {left right output : Value}
     (applies : FixedBinaryApplies type operator left right output) :
-    StrictBinaryOperator operator := by
+    StrictBinaryOperator operator ∨ PanickingBinaryOperator operator := by
   have own := applies.kind
-  cases own <;> constructor
+  cases own
+  all_goals first
+    | exact .inl (by constructor)
+    | exact .inr (by constructor)
 
 end FixedBinaryApplies
 
@@ -802,8 +880,12 @@ theorem BinaryPrimitivePanics.excludes_value {operandType : Option TypeSystem.Ty
   cases applies with
   | primitive _ applies => exact panics.excludes_application applies
   | fixed _ applies =>
-    have own := applies.kind
-    cases panics <;> cases own
+    cases panics <;> cases applies
+    all_goals first
+      | exact absurd rfl (by assumption)
+      | cases ‹FixedCheckedArithmetic _›
+      | cases ‹FixedCheckedDivision _›
+      | cases ‹FixedUncheckedArithmetic _›
 
 /-- Checked `+ - *` on a fixed-width integer type panic with `Panic(0x11)` when
 the exact result lies outside the type's range. Checked `/ %` panic with
@@ -831,18 +913,24 @@ theorem FixedBinaryPanics.excludes_application {type : TypeSystem.FixedInteger}
     all_goals first
       | exact outside (by assumption)
       | exact kind.not_division (by assumption)
+      | exact kind.not_unchecked (FixedUncheckedArithmetic.unchecked (by assumption))
+      | exact kind.not_unchecked (FixedUncheckedDivision.unchecked (by assumption))
       | cases kind
   | divisionByZero kind left =>
     cases applies
     all_goals first
       | exact absurd rfl (by assumption)
       | exact FixedCheckedArithmetic.not_division (by assumption) kind
+      | exact kind.not_unchecked (FixedUncheckedArithmetic.unchecked (by assumption))
+      | exact kind.not_unchecked (FixedUncheckedDivision.unchecked (by assumption))
       | cases kind
   | divisionOverflow kind left right nonzero outside =>
     cases applies
     all_goals first
       | exact outside (by assumption)
       | exact FixedCheckedArithmetic.not_division (by assumption) kind
+      | exact kind.not_unchecked (FixedUncheckedArithmetic.unchecked (by assumption))
+      | exact kind.not_unchecked (FixedUncheckedDivision.unchecked (by assumption))
       | cases kind
 
 /-- A strict binary operator panicking on evaluated operands whose static type

@@ -881,7 +881,7 @@ theorem expression_fault_step (selectedBodies : SelectedPreservation.SelectedBod
               obtain ⟨rightValueTyped, argumentsHeapTyped, secondExtends⟩ := SelectedPreservation.expression_value (expressionAllIH _ (Size.child_lt_stepSize (by simp)))
                 runtime covers (locals.mono firstExtends) middleTyped rightTyped second
               cases operatorTyped with
-              | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison | integerComparison | fixedComparison | fixedBitwise | fixedSignedComparison | fixedArithmetic | fixedDivision | booleanAnd | booleanOr => cases method
+              | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison | integerComparison | fixedComparison | fixedBitwise | fixedSignedComparison | fixedArithmetic | fixedDivision | fixedUnchecked | booleanAnd | booleanOr => cases method
               | trait staticDispatch profile requirementsProve =>
                 have same := binary_dispatch_same staticDispatch dispatch
                 rcases same with ⟨rfl, rfl⟩
@@ -1288,6 +1288,9 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
               | fixedDivision kind =>
                 exact ⟨applies.preserves_division kind (Dynamic.operandType?_of_typing runtime.graph.nodeOccurrencesUnique leftTyped),
                   secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
+              | fixedUnchecked kind =>
+                exact ⟨applies.preserves_unchecked kind (Dynamic.operandType?_of_typing runtime.graph.nodeOccurrencesUnique leftTyped),
+                  secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
               | booleanAnd => exact ⟨applies.preserves .booleanAnd aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
               | booleanOr => exact ⟨applies.preserves .booleanOr aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
               | trait _dispatch profile requirementsProve => cases requirementsProve; cases profile
@@ -1331,7 +1334,7 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
               obtain ⟨rightValueTyped, argumentsHeapTyped, secondExtends⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
                 runtime covers (locals.mono firstExtends) middleTyped rightTyped second
               cases operatorTyped with
-              | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison | integerComparison | fixedComparison | fixedBitwise | fixedSignedComparison | fixedArithmetic | fixedDivision | booleanAnd | booleanOr => cases method
+              | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison | integerComparison | fixedComparison | fixedBitwise | fixedSignedComparison | fixedArithmetic | fixedDivision | fixedUnchecked | booleanAnd | booleanOr => cases method
               | trait staticDispatch profile requirementsProve =>
                 have same := binary_dispatch_same staticDispatch dispatch
                 rcases same with ⟨rfl, rfl⟩

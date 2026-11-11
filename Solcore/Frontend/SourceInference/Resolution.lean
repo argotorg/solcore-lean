@@ -457,16 +457,20 @@ def binaryBuiltinType : Syntax.BinaryOp → Ty
   | _ => .word
 
 /-- The binary operators that are builtins on a fixed-width integer type, with
-both operands of that type: `==`, `!=`, `& | ^`, the orderings and checked
-`+ - * / %`. On canonical words they are Word's, except the orderings on the
-signed types, which compare the integers the words stand for, and the checked
-arithmetic, which panics outside the type's range or on a zero divisor. -/
+both operands of that type: `==`, `!=`, `& | ^`, the orderings, checked
+`+ - * / %` and, in an `unchecked` block, unchecked `+ - * / %`. On canonical
+words they are Word's, except the orderings on the signed types, which compare
+the integers the words stand for, the checked arithmetic, which panics outside
+the type's range or on a zero divisor, and the unchecked arithmetic, which
+wraps to the type's width and panics on a zero divisor. -/
 def fixedBinaryOperator (operator : Syntax.BinaryOp) : Ty → Bool
   | .constructor (.builtin (.fixed _)) =>
       match operator with
       | .equal | .notEqual | .bitAnd | .bitXor | .bitOr
       | .less | .greater | .lessEqual | .greaterEqual
-      | .add | .subtract | .multiply | .divide | .modulo => true
+      | .add | .subtract | .multiply | .divide | .modulo
+      | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide
+      | .uncheckedModulo => true
       | _ => false
   | _ => false
 
@@ -660,7 +664,8 @@ def binaryOperatorTail (context : Context) (operator : Syntax.BinaryOp) (left : 
     Except Error OperatorInferenceResult := do
   let operand := state.resolve left
   -- The twelve fixed-width integer types take `==`, `!=`, `& | ^`, the
-  -- orderings and checked `+ - * / %` as builtins (`fixedBinaryOperator`).
+  -- orderings and checked and unchecked `+ - * / %` as builtins
+  -- (`fixedBinaryOperator`).
   if fixedBinaryOperator operator operand then
     pure {
       type := if binaryResultIsBool operator then .bool else operand
@@ -729,9 +734,10 @@ def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
     let state ← unify state right .word
     return { type := .word, requirements := [], state }
   if isUncheckedOperator operator then
-    -- Upstream's `UncheckedAdd` … `UncheckedMod` traits cover `word` and the
-    -- declared types that implement them, never `integer`. A literal operand
-    -- can only be a Word, so it is one at once, and the operator never waits
+    -- Upstream's `UncheckedAdd` … `UncheckedMod` traits cover `word`, the
+    -- twelve fixed-width integer types and the declared types that implement
+    -- them, never `integer`. A literal operand takes the other operand's type;
+    -- one that is still open is a Word at once, and the operator never waits
     -- for its operands' type as the checked ones may.
     let state ← unify state left right
     let state ← if isOpenIntegerLiteralTarget state integerLiterals left then

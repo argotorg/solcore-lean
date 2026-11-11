@@ -4072,8 +4072,8 @@ range, and `/ %` panic with `Panic(0x12)` on a zero divisor and round toward
 zero, so the results stay canonical. A literal takes the type its uses give it,
 and one above the type's greatest value is rejected. A prefix `-` on a literal
 folds into it, through groups and repeated, and the range is checked with the
-sign; any other `-e` reads as `0 - e`. Shifts, unchecked arithmetic and
-in-place `~` are still rejected. -/
+sign; any other `-e` reads as `0 - e`. Unchecked `+ - * / %` wrap to the
+type's width (`runUnchecked`); shifts and in-place `~` are still rejected. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreFixedIntegerOperators
 open Solcore Solcore.Frontend SourceCoreExecution
@@ -4470,6 +4470,108 @@ def runDefaulting : IO Unit := do
   | .error errors => throw (IO.userError s!"a compound on a generalized lambda parameter gave {reprStr errors}")
   IO.println "SOURCE_CORE_UINT256_DEFAULT_PASS: open literals in comparisons, operators, requirements and matches default to uint256 with checked arithmetic, a generic call's literal takes the return's type, shifts keep Word literals, numeric patterns at uint256 up to 2^256 - 1, unconstrained literals rejected as ambiguous, an open -1 and a defaulted 2^256 out of uint256's range, an unsolved Mark<uint256> rejected, compound assignments on an open target typed with their operand and defaulted to uint256 with checked += -= *= /= %= and Word's &= |= ^=, a later use's uint8 and int8, uint256 and Word for loop counters, compound shifts and unchecked compounds still Word, an integer compound target rejected, lambda parameters as compound targets typed by a captured Word, a declaration or a literal operand, and one that nothing types rejected, numeric patterns on the other eleven types rejected, a 2^256 pattern at uint256 rejected by inference, declared or defaulted, upstream's poly_int_defaulting rejected at its Int bound and its unbounded form as ambiguous"
 
+/-- Step 8a's fixture: unchecked `+ - * / %` on the twelve types, in a block. -/
+private def uncheckedWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function uadd8u(x: uint8, y: uint8) returns (uint8) { unchecked { return x + y; } }",
+  "function usub8u(x: uint8, y: uint8) returns (uint8) { unchecked { return x - y; } }",
+  "function umul16u(x: uint16, y: uint16) returns (uint16) { unchecked { return x * y; } }",
+  "function uadd256u(x: uint256, y: uint256) returns (uint256) { unchecked { return x + y; } }",
+  "function usub256u(x: uint256, y: uint256) returns (uint256) { unchecked { return x - y; } }",
+  "function uadd8s(x: int8, y: int8) returns (int8) { unchecked { return x + y; } }",
+  "function usub8s(x: int8, y: int8) returns (int8) { unchecked { return x - y; } }",
+  "function umul8s(x: int8, y: int8) returns (int8) { unchecked { return x * y; } }",
+  "function umul256s(x: int256, y: int256) returns (int256) { unchecked { return x * y; } }",
+  "function uadd64s(x: int64, y: int64) returns (int64) { unchecked { return x + y; } }",
+  "function udiv8u(x: uint8, y: uint8) returns (uint8) { unchecked { return x / y; } }",
+  "function umod8u(x: uint8, y: uint8) returns (uint8) { unchecked { return x % y; } }",
+  "function udiv8s(x: int8, y: int8) returns (int8) { unchecked { return x / y; } }",
+  "function umod8s(x: int8, y: int8) returns (int8) { unchecked { return x % y; } }",
+  "function udiv256s(x: int256, y: int256) returns (int256) { unchecked { return x / y; } }",
+  "function umod256u(x: uint256, y: uint256) returns (uint256) { unchecked { return x % y; } }",
+  "function uneg8s(x: int8) returns (int8) { unchecked { return -x; } }",
+  "function uneg8u(x: uint8) returns (uint8) { unchecked { return -x; } }",
+  "function uneg256u(x: uint256) returns (uint256) { unchecked { return -x; } }",
+  "function uinc8u(x: uint8) returns (uint8) { unchecked { return x + 1; } }",
+  "function ulitLeft8s(x: int8) returns (int8) { unchecked { return 100 - x; } }",
+  "function uletTyped16u(x: uint16) returns (uint16) { unchecked { let r: uint16 = x * 2; return r; } }",
+  "function uassign8u(x: uint8, y: uint8) returns (uint8) { let s: uint8 = 0; unchecked { s = x + y; } return s; }",
+  "function ucompare8s(x: int8) returns (bool) { unchecked { return x + 1 < x; } }",
+  "function uscope8u(x: uint8) returns (uint8) { unchecked { let a: uint8 = x + 1; } return x + 1; }"]
+
+private def uncheckedNames : List String := [
+  "uadd8u", "usub8u", "umul16u", "uadd256u", "usub256u", "uadd8s", "usub8s", "umul8s", "umul256s", "uadd64s",
+  "udiv8u", "umod8u", "udiv8s", "umod8s", "udiv256s", "umod256u", "uneg8s", "uneg8u", "uneg256u", "uinc8u",
+  "ulitLeft8s", "uletTyped16u", "uassign8u", "ucompare8s", "uscope8u"]
+
+/-- Step 8a, unchecked `+ - * / %` on the twelve types, through the public API:
+the exact result wrapped to the type's width, `MIN / -1` giving `MIN`, and
+`Panic(0x12)` on a zero divisor, as upstream's `UncheckedAdd` … `UncheckedMod`
+instances give. -/
+def runUnchecked : IO Unit := do
+  let program ← get "unchecked fixed-width check" (checkProgram uncheckedWorkspace)
+  let seeds ← uncheckedNames.mapM (seed program)
+  let compiled ← get "unchecked fixed-width compilation"
+    (compile uncheckedWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (index : Nat) : IO Key := match compiled.keys[index]? with
+    | some key => pure key | none => throw (IO.userError "unchecked fixed-width root missing")
+  let mut session ← boot (← compiled.open)
+  let cases : List (Nat × List Value × Value) := [
+    -- `+ - *` wrap modulo `2^N` on the unsigned types.
+    (0, [word 200, word 100], word 44), (0, [word 255, word 1], word 0), (0, [word 3, word 4], word 7),
+    (1, [word 3, word 5], word 254), (1, [word 5, word 3], word 2),
+    (2, [word 256, word 256], word 0), (2, [word 300, word 300], word 24464),
+    (3, [word (modulus - 1), word 1], word 0), (3, [word (2 ^ 255), word (2 ^ 255)], word 0),
+    (4, [word 0, word 1], word (modulus - 1)),
+    -- On the signed types they wrap in two's complement, and the result stays sign-extended.
+    (5, [word 127, word 1], word (modulus - 128)), (5, [word (modulus - 128), word (modulus - 1)], word 127),
+    (6, [word (modulus - 128), word 1], word 127), (6, [word 0, word (modulus - 128)], word (modulus - 128)),
+    (7, [word (modulus - 128), word (modulus - 1)], word (modulus - 128)), (7, [word 64, word 2], word (modulus - 128)),
+    (7, [word 16, word 16], word 0), (7, [word (modulus - 3), word 5], word (modulus - 15)),
+    (8, [word (2 ^ 255), word (modulus - 1)], word (2 ^ 255)), (8, [word (2 ^ 254), word 2], word (2 ^ 255)),
+    (9, [word (2 ^ 63 - 1), word 1], word (modulus - 2 ^ 63)),
+    -- `/ %` round toward zero; `MIN / -1` wraps to `MIN`, and `MIN % -1` is 0.
+    (10, [word 7, word 2], word 3), (10, [word 255, word 255], word 1), (11, [word 7, word 2], word 1),
+    (12, [word (modulus - 128), word (modulus - 1)], word (modulus - 128)),
+    (12, [word (modulus - 7), word 2], word (modulus - 3)), (12, [word 7, word (modulus - 2)], word (modulus - 3)),
+    (13, [word (modulus - 7), word 2], word (modulus - 1)), (13, [word (modulus - 128), word (modulus - 1)], word 0),
+    (13, [word 7, word (modulus - 2)], word 1),
+    (14, [word (2 ^ 255), word (modulus - 1)], word (2 ^ 255)), (14, [word (modulus - 6), word 3], word (modulus - 2)),
+    (15, [word (modulus - 1), word 10], word 5),
+    -- `-x` in a block is unchecked `0 - x`: `-MIN` is `MIN`, and on an unsigned type it is `2^N - x`.
+    (16, [word (modulus - 128)], word (modulus - 128)), (16, [word 5], word (modulus - 5)), (16, [word 0], word 0),
+    (17, [word 1], word 255), (17, [word 0], word 0), (17, [word 255], word 1),
+    (18, [word 1], word (modulus - 1)),
+    -- A literal operand takes the other operand's type, on either side.
+    (19, [word 255], word 0), (19, [word 7], word 8),
+    (20, [word (modulus - 100)], word (modulus - 56)), (20, [word 5], word 95),
+    (21, [word 40000], word 14464), (22, [word 200, word 100], word 44),
+    (23, [word 127], boolean true), (23, [word 0], boolean false),
+    -- Arithmetic after the block is checked again.
+    (24, [word 7], word 8)]
+  for (index, arguments, expected) in cases do
+    let completed ← execute session (← key index) arguments
+    require (completed.value == expected)
+      s!"{uncheckedNames[index]?} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  -- A zero divisor panics with 0x12, `MIN / 0` too.
+  for (index, arguments) in [(10, [word 7, word 0]), (11, [word 7, word 0]), (12, [word (modulus - 128), word 0]),
+      (13, [word 5, word 0]), (14, [word 1, word 0]), (15, [word 1, word 0])] do
+    session ← panics session (← key index) arguments SourceCorePanics.divisionByZero
+      s!"{uncheckedNames[index]?} on {reprStr arguments}"
+  discard <| panics session (← key 24) [word 255] SourceCorePanics.arithmetic "uscope8u after the block"
+  -- Both operands share the type, and unchecked arithmetic never takes `integer`.
+  rejectedByInference "unchecked operands of different fixed-width types"
+    ["function bad(x: uint8, y: uint16) returns (uint8) { unchecked { return x + y; } }"]
+  rejectedByInference "unchecked + on a fixed-width type and Word"
+    ["function bad(x: uint8, w: Word) returns (uint8) { unchecked { return x + w; } }"]
+  -- Not yet: an unchecked compound assignment on a fixed-width target, and two open literal
+  -- operands, which are still Words at once.
+  rejectedByInference "an unchecked += on uint8"
+    ["function bad(x: uint8, y: uint8) returns (uint8) { let r: uint8 = x; unchecked { r += y; } return r; }"]
+  rejectedByInference "two open literals in an unchecked + at uint8"
+    ["function bad() returns (uint8) { unchecked { let a = 200 + 100; let b: uint8 = a; return b; } }"]
+  IO.println "SOURCE_CORE_FIXED_UNCHECKED_PASS: unchecked + - * wrapping modulo 2^N on the unsigned types and in two's complement on the signed ones with canonical results, unchecked / % rounding toward zero with MIN / -1 giving MIN and MIN % -1 giving 0, a zero divisor panicking with 0x12, -x in a block as unchecked 0 - x, literal operands typed by the other operand on either side, checked arithmetic again after the block, mixed operand types rejected, and unchecked compound assignments on fixed-width targets and two open literal operands not yet accepted"
+
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)
   let seeds ← names.mapM (seed program)
@@ -4670,16 +4772,15 @@ def run : IO Unit := do
   rejectedOutOfRange "an operand of -129 at int8" "int8" (-129)
     ["function bad(x: int8) returns (int8) { return x + -129; }"]
   -- `-e` reads as `0 - e`: a declared type has no builtin `Int` for the `0`, so it is rejected
-  -- even with `Sub`; in a block `-x` is unchecked, which the twelve types reject until step 8.
+  -- even with `Sub`. In a block `-x` is unchecked, which wraps on the twelve types (`runUnchecked`).
   rejectedByInference "unary minus on a declared type"
     ["enum Token { Token(Word) }", "trait Sub<T> {", "  function sub(left: T, right: T) returns (T);", "}",
      "impl Sub<Token> {", "  function sub(left: Token, right: Token) returns (Token) {", "    return left;", "  }", "}",
      "function bad(t: Token) returns (Token) { return -t; }"]
-  rejectedByInference "unchecked unary minus on uint8"
-    ["function bad(x: uint8) returns (uint8) { unchecked { return -x; } }"]
   rejectedByInference "unary minus on Bool" ["function bad(b: Bool) returns (Bool) { return -b; }"]
-  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * / % on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= /= %= panicking with 0x11 outside the range (MIN / -1 among them, MIN % -1 not), / % /= %= panicking with 0x12 on a zero divisor and rounding toward zero, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, literals at their range edges and as operands, deferred operators and mapping elements, one past each range rejected naming the type, negated literals folded through groups and repeated with their range checked by sign, -x as checked 0 - x panicking for MIN and nonzero unsigned values and wrapping on Word, negated-literal operands and compound forms, unary minus rejected on declared types, Bool and unchecked fixed-width operands, <<= and in-place ~ still rejected"
+  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * / % on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= /= %= panicking with 0x11 outside the range (MIN / -1 among them, MIN % -1 not), / % /= %= panicking with 0x12 on a zero divisor and rounding toward zero, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, literals at their range edges and as operands, deferred operators and mapping elements, one past each range rejected naming the type, negated literals folded through groups and repeated with their range checked by sign, -x as checked 0 - x panicking for MIN and nonzero unsigned values and wrapping on Word, negated-literal operands and compound forms, unary minus rejected on declared types and Bool, <<= and in-place ~ still rejected"
   runDefaulting
+  runUnchecked
 
 end Tests.SourceCoreFixedIntegerOperators
 end
