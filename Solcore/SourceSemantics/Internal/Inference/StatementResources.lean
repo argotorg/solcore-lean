@@ -316,7 +316,9 @@ theorem inferAssignedValueFuel_success_sound_of_typed_result
       inferredValue.id (outer.apply inferredValue.type))
     (success : Detail.inferAssignedValueFuel fuel inferenceContext
       targetExpression operator value initial =
-        .ok (assignment, inferredValue, final)) :
+        .ok (assignment, inferredValue, final))
+    (targetFits : AssignmentTargetFits (assignment.applySubstitution outer)
+      operator) :
     SourceAssignmentHasType (source.applySubstitution outer) target
       (assignment.applySubstitution outer) operator inferredValue.id := by
   unfold Detail.inferAssignedValueFuel at success
@@ -344,26 +346,26 @@ theorem inferAssignedValueFuel_success_sound_of_typed_result
                 .ok (assignment, inferredValue, final)) :
           SourceAssignmentHasType (source.applySubstitution outer) target
             (assignment.applySubstitution outer) operator inferredValue.id := by
+        have notEqual : operator ≠ .equal := by
+          cases operatorKind <;> decide
+        have expectedBelow :
+            (placeState.resolve place.type).VariablesBelow
+              placeState.inference.next :=
+          placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2
         cases unifyResult : Detail.unify placeState place.type
             (Detail.compoundOperandType operator (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
             simp only [unifyResult, bind, Except.bind] at tailSuccess
-            have resolvedOperand : fittedState.resolve place.type = (Detail.compoundOperandType operator (placeState.resolve place.type)) :=
-              (Detail.unify_resolve_eq unifyResult).trans (by rfl)
-            have expectedEq : (Detail.compoundOperandType operator (fittedState.resolve place.type)) = (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
-              rw [resolvedOperand]
-              exact congrArg Ty.constructor (Detail.compoundOperandConstructor_idem _ _)
-            rw [expectedEq] at tailSuccess
             have fitProgress := Detail.unify_inferenceProgress
               placeProperties.2.1.solved placeProperties.2.2
-              (Ty.variablesBelow_constructor _ _) unifyResult
+              (Detail.compoundOperandType_variablesBelow expectedBelow) unifyResult
             have fittedReady := Detail.unify_preserves_inferenceReady
               placeProperties.2.1 placeProperties.2.2
-              (Ty.variablesBelow_constructor _ _) unifyResult
+              (Detail.compoundOperandType_variablesBelow expectedBelow) unifyResult
             cases valueResult : Detail.inferExprFuel fuel inferenceContext
-                value (some (Detail.compoundOperandType operator (placeState.resolve place.type))) fittedState with
+                value (some (Detail.compoundOperandType operator (fittedState.resolve place.type))) fittedState with
             | error error =>
                 simp [valueResult] at tailSuccess
             | ok valuePair =>
@@ -383,57 +385,56 @@ theorem inferAssignedValueFuel_success_sound_of_typed_result
                       simp only [Option.mem_def] at member
                       injection member with typeEq
                       subst expectedType
-                      exact Ty.variablesBelow_constructor _ _)
+                      exact Detail.compoundOperandType_variablesBelow
+                        (fitProgress.resolve_variablesBelow placeProperties.2.2))
                     valueResult
                 have outerFitted : outer.SemanticallyExtends
                     fittedState.inference.substitution :=
                   Substitution.SemanticallyExtends.trans outerExtension
                     valueProperties.1.substitution_extends
-                have placeWordEq : outer.apply place.type = (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
-                  calc
-                    outer.apply place.type =
-                        outer.apply (fittedState.resolve place.type) := by
-                      simpa [Frontend.SourceInference.State.resolve,
-                        TypeSystem.InferState.resolve] using
-                          (outerFitted place.type).symm
-                    _ = outer.apply (Detail.compoundOperandType operator (placeState.resolve place.type)) := congrArg outer.apply resolvedOperand
-                    _ = (Detail.compoundOperandType operator (placeState.resolve place.type)) := rfl
-                have storedWordEq :
-                    outer.apply (finalState.resolve place.type) = (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
-                  calc
+                have resolvedFinal :
                     outer.apply (finalState.resolve place.type) =
-                        outer.apply place.type := by
-                      simpa [Frontend.SourceInference.State.resolve,
-                        TypeSystem.InferState.resolve] using
-                          outerExtension place.type
-                    _ = (Detail.compoundOperandType operator (placeState.resolve place.type)) := placeWordEq
-                have placeWord : SourcePlaceHasType
+                      outer.apply place.type := by
+                  simpa [Frontend.SourceInference.State.resolve,
+                    TypeSystem.InferState.resolve] using
+                      outerExtension place.type
+                have resolvedFitted :
+                    outer.apply (fittedState.resolve place.type) =
+                      outer.apply place.type := by
+                  simpa [Frontend.SourceInference.State.resolve,
+                    TypeSystem.InferState.resolve] using
+                      outerFitted place.type
+                have fitsHere : Detail.compoundTargetFits operator
+                    (outer.apply place.type) = true := by
+                  simpa [AssignmentTargetFits,
+                    AssignmentResolution.applySubstitution,
+                    PlaceResolution.applySubstitution, resolvedFinal]
+                    using targetFits
+                have valueExpectedEq : outer.apply inferred.type =
+                    outer.apply place.type := by
+                  rw [Detail.inferExprFuel_expected_type_apply_eq valueResult
+                      outerExtension,
+                    compoundOperandType_apply_of_fits notEqual
+                      (by rw [resolvedFitted]; exact fitsHere),
+                    resolvedFitted]
+                have placeAt : SourcePlaceHasType
                     (source.applySubstitution outer) target
                     (({ place with type := finalState.resolve place.type } :
-                      PlaceResolution).applySubstitution outer) (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
-                  rw [← storedWordEq]
+                      PlaceResolution).applySubstitution outer)
+                    (outer.apply place.type) := by
+                  rw [← resolvedFinal]
                   exact placeTyped
-                have valueWordEq : outer.apply inferred.type = (Detail.compoundOperandType operator (placeState.resolve place.type)) :=
-                  Detail.inferExprFuel_expected_type_apply_eq valueResult outerExtension
-                have valueWord : ExpressionHasType
+                have valueAt : ExpressionHasType
                     (source.applySubstitution outer) target inferred.id
-                    (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
-                  rw [← valueWordEq]
+                    (outer.apply place.type) := by
+                  rw [← valueExpectedEq]
                   exact valueTyped
-                rcases compoundOperandConstructor_cases operator (placeState.resolve place.type) with
+                rcases compoundTargetFits_cases notEqual fitsHere with
                   word | ⟨type, fixed, kind⟩
-                · have typeEq : (Detail.compoundOperandType operator (placeState.resolve place.type)) = .word := by
-                    show Ty.constructor _ = _
-                    rw [word]
-                    rfl
-                  rw [typeEq] at placeWord valueWord
-                  exact .wordCompound operatorKind placeWord valueWord rfl
-                · have typeEq : (Detail.compoundOperandType operator (placeState.resolve place.type)) = .fixed type := by
-                    show Ty.constructor _ = _
-                    rw [fixed]
-                    rfl
-                  rw [typeEq] at placeWord valueWord
-                  exact .fixedCompound kind placeWord valueWord rfl
+                · rw [word] at placeAt valueAt
+                  exact .wordCompound operatorKind placeAt valueAt rfl
+                · rw [fixed] at placeAt valueAt
+                  exact .fixedCompound kind placeAt valueAt rfl
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
@@ -544,7 +545,9 @@ theorem inferStatementFuel_success_assignValue_sound_of_typed_children
       (outer.apply assignment.target.type))
     (valueTyped : ExpressionHasType
       ((result.state.toTypedSource roots).applySubstitution outer) target
-      inferred.id (outer.apply inferred.type)) :
+      inferred.id (outer.apply inferred.type))
+    (targetFits : AssignmentTargetFits (assignment.applySubstitution outer)
+      operator.value) :
     ActiveLocalContextInvariant result.state outer target ∧
       StatementHasType
         ((result.state.toTypedSource roots).applySubstitution outer)
@@ -578,7 +581,7 @@ theorem inferStatementFuel_success_assignValue_sound_of_typed_children
   have assignmentTyped :=
     inferAssignedValueFuel_success_sound_of_typed_result allocatedReady
       signatureFormation functionsCanonical assignmentExtension placeTyped
-      valueTyped assignmentSuccess
+      valueTyped assignmentSuccess targetFits
   exact inferStatementFuel_success_assignValue_sound_of_actual_child
     statementEq allocationEq success invariant roots assignmentSuccess
     assignmentTyped
@@ -618,6 +621,7 @@ theorem inferStatementFuel_success_assignValue_bounded_scoped
     (parentCovered : TemplateScopeCovered coverageSource target
       (.statement result.id))
     (closed : OccurrenceGraphClosed coverageSource)
+    (targetsFit : SourceAssignmentTargetsFit coverageSource)
     (resultExtension : TypingSourceExtends
       ((result.state.toTypedSource roots).applySubstitution outer)
       coverageSource)
@@ -728,10 +732,15 @@ theorem inferStatementFuel_success_assignValue_bounded_scoped
   obtain ⟨placeTyped, valueTyped⟩ :=
     actualChildrenSound assignmentSuccess assignmentExtension patternsSubset
       literalsSubset requirementsSubset keysCovered rhsCovered
+  have targetFits : AssignmentTargetFits (assignment.applySubstitution outer)
+      operator.value := by
+    have fit := targetsFit containsFinal
+    simpa [StatementNode.applySubstitution, StatementForm.applySubstitution,
+      StatementAssignmentTargetsFit] using fit
   exact inferStatementFuel_success_assignValue_sound_of_typed_children
     statementEq allocationEq success assignmentSuccess ready
     signatureFormation functionsCanonical invariant outerExtension roots
-    placeTyped valueTyped
+    placeTyped valueTyped targetFits
 
 /-- Bit-not assignment has only the actual place traversal as a recursive
 child.  Its indexed keys inherit the final graph's template scope from the

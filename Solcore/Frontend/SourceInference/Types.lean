@@ -112,6 +112,12 @@ negative for a negative literal. -/
   value. -/
   | integerPatternOutOfRange
       (span : Syntax.SourceSpan) (type : Ty) (value : Nat)
+  /-- A compound assignment whose target type does not take its operator once
+  inference is done (`Detail.compoundTargetFits`): the target is still open, or
+  `integer`, or another type that is neither `word` nor, for the operators
+  that take it, a fixed-width integer type. It names the assigned value. -/
+  | compoundTargetNotSupported
+      (value : ExpressionId) (operator : Syntax.ValueAssignOp) (type : Ty)
   | missingIntegerLiteralRequirement
       (expression : ExpressionId) (requirement : RequirementId)
   | integerLiteralRequirementPredicateMismatch

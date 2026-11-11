@@ -349,13 +349,21 @@ theorem assignedValue_place
   have placeProperties := inferPlaceFuel_inferenceProperties ready catalog.formation catalog.canonical placeAccepted
   have fitProperties := assignmentFit_properties placeProperties.2.1 placeProperties.2.2 fitting
   have fittedLife : GeneralizationLifetime event initial.inference.next fitted [place.type] := by
-    cases operator <;> simp only [assignmentFit] at fitting
-    all_goals first
-    | (change Except.ok targetState = Except.ok fitted at fitting
-       cases Except.ok.inj fitting
-       exact lifetime)
-    | exact lifetime.unify placeProperties.2.1 placeProperties.2.2 (Ty.variablesBelow_constructor _ _)
-        (lifetime.values _ (by simp)) (safe_closed _ _ (Ty.variablesBelow_constructor _ _)) fitting
+    by_cases equalOp : operator = .equal
+    · subst equalOp
+      simp only [assignmentFit] at fitting
+      change Except.ok targetState = Except.ok fitted at fitting
+      cases Except.ok.inj fitting
+      exact lifetime
+    · have unified : Detail.unify targetState place.type
+          (compoundOperandType operator (targetState.resolve place.type)) = .ok fitted := by
+        cases operator <;> first | exact absurd rfl equalOp | exact fitting
+      exact lifetime.unify placeProperties.2.1 placeProperties.2.2
+        (compoundOperandType_variablesBelow
+          (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2))
+        (lifetime.values _ (by simp))
+        (safe_compoundOperandType (safe_resolved placeProperties.2.1 (lifetime.values _ (by simp))))
+        unified
   have fittedWF : fitted.RequirementsWellFormed := by
     have placeWF := (inferPlaceFuel_direct_progress placeAccepted).wellFormed wellFormed
     cases operator <;> simp only [assignmentFit] at fitting
@@ -365,10 +373,15 @@ theorem assignedValue_place
        exact placeWF)
     | exact unify_preserves_requirementsWellFormed fitting placeWF
   have expectedSafe : Safe binder.scheme.quantified fitted (assignmentExpected operator fitted place.type) := by
-    cases operator <;> simp only [assignmentFit] at fitting
-    all_goals first
-    | exact safe_resolved fitProperties.2.1 (fittedLife.values _ (by simp))
-    | exact safe_closed _ _ (Ty.variablesBelow_constructor _ _)
+    have resolvedSafe := safe_resolved fitProperties.2.1 (fittedLife.values place.type (by simp))
+    by_cases equalOp : operator = .equal
+    · subst equalOp
+      exact resolvedSafe
+    · have expectedEq : assignmentExpected operator fitted place.type =
+          compoundOperandType operator (fitted.resolve place.type) := by
+        cases operator <;> first | exact absurd rfl equalOp | rfl
+      rw [expectedEq]
+      exact safe_compoundOperandType resolvedSafe
   have valueProperties := inferExprFuel_inferenceProperties fitProperties.2.1 catalog.formation catalog.canonical
     (by intro type member; cases member; exact fitProperties.2.2) valueAccepted
   have after := fittedLife.inferExpr fitProperties.2.1 fittedWF catalog

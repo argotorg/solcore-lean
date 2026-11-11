@@ -2162,10 +2162,218 @@ theorem compoundOperandConstructor_cases (operator : Syntax.ValueAssignOp)
       | exact .inr ⟨type, rfl, by constructor⟩
   · exact .inl rfl
 
+/-- Away from the operators that take a fixed-width target's type, the operand
+constructor is Word's at every target type. -/
+theorem compoundOperandConstructor_of_not_takes {operator : Syntax.ValueAssignOp}
+    (takes : Detail.compoundTakesTargetType operator = false) (target : TypeSystem.Ty) :
+    Detail.compoundOperandConstructor operator target = .builtin .word := by
+  unfold Detail.compoundOperandConstructor
+  split
+  · cases operator <;> simp_all [Detail.compoundTakesTargetType]
+  · rfl
+
+/-- A target type that fits its compound operator (`compoundTargetFits`) is
+Word, or a fixed-width integer type for an operator of
+`FixedCompoundAssignmentOperator`. -/
+theorem compoundTargetFits_cases {operator : Syntax.ValueAssignOp}
+    {type : TypeSystem.Ty} (notEqual : operator ≠ .equal)
+    (fits : Detail.compoundTargetFits operator type = true) :
+    type = .word ∨
+      ∃ fixed, type = .fixed fixed ∧ FixedCompoundAssignmentOperator operator := by
+  have fitsEq : TypeSystem.Ty.constructor
+      (Detail.compoundOperandConstructor operator type) = type := by
+    cases operator <;> simp_all [Detail.compoundTargetFits]
+  rcases compoundOperandConstructor_cases operator type with
+    word | ⟨fixed, fixedEq, kind⟩
+  · left
+    rw [← fitsEq, word]
+    rfl
+  · right
+    exact ⟨fixed, by rw [← fitsEq, fixedEq]; rfl, kind⟩
+
+/-- Where the final target type fits its compound operator, the final
+substitution of the operand type is that target type: an open target's operand
+waited for it (`compoundOperandType`), and a closed target's operand is the
+target's constructor already. -/
+theorem compoundOperandType_apply_of_fits {outer : TypeSystem.Substitution}
+    {operator : Syntax.ValueAssignOp} {target : TypeSystem.Ty}
+    (notEqual : operator ≠ .equal)
+    (fits : Detail.compoundTargetFits operator (outer.apply target) = true) :
+    outer.apply (Detail.compoundOperandType operator target) =
+      outer.apply target := by
+  have fitsEq : TypeSystem.Ty.constructor
+      (Detail.compoundOperandConstructor operator (outer.apply target)) =
+        outer.apply target := by
+    cases operator <;> simp_all [Detail.compoundTargetFits]
+  rcases Detail.compoundOperandType_cases operator target with
+    ⟨openEq, _, _⟩ | closedEq
+  · rw [openEq]
+  · have sameConstructor : Detail.compoundOperandConstructor operator target =
+        Detail.compoundOperandConstructor operator (outer.apply target) := by
+      cases takes : Detail.compoundTakesTargetType operator
+      · rw [compoundOperandConstructor_of_not_takes takes,
+          compoundOperandConstructor_of_not_takes takes]
+      · cases target with
+        | parameter _ => rfl
+        | constructor _ => rfl
+        | application _ _ => rfl
+        | function _ _ => rfl
+        | product _ _ => rfl
+        | mapping _ _ => rfl
+        | proxy _ => rfl
+        | comptime _ => rfl
+        | error => rfl
+        | _ => simp [Detail.compoundOperandType, takes] at closedEq
+    rw [closedEq]
+    show TypeSystem.Ty.constructor _ = _
+    rw [sameConstructor, fitsEq]
+
+/-- A value assignment's final target type takes its operator
+(`Detail.compoundTargetFits`). -/
+def AssignmentTargetFits (assignment : AssignmentResolution)
+    (operator : Syntax.ValueAssignOp) : Prop :=
+  Detail.compoundTargetFits operator assignment.target.type = true
+
+/-- A `for` header item takes its operator, if it is a value assignment. -/
+def ForItemAssignmentTargetFits : ForItemForm → Prop
+  | .assignValue assignment operator _ => AssignmentTargetFits assignment operator
+  | _ => True
+
+/-- The value assignments of one statement form take their operators: an
+assignment statement's, or a `for` loop's header items. -/
+def StatementAssignmentTargetsFit : StatementForm → Prop
+  | .assignValue assignment operator _ => AssignmentTargetFits assignment operator
+  | .forLoop initializer _ post _ =>
+      (∀ item ∈ initializer, ForItemAssignmentTargetFits item) ∧
+        ∀ item ∈ post, ForItemAssignmentTargetFits item
+  | _ => True
+
+/-- Every value assignment of a typed source takes its operator. Finalization
+establishes it for the finalized source
+(`FinalInferenceResources.assignment_targets_fit`), since an open compound
+target's type is known only then. -/
+def SourceAssignmentTargetsFit (source : TypedSource) : Prop :=
+  ∀ {id : StatementId} {node : StatementNode},
+    ContainsStatement source id node → StatementAssignmentTargetsFit node.form
+
+/-- One successful assignment check gives the fit under the checked state's
+substitution. -/
+theorem assignmentTargetFits_of_validate {state : Frontend.SourceInference.State}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
+    {value : ExpressionId}
+    (success : Detail.validateAssignmentTarget state assignment operator value =
+      .ok ()) :
+    AssignmentTargetFits
+      (assignment.applySubstitution state.inference.substitution) operator := by
+  simp only [Detail.validateAssignmentTarget] at success
+  by_cases fits : Detail.compoundTargetFits operator
+      (state.resolve assignment.target.type) = true
+  · simpa [AssignmentTargetFits, AssignmentResolution.applySubstitution,
+      PlaceResolution.applySubstitution, Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using fits
+  · simp [fits] at success
+
+/-- A successful check of a `for` header's items gives each item's fit. -/
+theorem forItemAssignmentTargetsFit_of_validate
+    {state : Frontend.SourceInference.State} {items : List ForItemForm}
+    (success : Detail.validateForItemAssignmentTargets state items = .ok ()) :
+    ∀ item ∈ items.map (ForItemForm.applySubstitution state.inference.substitution),
+      ForItemAssignmentTargetFits item := by
+  induction items with
+  | nil =>
+      intro item member
+      simp at member
+  | cons head tail induction =>
+      cases head with
+      | assignValue assignment operator value =>
+          simp only [Detail.validateForItemAssignmentTargets, bind, Except.bind]
+            at success
+          cases headResult :
+              Detail.validateAssignmentTarget state assignment operator value with
+          | error error => simp [headResult] at success
+          | ok checked =>
+              cases checked
+              have tailResult :
+                  Detail.validateForItemAssignmentTargets state tail = .ok () := by
+                simpa [headResult] using success
+              intro item member
+              rcases List.mem_cons.mp member with rfl | tailMember
+              · exact assignmentTargetFits_of_validate headResult
+              · exact induction tailResult item tailMember
+      | letDecl binder initializer =>
+          intro item member
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · trivial
+          · exact induction
+              (by simpa [Detail.validateForItemAssignmentTargets] using success)
+              item tailMember
+      | expression expression =>
+          intro item member
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · trivial
+          · exact induction
+              (by simpa [Detail.validateForItemAssignmentTargets] using success)
+              item tailMember
+      | assignBitNot assignment =>
+          intro item member
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · trivial
+          · exact induction
+              (by simpa [Detail.validateForItemAssignmentTargets] using success)
+              item tailMember
+
+/-- A successful check of one statement node gives its fit under the checked
+state's substitution. -/
+theorem statementAssignmentTargetsFit_of_validate
+    {state : Frontend.SourceInference.State} {node : StatementNode}
+    (success : Detail.validateAssignmentTargetNode state (.statement node) =
+      .ok ()) :
+    StatementAssignmentTargetsFit
+      (node.applySubstitution state.inference.substitution).form := by
+  show StatementAssignmentTargetsFit
+    (node.form.applySubstitution state.inference.substitution)
+  simp only [Detail.validateAssignmentTargetNode] at success
+  cases formEq : node.form with
+  | assignValue assignment operator value =>
+      exact assignmentTargetFits_of_validate (by simpa [formEq] using success)
+  | forLoop initializer condition post body =>
+      simp only [formEq, bind, Except.bind] at success
+      cases initializerResult :
+          Detail.validateForItemAssignmentTargets state initializer with
+      | error error => simp [initializerResult] at success
+      | ok checked =>
+          cases checked
+          have postResult :
+              Detail.validateForItemAssignmentTargets state post = .ok () := by
+            simpa [initializerResult] using success
+          exact ⟨forItemAssignmentTargetsFit_of_validate initializerResult,
+            forItemAssignmentTargetsFit_of_validate postResult⟩
+  | _ => simp [StatementForm.applySubstitution, StatementAssignmentTargetsFit]
+
+/-- A successful check of every node covers each retained node. -/
+theorem validateAssignmentTargets_member {state : Frontend.SourceInference.State}
+    {nodes : List Node}
+    (success : Detail.validateAssignmentTargets state nodes = .ok ())
+    {node : Node} (member : node ∈ nodes) :
+    Detail.validateAssignmentTargetNode state node = .ok () := by
+  induction nodes with
+  | nil => simp at member
+  | cons head tail induction =>
+      simp only [Detail.validateAssignmentTargets, bind, Except.bind] at success
+      cases headResult : Detail.validateAssignmentTargetNode state head with
+      | error error => simp [headResult] at success
+      | ok checked =>
+          cases checked
+          rcases List.mem_cons.mp member with rfl | tailMember
+          · exact headResult
+          · exact induction (by simpa [headResult] using success) tailMember
+
 /-- Successful value-assignment inference reconstructs the complete
 declarative assignment judgment.  Plain assignment retains the inferred place
 type; a compound operator is checked at `Word`, or at the target's fixed-width
-integer type for `+= -= *= /= %= &= |= ^=`. -/
+integer type for `+= -= *= /= %= &= |= ^=`. A target whose type was still open
+gets its type from finalization, which checks that it takes the operator
+(`targetFits`). -/
 theorem inferAssignedValueFuel_success_sound
     {source : TypedSource} {outer : TypeSystem.Substitution}
     {target : SourceSemantics.Context}
@@ -2197,7 +2405,9 @@ theorem inferAssignedValueFuel_success_sound
             inferred.id (outer.apply inferred.type))
     (success : Detail.inferAssignedValueFuel fuel inferenceContext
       targetExpression operator value initial =
-        .ok (assignment, inferredValue, final)) :
+        .ok (assignment, inferredValue, final))
+    (targetFits : AssignmentTargetFits (assignment.applySubstitution outer)
+      operator) :
     SourceAssignmentHasType (source.applySubstitution outer) target
       (assignment.applySubstitution outer) operator inferredValue.id := by
   unfold Detail.inferAssignedValueFuel at success
@@ -2225,26 +2435,26 @@ theorem inferAssignedValueFuel_success_sound
                 .ok (assignment, inferredValue, final)) :
           SourceAssignmentHasType (source.applySubstitution outer) target
             (assignment.applySubstitution outer) operator inferredValue.id := by
+        have notEqual : operator ≠ .equal := by
+          cases operatorKind <;> decide
+        have expectedBelow :
+            (placeState.resolve place.type).VariablesBelow
+              placeState.inference.next :=
+          placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2
         cases unifyResult : Detail.unify placeState place.type
             (Detail.compoundOperandType operator (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
             simp only [unifyResult, bind, Except.bind] at tailSuccess
-            have resolvedOperand : fittedState.resolve place.type = (Detail.compoundOperandType operator (placeState.resolve place.type)) :=
-              (Detail.unify_resolve_eq unifyResult).trans (by rfl)
-            have expectedEq : (Detail.compoundOperandType operator (fittedState.resolve place.type)) = (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
-              rw [resolvedOperand]
-              exact congrArg TypeSystem.Ty.constructor (Detail.compoundOperandConstructor_idem _ _)
-            rw [expectedEq] at tailSuccess
             have fitProgress := Detail.unify_inferenceProgress
               placeProperties.2.1.solved placeProperties.2.2
-              (TypeSystem.Ty.variablesBelow_constructor _ _) unifyResult
+              (Detail.compoundOperandType_variablesBelow expectedBelow) unifyResult
             have fittedReady := Detail.unify_preserves_inferenceReady
               placeProperties.2.1 placeProperties.2.2
-              (TypeSystem.Ty.variablesBelow_constructor _ _) unifyResult
+              (Detail.compoundOperandType_variablesBelow expectedBelow) unifyResult
             cases valueResult : Detail.inferExprFuel fuel inferenceContext
-                value (some (Detail.compoundOperandType operator (placeState.resolve place.type))) fittedState with
+                value (some (Detail.compoundOperandType operator (fittedState.resolve place.type))) fittedState with
             | error error =>
                 simp [valueResult] at tailSuccess
             | ok valuePair =>
@@ -2264,7 +2474,8 @@ theorem inferAssignedValueFuel_success_sound
                       simp only [Option.mem_def] at member
                       injection member with typeEq
                       subst expectedType
-                      exact TypeSystem.Ty.variablesBelow_constructor _ _)
+                      exact Detail.compoundOperandType_variablesBelow
+                        (fitProgress.resolve_variablesBelow placeProperties.2.2))
                     valueResult
                 have outerFitted : outer.SemanticallyExtends
                     fittedState.inference.substitution :=
@@ -2277,59 +2488,55 @@ theorem inferAssignedValueFuel_success_sound
                 have placeType := inferPlaceFuel_success_sound ready
                   signatureFormation functionsCanonical invariant outerPlace
                   expressionSound placeResult
-                have placeWordEq : outer.apply place.type = (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
-                  calc
-                    outer.apply place.type =
-                        outer.apply (fittedState.resolve place.type) := by
-                      simpa [Frontend.SourceInference.State.resolve,
-                        TypeSystem.InferState.resolve] using
-                          (outerFitted place.type).symm
-                    _ = outer.apply (Detail.compoundOperandType operator (placeState.resolve place.type)) := congrArg outer.apply resolvedOperand
-                    _ = (Detail.compoundOperandType operator (placeState.resolve place.type)) := rfl
-                have placeWord : SourcePlaceHasType
-                    (source.applySubstitution outer) target
-                    (place.applySubstitution outer) (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
-                  rw [← placeWordEq]
-                  exact placeType
-                have valueExpectedEq : outer.apply inferred.type = (Detail.compoundOperandType operator (placeState.resolve place.type)) :=
-                  Detail.inferExprFuel_expected_type_apply_eq valueResult outerExtension
-                have valueWord : ExpressionHasType
-                    (source.applySubstitution outer) target inferred.id
-                    (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
-                  rw [← valueExpectedEq]
-                  exact expressionSound valueResult
                 have resolvedFinal :
                     outer.apply (finalState.resolve place.type) =
                       outer.apply place.type := by
                   simpa [Frontend.SourceInference.State.resolve,
                     TypeSystem.InferState.resolve] using
                       outerExtension place.type
+                have resolvedFitted :
+                    outer.apply (fittedState.resolve place.type) =
+                      outer.apply place.type := by
+                  simpa [Frontend.SourceInference.State.resolve,
+                    TypeSystem.InferState.resolve] using
+                      outerFitted place.type
+                have fitsHere : Detail.compoundTargetFits operator
+                    (outer.apply place.type) = true := by
+                  simpa [AssignmentTargetFits,
+                    AssignmentResolution.applySubstitution,
+                    PlaceResolution.applySubstitution, resolvedFinal]
+                    using targetFits
+                have valueExpectedEq : outer.apply inferred.type =
+                    outer.apply place.type := by
+                  rw [Detail.inferExprFuel_expected_type_apply_eq valueResult
+                      outerExtension,
+                    compoundOperandType_apply_of_fits notEqual
+                      (by rw [resolvedFitted]; exact fitsHere),
+                    resolvedFitted]
+                have valueTyped : ExpressionHasType
+                    (source.applySubstitution outer) target inferred.id
+                    (outer.apply place.type) := by
+                  rw [← valueExpectedEq]
+                  exact expressionSound valueResult
                 have storedPlaceEq :
                     ({ place with type := finalState.resolve place.type } :
                       PlaceResolution).applySubstitution outer =
                         place.applySubstitution outer := by
                   cases place
                   simp [PlaceResolution.applySubstitution, resolvedFinal]
-                have storedPlaceWord : SourcePlaceHasType
+                have storedPlaceTyped : SourcePlaceHasType
                     (source.applySubstitution outer) target
                     (({ place with type := finalState.resolve place.type } :
-                      PlaceResolution).applySubstitution outer) (Detail.compoundOperandType operator (placeState.resolve place.type)) := by
+                      PlaceResolution).applySubstitution outer)
+                    (outer.apply place.type) := by
                   rw [storedPlaceEq]
-                  exact placeWord
-                rcases compoundOperandConstructor_cases operator (placeState.resolve place.type) with
+                  exact placeType
+                rcases compoundTargetFits_cases notEqual fitsHere with
                   word | ⟨type, fixed, kind⟩
-                · have typeEq : (Detail.compoundOperandType operator (placeState.resolve place.type)) = .word := by
-                    show TypeSystem.Ty.constructor _ = _
-                    rw [word]
-                    rfl
-                  rw [typeEq] at storedPlaceWord valueWord
-                  exact .wordCompound operatorKind storedPlaceWord valueWord rfl
-                · have typeEq : (Detail.compoundOperandType operator (placeState.resolve place.type)) = .fixed type := by
-                    show TypeSystem.Ty.constructor _ = _
-                    rw [fixed]
-                    rfl
-                  rw [typeEq] at storedPlaceWord valueWord
-                  exact .fixedCompound kind storedPlaceWord valueWord rfl
+                · rw [word] at storedPlaceTyped valueTyped
+                  exact .wordCompound operatorKind storedPlaceTyped valueTyped rfl
+                · rw [fixed] at storedPlaceTyped valueTyped
+                  exact .fixedCompound kind storedPlaceTyped valueTyped rfl
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
@@ -8053,7 +8260,9 @@ theorem inferStatementFuel_success_assignValue_deep_sound
             expected expressionInitial = .ok (inferred, expressionFinal) →
           ExpressionHasType
             ((result.state.toTypedSource roots).applySubstitution outer)
-            target inferred.id (outer.apply inferred.type)) :
+            target inferred.id (outer.apply inferred.type))
+    (targetsFit : SourceAssignmentTargetsFit
+      ((result.state.toTypedSource roots).applySubstitution outer)) :
     ActiveLocalContextInvariant result.state outer target ∧
       StatementHasType
         ((result.state.toTypedSource roots).applySubstitution outer)
@@ -8090,9 +8299,15 @@ theorem inferStatementFuel_success_assignValue_deep_sound
     change outer.SemanticallyExtends assignmentState.inference.substitution
       at outerExtension
     exact outerExtension
+  have targetFits : AssignmentTargetFits (assignment.applySubstitution outer)
+      operator.value := by
+    have fit := targetsFit
+      (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+    simpa [StatementNode.applySubstitution, StatementForm.applySubstitution,
+      StatementAssignmentTargetsFit] using fit
   have assignmentType := inferAssignedValueFuel_success_sound allocatedReady
     signatureFormation functionsCanonical allocatedInvariant
-    assignmentExtension expressionSound assignmentSuccess
+    assignmentExtension expressionSound assignmentSuccess targetFits
   refine ⟨assignmentInvariant.recordNode _, ?_, ?_⟩
   · exact assignValueStatementHasType_afterSubstitution contains
       assignmentType
@@ -10558,6 +10773,11 @@ structure StatementInferenceSoundnessCallbacks
     (result : Detail.StatementResult)
     (outer : TypeSystem.Substitution)
     (target : SourceSemantics.Context) (roots : List NodeId) : Prop where
+  /-- Every value assignment of the statement's eventual typed source takes its
+  operator, as finalization checks. -/
+  assignmentTargetsFit :
+    SourceAssignmentTargetsFit
+      ((result.state.toTypedSource roots).applySubstitution outer)
   unannotatedInitializedLet :
     ∀ {name : Syntax.Identifier} {initializer : Syntax.Expr}
       {inferred : InferredExpression}
@@ -10801,6 +11021,7 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
           exact inferStatementFuel_success_assignValue_deep_sound rfl
             allocationEq success ready signatureFormation functionsCanonical
             invariant outerExtension roots callbacks.expression
+            callbacks.assignmentTargetsFit
       | assignBitNot targetExpression operatorSpan =>
           refine ⟨target, {
               type := .unit
@@ -25488,6 +25709,31 @@ theorem finalize_requirementOwnership
   · rw [solved_eq]
     simpa [idsEq] using validated.2.2
 
+/-- Finalization checks every value assignment's target type, so every value
+assignment of the finalized source takes its operator. -/
+theorem finalize_assignmentTargetsFit
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    SourceAssignmentTargetsFit result.typedSource := by
+  let witness := Detail.finalize_success_witness success
+  have sourceEq : result.typedSource =
+      (witness.finalState.toTypedSource roots).applySubstitution
+        witness.finalState.inference.substitution :=
+    congrArg Frontend.SourceInference.Result.typedSource witness.result_eq
+  intro id node contains
+  rw [sourceEq] at contains
+  obtain ⟨raw, rawMember, rawEq⟩ := List.mem_map.mp contains.1
+  cases raw with
+  | expression _ => cases rawEq
+  | statement rawNode =>
+      cases rawEq
+      exact statementAssignmentTargetsFit_of_validate
+        (validateAssignmentTargets_member witness.assignmentValidation rawMember)
+
 /-- The reusable whole-body resources exposed by one successful finalization.
 
 The hidden post-defaulting state is retained so recursive inference proofs can
@@ -25540,6 +25786,8 @@ structure FinalInferenceResources
   local_no_capture : ∀ binder,
     binder ∈ (state.toTypedSource roots).initializedLetBinders →
       Detail.LocalBinderInstantiationNoCapture result.substitution binder
+  /-- Every value assignment's final target type takes its operator. -/
+  assignment_targets_fit : SourceAssignmentTargetsFit result.typedSource
 
 namespace FinalInferenceResources
 
@@ -25591,6 +25839,7 @@ def ofFinalize
       Detail.finalize_expressionTypeFormationValidated success
     local_no_capture :=
       Detail.finalize_localBinderInstantiationNoCapture success
+    assignment_targets_fit := finalize_assignmentTargetsFit success
   }
   · intro ready
     have originsBelow := Detail.finalize_numericOriginsBelowNext success

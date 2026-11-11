@@ -173,7 +173,18 @@ results are masked and signed ones sign-extended. Comparisons are signed for
   `AssignOp` (`crates/hir-ty/src/infer/stmt.rs`). So an open local target
   types as `x = x op e` does: the target and the operand share one type, which
   carries the operator's obligation and comes from a later use or else
-  defaults to `uint256`.
+  defaults to `uint256`. Lean types an open target the same way since step 7b,
+  and still evaluates the place once.
+- **Closures.** Upstream keeps a closure monomorphic: its parameters take their
+  types from its calls, or their literals default to `uint256`. Lean
+  generalizes a local lambda's type at its `let`, and a type variable that no
+  literal or requirement holds is quantified. So since step 7b a compound
+  assignment on an unannotated lambda parameter that nothing in the body types,
+  as in `lam(acc, step) { acc += step; return acc; }`, is rejected at
+  finalization (`compoundTargetNotSupported`), as `acc + step` already was
+  (`operatorNotSupported`). A captured `Word` operand, a declared `acc: Word`,
+  or a literal operand, which keeps the parameter monomorphic, types it. Like
+  the `where`-clause gap below, the difference predates row 1.
 - **Range.** At an integer type, an out-of-range literal is a compile error
   (`SC0409` or `SC0411`). This includes any negative literal at an unsigned
   type. A `word` literal wraps modulo 2^256, so `-1` is `2^256 − 1`, and an
@@ -1002,13 +1013,27 @@ Made on 2026-11-11, during step 7.
   arithmetic give what `uint256`'s would, so only the typing differs: such a
   literal cannot then flow to `uint256`. Step 8, which brings these operators
   to the twelve types, defaults their literals as the design says.
-- **Compound assignments on an open target** are `word` at once too
-  (`compoundOperandConstructor`). Here the results differ from upstream's:
-  `let x = 0; x -= 1;` wraps, where upstream panics with `0x11`, and after
-  step 7 `x -= 1` and `x = x - 1` differ on an open `x`. Step 7b types them
-  as upstream's rewrite does. The public-API tests pin today's behaviour
-  (`compoundOpen`, `rewrittenOpen`, `compoundWord`), so step 7b changes it
-  visibly.
+- **Compound assignments on an open target (step 7b).** `+= -= *= /= %= &=
+  |= ^=` (`compoundTakesTargetType`) on a target whose type is still open take
+  that open type as their operand's type (`compoundOperandType`), so the
+  target and the operand share one type, as upstream's rewrite to
+  `x = x op e` types them. The compound counts as an operator use for the
+  default (`assignmentMentions`, part of `operatorMentions`). So
+  `let x = 0; x -= 1;` is `uint256` and panics with `0x11`, as `x = x - 1`
+  does, and a later use can give the type instead:
+  `let x = 200; x += 56; return x;` from a function returning `uint8` panics
+  too. Finalization then checks every assignment's resolved target type
+  (`validateAssignmentTargets`, `compoundTargetFits`): `word`, or for these
+  operators one of the twelve types. A target that becomes `integer`, or one
+  that nothing fixes, is rejected with `Error.compoundTargetNotSupported`,
+  which names the assigned value, the operator and the type. Only the typing
+  changes: the place is still evaluated once, and the compound semantics stay
+  as they are. Compound shifts and unchecked compounds still make an open
+  target `word` at once, until step 8. In the proofs the check reaches the
+  statement rules through `FinalInferenceResources.assignment_targets_fit`
+  (`SourceAssignmentTargetsFit`), and the `for` items get it from the
+  enclosing loop. A lambda parameter that nothing types is the one new
+  rejection outside `integer`; see the upstream section's "Closures".
 - **Gaps left for step 8.** Two older paths take only `word` and `integer`,
   as since step 1, so a value that now defaults to `uint256` fails there:
   - The monomorphic scalar and function profile
@@ -1087,7 +1112,9 @@ first planned after the literals and moved before them for this reason
    - 7b. **Compound assignments on an open target.** `+= -= *= /= %= &= |=
      ^=` on a target whose type is still open take the operand's type and
      count as an operator use for the `uint256` default, as upstream's
-     rewrite to `x = x op e` types them. The place is still evaluated once.
-     Compound shifts stay `word`-only until step 8.
+     rewrite to `x = x op e` types them, and finalization checks the type the
+     target resolves to ([row 1's `uint256`
+     default](#row-1s-uint256-default-chosen-by-the-literals-uses)). The place
+     is still evaluated once. Compound shifts stay `word`-only until step 8.
 8. **Unchecked operators and shifts on the twelve types**, and ports of the
    upstream fixtures.

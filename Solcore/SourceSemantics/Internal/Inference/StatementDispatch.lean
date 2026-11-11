@@ -108,6 +108,10 @@ theorem inferAssignedValueFuel_children_invariants
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
             simp only [unifyResult, bind, Except.bind] at tailSuccess
+            have operandBelow := Detail.compoundOperandType_variablesBelow (operator := operator)
+              (placeProperties.2.1.solved.variablesBelow_apply placeTypeBelow)
+            have earlyProgress := Detail.unify_inferenceProgress
+              placeProperties.2.1.solved placeTypeBelow operandBelow unifyResult
             cases valueResult : Detail.inferExprFuel fuel inferenceContext
                 value (some (Detail.compoundOperandType operator (fittedState.resolve place.type))) fittedState with
             | error error => simp [valueResult] at tailSuccess
@@ -124,14 +128,15 @@ theorem inferAssignedValueFuel_children_invariants
                 have fittedReady : fittedState.InferenceReady :=
                   Detail.unify_preserves_inferenceReady
                     placeProperties.2.1 placeTypeBelow
-                    (Ty.variablesBelow_constructor _ _)
+                    operandBelow
                     unifyResult
                 have valueProperties := Detail.inferExprFuel_inferenceProperties
                   fittedReady signatureFormation functionsCanonical (by
                     intro expectedType member
                     simp only [Option.mem_def] at member
                     cases member
-                    exact Ty.variablesBelow_constructor _ _) valueResult
+                    exact Detail.compoundOperandType_variablesBelow
+                      (earlyProgress.resolve_variablesBelow placeTypeBelow)) valueResult
                 have outerFitted :
                     finalized.substitution.SemanticallyExtends
                       fittedState.inference.substitution :=
@@ -140,7 +145,7 @@ theorem inferAssignedValueFuel_children_invariants
                     valueProperties.1.substitution_extends
                 have unifyProgress := Detail.unify_inferenceProgress
                   placeProperties.2.1.solved placeTypeBelow
-                  (Ty.variablesBelow_constructor _ _)
+                  operandBelow
                   unifyResult
                 have outerPlace : finalized.substitution.SemanticallyExtends
                     placeState.inference.substitution :=
@@ -153,12 +158,13 @@ theorem inferAssignedValueFuel_children_invariants
                 have fittedInvariant : RecursiveExpressionInvariant
                     wholeContext finalized fittedState semanticContext :=
                   placeInvariant.unify placeTypeBelow
-                    (Ty.variablesBelow_constructor _ _)
+                    operandBelow
                     outerFitted unifyResult
                 exact ⟨place, placeState,
                   Detail.compoundOperandType operator (fittedState.resolve place.type), fittedState, rfl,
                   placeInvariant, valueResult, fittedInvariant,
-                  Ty.variablesBelow_constructor _ _, rfl, rfl⟩
+                  Detail.compoundOperandType_variablesBelow
+                    (earlyProgress.resolve_variablesBelow placeTypeBelow), rfl, rfl⟩
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
@@ -454,6 +460,7 @@ theorem inferStatementFuel_success_assignValue_recursive_scoped
   apply inferStatementFuel_success_assignValue_bounded_scoped
     statementEq allocationEq success ready initialBelow signatureFormation
     functionsCanonical invariant outerExtension roots parentCovered closed
+    resources.assignment_targets_fit
     resultExtension resultIntegerPatternsSubset resultIntegerLiteralsSubset
     resultRequirementsSubset
   intro assignment inferred assignmentState assignmentSuccess

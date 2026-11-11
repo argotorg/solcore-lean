@@ -468,6 +468,8 @@ theorem forItem_assignValue_for
     valueCovered := boundary.covered _ valueMember
     keysActualCovered := fun key member => boundary.actualCovered _ (keyMember key member)
     valueActualCovered := boundary.actualCovered _ valueMember
+    targetFits := by
+      simpa [ForItemForm.applySubstitution, ForItemAssignmentTargetFits] using boundary.targetsFit
   } : AssignedValueBoundary selected childFuel inferenceContext targetExpression operator.value valueExpression
     initial assignment value resultState frames target)
   have binders : resultState.localBinders = initial.localBinders :=
@@ -636,6 +638,7 @@ theorem forItemsRooted_of_item_for {callProvenance : CallIndex → Prop}
                     exact .inl member
                   actualCovered := boundary.actualCovered inferredItem (by simp)
                   actualBindings := boundary.actualBindings inferredItem (by simp)
+                  targetsFit := boundary.targetsFit inferredItem (by simp)
                 } : ForItemBoundary selected childFuel inferenceContext item expectedReturn
                   initial inferredItem itemState frames target)
               obtain ⟨finalContext, invariant, actual, operational, tailTyped⟩ :=
@@ -661,6 +664,7 @@ theorem forItemsRooted_of_item_for {callProvenance : CallIndex → Prop}
                     exact .inr member
                   actualCovered := fun next member => boundary.actualCovered next (by simp [member])
                   actualBindings := fun next member => boundary.actualBindings next (by simp [member])
+                  targetsFit := fun next member => boundary.targetsFit next (by simp [member])
                 } : ForItemsBoundary selected childFuel inferenceContext rest expectedReturn itemState tail frames middle)
               exact ⟨finalContext, invariant, actual, operational, .cons itemTyped tailTyped⟩
 
@@ -776,6 +780,16 @@ theorem statement_for_of_initializer_privacy_for {callProvenance : CallIndex →
   have provenancePostEq := (Except.ok.inj provenancePostSuccess).symm
   subst provenancePost
   have containsFinal := resultExtension.containsStatement containsRaw
+  have headerFits :
+      (∀ item ∈ initializerResult.items,
+        ForItemAssignmentTargetFits (item.applySubstitution selected.body.finalized.substitution)) ∧
+      (∀ item ∈ postResult.items,
+        ForItemAssignmentTargetFits (item.applySubstitution selected.body.finalized.substitution)) := by
+    have fit := resources.assignment_targets_fit containsFinal
+    simp only [StatementNode.applySubstitution, StatementForm.applySubstitution,
+      StatementAssignmentTargetsFit] at fit
+    exact ⟨fun item member => fit.1 _ (List.mem_map.mpr ⟨item, member, rfl⟩),
+      fun item member => fit.2 _ (List.mem_map.mpr ⟨item, member, rfl⟩)⟩
   have headerCovered := forItemsReferencesCovered_of_rootedForLoop
     containsRaw rfl resultExtension resources.graph_closed boundary.covered
   have headerBindings := forItemsBindingsRetained_of_containedForLoop
@@ -819,7 +833,8 @@ theorem statement_for_of_initializer_privacy_for {callProvenance : CallIndex →
       actualCovered := fun item member reference present =>
         boundary.actualCovered.preserved_statement_reference containsRaw resultExtension
           (initializerReference item member reference present)
-      actualBindings := headerActualBindings.1 } :
+      actualBindings := headerActualBindings.1
+      targetsFit := headerFits.1 } :
       ForItemsBoundary selected childFuel inferenceContext initializer expectedReturn
         initial.allocateStatementId.2 initializerResult frames target)
   have loopAssumptions : loopContext.assumptions = target.assumptions :=
@@ -969,7 +984,8 @@ theorem statement_for_of_initializer_privacy_for {callProvenance : CallIndex →
       actualCovered := fun item member reference present =>
         boundary.actualCovered.preserved_statement_reference containsRaw resultExtension
           (postReference item member reference present)
-      actualBindings := headerActualBindings.2 } :
+      actualBindings := headerActualBindings.2
+      targetsFit := headerFits.2 } :
       ForItemsBoundary selected childFuel {inferenceContext with loopDepth := inferenceContext.loopDepth + 1}
         post expectedReturn (bodyResult.state.restoreLexicalScope initializerResult.state.lexicalScope)
         postResult frames loopContext)

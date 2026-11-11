@@ -498,10 +498,58 @@ def compoundOperandConstructor (operator : Syntax.ValueAssignOp) : Ty → TypeSy
       | _ => .builtin .word
   | _ => .builtin .word
 
+/-- The compound operators that take a fixed-width integer target's type:
+checked `+= -= *= /= %=` and `&= |= ^=`. The others, shifts and unchecked
+arithmetic, are Word's. -/
+def compoundTakesTargetType : Syntax.ValueAssignOp → Bool
+  | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr => true
+  | _ => false
+
 /-- The operand type of a compound assignment at a target type, built from
-`compoundOperandConstructor`. -/
-abbrev compoundOperandType (operator : Syntax.ValueAssignOp) (target : Ty) : Ty :=
-  .constructor (compoundOperandConstructor operator target)
+`compoundOperandConstructor`. While the target's type is still open, an
+operator of `compoundTakesTargetType` takes that open type, so the target and
+the operand share it, and finalization checks the type it resolves to
+(`compoundTargetFits`). The other compound operators are Word's at once. -/
+def compoundOperandType (operator : Syntax.ValueAssignOp) (target : Ty) : Ty :=
+  match target with
+  | .variable _ =>
+      if compoundTakesTargetType operator then target
+      else .constructor (compoundOperandConstructor operator target)
+  | _ => .constructor (compoundOperandConstructor operator target)
+
+/-- The operand type is the open target's own type, or the constructor's. -/
+theorem compoundOperandType_cases (operator : Syntax.ValueAssignOp) (target : Ty) :
+    (compoundOperandType operator target = target ∧ (∃ id, target = .variable id) ∧
+        compoundTakesTargetType operator = true) ∨
+      compoundOperandType operator target =
+        .constructor (compoundOperandConstructor operator target) := by
+  match target with
+  | .variable id =>
+      by_cases takes : compoundTakesTargetType operator = true
+      · exact .inl ⟨by simp [compoundOperandType, takes], ⟨id, rfl⟩, takes⟩
+      · exact .inr (by simp [compoundOperandType, takes])
+  | .parameter _ | .constructor _ | .application _ _ | .function _ _ | .product _ _
+  | .mapping _ _ | .proxy _ | .comptime _ | .error => exact .inr rfl
+
+/-- At a target type that is not a variable, the operand type is the
+constructor's. -/
+theorem compoundOperandType_of_not_variable {operator : Syntax.ValueAssignOp} {target : Ty}
+    (closed : ∀ id, target ≠ .variable id) :
+    compoundOperandType operator target =
+      .constructor (compoundOperandConstructor operator target) := by
+  rcases compoundOperandType_cases operator target with ⟨_, ⟨id, open_⟩, _⟩ | closedEq
+  · exact absurd open_ (closed id)
+  · exact closedEq
+
+/-- The operand type has no variable that its target type lacks. -/
+theorem compoundOperandType_variablesBelow {operator : Syntax.ValueAssignOp}
+    {target : Ty} {next : Nat} (below : target.VariablesBelow next) :
+    (compoundOperandType operator target).VariablesBelow next := by
+  rcases compoundOperandType_cases operator target with ⟨openEq, _, _⟩ | closedEq
+  · rw [openEq]
+    exact below
+  · rw [closedEq]
+    exact Ty.variablesBelow_constructor _ _
 
 /-- The operand type at an operand type is that operand type. -/
 theorem compoundOperandConstructor_idem (operator : Syntax.ValueAssignOp) (target : Ty) :
@@ -513,6 +561,28 @@ theorem compoundOperandConstructor_idem (operator : Syntax.ValueAssignOp) (targe
       | builtin builtin => cases builtin <;> cases operator <;> rfl
       | _ => cases operator <;> rfl
   | _ => cases operator <;> rfl
+
+/-- The operand type at the operand type is the operand type. -/
+theorem compoundOperandType_idem (operator : Syntax.ValueAssignOp) (target : Ty) :
+    compoundOperandType operator (compoundOperandType operator target) =
+      compoundOperandType operator target := by
+  rcases compoundOperandType_cases operator target with ⟨openEq, _, _⟩ | closedEq
+  · rw [openEq, openEq]
+  · rw [closedEq]
+    show Ty.constructor (compoundOperandConstructor operator
+      (.constructor (compoundOperandConstructor operator target))) = _
+    rw [← closedEq, compoundOperandConstructor_idem, closedEq]
+
+/-- A value assignment's target type takes its operator once inference is
+done: `=` takes any type, and a compound operator a type at which its operand
+type is the target's own, `word` or, for `compoundTakesTargetType`, a
+fixed-width integer type. A target that is still open, `integer`, or any other
+type fails. Finalization checks every assignment, since an open target's type
+is known only then. -/
+def compoundTargetFits (operator : Syntax.ValueAssignOp) (type : Ty) : Bool :=
+  match operator with
+  | .equal => true
+  | _ => decide (Ty.constructor (compoundOperandConstructor operator type) = type)
 
 /-- The builtin operand type of a binary operator at one operand type: the
 operand itself when it is a fixed-width integer type that takes the operator

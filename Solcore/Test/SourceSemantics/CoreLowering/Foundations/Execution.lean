@@ -4313,12 +4313,32 @@ private def defaultingWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function markOpen() returns (Word) { keep(7); return 4; }",
   "function compoundOpen() returns (bool) { let x = 0; x -= 1; return x > 5; }",
   "function rewrittenOpen() returns (bool) { let x = 0; x = x - 1; return x > 5; }",
-  "function compoundWord(w: Word) returns (Word) { let total = 0; total += w; return total; }"]
+  "function compoundWord(w: Word) returns (Word) { let total = 0; total += w; return total; }",
+  "function compoundAddOpen() returns (bool) { let x = 0; x += 7; return x == 7; }",
+  "function compoundAddMax() returns (bool) { let x = 115792089237316195423570985008687907853269984665640564039457584007913129639935; x += 1; return x == 0; }",
+  "function compoundMulOpen() returns (bool) { let x = 57896044618658097711785492504343953926634992332820282019728792003956564819968; x *= 2; return x == 0; }",
+  "function compoundDivZero() returns (bool) { let x = 1; x /= 0; return x == 0; }",
+  "function compoundModZero() returns (bool) { let x = 1; x %= 0; return x == 0; }",
+  "function compoundBitsOpen() returns (bool) { let x = 12; x &= 10; let y = 12; y |= 3; let z = 12; z ^= 10; return x + y + z == 29; }",
+  "function deferredCompound8u() returns (uint8) { let x = 200; x += 55; return x; }",
+  "function deferredCompound8uOver() returns (uint8) { let x = 200; x += 56; return x; }",
+  "function deferredCompound8s() returns (int8) { let x = -100; x -= 28; return x; }",
+  "function deferredCompound8sUnder() returns (int8) { let x = -100; x -= 29; return x; }",
+  "function loopOpen() returns (uint256) { let total = 0; for (let i = 0; i < 4; i += 1) { total += i; } return total; }",
+  "function loopWord(n: Word) returns (Word) { let total = 0; for (let i = 0; i < n; i += 1) { total += 1; } return total; }",
+  "function shiftCompoundOpen() returns (bool) { let x = 1; x <<= 3; return x == 8; }",
+  "function uncheckedCompoundOpen() returns (bool) { let x = 0; unchecked { x -= 1; } return x > 5; }",
+  "function lambdaCaptured(w: Word) returns (Word) { let f = lam(acc) { acc += w; return acc; }; return f(5); }",
+  "function lambdaAnnotated() returns (Word) { let f = lam(acc: Word) { acc += 1; return acc; }; return f(41); }",
+  "function lambdaLiteral() returns (uint256) { let f = lam(acc) { acc += 1; return acc; }; return f(41); }"]
 
 private def defaultingNames : List String := [
   "eqOpen", "addUnused", "idOpen", "shiftUnused", "shiftOpen", "matchOpen", "matchOpenMiss",
   "matchU256", "maxOpen", "addOpen", "overflowOpen", "underflowOpen", "markOpen",
-  "compoundOpen", "rewrittenOpen", "compoundWord"]
+  "compoundOpen", "rewrittenOpen", "compoundWord",
+  "compoundAddOpen", "compoundAddMax", "compoundMulOpen", "compoundDivZero", "compoundModZero", "compoundBitsOpen",
+  "deferredCompound8u", "deferredCompound8uOver", "deferredCompound8s", "deferredCompound8sUnder", "loopOpen", "loopWord", "shiftCompoundOpen", "uncheckedCompoundOpen",
+  "lambdaCaptured", "lambdaAnnotated", "lambdaLiteral"]
 
 /-- Inference rejects an open literal that nothing constrains, naming it. -/
 private def rejectedAmbiguous (label : String) (lines : List String) : IO Unit :=
@@ -4360,21 +4380,32 @@ def runDefaulting : IO Unit := do
     (8, [], boolean true), (9, [], boolean true),
     -- A literal in a pending `Mark` requirement is `uint256`, and `impl Mark<uint256>` solves it.
     (12, [], word 4),
-    -- Today a compound assignment makes an open target `word` at once, so `x -= 1` wraps, where
-    -- upstream, which reads `x -= 1` as `x = x - 1`, defaults `x` to `uint256` and panics with
-    -- 0x11, as `rewrittenOpen` does here. Step 7b brings upstream's typing and changes this case.
-    (13, [], boolean true),
     -- A `word` operand types the open target `word`, here and upstream.
-    (15, [word 9], word 9)]
+    (15, [word 9], word 9),
+    -- Step 7b: a compound assignment on an open target takes its operand's type and counts as an
+    -- operator use, as upstream's rewrite to `x = x op e` types it, so the target is `uint256`.
+    (16, [], boolean true), (21, [], boolean true),
+    -- A later use gives the open target its type: `uint8` and `int8` at their range edges.
+    (22, [], word 255), (24, [], word (modulus - 128)),
+    -- A `for` loop's post `i += 1`: `uint256` counters, or `Word` ones under a `Word` bound.
+    (26, [], word 6), (27, [word 3], word 3),
+    -- Compound shifts and unchecked compounds stay Word's until step 8.
+    (28, [], boolean true), (29, [], boolean true),
+    -- A lambda parameter as a compound target: typed by a captured `Word` in the body, declared
+    -- `Word`, or tied to its literal operand, which keeps it monomorphic, so the call types it.
+    (30, [word 2], word 7), (31, [], word 42), (32, [], word 42)]
   for (index, arguments, expected) in cases do
     let completed ← execute session (← key index) arguments
     require (completed.value == expected)
       s!"{defaultingNames[index]?} on {reprStr arguments} gave {reprStr completed.value}"
     session := completed.session
   -- Arithmetic on defaulted literals is checked: past `uint256`'s range it panics with 0x11,
-  -- `x = x - 1` on an open `x` too.
-  for index in [10, 11, 14] do
+  -- `x = x - 1` on an open `x` too, and since step 7b `x -= 1`, `x += 1` and `x *= 2` on one.
+  for index in [10, 11, 13, 14, 17, 18, 23, 25] do
     session ← panics session (← key index) [] SourceCorePanics.arithmetic s!"{defaultingNames[index]?}"
+  -- A zero divisor in `x /= 0` and `x %= 0` on an open target panics with 0x12.
+  for index in [19, 20] do
+    session ← panics session (← key index) [] SourceCorePanics.divisionByZero s!"{defaultingNames[index]?}"
   -- An open literal that nothing constrains is ambiguous; it never defaults to Word.
   rejectedAmbiguous "an unused let y = 7" ["function bad() returns (Word) { let y = 7; return 0; }"]
   rejectedAmbiguous "let y = 7; let z = y" ["function bad() returns (Word) { let y = 7; let z = y; return 0; }"]
@@ -4419,7 +4450,25 @@ def runDefaulting : IO Unit := do
   -- literal, and `f`'s root type holds no variable.
   rejectedAmbiguous "an unbounded poly(7) with an unused result"
     ["function poly<a>(x: a) returns (a) { return x; }", "function f() returns (word) { let y = poly(7); return 0; }"]
-  IO.println "SOURCE_CORE_UINT256_DEFAULT_PASS: open literals in comparisons, operators, requirements and matches default to uint256 with checked arithmetic, a generic call's literal takes the return's type, shifts keep Word literals, numeric patterns at uint256 up to 2^256 - 1, unconstrained literals rejected as ambiguous, an open -1 and a defaulted 2^256 out of uint256's range, an unsolved Mark<uint256> rejected, an open compound target still word (step 7b brings upstream's uint256) and its rewritten form checked at uint256, numeric patterns on the other eleven types rejected, a 2^256 pattern at uint256 rejected by inference, declared or defaulted, upstream's poly_int_defaulting rejected at its Int bound and its unbounded form as ambiguous"
+  -- Step 7b: finalization checks the open compound target's type: one that becomes `integer`
+  -- takes no compound operator.
+  match checkProgram (workspaceOf
+      ["function bad() returns (Word) { let x = 0; x += 1; let y: integer = x; return 0; }"]) with
+  | .error [.inference ⟨_, .compoundTargetNotSupported _ operator type⟩] =>
+      require (operator == .add && decide (type = TypeSystem.Ty.integer))
+        s!"an integer compound target named {reprStr operator} and {reprStr type}"
+  | .ok _ => throw (IO.userError "an integer compound target was accepted")
+  | .error errors => throw (IO.userError s!"an integer compound target gave {reprStr errors}")
+  -- A compound on a lambda parameter that nothing else types: local generalization quantifies
+  -- the parameter, so its type is still open at finalization, as `acc + step` was rejected
+  -- before. Upstream keeps closures monomorphic.
+  match checkProgram (workspaceOf
+      ["function bad() returns (Word) { let f = lam(acc, step) { acc += step; return acc; }; return 0; }"]) with
+  | .error [.inference ⟨_, .compoundTargetNotSupported _ operator (.variable _)⟩] =>
+      require (operator == .add) s!"a generalized lambda's compound target named {reprStr operator}"
+  | .ok _ => throw (IO.userError "a compound on a generalized lambda parameter was accepted")
+  | .error errors => throw (IO.userError s!"a compound on a generalized lambda parameter gave {reprStr errors}")
+  IO.println "SOURCE_CORE_UINT256_DEFAULT_PASS: open literals in comparisons, operators, requirements and matches default to uint256 with checked arithmetic, a generic call's literal takes the return's type, shifts keep Word literals, numeric patterns at uint256 up to 2^256 - 1, unconstrained literals rejected as ambiguous, an open -1 and a defaulted 2^256 out of uint256's range, an unsolved Mark<uint256> rejected, compound assignments on an open target typed with their operand and defaulted to uint256 with checked += -= *= /= %= and Word's &= |= ^=, a later use's uint8 and int8, uint256 and Word for loop counters, compound shifts and unchecked compounds still Word, an integer compound target rejected, lambda parameters as compound targets typed by a captured Word, a declaration or a literal operand, and one that nothing types rejected, numeric patterns on the other eleven types rejected, a 2^256 pattern at uint256 rejected by inference, declared or defaulted, upstream's poly_int_defaulting rejected at its Int bound and its unbounded form as ambiguous"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)

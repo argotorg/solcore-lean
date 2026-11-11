@@ -149,7 +149,7 @@ private def content : String := String.intercalate "\n" [
   "function calculate() returns (Word) { let sum = 0; for (let i = 0; i < 5; i += 1) { if (i == 1) { continue; } sum += i; if (i == 3) { break; } } return sum; }",
   "function early() returns (Bool) { let prior: Word = 21; while (true) { let inside: Word = 22; return true; } let skipped: Word = 99; return false; }",
   "function unitFallthrough() { let saved: Word = 23; for (let i: Word = 0; i < 2; i += 1) { let saved = i; } }",
-  "function failBody() returns (Word) { let prior: Word = 24; for (let i = 0; true; i += 1) { let saved: Word = 25; let gap: Word; return gap; } let skipped = 26; return skipped; }",
+  "function failBody() returns (Word) { let prior: Word = 24; for (let i: Word = 0; true; i += 1) { let saved: Word = 25; let gap: Word; return gap; } let skipped = 26; return skipped; }",
   "function integerResult(left: Word, right: Word) returns (integer) { return integerSub(wordToInteger(left), wordToInteger(right)); }",
   "function mapped() returns (Bool) { let m: mapping(Bool => Word); m[true] = 27; let expected = 27; return m[true] == expected; }"
 ]

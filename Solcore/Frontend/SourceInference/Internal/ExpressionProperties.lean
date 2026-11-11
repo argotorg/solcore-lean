@@ -12751,14 +12751,18 @@ private theorem inferFuel_inferenceProperties_internal :
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
           simp only [unifyResult, bind, Except.bind] at tailSuccess
+          have operandBelow :=
+            compoundOperandType_variablesBelow (operator := operator)
+              (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
           have fitProgress := unify_inferenceProgress
             placeProperties.2.1.solved placeProperties.2.2
-            (Ty.variablesBelow_constructor _ _) unifyResult
+            operandBelow unifyResult
           have fittedReady := unify_preserves_inferenceReady
             placeProperties.2.1 placeProperties.2.2
-            (Ty.variablesBelow_constructor _ _) unifyResult
+            operandBelow unifyResult
           exact finishValue fittedState fitProgress fittedReady (compoundOperandType operator (fittedState.resolve place.type))
-            (Ty.variablesBelow_constructor _ _)
+            (compoundOperandType_variablesBelow
+              (fitProgress.resolve_variablesBelow placeProperties.2.2))
             (valueProperties fittedState) tailSuccess
       cases operator with
       | equal =>

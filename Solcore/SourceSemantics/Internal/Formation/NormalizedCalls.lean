@@ -2084,10 +2084,12 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
         | error error => simp [fitRun, bind, Except.bind] at accepted
         | ok fitted =>
           simp only [fitRun, bind, Except.bind] at accepted
+          have operandBelow := Detail.compoundOperandType_variablesBelow (operator := operator)
+            (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
           have progress := unify_inferenceProgress placeProperties.2.1.solved
-            placeProperties.2.2 (Ty.variablesBelow_constructor _ _) fitRun
+            placeProperties.2.2 operandBelow fitRun
           have fitReady := unify_preserves_inferenceReady placeProperties.2.1
-            placeProperties.2.2 (Ty.variablesBelow_constructor _ _) fitRun
+            placeProperties.2.2 operandBelow fitRun
           have fitNodes : fitted.NodesBelowNextOccurrence := by
             intro node member
             rw [(unify_occurrenceState_eq fitRun).1] at member
@@ -2095,15 +2097,22 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
             exact placeNodes node member
           exact finishValue fitted progress fitReady fitNodes (unify_occurrenceState_eq fitRun).1
             (congrArg LexicalScope.binders (unify_preserves_lexicalScope fitRun)) (unify_requirements_eq fitRun)
-            (Detail.compoundOperandType operator (fitted.resolve place.type)) (Ty.variablesBelow_constructor _ _)
-            (fun _ _ => by
-              show TypeAdmissible semantic (.constructor _)
-              unfold Detail.compoundOperandConstructor
-              split
-              · cases operator <;> first
-                  | exact TypeAdmissible.fixed formation.scope.binders _
-                  | exact TypeAdmissible.word formation.scope.binders
-              · exact TypeAdmissible.word formation.scope.binders)
+            (Detail.compoundOperandType operator (fitted.resolve place.type))
+            (Detail.compoundOperandType_variablesBelow
+              (progress.resolve_variablesBelow placeProperties.2.2))
+            (fun extension formedType => by
+              rcases Detail.compoundOperandType_cases operator (fitted.resolve place.type) with
+                ⟨openEq, _, _⟩ | closedEq
+              · rw [openEq]
+                exact (extension place.type).symm ▸ formedType
+              · rw [closedEq]
+                show TypeAdmissible semantic (.constructor _)
+                unfold Detail.compoundOperandConstructor
+                split
+                · cases operator <;> first
+                    | exact TypeAdmissible.fixed formation.scope.binders _
+                    | exact TypeAdmissible.word formation.scope.binders
+                · exact TypeAdmissible.word formation.scope.binders)
             (child fitted) accepted
       cases operator with
       | equal =>

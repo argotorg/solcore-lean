@@ -115,6 +115,10 @@ theorem inferAssignedValueFuel_children_actual_invariants
             simp [unifyResult, bind, Except.bind] at tailSuccess
         | ok fittedState =>
             simp only [unifyResult, bind, Except.bind] at tailSuccess
+            have operandBelow := Detail.compoundOperandType_variablesBelow (operator := operator)
+              (placeProperties.2.1.solved.variablesBelow_apply placeTypeBelow)
+            have earlyProgress := Detail.unify_inferenceProgress
+              placeProperties.2.1.solved placeTypeBelow operandBelow unifyResult
             cases valueResult : Detail.inferExprFuel fuel inferenceContext
                 value (some (Detail.compoundOperandType operator (fittedState.resolve place.type))) fittedState with
             | error error => simp [valueResult] at tailSuccess
@@ -131,14 +135,15 @@ theorem inferAssignedValueFuel_children_actual_invariants
                 have fittedReady : fittedState.InferenceReady :=
                   Detail.unify_preserves_inferenceReady
                     placeProperties.2.1 placeTypeBelow
-                    (Ty.variablesBelow_constructor _ _)
+                    operandBelow
                     unifyResult
                 have valueProperties := Detail.inferExprFuel_inferenceProperties
                   fittedReady signatureFormation functionsCanonical (by
                     intro expectedType member
                     simp only [Option.mem_def] at member
                     cases member
-                    exact Ty.variablesBelow_constructor _ _) valueResult
+                    exact Detail.compoundOperandType_variablesBelow
+                      (earlyProgress.resolve_variablesBelow placeTypeBelow)) valueResult
                 have outerFitted :
                     finalized.substitution.SemanticallyExtends
                       fittedState.inference.substitution :=
@@ -147,7 +152,7 @@ theorem inferAssignedValueFuel_children_actual_invariants
                     valueProperties.1.substitution_extends
                 have unifyProgress := Detail.unify_inferenceProgress
                   placeProperties.2.1.solved placeTypeBelow
-                  (Ty.variablesBelow_constructor _ _)
+                  operandBelow
                   unifyResult
                 have outerPlace : finalized.substitution.SemanticallyExtends
                     placeState.inference.substitution :=
@@ -160,12 +165,13 @@ theorem inferAssignedValueFuel_children_actual_invariants
                 have fittedInvariant : RecursiveExpressionInvariant
                     wholeContext finalized fittedState semanticContext :=
                   placeInvariant.unify placeTypeBelow
-                    (Ty.variablesBelow_constructor _ _)
+                    operandBelow
                     outerFitted unifyResult
                 exact ⟨place, placeState,
                   Detail.compoundOperandType operator (fittedState.resolve place.type), fittedState, rfl,
                   placeInvariant, valueResult, fittedInvariant,
-                  Ty.variablesBelow_constructor _ _, rfl, rfl, .inr ⟨unifyResult, rfl⟩⟩
+                  Detail.compoundOperandType_variablesBelow
+                    (earlyProgress.resolve_variablesBelow placeTypeBelow), rfl, rfl, .inr ⟨unifyResult, rfl⟩⟩
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
@@ -359,14 +365,24 @@ theorem actualInferAssignedValueFuel_children_rootedSound
         simpa only [State.resolve, InferState.resolve] using placeInvariant.substitutionExtension place.type
       rw [resolved]
       exact sourcePlace_type_admissible placeTyped
-    · have binders := initialInvariant.typeParameterBinders (by simpa only [ownerEq, parametersEq] using signatureParameters)
-      show TypeAdmissible semanticContext (.constructor _)
-      unfold Detail.compoundOperandConstructor
-      split
-      · cases operator <;> first
-          | exact TypeAdmissible.fixed binders _
-          | exact TypeAdmissible.word binders
-      · exact TypeAdmissible.word binders
+    · rcases Detail.compoundOperandType_cases operator (valueInitial.resolve place.type) with
+        ⟨openEq, _, _⟩ | closedEq
+      · rw [openEq]
+        have resolved : finalized.substitution.apply (valueInitial.resolve place.type) =
+            finalized.substitution.apply place.type := by
+          simpa only [State.resolve, InferState.resolve] using
+            valueInvariant.substitutionExtension place.type
+        rw [resolved]
+        exact sourcePlace_type_admissible placeTyped
+      · rw [closedEq]
+        have binders := initialInvariant.typeParameterBinders (by simpa only [ownerEq, parametersEq] using signatureParameters)
+        show TypeAdmissible semanticContext (.constructor _)
+        unfold Detail.compoundOperandConstructor
+        split
+        · cases operator <;> first
+            | exact TypeAdmissible.fixed binders _
+            | exact TypeAdmissible.word binders
+        · exact TypeAdmissible.word binders
   have valueTyped : ExpressionHasType
       ((parentState.toTypedSource roots).applySubstitution
         finalized.substitution)
@@ -779,9 +795,14 @@ theorem actualInferStatementFuelRootedSoundness_assignValue {fuel : Nat}
     keysCovered rhsCovered
     (fun key member => actualCovered.preserved_statement_reference contains final (reference key member))
     (actualCovered.preserved_statement_reference contains final (by simp [StatementForm.references])) placeSound expressionSound
+  have targetFits : AssignmentTargetFits (assignment.applySubstitution finalized.substitution)
+      operator.value := by
+    have fit := resources.assignment_targets_fit (final.containsStatement contains)
+    simpa [StatementNode.applySubstitution, StatementForm.applySubstitution,
+      StatementAssignmentTargetsFit] using fit
   obtain ⟨active, typing, agreement⟩ := inferStatementFuel_success_assignValue_sound_of_typed_children
     statementEq allocationEq success assignmentSuccess invariant.ready formation functions invariant.active extension roots
-    placeTyped valueTyped
+    placeTyped valueTyped targetFits
   have bindersEq : result.state.localBinders = initial.localBinders := by
     have assignedBinders := congrArg LexicalScope.binders (Detail.inferAssignedValueFuel_success_lexicalScope_eq assignmentSuccess)
     have allocatedBinders := congrArg LexicalScope.binders (Detail.allocateStatementId_success_lexicalScope allocationEq)

@@ -1394,6 +1394,10 @@ structure ForItemBoundary (selected : BodySelection compiled row fuel)
   actualCovered : ∀ reference ∈ inferred.references,
     ActualContext.Covers selected.body.finalized frames reference
   actualBindings : ActualForItemBindings selected.body.finalized frames inferred
+  /-- The item's value assignment, if it is one, takes its operator, as
+  finalization checks for the enclosing `for` loop. -/
+  targetsFit : ForItemAssignmentTargetFits
+    (inferred.applySubstitution selected.body.finalized.substitution)
 
 def ForItemConclusion (selected : BodySelection compiled row fuel)
     (inferenceContext : SourceInference.Context) (expectedReturn : Ty)
@@ -1433,6 +1437,9 @@ structure ForItemsBoundary (selected : BodySelection compiled row fuel)
   actualCovered : ∀ item ∈ result.items, ∀ reference ∈ item.references,
     ActualContext.Covers selected.body.finalized frames reference
   actualBindings : ActualForItemsBindings selected.body.finalized frames result.items
+  /-- Every item's value assignment takes its operator. -/
+  targetsFit : ∀ item ∈ result.items,
+    ForItemAssignmentTargetFits (item.applySubstitution selected.body.finalized.substitution)
 
 def ForItemsConclusion (selected : BodySelection compiled row fuel)
     (inferenceContext : SourceInference.Context) (expectedReturn : Ty)

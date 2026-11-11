@@ -179,6 +179,18 @@ theorem safe_closed (protectedVars : List TypeVarId) (state : State) {type : Ty}
     (by simp [empty])
   simp [Safe, Avoids, State.resolve, InferState.resolve, fixed, empty]
 
+/-- A compound assignment's operand type is safe where its target type is:
+the open target's own type, or a closed constructor. -/
+theorem safe_compoundOperandType {protectedVars : List TypeVarId} {state : State}
+    {operator : Syntax.ValueAssignOp} {type : Ty}
+    (safe : Safe protectedVars state type) :
+    Safe protectedVars state (Detail.compoundOperandType operator type) := by
+  rcases Detail.compoundOperandType_cases operator type with ⟨openEq, _, _⟩ | closedEq
+  · rw [openEq]
+    exact safe
+  · rw [closedEq]
+    exact safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+
 theorem safe_applyMany (protectedVars : List TypeVarId) (state : State) (base : Ty) (arguments : List Ty)
     (baseSafe : Safe protectedVars state base)
     (argumentsSafe : ∀ argument ∈ arguments, Safe protectedVars state argument) :

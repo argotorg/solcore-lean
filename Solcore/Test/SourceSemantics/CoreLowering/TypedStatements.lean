@@ -1141,8 +1141,8 @@ private def workspace : Workspace.RawWorkspace := {
     "function repeated() returns (Word) { let i = 0; let sum: Word; sum = 0; while (i < 5) { i += 1; if (i == 2) { continue; } { let shadow = i; sum += shadow; } if (i == 4) { break; } } return sum; }",
     "function nested() returns (Word) { let i = 0; let m: mapping(Bool => Word); while (i < 3) { let j = 0; while (j < 2) { j += 1; m[true] = i * 10 + j; } i += 1; } return m[true]; }",
     "function early() returns (Word) { let i = 0; while (true) { i += 1; if (i == 3) { return i; } } return 99; }",
-    "function rhsFault() returns (Word) { let i = 0; let m: mapping(Bool => Word); let keys: mapping(Bool => Bool); let lazy: mapping(Bool => Word); let missing: Word; while (i < 2) { i += 1; m[keys[true]] = lazy[false] + missing; let never = true; } return 0; }",
-    "function targetFault() returns (Word) { let i = 0; let m: mapping(Bool => Box); let keys: mapping(Bool => Bool); let rhs: mapping(Bool => Word); while (i < 2) { i += 1; m[keys[true]] = .Box(rhs[false]); } return 0; }"
+    "function rhsFault() returns (Word) { let i: Word = 0; let m: mapping(Bool => Word); let keys: mapping(Bool => Bool); let lazy: mapping(Bool => Word); let missing: Word; while (i < 2) { i += 1; m[keys[true]] = lazy[false] + missing; let never = true; } return 0; }",
+    "function targetFault() returns (Word) { let i: Word = 0; let m: mapping(Bool => Box); let keys: mapping(Bool => Bool); let rhs: mapping(Bool => Word); while (i < 2) { i += 1; m[keys[true]] = .Box(rhs[false]); } return 0; }"
   ]}] }
 private def failureResume (entry : SourceCompilerFeatureSupport.Entry) : IO Unit := do
   let complete ← entry.invoke []
@@ -1397,7 +1397,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function transfers() returns (Word) { let sum = 0; for (let i = 0; i < 5; let copy = i, i = copy + 1) { if (i == 1) { continue; } { let copy = i; sum += copy; } if (i == 3) { break; } } return sum; }",
     "function early() returns (Word) { for (let i = 0; true; let copy = i, i = copy + 1) { for (let j = 0; j < 2; j += 1) { if (i == 2) { return i + j; } } } return 99; }",
     "function falseFirst() returns (Word) { let i = 17; for (let i: Word = 3; false; let never: Word = 99) { return 0; } return i; }",
-    "function bodyFault() returns (Word) { let m: mapping(Bool => Word); let keys: mapping(Bool => Bool); let lazy: mapping(Bool => Word); let missing: Word; for (let i = 0; i < 2; let never: Word = 99) { i += 1; m[keys[true]] = lazy[false] + missing; } return 0; }",
+    "function bodyFault() returns (Word) { let m: mapping(Bool => Word); let keys: mapping(Bool => Bool); let lazy: mapping(Bool => Word); let missing: Word; for (let i: Word = 0; i < 2; let never: Word = 99) { i += 1; m[keys[true]] = lazy[false] + missing; } return 0; }",
     "function postFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let i = 0; true; let copy = i, i = seen[false] + missing, let never: Word = 99) { continue; } return 1; }",
     "function initializerFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let ready: Word = 1, let dead = seen[false] + missing; true; ) { return 0; } return 1; }",
     "function conditionFault() returns (Word) { let missing: Bool; let seen: mapping(Bool => Bool); for (let ready: Word = 1; seen[false] || missing; let never: Word = 99) { return 0; } return 1; }"

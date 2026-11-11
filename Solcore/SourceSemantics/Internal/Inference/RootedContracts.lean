@@ -40,9 +40,11 @@ theorem assignmentFit_properties
   | (change Except.ok state = Except.ok fitted at accepted
      cases Except.ok.inj accepted
      exact ⟨.refl ready.solved, ready, ready.solved.variablesBelow_apply below⟩)
-  | (have progress := unify_inferenceProgress ready.solved below (Ty.variablesBelow_constructor _ _) accepted
-     exact ⟨progress, unify_preserves_inferenceReady ready below (Ty.variablesBelow_constructor _ _) accepted,
-       Ty.variablesBelow_constructor _ _⟩)
+  | (have progress := unify_inferenceProgress ready.solved below
+       (compoundOperandType_variablesBelow (ready.solved.variablesBelow_apply below)) accepted
+     exact ⟨progress, unify_preserves_inferenceReady ready below
+       (compoundOperandType_variablesBelow (ready.solved.variablesBelow_apply below)) accepted,
+       compoundOperandType_variablesBelow (progress.resolve_variablesBelow below)⟩)
 
 end Solcore.SourceSemantics.SourceInferenceExecution
 end
@@ -938,6 +940,7 @@ def ActualInferForItemFuelRootedSoundness (fuel : Nat) : Prop :=
     ForItemBindingRetained (evidenceState.toTypedSource roots) inferred →
     (∀ reference ∈ inferred.references, ActualContext.Covers finalized frames reference) →
     ActualForItemBindings finalized frames inferred →
+    ForItemAssignmentTargetFits (inferred.applySubstitution finalized.substitution) →
     ∃ finalContext,
       RecursiveStatementInvariant wholeContext expectedReturn finalized
         final finalContext ∧
@@ -997,6 +1000,8 @@ def ActualInferForItemsFuelRootedSoundness (fuel : Nat) : Prop :=
     (∀ item ∈ result.items, ∀ reference ∈ item.references,
       ActualContext.Covers finalized frames reference) →
     ActualForItemsBindings finalized frames result.items →
+    (∀ item ∈ result.items,
+      ForItemAssignmentTargetFits (item.applySubstitution finalized.substitution)) →
     ∃ finalContext,
       RecursiveStatementInvariant wholeContext expectedReturn finalized
         result.state finalContext ∧

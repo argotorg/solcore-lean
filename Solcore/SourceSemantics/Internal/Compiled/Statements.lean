@@ -134,6 +134,10 @@ structure AssignedValueBoundary {compiled : SourceCoreCompiler.Compiled}
   keysActualCovered : ∀ key, .expression key ∈ assignment.references →
     ActualContext.Covers selected.body.finalized frames (.expression key)
   valueActualCovered : ActualContext.Covers selected.body.finalized frames (.expression inferred.id)
+  /-- The assignment's final target type takes its operator, as finalization
+  checks. -/
+  targetFits : AssignmentTargetFits
+    (assignment.applySubstitution selected.body.finalized.substitution) operator
 
 theorem assignedValue_of_actual_children_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
@@ -163,7 +167,7 @@ theorem assignedValue_of_actual_children_for
   let expected := assignmentExpected operator valueInitial place.type
   have valueOrigin :
       (valueInitial = placeState ∧ expected = placeState.resolve place.type) ∨
-      (Detail.unify placeState place.type
+      (operator ≠ .equal ∧ Detail.unify placeState place.type
           (Detail.compoundOperandType operator (placeState.resolve place.type)) = .ok valueInitial ∧
         expected = Detail.compoundOperandType operator (valueInitial.resolve place.type)) := by
     cases operator with
@@ -171,33 +175,37 @@ theorem assignedValue_of_actual_children_for
         have same : placeState = valueInitial := Except.ok.inj fitting
         subst valueInitial
         exact .inl ⟨rfl, rfl⟩
-    | _ => exact .inr ⟨fitting, rfl⟩
+    | _ => exact .inr ⟨by decide, fitting, rfl⟩
   have placeProperties := Detail.inferPlaceFuel_inferenceProperties boundary.invariant.ready formation canonical placeAccepted
+  have operandBelow := Detail.compoundOperandType_variablesBelow (operator := operator)
+    (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
   have valueReady : valueInitial.InferenceReady := by
-    rcases valueOrigin with ⟨rfl, _⟩ | ⟨unified, _⟩
+    rcases valueOrigin with ⟨rfl, _⟩ | ⟨_, unified, _⟩
     · exact placeProperties.2.1
     · exact Detail.unify_preserves_inferenceReady placeProperties.2.1 placeProperties.2.2
-        (Ty.variablesBelow_constructor _ _) unified
+        operandBelow unified
   have expectedBelow : expected.VariablesBelow valueInitial.inference.next := by
-    rcases valueOrigin with ⟨same, expectedEq⟩ | ⟨_, expectedEq⟩
+    rcases valueOrigin with ⟨same, expectedEq⟩ | ⟨_, unified, expectedEq⟩
     · rw [expectedEq, same]
       exact placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2
     · rw [expectedEq]
-      exact Ty.variablesBelow_constructor _ _
+      exact Detail.compoundOperandType_variablesBelow
+        ((Detail.unify_inferenceProgress placeProperties.2.1.solved placeProperties.2.2
+          operandBelow unified).resolve_variablesBelow placeProperties.2.2)
   have valueProperties := Detail.inferExprFuel_inferenceProperties valueReady formation canonical
     (by intro type member; cases Option.some.inj (Option.mem_def.mp member); exact expectedBelow) valueAccepted
   have valueExtension := boundary.extension.trans valueProperties.1.substitution_extends
   have placeExtension : selected.body.finalized.substitution.SemanticallyExtends placeState.inference.substitution := by
-    rcases valueOrigin with ⟨rfl, _⟩ | ⟨unified, _⟩
+    rcases valueOrigin with ⟨rfl, _⟩ | ⟨_, unified, _⟩
     · exact valueExtension
     · exact valueExtension.trans (Detail.unify_inferenceProgress placeProperties.2.1.solved
-        placeProperties.2.2 (Ty.variablesBelow_constructor _ _) unified).substitution_extends
+        placeProperties.2.2 operandBelow unified).substitution_extends
   have placeInvariant := boundary.invariant.ofPlace formation canonical placeExtension placeAccepted
   have valueInvariant : RecursiveExpressionInvariant (checkingContext selected) selected.body.finalized
       valueInitial target := by
-    rcases valueOrigin with ⟨rfl, _⟩ | ⟨unified, _⟩
+    rcases valueOrigin with ⟨rfl, _⟩ | ⟨_, unified, _⟩
     · exact placeInvariant
-    · exact placeInvariant.unify placeProperties.2.2 (Ty.variablesBelow_constructor _ _) valueExtension unified
+    · exact placeInvariant.unify placeProperties.2.2 operandBelow valueExtension unified
   have referencesEq : assignment.target.references = place.references := by
     rw [targetEq]
     rfl
@@ -238,23 +246,34 @@ theorem assignedValue_of_actual_children_for
       congrArg (fun type => ({ place with type := type } : PlaceResolution)) storedEq
   have placeProperties := Detail.inferPlaceFuel_inferenceProperties boundary.invariant.ready formation canonical placeAccepted
   have valueOperational : GeneralizedActualStateInvariant valueInitial (evidenceSource selected) := by
-    rcases valueOrigin with ⟨rfl, _⟩ | ⟨unified, _⟩
+    rcases valueOrigin with ⟨rfl, _⟩ | ⟨_, unified, _⟩
     · exact placeOperational
     · exact placeOperational.unify placeProperties.2.1 placeProperties.2.2
-        (Ty.variablesBelow_constructor _ _) placeSafe
-        (fun binder _ => ProtectedVariables.safe_closed binder.scheme.quantified placeState
-          (Ty.variablesBelow_constructor 0 _)) unified
+        operandBelow placeSafe
+        (fun binder member => ProtectedVariables.safe_compoundOperandType
+          (ProtectedVariables.safe_resolved placeProperties.2.1 (placeSafe binder member))) unified
   have expectedSafe : ∀ binder ∈ valueInitial.localBinders,
       ProtectedVariables.Safe binder.scheme.quantified valueInitial expected := by
-    rcases valueOrigin with ⟨same, expectedEq⟩ | ⟨_, expectedEq⟩
+    rcases valueOrigin with ⟨same, expectedEq⟩ | ⟨_, unified, expectedEq⟩
     · rw [expectedEq, same]
       intro binder member
       exact ProtectedVariables.safe_resolved placeProperties.2.1 (placeSafe binder member)
     · rw [expectedEq]
-      intro binder _
-      exact ProtectedVariables.safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+      intro binder member
+      have placeMember : binder ∈ placeState.localBinders := by
+        have bindersEq : valueInitial.localBinders = placeState.localBinders :=
+          congrArg LexicalScope.binders (Detail.unify_preserves_lexicalScope unified)
+        rw [bindersEq] at member
+        exact member
+      have rightSafe := ProtectedVariables.safe_compoundOperandType (operator := operator)
+        (ProtectedVariables.safe_resolved placeProperties.2.1 (placeSafe binder placeMember))
+      have transported :=
+        ProtectedVariables.unify (placeSafe binder placeMember) rightSafe unified
+      exact ProtectedVariables.safe_compoundOperandType
+        (ProtectedVariables.safe_resolved valueReady
+          (transported _ (placeSafe binder placeMember)))
   have expectedAdmissible : TypeAdmissible target (selected.body.finalized.substitution.apply expected) := by
-    rcases valueOrigin with ⟨_, expectedEq⟩ | ⟨_, expectedEq⟩
+    rcases valueOrigin with ⟨_, expectedEq⟩ | ⟨notEqual, _, expectedEq⟩
     · rw [expectedEq]
       have resolved : selected.body.finalized.substitution.apply (placeState.resolve place.type) =
           selected.body.finalized.substitution.apply place.type := by
@@ -262,15 +281,18 @@ theorem assignedValue_of_actual_children_for
       rw [resolved]
       exact sourcePlace_type_admissible placeTyped
     · rw [expectedEq]
-      have binders := boundary.invariant.typeParameterBinders (by
-        simpa only [boundary.scope.owner, boundary.scope.parameters] using boundary.scope.canonical checked)
-      show TypeAdmissible target (.constructor _)
-      unfold Detail.compoundOperandConstructor
-      split
-      · cases operator <;> first
-          | exact TypeAdmissible.fixed binders _
-          | exact TypeAdmissible.word binders
-      · exact TypeAdmissible.word binders
+      have fitsHere : Detail.compoundTargetFits operator
+          (selected.body.finalized.substitution.apply place.type) = true := by
+        rw [← targetTypeEq]
+        simpa [AssignmentTargetFits, AssignmentResolution.applySubstitution,
+          PlaceResolution.applySubstitution] using boundary.targetFits
+      have resolvedValue :
+          selected.body.finalized.substitution.apply (valueInitial.resolve place.type) =
+            selected.body.finalized.substitution.apply place.type := by
+        simpa only [State.resolve, InferState.resolve] using valueExtension place.type
+      rw [compoundOperandType_apply_of_fits notEqual (by rw [resolvedValue]; exact fitsHere),
+        resolvedValue]
+      exact sourcePlace_type_admissible placeTyped
   have expectedBound : ∀ type ∈ some expected, type.VariablesBelow valueInitial.inference.next := by
     intro type member
     have same : type = expected := Option.some.inj member.symm
@@ -311,7 +333,7 @@ theorem assignedValue_of_actual_children_for
     simpa only [targetSubstEq, targetTypeEq] using placeTyped
   rw [selected.body.resources.source_eq] at assignmentPlace valueTyped ⊢
   exact inferAssignedValueFuel_success_sound_of_typed_result boundary.invariant.ready formation canonical
-    boundary.extension assignmentPlace valueTyped boundary.accepted
+    boundary.extension assignmentPlace valueTyped boundary.accepted boundary.targetFits
 
 theorem assignedValue_of_actual_children
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
@@ -1698,6 +1720,11 @@ theorem statement_assignValue_for
     requirements := by simpa only [resultEq, State.recordNode] using boundary.requirements
     keysCovered := keysCovered
     valueCovered := valueCovered
+    targetFits := by
+      have fit := selected.body.resources.assignment_targets_fit
+        (finalized.containsStatement containsRaw)
+      simpa [StatementNode.applySubstitution, StatementForm.applySubstitution,
+        StatementAssignmentTargetsFit] using fit
     keysActualCovered := fun key member =>
       boundary.actualCovered.preserved_statement_reference containsRaw finalized (reference key member)
     valueActualCovered := boundary.actualCovered.preserved_statement_reference containsRaw finalized

@@ -205,10 +205,10 @@ end Concrete
 private def content : String := String.intercalate "\n" [
   "function calculate(limit: Word) returns (Word) { let sum = 0; for (let i = 0; i < limit; i += 1) { if (i == 1) { continue; } sum += i; if (i == 3) { break; } } return sum; }",
   "function early(value: Word) returns (Bool) { let prior = value; while (true) { let inside = value + 1; return true; } let skipped: Word = 99; return false; }",
-  "function unitBody(seed: Word) { let saved = seed; for (let i = 0; i < 2; i += 1) { let saved = i; } }",
-  "function failBody(seed: Word) returns (Word) { let prior = seed; for (let i = 0; true; i += 1) { let saved = prior + 1; let gap: Word; return gap; } let skipped = 26; return skipped; }",
+  "function unitBody(seed: Word) { let saved = seed; for (let i: Word = 0; i < 2; i += 1) { let saved = i; } }",
+  "function failBody(seed: Word) returns (Word) { let prior = seed; for (let i: Word = 0; true; i += 1) { let saved = prior + 1; let gap: Word; return gap; } let skipped = 26; return skipped; }",
   "function postFault(seed: Word) returns (Word) { let prior = seed; let gap: Word; for (let i = 0; i < 3; i += gap) { let saved = i + 1; } return prior; }",
-  "function nested(value: Word) returns (Word) { for (let i = 0; i < 2; i += 1) { while (true) { let seen = i; if (i == 0) { break; } else { return value; } } } return 0; }",
+  "function nested(value: Word) returns (Word) { for (let i: Word = 0; i < 2; i += 1) { while (true) { let seen = i; if (i == 0) { break; } else { return value; } } } return 0; }",
   "function integerBody(left: Word, right: Word) returns (integer) { return integerSub(wordToInteger(left), wordToInteger(right)); }",
   "function mapped(flag: Bool) returns (Word) { let m: mapping(Bool => Word); m[flag] = 27; return m[flag]; }",
   "function zero() returns (Word) { return calculate(0); }",
@@ -729,7 +729,7 @@ theorem same_ready : GenericImperativeMatch.Tree.ReadyFor policy registry faults
 end StaticCompatibility
 
 private def content : String := String.intercalate "\n" [
-  "function self(n: Word) returns (Word) { match ((n, n)) { case (0, terminal) { return terminal + 2; } default { let total = 0; for (let i = 0; i < 2; i += 1) { total += self(n - 1); } return total; } } }",
+  "function self(n: Word) returns (Word) { match ((n, n)) { case (0, terminal) { return terminal + 2; } default { let total = 0; for (let i: Word = 0; i < 2; i += 1) { total += self(n - 1); } return total; } } }",
   "function left(n: Word) returns (Word) { match (n) { case 0 { return 7; } default { return right(n - 1); } } }",
   "function right(n: Word) returns (Word) { let i = n; while (i != 0) { i -= 1; match (i) { case 0 { return left(i); } default { return left(i); } } } return 11; }",
   "function driver(n: Word) returns (Word) { let total = self(2); for (let i = 0; i < n; i += 1) { total += left(i); } return total; }",
@@ -903,7 +903,7 @@ theorem completed_call_reflected [FunctionCalls.FaultTokens faults]
 end ActualCalls
 
 private def content : String := String.intercalate "\n" [
-  "function self(n: Word) returns (Word) { if (n == 0) { return 2; } let total = 0; for (let i = 0; i < 2; i += 1) { total += self(n - 1); } return total; }",
+  "function self(n: Word) returns (Word) { if (n == 0) { return 2; } let total = 0; for (let i: Word = 0; i < 2; i += 1) { total += self(n - 1); } return total; }",
   "function left(n: Word) returns (Word) { return n == 0 ? 7 : right(n - 1); }",
   "function right(n: Word) returns (Word) { let i = n; while (i != 0) { i -= 1; return left(i); } return 11; }",
   "function driver(n: Word) returns (Word) { let total = self(2); for (let i = 0; i < n; i += 1) { total += left(i); } return total; }",

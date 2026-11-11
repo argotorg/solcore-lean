@@ -1715,16 +1715,26 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         | error error => simp [fittedRun, bind, Except.bind] at accepted
         | ok fitted =>
           simp only [fittedRun, bind, Except.bind] at accepted
-          have wordSafe : Safe protectedVars placeState (Detail.compoundOperandType operator (placeState.resolve place.type)) := safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+          have wordSafe : Safe protectedVars placeState (Detail.compoundOperandType operator (placeState.resolve place.type)) :=
+            safe_compoundOperandType (safe_resolved placeProperties.2.1 placePrivacy.2.1)
           have fittedPrivacy := ProtectedVariables.unify placePrivacy.2.1 wordSafe fittedRun
+          have operandBelow := Detail.compoundOperandType_variablesBelow (operator := operator)
+            (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
+          have fittedProgress := unify_inferenceProgress placeProperties.2.1.solved placeProperties.2.2
+            operandBelow fittedRun
+          have fittedReady := unify_preserves_inferenceReady placeProperties.2.1 placeProperties.2.2
+            operandBelow fittedRun
           exact finishValue fitted
-            (unify_inferenceProgress placeProperties.2.1.solved placeProperties.2.2 (Ty.variablesBelow_constructor _ _) fittedRun)
-            (unify_preserves_inferenceReady placeProperties.2.1 placeProperties.2.2 (Ty.variablesBelow_constructor _ _) fittedRun)
+            fittedProgress
+            fittedReady
             (unify_preserves_requirementsWellFormed fittedRun placeWF) fittedPrivacy
             (placePrivacy.2.2.1.unify placePrivacy.2.1 wordSafe fittedRun)
             (unify_fixes_protected placeFixed placePrivacy.2.1 wordSafe fittedRun) (Detail.unify_requirements_eq fittedRun)
-            (Detail.compoundOperandType operator (fitted.resolve place.type)) (Ty.variablesBelow_constructor _ _)
-            (safe_closed _ _ (Ty.variablesBelow_constructor 0 _)) (ih fitted) accepted
+            (Detail.compoundOperandType operator (fitted.resolve place.type))
+            (Detail.compoundOperandType_variablesBelow
+              (fittedProgress.resolve_variablesBelow placeProperties.2.2))
+            (safe_compoundOperandType (safe_resolved fittedReady (fittedPrivacy _ placePrivacy.2.1)))
+            (ih fitted) accepted
       cases operator with
       | equal =>
         simp only [pure, Pure.pure, Except.pure] at success

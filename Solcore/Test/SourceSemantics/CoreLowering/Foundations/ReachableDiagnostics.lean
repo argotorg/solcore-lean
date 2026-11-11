@@ -3027,8 +3027,8 @@ theorem terminal_if_reflects_at [FunctionCalls.FaultTokens faults] (budget size 
 end Concrete
 
 private def content : String := String.intercalate "\n" [
-  "function both(flag: Bool) returns (Word) { if (flag) { for (let i = 0; i < 1; i += 1) {} return 7; } else { while (false) {} return 9; } }",
-  "function block() returns (Word) { { for (let i = 0; i < 1; i += 1) {} return 11; } }",
+  "function both(flag: Bool) returns (Word) { if (flag) { for (let i: Word = 0; i < 1; i += 1) {} return 7; } else { while (false) {} return 9; } }",
+  "function block() returns (Word) { { for (let i: Word = 0; i < 1; i += 1) {} return 11; } }",
   "function nested(flag: Bool) returns (Word) { let saved = 13; { if (flag) { for (; true; ) { break; } return saved; } else { while (true) { break; } return 17; } } }",
   "function inFor(flag: Bool) returns (Word) { for (; true; ) { if (flag) { return 43; } else { return 47; } let gap: Word; gap; } return 99; }",
   "function inWhile(flag: Bool) returns (Word) { while (true) { { if (flag) { return 53; } else { return 59; } } let gap: Word; gap; } return 99; }",

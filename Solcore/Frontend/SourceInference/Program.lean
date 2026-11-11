@@ -395,8 +395,22 @@ def expressionTypeAt? (state : State) (expression : ExpressionId) : Option Ty :=
     | .expression node => if node.id = expression then some (state.resolve node.type) else none
     | .statement _ => none
 
+/-- Whether a type variable occurs in a compound assignment's target type, for
+an operator that takes its target's type (`compoundTakesTargetType`). -/
+def assignmentMentions (state : State) (typeVar : TypeVarId)
+    (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) : Bool :=
+  compoundTakesTargetType operator &&
+    (state.resolve assignment.target.type).freeVariables.contains typeVar
+
+/-- Whether a type variable occurs in a `for` item's compound target type. -/
+def forItemMentions (state : State) (typeVar : TypeVarId) : ForItemForm → Bool
+  | .assignValue assignment operator _ => assignmentMentions state typeVar assignment operator
+  | _ => false
+
 /-- Whether a type variable occurs in an operand type of a unary or binary
-operator: a builtin operator deferred on an open literal, or a comparison. -/
+operator (a builtin operator deferred on an open literal, or a comparison), or
+in the target type of a compound assignment that takes its target's type, a
+statement's or a `for` item's: upstream reads `x op= e` as `x = x op e`. -/
 def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
   let mentions (operand : ExpressionId) : Bool :=
     match expressionTypeAt? state operand with
@@ -409,7 +423,14 @@ def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
         | .unary _ operand => mentions operand
         | .binary left _ right => mentions left || mentions right
         | _ => false
-    | .statement _ => false
+    | .statement node =>
+        match node.form with
+        | .assignValue assignment operator _ =>
+            assignmentMentions state typeVar assignment operator
+        | .forLoop initializer _ post _ =>
+            initializer.any (forItemMentions state typeVar) ||
+              post.any (forItemMentions state typeVar)
+        | _ => false
 
 /-- Whether a type variable occurs in a pending requirement other than a
 literal's own builtin `Int`. -/
@@ -554,6 +575,45 @@ def validateIntegerLiteralTargets (state : State) :
       validateIntegerLiteralTarget origin state
       validateIntegerLiteralTargets state rest
 
+/-- Check one value assignment's target type once the defaults are in
+(`compoundTargetFits`), naming the assigned value. -/
+def validateAssignmentTarget (state : State) (assignment : AssignmentResolution)
+    (operator : Syntax.ValueAssignOp) (value : ExpressionId) : Except Error Unit :=
+  let type := state.resolve assignment.target.type
+  if compoundTargetFits operator type then pure ()
+  else throw (.compoundTargetNotSupported value operator type)
+
+/-- Check the value assignments among a `for` header's items. -/
+def validateForItemAssignmentTargets (state : State) :
+    List ForItemForm → Except Error Unit
+  | [] => .ok ()
+  | .assignValue assignment operator value :: rest => do
+      validateAssignmentTarget state assignment operator value
+      validateForItemAssignmentTargets state rest
+  | _ :: rest => validateForItemAssignmentTargets state rest
+
+/-- Check the value assignments of one node: an assignment statement's, or a
+`for` loop's header items. -/
+def validateAssignmentTargetNode (state : State) : Node → Except Error Unit
+  | .statement node =>
+      match node.form with
+      | .assignValue assignment operator value =>
+          validateAssignmentTarget state assignment operator value
+      | .forLoop initializer _ post _ => do
+          validateForItemAssignmentTargets state initializer
+          validateForItemAssignmentTargets state post
+      | _ => .ok ()
+  | .expression _ => .ok ()
+
+/-- Check every value assignment's target type. An open compound target waits
+for its type (`compoundOperandType`), so a literal it holds may default to
+`uint256` first. -/
+def validateAssignmentTargets (state : State) : List Node → Except Error Unit
+  | [] => .ok ()
+  | node :: rest => do
+      validateAssignmentTargetNode state node
+      validateAssignmentTargets state rest
+
 /-- Check the source spelling and exact inference metadata retained by one
 integer-literal expression node. -/
 def validateIntegerLiteralNode (state : State) : Node → Except Error Unit
@@ -611,6 +671,7 @@ def finalize (context : Context) (type : Ty) (state : State)
   let state ← defaultIntegerLiteralTargets state.integerLiterals state
   validateIntegerPatternTargets state state.integerPatterns
   validateIntegerLiteralTargets state state.integerLiterals
+  validateAssignmentTargets state state.nodes
   validateSourceRequirementOwnership (state.toTypedSource roots)
     state.requirements
   let substitution := state.inference.substitution
