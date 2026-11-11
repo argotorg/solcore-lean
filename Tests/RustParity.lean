@@ -50,6 +50,7 @@ private def loadStage : ProgramLoadError → String
   | .workspace _ => "workspace"
   | .syntaxInvariant _ _ => "parser-invariant"
   | .sourceDiagnostics _ lexical _ => if lexical.isEmpty then "parsing" else "lexing"
+  | .uncheckedBlock _ _ => "unchecked-blocks"
   | .environment _ => "name-resolution"
 
 private def checkStage : ProgramCheckError → String
