@@ -1412,7 +1412,7 @@ private def content : String := String.intercalate "\n" [
   "function recur<T>(value: T, count: Word) returns (T) { if (count == 0) { return value; } else { return recur(value, count - 1); } }",
   "function missing<T>(value: T) returns (T) { let absent: T; return absent; }",
   "function wordRoot() returns (Word) { return choose(7, true); }",
-  "function boolRoot() returns (Bool) { return choose(false, 9); }",
+  "function boolRoot() returns (Bool) { let nine: Word = 9; return choose(false, nine); }",
   "function constrained(value: Word) returns (Word) where Word: Marker { return relay(value); }",
   "function recurRoot() returns (Word) { return recur(13, 3); }",
   "function faultRoot() returns (Word) { return missing(7); }"
@@ -2335,7 +2335,7 @@ private def content : String := String.intercalate "\n" [
   "function loop(n: Word) returns (Word) { let total = 0; for (let i = 0; i < n; i += 1) { total += step(i); } return total; }",
   "function down(n: Word) returns (Word) { while (n != 0) { n -= 1; } return n; }",
   "function assign(m: mapping(Bool => Word)) returns (Word) { m[true] = step(6); return m[true]; }",
-  "function fail() returns (Word) { let saved = 17; let gap: Word; return gap; }",
+  "function fail() returns (Word) { let saved: Word = 17; let gap: Word; return gap; }",
   "function zero() {}"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -2599,7 +2599,7 @@ private def content : String := String.intercalate "\n" [
   "function side(x: Word) returns (Word) { return x; }",
   "function truth(x: Bool) returns (Bool) { return x; }",
   "function choose<A, B>(a: A, b: B) returns (A) { return a; }",
-  "function fail() returns (Word) { let written = 5; let gap: Word; return gap; }",
+  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
   "function rootWord() returns (Word) { return choose(side(7), truth(true)); }",
   "function rootBool() returns (Bool) { return choose(truth(false), side(9)); }",
   "function rootData() returns (Pair<Word, Bool>) { return Pair(side(11), truth(true)); }",
@@ -2820,7 +2820,7 @@ private def content : String := String.intercalate "\n" [
   "function pair<A, B>(first: A, second: B) returns ((A, B)) { return (first, second); }",
   "function wrap<T>(value: T) returns (Box<T>) { return Box(value); }",
   "function wordRoot() returns (Word) { return choose(9, false); }",
-  "function boolRoot() returns (Bool) { return choose(true, 8); }",
+  "function boolRoot() returns (Bool) { let eight: Word = 8; return choose(true, eight); }",
   "function pairRoot() returns ((Word, Bool)) { return pair(7, true); }",
   "function boxRoot() returns (Box<Word>) { return wrap(5); }"
 ]
@@ -3113,10 +3113,10 @@ private def content : String := String.intercalate "\n" [
   "enum Pair<A, B> { Pair(A, B) }",
   "function choose<A, B>(a: A, b: B) returns (A) { return a; }",
   "function side(x: Word) returns (Word) { return x; }",
-  "function fail() returns (Word) { let written = 5; let gap: Word; return gap; }",
-  "function unitRoot() { return choose((), 7); }",
+  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
+  "function unitRoot() { return choose((), side(7)); }",
   "function wordRoot() returns (Word) { return choose(side(7), side(7)); }",
-  "function flagRoot() returns (Bool) { return choose(false, 13); }",
+  "function flagRoot() returns (Bool) { return choose(false, side(13)); }",
   "function dataRoot() returns (Pair<Word, Bool>) { return Pair(choose(17, false), true); }",
   "function lateFault() returns (Word) { return choose(side(19), fail()); }"
 ]
@@ -3175,7 +3175,8 @@ private def inspect (compiled : SourceCoreUnifiedCompilation.Compiled) (names : 
             if instantiation.parameterSubstitution.length == 2 then generic := generic + 1
           | _ => pure ()
         | _ => pure ()
-  require (calls == 9 && generic == 5) s!"selected expressions coverage changed: calls={calls}, generic={generic}"
+  -- `unitRoot` and `flagRoot` pass `side(…)`, a `Word`, where an open literal would be ambiguous (row 1, step 7).
+  require (calls == 11 && generic == 5) s!"selected expressions coverage changed: calls={calls}, generic={generic}"
 
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String)
     (fuel : Nat) (initial : SourceTypedRuntime.RuntimeState) : IO SourceTypedRuntime.RunResult := do
@@ -3204,9 +3205,9 @@ def run : IO Unit := do
     | some instantiation => pure instantiation
     | none => throw (IO.userError "selected expressions constructor missing")
   let successes : List (String × SourceTypedRuntime.Value × List (TypeSystem.Ty × Option SourceTypedRuntime.Value)) := [
-    ("unitRoot", .unit, [(.unit, some .unit), (.word, some (w 7))]),
+    ("unitRoot", .unit, [(.word, some (w 7)), (.unit, some .unit), (.word, some (w 7))]),
     ("wordRoot", w 7, [(.word, some (w 7)), (.word, some (w 7)), (.word, some (w 7)), (.word, some (w 7))]),
-    ("flagRoot", .bool false, [(.bool, some (.bool false)), (.word, some (w 13))]),
+    ("flagRoot", .bool false, [(.word, some (w 13)), (.bool, some (.bool false)), (.word, some (w 13))]),
     ("dataRoot", .constructed actualPair [w 17, .bool true], [(.word, some (w 17)), (.bool, some (.bool false))])]
   let initial : SourceTypedRuntime.RuntimeState := {heap := [⟨.word, some (w 819)⟩]}
   let baselines ← successes.mapM (fun test => finish compiled test.1 300000 initial)
@@ -3284,7 +3285,7 @@ private def content : String := String.intercalate "\n" [
   "function first<A, B>(one: A, two: B) returns (A) { return one; }",
   "function reverse<A, B>(one: A, two: B) returns ((B, A)) { return (two, one); }",
   "function wordRoot() returns (Word) { return first(7, true); }",
-  "function boolRoot() returns (Bool) { return first(false, 9); }",
+  "function boolRoot() returns (Bool) { let nine: Word = 9; return first(false, nine); }",
   "function pairRoot() returns ((Bool, Word)) { return reverse(11, false); }"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue

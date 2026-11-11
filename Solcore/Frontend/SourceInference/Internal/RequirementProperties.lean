@@ -2143,8 +2143,9 @@ theorem inferMatchPatternFlatFuel_integerLiteral_metadata
                 metavariable := ⟨state.inference.next⟩
                 span := pattern.span
                 requirement := ⟨state.nextRequirement⟩
+                rawValue
               } : IntegerPatternOrigin), ?_⟩
-            simp
+            simp_all
       | hexadecimal spelling =>
           unfold inferMatchPatternFlatFuel at success
           simp only [patternValue, literalValue, numeric, bind, Except.bind]
@@ -2170,8 +2171,9 @@ theorem inferMatchPatternFlatFuel_integerLiteral_metadata
                 metavariable := ⟨state.inference.next⟩
                 span := pattern.span
                 requirement := ⟨state.nextRequirement⟩
+                rawValue
               } : IntegerPatternOrigin), ?_⟩
-            simp
+            simp_all
 
 /-- Re-index the direct integer-pattern metadata by the concrete resolution
 already exposed by a successful result.  This is the callback-facing form:

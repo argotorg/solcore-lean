@@ -821,7 +821,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function inherited() returns (Word) where Word: Mark { return empty(); }",
     "function referenced() returns (Word) { let f: function() returns (Word) = value; return f(); }",
     "function keep<T>(item: T) returns (T) where T: Mark { return item; }",
-    "function local(flag: Bool) returns (Word, Word) { let f = lam(item) { keep(item); return value(); }; return (f(7), f(flag)); }",
+    "function local(flag: Bool) returns (Word, Word) { let f = lam(item) { keep(item); return value(); }; let seven: Word = 7; return (f(seven), f(flag)); }",
     "function failed() returns (Word) { let table: mapping(Word => Word); table[0] = value(); let absent: Word; return absent; }"
   ]}] }
 
@@ -1845,8 +1845,8 @@ private def workspace : Workspace.RawWorkspace := {
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function views(seed: Word) returns (F, F) { let f = lam(item) { keep(item); seed += 1; return seed; }; return (f, f); }",
-    "function nested(seed: Word) returns (F, F) { let outer = lam(value) { keep(value); let inner = lam(item) { keep(item); seed += 1; return seed; }; return (inner, inner); }; return outer(1); }",
-    "function shared(seed: Word) returns (F, F) { let shared = lam(item) { seed += 1; return seed; }; let outer = lam(value) { keep(value); return (shared, shared); }; return outer(1); }",
+    "function nested(seed: Word) returns (F, F) { let outer = lam(value) { keep(value); let inner = lam(item) { keep(item); seed += 1; return seed; }; return (inner, inner); }; let one: Word = 1; return outer(one); }",
+    "function shared(seed: Word) returns (F, F) { let shared = lam(item) { seed += 1; return seed; }; let outer = lam(value) { keep(value); return (shared, shared); }; let one: Word = 1; return outer(one); }",
     "function mono(seed: Word) returns (F) { let f: F = lam(item: Word) -> Word { seed += item; return seed; }; return f; }",
     "function failure(seed: Word) returns (Word) { let f = lam(item) { keep(item); seed += 1; return seed; }; let captured: F = f; let absent: Word; return absent; }",
     "function suspended(seed: Word) returns (Word) { let f = lam(item) { keep(item); seed += 1; return seed; }; let captured: F = f; while (true) {} return 0; }"
@@ -2143,8 +2143,8 @@ private def workspace : Workspace.RawWorkspace := {
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function qualified(seed: Word) returns (F) { let f = lam(item) { keep(item); seed += 1; return seed; }; return f; }",
-    "function nested(seed: Word) returns (F) { let outer = lam(value) { keep(value); let inner = lam(item) { keep(item); seed += 1; return seed; }; return inner; }; return outer(1); }",
-    "function shared(seed: Word) returns (F) { let f = lam(item) { seed += 1; return seed; }; let outer = lam(value) { keep(value); return f; }; return outer(1); }",
+    "function nested(seed: Word) returns (F) { let outer = lam(value) { keep(value); let inner = lam(item) { keep(item); seed += 1; return seed; }; return inner; }; let one: Word = 1; return outer(one); }",
+    "function shared(seed: Word) returns (F) { let f = lam(item) { seed += 1; return seed; }; let outer = lam(value) { keep(value); return f; }; let one: Word = 1; return outer(one); }",
     "function mono(seed: Word) returns (F) { let f: F = lam(item: Word) -> Word { seed += item; return seed; }; return f; }",
     "function failure(seed: Word) returns (Word) { let f = lam(item) { keep(item); seed += 1; return seed; }; let captured: F = f; let absent: Word; return absent; }",
     "function suspended(seed: Word) returns (Word) { let f = lam(item) { keep(item); seed += 1; return seed; }; let captured: F = f; while (true) {} return 0; }",
@@ -2343,7 +2343,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function recursive(n: Word) returns (Word) { let f: F; f = lam(left: Word) { return left == 0 ? 0 : f(left - 1) + 1; }; return f(n); }",
     "function unused() returns (Word) { let unused = lam(item) { return item; }; return 7; }",
     "function looping(limit: Word) returns (Word) { let total = 0; for (let i = 0; i < limit; i += 1) { total += i; } return total; }",
-    "function absent(seed: Word) returns (Word) { let f = lam(item) { seed += 1; let absent: Word; return absent; }; return f(0); }",
+    "function absent(seed: Word) returns (Word) { let f = lam(item) { seed += 1; let absent: Word; return absent; }; let zero: Word = 0; return f(zero); }",
     "function spin() returns (Word) { let f = lam() -> Word { while (true) {} return 0; }; return f(); }"
   ]}] }
 private def key (program : CheckedProgram) (name : String) : IO Key :=
@@ -2600,7 +2600,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function nested(flag: Bool) returns (Word, Word) {",
     " let outer = lam(value) { keep(value); let inner = lam(item) { return keep(item); };",
     " let untouched = lam(other) { return other; }; return inner(1); };",
-    " return (outer(1), outer(flag)); }",
+    " let one: Word = 1; return (outer(one), outer(flag)); }",
     "function enclosing<T>(value: T) returns (T) where T: Mark { let ignored = lam(item) { return item; }; return keep(value); }",
     "function reachable(flag: Bool) returns (Word, Bool) { return (enclosing(1), enclosing(flag)); }"
   ]}] }
@@ -3208,10 +3208,10 @@ private def workspace : Workspace.RawWorkspace := {
     " let f = lam(item) { return keep(item); }; return (f(1), f(2), f(flag)); }",
     "function nested(flag: Bool) returns (Word, Word) {",
     " let outer = lam(value) { keep(value); let inner = lam(item) { return keep(item); }; return inner(1); };",
-    " return (outer(1), outer(flag)); }",
+    " let one: Word = 1; return (outer(one), outer(flag)); }",
     "function nestedMono(flag: Bool) returns (Word, Word) {",
     " let outer = lam(value) { keep(value); let f: WordFunction = lam(item: Word) -> Word { return item; }; return f(1); };",
-    " return (outer(1), outer(flag)); }"
+    " let one: Word = 1; return (outer(one), outer(flag)); }"
   ]}] }
 
 private def key (program : CheckedProgram) (name : String) : IO Key := do

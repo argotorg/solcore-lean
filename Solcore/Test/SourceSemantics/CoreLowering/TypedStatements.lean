@@ -527,7 +527,7 @@ private def content : String := String.intercalate "\n" [
   "function nestedDefault(seed: Word) returns (Word) { { match (seed) { case 0 { return 19; } default { return 23; } } } let gap: Word; gap; }",
   "function nestedIf(seed: Word) returns (Word) { if (seed == 0) { match (seed) { case 0 { return 29; } default { return 31; } } } else { return 37; } let gap: Word; gap; }",
   "function deep(seed: Word) returns (Word) { { match (seed) { case 0 { return 47; } default { { match (seed + 1) { case 2 { return 41; } default { return 43; } } } } } } return 99; }",
-  "function prefix(seed: Word) returns (Word) { let stamp = 53; { match (seed) { case 0 { let gap: Word; return gap; } default { return 59; } } } let dead = 99; return dead; }",
+  "function prefix(seed: Word) returns (Word) { let stamp: Word = 53; { match (seed) { case 0 { let gap: Word; return gap; } default { return 59; } } } let dead = 99; return dead; }",
   "function unit(seed: Word) returns (Unit) { { match (seed) { case 0 { return; } default { return; } } } let gap: Word; gap; }",
   "function ordinary(seed: Word) returns (Word) { match (seed) { case 0 {} default { return 71; } } return 67; }",
   "function noDefault(value: Choice) returns (Word) { match (value) { case .Left(x) { return x; } case .Right(y) { return y; } } }"
@@ -883,12 +883,12 @@ end CompilerBridge
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
     "function mixed() returns (Word) { let sum = 0; for (let i: Word, i = 0, let flag: Bool = true; i < 3; let copy = i, i = copy + 1) { if (flag) { sum += i; } } return sum; }",
-    "function shadow() returns (Word) { let i = 17; for (let i = 0; i < 2; let copy = i, i = copy + 1) { continue; } return i; }",
-    "function falseFirst() returns (Word) { for (let i = 5; false; let never = 99) { return 0; } return 5; }",
-    "function breaks() returns (Word) { for (let i = 0; true; let never = 99) { break; } return 1; }",
-    "function returns() returns (Word) { for (let i = 0; true; let never = 99) { return i; } return 1; }",
-    "function initializerFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let ready = 1, let dead = seen[false] + missing; true; ) { return 0; } return 1; }",
-    "function postFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let i = 0; true; let copy = i, i = seen[false] + missing, let never = 99) { continue; } return 1; }",
+    "function shadow() returns (Word) { let i = 17; for (let i: Word = 0; i < 2; let copy = i, i = copy + 1) { continue; } return i; }",
+    "function falseFirst() returns (Word) { for (let i: Word = 5; false; let never: Word = 99) { return 0; } return 5; }",
+    "function breaks() returns (Word) { for (let i: Word = 0; true; let never: Word = 99) { break; } return 1; }",
+    "function returns() returns (Word) { for (let i = 0; true; let never: Word = 99) { return i; } return 1; }",
+    "function initializerFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let ready: Word = 1, let dead = seen[false] + missing; true; ) { return 0; } return 1; }",
+    "function postFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let i = 0; true; let copy = i, i = seen[false] + missing, let never: Word = 99) { continue; } return 1; }",
     "function postAbsent() returns (Word) { for (let i = 0; true; let absent: Word, i = absent) { continue; } return 1; }"
   ]}] }
 private def escape : Workspace.RawWorkspace := {
@@ -1396,11 +1396,11 @@ private def workspace : Workspace.RawWorkspace := {
     "function nested() returns (Word) { let sum = 0; let m: mapping(Bool => Word); for (let i: Word, i = 0; i < 3; let copy = i, i = copy + 1) { let j = 0; while (j < 2) { j += 1; if (j == 1) { continue; } for (let k = 0; k < 2; k += 1) { m[true] = i * 10 + j + k; sum += k; } } } return m[true] + sum; }",
     "function transfers() returns (Word) { let sum = 0; for (let i = 0; i < 5; let copy = i, i = copy + 1) { if (i == 1) { continue; } { let copy = i; sum += copy; } if (i == 3) { break; } } return sum; }",
     "function early() returns (Word) { for (let i = 0; true; let copy = i, i = copy + 1) { for (let j = 0; j < 2; j += 1) { if (i == 2) { return i + j; } } } return 99; }",
-    "function falseFirst() returns (Word) { let i = 17; for (let i = 3; false; let never = 99) { return 0; } return i; }",
-    "function bodyFault() returns (Word) { let m: mapping(Bool => Word); let keys: mapping(Bool => Bool); let lazy: mapping(Bool => Word); let missing: Word; for (let i = 0; i < 2; let never = 99) { i += 1; m[keys[true]] = lazy[false] + missing; } return 0; }",
-    "function postFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let i = 0; true; let copy = i, i = seen[false] + missing, let never = 99) { continue; } return 1; }",
-    "function initializerFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let ready = 1, let dead = seen[false] + missing; true; ) { return 0; } return 1; }",
-    "function conditionFault() returns (Word) { let missing: Bool; let seen: mapping(Bool => Bool); for (let ready = 1; seen[false] || missing; let never = 99) { return 0; } return 1; }"
+    "function falseFirst() returns (Word) { let i = 17; for (let i: Word = 3; false; let never: Word = 99) { return 0; } return i; }",
+    "function bodyFault() returns (Word) { let m: mapping(Bool => Word); let keys: mapping(Bool => Bool); let lazy: mapping(Bool => Word); let missing: Word; for (let i = 0; i < 2; let never: Word = 99) { i += 1; m[keys[true]] = lazy[false] + missing; } return 0; }",
+    "function postFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let i = 0; true; let copy = i, i = seen[false] + missing, let never: Word = 99) { continue; } return 1; }",
+    "function initializerFault() returns (Word) { let missing: Word; let seen: mapping(Bool => Word); for (let ready: Word = 1, let dead = seen[false] + missing; true; ) { return 0; } return 1; }",
+    "function conditionFault() returns (Word) { let missing: Bool; let seen: mapping(Bool => Bool); for (let ready: Word = 1; seen[false] || missing; let never: Word = 99) { return 0; } return 1; }"
   ]}] }
 private def escape : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
@@ -1649,9 +1649,9 @@ private def workspace : Workspace.RawWorkspace := {
     "function transfer() returns (Word) { let x = 5; for (x ~=, let i = 0; true; x ~=, i += 1) { if (i == 0) { continue; } { x ~=; break; } } return x; }",
     "function early() returns (Word) { let x = 9; for (x ~=; true; x ~=) { x ~=; return x; } return 0; }",
     "function falseFirst() returns (Word) { let x = 2; for (x ~=; false; x ~=) { x ~=; } return x; }",
-    "function postFault() returns (Word) { let missing: Word; let seen = 0; for (let i = 0; true; let copy = i, seen = 8, missing ~=, let never = 99) { seen = 3; continue; } return 1; }",
-    "function initializerFault() returns (Word) { let missing: Word; let seen = 0; for (seen = 6, missing ~=, let never = 99; true; ) { seen = 3; } return 1; }",
-    "function bodyFault() returns (Word) { let missing: Word; let seen = 0; for (seen = 6; true; seen = 7) { { missing ~=; } seen = 8; } return 1; }"
+    "function postFault() returns (Word) { let missing: Word; let seen: Word = 0; for (let i: Word = 0; true; let copy = i, seen = 8, missing ~=, let never: Word = 99) { seen = 3; continue; } return 1; }",
+    "function initializerFault() returns (Word) { let missing: Word; let seen: Word = 0; for (seen = 6, missing ~=, let never: Word = 99; true; ) { seen = 3; } return 1; }",
+    "function bodyFault() returns (Word) { let missing: Word; let seen: Word = 0; for (seen = 6; true; seen = 7) { { missing ~=; } seen = 8; } return 1; }"
   ]}] }
 private def rejected : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=

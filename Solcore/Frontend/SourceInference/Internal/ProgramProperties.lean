@@ -1062,17 +1062,40 @@ theorem validateSourceLocalSchemeNoCapture_success
   · intro supported
     rcases supported with rfl | rfl <;> rfl
 
-/-- Successful pattern-target validation exposes exactly the two carriers
-implemented by source pattern matching. -/
+@[simp] theorem supportedIntegerPatternTarget_eq_true_iff
+    (type : Ty) :
+    supportedIntegerPatternTarget type = true ↔ type.IntegerPatternCarrier := by
+  unfold Ty.IntegerPatternCarrier
+  constructor
+  · intro supported
+    cases type with
+    | constructor constructor =>
+      cases constructor with
+      | builtin builtin =>
+        cases builtin with
+        | fixed fixed =>
+          rcases fixed with ⟨signed, width⟩
+          cases signed <;> cases width <;>
+            simp [supportedIntegerPatternTarget, supportedIntegerTarget, Ty.fixed,
+              TypeSystem.FixedInteger.uint256] at supported ⊢
+        | _ =>
+          simp [supportedIntegerPatternTarget, supportedIntegerTarget, Ty.word,
+            Ty.integer, Ty.fixed] at supported ⊢
+      | declaration declaration =>
+        simp [supportedIntegerPatternTarget, supportedIntegerTarget] at supported
+    | _ => simp [supportedIntegerPatternTarget, supportedIntegerTarget] at supported
+  · rintro (rfl | rfl | rfl) <;> rfl
+
+/-- Successful pattern-target validation exposes exactly the carriers
+implemented by source pattern matching: `word`, `integer` and `uint256`. -/
 theorem validateIntegerPatternTarget_success_supported
     {state : State} {origin : IntegerPatternOrigin}
     (success : validateIntegerPatternTarget origin state = .ok ()) :
-    state.resolve (.variable origin.metavariable) = .word ∨
-      state.resolve (.variable origin.metavariable) = .integer := by
+    (state.resolve (.variable origin.metavariable)).IntegerPatternCarrier := by
   simp only [validateIntegerPatternTarget] at success
-  by_cases supported : supportedIntegerTarget
+  by_cases supported : supportedIntegerPatternTarget
       (state.resolve (.variable origin.metavariable)) = true
-  · exact (supportedIntegerTarget_eq_true_iff _).mp supported
+  · exact (supportedIntegerPatternTarget_eq_true_iff _).mp supported
   · simp [supported] at success
 
 /-- Successful validation of the complete pattern-origin row supports every
@@ -1081,8 +1104,7 @@ theorem validateIntegerPatternTargets_success_supported
     {state : State} {origins : List IntegerPatternOrigin}
     (success : validateIntegerPatternTargets state origins = .ok ()) :
     ∀ origin, origin ∈ origins →
-      state.resolve (.variable origin.metavariable) = .word ∨
-        state.resolve (.variable origin.metavariable) = .integer := by
+      (state.resolve (.variable origin.metavariable)).IntegerPatternCarrier := by
   induction origins with
   | nil =>
       intro origin member
@@ -1495,7 +1517,9 @@ theorem defaultIntegerLiteralTarget_localSchemeAssumptions
     next.localSchemeAssumptions = state.localSchemeAssumptions := by
   cases resolved : state.resolve (.variable origin.metavariable) <;>
     simp [defaultIntegerLiteralTarget, resolved] at result
-  · exact unify_localSchemeAssumptions result
+  · split at result
+    · exact unify_localSchemeAssumptions result
+    · cases result
   all_goals cases result <;> rfl
 
 theorem defaultIntegerLiteralTargets_localSchemeAssumptions
@@ -1526,7 +1550,9 @@ theorem defaultIntegerLiteralTarget_integerLiterals
     next.integerLiterals = state.integerLiterals := by
   cases resolved : state.resolve (.variable origin.metavariable) <;>
     simp [defaultIntegerLiteralTarget, resolved] at result
-  · exact unify_integerLiterals result
+  · split at result
+    · exact unify_integerLiterals result
+    · cases result
   all_goals cases result <;> rfl
 
 theorem defaultIntegerLiteralTargets_integerLiterals
@@ -1557,7 +1583,9 @@ theorem defaultIntegerLiteralTarget_integerPatterns
     next.integerPatterns = state.integerPatterns := by
   cases resolved : state.resolve (.variable origin.metavariable) <;>
     simp [defaultIntegerLiteralTarget, resolved] at result
-  · exact unify_integerPatterns result
+  · split at result
+    · exact unify_integerPatterns result
+    · cases result
   all_goals cases result <;> rfl
 
 theorem defaultIntegerLiteralTargets_integerPatterns
@@ -1588,7 +1616,9 @@ theorem defaultIntegerLiteralTarget_requirements
     next.requirements = state.requirements := by
   cases resolved : state.resolve (.variable origin.metavariable) <;>
     simp [defaultIntegerLiteralTarget, resolved] at result
-  · exact unify_requirements_eq result
+  · split at result
+    · exact unify_requirements_eq result
+    · cases result
   all_goals cases result <;> rfl
 
 theorem defaultIntegerLiteralTargets_requirements
@@ -1628,7 +1658,7 @@ theorem defaultIntegerPatternTarget_inferenceProperties
   · have targetBelow : (Ty.variable origin.metavariable).VariablesBelow
         state.inference.next :=
       (Ty.variablesBelow_variable_iff _ _).2 originBelow
-    have wordBelow : Ty.word.VariablesBelow state.inference.next :=
+    have wordBelow : (Ty.fixed .uint256).VariablesBelow state.inference.next :=
       Ty.variablesBelow_constructor _ _
     exact ⟨unify_inferenceProgress ready.solved targetBelow wordBelow success,
       unify_preserves_inferenceReady ready targetBelow wordBelow success⟩
@@ -1680,13 +1710,15 @@ theorem defaultIntegerLiteralTarget_inferenceProperties
     state.InferenceProgress next ∧ next.InferenceReady := by
   cases resolved : state.resolve (.variable origin.metavariable) <;>
     simp [defaultIntegerLiteralTarget, resolved] at success
-  · have targetBelow : (Ty.variable origin.metavariable).VariablesBelow
-        state.inference.next :=
-      (Ty.variablesBelow_variable_iff _ _).2 originBelow
-    have wordBelow : Ty.word.VariablesBelow state.inference.next :=
-      Ty.variablesBelow_constructor _ _
-    exact ⟨unify_inferenceProgress ready.solved targetBelow wordBelow success,
-      unify_preserves_inferenceReady ready targetBelow wordBelow success⟩
+  · split at success
+    · have targetBelow : (Ty.variable origin.metavariable).VariablesBelow
+          state.inference.next :=
+        (Ty.variablesBelow_variable_iff _ _).2 originBelow
+      have wordBelow : (Ty.fixed .uint256).VariablesBelow state.inference.next :=
+        Ty.variablesBelow_constructor _ _
+      exact ⟨unify_inferenceProgress ready.solved targetBelow wordBelow success,
+        unify_preserves_inferenceReady ready targetBelow wordBelow success⟩
+    · cases success
   all_goals cases success
   all_goals exact ⟨State.InferenceProgress.refl ready.solved, ready⟩
 
@@ -1776,7 +1808,9 @@ theorem defaultIntegerLiteralTarget_preserves_resolve_eq
     next.resolve left = next.resolve right := by
   cases resolved : state.resolve (.variable origin.metavariable) <;>
     simp [defaultIntegerLiteralTarget, resolved] at success
-  · exact unify_preserves_resolve_eq equal success
+  · split at success
+    · exact unify_preserves_resolve_eq equal success
+    · cases success
   all_goals cases success
   all_goals exact equal
 
@@ -1857,7 +1891,9 @@ private theorem defaultIntegerLiteralTarget_toTypedSource
     next.toTypedSource roots = state.toTypedSource roots := by
   cases resolved : state.resolve (.variable origin.metavariable) <;>
     simp [defaultIntegerLiteralTarget, resolved] at result
-  · exact unify_toTypedSource result
+  · split at result
+    · exact unify_toTypedSource result
+    · cases result
   all_goals cases result <;> rfl
 
 private theorem defaultIntegerLiteralTargets_toTypedSource
@@ -2516,8 +2552,7 @@ theorem finalize_integerPatternTarget_supported
     {roots : List NodeId} {result : Result}
     (success : finalize context type state roots = .ok result) :
     ∀ origin, origin ∈ state.integerPatterns →
-      result.substitution.apply (.variable origin.metavariable) = .word ∨
-        result.substitution.apply (.variable origin.metavariable) = .integer := by
+      (result.substitution.apply (.variable origin.metavariable)).IntegerPatternCarrier := by
   obtain ⟨patternState, finalState, _, _, _, _, _, patternResult,
       literalResult, patternValidation, _, _, _, resultEq⟩ :=
     finalize_success_witness success

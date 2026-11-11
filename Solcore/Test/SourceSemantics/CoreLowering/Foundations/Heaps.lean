@@ -254,7 +254,7 @@ private def workspace : Workspace.RawWorkspace := {
     "}",
     "function nested(flag: Bool) returns (Word, Word) {",
     " let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); };",
-    " return (outer(1), outer(flag)); }"
+    " let one: Word = 1; return (outer(one), outer(flag)); }"
   ]}]
 }
 
@@ -2056,7 +2056,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function nested(flag: Bool) returns (Word, Word) {",
     " let outer = lam(value) { keep(value);",
     "   let inner = lam(item) { return keep(item); }; return inner(1); };",
-    " return (outer(1), outer(flag)); }"
+    " let one: Word = 1; return (outer(one), outer(flag)); }"
   ] }] }
 
 private def plan (program : CheckedProgram) (name : String) : IO SourceSpecializationWorklist.Plan := do
@@ -2271,8 +2271,8 @@ private def workspace : Workspace.RawWorkspace := {
     "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function qualified(flag: Bool) returns (Word, Bool) { let f = lam(item) { return keep(item); }; return (f(19), f(flag)); }",
-    "function qualifiedNested(flag: Bool) returns (Word, Word) { let outer = lam(value) { keep(value); let inner = lam(item) { return keep(item); }; return inner(1); }; return (outer(1), outer(flag)); }",
-    "function qualifiedCapture(flag: Bool) returns (Word) { let count: Word = 0; let f = lam(item) { count += 1; return keep(item); }; f(1); f(flag); return count; }",
+    "function qualifiedNested(flag: Bool) returns (Word, Word) { let outer = lam(value) { keep(value); let inner = lam(item) { return keep(item); }; return inner(1); }; let one: Word = 1; return (outer(one), outer(flag)); }",
+    "function qualifiedCapture(flag: Bool) returns (Word) { let count: Word = 0; let f = lam(item) { count += 1; return keep(item); }; let one: Word = 1; f(one); f(flag); return count; }",
     "type WordFunction = function(Word) returns (Word);",
     "function qualifiedMaker(seed: Word) returns (WordFunction) { let count: Word = seed; let f = lam(item) { keep(item); count += 1; return count; }; return f; }",
     "function useFunction(f: WordFunction, value: Word) returns (Word) { return f(value); }",
@@ -2280,9 +2280,9 @@ private def workspace : Workspace.RawWorkspace := {
     "function local(flag: Bool) returns (Word, Bool) { let f = lam(item) { return identity(item); }; return (f(11), f(flag)); }",
     "function nested(flag: Bool) returns (Word, Bool) { let outer = lam(item) { let inner = lam(value) { return identity(value); }; return inner(item); }; return (outer(13), outer(flag)); }",
     "function recursiveContext(flag: Bool) returns (Word, Bool) { let outer = lam(value) { let middle = lam(item) { let inner = lam(innerValue) { return identity(innerValue); }; return inner(item); }; return middle(value); }; return (outer(15), outer(flag)); }",
-    "function sameInnerType(flag: Bool) returns (Word, Word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); }; return (outer(1), outer(flag)); }",
+    "function sameInnerType(flag: Bool) returns (Word, Word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); }; let one: Word = 1; return (outer(one), outer(flag)); }",
     "function dependentInner(flag: Bool) returns ((Word, Word), (Bool, Bool)) { let outer = lam(value) { let inner = lam(item) { return (value, item); }; return inner(value); }; return (outer(1), outer(flag)); }",
-    "function repeatedCapture(flag: Bool) returns (Word) { let total: Word = 0; let f = lam(item) { total += 1; return item; }; f(1); f(flag); f(2); return total; }",
+    "function repeatedCapture(flag: Bool) returns (Word) { let total: Word = 0; let f = lam(item) { total += 1; return item; }; let one: Word = 1; let two: Word = 2; f(one); f(flag); f(two); return total; }",
     "function unused() returns (Word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(value); }; return 9; }",
     "enum Box<T> { Full(T) }",
     "function intermediate(flag: Bool) returns (Word, Bool) { let f = lam(item) { let box = Box.Full(item); match (box) { case .Full(value) { return value; } } }; return (f(17), f(flag)); }"

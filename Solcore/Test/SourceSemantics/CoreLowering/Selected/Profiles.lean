@@ -2641,7 +2641,7 @@ def basicWorkspace : Workspace.RawWorkspace := {
 
 def tupleContent : String := String.intercalate "\n" [
   "function side(x: Word) returns (Word) { return x; }",
-  "function fail() returns (Word) { let written = 5; let gap: Word; return gap; }",
+  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
   "function triple() returns ((Word, Bool, Word)) { return (side(7), true, 3 + 4); }",
   "function quadruple() returns ((Word, Bool, Word, Bool)) { return (side(11), false, side(13), true); }",
   "function nested() returns (((Word, Bool, Word), Word, Bool)) { return ((side(17), true, 5 + 6), side(19), false); }",

@@ -189,7 +189,7 @@ private def workspace : Workspace.RawWorkspace := {
     " let f = lam(item) { return item; }; return (f(1), f(flag)); }",
     "function nested(flag: Bool) returns (Word, Word) {",
     " let outer = lam(value) { keep(value); let inner = lam(item) { return keep(item); }; return inner(1); };",
-    " return (outer(1), outer(flag)); }",
+    " let one: Word = 1; return (outer(one), outer(flag)); }",
     "function builtin(value: Word) returns (integer) { let op = wordToInteger; return op(value); }"
   ] }] }
 

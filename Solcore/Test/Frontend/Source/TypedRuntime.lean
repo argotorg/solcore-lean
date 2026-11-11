@@ -470,7 +470,7 @@ private def source : String := String.intercalate "\n" [
   "}",
   "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
   "function localProof(flag: Bool) returns (Word, Bool) {",
-  "  let f = lam(value) { return keepAs(1, value); };",
+  "  let f = lam(value) { let one: Word = 1; return keepAs(one, value); };",
   "  return (f(2), f(flag));",
   "}",
   "function localGenericCalls(flag: Bool) returns (Word, Bool) {",

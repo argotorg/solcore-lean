@@ -971,7 +971,7 @@ private def workspace : Workspace.RawWorkspace := {
         "}",
         "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
         "function localProof(flag: Bool) returns (Word, Bool) {",
-        "  let f = lam(value) { return keepAs(1, value); };",
+        "  let f = lam(value) { let one: Word = 1; return keepAs(one, value); };",
         "  return (f(2), f(flag));",
         "}",
         "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
@@ -2359,16 +2359,19 @@ private def testDeferredIntegerOperators : IO Unit := do
   | .error error => throw (IO.userError
       s!"public deferred complement failed: {reprStr error}")
 
+/-- An unconstrained literal is rejected as ambiguous (row 1, step 7); none
+defaults to `Word`. This execution path links Word and Integer values only, so
+the `uint256` default is exercised through `SourceCoreExecution` instead. -/
 private def testDefaultedIntegerLiterals : IO Unit := do
   let moduleId ← mainModule "main.solc"
   let workspace := rawWorkspace "main.solc" [("main.solc",
     "function defaulted() returns (Word) { let unused = 1; return 9; }")]
   match run workspace (Seed.named moduleId "defaulted") [] generousLimits with
-  | .ok result =>
-      assertTrue (decide (result = .done (.word (word 9)) []))
-        "public execution did not default unconstrained integer literals to Word"
+  | .error (.checking [.inference { error := .ambiguousIntegerLiteral _, .. }]) => pure ()
+  | .ok _ => throw (IO.userError
+      "public execution accepted an unconstrained integer literal")
   | .error error => throw (IO.userError
-      s!"public defaulted integer literal failed: {reprStr error}")
+      s!"public unconstrained integer literal failed otherwise: {reprStr error}")
 
 private def testDefaultImplementationPriority : IO Unit := do
   let moduleId ← mainModule "main.solc"

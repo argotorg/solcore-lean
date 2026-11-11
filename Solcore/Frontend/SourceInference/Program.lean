@@ -363,10 +363,11 @@ def validateNumericOriginsBelowNext (state : State) : Except Error Unit := do
     (fun origin : IntegerLiteralOrigin => origin.metavariable)
     state.integerLiterals
 
+/-- An open numeric pattern defaults to `uint256`. -/
 def defaultIntegerPatternTarget (state : State)
     (origin : IntegerPatternOrigin) : Except Error State :=
   match state.resolve (.variable origin.metavariable) with
-  | .variable _ => unify state (.variable origin.metavariable) .word
+  | .variable _ => unify state (.variable origin.metavariable) (.fixed .uint256)
   | _ => pure state
 
 def defaultIntegerPatternTargets :
@@ -376,10 +377,69 @@ def defaultIntegerPatternTargets :
       let state ← defaultIntegerPatternTarget state origin
       defaultIntegerPatternTargets rest state
 
+/-- The source of the integer-literal node at one expression identity. -/
+def literalSourceAt? (state : State) (expression : ExpressionId) :
+    Option Syntax.CoreLiteralValue :=
+  state.nodes.findSome? fun node =>
+    match node with
+    | .expression node =>
+        match node.form with
+        | .integerLiteral source _ => if node.id = expression then some source else none
+        | _ => none
+    | .statement _ => none
+
+/-- The resolved type of the expression node at one identity. -/
+def expressionTypeAt? (state : State) (expression : ExpressionId) : Option Ty :=
+  state.nodes.findSome? fun node =>
+    match node with
+    | .expression node => if node.id = expression then some (state.resolve node.type) else none
+    | .statement _ => none
+
+/-- Whether a type variable occurs in an operand type of a unary or binary
+operator: a builtin operator deferred on an open literal, or a comparison. -/
+def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
+  let mentions (operand : ExpressionId) : Bool :=
+    match expressionTypeAt? state operand with
+    | some type => type.freeVariables.contains typeVar
+    | none => false
+  state.nodes.any fun node =>
+    match node with
+    | .expression node =>
+        match node.form with
+        | .unary _ operand => mentions operand
+        | .binary left _ right => mentions left || mentions right
+        | _ => false
+    | .statement _ => false
+
+/-- Whether a type variable occurs in a pending requirement other than a
+literal's own builtin `Int`. -/
+def requirementMentions (state : State) (typeVar : TypeVarId) : Bool :=
+  state.requirements.any fun requirement =>
+    requirement.predicate.trait != ProgramTraitId.builtin .int &&
+      let predicate := applyPredicate state requirement.predicate
+      (predicate.subject.freeVariables.contains typeVar ||
+        predicate.arguments.any fun argument => argument.freeVariables.contains typeVar)
+
+/-- An open literal defaults to `uint256` when its type occurs in an operator
+or comparison obligation or a requirement other than its own `Int`, or when it
+is negative (`-1`, as upstream, then fails `uint256`'s range). Numeric patterns
+default before literals, so a literal matched by one is `uint256` already. -/
+def literalDefaultsToUint256 (state : State) (origin : IntegerLiteralOrigin)
+    (typeVar : TypeVarId) : Bool :=
+  (match literalSourceAt? state origin.expression with
+    | some source => Frontend.isNegativeLiteral source
+    | none => false) ||
+    operatorMentions state typeVar || requirementMentions state typeVar
+
+/-- An open literal defaults to `uint256`, never to `word`; one that nothing
+constrains is rejected as ambiguous. -/
 def defaultIntegerLiteralTarget (state : State)
     (origin : IntegerLiteralOrigin) : Except Error State :=
   match state.resolve (.variable origin.metavariable) with
-  | .variable _ => unify state (.variable origin.metavariable) .word
+  | .variable typeVar =>
+      if literalDefaultsToUint256 state origin typeVar then
+        unify state (.variable origin.metavariable) (.fixed .uint256)
+      else throw (.ambiguousIntegerLiteral origin.expression)
   | _ => pure state
 
 def defaultIntegerLiteralTargets :
@@ -396,10 +456,30 @@ def supportedIntegerTarget : Ty → Bool
   | .constructor (.builtin .integer) => true
   | _ => false
 
+/-- Numeric pattern carriers: `word`, `integer` and `uint256`. The other
+eleven fixed-width types keep rejecting numeric patterns. -/
+def supportedIntegerPatternTarget : Ty → Bool
+  | .constructor (.builtin (.fixed ⟨false, .w256⟩)) => true
+  | type => supportedIntegerTarget type
+
+/-- A literal's value fits its target: at a fixed-width integer type it is at
+most the type's greatest value, and the other carriers take every literal. -/
+def literalFitsTarget (type : Ty) (raw : Nat) : Bool :=
+  match type with
+  | .constructor (.builtin (.fixed fixed)) => decide (raw ≤ fixed.maxNat)
+  | _ => true
+
+/-- A numeric pattern's final type is a pattern carrier, and its value is in
+that type's range. Only `uint256` has a range among the carriers, and it is
+checked whether the pattern defaulted to it or was declared at it, as
+upstream's `check_integer_literal_pattern_range` does; the compiler checks it
+again. -/
 def validateIntegerPatternTarget (origin : IntegerPatternOrigin)
     (state : State) : Except Error Unit := do
   let type := state.resolve (.variable origin.metavariable)
-  if supportedIntegerTarget type then pure ()
+  if supportedIntegerPatternTarget type then
+    if literalFitsTarget type origin.rawValue then pure ()
+    else throw (.integerPatternOutOfRange origin.span type origin.rawValue)
   else throw (.nonNumericPatternType origin.span type)
 
 def validateIntegerPatternTargets (state : State) :
@@ -414,13 +494,6 @@ fixed-width integer types. Integer patterns keep `supportedIntegerTarget`. -/
 def supportedIntegerLiteralTarget : Ty → Bool
   | .constructor (.builtin (.fixed _)) => true
   | type => supportedIntegerTarget type
-
-/-- A literal's value fits its target: at a fixed-width integer type it is at
-most the type's greatest value, and the other carriers take every literal. -/
-def literalFitsTarget (type : Ty) (raw : Nat) : Bool :=
-  match type with
-  | .constructor (.builtin (.fixed fixed)) => decide (raw ≤ fixed.maxNat)
-  | _ => true
 
 /-- A negative literal's magnitude fits its target: at a fixed-width integer
 type it is at most the magnitude of the type's least value, so only `-0` fits
@@ -555,7 +628,14 @@ def finalize (context : Context) (type : Ty) (state : State)
 
 end Detail
 
-/-- Infer one canonical source expression from an optional local environment. -/
+/-- Infer one canonical source expression from an optional local environment.
+
+The expression is its own root, and its type can stay open, unlike a named
+function's, whose parameters and results are declared. An open literal that only
+that root type constrains, such as a lone `7`, is rejected as ambiguous
+(`Error.ambiguousIntegerLiteral`): upstream's `default_root_integer_literals`
+would give it `uint256`. This is the one place the two differ, and nothing in
+the repository calls this function. -/
 def inferExpression (context : Context) (expression : Syntax.Expr)
     (locals : TypeSystem.Environment := []) (fuel : Nat := 1024) :
     Except Error Result := do

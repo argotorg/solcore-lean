@@ -499,6 +499,7 @@ private def numericPatternOrigin : SourceInference.IntegerPatternOrigin := {
   metavariable := ⟨0⟩
   span := solverRegressionSpan
   requirement := ⟨0⟩
+  rawValue := 0
 }
 
 private def numericPatternState : SourceInference.State := {
@@ -544,8 +545,12 @@ example :
         numericLiteralOutOfBoundsOrigin.metavariable 1) := by
   rfl
 
+/-- An open numeric pattern defaults to `uint256` (row 1, step 7). -/
 private def numericPatternResult : SourceInference.State := {
-  numericPatternState with inference := unificationProgressResult.inference
+  numericPatternState with inference := {
+    next := 1
+    substitution := [(⟨0⟩, .fixed .uint256)]
+  }
 }
 
 private theorem numericPatternState_ready :
@@ -568,7 +573,7 @@ private theorem numericPatternDefault_success :
   rfl
 
 /-- A concrete unresolved numeric origin is allocator-bounded and defaulting
-it to `Word` preserves both solved inference progress and readiness. -/
+it to `uint256` preserves both solved inference progress and readiness. -/
 example :
     numericPatternState.InferenceProgress numericPatternResult ∧
       numericPatternResult.InferenceReady := by
@@ -2242,6 +2247,7 @@ private def testClosedUnsupportedIntegerPatternTarget : IO Unit := do
     metavariable
     span := solverRegressionSpan
     requirement := ⟨0⟩
+    rawValue := 0
   }
   let initial := SourceInference.State.initial solverRegressionOwner
   let state : SourceInference.State := {
@@ -2259,6 +2265,38 @@ private def testClosedUnsupportedIntegerPatternTarget : IO Unit := do
       s!"unsupported closed integer-pattern target produced {reprStr error}")
   | .ok _ => throw (IO.userError
       "unsupported closed integer-pattern target passed final validation")
+
+/-- A numeric pattern at `uint256` is range-checked by final validation, which
+names the type and the value; `2^256 - 1` passes. -/
+private def testClosedUint256IntegerPatternRange : IO Unit := do
+  let metavariable : TypeSystem.TypeVarId := ⟨0⟩
+  let initial := SourceInference.State.initial solverRegressionOwner
+  let state : SourceInference.State := {
+    initial with
+    inference := {
+      next := 1
+      substitution := [(metavariable, .fixed .uint256)]
+    }
+  }
+  let origin (rawValue : Nat) : SourceInference.IntegerPatternOrigin := {
+    metavariable
+    span := solverRegressionSpan
+    requirement := ⟨0⟩
+    rawValue
+  }
+  match SourceInference.Detail.validateIntegerPatternTarget (origin (2 ^ 256)) state with
+  | .error (.integerPatternOutOfRange span type value) =>
+      assertTrue (span == solverRegressionSpan && type == TypeSystem.Ty.fixed .uint256 &&
+          value == 2 ^ 256)
+        "an out-of-range uint256 pattern lost its exact diagnostic"
+  | .error error => throw (IO.userError
+      s!"an out-of-range uint256 pattern produced {reprStr error}")
+  | .ok _ => throw (IO.userError
+      "an out-of-range uint256 pattern passed final validation")
+  match SourceInference.Detail.validateIntegerPatternTarget (origin (2 ^ 256 - 1)) state with
+  | .ok _ => pure ()
+  | .error error => throw (IO.userError
+      s!"the greatest uint256 pattern produced {reprStr error}")
 
 private def testSourceNamedLiteralTraitsDoNotAuthorize : IO Unit := do
   let source := String.intercalate "\n" [
@@ -2281,18 +2319,28 @@ private def testSourceNamedLiteralTraitsDoNotAuthorize : IO Unit := do
   | .ok _ => throw (IO.userError
       "source traits named Int/FromLiteral/Numeric authorized a nominal literal")
 
-private def testUnconstrainedIntegerLiteralDefaultsToWord : IO Unit := do
-  let checked ← check "function defaulted() { 1; return; }"
-  let function ← match checked with
-    | [function] => pure function
-    | functions => throw (IO.userError
-        s!"unconstrained literal fixture checked {functions.length} functions")
-  let literals := integerLiteralRows function
-  assertTrue (decide (function.inferredBodyType = TypeSystem.Ty.unit) &&
-      literals.length == 1 && literals.all (hasExactDefaultedWordEvidence function) &&
-      function.solvedRequirements.length == 1 &&
-      function.solvedRequirements.all hasBuiltinIntWordEvidence)
-    "an unconstrained integer literal did not default exactly to builtin Int<Word>"
+/-- An unconstrained literal is rejected as ambiguous; it never defaults to
+`Word` (row 1, step 7). -/
+private def rejectsAmbiguousLiteral (label : String) (content : String) : IO Unit :=
+  match SourceInference.loadAndCheckProgram (workspace content) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .ambiguousIntegerLiteral _, .. } => true
+        | _ => false)
+        s!"{label} was rejected for another reason: {reprStr errors}"
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+
+private def hasBuiltinIntUint256Evidence
+    (solved : SourceInference.SolvedRequirement) : Bool :=
+  solved.predicate == ProgramSignatures.builtinIntPredicate (.fixed .uint256) &&
+    match solved.evidence with
+    | .implementation (.byImpl goal (.builtin (.intFixed type)) premises) =>
+        type == .uint256 && goal == solved.predicate && premises.isEmpty
+    | _ => false
+
+private def testUnconstrainedIntegerLiteralIsAmbiguous : IO Unit := do
+  rejectsAmbiguousLiteral "an unconstrained integer literal"
+    "function defaulted() { 1; return; }"
 
 private def testLetBoundIntegerLiteralClosesLater : IO Unit := do
   let checked ← check
@@ -2307,8 +2355,12 @@ private def testLetBoundIntegerLiteralClosesLater : IO Unit := do
     "a later return context did not close the let-bound literal as Word"
 
 private def testUnusedLetIntegerLiteralDefaultsIndependently : IO Unit := do
-  let checked ← check
+  rejectsAmbiguousLiteral "an unused let literal"
     "function unused() returns (Word) { let value = 1; return 9; }"
+  -- Through an operator the unused let defaults to `uint256`, independently of the returned
+  -- literal, which the return makes `Word`.
+  let checked ← check
+    "function unused() returns (Word) { let value = 1 + 2; return 9; }"
   let function ← match checked with
     | [function] => pure function
     | functions => throw (IO.userError
@@ -2321,12 +2373,17 @@ private def testUnusedLetIntegerLiteralDefaultsIndependently : IO Unit := do
     | binders => throw (IO.userError
         s!"unused literal fixture retained {binders.length} value binders")
   let literals := integerLiteralRows function
-  assertTrue (decide (binder.scheme = .mono .word) &&
-      literals.map (fun row => row.2.rawValue) == [1, 9] &&
-      literals.all (hasExactDefaultedWordEvidence function) &&
-      function.solvedRequirements.length == 2 &&
-      function.solvedRequirements.all hasBuiltinIntWordEvidence)
-    "an unused let literal and returned literal did not retain independent Int<Word> evidence"
+  let uint256Literals := literals.filter fun row => row.2.rawValue != 9
+  let wordLiterals := literals.filter fun row => row.2.rawValue == 9
+  assertTrue (decide (binder.scheme = .mono (.fixed .uint256)) &&
+      literals.map (fun row => row.2.rawValue) == [1, 2, 9] &&
+      uint256Literals.all (fun row => row.1.type == TypeSystem.Ty.fixed .uint256 &&
+        row.2.targetType == TypeSystem.Ty.fixed .uint256) &&
+      wordLiterals.all (hasExactDefaultedWordEvidence function) &&
+      function.solvedRequirements.length == 3 &&
+      (function.solvedRequirements.filter hasBuiltinIntUint256Evidence).length == 2 &&
+      (function.solvedRequirements.filter hasBuiltinIntWordEvidence).length == 1)
+    "an unused let through an operator and a returned literal did not retain independent Int<uint256> and Int<Word> evidence"
 
 private def testLiteralRequirementPreservesIndependentPolymorphism : IO Unit := do
   let checked ← check (String.intercalate "\n" [
@@ -2412,7 +2469,22 @@ private def testNestedIntegerLiteralOperatorsCloseLater : IO Unit := do
   | functions => throw (IO.userError
       s!"nested operator fixture checked {functions.length} functions")
 
-private def testUnconstrainedIntegerLiteralOperatorsDefaultToWord : IO Unit := do
+private def hasExactDefaultedUint256Evidence
+    (function : SourceInference.CheckedFunction)
+    (row : SourceInference.ExpressionNode ×
+      SourceInference.IntegerLiteralResolution) : Bool :=
+  let node := row.1
+  let resolution := row.2
+  node.type == TypeSystem.Ty.fixed .uint256 &&
+    resolution.targetType == TypeSystem.Ty.fixed .uint256 &&
+    node.requirements == [resolution.requirement] &&
+    node.coercions.isEmpty &&
+    function.solvedRequirements.any fun solved =>
+      solved.id == resolution.requirement && hasBuiltinIntUint256Evidence solved
+
+/-- Open literals under an operator or a comparison default to `uint256`, and
+the operator takes `uint256`'s builtin (row 1, step 7). -/
+private def testUnconstrainedIntegerLiteralOperatorsDefaultToUint256 : IO Unit := do
   let unconstrained := String.intercalate "\n" [
     "function add() { 1 + 1; return; }",
     "function invert() { ~1; return; }",
@@ -2431,15 +2503,15 @@ private def testUnconstrainedIntegerLiteralOperatorsDefaultToWord : IO Unit := d
       | .statement _ => false
     assertTrue (function.inferredBodyType == expectedBody &&
         literals.length == literalCount &&
-        literals.all (hasExactDefaultedWordEvidence function) &&
+        literals.all (hasExactDefaultedUint256Evidence function) &&
         function.solvedRequirements.length == literalCount &&
-        function.solvedRequirements.all hasBuiltinIntWordEvidence && hasOperator)
-      s!"{label} did not default its operands to the builtin Word operator"
+        function.solvedRequirements.all hasBuiltinIntUint256Evidence && hasOperator)
+      s!"{label} did not default its operands to the builtin uint256 operator"
   match checked with
   | [addition, complement, comparison] =>
-      validate "unconstrained addition" .unit .word 2
+      validate "unconstrained addition" .unit (.fixed .uint256) 2
         (fun form => form matches .binary _ .add _) addition
-      validate "unconstrained complement" .unit .word 1
+      validate "unconstrained complement" .unit (.fixed .uint256) 1
         (fun form => form matches .unary .bitNot _) complement
       validate "unconstrained equality" .bool .bool 2
         (fun form => form matches .binary _ .equal _) comparison
@@ -2555,15 +2627,16 @@ private def testDefaultedIntegerLiteralOperatorsRespectSourceTraits : IO Unit :=
         s!"expected one BitNot trait, found {declarations.length}")
   match SourceInference.checkLoadedProgram loaded with
   | .error errors =>
+      -- The literals default to `uint256` through the pending source obligations (row 1, step 7).
       let misses (trait : Resolved.DeclarationId) := errors.any fun error =>
         match error with
         | .body { error := .noTraitImplementation predicate, .. } =>
             decide (predicate.trait = trait) &&
-              predicate.subject == TypeSystem.Ty.word &&
+              predicate.subject == TypeSystem.Ty.fixed .uint256 &&
               predicate.arguments.isEmpty
         | _ => false
       assertTrue (errors.length == 2 && misses eq && misses bitNot)
-        "defaulted literal operators lost their exact Eq<Word> or BitNot<Word> obligation"
+        "defaulted literal operators lost their exact Eq<uint256> or BitNot<uint256> obligation"
   | .ok _ => throw (IO.userError
       "source Eq/BitNot catalogs without Word implementations were bypassed")
 
@@ -3034,14 +3107,15 @@ def testSourceInference : IO Unit := do
   testIntegerLiteralLedgerValidation
   testSourceGraphValidation
   testClosedUnsupportedIntegerPatternTarget
+  testClosedUint256IntegerPatternRange
   testSourceNamedLiteralTraitsDoNotAuthorize
-  testUnconstrainedIntegerLiteralDefaultsToWord
+  testUnconstrainedIntegerLiteralIsAmbiguous
   testLetBoundIntegerLiteralClosesLater
   testUnusedLetIntegerLiteralDefaultsIndependently
   testLiteralRequirementPreservesIndependentPolymorphism
   testContextualIntegerLiteralOperators
   testNestedIntegerLiteralOperatorsCloseLater
-  testUnconstrainedIntegerLiteralOperatorsDefaultToWord
+  testUnconstrainedIntegerLiteralOperatorsDefaultToUint256
   testDeferredIntegerLiteralOperatorRejections
   testDefaultedIntegerLiteralOperatorsRespectSourceTraits
   testGroundOperatorResultKeepsCoercion

@@ -649,7 +649,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function unused(value: Word) returns (Word) { let ignored = lam(item) { return item; }; return value; }",
     "function poly(flag: Bool) returns (Word, Bool) { let f = lam(item) { return item; }; return (f(1), f(flag)); }",
     "function loop(value: Word) returns (F) { let f: F; while (true) { f = lam(delta: Word) -> Word { value = value + delta; return value; }; break; } return f; }",
-    "function nestedPoly(flag: Bool) returns (Word, Word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); }; return (outer(1), outer(flag)); }"
+    "function nestedPoly(flag: Bool) returns (Word, Word) { let outer = lam(value) { let inner = lam(item) { return item; }; return inner(1); }; let one: Word = 1; return (outer(one), outer(flag)); }"
   ]}] }
 private def key (program : CheckedProgram) (name : String) : IO Key := do
   match program.signatures.functions.filter (·.name == name) with
@@ -1869,7 +1869,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function tupleAfter() returns (comptime<Word>) { let trace: Word = 0; let f = lam(value: (Word, Word)) -> Word { return 7; }; let bump = lam() -> Word { trace += 1; return trace; }; return f(bump(), bump()); }",
     "function tupleAccepted() returns (Word) { let f = lam(value: (Word, Word)) -> Word { return 7; }; return f((1, 2)); }",
     "function polymorphic(flag: Bool) returns (Word, Bool) { let f = lam(item) { return keep(item); }; return (f(1), f(flag)); }",
-    "function nested(flag: Bool) returns (Word, Word) { let outer = lam(item) { keep(item); let inner = lam(value) { return keep(value); }; return inner(1); }; return (outer(13), outer(flag)); }",
+    "function nested(flag: Bool) returns (Word, Word) { let outer = lam(item) { keep(item); let inner = lam(value) { return keep(value); }; return inner(1); }; let thirteen: Word = 13; return (outer(thirteen), outer(flag)); }",
     "type F = function(Word) returns (Word);",
     "function maker(seed: Word) returns (F) { let total: Word = seed; let f = lam(item) { keep(item); total += 1; return total; }; return f; }",
     "function use(f: F, item: Word) returns (Word) { return f(item); }",
@@ -4182,7 +4182,7 @@ private def workspace : Workspace.RawWorkspace := workspaceOf [
   "function negLit256s() returns (int256) { return -57896044618658097711785492504343953926634992332820282019728792003956564819968; }",
   "function negZero8u() returns (uint8) { return -0; }",
   "function negOneWord() returns (Word) { let w: Word = -1; return w; }",
-  "function openNegative() returns (Word) { let k = -1; return k; }",
+  "function letNegative() returns (Word) { let k = -1; return k; }",
   "function neg8s(x: int8) returns (int8) { return -x; }",
   "function neg8u(x: uint8) returns (uint8) { return -x; }",
   "function neg256s(x: int256) returns (int256) { return -x; }",
@@ -4211,7 +4211,7 @@ private def names : List String :=
     "lit256u", "lit8s", "lit256s", "zero8s", "inc8u", "inc256s", "below8s", "isZero256u", "doubleAssign8u",
     "half8s", "tenthAssign256u", "deferredDiv8u", "deferredMod8s", "tableLit8u", "tableLit8s", "mask16u",
     "deferredAdd8u", "negLit8s", "negGroup8s", "negOfGroup8s", "doubleNeg8s", "negLit256s", "negZero8u",
-    "negOneWord", "openNegative", "neg8s", "neg8u", "neg256s", "neg256u", "negWord",
+    "negOneWord", "letNegative", "neg8s", "neg8u", "neg256s", "neg256u", "negWord",
     "addNegLit8s", "mulNegLit256s", "compoundNeg8s", "compoundNeg256s", "nestedNeg8s", "nestedNegGroup8s", "blockNegWord", "belowNegLit8s", "tableNeg8s"]
 
 private def seed (program : CheckedProgram) (name : String) : IO Seed :=
@@ -4289,6 +4289,137 @@ private def rejectedOutOfRange (label : String) (name : String) (value : Int) (l
         s!"{label} named {reprStr actual} and {actualValue}"
   | .ok _ => throw (IO.userError s!"{label} was accepted")
   | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+/-- Step 7's fixture: an open literal defaults to `uint256` in an operator, a
+comparison, a requirement or a match, and numeric patterns are admitted at
+`uint256`. -/
+private def defaultingWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function sc_id<A>(x: A) returns (A) { return x; }",
+  "trait Mark<T> {}",
+  "impl Mark<uint256> {}",
+  "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
+  "function eqOpen() returns (bool) { return 7 == 7; }",
+  "function addUnused() returns (Word) { let a = 7 + 1; return 3; }",
+  "function idOpen() returns (Word) { return sc_id(7); }",
+  "function shiftUnused() returns (Word) { let s = 1 << 3; return 5; }",
+  "function shiftOpen() returns (bool) { return (1 << 3) == 8; }",
+  "function matchOpen() returns (Word) { match (7) { case 7 { return 1; } default { return 0; } } }",
+  "function matchOpenMiss() returns (Word) { match (8) { case 7 { return 1; } default { return 0; } } }",
+  "function matchU256(x: uint256) returns (Word) { match (x) { case 0 { return 10; } case 0xff { return 20; } case 115792089237316195423570985008687907853269984665640564039457584007913129639935 { return 30; } default { return 40; } } }",
+  "function maxOpen() returns (bool) { return 115792089237316195423570985008687907853269984665640564039457584007913129639935 == 115792089237316195423570985008687907853269984665640564039457584007913129639935; }",
+  "function addOpen() returns (bool) { return 7 + 1 == 8; }",
+  "function overflowOpen() returns (bool) { return 115792089237316195423570985008687907853269984665640564039457584007913129639935 + 1 == 0; }",
+  "function underflowOpen() returns (bool) { return 0 - 1 == 0; }",
+  "function markOpen() returns (Word) { keep(7); return 4; }",
+  "function compoundOpen() returns (bool) { let x = 0; x -= 1; return x > 5; }",
+  "function rewrittenOpen() returns (bool) { let x = 0; x = x - 1; return x > 5; }",
+  "function compoundWord(w: Word) returns (Word) { let total = 0; total += w; return total; }"]
+
+private def defaultingNames : List String := [
+  "eqOpen", "addUnused", "idOpen", "shiftUnused", "shiftOpen", "matchOpen", "matchOpenMiss",
+  "matchU256", "maxOpen", "addOpen", "overflowOpen", "underflowOpen", "markOpen",
+  "compoundOpen", "rewrittenOpen", "compoundWord"]
+
+/-- Inference rejects an open literal that nothing constrains, naming it. -/
+private def rejectedAmbiguous (label : String) (lines : List String) : IO Unit :=
+  match checkProgram (workspaceOf lines) with
+  | .error [.inference ⟨_, .ambiguousIntegerLiteral _⟩] => pure ()
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+/-- Inference rejects a numeric pattern above `uint256`'s greatest value at
+`uint256`, declared or defaulted, and names the type and the value. -/
+private def rejectedPatternOutOfRange (label : String) (value : Nat) (lines : List String) : IO Unit :=
+  match checkProgram (workspaceOf lines) with
+  | .error [.inference ⟨_, .integerPatternOutOfRange _ type actual⟩] =>
+      require (decide (type = TypeSystem.Ty.fixed .uint256) && actual == value)
+        s!"{label} named {reprStr type} and {actual}"
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+/-- Step 7, the `uint256` default, through the public API. -/
+def runDefaulting : IO Unit := do
+  let program ← get "uint256 default check" (checkProgram defaultingWorkspace)
+  let seeds ← defaultingNames.mapM (seed program)
+  let compiled ← get "uint256 default compilation"
+    (compile defaultingWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (index : Nat) : IO Key := match compiled.keys[index]? with
+    | some key => pure key | none => throw (IO.userError "uint256 default root missing")
+  let mut session ← boot (← compiled.open)
+  let cases : List (Nat × List Value × Value) := [
+    -- Two open literals compared, or added and unused, are `uint256`.
+    (0, [], boolean true), (1, [], word 3),
+    -- A literal through a generic call takes the return's type; a shift's literals are Words.
+    (2, [], word 7), (3, [], word 5), (4, [], boolean true),
+    -- A match on an open literal makes it and its pattern `uint256`.
+    (5, [], word 1), (6, [], word 0),
+    -- Numeric patterns at `uint256`, up to its greatest value.
+    (7, [word 0], word 10), (7, [word 0xff], word 20), (7, [word (modulus - 1)], word 30),
+    (7, [word 7], word 40), (7, [word 256], word 40),
+    -- `2^256 - 1` defaulted, and checked addition on defaulted literals.
+    (8, [], boolean true), (9, [], boolean true),
+    -- A literal in a pending `Mark` requirement is `uint256`, and `impl Mark<uint256>` solves it.
+    (12, [], word 4),
+    -- Today a compound assignment makes an open target `word` at once, so `x -= 1` wraps, where
+    -- upstream, which reads `x -= 1` as `x = x - 1`, defaults `x` to `uint256` and panics with
+    -- 0x11, as `rewrittenOpen` does here. Step 7b brings upstream's typing and changes this case.
+    (13, [], boolean true),
+    -- A `word` operand types the open target `word`, here and upstream.
+    (15, [word 9], word 9)]
+  for (index, arguments, expected) in cases do
+    let completed ← execute session (← key index) arguments
+    require (completed.value == expected)
+      s!"{defaultingNames[index]?} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  -- Arithmetic on defaulted literals is checked: past `uint256`'s range it panics with 0x11,
+  -- `x = x - 1` on an open `x` too.
+  for index in [10, 11, 14] do
+    session ← panics session (← key index) [] SourceCorePanics.arithmetic s!"{defaultingNames[index]?}"
+  -- An open literal that nothing constrains is ambiguous; it never defaults to Word.
+  rejectedAmbiguous "an unused let y = 7" ["function bad() returns (Word) { let y = 7; return 0; }"]
+  rejectedAmbiguous "let y = 7; let z = y" ["function bad() returns (Word) { let y = 7; let z = y; return 0; }"]
+  rejectedAmbiguous "sc_id(7) with an unused result"
+    ["function sc_id<A>(x: A) returns (A) { return x; }", "function bad() returns (Word) { sc_id(7); return 0; }"]
+  rejectedAmbiguous "a lambda returning 7, never called"
+    ["function bad() returns (Word) { let f = lam () { return 7; }; return 0; }"]
+  -- An open negative literal defaults to `uint256` and is out of its range, as upstream's SC0411.
+  rejectedOutOfRange "an open let k = -1" "uint256" (-1) ["function bad() returns (Word) { let k = -1; return 0; }"]
+  rejectedOutOfRange "2^256 defaulted" "uint256" 115792089237316195423570985008687907853269984665640564039457584007913129639936
+    ["function bad() returns (bool) { return 115792089237316195423570985008687907853269984665640564039457584007913129639936 == 0; }"]
+  -- The requirement a literal defaults for must be solved at `uint256`: here no implementation does.
+  match checkProgram (workspaceOf ["trait Mark<T> {}", "impl Mark<Word> {}",
+      "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
+      "function bad() returns (Word) { keep(7); return 0; }"]) with
+  | .error [.noSolution _ predicate] =>
+      require (decide (predicate.subject = TypeSystem.Ty.fixed .uint256))
+        s!"the unsolved Mark requirement named {reprStr predicate.subject}"
+  | .ok _ => throw (IO.userError "a Mark requirement without impl Mark<uint256> was accepted")
+  | .error errors => throw (IO.userError s!"a Mark requirement without impl Mark<uint256> gave {reprStr errors}")
+  -- Numeric patterns stay rejected on the other eleven types.
+  for name in ["uint8", "uint16", "uint32", "uint64", "uint128", "int8", "int16", "int32", "int64", "int128", "int256"] do
+    rejectedByInference s!"a numeric pattern on {name}"
+      [s!"function bad(x: {name}) returns (Word) \{ match (x) \{ case 1 \{ return 1; } default \{ return 0; } } }"]
+  -- A numeric pattern is range-checked at `uint256`, declared or defaulted, as upstream's
+  -- `check_integer_literal_pattern_range` does.
+  rejectedPatternOutOfRange "a numeric pattern of 2^256 at uint256" 115792089237316195423570985008687907853269984665640564039457584007913129639936
+    ["function bad(x: uint256) returns (Word) { match (x) { case 115792089237316195423570985008687907853269984665640564039457584007913129639936 { return 1; } default { return 0; } } }"]
+  rejectedPatternOutOfRange "a defaulted numeric pattern of 2^256" 115792089237316195423570985008687907853269984665640564039457584007913129639936
+    ["function bad() returns (Word) { match (7) { case 115792089237316195423570985008687907853269984665640564039457584007913129639936 { return 1; } default { return 0; } } }"]
+  -- Upstream's `crates/uitest/tests/fixtures/solver/poly_int_defaulting`, verbatim. Upstream rejects it
+  -- in inference as ambiguous (SC0299); Lean rejects it earlier, at the signature, because a `where`
+  -- clause cannot name the builtin `Int`.
+  match checkProgram (workspaceOf ["pragma solcore;", "",
+      "function poly<a>(x: a) returns (a) where a: Int {", "    return x;", "}", "",
+      "function f() returns (word) {", "    let y = poly(7);", "    return 0;", "}"]) with
+  | .error [.signature (.unknownTrait _ name)] =>
+      require (name == "Int") s!"poly_int_defaulting named the unknown trait {name}"
+  | .ok _ => throw (IO.userError "poly_int_defaulting was accepted")
+  | .error errors => throw (IO.userError s!"poly_int_defaulting gave {reprStr errors}")
+  -- Without the bound upstream's rules give SC0299 too: no non-`Int` obligation constrains the
+  -- literal, and `f`'s root type holds no variable.
+  rejectedAmbiguous "an unbounded poly(7) with an unused result"
+    ["function poly<a>(x: a) returns (a) { return x; }", "function f() returns (word) { let y = poly(7); return 0; }"]
+  IO.println "SOURCE_CORE_UINT256_DEFAULT_PASS: open literals in comparisons, operators, requirements and matches default to uint256 with checked arithmetic, a generic call's literal takes the return's type, shifts keep Word literals, numeric patterns at uint256 up to 2^256 - 1, unconstrained literals rejected as ambiguous, an open -1 and a defaulted 2^256 out of uint256's range, an unsolved Mark<uint256> rejected, an open compound target still word (step 7b brings upstream's uint256) and its rewritten form checked at uint256, numeric patterns on the other eleven types rejected, a 2^256 pattern at uint256 rejected by inference, declared or defaulted, upstream's poly_int_defaulting rejected at its Int bound and its unbounded form as ambiguous"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)
@@ -4389,7 +4520,7 @@ def run : IO Unit := do
     (84, [], word (modulus - 128)), (85, [], word (modulus - 128)),
     (86, [], word (modulus - 128)), (87, [], word 5),
     (88, [], word (2 ^ 255)), (89, [], word 0),
-    -- A negative Word literal wraps, and an open one is still a Word until step 7.
+    -- A negative Word literal wraps, and so does one that takes the return's type.
     (90, [], word (modulus - 1)), (91, [], word (modulus - 1)),
     -- `-x` reads as checked `0 - x` on the twelve types and wraps on Word.
     (92, [word 5], word (modulus - 5)), (92, [word (modulus - 7)], word 7),
@@ -4499,6 +4630,7 @@ def run : IO Unit := do
     ["function bad(x: uint8) returns (uint8) { unchecked { return -x; } }"]
   rejectedByInference "unary minus on Bool" ["function bad(b: Bool) returns (Bool) { return -b; }"]
   IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * / % on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= /= %= panicking with 0x11 outside the range (MIN / -1 among them, MIN % -1 not), / % /= %= panicking with 0x12 on a zero divisor and rounding toward zero, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, literals at their range edges and as operands, deferred operators and mapping elements, one past each range rejected naming the type, negated literals folded through groups and repeated with their range checked by sign, -x as checked 0 - x panicking for MIN and nonzero unsigned values and wrapping on Word, negated-literal operands and compound forms, unary minus rejected on declared types, Bool and unchecked fixed-width operands, <<= and in-place ~ still rejected"
+  runDefaulting
 
 end Tests.SourceCoreFixedIntegerOperators
 end

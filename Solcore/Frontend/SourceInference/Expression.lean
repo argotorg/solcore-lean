@@ -1352,6 +1352,7 @@ mutual
                 metavariable
                 span := pattern.span
                 requirement
+                rawValue
               }
               let state := {
                 state with integerPatterns := state.integerPatterns ++ [origin]
@@ -1359,7 +1360,8 @@ mutual
               let normalizedExpected := state.resolve expected
               let state ← match normalizedExpected with
                 | .variable _ | .constructor (.builtin .word)
-                | .constructor (.builtin .integer) =>
+                | .constructor (.builtin .integer)
+                | .constructor (.builtin (.fixed ⟨false, .w256⟩)) =>
                     unify state target normalizedExpected
                 | _ => throw (Error.nonNumericPatternType pattern.span
                     normalizedExpected)

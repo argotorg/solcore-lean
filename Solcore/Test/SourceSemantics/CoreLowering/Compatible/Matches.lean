@@ -1241,7 +1241,7 @@ private def template_head : IO Unit := do
 
 private def content : String := String.intercalate "\n" [
   "function empty() returns (Word) { match (37) { case 37 {} default {} } return 41; }",
-  "function bound() returns (Word) { match (9) { case binding {} } return 43; }",
+  "function bound() returns (Word) { let head: Word = 9; match (head) { case binding {} } return 43; }",
   "function integerHead(value: integer) returns (Word) { match (value) { case 73 {} default {} } return 47; }",
   "function selected(a: Word, b: Word) returns (Word) { match ((a, b)) { case (37, chosen) { return chosen; } case (left, right) { return left + right; } } }",
   "function faultArm() returns (Word) { match (37) { case 37 { let prior: Word = 41; let missing: Word; return missing; } default { return 19; } } }",
@@ -1259,8 +1259,8 @@ def run : IO Unit := do
     ["empty", "bound", "integerHead", "selected", "faultArm", "faultScrutinee"]
   let initial : SourceTypedRuntime.RuntimeState := {heap := [⟨.word, some (word 991)⟩]}
   let cases : List (String × List SourceTypedRuntime.Value × SourceTypedRuntime.Value × List (TypeSystem.Ty × Option SourceTypedRuntime.Value)) := [
-    ("empty", [], word 41, [(.word, some (word 37))]),
-    ("bound", [], word 43, [(.word, some (word 9)), (.word, some (word 9))]),
+    ("empty", [], word 41, [(.fixed .uint256, some (word 37))]),
+    ("bound", [], word 43, [(.word, some (word 9)), (.word, some (word 9)), (.word, some (word 9))]),
     ("integerHead", [.integer 73], word 47, [(.integer, some (.integer 73)), (.integer, some (.integer 73))]),
     ("integerHead", [.integer 74], word 47, [(.integer, some (.integer 74)), (.integer, some (.integer 74))]),
     ("selected", [word 37, word 8], word 8, [(.word, some (word 37)), (.word, some (word 8)), (.product .word .word, some (.product (word 37) (word 8))), (.word, some (word 8))]),
@@ -1277,7 +1277,7 @@ def run : IO Unit := do
           s!"head public full source cells {name}"
       | other => throw (IO.userError s!"head success expected {reprStr other}")
   let failures : List (String × List (TypeSystem.Ty × Option SourceTypedRuntime.Value)) := [
-    ("faultArm", [(.word, some (word 37)), (.word, some (word 41)), (.word, none)]),
+    ("faultArm", [(.fixed .uint256, some (word 37)), (.word, some (word 41)), (.word, none)]),
     ("faultScrutinee", [(.word, none)])]
   for (name, cells) in failures do
     let named ← match compiled.indexed.base.functions.find? (fun named =>

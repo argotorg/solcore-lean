@@ -961,6 +961,18 @@ inductive LiteralCode (compilation : Compilation) (literal : Syntax.CoreLiteralV
         (.lambda .integer (.sum .unit .unit)
           (.ifE (.binary .integerEq (.var 0) (.integer (Int.ofNat resolution.rawValue)))
             (.inRight .unit .unit) (.inLeft .unit .unit)))
+  /-- A numeric pattern at `uint256`, the type an open literal defaults to,
+  compares the scrutinee's word with the literal's, which is in range. -/
+  | uint256
+      (target : resolution.targetType = .fixed .uint256)
+      (meaning : NumericLiteralDenotes literal resolution.rawValue)
+      (fits : resolution.rawValue ≤ TypeSystem.FixedInteger.uint256.maxNat)
+      (requirement : ∃ solved ∈ compilation.solvedRequirements, solved.id = resolution.requirement ∧
+        solved.predicate = ProgramSignatures.builtinIntPredicate (.fixed .uint256)) :
+      LiteralCode compilation literal resolution (.fixed .uint256)
+        (.lambda .word (.sum .unit .unit)
+          (.ifE (.binary .wordEq (.var 0) (.word (Word.ofNatModulo resolution.rawValue)))
+            (.inRight .unit .unit) (.inLeft .unit .unit)))
 
 theorem literalMatcher_sound (compilation : Compilation) (site : StatementId) (span : Syntax.SourceSpan)
     (type : TypeSystem.Ty) (literal : Syntax.CoreLiteralValue) (resolution : IntegerLiteralResolution)
@@ -972,7 +984,26 @@ theorem literalMatcher_sound (compilation : Compilation) (site : StatementId) (s
     | declaration => simp [literalMatcher, bind, Except.bind] at accepted
     | builtin builtin =>
       cases builtin with
-      | unit | bool | fixed _ => simp [literalMatcher, bind, Except.bind] at accepted
+      | unit | bool => simp [literalMatcher, bind, Except.bind] at accepted
+      | fixed fixedType =>
+        rcases fixedType with ⟨signed, width⟩
+        cases signed <;> cases width <;>
+          first | (simp [literalMatcher, bind, Except.bind] at accepted; done) | skip
+        let node : ExpressionNode := ⟨⟨site.occurrence⟩, span, .constructor (.builtin (.fixed ⟨false, .w256⟩)),
+          .integerLiteral literal resolution, [resolution.requirement], [], none⟩
+        cases validated : SourceCoreElaboration.validateFixedIntegerLiteral compilation.solvedRequirements node literal
+            resolution .uint256 with
+        | error error =>
+          simp only [node] at validated
+          simp [literalMatcher, validated, Except.mapError, bind, Except.bind] at accepted
+        | ok validatedValue =>
+          simp only [node] at validated
+          have certificate := SourceCoreElaboration.validateFixedIntegerLiteral_sound validated
+          have same : matcher = .lambda .word (.sum .unit .unit)
+              (.ifE (.binary .wordEq (.var 0) (.word validatedValue.value)) (.inRight .unit .unit) (.inLeft .unit .unit)) := by
+            simpa [literalMatcher, validated, Except.mapError, bind, Except.bind, pure, Except.pure] using accepted.symm
+          rw [same, certificate.value]
+          exact .uint256 certificate.targetType certificate.meaning certificate.fits certificate.solved
       | word =>
         let node : ExpressionNode := ⟨⟨site.occurrence⟩, span, .word, .integerLiteral literal resolution, [resolution.requirement], [], none⟩
         cases validated : SourceCoreElaboration.validateWordIntegerLiteral compilation.solvedRequirements node literal resolution with
@@ -1071,6 +1102,19 @@ theorem LiteralCode.constructs_integer_with_requirement {context : Context}
     subst type
     exact .integer meaning requirement
 
+theorem LiteralCode.constructs_uint256_with_requirement {context : Context}
+    {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
+    (target : resolution.targetType = .fixed .uint256)
+    (meaning : NumericLiteralDenotes literal resolution.rawValue)
+    (fits : resolution.rawValue ≤ TypeSystem.FixedInteger.uint256.maxNat)
+    (requirement : RequirementProves context resolution.requirement resolution.predicate) :
+    Dynamic.ResolvedIntegerLiteralConstructs context literal resolution (.word (Word.ofNatModulo resolution.rawValue)) := by
+  cases resolution with
+  | mk raw type requirementId =>
+    dsimp at target fits
+    subst type
+    exact .fixed meaning fits requirement
+
 theorem LiteralCode.constructs_word {compilation : Compilation} {context : Context}
     {literal : Syntax.CoreLiteralValue} {resolution : IntegerLiteralResolution}
     (valid : ContextValid compilation context) (target : resolution.targetType = .word)
@@ -1097,6 +1141,8 @@ private theorem projected_word (compilation : Compilation) (source : TypedSource
     projected compilation source TypeSystem.Ty.word = .ok .word := rfl
 private theorem projected_integer (compilation : Compilation) (source : TypedSource) :
     projected compilation source TypeSystem.Ty.integer = .ok .integer := rfl
+private theorem projected_uint256 (compilation : Compilation) (source : TypedSource) :
+    projected compilation source (TypeSystem.Ty.fixed .uint256) = .ok .word := rfl
 
 theorem LeafResolution.bindings_unique {context : Context} {pattern : TypedMatchPattern}
     {value : Dynamic.Value} {left right : List (TypedBinder × Dynamic.Value)}
@@ -1144,7 +1190,7 @@ private theorem ordinary_numeric {compilation : Compilation} {context : Context}
   | literal projection validated =>
     have code := literalMatcher_sound compilation site span expected literal numeric _ validated
     cases code with
-    | word target meaning retained | integer target meaning retained =>
+    | word target meaning retained | integer target meaning retained | uint256 target meaning _ retained =>
       simpa only [IntegerLiteralResolution.predicate, target] using proves valid retained
 
 /-- Every accepted leaf pattern produces its independent source outcome in
@@ -1191,6 +1237,23 @@ theorem leaf_preserves_with_requirements {compilation : Compilation} {context : 
         cases coreType
         obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields represented
         have constructs := LiteralCode.constructs_word_with_requirement target meaning (numeric _ _ rfl)
+        by_cases same : actual = Word.ofNatModulo resolution.rawValue
+        · subst actual
+          refine ⟨.inRight .unit .unit, .matched (values := []) (.intro sourceRep (.integerLiteral constructs)) .nil, ?_⟩
+          exact .apply .lambda (.var rfl)
+            (.ifTrue (.binary (.var rfl) .word (by simp [BinaryOp.apply])) (.inRight .unit))
+        · refine ⟨.inLeft .unit .unit, .noMatch (.intro sourceRep ⟨.integerLiteral, ?_⟩), ?_⟩
+          · intro bindings matched
+            cases matched with
+            | integerLiteral construction => exact same (Dynamic.Value.word.inj (construction.functional constructs))
+          · exact .apply .lambda (.var rfl)
+              (.ifFalse (.binary (.var rfl) .word (by simp [BinaryOp.apply, same])) (.inLeft .unit))
+      | uint256 target meaning fits retained =>
+        have coreType := projection
+        rw [projected_uint256] at coreType
+        cases coreType
+        obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields represented
+        have constructs := LiteralCode.constructs_uint256_with_requirement target meaning fits (numeric _ _ rfl)
         by_cases same : actual = Word.ofNatModulo resolution.rawValue
         · subst actual
           refine ⟨.inRight .unit .unit, .matched (values := []) (.intro sourceRep (.integerLiteral constructs)) .nil, ?_⟩
@@ -1372,6 +1435,20 @@ theorem leaf_reflects_with_requirements {compilation : Compilation} {context : C
         cases coreType
         obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields represented
         have constructs := LiteralCode.constructs_word_with_requirement target meaning (numeric _ _ rfl)
+        obtain ⟨result, sameStore⟩ := word_matcher_inv (apply_lambda_var completed)
+        rcases result with ⟨same, rfl⟩ | ⟨different, rfl⟩
+        · subst actual
+          exact ⟨.matched (values := []) (.intro sourceRep (.integerLiteral constructs)) .nil, sameStore⟩
+        · refine ⟨.noMatch (.intro sourceRep ⟨.integerLiteral, ?_⟩), sameStore⟩
+          intro bindings matched
+          cases matched with
+          | integerLiteral construction => exact different (Dynamic.Value.word.inj (construction.functional constructs))
+      | uint256 target meaning fits retained =>
+        have coreType := projection
+        rw [projected_uint256] at coreType
+        cases coreType
+        obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields represented
+        have constructs := LiteralCode.constructs_uint256_with_requirement target meaning fits (numeric _ _ rfl)
         obtain ⟨result, sameStore⟩ := word_matcher_inv (apply_lambda_var completed)
         rcases result with ⟨same, rfl⟩ | ⟨different, rfl⟩
         · subst actual
@@ -1762,10 +1839,10 @@ private theorem literal_success {context : Context} {literal : Syntax.CoreLitera
       intro environment store expression selected
       exact .apply .lambda (selected.evaluates store)
         (.ifTrue (.binary (.var rfl) .word (by simp [BinaryOp.apply])) (.inRight .unit))
-    | integer target => cases target
+    | integer target | uint256 target => cases target
   | integer meaning evidence =>
     cases code with
-    | word target => cases target
+    | word target | uint256 target => cases target
     | integer target numeric retained =>
       have typeEq : type = .integer := Except.ok.inj projection.symm
       subst type
@@ -1780,9 +1857,19 @@ private theorem literal_success {context : Context} {literal : Syntax.CoreLitera
     cases code with
     | word target => cases target
     | integer target => cases target
+    | uint256 target numeric fits retained =>
+      have typeEq : type = .word := Except.ok.inj projection.symm
+      subst type
+      obtain ⟨actual, sameSource, sameNative⟩ := CompatibleExpressionPrimitives.word_fields represented
+      have same := Dynamic.Value.word.inj sameSource
+      subst actual
+      subst value
+      intro environment store expression selected
+      exact .apply .lambda (selected.evaluates store)
+        (.ifTrue (.binary (.var rfl) .word (by simp [BinaryOp.apply])) (.inRight .unit))
   | negativeWord meaning _ | negativeInteger meaning _ | negativeFixed meaning _ _ =>
     cases code with
-    | word _ numeric _ | integer _ numeric _ => exact absurd numeric meaning.not_numeric
+    | word _ numeric _ | integer _ numeric _ | uint256 _ numeric _ _ => exact absurd numeric meaning.not_numeric
 
 def TreeSuccess (context : Context) (type : TypeSystem.Ty) (instructions : List MatchPatternInstruction)
     (pattern : Pattern) (rest : List MatchPatternInstruction) : Prop :=
@@ -2051,7 +2138,7 @@ private theorem ordinary_requirement {context : Context} (valid : ContextValid c
     RequirementProves context resolution.requirement resolution.predicate := by
   have code := literalMatcher_sound compilation site span expected literal resolution matcher accepted
   cases code with
-  | word target meaning retained | integer target meaning retained =>
+  | word target meaning retained | integer target meaning retained | uint256 target meaning _ retained =>
     obtain ⟨row, member, identifier, predicate⟩ := retained
     have inContext : row ∈ context.solvedRequirements := by rw [valid.ledger]; exact member
     refine ⟨row, ⟨inContext, identifier⟩, ?_, valid.valid.entriesValid row inContext⟩
@@ -2103,6 +2190,17 @@ theorem Tree.decides_with_literals {context : Context} {source : TypedSource} {s
       by_cases same : actual = Word.ofNatModulo resolution.rawValue
       · subst actual
         exact .inl ⟨[], [], .integerLiteral (LiteralCode.constructs_word_with_requirement target meaning (requirements resolution (sites resolution (.literal (projection := projection) (validated := validated))))), .nil,
+          fun _ store _ selected => .apply .lambda (selected.evaluates store)
+            (.ifTrue (.binary (.var rfl) .word (by simp [BinaryOp.apply])) (.inRight .unit))⟩
+      · exact .inr (fun _ store _ selected => .apply .lambda (selected.evaluates store)
+          (.ifFalse (.binary (.var rfl) .word (by simp [BinaryOp.apply, same])) (.inLeft .unit)))
+    | uint256 target meaning fits retained =>
+      have typeEq : _ = Ty.word := Except.ok.inj projection.symm
+      subst typeEq
+      obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields represented
+      by_cases same : actual = Word.ofNatModulo resolution.rawValue
+      · subst actual
+        exact .inl ⟨[], [], .integerLiteral (LiteralCode.constructs_uint256_with_requirement target meaning fits (requirements resolution (sites resolution (.literal (projection := projection) (validated := validated))))), .nil,
           fun _ store _ selected => .apply .lambda (selected.evaluates store)
             (.ifTrue (.binary (.var rfl) .word (by simp [BinaryOp.apply])) (.inRight .unit))⟩
       · exact .inr (fun _ store _ selected => .apply .lambda (selected.evaluates store)
@@ -2461,6 +2559,15 @@ theorem Tree.reflects_with_literals {context : Context} {source : TypedSource} {
       refine ⟨?_, sameStore⟩
       rcases observed with ⟨rfl, rfl⟩ | ⟨_, rfl⟩
       · exact .inl ⟨[], [], .integerLiteral (LiteralCode.constructs_word_with_requirement target meaning requirement), .nil, rfl⟩
+      · exact .inr rfl
+    | uint256 target meaning fits retained =>
+      have typeEq : _ = Ty.word := Except.ok.inj projection.symm
+      subst typeEq
+      obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields represented
+      obtain ⟨observed, sameStore⟩ := word_matcher_inv (apply_lambda_inv selected completed)
+      refine ⟨?_, sameStore⟩
+      rcases observed with ⟨rfl, rfl⟩ | ⟨_, rfl⟩
+      · exact .inl ⟨[], [], .integerLiteral (LiteralCode.constructs_uint256_with_requirement target meaning fits requirement), .nil, rfl⟩
       · exact .inr rfl
     | integer target meaning retained =>
       have typeEq : _ = Ty.integer := Except.ok.inj projection.symm
@@ -2877,7 +2984,7 @@ private theorem ordinary_requirement {context : SourceSemantics.Context}
     RequirementProves context resolution.requirement resolution.predicate := by
   have code := literalMatcher_sound compilation site span expected literal resolution matcher accepted
   cases code with
-  | word target meaning retained | integer target meaning retained =>
+  | word target meaning retained | integer target meaning retained | uint256 target meaning _ retained =>
     obtain ⟨row, member, identifier, predicate⟩ := retained
     have inContext : row ∈ context.solvedRequirements := by rw [valid.ledger]; exact member
     refine ⟨row, ⟨inContext, identifier⟩, ?_, valid.valid.entriesValid row inContext⟩

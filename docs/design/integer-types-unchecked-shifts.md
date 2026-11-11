@@ -141,10 +141,39 @@ results are masked and signed ones sign-extended. Comparisons are signed for
 
 - **Typing.** Context types a literal: an annotation, a parameter, a return
   type, or the other operand.
-- **Defaulting.** A literal still open after inference defaults to `uint256`
-  when its type occurs in an operator or comparison obligation, or when it is
-  a numeric pattern. Otherwise it is rejected as ambiguous (`SC0299`), for
-  example `let y = 7;` when `y` is never used. It never defaults to `word`.
+- **Defaulting.** After the solve loop, upstream's
+  `crates/hir-ty/src/infer/obligations.rs` defaults open literals to `uint256`
+  in three passes, in this order:
+  - `default_integer_literals_with_non_int_obligations`: a literal or numeric
+    pattern whose variable occurs in an unresolved obligation of any class
+    other than the builtin `Int`. Operators are such obligations (`Sub`,
+    `Ord`, …), and so is a generic call's bound, such as a `Mark` bound.
+  - `default_integer_literal_patterns`: every numeric pattern still open.
+    It then checks the range of every `uint256` pattern, defaulted or
+    declared (`check_integer_literal_pattern_range` in `pattern.rs`).
+  - `default_root_integer_literals`: a literal whose variables all occur in
+    the root body's own type.
+
+  The obligations are then attempted again, so a bound with no `uint256`
+  implementation is an error. Any other open literal is rejected as ambiguous
+  (`SC0299`), for example `let y = 7;` when `y` is never used, or
+  `let y = poly(7);` when `poly`'s only bound is `Int`, which the first pass
+  skips (the uitest `crates/uitest/tests/fixtures/solver/poly_int_defaulting`).
+  No literal defaults to `word`. The hir-ty tests in
+  `crates/hir-ty/src/infer/tests/integer_defaulting.rs` cover the passes:
+  `arithmetic_literals_default_to_canonical_uint256` for operators,
+  `implicit_literal_pattern_uses_checked_default` and
+  `uint256_numeric_patterns_reject_values_outside_the_range` for patterns,
+  and `unconstrained_root_literal_uses_checked_type_without_name_lookup` for
+  the root rule.
+- **Compound assignments.** Upstream's parser rewrites `lhs op= rhs` into
+  `lhs = lhs op rhs` before typing (`assign_stmt_kind` in
+  `crates/parser/src/parse/stmt.rs`), "so type-class resolution and backend
+  specialization stay identical". Only storage-index compounds keep an
+  `AssignOp` (`crates/hir-ty/src/infer/stmt.rs`). So an open local target
+  types as `x = x op e` does: the target and the operand share one type, which
+  carries the operator's obligation and comes from a later use or else
+  defaults to `uint256`.
 - **Range.** At an integer type, an out-of-range literal is a compile error
   (`SC0409` or `SC0411`). This includes any negative literal at an unsigned
   type. A `word` literal wraps modulo 2^256, so `-1` is `2^256 − 1`, and an
@@ -910,6 +939,98 @@ Made on 2026-11-11, during step 6.
     `let k = -1;` is `2^256 - 1`. Upstream rejects it (`SC0411`) through the
     `uint256` default, which step 7 brings.
 
+### Row 1's `uint256` default: chosen by the literal's uses
+
+Made on 2026-11-11, during step 7.
+
+- **Defaulting.** After inference, a literal whose type is still a variable
+  defaults to `uint256` (`Detail.defaultIntegerLiteralTarget`,
+  `literalDefaultsToUint256`) when:
+  - its type occurs in an operand type of a unary or binary node
+    (`operatorMentions`): a builtin operator deferred on an open literal, or a
+    comparison, so `7 == 7` and an unused `7 + 1` are `uint256`;
+  - it occurs in a pending requirement other than its own builtin `Int`
+    (`requirementMentions`), which is then solved at `uint256`;
+  - or its spelling is negative. The `-` is an operator until it folds into
+    the literal, so `let k = -1;` defaults and then fails `uint256`'s range
+    (`Error.integerLiteralOutOfRange`), as upstream rejects it with `SC0411`
+    rather than as ambiguous.
+
+  Any other open literal is rejected as ambiguous
+  (`Error.ambiguousIntegerLiteral`, upstream's `SC0299`): `let y = 7;` unused,
+  `let y = 7; let z = y;`, `sc_id(7)` with an unused result, and
+  `lam () { return 7; }` never called. No literal defaults to `word` any more.
+- **Upstream's three passes in Lean.**
+  - The non-`Int` obligation pass is `operatorMentions` and
+    `requirementMentions`. Lean's builtin operators are deferred nodes, not
+    requirements, so they need their own test.
+  - The pattern pass is `defaultIntegerPatternTarget`, and the range check is
+    `validateIntegerPatternTarget` (below).
+  - The root pass has no counterpart for named functions: their parameters
+    are always typed, and a missing `returns` clause is unit, so a function's
+    root type holds no variable. The one root whose type can be open is
+    `SourceInference.inferExpression`, which checks an expression on its own.
+    A literal that only that type constrains, such as a lone `7`, is rejected
+    as ambiguous there, where upstream's root pass would give it `uint256`.
+    Nothing in the repository calls `inferExpression`.
+  - The negative-spelling case has no counterpart upstream, which reaches the
+    same `SC0411` through the `-`.
+- **Numeric patterns.**
+  - An open pattern defaults to `uint256` (`defaultIntegerPatternTarget`).
+    Patterns default before literals, so a `match` on an open literal makes
+    the literal `uint256` too.
+  - Patterns are admitted on `word`, `integer` and `uint256`
+    (`Ty.IntegerPatternCarrier`, `Detail.supportedIntegerPatternTarget`). The
+    other eleven types keep rejecting them (`Error.nonNumericPatternType`).
+  - At `uint256` a pattern compares the scrutinee's word with the literal's.
+    Both pattern compilers validate it with `validateFixedIntegerLiteral`,
+    and the meaning proofs cover it (`LiteralCode.uint256`).
+  - The range is checked twice, as for literals. Finalization checks every
+    `uint256` pattern, defaulted or declared, as upstream does
+    (`IntegerPatternOrigin.rawValue`, `Error.integerPatternOutOfRange`, which
+    names the type and the value), and the compiler's validator checks it
+    again.
+- **`where` clauses.** A `where` clause cannot name the builtin `Int`: Lean
+  reports `unknownTrait "Int"`, and a declared `trait Int` is an ordinary
+  source trait. So upstream's `poly_int_defaulting` is rejected at its
+  signature in Lean. This frontend gap predates row 1. Without the bound,
+  `poly(7)` with an unused result is ambiguous, as upstream has it.
+- **Shifts and unchecked operators** still make their literal operands `word`
+  at once ([shifts as implemented](#shifts-as-implemented),
+  [unchecked blocks as implemented](#unchecked-blocks-as-implemented)), so
+  `1 << 3` is a `word`. On the same words, Word's shifts and wrapping
+  arithmetic give what `uint256`'s would, so only the typing differs: such a
+  literal cannot then flow to `uint256`. Step 8, which brings these operators
+  to the twelve types, defaults their literals as the design says.
+- **Compound assignments on an open target** are `word` at once too
+  (`compoundOperandConstructor`). Here the results differ from upstream's:
+  `let x = 0; x -= 1;` wraps, where upstream panics with `0x11`, and after
+  step 7 `x -= 1` and `x = x - 1` differ on an open `x`. Step 7b types them
+  as upstream's rewrite does. The public-API tests pin today's behaviour
+  (`compoundOpen`, `rewrittenOpen`, `compoundWord`), so step 7b changes it
+  visibly.
+- **Gaps left for step 8.** Two older paths take only `word` and `integer`,
+  as since step 1, so a value that now defaults to `uint256` fails there:
+  - The monomorphic scalar and function profile
+    (`SourceCoreFunctions.lowerExpressionWithReasons`, also behind
+    `SourceCoreFunctionEntry`) projects only those types and rejects
+    fixed-width literals, so a `uint256` value or pattern fails with
+    `typeProjection`.
+  - `SourceProgramExecution`'s direct linking (`SourceCoreDirectLinking`)
+    rejects a `uint256` binder with `unsupportedType`.
+
+  The public compiler (`SourceCoreExecution`) uses neither path, and its
+  general and compatible paths compile `uint256` values and matches.
+  Extending the scalar profile would reach its Word and Integer meaning
+  proofs, so step 7 types the scrutinees and literals of the tests that use
+  these paths `Word` instead.
+- **Consequences**, as [consequences for existing
+  programs](#consequences-for-existing-programs) expects: arithmetic on a
+  defaulted literal is checked at `uint256`, so `2^256 - 1 + 1 == 0` panics
+  with `0x11` where it was `true` at `word`; unconstrained literals are
+  rejected; and the tests that relied on the `word` default change, as the
+  hand-over note lists.
+
 ### Row 1: steps
 
 Row 1 is committed in steps, each through the full gate, so that each can be
@@ -960,7 +1081,13 @@ first planned after the literals and moved before them for this reason
    ([row 1's unary minus](#row-1s-unary-minus-folded-or-read-as-0---e-before-inference)).
 7. **The `uint256` default.** Open literals default to `uint256`, and an open
    literal in no operator, comparison or requirement is rejected as
-   ambiguous. The existing tests that relied on the `word` default change in
-   this step.
+   ambiguous ([row 1's `uint256`
+   default](#row-1s-uint256-default-chosen-by-the-literals-uses)). The
+   existing tests that relied on the `word` default change in this step.
+   - 7b. **Compound assignments on an open target.** `+= -= *= /= %= &= |=
+     ^=` on a target whose type is still open take the operand's type and
+     count as an operator use for the `uint256` default, as upstream's
+     rewrite to `x = x op e` types them. The place is still evaluated once.
+     Compound shifts stay `word`-only until step 8.
 8. **Unchecked operators and shifts on the twelve types**, and ports of the
    upstream fixtures.

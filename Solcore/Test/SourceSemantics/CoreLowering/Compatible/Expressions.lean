@@ -3643,7 +3643,7 @@ private def content : String := String.intercalate "\n" [
   "function wordRoot() returns (Word) { let first = 0x25; return first; }",
   s!"function wrapRoot() returns (Word) \{ return {huge}; }",
   s!"function integerRoot() returns (integer) \{ let full = {huge}; return full; }",
-  "function faultRoot() returns (Word) { let prior = 41; let missing: Word; return missing + 43; }"
+  "function faultRoot() returns (Word) { let prior: Word = 41; let missing: Word; return missing + 43; }"
 ]
 
 private def scalar? : Expr → Option Core.Value

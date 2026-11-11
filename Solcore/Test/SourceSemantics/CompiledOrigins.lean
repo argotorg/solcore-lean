@@ -2245,7 +2245,7 @@ def workspace : Workspace.RawWorkspace := {
     "function run(flag: Bool) returns (Word, Bool) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
-    "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
+    "if (flag) { let two: Word = 2; let discarded = keep(two, true); } else { let three: Word = 3; let discarded = keep(three, false); }",
     "return result; }"]}] }
 
 private def hasEmitter (catalog : List Resolved.DeclarationId) (nodes : List Node) (requirement : RequirementId) : Bool :=

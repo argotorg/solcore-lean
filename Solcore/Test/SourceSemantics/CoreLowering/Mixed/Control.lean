@@ -313,7 +313,7 @@ def workspace : Workspace.RawWorkspace := {
     "function mixed(flag: Bool) returns (Word, Bool) {",
     "  let f = lam(value) { return value; };",
     "  {",
-    "    let first = f(11);",
+    "    let first: Word = f(11);",
     "    if (flag) {",
     "      let g = lam(value) { return value; };",
     "      let chosen = g(first);",

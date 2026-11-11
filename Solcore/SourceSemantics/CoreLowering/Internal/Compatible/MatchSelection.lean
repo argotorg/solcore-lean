@@ -1614,6 +1614,17 @@ theorem literalMatcher_selected (compilation : Compilation) (site : StatementId)
       simp only [node, TypeSystem.Ty.integer] at validated
       simp [literalMatcher, TypeSystem.Ty.integer, validated, Except.mapError, bind, Except.bind] at accepted
     | ok value => exact ⟨_, NumericLiteralEvidenceReceipts.integer validated⟩
+  | uint256 target meaning fits retained =>
+    let node : ExpressionNode := ⟨⟨site.occurrence⟩, span, .constructor (.builtin (.fixed ⟨false, .w256⟩)),
+      .integerLiteral literal resolution, [resolution.requirement], [], none⟩
+    cases validated : SourceCoreElaboration.validateFixedIntegerLiteral compilation.solvedRequirements node literal
+        resolution .uint256 with
+    | error error =>
+      simp only [node] at validated
+      change literalMatcher compilation site span (.constructor (.builtin (.fixed ⟨false, .w256⟩))) literal
+        resolution = .ok _ at accepted
+      simp [literalMatcher, validated, Except.mapError, bind, Except.bind] at accepted
+    | ok value => exact ⟨_, NumericLiteralEvidenceReceipts.fixed validated⟩
 
 /-- The original pattern certificate and the selected numeric row share all
 source, instruction, matcher, requirement and binding indices. -/

@@ -316,7 +316,7 @@ open Solcore Core Frontend SourceInference SourceSemantics
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
-    "function local(flag: Bool) returns (Word, Bool) { let f = lam(value) { return value; }; let y = f(11); let absent: Word; return (absent, f(flag)); }"}] }
+    "function local(flag: Bool) returns (Word, Bool) { let f = lam(value) { return value; }; let y: Word = f(11); let absent: Word; return (absent, f(flag)); }"}] }
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
 def runOptions : SourceCoreExecution.RunOptions :=

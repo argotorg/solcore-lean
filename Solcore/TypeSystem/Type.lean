@@ -126,6 +126,9 @@ theorem canonical_of_le_maxNat {type : FixedInteger} {n : Nat} (bounded : n ≤ 
     have below : n < 2 ^ type.width.bits := by omega
     simp [below]
 
+/-- `uint256`, the type an open literal defaults to. -/
+def uint256 : FixedInteger := ⟨false, .w256⟩
+
 /-- The twelve types, unsigned first. -/
 def all : List FixedInteger :=
   IntegerWidth.all.map (⟨false, ·⟩) ++ IntegerWidth.all.map (⟨true, ·⟩)
@@ -205,6 +208,11 @@ def fixed (type : FixedInteger) : Ty := .constructor (.builtin (.fixed type))
 fixed-width integer types. -/
 def IntegerLiteralCarrier (type : Ty) : Prop :=
   type = .word ∨ type = .integer ∨ ∃ fixed, type = .fixed fixed
+
+/-- The numeric-pattern carriers: `word`, `integer` and `uint256`, the type an
+open numeric pattern defaults to. -/
+def IntegerPatternCarrier (type : Ty) : Prop :=
+  type = .word ∨ type = .integer ∨ type = .fixed .uint256
 
 /-- The fixed-width integer type a type is, if it is one of the twelve. -/
 def fixedInteger? : Ty → Option FixedInteger

@@ -1684,6 +1684,11 @@ def literalMatcher (context : Context) (site : StatementId) (span : Syntax.Sourc
       let valid ← (SourceCoreElaboration.validateNativeIntegerLiteral context.solvedRequirements node literal resolution)
         |>.mapError SourceCoreBasic.Error.literalEvidence
       pure (Core.Ty.integer, Core.Expr.binary .integerEq (.var 0) (.integer valid.value))
+    | .constructor (.builtin (.fixed ⟨false, .w256⟩)) => do
+      let valid ← (SourceCoreElaboration.validateFixedIntegerLiteral context.solvedRequirements node literal
+          resolution .uint256)
+        |>.mapError SourceCoreBasic.Error.literalEvidence
+      pure (Core.Ty.word, Core.Expr.binary .wordEq (.var 0) (.word valid.value))
     | _ => throw invalid
   pure (.lambda coreType (.sum .unit .unit)
     (.ifE equal (.inRight .unit .unit) (.inLeft .unit .unit)))

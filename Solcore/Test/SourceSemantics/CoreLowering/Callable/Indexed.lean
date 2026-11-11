@@ -2568,8 +2568,8 @@ private def workspace : Workspace.RawWorkspace := {
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function views(seed: Word) returns (F, F) { let f = lam(item) { keep(item); seed += 1; return seed; }; return (f, f); }",
-    "function nested(seed: Word) returns (F, F) { let outer = lam(value) { keep(value); let inner = lam(item) { keep(item); seed += 1; return seed; }; return (inner, inner); }; return outer(1); }",
-    "function shared(seed: Word) returns (F, F) { let shared = lam(item) { seed += 1; return seed; }; let outer = lam(value) { keep(value); return (shared, shared); }; return outer(1); }",
+    "function nested(seed: Word) returns (F, F) { let outer = lam(value) { keep(value); let inner = lam(item) { keep(item); seed += 1; return seed; }; return (inner, inner); }; let one: Word = 1; return outer(one); }",
+    "function shared(seed: Word) returns (F, F) { let shared = lam(item) { seed += 1; return seed; }; let outer = lam(value) { keep(value); return (shared, shared); }; let one: Word = 1; return outer(one); }",
     "function mono(seed: Word) returns (F) { let f: F = lam(item: Word) -> Word { seed += item; return seed; }; return f; }",
     "function failure(seed: Word) returns (Word) { let f = lam(item) { keep(item); seed += 1; return seed; }; let captured: F = f; let absent: Word; return absent; }",
     "function suspended(seed: Word) returns (Word) { let f = lam(item) { keep(item); seed += 1; return seed; }; let captured: F = f; while (true) {} return 0; }"
@@ -3265,7 +3265,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function deep() returns (Word) { let f0 = lam(item0) { let f1 = lam(item1) { let f2 = lam(item2) { let probeDeep: Word = 7; return probeDeep; }; return f2(true); }; return f1(true); }; return f0(true); }",
     "function repeatViews(limit: Word) returns (Word) { let total = 0; let f = lam(item) { total += 1; return item; }; let i = 0; while (i < limit) { f(true); i += 1; } return total; }",
     "function looping(limit: Word) returns (Word) { let total = 0; for (let i = 0; i < limit; i += 1) { total += i; } return total; }",
-    "function absent(seed: Word) returns (Word) { let f = lam(item) { seed += 1; let absent: Word; return absent; }; return f(0); }",
+    "function absent(seed: Word) returns (Word) { let f = lam(item) { seed += 1; let absent: Word; return absent; }; let zero: Word = 0; return f(zero); }",
     "function spin() returns (Word) { let f = lam() -> Word { while (true) {} return 0; }; return f(); }"
   ]}] }
 private def key (program : CheckedProgram) (name : String) : IO Key :=

@@ -821,7 +821,7 @@ theorem parent_reference_forbidden {original : TypedSource} {bodyRoots : List No
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
   mainSources := [{path := "main.solc", content :=
-    "function make() returns (function() returns (Word)) { return lam() -> Word { let x: Word = 1; { 2; } if (true) { 3; } else { 4; } return 5; }; }"}] }
+    "function make() returns (function() returns (Word)) { return lam() -> Word { let x: Word = 1; { true; } if (true) { false; } else { true; } return 5; }; }"}] }
 
 def run : IO Unit := do
   let program ← SourceCompilerFeatureSupport.get "body view checker" (checkProgram workspace)
@@ -2816,7 +2816,7 @@ theorem metadata_alone_insufficient :
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
     "function nested() returns (integer) { let f: function() returns (integer) = lam() -> integer { let x: Word = 7; { integerEq(wordToInteger(x), wordToInteger(x)); } if (integerLt(wordToInteger(x), wordToInteger(x))) { return wordToInteger(x); } else { x; } return integerSub(wordToInteger(x), wordToInteger(3)); }; return 0; }",
-    "function indexed() returns (integer) { let f: function() returns (Word) = lam() -> Word { let table: mapping((Bool, Bool) => Word); let spare: Word; { @Word; } if (integerEq(wordToInteger(2), wordToInteger(2))) { 3; } else { 4; } return table[(integerEq(wordToInteger(2), wordToInteger(2)), integerLt(wordToInteger(2), wordToInteger(2)))]; }; return 0; }",
+    "function indexed() returns (integer) { let f: function() returns (Word) = lam() -> Word { let table: mapping((Bool, Bool) => Word); let spare: Word; { @Word; } if (integerEq(wordToInteger(2), wordToInteger(2))) { true; } else { false; } return table[(integerEq(wordToInteger(2), wordToInteger(2)), integerLt(wordToInteger(2), wordToInteger(2)))]; }; return 0; }",
     "function branch() returns (integer) { let f: function() returns (Bool) = lam() -> Bool { let x: Word = 3; if (integerEq(wordToInteger(x), wordToInteger(x))) { let y: Word = 7; y; } else { let y: Word; y; } return integerLt(wordToInteger(x), integerSub(wordToInteger(x), wordToInteger(1))); }; return 0; }"]}] }
 
 def run : IO Unit := do

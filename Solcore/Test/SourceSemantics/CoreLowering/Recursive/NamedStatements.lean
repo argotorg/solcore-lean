@@ -262,12 +262,12 @@ private def content : String := String.intercalate "\n" [
   "function transfers(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; less(index, 4); index += next(0)) { raw[next(0)] += copied(1); if (less(index, 2)) { continue; } raw[next(0)] += copied(1); } return copied(index + raw[next(0)]); }",
   "function breaks(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; less(index, 4); raw[next(0)] += copied(10), index += next(0)) { raw[next(0)] += copied(1); break; } return copied(index + raw[next(0)]); }",
   "function early(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; true; raw[next(0)] += copied(10), index += next(0)) { raw[next(0)] += copied(2); return copied(raw[next(0)]); } return copied(99); }",
-  "function zero(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; false; raw[next(0)] += bad(seed)) { bad(seed); } return copied(raw[next(0)]); }",
+  "function zero(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index: Word = 0; for (; false; raw[next(0)] += bad(seed)) { bad(seed); } return copied(raw[next(0)]); }",
   "function nested(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; less(index, 2); index += next(0)) { let inner = 0; while (less(inner, 3)) { inner += next(0); if (less(inner, 2)) { continue; } raw[next(0)] += copied(1); break; } for (let local = 0; less(local, 2); local += next(0)) { if (less(local, 1)) { continue; } raw[next(0)] += copied(1); } } return copied(index + raw[next(0)]); }",
   "function bodyFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; true; raw[next(0)] += copied(9), index += next(0)) { raw[next(0)] += copied(2); bad(seed); } return copied(99); }",
   "function postFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; true; raw[next(0)] += copied(3), let failed = bad(seed), index += next(0)) { raw[next(0)] += copied(2); continue; } return copied(99); }",
   "function conditionFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (; stopOrFail(index); index += next(0)) { raw[next(0)] += copied(2); } return copied(99); }",
-  "function initializerFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index = 0; for (raw[next(0)] += copied(3), let failed = bad(seed); true; ) { raw[next(0)] += copied(99); } return copied(99); }"
+  "function initializerFault(raw: mapping(Word => Word), seed: Word) returns (Word) { let saved: function(Word) returns (Word) = lam(value: Word) -> Word { return seed + value; }; let index: Word = 0; for (raw[next(0)] += copied(3), let failed = bad(seed); true; ) { raw[next(0)] += copied(99); } return copied(99); }"
 ]
 
 private def wordValue (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -473,12 +473,12 @@ end Concrete
 private def content : String := String.intercalate "\n" [
   "function side(value: Word) returns (Word) { return value; }",
   "function truth(value: Bool) returns (Bool) { return value; }",
-  "function bad() returns (Word) { let stamp = 19; let gap: Word; return gap; }",
-  "function badBool() returns (Bool) { let stamp = 23; let gap: Bool; return gap; }",
+  "function bad() returns (Word) { let stamp: Word = 19; let gap: Word; return gap; }",
+  "function badBool() returns (Bool) { let stamp: Word = 23; let gap: Bool; return gap; }",
   "function nested(raw: mapping(Word => Word), seed: Word) returns (Word) { let outer = 0; let count = seed; for (; outer < 2; outer += 1) { let inner = 0; while (inner < 2) { inner += 1; raw[side(1)] += side(2); count += 1; if (inner < 2) { continue; } break; } } return side(count + raw[1]); }",
-  "function returns(raw: mapping(Word => Word), seed: Word) returns (Word) { for (let outer = 0; true; let dead = bad()) { while (true) { for (let inner = 0; true; let dead = bad()) { raw[side(1)] += side(2); return side(seed + raw[1]); } } } return 99; }",
+  "function returns(raw: mapping(Word => Word), seed: Word) returns (Word) { for (let outer: Word = 0; true; let dead = bad()) { while (true) { for (let inner: Word = 0; true; let dead = bad()) { raw[side(1)] += side(2); return side(seed + raw[1]); } } } return 99; }",
   "function headerFault(raw: mapping(Word => Word), seed: Word) returns (Word) { for (raw[side(1)] += side(3), let missing: Word, let failed = missing; true; ) { raw[side(1)] += side(99); } return seed; }",
-  "function postFault(raw: mapping(Word => Word), seed: Word) returns (Word) { for (let i = 0; i < 2; let stage = side(3), raw[side(1)] += stage, let missing: Word, raw[side(1)] += missing) { raw[side(1)] += side(2); continue; } return seed; }",
+  "function postFault(raw: mapping(Word => Word), seed: Word) returns (Word) { for (let i: Word = 0; i < 2; let stage = side(3), raw[side(1)] += stage, let missing: Word, raw[side(1)] += missing) { raw[side(1)] += side(2); continue; } return seed; }",
   "function keyFault(raw: mapping(Word => Word), seed: Word) returns (Word) { for (; true; ) { raw[bad()] += side(99); } return seed; }",
   "function rhsFault(raw: mapping(Word => Word), seed: Word) returns (Word) { for (; true; ) { raw[side(1)] += side(2); raw[side(1)] += bad(); } return seed; }",
   "function bitNot(raw: mapping(Word => Word), seed: Word) returns (Word) { let mask = seed; for (let i = 0; i < 2; i += 1, mask ~=, mask ~=) { mask ~=; mask ~=; raw[side(1)] += side(1); } return mask + raw[1]; }",
@@ -688,7 +688,7 @@ private def content : String := String.intercalate "\n" [
   "function selectedFault(seed: Word) returns (Word) { match (seed) { case 0 { let prior = mark(11); return fail(prior); } default { return mark(13); } } }",
   "function scrutineeFault() returns (Word) { let prior = mark(17); match (fail(prior)) { case 0 { return 0; } default { return 1; } } }",
   "function duplicate(raw: mapping(Word => Word)) returns (Word) { match (mark(0)) { case 0 { raw[mark(1)] += mark(2); } default { raw[1] += 99; } } return raw[1]; }",
-  "function armShadow(seed: Word) returns (Word) { let kept = seed; match ((0, kept)) { case (0, kept) { let local = mark(kept + 1); } default {} } return kept; }"
+  "function armShadow(seed: Word) returns (Word) { let kept = seed; let zero: Word = 0; match ((zero, kept)) { case (0, kept) { let local = mark(kept + 1); } default {} } return kept; }"
 ]
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -720,7 +720,7 @@ def run : IO Unit := do
     ("terminal", [word 1], 7, [cell 1, cell 1, cell 7, cell 7]),
     ("selectedFault", [word 1], 13, [cell 1, cell 1, cell 13, cell 13]),
     ("duplicate", [table 10], 12, [(.mapping .word .word, some (table 12)), cell 0, cell 0, cell 0, cell 1, cell 1, cell 2, cell 2]),
-    ("armShadow", [word 4], 4, [cell 4, cell 4, pair 0 4, cell 4, cell 5, cell 5, cell 5])]
+    ("armShadow", [word 4], 4, [cell 4, cell 4, cell 0, pair 0 4, cell 4, cell 5, cell 5, cell 5])]
   for (name, arguments, expected, cells) in successes do
     let baseline ← finish compiled name arguments 600000 initial
     for fuel in [0, 19, 113, 600000] do
@@ -898,13 +898,13 @@ theorem closed_conditional_reflects_at [FunctionCalls.FaultTokens faults] (budge
 end Concrete
 
 private def content : String := String.intercalate "\n" [
-  "function branch(flag: Bool) returns (Word) { let prior = 1; { let inside = 2; if (flag) { let selected = 3; return selected; } else { let selected = 4; return selected; } } let unreachable = 99; return unreachable; }",
-  "function absent(flag: Bool) returns (Word) { let prior = 5; if (flag) { let selected = 6; } let after = 7; return after; }",
-  "function shadow() returns (Word) { let value = 8; { let value = 9; } return value; }",
-  "function conditionFault() returns (Word) { let prior = 10; let gap: Bool; if (gap) { let skipped = 98; } let skipped = 99; return skipped; }",
-  "function thenFault(flag: Bool) returns (Word) { let prior = 11; if (flag) { let selected = 12; let gap: Word; return gap; } else { let unselected = 97; return unselected; } let skipped = 99; return skipped; }",
-  "function elseFault(flag: Bool) returns (Word) { let prior = 13; if (flag) { let unselected = 97; return unselected; } else { let selected = 14; let gap: Word; return gap; } let skipped = 99; return skipped; }",
-  "function sequenceFault() returns (Word) { let prior = 15; { let selected = 16; let gap: Word; gap; } let skipped = 99; return skipped; }"
+  "function branch(flag: Bool) returns (Word) { let prior: Word = 1; { let inside: Word = 2; if (flag) { let selected = 3; return selected; } else { let selected = 4; return selected; } } let unreachable = 99; return unreachable; }",
+  "function absent(flag: Bool) returns (Word) { let prior: Word = 5; if (flag) { let selected: Word = 6; } let after = 7; return after; }",
+  "function shadow() returns (Word) { let value = 8; { let value: Word = 9; } return value; }",
+  "function conditionFault() returns (Word) { let prior: Word = 10; let gap: Bool; if (gap) { let skipped: Word = 98; } let skipped = 99; return skipped; }",
+  "function thenFault(flag: Bool) returns (Word) { let prior: Word = 11; if (flag) { let selected: Word = 12; let gap: Word; return gap; } else { let unselected = 97; return unselected; } let skipped = 99; return skipped; }",
+  "function elseFault(flag: Bool) returns (Word) { let prior: Word = 13; if (flag) { let unselected = 97; return unselected; } else { let selected: Word = 14; let gap: Word; return gap; } let skipped = 99; return skipped; }",
+  "function sequenceFault() returns (Word) { let prior: Word = 15; { let selected: Word = 16; let gap: Word; gap; } let skipped = 99; return skipped; }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (name : String) (arguments : List SourceTypedRuntime.Value)
@@ -1058,10 +1058,10 @@ end Concrete
 private def content : String := String.intercalate "\n" [
   "function side(n: Word) returns (Word) { let copied = n; return copied; }",
   "function truth(flag: Bool) returns (Bool) { let copied = flag; return copied; }",
-  "function bad() returns (Word) { let written = 5; let gap: Word; return gap; }",
-  "function badBool() returns (Bool) { let written = 19; let gap: Bool; return gap; }",
+  "function bad() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
+  "function badBool() returns (Bool) { let written: Word = 19; let gap: Bool; return gap; }",
   "function empty() {}",
-  "function unitReturn() { return; let skipped = 99; }",
+  "function unitReturn() { return; let skipped: Word = 99; }",
   "function returned() returns (Word) { return side(7); }",
   "function tailed() returns (Word) { side(7) }",
   "function absent() { let gap: Word; }",
@@ -1071,7 +1071,7 @@ private def content : String := String.intercalate "\n" [
   "function branches(flag: Bool) returns (Word) { if (truth(flag && integerEq(7, 7))) { let chosen = side(7); chosen; } else { let chosen = side(4); chosen; } return side(3); }",
   "function shadow() returns (Word) { let value = side(7); { let value = side(4); value; } return side(value); }",
   "function earlyReturn(flag: Bool) returns (Word) { if (truth(flag)) { return side(9); } else { return side(5); } return bad(); }",
-  "function absentFault() returns (Word) { let prior = 2; let gap: Word; return gap; }",
+  "function absentFault() returns (Word) { let prior: Word = 2; let gap: Word; return gap; }",
   "function initializerFault() returns (Word) { let prior = side(2); let failed = bad(); return side(99); }",
   "function conditionFault() returns (Word) { let prior = side(2); if (truth(badBool())) { side(99); } return side(100); }",
   "function discardFault() returns (Word) { { let retained = side(4); bad(); } return side(99); }",
@@ -2892,9 +2892,9 @@ private def template_blocks : IO Unit := do
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word, Bool) {",
-      " { match ((61, 7)) { case (61, picked) { let chosen: Word = picked; } default {} } }",
-      " { if (true) { match (62) { case 61 { let skipped: Word = 1; } default { let reached: Word = 11; } } } else { let skipped: Word = 2; } }",
-      " { let missing: Word; match (61) { case 61 { let fault: Word = missing; } default {} } let skipped: Word = 13; }",
+      " { let left: Word = 61; match ((left, 7)) { case (61, picked) { let chosen: Word = picked; } default {} } }",
+      " { if (true) { let probe: Word = 62; match (probe) { case 61 { let skipped: Word = 1; } default { let reached: Word = 11; } } } else { let skipped: Word = 2; } }",
+      " { let missing: Word; let probe: Word = 61; match (probe) { case 61 { let fault: Word = missing; } default {} } let skipped: Word = 13; }",
       " let f = lam(item) { return keep(item); }; return (f(1), f(flag)); }"
     ]}] })
   let signature ← match program.signatures.functions.filter (·.name == "qualified") with
@@ -2935,10 +2935,12 @@ private def template_blocks : IO Unit := do
   let word := fun n => Core.Value.word (Word.ofNatModulo n)
   let captured := Core.Value.closure .word .word (.var 0) [word 947]
   let before : Core.Store := [.integer (-953), captured, .cellRef .integer 0]
+  -- Each block's scrutinee is a `Word` local, so its numeric patterns are `Word` patterns,
+  -- which this word-only profile lowers; open ones would default to `uint256` (row 1, step 7).
   let expectedCells : List Core.Store := [
-    [.inRight .unit (.pair (word 61) (word 7)), .inRight .unit (word 7), .inRight .unit (word 7)],
-    [.inRight .unit (word 62), .inRight .unit (word 11)],
-    [.inLeft .word .unit, .inRight .unit (word 61)] ]
+    [.inRight .unit (word 61), .inRight .unit (.pair (word 61) (word 7)), .inRight .unit (word 7), .inRight .unit (word 7)],
+    [.inRight .unit (word 62), .inRight .unit (word 62), .inRight .unit (word 11)],
+    [.inLeft .word .unit, .inRight .unit (word 61), .inRight .unit (word 61)] ]
   for ((node, cells), index) in (roots.zip expectedCells).zipIdx do
     let code ← get "upper actual recursive flow"
       (SourceCoreLoops.lowerFlowStatementsWithPolicy policy 200 source [] [node.id] .unit

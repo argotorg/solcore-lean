@@ -2581,11 +2581,11 @@ private def workspace : Workspace.RawWorkspace := {
     "function copied(value: Word) returns (Word) { let local = value; return local; }",
     "function bad(value: Word) returns (Word) { let local = value; let gap: Word; return gap; }",
     "function initialEqual(seed: Word) returns (Word) { for (let root: Word, root = copied(seed); false; ) { return 99; } return seed; }",
-    "function postEqual(seed: Word) returns (Word) { let outer = 17; let index = 0; for (; index < 1; let outer: Word, outer = copied(seed), index = index + 1) { continue; } return outer; }",
-    "function initialCompound(seed: Word) returns (Word) { for (let root: Word, root += copied(seed), let never = 99; true; ) { return 99; } return 99; }",
-    "function postCompound(seed: Word) returns (Word) { let index = 0; for (; true; let root: Word, root += copied(seed), let never = 99) { index = index + 1; continue; } return 99; }",
-    "function initialRhsFault(seed: Word) returns (Word) { for (let root: Word, root = bad(seed), let never = 99; true; ) { return 99; } return 99; }",
-    "function postRhsFault(seed: Word) returns (Word) { let index = 0; for (; true; let root: Word, root = bad(seed), let never = 99) { index = index + 1; continue; } return 99; }"
+    "function postEqual(seed: Word) returns (Word) { let outer = 17; let index: Word = 0; for (; index < 1; let outer: Word, outer = copied(seed), index = index + 1) { continue; } return outer; }",
+    "function initialCompound(seed: Word) returns (Word) { for (let root: Word, root += copied(seed), let never: Word = 99; true; ) { return 99; } return 99; }",
+    "function postCompound(seed: Word) returns (Word) { let index: Word = 0; for (; true; let root: Word, root += copied(seed), let never: Word = 99) { index = index + 1; continue; } return 99; }",
+    "function initialRhsFault(seed: Word) returns (Word) { for (let root: Word, root = bad(seed), let never: Word = 99; true; ) { return 99; } return 99; }",
+    "function postRhsFault(seed: Word) returns (Word) { let index: Word = 0; for (; true; let root: Word, root = bad(seed), let never: Word = 99) { index = index + 1; continue; } return 99; }"
   ]}]
 }
 
@@ -5501,7 +5501,7 @@ private def content : String := String.intercalate "\n" [
   "function wordRoot() returns (Word) { let first = 0x25; return first; }",
   s!"function wrapRoot() returns (Word) \{ return {huge}; }",
   s!"function integerRoot() returns (integer) \{ let full = {huge}; return full; }",
-  "function faultRoot() returns (Word) { let prior = 41; let missing: Word; return missing + 43; }"
+  "function faultRoot() returns (Word) { let prior: Word = 41; let missing: Word; return missing + 43; }"
 ]
 
 private def inspect (compiled : SourceCoreUnifiedCompilation.Compiled) : IO Unit := do

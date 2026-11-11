@@ -399,7 +399,7 @@ theorem projection_typing_is_static {catalog : SourceCoreCompatibleCatalog.Catal
 private def content : String := String.intercalate "\n" [
   "function side(n: Word) returns (Word) { let saved = n; return saved; }",
   "function truth(flag: Bool) returns (Bool) { return flag; }",
-  "function fail() returns (Word) { let written = 5; let gap: Word; return gap; }",
+  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
   "function assign(x: Word, y: Word) returns (Word) { x = side(y); return x; }",
   "function compound(x: Word, y: Word) returns (Word) { x += side(y); return x; }",
   "function indexed(m: mapping(Bool => Word), y: Word) returns (Word) { m[truth(true)] = side(y); return m[true]; }",
@@ -1132,7 +1132,7 @@ private def content : String := String.intercalate "\n" [
   "function down(n: Word) returns (Word) { while (n != 0) { n -= 1; } return n; }",
   "function assign(m: mapping(Bool => Word)) returns (Word) { m[true] = step(6); return m[true]; }",
   "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(value: Word) -> Word { seed += value; return seed; }; }",
-  "function fail() returns (Word) { let saved = 17; let gap: Word; return gap; }",
+  "function fail() returns (Word) { let saved: Word = 17; let gap: Word; return gap; }",
   "function zero() {}"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -1390,7 +1390,7 @@ end OriginalSource
 private def content : String := String.intercalate "\n" [
   "function side(n: Word) returns (Word) { let saved = n; return saved; }",
   "function take(a: Word, b: Word) returns (Word) { return a - b; }",
-  "function fail() returns (Word) { let written = 5; let gap: Word; return gap; }",
+  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
   "function failAfter(a: Word) returns (Word) { let written = a + 10; let gap: Word; return gap; }",
   "function ordered() returns (Word) { return take(side(7), side(3)); }",
   "function firstFault() returns (Word) { return take(fail(), side(7)); }",
@@ -1635,11 +1635,11 @@ private def content : String := String.intercalate "\n" [
   "enum Key { Key(Bool) }", "enum Missing { Missing(Word) }",
   "function side(n: Word) returns (Word) { let saved = n; return saved; }",
   "function truth(flag: Bool) returns (Bool) { let saved = flag; return saved; }",
-  "function failWord() returns (Word) { let written = 5; let gap: Word; return gap; }",
-  "function badBool() returns (Bool) { let written = 19; let gap: Bool; return gap; }",
+  "function failWord() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
+  "function badBool() returns (Bool) { let written: Word = 19; let gap: Bool; return gap; }",
   "function filled() returns (mapping(Bool => Bool)) { let m: mapping(Bool => Bool); m[true] = true; return m; }",
   "function empty() returns (mapping(Bool => Bool)) { let m: mapping(Bool => Bool); return m; }",
-  "function badMap() returns (mapping(Bool => Bool)) { let written = 23; let gap: Word; gap; let m: mapping(Bool => Bool); return m; }",
+  "function badMap() returns (mapping(Bool => Bool)) { let written: Word = 23; let gap: Word; gap; let m: mapping(Bool => Bool); return m; }",
   "function single() returns (Box) { return Box(truth(true)); }",
   "function row() returns (Row) { return Row(side(7), truth(false)); }",
   "function nominalKey() returns (Bool) { let m: mapping(Key => Bool); return m[Key(truth(true))]; }",
@@ -1924,8 +1924,8 @@ end ConcreteBodies
 private def content : String := String.intercalate "\n" [
   "function side(n: Word) returns (Word) { let saved = n; return saved; }",
   "function truth(flag: Bool) returns (Bool) { let saved = flag; return saved; }",
-  "function fail() returns (Word) { let written = 5; let gap: Word; return gap; }",
-  "function badBool() returns (Bool) { let written = 19; let gap: Bool; return gap; }",
+  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
+  "function badBool() returns (Bool) { let written: Word = 19; let gap: Bool; return gap; }",
   "function grouped() returns (Word) { return ((side(7))); }",
   "function paired() returns ((Word, Word)) { return (side(7), side(3)); }",
   "function unary() returns (Bool) { return !truth(false); }",
@@ -2091,7 +2091,7 @@ end ConcreteBodies
 private def content : String := String.intercalate "\n" [
   "function side(n: Word) returns (Word) { let saved = n; return saved; }",
   "function wordSide(n: Word) returns (Word) { let saved = n; return saved; }",
-  "function fail() returns (Word) { let written = 5; let gap: Word; return gap; }",
+  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
   "function ordered() returns (integer) { return integerSub(wordToInteger(side(7)), wordToInteger(side(3))); }",
   "function converted() returns (integer) { return wordToInteger(wordFromInteger(integerSub(wordToInteger(side(0)), wordToInteger(side(9))))); }",
   "function fromWord() returns (integer) { return wordToInteger(wordSide(11)); }",
@@ -2639,9 +2639,9 @@ private def content : String := String.intercalate "\n" [
   "function side(n: Word) returns (Word) { let saved = n; return saved; }",
   "function truth(flag: Bool) returns (Bool) { let saved = flag; return saved; }",
   "function take(a: Word, b: Word) returns (Word) { return a - b; }",
-  "function fail() returns (Word) { let written = 5; let gap: Word; return gap; }",
+  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
   "function failAfter(n: Word) returns (Word) { let written = n + 10; let gap: Word; return gap; }",
-  "function badBool() returns (Bool) { let written = 19; let gap: Bool; return gap; }",
+  "function badBool() returns (Bool) { let written: Word = 19; let gap: Bool; return gap; }",
   "function ordered() returns (Word) { return take(side(7), side(3)); }",
   "function grouped() returns (integer) { return ((integerSub(wordToInteger(side(7)), wordToInteger(side(9))))); }",
   "function fromIndex() returns (integer) { let m: mapping(Bool => Word); m[true] = 37; return integerAdd(wordToInteger(m[truth(true)]), wordToInteger(side(5))); }",
@@ -3132,7 +3132,7 @@ end Boundaries
 
 private def content : String := String.intercalate "\n" [
   "function side(x: Word) returns (Word) { return x; }",
-  "function fail() returns (Word) { let written = 5; let gap: Word; return gap; }",
+  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
   "function triple() returns ((Word, Bool, Word)) { return (side(7), true, 3 + 4); }",
   "function quadruple() returns ((Word, Bool, Word, Bool)) { return (side(11), false, side(13), true); }",
   "function nested() returns (((Word, Bool, Word), Word, Bool)) { return ((side(17), true, 5 + 6), side(19), false); }",

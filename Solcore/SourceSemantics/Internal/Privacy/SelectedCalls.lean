@@ -1729,31 +1729,33 @@ set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceInferenceSoundness.ProtectedVariables
 open Frontend SourceInference TypeSystem
 
-private theorem default_unifier (v : TypeVarId) :
-    Unification.unifyTypes (.variable v) .word = .ok [(v,.word)] := by
-  exact Unification.unifyWithFuel_variable_constructor 14 v (.builtin .word)
+private theorem default_unifier (v : TypeVarId) (constructor : TypeConstructorId) :
+    Unification.unifyTypes (.variable v) (.constructor constructor) =
+      .ok [(v,.constructor constructor)] := by
+  exact Unification.unifyWithFuel_variable_constructor 14 v constructor
 
-private theorem unify_word_private {protectedVars : List TypeVarId}
-    {before after : State} {original resolved : TypeVarId}
+private theorem unify_constructor_private {protectedVars : List TypeVarId}
+    {before after : State} {original resolved : TypeVarId} {constructor : TypeConstructorId}
     (normal : before.resolve (.variable original) = .variable resolved)
-    (accepted : Detail.unify before (.variable original) .word = .ok after) :
+    (accepted : Detail.unify before (.variable original) (.constructor constructor) = .ok after) :
     SafeTransport protectedVars before after := by
   unfold Detail.unify at accepted
-  have unifyEq : before.inference.unify (.variable original) .word =
-      .ok { before.inference with substitution := Substitution.compose [(resolved,Ty.word)] before.inference.substitution } := by
+  have unifyEq : before.inference.unify (.variable original) (.constructor constructor) =
+      .ok { before.inference with substitution := Substitution.compose [(resolved,Ty.constructor constructor)] before.inference.substitution } := by
     unfold InferState.unify
     change (do
-      let update ← Unification.unifyTypes (before.resolve (.variable original)) .word
+      let update ← Unification.unifyTypes (before.resolve (.variable original)) (.constructor constructor)
       pure { before.inference with substitution := update.compose before.inference.substitution }) = _
     simp only [normal,default_unifier,bind,Except.bind,pure,Pure.pure,Except.pure]
   simp only [unifyEq,Detail.liftUnification,bind,Except.bind,pure,Pure.pure,Except.pure,Except.ok.injEq] at accepted
   subst after
-  have range : Substitution.RangeAvoidsDomain [(resolved,Ty.word)] (guard protectedVars) := by
+  have range : Substitution.RangeAvoidsDomain [(resolved,Ty.constructor constructor)]
+      (guard protectedVars) := by
     intro v type member
-    have same : (v,type) = (resolved,Ty.word) := List.mem_singleton.mp member
+    have same : (v,type) = (resolved,Ty.constructor constructor) := List.mem_singleton.mp member
     cases same
     intro candidate occurs
-    simp only [Ty.word,Ty.freeVariables,List.not_mem_nil] at occurs
+    simp only [Ty.freeVariables,List.not_mem_nil] at occurs
   intro type safe
   simpa only [Safe,State.resolve,InferState.resolve,Substitution.compose_apply] using Avoids.apply safe range
 
@@ -1763,7 +1765,7 @@ theorem defaultIntegerPatternTarget_private {protectedVars : List TypeVarId}
     SafeTransport protectedVars before after := by
   unfold Detail.defaultIntegerPatternTarget at accepted
   split at accepted
-  · exact unify_word_private (by assumption) accepted
+  · exact unify_constructor_private (by assumption) accepted
   · have same : before = after := Except.ok.inj accepted
     subst after
     exact .refl _ _
@@ -1774,7 +1776,9 @@ theorem defaultIntegerLiteralTarget_private {protectedVars : List TypeVarId}
     SafeTransport protectedVars before after := by
   unfold Detail.defaultIntegerLiteralTarget at accepted
   split at accepted
-  · exact unify_word_private (by assumption) accepted
+  · split at accepted
+    · exact unify_constructor_private (by assumption) accepted
+    · cases accepted
   · have same : before = after := Except.ok.inj accepted
     subst after
     exact .refl _ _

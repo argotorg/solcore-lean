@@ -954,7 +954,7 @@ private def content : String := String.intercalate "\n" [
   "function shortCircuit() returns (Bool) { let absent: Word; return false && (absent == 17); }",
   "function paired() returns ((Word, Word)) { let prior = 19; return (prior, 23); }",
   "function mappingRoot() returns (Word) { let table: mapping(Word => Word); table[29] = 31; return table[29] + table[37]; }",
-  "function leftFault() returns (Word) { let prior = 41; let absent: Word; return absent + (43 / 0); }",
+  "function leftFault() returns (Word) { let prior: Word = 41; let absent: Word; return absent + (43 / 0); }",
   "function rightFault() returns (Word) { let prior = 47; let absent: Word; return (prior + 53) + absent; }"
 ]
 
@@ -1134,7 +1134,7 @@ private def content : String := String.intercalate "\n" [
   "function compound() returns (Word) { return (false ? (1 / 0) : ((5 + 7) * 3)) + 2; }",
   "function pairRoot() returns ((Word, Word)) { return (13 + 17, 19 * 23); }",
   "function lazyRoot() returns (Bool) { return true || (29 / 0 == 31); }",
-  "function faultLeft() returns (Word) { let prior = 41; let absent: Word; return absent + (43 / 0); }",
+  "function faultLeft() returns (Word) { let prior: Word = 41; let absent: Word; return absent + (43 / 0); }",
   "function faultRight() returns (Word) { let prior = 47; let absent: Word; return (prior + 53) + absent; }",
   "function mappingRoot() returns (Word) { let table: mapping(Word => Word); table[59] = 61; return table[59] + table[67]; }"
 ]
@@ -2662,7 +2662,7 @@ private def content : String := String.intercalate "\n" [
   "function falseValue() returns (Bool) { return false; }",
   "function pair() returns ((Word, Bool)) { return (7, false); }",
   "function discardReturn() returns (Word) { false; return 9; }",
-  "function early() returns (Word) { return 11; 99; }"
+  "function early() returns (Word) { return 11; true; }"
 ]
 
 /-- Concrete named invocation uses the actual cached indexed compiler, with
@@ -3336,7 +3336,7 @@ private def content : String := String.intercalate "\n" [
   "enum Pair<A, B> { Pair(A, B) }",
   "function choose<A, B>(first: A, second: B) returns (A) { return first; }",
   "function wordRoot() returns (Word) { return choose(7, true); }",
-  "function boolRoot() returns (Bool) { return choose(false, 9); }",
+  "function boolRoot() returns (Bool) { let nine: Word = 9; return choose(false, nine); }",
   "function dataRoot() returns (Pair<Word, Bool>) { return Pair(choose(11, false), true); }"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue

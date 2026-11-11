@@ -204,7 +204,7 @@ end Concrete
 
 private def content : String := String.intercalate "\n" [
   "function calculate(limit: Word) returns (Word) { let sum = 0; for (let i = 0; i < limit; i += 1) { if (i == 1) { continue; } sum += i; if (i == 3) { break; } } return sum; }",
-  "function early(value: Word) returns (Bool) { let prior = value; while (true) { let inside = value + 1; return true; } let skipped = 99; return false; }",
+  "function early(value: Word) returns (Bool) { let prior = value; while (true) { let inside = value + 1; return true; } let skipped: Word = 99; return false; }",
   "function unitBody(seed: Word) { let saved = seed; for (let i = 0; i < 2; i += 1) { let saved = i; } }",
   "function failBody(seed: Word) returns (Word) { let prior = seed; for (let i = 0; true; i += 1) { let saved = prior + 1; let gap: Word; return gap; } let skipped = 26; return skipped; }",
   "function postFault(seed: Word) returns (Word) { let prior = seed; let gap: Word; for (let i = 0; i < 3; i += gap) { let saved = i + 1; } return prior; }",
@@ -215,8 +215,8 @@ private def content : String := String.intercalate "\n" [
   "function outer() returns (Word) { return calculate(5); }",
   "function twice() returns (Word) { let first = calculate(0); let second = calculate(5); return first + second; }",
   "function earlyCall() returns (Bool) { return early(21); }",
-  "function unitCall() { unitBody(23); let after = 24; }",
-  "function faultCall() returns (Word) { let before = 23; let failed = failBody(24); return failed; }",
+  "function unitCall() { unitBody(23); let after: Word = 24; }",
+  "function faultCall() returns (Word) { let before: Word = 23; let failed = failBody(24); return failed; }",
   "function postFaultCall() returns (Word) { return postFault(30); }",
   "function nestedCall() returns (Word) { return nested(31); }",
   "function integerCall() returns (integer) { return integerBody(7, 9); }",
@@ -388,7 +388,7 @@ private def content : String := String.intercalate "\n" [
   "function flop(n: Word) returns (Bool) { if (n == 0) { return false; } return flip(n - 1); }",
   "function unit(n: Word) { let prior = n; if (n != 0) { unit(n - 1); return; } }",
   "function fail(n: Word) returns (Word) { let prior = n; if (n != 0) { return fail(n - 1); } let gap: Word; return gap; }",
-  "function callerFault() returns (Word) { let prior = 59; fail(2); let skipped = 99; return skipped; }",
+  "function callerFault() returns (Word) { let prior: Word = 59; fail(2); let skipped = 99; return skipped; }",
   "function spin(n: Word) returns (Word) { return spin(n); }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
@@ -553,7 +553,7 @@ private def content : String := String.intercalate "\n" [
   "function right(n: Word) returns (Bool) { if (n == 0) { return false; } return left(n - 1); }",
   "function order(first: Word, flag: Bool, last: Word) returns (Word) { if (flag) { return step(first); } return step(last); }",
   "function make(seed: Word) returns (function(Word) returns (Word)) { let extra = step(seed); return lam(value: Word) -> Word { extra += value; return extra; }; }",
-  "function fail() returns (Word) { let written = 17; let gap: Word; return gap; }",
+  "function fail() returns (Word) { let written: Word = 17; let gap: Word; return gap; }",
   "function zero() {}"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -735,7 +735,7 @@ private def content : String := String.intercalate "\n" [
   "function driver(n: Word) returns (Word) { let total = self(2); for (let i = 0; i < n; i += 1) { total += left(i); } return total; }",
   "function unit(n: Word) { let prior = n; if (n != 0) { unit(n - 1); return; } }",
   "function fail(n: Word) returns (Word) { let prior = n; match (n) { case 0 { let gap: Word; return gap; } default { return fail(n - 1); } } }",
-  "function driverFault() returns (Word) { let prior = 29; fail(2); let skipped = 99; return skipped; }"
+  "function driverFault() returns (Word) { let prior: Word = 29; fail(2); let skipped = 99; return skipped; }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def present (n : Nat) : TypeSystem.Ty × Option SourceTypedRuntime.Value := (.word, some (w n))
@@ -909,7 +909,7 @@ private def content : String := String.intercalate "\n" [
   "function driver(n: Word) returns (Word) { let total = self(2); for (let i = 0; i < n; i += 1) { total += left(i); } return total; }",
   "function unit(n: Word) { let prior = n; if (n != 0) { unit(n - 1); return; } }",
   "function fail(n: Word) returns (Word) { let prior = n; if (n != 0) { return fail(n - 1); } let gap: Word; return gap; }",
-  "function driverFault() returns (Word) { let prior = 29; fail(2); let skipped = 99; return skipped; }"
+  "function driverFault() returns (Word) { let prior: Word = 29; fail(2); let skipped = 99; return skipped; }"
 ]
 private def w (n : Nat) : SourceTypedRuntime.Value := .word (Word.ofNatModulo n)
 private def present (n : Nat) : TypeSystem.Ty × Option SourceTypedRuntime.Value := (.word, some (w n))
@@ -2714,7 +2714,7 @@ private def content : String := String.intercalate "\n" [
   "function empty() {}",
   "function terminal(flag: Bool) returns (Word) { if (flag) { return 3; } else { return 4; } return 5; }",
   "function wordRoot() returns (Word) { return choose(7, true); }",
-  "function boolRoot() returns (Bool) { return choose(false, 9); }",
+  "function boolRoot() returns (Bool) { let nine: Word = 9; return choose(false, nine); }",
   "function localRoot() returns (Word) { return local(11); }"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue

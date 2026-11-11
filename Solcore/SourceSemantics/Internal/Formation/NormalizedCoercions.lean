@@ -747,9 +747,10 @@ theorem integerPatternProducer
       (ProgramSignatures.builtinIntPredicate (.variable origin.metavariable))) := by
   apply builtin_integer_predicate
   change TypeAdmissible semantic (finalized.substitution.apply (.variable origin.metavariable))
-  rcases resources.integer_pattern_target_supported origin member with word | integer
+  rcases resources.integer_pattern_target_supported origin member with word | integer | uint256
   · rw [word]; exact .word scope.binders
   · rw [integer]; exact .integer scope.binders
+  · rw [uint256]; exact .fixed scope.binders _
 
 /-- A real retained operand supplies the normalized type required by actual
 operator-profile issuance. No operator-expression typing is assumed. -/

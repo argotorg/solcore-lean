@@ -405,23 +405,37 @@ private def testLetBoundLiteralParticipatesInRanking : IO Unit := do
   assertTrue (hasBuiltinIntEvidence run .word .intWord)
     "a let-bound flexible literal made a generic overload look ground"
 
-private def testSoleDeferredCandidateDefaultsToWord : IO Unit := do
+/-- A sole deferred generic candidate leaves its literal open. Unconstrained,
+the literal is ambiguous; under a pending `Mark` bound it defaults to `uint256`,
+which closes the instantiation (row 1, step 7). -/
+private def testSoleDeferredCandidateDefaultsToUint256 : IO Unit := do
+  match SourceInference.loadAndCheckProgram (rawWorkspace [
+      "function keep<T>(value: T) returns (T) { return value; }",
+      "function bad() { keep(1); return; }"]) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .ambiguousIntegerLiteral _, .. } => true
+        | _ => false)
+        s!"an unconstrained discarded generic literal was rejected otherwise: {reprStr errors}"
+  | .ok _ => throw (IO.userError "an unconstrained discarded generic literal was accepted")
   let run ← expectLastChecked [
-    "function keep<T>(value: T) returns (T) { return value; }",
+    "trait Mark<T> {}",
+    "impl Mark<uint256> {}",
+    "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function bad() { keep(1); return; }"
   ]
   assertTrue (decide (run.inferredBodyType = TypeSystem.Ty.unit))
     "a defaulted discarded generic call changed the function result type"
-  assertTrue (hasBuiltinIntEvidence run .word .intWord)
-    "a sole deferred generic candidate did not default its literal to Word"
+  assertTrue (hasBuiltinIntEvidence run (.fixed .uint256) (.intFixed .uint256))
+    "a sole deferred generic candidate did not default its literal to uint256"
   let calls := run.typedBody.nodes.filterMap fun
     | .expression node => match node.form with
         | .call _ _ (.declaration instantiation) => some instantiation
         | _ => none
     | .statement _ => none
   assertTrue (calls.any fun instantiation =>
-      decide (instantiation.parameterSubstitution.map Prod.snd = [.word] ∧
-        instantiation.type = .function .word .word))
+      decide (instantiation.parameterSubstitution.map Prod.snd = [.fixed .uint256] ∧
+        instantiation.type = .function (.fixed .uint256) (.fixed .uint256)))
     "literal defaulting did not close the selected generic instantiation"
 
 /-- Exercise builtin-Int overload viability, equal-cost ambiguity, contextual
@@ -434,7 +448,7 @@ def testSourceLiteralOverloadRanking : IO Unit := do
   testGroundCandidateOutranksCheaperDeferredCandidate
   testNestedGenericDefersUntilOuterCandidate
   testLetBoundLiteralParticipatesInRanking
-  testSoleDeferredCandidateDefaultsToWord
+  testSoleDeferredCandidateDefaultsToUint256
 
 end Tests.SourceLiteralOverloadRanking
 end
@@ -976,10 +990,12 @@ private def solvedByBuiltinInt (target : Ty)
     match solved.evidence with
     | .implementation (.byImpl goal implementation premises) =>
         goal == solved.predicate && premises.isEmpty &&
-          implementation == if target == Ty.word then
-            ProgramImplId.builtin .intWord
-          else
-            ProgramImplId.builtin .intInteger
+          implementation == match target.fixedInteger? with
+            | some fixed => ProgramImplId.builtin (.intFixed fixed)
+            | none => if target == Ty.word then
+                ProgramImplId.builtin .intWord
+              else
+                ProgramImplId.builtin .intInteger
     | .assumption _ => false
 
 private def expectInferenceError (label content : String)
@@ -1031,8 +1047,8 @@ private def testPatternDefaultAndLateConstraint : IO Unit := do
   let patternRequirement ← match pattern.resolution with
     | .integerLiteral (.decimal "1") literal =>
         assertTrue (decide (literal.rawValue = 1 ∧
-          literal.targetType = Ty.word ∧
-          pattern.type = Ty.word ∧
+          literal.targetType = Ty.fixed .uint256 ∧
+          pattern.type = Ty.fixed .uint256 ∧
           pattern.requirements = [literal.requirement] ∧
           resolution.requirements = [literal.requirement] ∧
           sourceGroupDepth pattern.source = 3))
@@ -1040,10 +1056,12 @@ private def testPatternDefaultAndLateConstraint : IO Unit := do
         pure literal.requirement
     | other => throw (IO.userError
         s!"defaulted retained the wrong pattern carrier: {reprStr other}")
+  -- The scrutinee and the pattern default to `uint256` (row 1, step 7); the returns are `Word`.
   assertTrue (decide (patternRequirement.index = 1 ∧
       defaulted.solvedRequirements.map (·.id.index) = [0, 1, 2, 3]) &&
-      defaulted.solvedRequirements.all (solvedByBuiltinInt .word))
-    "pattern-only defaulting did not close expression and pattern rows as Word"
+      (defaulted.solvedRequirements.take 2).all (solvedByBuiltinInt (.fixed .uint256)) &&
+      (defaulted.solvedRequirements.drop 2).all (solvedByBuiltinInt .word))
+    "pattern-only defaulting did not close the expression and pattern rows as uint256"
   let late ← checkedNamed program "lateInteger"
   let latePattern ← match matchResolutions late with
     | [{ cases := [arm], .. }] => pure arm.pattern
@@ -1056,7 +1074,7 @@ private def testPatternDefaultAndLateConstraint : IO Unit := do
           decide (latePattern.type = .integer ∧
             literal.targetType = .integer)
       | _ => false)
-    "body inference did not constrain the pattern before Word defaulting"
+    "body inference did not constrain the pattern before uint256 defaulting"
   let signature ← signatureNamed program "generic"
   let generic ← checkedNamed program "generic"
   let parameter ← match signature.scheme.parameters with
@@ -1100,41 +1118,19 @@ private def testPatternDefaultAndLateConstraint : IO Unit := do
       specializedWildcard.requirements = []))
     "specialization did not substitute a rigid wildcard pattern type"
 
+/-- A literal scrutinee that only a wildcard matches is open, so it is rejected
+as ambiguous, as upstream rejects it (row 1, step 7). With a `Word` scrutinee the
+wildcard-only match still prepares and runs. -/
 private def testWildcardOnlyLiteralDefault : IO Unit := do
+  match checkProgram (workspace "function wildcardOnly() { match (1) { case _ { return; } } }") with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .inference { error := .ambiguousIntegerLiteral _, .. } => true
+        | _ => false)
+        s!"a wildcard-only literal scrutinee was rejected otherwise: {reprStr errors}"
+  | .ok _ => throw (IO.userError "a wildcard-only literal scrutinee was accepted")
   let source :=
-    "function wildcardOnly() { match (1) { case _ { return; } } }"
-  let program ← checkedProgram source
-  let checked ← checkedNamed program "wildcardOnly"
-  let resolution ← match matchResolutions checked with
-    | [resolution] => pure resolution
-    | resolutions => throw (IO.userError
-        s!"wildcard-only fixture retained {resolutions.length} match nodes")
-  let pattern ← match resolution.cases with
-    | [arm] => pure arm.pattern
-    | cases => throw (IO.userError
-        s!"wildcard-only fixture retained {cases.length} match cases")
-  let literal ← match checked.typedBody.lookupExpression? resolution.scrutinee with
-    | some node =>
-        match node.form, node.requirements with
-        | .integerLiteral (.decimal "1") literal, [requirement] =>
-            if node.type = Ty.word && literal.targetType = Ty.word &&
-                literal.requirement = requirement then
-              pure literal
-            else
-              throw (IO.userError
-                "wildcard-only scrutinee lost its Word literal metadata")
-        | _, _ => throw (IO.userError
-            s!"wildcard-only scrutinee retained the wrong node: {reprStr node}")
-    | other => throw (IO.userError
-        s!"wildcard-only scrutinee retained the wrong node: {reprStr other}")
-  assertTrue (decide (pattern.type = Ty.word ∧
-      pattern.resolution = .wildcard ∧
-      pattern.requirements = [] ∧
-      resolution.requirements = [] ∧
-      checked.inferredBodyType = Ty.unit ∧
-      checked.solvedRequirements.map (·.id) = [literal.requirement]) ∧
-      checked.solvedRequirements.all (solvedByBuiltinInt .word))
-    "expression defaulting did not close a wildcard-only match as Word"
+    "function wildcardOnly() { let one: Word = 1; match (one) { case _ { return; } } }"
   let limits : Limits := {
     checkingFuel := 1024
     specializationBudget := 16
@@ -2304,7 +2300,7 @@ private def workspace : Workspace.RawWorkspace := {
       "function twice<T>(value: T) returns (T) { return identity(identity(value)); }",
       "function contextualLocal(flag: Bool) returns (Word, Bool) {",
       "  let f = lam(value) { return identity(value); };",
-      "  f(2);",
+      "  let two: Word = 2;", "  f(two);",
       "  return (f(1), f(flag));",
       "}",
       "function unusedContextualLocal() returns (Word) {",
@@ -2323,7 +2319,7 @@ private def workspace : Workspace.RawWorkspace := {
       "    let inner = lam(item) { return globalIdentity(item); };",
       "    return inner(1);",
       "  };",
-      "  return (outer(1), outer(flag));",
+      "  let one: Word = 1;", "  return (outer(one), outer(flag));",
       "}",
       "function siblingContextualLocal(flag: Bool) returns (Word, Bool) {",
       "  let outer = lam(value) {",
@@ -2364,7 +2360,7 @@ private def workspace : Workspace.RawWorkspace := {
       "    };",
       "    return middle(value);",
       "  };",
-      "  outer(1);",
+      "  let one: Word = 1;", "  outer(one);",
       "  outer(flag);",
       "  return 9;",
       "}",
@@ -2375,7 +2371,7 @@ private def workspace : Workspace.RawWorkspace := {
       "    let middle = lam(item) { return adapter((value, item)); };",
       "    return middle(value);",
       "  };",
-      "  outer(1);",
+      "  let one: Word = 1;", "  outer(one);",
       "  outer(flag);",
       "  return 9;",
       "}",
@@ -2411,16 +2407,16 @@ private def workspace : Workspace.RawWorkspace := {
       "function requireBool(value: Bool) returns (Bool) { return value; }",
       "function qualifiedLocalCoerced(flag: Bool) returns (Bool, Bool) {",
       "  let f = lam(value) { return requireBool(guarded(value)); };",
-      "  return (f(1), f(flag));",
+      "  let one: Word = 1;", "  return (f(one), f(flag));",
       "}",
       "function qualifiedLocalResultCoerced(flag: Bool) returns (Bool, Bool) {",
       "  let f = lam(value) -> Bool { return guarded(value); };",
-      "  return (f(1), f(flag));",
+      "  let one: Word = 1;", "  return (f(one), f(flag));",
       "}",
       "function constrained(value: Word) returns (Word) { return keep(value); }",
       "function keepAs<T, U>(guard: T, value: U) returns (U) where T: Eq { return value; }",
       "function localProof(flag: Bool) returns (Word, Bool) {",
-      "  let f = lam(value) { return keepAs(1, value); };",
+      "  let f = lam(value) { let one: Word = 1; return keepAs(one, value); };",
       "  return (f(2), f(flag));",
       "}",
       "function asValue() returns (function(Word) returns (Word)) { return identity; }",

@@ -25528,8 +25528,7 @@ structure FinalInferenceResources
     (finalizedRequirementContext inferenceContext result) result.typedSource
   integer_pattern_target_supported : ∀ origin,
     origin ∈ state.integerPatterns →
-      result.substitution.apply (.variable origin.metavariable) = .word ∨
-        result.substitution.apply (.variable origin.metavariable) = .integer
+      (result.substitution.apply (.variable origin.metavariable)).IntegerPatternCarrier
   integer_literal_target_supported : ∀ origin,
     origin ∈ state.integerLiterals →
       (result.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier
@@ -26156,9 +26155,7 @@ theorem integerPatternValidAt
   have supported := resources.integer_pattern_target_supported origin
     origin_member
   have closedSupported :
-      (resolution.applySubstitution result.substitution).targetType = .word ∨
-        (resolution.applySubstitution result.substitution).targetType =
-          .integer := by
+      (resolution.applySubstitution result.substitution).targetType.IntegerPatternCarrier := by
     simpa [IntegerLiteralResolution.applySubstitution, resolution_target] using
       supported
   have evidence := resources.requirementProvesAt signatures_eq requirements_eq
@@ -26172,7 +26169,9 @@ theorem integerPatternValidAt
       resolution_requirement, ProgramSignatures.builtinIntPredicate,
       TypedTraitResolution.applySubstitution] using evidence
   exact integerLiteralValid_of_evidence (literalMagnitude?_of_numeric decoded)
-    (closedSupported.elim (fun word => .inl word) (fun integer => .inr (.inl integer)))
+    (closedSupported.elim (fun word => .inl word)
+      (fun rest => rest.elim (fun integer => .inr (.inl integer))
+        (fun uint256 => .inr (.inr ⟨_, uint256⟩))))
     closedEvidence
 
 /-- Package the finalization-wide integer-pattern proof as reusable evidence

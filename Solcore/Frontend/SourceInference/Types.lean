@@ -101,10 +101,17 @@ inductive Error where
       (metavariable : TypeVarId) (next : Nat)
   | unsupportedIntegerLiteralTarget
       (expression : ExpressionId) (type : Ty)
+  /-- An open literal that no operator, comparison, requirement or numeric
+  pattern constrains, so it has no default type. -/
+  | ambiguousIntegerLiteral (expression : ExpressionId)
   /-- A literal outside the range of its fixed-width type, with its value:
 negative for a negative literal. -/
   | integerLiteralOutOfRange
       (expression : ExpressionId) (type : Ty) (value : Int)
+  /-- A numeric pattern outside the range of its type, `uint256`, with its
+  value. -/
+  | integerPatternOutOfRange
+      (span : Syntax.SourceSpan) (type : Ty) (value : Nat)
   | missingIntegerLiteralRequirement
       (expression : ExpressionId) (requirement : RequirementId)
   | integerLiteralRequirementPredicateMismatch
@@ -200,13 +207,15 @@ structure IntegerLiteralOrigin where
   requirement : RequirementId
   deriving Repr, BEq, DecidableEq
 
-/-- A numeric pattern's fresh builtin-`Int` target.  Unlike expression
-literal origins, a target which is still flexible after the whole body has
-been inferred is defaulted to Word during finalization. -/
+/-- A numeric pattern's fresh builtin-`Int` target, with the pattern's value.
+A target which is still flexible after the whole body has been inferred
+defaults to `uint256` during finalization, which then checks the value against
+the target's range. -/
 structure IntegerPatternOrigin where
   metavariable : TypeVarId
   span : Syntax.SourceSpan
   requirement : RequirementId
+  rawValue : Nat
   deriving Repr, BEq, DecidableEq
 
 /-- Mutable inference information threaded through a source body. -/

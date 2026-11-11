@@ -147,9 +147,9 @@ end Concrete
 
 private def content : String := String.intercalate "\n" [
   "function calculate() returns (Word) { let sum = 0; for (let i = 0; i < 5; i += 1) { if (i == 1) { continue; } sum += i; if (i == 3) { break; } } return sum; }",
-  "function early() returns (Bool) { let prior = 21; while (true) { let inside = 22; return true; } let skipped = 99; return false; }",
-  "function unitFallthrough() { let saved = 23; for (let i = 0; i < 2; i += 1) { let saved = i; } }",
-  "function failBody() returns (Word) { let prior = 24; for (let i = 0; true; i += 1) { let saved = 25; let gap: Word; return gap; } let skipped = 26; return skipped; }",
+  "function early() returns (Bool) { let prior: Word = 21; while (true) { let inside: Word = 22; return true; } let skipped: Word = 99; return false; }",
+  "function unitFallthrough() { let saved: Word = 23; for (let i: Word = 0; i < 2; i += 1) { let saved = i; } }",
+  "function failBody() returns (Word) { let prior: Word = 24; for (let i = 0; true; i += 1) { let saved: Word = 25; let gap: Word; return gap; } let skipped = 26; return skipped; }",
   "function integerResult(left: Word, right: Word) returns (integer) { return integerSub(wordToInteger(left), wordToInteger(right)); }",
   "function mapped() returns (Bool) { let m: mapping(Bool => Word); m[true] = 27; let expected = 27; return m[true] == expected; }"
 ]
@@ -455,7 +455,7 @@ private def content : String := String.intercalate "\n" [
   "function rootTwo() returns (Word) { return two(7, true); }",
   "function rootDuplicate() returns (Word) { return duplicate(7, false, 7); }",
   "function rootWord() returns (Word) { return choose(9, true); }",
-  "function rootBool() returns (Bool) { return choose(false, 9); }"
+  "function rootBool() returns (Bool) { let nine: Word = 9; return choose(false, nine); }"
 ]
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -612,11 +612,11 @@ end Boundaries
 private def content : String := String.intercalate "\n" [
   "function pick(first: Word, gate: Bool, last: Word) returns (Word) { if (gate) { return first; } else { return last; } }",
   "function second<A, B>(first: A, last: B) returns (B) { return last; }",
-  "function shadow(value: Word) returns (Word) { { let value = 13; } return value; }",
+  "function shadow(value: Word) returns (Word) { { let value: Word = 13; } return value; }",
   "function fail(first: Word, gate: Bool) returns (Word) { let missing: Word; return missing; }",
   "function empty() {}",
   "function rootPick() returns (Word) { return pick(7, false, 11); }",
-  "function rootGeneric() returns (Bool) { return second(9, true); }",
+  "function rootGeneric() returns (Bool) { let nine: Word = 9; return second(nine, true); }",
   "function rootReverse() returns (Word) { return second(false, 17); }",
   "function rootShadow() returns (Word) { return shadow(19); }",
   "function rootFault() returns (Word) { return fail(23, true); }"
@@ -678,7 +678,7 @@ def run : IO Unit := do
   let successes : List (String × SourceTypedRuntime.Value × List (TypeSystem.Ty × Option SourceTypedRuntime.Value)) := [
     ("empty", .unit, []),
     ("rootPick", word 11, [(.word, some (word 7)), (.bool, some (.bool false)), (.word, some (word 11))]),
-    ("rootGeneric", .bool true, [(.word, some (word 9)), (.bool, some (.bool true))]),
+    ("rootGeneric", .bool true, [(.word, some (word 9)), (.word, some (word 9)), (.bool, some (.bool true))]),
     ("rootReverse", word 17, [(.bool, some (.bool false)), (.word, some (word 17))]),
     ("rootShadow", word 19, [(.word, some (word 19)), (.word, some (word 13))])]
   for budget in [0, 37, 151, 300000] do
@@ -1236,7 +1236,7 @@ private def content := String.intercalate "\n" [
   "function pair(seed: Word) returns(F,F) { return (maker(seed), lam(item: Word) -> Word { return seed + item; }); }",
   "function branch(seed: Word) returns(F) { if(seed == 0) { return lam(item: Word) -> Word { return item; }; } else { return lam(item: Word) -> Word { return seed + item; }; } }",
   "function zero(seed: Word) returns(function() returns(Word)) { return lam() -> Word { { return seed; } }; }",
-  "function fail() returns(Word) { let written = 5; let gap: Word; return gap; }",
+  "function fail() returns(Word) { let written: Word = 5; let gap: Word; return gap; }",
   "function firstFault(seed: Word) returns(Word,F,F) { return (fail(), maker(seed), maker(9)); }",
   "function laterFault(seed: Word) returns(F,Word,F) { return (maker(seed), fail(), maker(9)); }"
 ]
@@ -1533,7 +1533,7 @@ theorem named_reflects [FunctionCalls.FaultTokens faults] (budget size : Nat) (b
 private def content : String := String.intercalate "\n" [
   "function mark(value: Word) returns (Word) { let seen = value; return seen; }",
   "function fail(value: Word) returns (Word) { let seen = value; let gap: Word; return gap; }",
-  "function choose(seed: Word) returns (Word) { let kept = 5; match ((mark(seed), mark(7))) { case (0, value) { let selected = mark(value); return selected; } default { let selected = mark(9); return selected; } } }",
+  "function choose(seed: Word) returns (Word) { let kept: Word = 5; match ((mark(seed), mark(7))) { case (0, value) { let selected = mark(value); return selected; } default { let selected = mark(9); return selected; } } }",
   "function bodyFault(seed: Word) returns (Word) { match ((mark(seed), 19)) { case (0, value) { let prior = mark(value); return fail(prior); } default { return mark(23); } } }",
   "function scrutineeFault() returns (Word) { match (fail(3)) { case 0 { return mark(29); } default { return mark(31); } } }",
   "function emptyDefault(seed: Word) returns (Word) { match (seed) { case 0 { let selected = mark(1); } default {} } return mark(17); }"
@@ -1716,7 +1716,7 @@ theorem selected_entry {entry : ProtectedExpressionMeaning.Entry}
 private def content : String := String.intercalate "\n" [
   "function ordered(seed: Word) returns (Word) { let kept = seed + 1; match ((seed, (11, 13))) { case (0, (left, right)) { let result = left + right; return result; } case (1, (left, right)) { return right; } default { return kept; } } }",
   "function empty(seed: Word) returns (Word) { match (seed) { case 0 {} default {} } return 17; }",
-  "function failed(seed: Word) returns (Word) { match ((seed, 19)) { case (0, value) { let prior = value; let gap: Word; return gap; } default { return 23; } } }",
+  "function failed(seed: Word) returns (Word) { match ((seed, 19)) { case (0, value) { let prior: Word = value; let gap: Word; return gap; } default { return 23; } } }",
   "function scrutineeFault() returns (Word) { let gap: Word; match (gap) { case 0 { return 29; } default { return 31; } } }"
 ]
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
@@ -2919,7 +2919,7 @@ private def content : String := String.intercalate "\n" [
   "function local<T>(value: T) returns (T) { let copied = value; return copied; }",
   "function calc(value: Word) returns (Word) { let first = value + 1; let second = first + 2; return second; }",
   "function wordRoot() returns (Word) { return choose(7, true); }",
-  "function boolRoot() returns (Bool) { return choose(false, 9); }",
+  "function boolRoot() returns (Bool) { let nine: Word = 9; return choose(false, nine); }",
   "function localRoot() returns (Word) { return local(11); }",
   "function calcRoot() returns (Word) { return calc(5); }"
 ]
@@ -3224,7 +3224,7 @@ private def content : String := String.intercalate "\n" [
   "function staged<T>(comptime value: T) returns (comptime<T>) { return value; }",
   "function unused<T>() returns (Word) { let value: Word = 3; return value; }",
   "function wordRoot() returns (Word) { return choose(9, false); }",
-  "function boolRoot() returns (Bool) { return choose(true, 8); }",
+  "function boolRoot() returns (Bool) { let eight: Word = 8; return choose(true, eight); }",
   "function stagedRoot() returns (comptime<Word>) { return staged(5); }"
 ]
 private def require := SourceCoreUnifiedCorpusSupport.assertTrue
@@ -3384,7 +3384,7 @@ private def content : String := String.intercalate "\n" [
   "function truth(flag: Bool) returns (Bool) { return flag; }",
   "function pair<A, B>(a: A, b: B) returns (A) { return a; }",
   "function take(a: Word, b: Word) returns (Word) { return a - b; }",
-  "function fail() returns (Word) { let written = 5; let gap: Word; return gap; }",
+  "function fail() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
   "function ordered() returns (Word) { return pair(side(7), truth(true)); }",
   "function duplicate() returns (Word) { return take(side(7), side(7)); }",
   "function grouped() returns (integer) { return ((integerSub(wordToInteger(side(7)), wordToInteger(side(9))))); }",
