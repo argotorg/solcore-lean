@@ -646,7 +646,8 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
         simpa only [Option.isNone_none, Bool.true_eq_false, and_false, false_or, routeEq] using
           operatorValid.imp_right (Or.imp_right And.left)
       exact ⟨binder, leaf, prepared, codes, sourceTypes, index, ⟨route, described, preparedBy⟩, binding, rootEq,
-        leafView, by simpa only [routeEq] using lookup, layout, ordinary, profile, by simp [routeEq, placeModifier]⟩
+        leafView, by simpa only [routeEq] using lookup, layout, ordinary, profile,
+        by simp [routeEq, placeModifier, SourceCoreDataPlaces.placeWrap]⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotCertificates
 end

@@ -1687,7 +1687,7 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
   by_cases bare : assignment.target.projections = []
   · obtain ⟨binder, prepared, index, lowered, binding, rootType, rawView, slot, layout, generated, sameType, _, codeEq⟩ :=
       CompatibleBareAssignment.of_lower bare accepted
-    rw [assignmentModifier_plain (checkedCompound_of_profile profile)] at codeEq
+    rw [assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)] at codeEq
     obtain ⟨node, found, tree, _⟩ := extract rhs lowered generated
     have rawType := stored_type unique found rightTyped
     refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
@@ -1700,7 +1700,7 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
   · obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, lowered, node, _, binding, rootType, slot, layout, ordinary,
       _, found, tree, rawView, sameType, codeEq⟩ :=
       CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped bare extract accepted typed
-    rw [assignmentModifier_plain (checkedCompound_of_profile profile)] at codeEq
+    rw [assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)] at codeEq
     have rawType := stored_type unique found rightTyped
     refine ⟨⟨prepared, index, codes, leaf, lowered, node, invalidOperand,
       .projected layout ordinary, slot, rootType ▸ writable binder binding, found, tree, rawView, sameType, ?_,

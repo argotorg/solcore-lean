@@ -55,7 +55,8 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
       value.type = prepared.route.leafType ∧
       (operator = .equal ∨ prepared.route.leafType = .word ∨ prepared.route.leafType = .integer ∧ operator.wordOnly = false) ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments []) value.expression next outputType
-        (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand := by
+        (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand
+        (SourceCoreDataPlaces.placeWrap assignment.target.type operator false) := by
   cases generated_of_lower accepted with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
     cases rhsGenerated with
@@ -874,7 +875,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
             compilation.checked.catalog.project_runtimeType]
           exact description.leafProjected))
       refine ⟨binder, prepared, index, description.binding, rootEq, rootEq ▸ view,
-        by simpa only [routeEq] using lookup, ?_, by simp [routeEq, placeModifier]⟩
+        by simpa only [routeEq] using lookup, ?_, by simp [routeEq, placeModifier, SourceCoreDataPlaces.placeWrap]⟩
       exact ⟨steps, routeEq ▸ description.ordinary notMapping, routeEq ▸ types⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleBareBitNotCertificates

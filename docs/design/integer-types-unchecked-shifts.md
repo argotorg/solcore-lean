@@ -776,8 +776,8 @@ Made on 2026-11-10, during step 3d.
   (checked) and `&= |= ^=` (Word's on canonical words) at the twelve types. So
   `&= |= ^=` come with this step. The other compound forms stay Word's until
   their binary operators are builtins at the twelve types: `/=` and `%=` with
-  step 4, the shifts and the unchecked forms with step 8. In-place `~` stays
-  Word's.
+  step 4, the unchecked forms with step 8b and the shifts with step 8d.
+  In-place `~` stays Word's.
 - **Semantics.** The value-assignment rules apply `CompoundAssignmentApplies`
   at the target's static type: `AssignmentValueApplies` where the meaning is
   Word's, Integer's or plain assignment, and checked `+= -= *=` by
@@ -1091,9 +1091,55 @@ Made on 2026-11-12, during step 8a.
   `uncheckedDivisionBody` (the zero test, `truncatedDivision`, the wrap). The
   meaning proofs cover both (`BinaryProfile.fixedUnchecked` and
   `fixedUncheckedDivision`).
-- **Not yet.** Unchecked `+= -= *= /= %=` on a fixed-width target are still
-  rejected: the place lowering's modifier applies one Core operation, and
-  wrapping below 256 bits takes a second one (step 8b).
+- **Compound forms.** Unchecked `+= -= *= /= %=` came with step 8b
+  ([row 1's unchecked compound
+  assignments](#row-1s-unchecked-compound-assignments-the-wrap-belongs-to-the-leaf)).
+
+### Row 1's unchecked compound assignments: the wrap belongs to the leaf
+
+Made on 2026-11-12, during step 8b.
+
+- **Typing.** `+= -= *= /= %=` in an `unchecked` block take a fixed-width
+  target's type, as the checked forms do (`Detail.compoundOperandConstructor`,
+  `FixedCompoundAssignmentOperator`), and an open target's own type
+  (`compoundTakesTargetType`), so step 7b's default and finalization check
+  cover them: an open target becomes `uint256` unless a later use types it,
+  and one that becomes `integer` is rejected with
+  `compoundTargetNotSupported`.
+- **Semantics.** `CompoundAssignmentApplies.uncheckedAdd` …
+  `uncheckedModulo` apply `FixedBinaryApplies` of the binary operator at a
+  fixed-width target, so the result wraps as step 8a's binary forms do. A zero
+  divisor panics with `0x12` by the primitive panic, as at `word`.
+  `FixedCheckedCompound`, the forms whose meaning at a fixed-width target is
+  the type's own, gains the unchecked forms and keeps its name, so the meaning
+  proofs' profiles exclude them as they exclude step 3d's.
+- **Lowering.** `checkedCompound` also returns the unchecked forms at a
+  fixed-width target, and `assignmentModifier` gives them Word's operation
+  (`checkedWordOperation`: `wordAdd`, `wordSub`, `wordMul`, and `wordDiv` and
+  `wordMod`, or `wordSdiv` and `wordSmod` on the signed types) with
+  `fixedCheck`: no check for `+= -= *=`, the zero test for `/= %=`, and the
+  range check for the checked forms as before. Word's operation keeps the low
+  `N` bits of the exact result, so the modified leaf is wrapped before the
+  setter writes it: `modified` and `execute` take a new optional last argument
+  `wrap` (`none` by default), and `wrapLeaf` masks it (`wordAnd`) on an
+  unsigned type or sign-extends it (`wordSignExtend`) on a signed one. `lower`
+  passes `placeWrap`: the target's type for the unchecked forms at a
+  fixed-width target, `none` otherwise and for in-place `~`.
+  `CompatibleBareAssignment.of_lower` states the new choice: its emitted
+  `execute` takes `placeWrap`.
+- **Rejected: the wrap in the guard's `Check`.** A `Check` constructor that
+  wraps would keep `of_lower`'s text, but the wrap belongs to the leaf the
+  setter writes, while `Check` is the post-setter guard that decides a panic.
+  It would also change `guard_inv`, `inv_sized` and `Passes` and about 40 of
+  their callers, with no gain in a public statement.
+- **Proofs.** Statements that write `execute …` or `modified …` without the
+  argument elaborate with `none` and keep their text. The lemmas over every
+  compiled assignment take it: the compiler receipts, the `of_lower`
+  inversions, the layout and helper typing inversions, and the present-RHS
+  typing (`wrapLeaf_typed`). Under the meaning proofs' profiles
+  `placeWrap_plain` gives `none`, next to `assignmentModifier_plain`.
+  Fixed-width compound targets stay outside the meaning proofs, as step 3d's
+  are.
 
 ### Row 1: steps
 
@@ -1160,7 +1206,9 @@ first planned after the literals and moved before them for this reason
    - 8a. **Unchecked `+ - * / %`** on the twelve types, and `-x` in a block
      ([row 1's unchecked
      arithmetic](#row-1s-unchecked-arithmetic-wrapped-to-the-types-width)).
-   - 8b. Unchecked compound assignments on fixed-width and open targets.
+   - 8b. **Unchecked compound assignments** on fixed-width and open targets
+     ([row 1's unchecked compound
+     assignments](#row-1s-unchecked-compound-assignments-the-wrap-belongs-to-the-leaf)).
    - 8c. The `uint256` default for the literal operands of unchecked operators.
    - 8d. Shifts on the twelve types, with their compound forms and literal
      operands.

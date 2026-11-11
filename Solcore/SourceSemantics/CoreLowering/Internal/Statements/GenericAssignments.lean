@@ -163,7 +163,7 @@ theorem Head.of_lower_bare_with_token {values : ValuesContext} {source : TypedSo
       code = head.emit next output ∧ head.invalid = invalidOperand := by
   obtain ⟨binder, prepared, index, lowered, binding, rootType, rawView, slot, layout, generated, sameType, _, codeEq⟩ :=
     CompatibleBareAssignment.of_lower bare accepted
-  rw [assignmentModifier_plain (checkedCompound_of_profile profile)] at codeEq
+  rw [assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)] at codeEq
   obtain ⟨node, found, tree⟩ := extract lowered generated
   have rawType := stored_type unique found rightTyped
   refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
@@ -294,7 +294,7 @@ theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSour
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
           found, certified, by simpa only [rawType] using leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩,
           by simp [Head.emit, routeEq, SourceCoreCompatibleDataPlaces.placeModifier,
-            assignmentModifier_plain (checkedCompound_of_profile profile)], rfl, ?_⟩
+            assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)], rfl, ?_⟩
         · rcases profile with equal | word | ⟨integer, notWordOnly⟩
           · exact .inl equal
           · exact .inr (.inl (leafView.trans word))

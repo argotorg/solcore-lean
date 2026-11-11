@@ -1139,7 +1139,8 @@ inductive Generated (checked : Checked) (signatures : ProgramSignatures) (expres
       Generated checked signatures expression fuel source scope site assignment operator rhs outputType next
         reasonAt invalidProjection invalidOperand missing
         (execute prepared (.var index) (SourceCoreCalls.packArguments keys) value next outputType
-          (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand)
+          (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand
+          (placeWrap assignment.target.type operator rhs.isNone))
 
 /-- The receipt follows actual successful compiler branches. It does not
 replace or reinterpret the executable place compiler. -/
@@ -1173,12 +1174,14 @@ theorem generated_of_lower {checked : Checked} {signatures : ProgramSignatures} 
           (completed : (show Except SourceCoreBasic.Error Expr from match rhs with
             | none => .ok (execute prepared (.var index) (SourceCoreCalls.packArguments keys)
                 (LanguageResult.success .unit) next outputType
-                (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand)
+                (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand
+                (placeWrap assignment.target.type operator rhs.isNone))
             | some id => do
                 let value ← expression fuel source scope id reasonAt
                 SourceCoreBasic.ensureType site route.leafType value.type
                 pure (execute prepared (.var index) (SourceCoreCalls.packArguments keys) value.expression next outputType
-                  (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand)) = .ok lowered) :
+                  (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand
+                  (placeWrap assignment.target.type operator rhs.isNone))) = .ok lowered) :
           Generated checked signatures expression fuel source scope site assignment operator rhs outputType next
             reasonAt invalidProjection invalidOperand missing lowered := by
         cases rhs with

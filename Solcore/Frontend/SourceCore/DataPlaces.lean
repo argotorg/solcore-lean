@@ -734,10 +734,10 @@ def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option Modifier
   | .uncheckedDivide => some ⟨.wordDiv, .divisor⟩
   | .uncheckedModulo => some ⟨.wordMod, .divisor⟩
 
-/-- The checked compound assignments at a target type: `+= -= *= /= %=` at a
-fixed-width integer type, with the type and the binary operator. The match
-tests the operator first, so every other operator reduces to `none` at any
-target. -/
+/-- The compound assignments with the type's own meaning at a target type:
+checked `+= -= *= /= %=` and their unchecked forms at a fixed-width integer
+type, with the type and the binary operator. The match tests the operator
+first, so every other operator reduces to `none` at any target. -/
 def checkedCompound (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) :
     Option (TypeSystem.FixedInteger × Syntax.BinaryOp) :=
   match operator, target with
@@ -746,17 +746,32 @@ def checkedCompound (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) :
   | .multiply, .constructor (.builtin (.fixed type)) => some (type, .multiply)
   | .divide, .constructor (.builtin (.fixed type)) => some (type, .divide)
   | .modulo, .constructor (.builtin (.fixed type)) => some (type, .modulo)
+  | .uncheckedAdd, .constructor (.builtin (.fixed type)) => some (type, .uncheckedAdd)
+  | .uncheckedSubtract, .constructor (.builtin (.fixed type)) => some (type, .uncheckedSubtract)
+  | .uncheckedMultiply, .constructor (.builtin (.fixed type)) => some (type, .uncheckedMultiply)
+  | .uncheckedDivide, .constructor (.builtin (.fixed type)) => some (type, .uncheckedDivide)
+  | .uncheckedModulo, .constructor (.builtin (.fixed type)) => some (type, .uncheckedModulo)
   | _, _ => none
 
 /-- Word's operation for checked `+ - * / %` at a fixed-width integer type: in
 the type's range, and by a nonzero divisor, it is the exact result's word.
-`/ %` are signed on the signed types. -/
+`/ %` are signed on the signed types. For unchecked `+ - * / %` it is the same
+operation, whose low `N` bits are those of the exact result (`wrapLeaf`). -/
 def checkedWordOperation (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → Core.BinaryOp
-  | .add => .wordAdd
-  | .subtract => .wordSub
-  | .divide => if type.signed then .wordSdiv else .wordDiv
-  | .modulo => if type.signed then .wordSmod else .wordMod
+  | .add | .uncheckedAdd => .wordAdd
+  | .subtract | .uncheckedSubtract => .wordSub
+  | .divide | .uncheckedDivide => if type.signed then .wordSdiv else .wordDiv
+  | .modulo | .uncheckedModulo => if type.signed then .wordSmod else .wordMod
   | _ => .wordMul
+
+/-- The check of a compound assignment with the type's own meaning: checked
+arithmetic tests the exact result against the type's range (`/ %` a zero
+divisor first), unchecked `/= %=` test a zero divisor, and unchecked
+`+= -= *=` test nothing. -/
+def fixedCheck (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → Check
+  | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply => .total
+  | .uncheckedDivide | .uncheckedModulo => .divisor
+  | binary => .range type binary
 
 /-- The modifier of a value assignment at its target's static type: checked
 `+= -= *= /= %=` at a fixed-width integer type compute Word's operation, and
@@ -765,7 +780,7 @@ type's range; every other operator takes `binaryOperator`'s modifier. -/
 def assignmentModifier (target : TypeSystem.Ty) (integer : Bool) (operator : Syntax.ValueAssignOp) :
     Option Modifier :=
   match checkedCompound target operator with
-  | some (type, binary) => some ⟨checkedWordOperation type binary, .range type binary⟩
+  | some (type, binary) => some ⟨checkedWordOperation type binary, fixedCheck type binary⟩
   | none => binaryOperator integer operator
 
 /-- Outside the checked compound assignments the modifier is `binaryOperator`'s. -/
@@ -795,27 +810,57 @@ def placeModifier (target : TypeSystem.Ty) (integer : Bool) (operator : Syntax.V
     Option Modifier :=
   if bitNot then binaryOperator integer operator else assignmentModifier target integer operator
 
+/-- A compound result wrapped to a fixed-width integer type's width, for
+unchecked arithmetic at a fixed-width target: the low `N` bits of Word's
+operation are those of the exact result, so they (`wordAnd` with the type's
+mask) on an unsigned type, or their sign extension (`wordSignExtend`) on a
+signed one, are the wrapped result's word. Without a type it is the result. -/
+@[simp] def wrapLeaf : Option TypeSystem.FixedInteger → Core.Expr → Core.Expr
+  | none, result => result
+  | some type, result =>
+      if type.signed then
+        .binary .wordSignExtend (.word (Core.Word.ofNatModulo (type.width.bits / 8 - 1))) result
+      else .binary .wordAnd result (.word (Core.Word.ofNatModulo (2 ^ type.width.bits - 1)))
+
+/-- The type a value assignment's result is wrapped to: the target's, for
+unchecked `+= -= *= /= %=` at a fixed-width integer type; none for every other
+assignment and for in-place `~`. -/
+def placeWrap (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) (bitNot : Bool) :
+    Option TypeSystem.FixedInteger :=
+  if bitNot then none
+  else match checkedCompound target operator with
+    | some (type, .uncheckedAdd) | some (type, .uncheckedSubtract) | some (type, .uncheckedMultiply)
+    | some (type, .uncheckedDivide) | some (type, .uncheckedModulo) => some type
+    | _ => none
+
+/-- Without the type's own compound meaning there is nothing to wrap. -/
+theorem placeWrap_plain {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp} {bitNot : Bool}
+    (plain : checkedCompound target operator = none) : placeWrap target operator bitNot = none := by
+  simp [placeWrap, plain]
+
 def modified (type : Core.Ty) (operator : Option Modifier) (bitNot : Bool)
-    (snapshot rhs : Core.Expr) (invalid : Core.Word) : Core.Expr :=
+    (snapshot rhs : Core.Expr) (invalid : Core.Word) (wrap : Option TypeSystem.FixedInteger := none) :
+    Core.Expr :=
   if bitNot then .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
     (Core.LanguageResult.success (.unary (if type = .integer then .integerNot else .wordNot) (.var 0)))
   else match operator with
     | none => Core.LanguageResult.success rhs
     | some modifier => .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
-        (Core.LanguageResult.success (.binary modifier.operation (.var 0) (shift 1 rhs)))
+        (Core.LanguageResult.success (wrapLeaf wrap (.binary modifier.operation (.var 0) (shift 1 rhs))))
 
 /-- Internal binders: reference, keys, snapshot, RHS, modified leaf, updated
 root, store result. Source expressions are shifted only at their insertion. -/
 def execute (prepared : Prepared) (reference : Core.Expr) (keys : SourceCoreBasic.LoweredExpr)
     (rhs next : Core.Expr) (outputType : Core.Ty) (operator : Option Modifier)
-    (bitNot : Bool) (invalidOperand : Core.Word) : Core.Expr :=
+    (bitNot : Bool) (invalidOperand : Core.Word) (wrap : Option TypeSystem.FixedInteger := none) :
+    Core.Expr :=
   .letE reference
     (Core.LanguageResult.bind outputType (shift 1 keys.expression)
       (Core.LanguageResult.bind outputType
         (.apply (getter prepared keys.type) (.pair (.loadCell (.var 1)) (.var 0)))
         (Core.LanguageResult.bind outputType (shift 3 rhs)
           (Core.LanguageResult.bind outputType
-            (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalidOperand)
+            (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalidOperand wrap)
             (Core.LanguageResult.bind outputType
               (.apply (setter prepared keys.type)
                 (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
@@ -848,7 +893,8 @@ def lower (checked : Checked) (signatures : ProgramSignatures) (expression : Exp
         SourceCoreBasic.ensureType site route.leafType value.type
         pure value.expression
   pure (execute prepared (.var index) (SourceCoreCalls.packArguments keys) rhs next outputType
-    (placeModifier assignment.target.type (route.leafType = .integer) operator bitNot) bitNot invalidOperand)
+    (placeModifier assignment.target.type (route.leafType = .integer) operator bitNot) bitNot invalidOperand
+    (placeWrap assignment.target.type operator bitNot))
 
 end Solcore.Frontend.SourceCoreDataPlaces
 end

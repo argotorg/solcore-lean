@@ -491,22 +491,25 @@ def fixedUnaryOperator (operator : Syntax.UnaryOp) : Ty → Bool
 
 /-- The type constructor of a compound assignment's operand type at a target
 type. Compound assignment takes the target's type where its binary operator is
-a builtin there: `+= -= *= /= %=` (checked) and `&= |= ^=` (Word's on canonical
-words) at a fixed-width integer type. Elsewhere the compound operators are
-Word's. -/
+a builtin there: `+= -= *= /= %=` (checked), their unchecked forms in a block
+(which wrap) and `&= |= ^=` (Word's on canonical words) at a fixed-width
+integer type. Elsewhere the compound operators are Word's. -/
 def compoundOperandConstructor (operator : Syntax.ValueAssignOp) : Ty → TypeSystem.TypeConstructorId
   | .constructor (.builtin (.fixed type)) =>
       match operator with
-      | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr =>
-          .builtin (.fixed type)
+      | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr
+      | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide
+      | .uncheckedModulo => .builtin (.fixed type)
       | _ => .builtin .word
   | _ => .builtin .word
 
 /-- The compound operators that take a fixed-width integer target's type:
-checked `+= -= *= /= %=` and `&= |= ^=`. The others, shifts and unchecked
-arithmetic, are Word's. -/
+checked `+= -= *= /= %=`, their unchecked forms and `&= |= ^=`. The shifts are
+Word's. -/
 def compoundTakesTargetType : Syntax.ValueAssignOp → Bool
-  | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr => true
+  | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr
+  | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide
+  | .uncheckedModulo => true
   | _ => false
 
 /-- The operand type of a compound assignment at a target type, built from

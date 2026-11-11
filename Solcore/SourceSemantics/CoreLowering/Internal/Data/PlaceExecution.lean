@@ -2176,7 +2176,8 @@ open Core Frontend SourceCoreDataPlaces
 theorem of_execute {definitions : DataEnvironment} {context : Core.Context}
     {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
     {outputType resultType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
-    (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid)
+    {wrap : Option TypeSystem.FixedInteger}
+    (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid wrap)
       resultType definitions) :
     HasType (keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
       (.apply (getter prepared keys.type) (.pair (.loadCell (.var 1)) (.var 0)))
@@ -2238,6 +2239,7 @@ theorem of_describe_prepare {checked : Checked} {signatures : ProgramSignatures}
     {codes : List SourceCoreBasic.LoweredExpr} {certificate : GenericExpressionMeaning.Certificate}
     {context : Core.Context} {reference rhs next : Expr} {outputType resultType : Ty}
     {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     (profile : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       Profile signatures source binder.scheme.body assignment.target.projections assignment.target.type)
     (described : describe checked signatures source site assignment = .ok route)
@@ -2246,7 +2248,7 @@ theorem of_describe_prepare {checked : Checked} {signatures : ProgramSignatures}
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id code)
     (typed : HasType context (execute prepared reference (SourceCoreCalls.packArguments codes) rhs next
-      outputType operator bitNot invalidOperand) resultType checked.catalog.definitions) :
+      outputType operator bitNot invalidOperand wrap) resultType checked.catalog.definitions) :
     ∃ sourceTypes, DataPlaceResolvedTarget.Layout checked signatures functions source certificate scope
       assignment.target prepared codes sourceTypes context := by
   obtain ⟨sourceTypes, tree, keyTypes⟩ := DataPlaceKeyOrder.tree_of_generated_keys described preparedBy generated extract
@@ -2285,7 +2287,7 @@ theorem of_lower {checked : Checked} {signatures : ProgramSignatures} {source : 
       RhsGenerated expression fuel source scope reasonAt prepared.route.leafType rhs value ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments codes) value next outputType
         (placeModifier assignment.target.type (prepared.route.leafType = .integer) sourceOperator rhs.isNone)
-        rhs.isNone invalidOperand := by
+        rhs.isNone invalidOperand (placeWrap assignment.target.type sourceOperator rhs.isNone) := by
   have generated := generated_of_lower accepted
   cases generated with
   | intro route prepared index keys value described lookup preparedBy keysGenerated operatorValid rhsGenerated =>

@@ -1201,7 +1201,8 @@ fixed-width integer type, `binaryOperator`'s otherwise. -/
 def assignmentModifier (target : TypeSystem.Ty) (integer : Bool) (operator : Syntax.ValueAssignOp) :
     Option SourceCoreDataPlaces.Modifier :=
   match SourceCoreDataPlaces.checkedCompound target operator with
-  | some (type, binary) => some ⟨SourceCoreDataPlaces.checkedWordOperation type binary, .range type binary⟩
+  | some (type, binary) =>
+      some ⟨SourceCoreDataPlaces.checkedWordOperation type binary, SourceCoreDataPlaces.fixedCheck type binary⟩
   | none => binaryOperator integer operator
 
 /-- Outside the checked compound assignments the modifier is `binaryOperator`'s. -/
@@ -1259,26 +1260,29 @@ theorem checkedCompound_of_sourceProfile {target : TypeSystem.Ty} {operator : Sy
   · exact SourceCoreDataPlaces.checkedCompound_word _
 
 def modified (type : Core.Ty) (operator : Option SourceCoreDataPlaces.Modifier) (bitNot : Bool)
-    (snapshot rhs : Core.Expr) (invalid : Core.Word) : Core.Expr :=
+    (snapshot rhs : Core.Expr) (invalid : Core.Word) (wrap : Option TypeSystem.FixedInteger := none) :
+    Core.Expr :=
   if bitNot then .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
     (Core.LanguageResult.success (.unary (if type = .integer then .integerNot else .wordNot) (.var 0)))
   else match operator with
     | none => Core.LanguageResult.success rhs
     | some modifier => .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
-        (Core.LanguageResult.success (.binary modifier.operation (.var 0) (shift 1 rhs)))
+        (Core.LanguageResult.success
+          (SourceCoreDataPlaces.wrapLeaf wrap (.binary modifier.operation (.var 0) (shift 1 rhs))))
 
 /-- Internal binders: reference, keys, snapshot, RHS, modified leaf, updated
 root, store result. Source expressions are shifted only at their insertion. -/
 def execute (prepared : Prepared) (reference : Core.Expr) (keys : SourceCoreBasic.LoweredExpr)
     (rhs next : Core.Expr) (outputType : Core.Ty) (operator : Option SourceCoreDataPlaces.Modifier)
-    (bitNot : Bool) (invalidOperand : Core.Word) : Core.Expr :=
+    (bitNot : Bool) (invalidOperand : Core.Word) (wrap : Option TypeSystem.FixedInteger := none) :
+    Core.Expr :=
   .letE reference
     (Core.LanguageResult.bind outputType (shift 1 keys.expression)
       (Core.LanguageResult.bind outputType
         (.apply (getter prepared keys.type) (.pair (.loadCell (.var 1)) (.var 0)))
         (Core.LanguageResult.bind outputType (shift 3 rhs)
           (Core.LanguageResult.bind outputType
-            (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalidOperand)
+            (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalidOperand wrap)
             (Core.LanguageResult.bind outputType
               (.apply (setter prepared keys.type)
                 (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
@@ -1311,7 +1315,8 @@ def lower (context : Context) (signatures : ProgramSignatures) (expression : Exp
         SourceCoreBasic.ensureType site route.leafType value.type
         pure value.expression
   pure (execute prepared (.var index) (SourceCoreCalls.packArguments keys) rhs next outputType
-    (placeModifier assignment.target.type (route.leafType = .integer) operator bitNot) bitNot invalidOperand)
+    (placeModifier assignment.target.type (route.leafType = .integer) operator bitNot) bitNot invalidOperand
+    (SourceCoreDataPlaces.placeWrap assignment.target.type operator bitNot))
 
 /-- A key failure stops before snapshot selection, RHS and structural write.
 The premise uses the actual inserted reference environment. -/

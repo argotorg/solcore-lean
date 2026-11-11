@@ -580,7 +580,8 @@ inductive Generated (compilation : SourceCoreCompatibleDataPlaces.Context) (sign
       Generated compilation signatures expression fuel source scope site assignment operator rhs outputType next
         reasonAt invalidProjection invalidOperand missing
         (execute prepared (.var index) (SourceCoreCalls.packArguments keys) value next outputType
-          (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand)
+          (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand
+          (SourceCoreDataPlaces.placeWrap assignment.target.type operator rhs.isNone))
 
 /-- The receipt follows actual successful compiler branches. It does not
 replace or reinterpret the executable place compiler. -/
@@ -614,12 +615,14 @@ theorem generated_of_lower {compilation : SourceCoreCompatibleDataPlaces.Context
           (completed : (show Except SourceCoreBasic.Error Expr from match rhs with
             | none => .ok (execute prepared (.var index) (SourceCoreCalls.packArguments keys)
                 (LanguageResult.success .unit) next outputType
-                (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand)
+                (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand
+                (SourceCoreDataPlaces.placeWrap assignment.target.type operator rhs.isNone))
             | some id => do
                 let value ← expression fuel source scope id reasonAt
                 SourceCoreBasic.ensureType site route.leafType value.type
                 pure (execute prepared (.var index) (SourceCoreCalls.packArguments keys) value.expression next outputType
-                  (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand)) = .ok lowered) :
+                  (placeModifier assignment.target.type (route.leafType = Core.Ty.integer) operator rhs.isNone) rhs.isNone invalidOperand
+                  (SourceCoreDataPlaces.placeWrap assignment.target.type operator rhs.isNone))) = .ok lowered) :
           Generated compilation signatures expression fuel source scope site assignment operator rhs outputType next
             reasonAt invalidProjection invalidOperand missing lowered := by
         cases rhs with
@@ -815,8 +818,9 @@ theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Contex
     (generated : ListRel (KeyGenerated expression fuel source scope reasonAt) prepared.keys codes)
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id code)
+    {wrap : Option TypeSystem.FixedInteger}
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext)
-      (execute prepared reference (SourceCoreCalls.packArguments codes) rhs next outputType operator bitNot invalidOperand)
+      (execute prepared reference (SourceCoreCalls.packArguments codes) rhs next outputType operator bitNot invalidOperand wrap)
       resultType definitions)
     (rhsTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) rhs
       (LanguageResult.resultType prepared.route.leafType) definitions) :
@@ -886,7 +890,8 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
       SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type ∧
       right.type = prepared.route.leafType ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments codes) right.expression next outputType
-        (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand := by
+        (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand
+        (SourceCoreDataPlaces.placeWrap assignment.target.type operator false) := by
   have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower accepted
   cases receipt with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
@@ -2256,7 +2261,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
   obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, right, node, actualPreparation, binding, rootEq, slot, layout, ordinary,
       generated, found, certified, rhsView, rhsType, lowering⟩ :=
     CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped nonempty extract accepted typed
-  rw [assignmentModifier_plain (checkedCompound_of_profile operatorProfile)] at lowering
+  rw [assignmentModifier_plain (checkedCompound_of_profile operatorProfile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile operatorProfile)] at lowering
   obtain ⟨typedNode, contains, nodeType⟩ := rightTyped.stored_type
   have same := Option.some.inj (found.symm.trans (lookupExpression?_complete unique contains))
   have leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type := by

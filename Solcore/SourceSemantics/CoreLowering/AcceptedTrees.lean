@@ -95,7 +95,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
   exact ⟨⟨values, invalidProjection, invalidOperand, missing, matched, sourceProfile, bare, accepted, lowered,
     binder, declaration, place, index, child, rootType, rawType, slot, layout, generated,
     childType, operatorType,
-    by rw [emitted, assignmentModifier_plain (checkedCompound_of_sourceProfile sourceProfile)]⟩⟩
+    by rw [emitted, assignmentModifier_plain (checkedCompound_of_sourceProfile sourceProfile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_sourceProfile sourceProfile)]⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedBareAssignmentReceipt
 end
@@ -193,7 +193,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
         child, generated, ?_, operatorType, ?_⟩⟩
       · simpa only [routeType] using childType.symm
       · simp only [routeType, Option.isNone_some, placeModifier, Bool.false_eq_true, ↓reduceIte,
-          assignmentModifier_plain (checkedCompound_of_sourceProfile sourceProfile)]
+          assignmentModifier_plain (checkedCompound_of_sourceProfile sourceProfile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_sourceProfile sourceProfile)]
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedProjectedAssignmentReceipt
 end
@@ -365,7 +365,8 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
         projected, _, callbackSelected, accepted, lowered, route, binder, selected, description,
         place, prepared, routeType, path, index, slot, keys, keysGenerated,
         CompatiblePlaceCompilerCertificates.PreparedPath.key_ids path, leafType, ?_⟩⟩
-      simp only [routeType, Option.isNone_none, SourceCoreCompatibleDataPlaces.placeModifier, ↓reduceIte]
+      simp only [routeType, Option.isNone_none, SourceCoreCompatibleDataPlaces.placeModifier,
+        SourceCoreDataPlaces.placeWrap, ↓reduceIte]
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedProjectedBitNotReceipt
 end

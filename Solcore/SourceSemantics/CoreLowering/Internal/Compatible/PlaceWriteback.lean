@@ -1481,7 +1481,8 @@ open Core Frontend SourceCoreCompatibleDataPlaces
 theorem getter_of_execute {definitions : DataEnvironment} {context : Core.Context}
     {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
     {outputType resultType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
-    (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid)
+    {wrap : Option TypeSystem.FixedInteger}
+    (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid wrap)
       resultType definitions) :
     HasType (keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
       (.apply (getter prepared keys.type) (.pair (.loadCell (.var 1)) (.var 0)))
@@ -1525,7 +1526,8 @@ static compiler obligation and does not assume any child evaluation. -/
 theorem setter_of_execute_rhs {definitions : DataEnvironment} {context : Core.Context}
     {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
     {outputType resultType rhsType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
-    (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid)
+    {wrap : Option TypeSystem.FixedInteger}
+    (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid wrap)
       resultType definitions)
     (rhsTyped : HasType (prepared.optionalLeaf :: keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
       (shift 3 rhs) (LanguageResult.resultType rhsType) definitions) :
@@ -1579,7 +1581,8 @@ theorem setter_of_execute_rhs {definitions : DataEnvironment} {context : Core.Co
 theorem setter_of_execute {definitions : DataEnvironment} {context : Core.Context}
     {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
     {outputType resultType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
-    (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid)
+    {wrap : Option TypeSystem.FixedInteger}
+    (typed : HasType context (execute prepared reference keys rhs next outputType operator bitNot invalid wrap)
       resultType definitions)
     (rhsTyped : HasType (prepared.optionalLeaf :: keys.type :: OptionalCell.referenceType prepared.route.rootType :: context)
       (shift 3 rhs) (LanguageResult.resultType prepared.route.leafType) definitions) :

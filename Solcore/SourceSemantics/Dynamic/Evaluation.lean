@@ -273,6 +273,26 @@ inductive CompoundAssignmentApplies (targetType : TypeSystem.Ty) :
       (target : targetType = .fixed type)
       (applies : FixedBinaryApplies type .modulo left right result) :
       CompoundAssignmentApplies targetType .modulo (some left) right result
+  | uncheckedAdd {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .uncheckedAdd left right result) :
+      CompoundAssignmentApplies targetType .uncheckedAdd (some left) right result
+  | uncheckedSubtract {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .uncheckedSubtract left right result) :
+      CompoundAssignmentApplies targetType .uncheckedSubtract (some left) right result
+  | uncheckedMultiply {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .uncheckedMultiply left right result) :
+      CompoundAssignmentApplies targetType .uncheckedMultiply (some left) right result
+  | uncheckedDivide {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .uncheckedDivide left right result) :
+      CompoundAssignmentApplies targetType .uncheckedDivide (some left) right result
+  | uncheckedModulo {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .uncheckedModulo left right result) :
+      CompoundAssignmentApplies targetType .uncheckedModulo (some left) right result
 
 namespace CompoundAssignmentApplies
 
@@ -301,6 +321,11 @@ theorem eq_of_plain {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignO
     | multiply target _ => exact absurd .multiply (plain _ target)
     | divide target _ => exact absurd .divide (plain _ target)
     | modulo target _ => exact absurd .modulo (plain _ target)
+    | uncheckedAdd target _ => exact absurd .uncheckedAdd (plain _ target)
+    | uncheckedSubtract target _ => exact absurd .uncheckedSubtract (plain _ target)
+    | uncheckedMultiply target _ => exact absurd .uncheckedMultiply (plain _ target)
+    | uncheckedDivide target _ => exact absurd .uncheckedDivide (plain _ target)
+    | uncheckedModulo target _ => exact absurd .uncheckedModulo (plain _ target)
   · exact .primitive plain
 
 end CompoundAssignmentApplies

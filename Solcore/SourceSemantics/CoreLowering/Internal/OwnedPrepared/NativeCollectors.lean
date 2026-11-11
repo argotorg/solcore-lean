@@ -82,9 +82,10 @@ arbitrary result there, so no declared leaf type is asserted. -/
 theorem execute_children {prepared : Prepared} {reference rhs next : Expr}
     {keys : SourceCoreBasic.LoweredExpr} {output result : Ty}
     {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     {definitions : DataEnvironment} {context : Core.Context}
     (typed : HasType context
-      (execute prepared reference keys rhs next output operator bitNot invalid) result definitions) :
+      (execute prepared reference keys rhs next output operator bitNot invalid wrap) result definitions) :
     RawTyped context rhs definitions ∧ RawTyped context keys.expression definitions := by
   cases typed with
   | letE reference first =>
@@ -102,11 +103,28 @@ theorem execute_children {prepared : Prepared} {reference rhs next : Expr}
                     exact ⟨_, remove_front (remove_front (remove_front right))⟩
                   exact ⟨rawRight, rawKeys⟩
 
+/-- A wrapped compound result is typed as the result it wraps: the wrap is
+Word's `wordAnd` or `wordSignExtend` with a constant. -/
+private theorem wrapLeaf_typed {definitions : DataEnvironment} {context : Core.Context}
+    {wrap : Option TypeSystem.FixedInteger} {inner : Expr} {type : Ty}
+    (typed : HasType context (SourceCoreDataPlaces.wrapLeaf wrap inner) type definitions) :
+    HasType context inner type definitions := by
+  cases wrap with
+  | none => exact typed
+  | some fixed =>
+    simp only [SourceCoreDataPlaces.wrapLeaf] at typed
+    split at typed
+    · cases typed with
+      | binary _ wrapped => exact wrapped
+    · cases typed with
+      | binary wrapped _ => exact wrapped
+
 private theorem modifier_slot {definitions : DataEnvironment} {context : Core.Context}
     {leaf payload failure : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {snapshot : Expr} {invalid : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     (ordinary : ∀ op, operator = some op → op.operation.rightType = op.operation.resultType)
     (typed : HasType (payload :: context)
-      (modified leaf operator false snapshot (.var 0) invalid) (.sum failure leaf) definitions) :
+      (modified leaf operator false snapshot (.var 0) invalid wrap) (.sum failure leaf) definitions) :
     payload = leaf := by
   cases operator with
   | none =>
@@ -123,6 +141,7 @@ private theorem modifier_slot {definitions : DataEnvironment} {context : Core.Co
       | caseE selectedValue failed returned =>
           cases returned with
           | inRight annotation value =>
+              have value := wrapLeaf_typed value
               cases value with
               | binary left right =>
                   cases right with
@@ -163,10 +182,11 @@ RHS failure binder fixes Word independently. No RHS typing is supplied. -/
 theorem execute_present_rhs_of {prepared : Prepared} {reference rhs next : Expr}
     {keys : SourceCoreBasic.LoweredExpr} {output result : Ty}
     {modifier : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     {definitions : DataEnvironment} {context : Core.Context}
     (ordinary : ∀ op, modifier = some op → op.operation.rightType = op.operation.resultType)
     (typed : HasType context
-      (execute prepared reference keys rhs next output modifier false invalid) result definitions) :
+      (execute prepared reference keys rhs next output modifier false invalid wrap) result definitions) :
     HasType context rhs (LanguageResult.resultType prepared.route.leafType) definitions := by
   unfold execute LanguageResult.bind at typed
   cases typed with
@@ -233,10 +253,11 @@ theorem execute_present_rhs {prepared : Prepared} {reference rhs next : Expr}
 theorem execute_present_rhs_assignment {prepared : Prepared} {reference rhs next : Expr}
     {keys : SourceCoreBasic.LoweredExpr} {output result : Ty}
     {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp} {invalid : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     {definitions : DataEnvironment} {context : Core.Context}
     (typed : HasType context
       (execute prepared reference keys rhs next output
-        (assignmentModifier target (prepared.route.leafType = .integer) operator) false invalid) result definitions) :
+        (assignmentModifier target (prepared.route.leafType = .integer) operator) false invalid wrap) result definitions) :
     HasType context rhs (LanguageResult.resultType prepared.route.leafType) definitions :=
   execute_present_rhs_of (fun _ accepted => assignment_modifier_types _ _ _ accepted) typed
 
@@ -338,7 +359,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
   by_cases bare : assignment.target.projections = []
   · obtain ⟨binder, prepared, index, value, _binding, _rootType, _rawView, _slot,
         _layout, generated, _sameType, _profile, codeEq⟩ := CompatibleBareAssignment.of_lower bare accepted
-    rw [assignmentModifier_plain (checkedCompound_of_profile profile)] at codeEq
+    rw [assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)] at codeEq
     have rhsNative := execute_present_rhs (prepared := prepared) (reference := .var index)
       (keys := SourceCoreCalls.packArguments []) (rhs := value.expression) (next := next)
       (output := output) (result := result) (operator := operator) (codeEq ▸ typed)
@@ -358,7 +379,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
           (keys := SourceCoreCalls.packArguments codes) (rhs := right.expression) (next := next)
           (output := output) (result := result) (operator := operator)
           (by simpa only [routeEq, Option.isNone_some, placeModifier, Bool.false_eq_true, ↓reduceIte,
-            assignmentModifier_plain (checkedCompound_of_profile profile)] using typed)
+            assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)] using typed)
         obtain ⟨node, found, certified⟩ := extract rhs right (by simp) rhsGenerated ⟨_, rhsNative⟩
         obtain ⟨_rhsRaw, ⟨packedResult, packedNative⟩⟩ := execute_children typed
         obtain ⟨sourceTypes, tree, keyTypes⟩ :=
@@ -392,7 +413,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
           found, certified, by simpa only [rawType] using leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩,
-          by simp [Head.emit, routeEq, placeModifier, assignmentModifier_plain (checkedCompound_of_profile profile)], rfl, ?_⟩
+          by simp [Head.emit, routeEq, placeModifier, assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)], rfl, ?_⟩
         · rcases profile with equal | word | ⟨integer, notWordOnly⟩
           · exact .inl equal
           · exact .inr (.inl (leafView.trans word))
@@ -1638,7 +1659,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
         exact description.ordinary (fun k v same => notMapping k v (rootEq.trans same))
       refine ⟨⟨prepared, index, codes, leaf, sourceTypes, site, invalidUnary, layout, ordinary,
         by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding, leafView ▸ profile⟩,
-        by simp [Head.emit, routeEq, placeModifier], rfl, ?_⟩
+        by simp [Head.emit, routeEq, placeModifier, SourceCoreDataPlaces.placeWrap], rfl, ?_⟩
       exact ⟨rfl, route, described, preparedBy⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors

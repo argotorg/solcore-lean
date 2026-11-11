@@ -943,6 +943,11 @@ theorem fixedBitwisePreserves
   | multiply => exact absurd .multiply plain
   | divide => exact absurd .divide plain
   | modulo => exact absurd .modulo plain
+  | uncheckedAdd => exact absurd .uncheckedAdd plain
+  | uncheckedSubtract => exact absurd .uncheckedSubtract plain
+  | uncheckedMultiply => exact absurd .uncheckedMultiply plain
+  | uncheckedDivide => exact absurd .uncheckedDivide plain
+  | uncheckedModulo => exact absurd .uncheckedModulo plain
   | bitAnd =>
       cases applies with
       | bitAnd primitive =>
@@ -974,8 +979,9 @@ theorem equalPreserves
   | primitive _ applies => exact applies.equalPreserves right_typed
 
 /-- A compound assignment keeps its target's type: Word's operators at a Word
-target, Word's `&= |= ^=` on canonical words, and checked `+= -= *= /= %=`,
-whose result lies in the range of the target's fixed-width type. -/
+target, Word's `&= |= ^=` on canonical words, checked `+= -= *= /= %=`, whose
+result lies in the range of the target's fixed-width type, and their unchecked
+forms, whose result is wrapped into it. -/
 theorem preserves
     {context : Context} {heap : Heap} {targetType leaf : Ty} {operator : Syntax.ValueAssignOp}
     {current : Option Value} {right result : Value}
@@ -990,7 +996,9 @@ theorem preserves
   | word kind =>
       cases applies with
       | primitive _ applies => exact applies.wordCompoundPreserves kind current_typed right_typed
-      | add target _ | subtract target _ | multiply target _ | divide target _ | modulo target _ =>
+      | add target _ | subtract target _ | multiply target _ | divide target _ | modulo target _
+      | uncheckedAdd target _ | uncheckedSubtract target _ | uncheckedMultiply target _
+      | uncheckedDivide target _ | uncheckedModulo target _ =>
           cases target
   | fixed kind =>
       cases applies with
@@ -1006,6 +1014,19 @@ theorem preserves
           cases applies with
           | division _ _ _ _ inRange => exact .fixed _ (fixed_canonical_ofInt inRange.1 inRange.2)
           | checked kind | unchecked kind | uncheckedDivision kind => cases kind
+      | uncheckedAdd target applies | uncheckedSubtract target applies
+      | uncheckedMultiply target applies =>
+          cases target
+          cases applies with
+          | unchecked _ _ _ =>
+            exact .fixed _ (fixed_canonical_ofInt (fixedWrap_inRange _ _).1 (fixedWrap_inRange _ _).2)
+          | checked kind | division kind | uncheckedDivision kind => cases kind
+      | uncheckedDivide target applies | uncheckedModulo target applies =>
+          cases target
+          cases applies with
+          | uncheckedDivision _ _ _ _ =>
+            exact .fixed _ (fixed_canonical_ofInt (fixedWrap_inRange _ _).1 (fixedWrap_inRange _ _).2)
+          | checked kind | division kind | unchecked kind => cases kind
 
 end CompoundAssignmentApplies
 

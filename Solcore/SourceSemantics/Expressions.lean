@@ -1282,7 +1282,8 @@ inductive WordCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
 
 /-- The compound assignments on a fixed-width integer target: those whose
 binary operator is a builtin there, so compound assignment takes the target's
-type. `+= -= *= /= %=` are checked, and `&= |= ^=` are Word's. -/
+type. `+= -= *= /= %=` are checked, their unchecked forms in a block wrap to
+the type's width, and `&= |= ^=` are Word's. -/
 inductive FixedCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
   | add : FixedCompoundAssignmentOperator .add
   | subtract : FixedCompoundAssignmentOperator .subtract
@@ -1292,14 +1293,26 @@ inductive FixedCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
   | bitAnd : FixedCompoundAssignmentOperator .bitAnd
   | bitXor : FixedCompoundAssignmentOperator .bitXor
   | bitOr : FixedCompoundAssignmentOperator .bitOr
+  | uncheckedAdd : FixedCompoundAssignmentOperator .uncheckedAdd
+  | uncheckedSubtract : FixedCompoundAssignmentOperator .uncheckedSubtract
+  | uncheckedMultiply : FixedCompoundAssignmentOperator .uncheckedMultiply
+  | uncheckedDivide : FixedCompoundAssignmentOperator .uncheckedDivide
+  | uncheckedModulo : FixedCompoundAssignmentOperator .uncheckedModulo
 
-/-- The compound assignments that are checked on a fixed-width integer target. -/
+/-- The compound assignments whose meaning on a fixed-width integer target is
+the type's own, not Word's: checked `+= -= *= /= %=`, and their unchecked forms,
+which wrap to the type's width. -/
 inductive FixedCheckedCompound : Syntax.ValueAssignOp → Prop where
   | add : FixedCheckedCompound .add
   | subtract : FixedCheckedCompound .subtract
   | multiply : FixedCheckedCompound .multiply
   | divide : FixedCheckedCompound .divide
   | modulo : FixedCheckedCompound .modulo
+  | uncheckedAdd : FixedCheckedCompound .uncheckedAdd
+  | uncheckedSubtract : FixedCheckedCompound .uncheckedSubtract
+  | uncheckedMultiply : FixedCheckedCompound .uncheckedMultiply
+  | uncheckedDivide : FixedCheckedCompound .uncheckedDivide
+  | uncheckedModulo : FixedCheckedCompound .uncheckedModulo
 
 /-- The operand type of a compound assignment: Word's operators at a Word
 target, or the fixed-width ones at a target of a fixed-width integer type. -/
