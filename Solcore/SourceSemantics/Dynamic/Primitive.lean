@@ -1128,6 +1128,13 @@ inductive BuiltinApplies : BuiltinFunctionId → List Value → Value → Prop w
   | fixedFromWord {type : TypeSystem.FixedInteger} {value : Core.Word}
       (canonical : type.canonical value.val = true) :
       BuiltinApplies (.fixedFromWord type) [.word value] (.word value)
+  /-- A fixed-width value's word, as `Typedef.rep` gives it. -/
+  | fixedToWord {type : TypeSystem.FixedInteger} {value : Core.Word}
+      (canonical : type.canonical value.val = true) :
+      BuiltinApplies (.fixedToWord type) [.word value] (.word value)
+  /-- `Typedef.abs` and `Typedef.rep` at `word`. -/
+  | wordIdentity (value : Core.Word) :
+      BuiltinApplies .wordIdentity [.word value] (.word value)
 
 /-- The failure of one compiler-provided source function: a conversion of a
 word that is not canonical for its type. -/

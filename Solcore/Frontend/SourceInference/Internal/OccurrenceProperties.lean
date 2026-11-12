@@ -5283,6 +5283,17 @@ private theorem inference_anchoredNodePrefixExtends :
                                           candidates attempt selectionResult
                                           resultEq
                                 | none =>
+                                    cases typedefEq : typedefCall? namespacePath name
+                                    case some call =>
+                                      simp only [typedefEq] at success
+                                      cases functionResult : typedefFunction call arguments expected
+                                          argumentState with
+                                      | error error => simp [functionResult, bind, Except.bind] at success
+                                      | ok function =>
+                                        simp only [functionResult, bind, Except.bind] at success
+                                        exact throughArguments.trans
+                                          (recordBuiltinFunctionCall_anchoredNodePrefixExtends success)
+                                    simp only [typedefEq] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>

@@ -5081,6 +5081,111 @@ def runConversions : IO Unit := do
     ["function bad(w: Word) returns (uint16) { return uint8(w); }"]
   IO.println "SOURCE_CORE_FIXED_CONVERSIONS_PASS: uint256(w), uintN(w) and intN(w) through the public API, canonical words at each of the twelve types kept, uint256 and int256 never failing, literal words as arguments, an open local and checked + after a conversion, every other word reverting with DirtyHigherBitsForInteger() and upstream's revert data 0x6cc54a63, a non-Word argument and a wrong result type rejected"
 
+/-- Step 9b's second part: `Typedef.abs` and `Typedef.rep`, chosen by the type
+known at the call: the expected type for `abs` and the argument's type for
+`rep`. -/
+private def typedefWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function absU8(w: Word) returns (uint8) { let x: uint8 = Typedef.abs(w); return x; }",
+  "function absI16(w: Word) returns (int16) { return Typedef.abs(w); }",
+  "function absU256(w: Word) returns (uint256) { return Typedef.abs(w); }",
+  "function absI256(w: Word) returns (int256) { return Typedef.abs(w); }",
+  "function absWord(w: Word) returns (Word) { let v: Word = Typedef.abs(w); return v; }",
+  "function absAssigned(w: Word) returns (uint16) { let x: uint16 = 0; x = Typedef.abs(w); return x; }",
+  "function absLiteral() returns (uint8) { return Typedef.abs(255); }",
+  "function dirtyLiteral() returns (int8) { return Typedef.abs(128); }",
+  "function repU8(x: uint8) returns (Word) { return Typedef.rep(x); }",
+  "function repI8(x: int8) returns (Word) { let w: Word = Typedef.rep(x); return w; }",
+  "function repU256(x: uint256) returns (Word) { return Typedef.rep(x); }",
+  "function repWord(w: Word) returns (Word) { return Typedef.rep(w); }",
+  "function repOpen(x: int64) returns (Word) { let w = Typedef.rep(x); return w; }",
+  "function repSum(a: uint8, b: uint8) returns (Word) { return Typedef.rep(a) + Typedef.rep(b); }",
+  "function roundTrip(x: int32) returns (int32) { return Typedef.abs(Typedef.rep(x)); }",
+  "function narrowed(x: uint256) returns (uint8) { return Typedef.abs(Typedef.rep(x)); }"]
+
+private def typedefNames : List String := [
+  "absU8", "absI16", "absU256", "absI256", "absWord", "absAssigned", "absLiteral", "dirtyLiteral", "repU8",
+  "repI8", "repU256", "repWord", "repOpen", "repSum", "roundTrip", "narrowed"]
+
+/-- Inference rejects a `Typedef` call whose type is not known at the call or is
+neither `Word` nor one of the twelve types, naming `Typedef` and that type. -/
+private def rejectedTypedef (label : String) (expected : TypeSystem.Ty → Bool) (lines : List String) :
+    IO Unit :=
+  match checkProgram (workspaceOf lines) with
+  | .error [.inference ⟨_, .operatorNotSupported actual type⟩] =>
+      require (actual == "Typedef" && expected type) s!"{label} named {actual} and {reprStr type}"
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+private def openType : TypeSystem.Ty → Bool
+  | .variable _ => true
+  | _ => false
+
+/-- Step 9b's second part through the public API: `Typedef.abs` at one of the
+twelve types is that type's conversion, and at `Word` the word itself;
+`Typedef.rep` gives a value's word. A type that is not known at the call is
+rejected, as is any other type. -/
+def runTypedef : IO Unit := do
+  let program ← get "Typedef check" (checkProgram typedefWorkspace)
+  let seeds ← typedefNames.mapM (seed program)
+  let compiled ← get "Typedef compilation"
+    (compile typedefWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match typedefNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"Typedef root {name} missing")
+    | none => throw (IO.userError s!"Typedef function {name} unknown")
+  let max := modulus - 1
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × List Value × Value) := [
+    -- `Typedef.abs` at an annotated `let`, a return, an assignment and a literal argument.
+    ("absU8", [word 255], word 255), ("absI16", [word (modulus - 32768)], word (modulus - 32768)),
+    ("absU256", [word max], word max), ("absI256", [word (2 ^ 255)], word (2 ^ 255)),
+    ("absWord", [word max], word max), ("absAssigned", [word 65535], word 65535),
+    ("absLiteral", [], word 255),
+    -- `Typedef.rep` gives the value's word, sign-extended at the signed types.
+    ("repU8", [word 200], word 200), ("repI8", [word max], word max), ("repU256", [word max], word max),
+    ("repWord", [word 7], word 7), ("repOpen", [word (modulus - 2 ^ 63)], word (modulus - 2 ^ 63)),
+    ("repSum", [word 255, word 255], word 510),
+    ("roundTrip", [word (modulus - 5)], word (modulus - 5)), ("narrowed", [word 255], word 255)]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) arguments
+    require (completed.value == expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  -- `Typedef.abs` at a type below 256 bits checks the word as `uintN(w)` and `intN(w)` do.
+  session ← dirty session (← key "absU8") [word 256] "Typedef.abs at uint8 of 256"
+  session ← dirty session (← key "absI16") [word 32768] "Typedef.abs at int16 of 2^15"
+  session ← dirty session (← key "absAssigned") [word 65536] "Typedef.abs assigned at uint16 of 2^16"
+  session ← dirty session (← key "dirtyLiteral") [] "Typedef.abs at int8 of 128"
+  session ← dirty session (← key "narrowed") [word 256] "Typedef.abs at uint8 of a uint256's word"
+  let _ := session
+  -- A type that is not known at the call waits for nothing: it is rejected.
+  rejectedTypedef "Typedef.abs into an open local" openType
+    ["function bad(w: Word) returns (uint8) { let a = Typedef.abs(w); let b: uint8 = a; return b; }"]
+  rejectedTypedef "Typedef.abs as an argument" openType
+    ["function take(x: uint8) returns (uint8) { return x; }",
+     "function bad(w: Word) returns (uint8) { return take(Typedef.abs(w)); }"]
+  rejectedTypedef "Typedef.rep of an open local" openType
+    ["function bad() returns (Word) { let a = 5; return Typedef.rep(a); }"]
+  rejectedTypedef "Typedef.rep of a literal" openType
+    ["function bad() returns (Word) { return Typedef.rep(5); }"]
+  -- Any other type is rejected.
+  rejectedTypedef "Typedef.abs at Bool" (· == TypeSystem.Ty.bool)
+    ["function bad(w: Word) returns (Bool) { return Typedef.abs(w); }"]
+  rejectedTypedef "Typedef.rep of a Bool" (· == TypeSystem.Ty.bool)
+    ["function bad(b: Bool) returns (Word) { return Typedef.rep(b); }"]
+  rejectedTypedef "Typedef.rep of an integer" (· == TypeSystem.Ty.integer)
+    ["function bad() returns (Word) { let i: integer = 1; return Typedef.rep(i); }"]
+  -- `abs` takes a `Word`, one argument, and the two names are the only ones.
+  rejectedByInference "Typedef.abs of a uint8"
+    ["function bad(x: uint8) returns (uint16) { return Typedef.abs(x); }"]
+  rejectedByInference "Typedef.abs of two words"
+    ["function bad(w: Word) returns (uint8) { return Typedef.abs(w, w); }"]
+  rejectedByInference "another Typedef name"
+    ["function bad(w: Word) returns (Word) { return Typedef.other(w); }"]
+  rejectedByInference "Typedef.abs as a value"
+    ["function bad() returns (Word) { let f = Typedef.abs; return 0; }"]
+  IO.println "SOURCE_CORE_TYPEDEF_PASS: Typedef.abs and Typedef.rep through the public API, chosen by the type known at the call, abs at the twelve types checking the word as uintN(w) and intN(w) do and at Word the word itself, rep giving a value's word, an abs or rep whose type is open at the call rejected naming Typedef, as are Bool and integer, a non-Word abs argument, two arguments, another name and Typedef.abs as a value"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -5090,8 +5195,11 @@ reach a type adapted where the meaning is kept: `uint256(0)` is `0` at
 the converted type, and a result converted to `uint256` is returned at its own
 type, whose word the API returns. Step 9a adds `basic`'s `bnoteq`, its one
 `~=` that needs no contract storage. Step 9b's first part ports `afterBlock`,
-`ltSigned` and `runtimePatterns` again as upstream wrote them, with `uint256(w)`.
-The lane's notes have the table. -/
+`ltSigned` and `runtimePatterns` again as upstream wrote them, with `uint256(w)`,
+and its second part ports `narrowAmount`, `wordShift`, `mulNeg`, `divSigned`,
+`explicitWord` and `negI8` … `negI256` again as upstream wrote them, with
+`Typedef.abs` and `Typedef.rep`, so none stays adapted. The lane's notes have
+the table. -/
 private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function addU256(a: uint256, b: uint256) returns (uint256) { return a + b; }",
   "function subU256(a: uint256, b: uint256) returns (uint256) { return a - b; }",
@@ -5123,8 +5231,8 @@ private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function lambdaBody(a: uint256, b: uint256) returns (uint256) { unchecked { return apply(lam (v: uint256) -> uint256 { return v + b; }, a); } }",
   "function divisionByZero(a: uint256, b: uint256) returns (uint256) { unchecked { return a / b; } }",
   "function literalAmount(x: uint256) returns (uint256) { return x << 3; }",
-  "function narrowAmount(x: uint256, k: uint8) returns (uint256) { return x >> k; }",
-  "function wordShift(w: Word, s: Word) returns (Word) { return w << s; }",
+  "function narrowAmount(x: uint256, s: uint256) returns (uint256) { let k: uint8 = Typedef.abs(Typedef.rep(s)); return x >> k; }",
+  "function wordShift(x: uint256, s: uint256) returns (uint256) { let w: Word = Typedef.rep(x); return uint256(w << Typedef.rep(s)); }",
   "function compound(x: uint256, s: uint256) returns (uint256) { let r: uint256 = x; r <<= s; r >>= 1; return r; }",
   "function neverReverts(x: uint256) returns (uint256) { return x << 255; }",
   "function insideUnchecked(x: uint256, s: uint256) returns (uint256) { unchecked { return x << s; } }",
@@ -5132,9 +5240,9 @@ private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function comparisons(a: uint256, b: uint256) returns (bool) { return a > b && a >= b; }",
   "function negate8(x: int8) returns (int8) { return 0 - x; }",
   "function addI32(a: int32, b: int32) returns (int32) { return a + b; }",
-  "function mulNeg() returns (int256) { let d: int256 = 5; return (0 - d) * d; }",
+  "function mulNeg() returns (uint256) { let d: int256 = 5; return uint256(Typedef.rep((0 - d) * d)); }",
   "function ltSigned() returns (uint256) { let d: int256 = 5; let e: int256 = 0 - d; if (e < d) { return uint256(1); } else { return uint256(0); } }",
-  "function divSigned() returns (int256) { let m20: int256 = 0 - 20; let three: int256 = 3; return m20 / three; }",
+  "function divSigned() returns (uint256) { let m20: int256 = 0 - 20; let three: int256 = 3; return uint256(Typedef.rep(m20 / three)); }",
   "function implicitSuccess() returns (bool) { let value = 6; value *= 7; return value == 42; }",
   "function negateSigned(value: int256) returns (int256) { return -value; }",
   "function negateWord(value: Word) returns (Word) { return -value; }",
@@ -5146,14 +5254,14 @@ private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function implicitMod(fail: bool) returns (bool) { let divisor = 5; if (fail) { divisor = 0; } let result = 42 % divisor; return result == 2; }",
   "function implicitNeg(fail: bool) returns (bool) { let x = 0; if (fail) { x = 1; } let result = -x; return result == 0; }",
   "function implicitCompound(failure: uint256) returns (bool) { let x = 6; if (failure == 1) { x = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; } x += 1; if (failure == 2) { x = 0; } x -= 1; if (failure == 3) { x = 0x8000000000000000000000000000000000000000000000000000000000000000; } x *= 7; let divisor = 1; if (failure == 4) { divisor = 0; } x /= divisor; if (failure == 5) { divisor = 0; } x %= divisor; return x == 0; }",
-  "function explicitWord(x: Word) returns (Word, Word, Word) { return (x + 1, x - 1, -x); }",
+  "function explicitWord(raw: uint256) returns (uint256, uint256, uint256) { let x: Word = Typedef.rep(raw); return (uint256(x + 1), uint256(x - 1), uint256(-x)); }",
   "function negUnsigned(x: uint256) returns (uint256) { return -x; }",
-  "function negI8(x: int8) returns (int8) { return -x; }",
-  "function negI16(x: int16) returns (int16) { return -x; }",
-  "function negI32(x: int32) returns (int32) { return -x; }",
-  "function negI64(x: int64) returns (int64) { return -x; }",
-  "function negI128(x: int128) returns (int128) { return -x; }",
-  "function negI256(x: int256) returns (int256) { return -x; }",
+  "function negI8(raw: uint256) returns (uint256) { let x: int8 = Typedef.abs(Typedef.rep(raw)); return uint256(Typedef.rep(-x)); }",
+  "function negI16(raw: uint256) returns (uint256) { let x: int16 = Typedef.abs(Typedef.rep(raw)); return uint256(Typedef.rep(-x)); }",
+  "function negI32(raw: uint256) returns (uint256) { let x: int32 = Typedef.abs(Typedef.rep(raw)); return uint256(Typedef.rep(-x)); }",
+  "function negI64(raw: uint256) returns (uint256) { let x: int64 = Typedef.abs(Typedef.rep(raw)); return uint256(Typedef.rep(-x)); }",
+  "function negI128(raw: uint256) returns (uint256) { let x: int128 = Typedef.abs(Typedef.rep(raw)); return uint256(Typedef.rep(-x)); }",
+  "function negI256(raw: uint256) returns (uint256) { let x: int256 = Typedef.abs(Typedef.rep(raw)); return uint256(Typedef.rep(-x)); }",
   "function bnoteq(x: uint256) returns (uint256) { let acc: uint256 = x; acc ~=; return acc; }"]
 
 private def fixtureNames : List String := [
@@ -5267,7 +5375,7 @@ def runUpstreamFixtures : IO Unit := do
     ("implicitCompound", [word 4]), ("implicitCompound", [word 5])]
   for (name, arguments) in zero do
     session ← panics session (← key name) arguments SourceCorePanics.divisionByZero s!"{name} on {reprStr arguments}"
-  IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no contract storage, with afterBlock, ltSigned and runtimePatterns as upstream wrote them with uint256(w), the other conversion-only functions adapted with the meaning kept, and basic's bnoteq, give the fixtures' values and panic codes"
+  IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no contract storage, with afterBlock, ltSigned, runtimePatterns, narrowAmount, wordShift, mulNeg, divSigned, explicitWord and negI8 … negI256 as upstream wrote them with uint256(w), Typedef.abs and Typedef.rep, the other conversion-only functions adapted with the meaning kept, and basic's bnoteq, give the fixtures' values and panic codes"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)
@@ -5478,6 +5586,7 @@ def run : IO Unit := do
   runCompoundShifts
   runBitNotAssignments
   runConversions
+  runTypedef
   runUpstreamFixtures
 
 end Tests.SourceCoreFixedIntegerOperators

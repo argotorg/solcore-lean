@@ -133,14 +133,17 @@ def assignmentExpected (operator : Syntax.ValueAssignOp) (state : State) (type :
   | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide
   | .uncheckedModulo => some (compoundOperandType operator (state.resolve type))
 
-/-- The actual dispatch tests selecting an indirect callee after its arguments. -/
+/-- The actual dispatch tests selecting an indirect callee after its arguments:
+a qualified name that no source namespace has is indirect unless it is one of
+the `Typedef` compiler functions. -/
 def IndirectCalleeAt (context : SourceInference.Context) (callee : Syntax.Expr)
     (state : State) : Prop :=
   match calleeQualifiedIdentifier? callee with
   | some (namespacePath, name) =>
       state.lookupBinder? namespacePath.head! ≠ none ∨
         (state.lookupBinder? namespacePath.head! = none ∧
-          qualifiedFunctionsNamed context namespacePath name = .ok none)
+          qualifiedFunctionsNamed context namespacePath name = .ok none ∧
+          typedefCall? namespacePath name = none)
   | none =>
       match calleeIdentifier? callee with
       | some name => state.lookupBinder? name ≠ none

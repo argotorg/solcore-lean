@@ -1576,7 +1576,12 @@ theorem primitive_forms (left right : ExpressionId) (function : BuiltinFunctionI
 /-- A conversion is outside the subset. -/
 theorem conversion_form (left : ExpressionId) (type : TypeSystem.FixedInteger) (callee : ExpressionId) :
     AcceptedCompilerExpressionProfile.supportedForm false false false
-      (.call callee [left] (.builtinFunction (.fixedFromWord type))) = false := rfl
+      (.call callee [left] (.builtinFunction (.fixedFromWord type))) = false ∧
+    AcceptedCompilerExpressionProfile.supportedForm false false false
+      (.call callee [left] (.builtinFunction (.fixedToWord type))) = false ∧
+    AcceptedCompilerExpressionProfile.supportedForm false false false
+      (.call callee [left] (.builtinFunction .wordIdentity)) = false :=
+  ⟨rfl, rfl, rfl⟩
 
 theorem narrow_forms (left right : ExpressionId) (function : BuiltinFunctionId) (callee : ExpressionId) :
     AcceptedCompilerExpressionProfile.supportedForm true false false (.unary .bitNot left) = false ∧

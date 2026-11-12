@@ -204,6 +204,25 @@ theorem inferExprFuel_call_formation
                                     functionsResult)
                                   attempt selectionResult resultEq
                         | none =>
+                            cases typedefEq : typedefCall? namespacePath name
+                            case some call =>
+                              simp only [typedefEq] at success
+                              cases functionResult : typedefFunction call arguments expected
+                                  argumentState with
+                              | error error => simp [functionResult] at success
+                              | ok function =>
+                                simp only [functionResult] at success
+                                have builtinProperties := recordBuiltinFunctionCall_inferenceProperties
+                                  argumentsProperties.2.1 argumentsProperties.2.2 expectedAtArguments success
+                                have argumentContinuation := continuation.trans builtinProperties.1.substitution_extends
+                                have fields := recordBuiltinFunctionCall_normalized_fields success
+                                have argumentCapture : NoCaptureNodes outer argumentState.nodes := by
+                                  unfold NoCaptureNodes at capture ⊢
+                                  rwa [fields.2.2] at capture
+                                have argumentFormation := argumentsInduction allocatedReady allocatedNodes allocatedFormed formation
+                                  (arguments,argumentState) argumentsResult argumentContinuation argumentCapture
+                                exact recordBuiltinFunctionCall_normalized_formation formation argumentFormation.2 success
+                            simp only [typedefEq] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

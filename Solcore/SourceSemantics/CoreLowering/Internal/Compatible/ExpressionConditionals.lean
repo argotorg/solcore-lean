@@ -1470,8 +1470,8 @@ open BuiltinBodyMeaning
 def argumentTypes : BuiltinFunctionId → List Ty
   | .wordToInteger => [.word]
   | .wordFromInteger => [.integer]
-  -- A conversion is no closure; its word has no integer representation.
-  | .fixedFromWord _ => [.integer]
+  -- A conversion is no closure; its argument has no integer representation.
+  | .fixedFromWord _ | .fixedToWord _ | .wordIdentity => [.integer]
   | _ => [.integer, .integer]
 
 theorem argumentTypes_project {checked : SourceCoreCompatibleCatalog.Checked}
@@ -1516,8 +1516,9 @@ theorem input_of_values
         | exact .integerEq left right
         | exact .integerLt left right
         | exact .integerMul left right
-    -- A conversion's word argument has no integer representation.
-    | obtain ⟨_, _, _, impossible⟩ := CompatibleRawScalarFields.word_fields head rfl
+    -- A conversion's argument, a word or a fixed-width value, has no integer
+    -- representation.
+    | have impossible := head.projection
       cases impossible
 
 theorem result_represents {function : BuiltinFunctionId} {arguments : List Dynamic.Value}

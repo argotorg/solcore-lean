@@ -867,7 +867,7 @@ theorem builtinFunctionParameter
   cases function <;>
     simp [Frontend.BuiltinFunctionId.parameterTypes] at member
   all_goals subst type
-  all_goals first | exact integer binders | exact word binders
+  all_goals first | exact integer binders | exact word binders | exact fixed binders _
 
 /-- Every fixed result type of a compiler-provided builtin function is
 admissible. -/

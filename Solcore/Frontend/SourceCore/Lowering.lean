@@ -2587,7 +2587,7 @@ def builtinParameter : BuiltinFunctionId → Core.Ty
   | .wordToInteger => .word
   | .wordFromInteger => .integer
   -- Unused: a conversion is lowered where it is called, never as a closure.
-  | .fixedFromWord _ => .integer
+  | .fixedFromWord _ | .fixedToWord _ | .wordIdentity => .integer
   | _ => .product .integer .integer
 
 def builtinResult : BuiltinFunctionId → Core.Ty
@@ -2603,8 +2603,8 @@ def builtinBody : BuiltinFunctionId → Core.Expr
   | .integerLt => .binary .integerLt (.first (.var 0)) (.second (.var 0))
   | .wordFromInteger => .unary .integerToWord (.var 0)
   | .wordToInteger => .unary .wordToInteger (.var 0)
-  -- Unused: a conversion is lowered where it is called (`conversion`), never as a closure.
-  | .fixedFromWord _ => .var 0
+  -- Unused: a conversion is lowered where it is called (`builtinConversion`), never as a closure.
+  | .fixedFromWord _ | .fixedToWord _ | .wordIdentity => .var 0
 
 def builtinClosure (function : BuiltinFunctionId) : Core.Expr :=
   .lambda (builtinParameter function) (Core.LanguageResult.resultType (builtinResult function))
@@ -2630,6 +2630,13 @@ where every word is canonical, and the checked word at the other ten types. -/
 def conversion (type : TypeSystem.FixedInteger) (argument : Core.Expr) : Core.Expr :=
   if type.width = .w256 then argument
   else Core.LanguageResult.bind .word argument (conversionCheck type)
+
+/-- A builtin conversion of a lowered word to the type it gives
+(`BuiltinFunctionId.conversion?`): `conversion` at a fixed-width type, and the
+word itself at `word`, since a fixed-width value is its canonical word. -/
+def builtinConversion : TypeSystem.Ty → Core.Expr → Core.Expr
+  | .fixed type, argument => conversion type argument
+  | _, argument => argument
 
 theorem builtinClosure_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
     (function : BuiltinFunctionId) : Core.HasType scope (builtinClosure function)
@@ -3144,14 +3151,14 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
               (SourceCoreElaboration.validateBuiltinFunctionCall source node callee arguments function)
                 |>.mapError SourceCoreBasic.Error.literalEvidence
               match function.conversion? with
-              | some fixed =>
+              | some target =>
                   -- A conversion is lowered where it is called: no closure is called.
                   let lowered ← arguments.mapM fun argument =>
                     lowerExpressionWithPolicy policy lowerBody fuel context source scope argument reasonAt
                   let [argument] := lowered | throw (.unsupportedExpression node.id node.form)
                   SourceCoreBasic.ensureType site .word argument.type
                   SourceCoreBasic.ensureType site .word type
-                  pure ⟨type, SourceCoreInteger.conversion fixed argument.expression⟩
+                  pure ⟨type, SourceCoreInteger.builtinConversion target argument.expression⟩
               | none =>
                   let (calleeNode, _) ← policy.readExpression source callee
                   let callee ← builtinReference policy.callables context source calleeNode function.spelling function

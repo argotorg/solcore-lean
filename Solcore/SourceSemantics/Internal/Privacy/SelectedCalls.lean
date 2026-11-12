@@ -470,7 +470,7 @@ private theorem equal_arguments_private {protectedVars : List TypeVarId}
 
 private theorem builtin_parameters_closed (function : BuiltinFunctionId) :
     ∀ type ∈ function.parameterTypes, type.VariablesBelow 0 := by
-  cases function <;> simp [BuiltinFunctionId.parameterTypes, Ty.integer, Ty.word]
+  cases function <;> simp [BuiltinFunctionId.parameterTypes, Ty.integer, Ty.word, Ty.fixed]
 
 private theorem builtin_return_closed (function : BuiltinFunctionId) :
     function.returnType.VariablesBelow 0 := by
@@ -1595,6 +1595,23 @@ theorem inferExprFuel_call_private
                                     functionsResult)
                                   attempt selectionResult resultEq
                         | none =>
+                            cases typedefEq : typedefCall? namespacePath name
+                            case some call =>
+                              simp only [typedefEq] at success
+                              cases functionResult : typedefFunction call arguments expected
+                                  argumentState with
+                              | error error => simp [functionResult] at success
+                              | ok function =>
+                                simp only [functionResult] at success
+                                have builtinPrivacy := recordBuiltinFunctionCall_private
+                                  argumentsPrivacy.2.1 expectedSafeAtArguments argumentsPrivacy.2.2.1 success
+                                refine ⟨prefixPrivacy.trans builtinPrivacy.1, builtinPrivacy.2.1,
+                                  builtinPrivacy.2.2.1, ?_⟩
+                                intro row member fresh
+                                have inArguments := builtinPrivacy.2.2.2 ▸ member
+                                exact fun type typeMember => builtinPrivacy.1 _
+                                  (argumentsPrivacy.2.2.2 row inArguments fresh type typeMember)
+                            simp only [typedefEq] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

@@ -34,6 +34,8 @@ def spelling : BuiltinFunctionId → String
   | .integerMul => "integerMul"
   | .wordToInteger => "wordToInteger"
   | .fixedFromWord type => type.name
+  | .fixedToWord _ => "Typedef.rep"
+  | .wordIdentity => "Typedef"
 
 /-- Exact compiler-function spellings remain pairwise distinct. -/
 theorem all_spellings_nodup : (all.map spelling).Nodup := by
@@ -49,6 +51,8 @@ def parameterTypes : BuiltinFunctionId → List TypeSystem.Ty
   | .integerMul => [TypeSystem.Ty.integer, TypeSystem.Ty.integer]
   | .wordToInteger => [TypeSystem.Ty.word]
   | .fixedFromWord _ => [TypeSystem.Ty.word]
+  | .fixedToWord type => [TypeSystem.Ty.fixed type]
+  | .wordIdentity => [TypeSystem.Ty.word]
 
 /-- Fixed source result type of one compiler-provided function. -/
 def returnType : BuiltinFunctionId → TypeSystem.Ty
@@ -60,6 +64,7 @@ def returnType : BuiltinFunctionId → TypeSystem.Ty
   | .integerMul => TypeSystem.Ty.integer
   | .wordToInteger => TypeSystem.Ty.integer
   | .fixedFromWord type => TypeSystem.Ty.fixed type
+  | .fixedToWord _ | .wordIdentity => TypeSystem.Ty.word
 
 /-- Exact monomorphic function type of one compiler-provided function. -/
 def type (function : BuiltinFunctionId) : TypeSystem.Ty :=

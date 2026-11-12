@@ -8429,7 +8429,7 @@ theorem recordBuiltinFunctionCall_success_argumentTypes_apply_eq
     _ = function.parameterTypes := by
       cases function <;>
         simp [BuiltinFunctionId.parameterTypes, Ty.integer, Ty.word, Ty.bool,
-          TypeSystem.Substitution.apply]
+          Ty.fixed, TypeSystem.Substitution.apply]
 
 /-- The recorded builtin-call result has exactly the builtin's closed return
 type; final substitution therefore needs no additional endpoint transport. -/
@@ -11707,6 +11707,22 @@ private theorem inferFuel_inferenceProperties_internal :
                                             functionsResult)
                                           attempt selectionResult resultEq
                                 | none =>
+                                    cases typedefEq : typedefCall? namespacePath name
+                                    case some call =>
+                                      simp only [typedefEq] at success
+                                      cases functionResult : typedefFunction call arguments expected
+                                          argumentState with
+                                      | error error => simp [functionResult, bind, Except.bind] at success
+                                      | ok function =>
+                                        simp only [functionResult, bind, Except.bind] at success
+                                        have builtinProperties :=
+                                          recordBuiltinFunctionCall_inferenceProperties
+                                            argumentsProperties.2.1
+                                            argumentsProperties.2.2
+                                            expectedAtArguments success
+                                        exact ⟨prefixProgress.trans builtinProperties.1,
+                                          builtinProperties.2⟩
+                                    simp only [typedefEq] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>
@@ -13908,6 +13924,17 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                           candidates attempt selectionResult
                                           resultEq
                                 | none =>
+                                    cases typedefEq : typedefCall? namespacePath name
+                                    case some call =>
+                                      simp only [typedefEq] at success
+                                      cases functionResult : typedefFunction call arguments expected
+                                          argumentState with
+                                      | error error => simp [functionResult, bind, Except.bind] at success
+                                      | ok function =>
+                                        simp only [functionResult, bind, Except.bind] at success
+                                        exact (recordBuiltinFunctionCall_lexicalScope success).trans
+                                          throughArguments
+                                    simp only [typedefEq] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>

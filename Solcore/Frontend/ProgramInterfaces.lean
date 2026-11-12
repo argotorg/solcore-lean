@@ -637,6 +637,13 @@ inductive BuiltinFunctionId where
   reverts with `DirtyHigherBitsForInteger()`. A conversion is no closure: it is
   lowered where it is called, so it is not in `all`. -/
   | fixedFromWord (type : TypeSystem.FixedInteger)
+  /-- `Typedef.rep(x)` at one of the twelve fixed-width integer types: the
+  value's word. A conversion, so not in `all`. -/
+  | fixedToWord (type : TypeSystem.FixedInteger)
+  /-- `Typedef.abs(w)` and `Typedef.rep(w)` at `word`: the word itself, as
+  upstream's `default impl<t> Typedef<t, t>` gives it. A conversion, so not in
+  `all`. -/
+  | wordIdentity
   deriving Repr, BEq, DecidableEq
 
 namespace BuiltinFunctionId
@@ -649,9 +656,12 @@ def all : List BuiltinFunctionId :=
   [.integerSub, .wordFromInteger, .integerAdd, .integerEq, .integerLt,
     .integerMul, .wordToInteger]
 
-/-- The fixed-width type a conversion gives, or none for a closure. -/
-def conversion? : BuiltinFunctionId → Option TypeSystem.FixedInteger
-  | .fixedFromWord type => some type
+/-- The type a conversion gives, or none for a closure. A conversion is
+lowered where it is called: the word checked against the type at a fixed-width
+type, and the word itself at `word`. -/
+def conversion? : BuiltinFunctionId → Option TypeSystem.Ty
+  | .fixedFromWord type => some (.fixed type)
+  | .fixedToWord _ | .wordIdentity => some .word
   | _ => none
 
 /-- Every compiler-function identity is a closure of the lookup catalog or a

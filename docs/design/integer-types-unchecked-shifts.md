@@ -1349,7 +1349,8 @@ Made on 2026-11-12, during step 9a.
 
 ### Row 1's conversions: a word becomes a value only when canonical
 
-Made on 2026-11-13, during step 9b, on the user's choice (a).
+Made on 2026-11-13, during step 9b, on the user's choice (a). Part 2's rule for `Typedef` is
+option B, decided the same day.
 
 - **Upstream.**
   - `uint256` is `enum uint256 { uint256(word) }` (`std/std.sol:1010-1012`). The other eleven are
@@ -1380,6 +1381,53 @@ Made on 2026-11-13, during step 9b, on the user's choice (a).
     - otherwise the word if it equals its canonical form, and the dirty reason if not. The
       canonical form (`canonicalForm`) is the mask or sign extension of step 8b's `wrapLeaf`.
   - A conversion used as a function value has no closure, so it is not compiled.
+- **`Typedef.abs` and `Typedef.rep` (part 2).**
+  - **Upstream.** `trait Typedef<abs, rep>` (`std/std.sol:387-390`) has the identity as
+    `default impl<t> Typedef<t, t>` (`std/std.sol:392-399`). Each of the twelve types has an
+    instance whose `abs` is its constructor and whose `rep` gives its word (`std/std.sol:1013-1025`,
+    `std/unsigned.sol:21-28`, `std/signed.sol:21-29`, and the same at each width). A default is
+    admitted only when no other instance head can unify with the goal
+    (`crates/hir-ty/src/solver/engine.rs:130-182`, `solver/mod.rs:640-643`). So `abs` takes its
+    type from its context, `rep` gives `word` at the twelve types, and both are the identity at
+    `word`.
+  - **Where they are found.** A qualified call `Typedef.abs(e)` or `Typedef.rep(e)` is a builtin
+    call when no local is named `Typedef` and no source namespace is (`qualifiedFunctionsNamed`
+    finds none, then `typedefCall?`). A program's own `Typedef` namespace takes the names over.
+  - **The rule for "known at the call".** The function is chosen at the call, once its arguments
+    are inferred (`typedefFunction`). Arguments are inferred with no expected type, as every call's
+    are.
+    - `Typedef.abs(e)` takes the expected type the call is inferred against, resolved by the
+      substitution so far. An annotated `let`, a `return`, the right side of `=`, and a group or a
+      conditional's branch inside one of those give one. A call's argument, an operator's operand
+      and an unannotated `let` give none.
+    - `Typedef.rep(e)` takes `e`'s inferred type, resolved the same way.
+  - **The functions.**
+    - At `word`, either is the word itself (`BuiltinFunctionId.wordIdentity`), as the default gives
+      it.
+    - At one of the twelve types, `Typedef.abs` is part 1's conversion of that type
+      (`fixedFromWord`), with its check and revert. So `Typedef.abs` at `uint256` and `int256`
+      never fails.
+    - At one of the twelve types, `Typedef.rep` is the value's word (`BuiltinFunctionId.fixedToWord`,
+      `BuiltinApplies.fixedToWord`), which never fails.
+    - Each is recorded under the builtin's own spelling, which part 1's metadata check
+      (`validateBuiltinFunctionCall`) requires.
+  - **Rejected.** Any other type, and a type still open at the call, is rejected with
+    `operatorNotSupported "Typedef" τ`, which names the type, or its variable when it is open. So
+    `let a = Typedef.abs(w); let b: uint8 = a;`, `take(Typedef.abs(w))`, `Typedef.rep(5)` and
+    `let a = 5; … Typedef.rep(a)` are rejected, as are `Bool` and `integer`. The typing is
+    upstream's wherever both accept.
+  - **The remaining gap.** A probe of the pinned driver on 2026-11-13 accepts each of those waiting
+    cases: its instance resolution waits for later uses, and an open literal takes its default.
+    This is a gap, not a permanent difference. Option A, a `Typedef` constraint solved at
+    finalization, could lift it as its own unit, which is not scheduled.
+  - **Other types.** Upstream's default gives the identity at every other type too: the same probe
+    accepts `let c: bool = Typedef.rep(b)`, and rejects `Typedef.abs(w)` at `bool` (`SC0207`,
+    "cannot satisfy trait constraint: bool: Typedef<word>"). Lean rejects both. The identity at
+    other types is generic code, which row 1 leaves out.
+  - **Lowering.** Both are lowered where they are called, as part 1's conversions are
+    (`SourceCoreInteger.builtinConversion`): `conversion` at a fixed-width type, and the word
+    itself at `word`. Neither is a function value: `Typedef.abs` as a value is no expression Lean
+    types.
 - **The revert.**
   - `SourceCorePanics.dirtyReason` is the word just below the panic range, `2^256 − 2^8 − 1`.
   - The fault-site tables allocate below it (`tableBound`). `Table.PanicFree` and preparation's
@@ -1397,6 +1445,10 @@ Made on 2026-11-13, during step 9b, on the user's choice (a).
   - The builtin-call inversion (`BuiltinCalls.call_of_accepted`) takes
     `function.conversion? = none`. The proofs get it from the closure's catalog index
     (`conversion?_of_inventory`) or from the supported syntax.
+  - `conversion?` gives the type a conversion gives, so part 2's two functions are conversions
+    too.
+  - The inference proofs follow a `Typedef` call as a builtin call (`recordBuiltinFunctionCall`).
+    `IndirectCalleeAt` excludes it, so the callee is never inferred.
   - A builtin profile with the dirty reason's token would bring the conversions in.
 
 ### Row 1: steps
@@ -1495,7 +1547,7 @@ first planned after the literals and moved before them for this reason
      is canonical ([row 1's conversions](#row-1s-conversions-a-word-becomes-a-value-only-when-canonical)),
      planned in three parts:
      - first `uint256(w)`, `uintN(w)` and `intN(w)` with the dirty-integer revert (done);
-     - then `Typedef.abs` and `Typedef.rep`;
+     - then `Typedef.abs` and `Typedef.rep`, chosen by the type known at the call (done);
      - then `case uint256(w)`; `x.value` is rejected outside std upstream too.
 
      Each part ports again the 8e functions it makes possible, as upstream wrote them.

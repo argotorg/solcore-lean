@@ -2753,7 +2753,7 @@ private def mismatchedBuiltin : BuiltinFunctionId → BuiltinFunctionId
   | .wordToInteger => .wordFromInteger
   | .integerSub => .integerAdd
   | .wordFromInteger => .integerAdd
-  | .fixedFromWord _ => .wordToInteger
+  | .fixedFromWord _ | .fixedToWord _ | .wordIdentity => .wordToInteger
 
 private def testExpandedBinaryBaseline (fixture : BinaryFixture) : IO Unit := do
   let leftRequirement := fixture.leftResolution.requirement

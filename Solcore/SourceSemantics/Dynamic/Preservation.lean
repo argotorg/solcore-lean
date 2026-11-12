@@ -883,6 +883,7 @@ theorem preserves
       ValueHasType context heap result function.returnType := by
   cases application with
   | fixedFromWord canonical => exact ⟨.cons (.word _) .nil, .fixed _ canonical⟩
+  | fixedToWord canonical => exact ⟨.cons (.fixed _ canonical) .nil, .word _⟩
   | _ =>
     constructor <;>
     repeat' first | exact .nil | apply ValuesHaveTypes.cons | constructor

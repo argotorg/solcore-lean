@@ -549,7 +549,7 @@ private theorem equal_arguments_fixed {protectedVars : List TypeVarId}
 
 private theorem builtin_parameters_closed (function : BuiltinFunctionId) :
     ∀ type ∈ function.parameterTypes, type.VariablesBelow 0 := by
-  cases function <;> simp [BuiltinFunctionId.parameterTypes, Ty.integer, Ty.word]
+  cases function <;> simp [BuiltinFunctionId.parameterTypes, Ty.integer, Ty.word, Ty.fixed]
 
 private theorem builtin_return_closed (function : BuiltinFunctionId) :
     function.returnType.VariablesBelow 0 := by
@@ -993,6 +993,17 @@ theorem inferExprFuel_call_fixes_protected
                                     functionsResult)
                                   attempt selectionResult resultEq
                         | none =>
+                            cases typedefEq : typedefCall? namespacePath name
+                            case some call =>
+                              simp only [typedefEq] at success
+                              cases functionResult : typedefFunction call arguments expected
+                                  argumentState with
+                              | error error => simp [functionResult] at success
+                              | ok function =>
+                                simp only [functionResult] at success
+                                exact recordBuiltinFunctionCall_fixes_protected
+                                  argumentsPrivacy.2.1 expectedSafeAtArguments argumentsFixed success
+                            simp only [typedefEq] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

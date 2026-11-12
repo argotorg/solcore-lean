@@ -1283,6 +1283,41 @@ def recordBuiltinFunctionCall (source callee : Syntax.Expr) (name : String)
     (.call calleeId (arguments.map (·.id)) (.builtinFunction function))
     [] [] state
 
+/-- The two functions of upstream's `Typedef` trait, which Lean has as
+compiler functions rather than a trait. -/
+inductive TypedefCall where
+  | abs
+  | rep
+  deriving Repr, DecidableEq
+
+/-- `Typedef.abs` and `Typedef.rep`: the qualified names of compiler
+functions, found only when no source namespace or local is named `Typedef`. -/
+def typedefCall? : List String → String → Option TypedefCall
+  | ["Typedef"], "abs" => some .abs
+  | ["Typedef"], "rep" => some .rep
+  | _, _ => none
+
+/-- The compiler function of a `Typedef` call, chosen by the type already
+known at the call once its arguments are inferred: the expected type for
+`abs` and the argument's type for `rep`. `word` gives the identity and one of
+the twelve fixed-width types its conversion. Any other type, including one
+still open, is rejected: the choice is made here and does not wait for later
+uses, as upstream's instance resolution would. -/
+def typedefFunction (call : TypedefCall) (arguments : List InferredExpression)
+    (expected : Option Ty) (state : State) : Except Error BuiltinFunctionId :=
+  let known : Option Ty := match call with
+    | .abs => expected.map state.resolve
+    | .rep => arguments.head?.map fun (argument : InferredExpression) =>
+        state.resolve argument.type
+  match known with
+  | some .word => .ok .wordIdentity
+  | some (.fixed type) =>
+      .ok (match call with
+        | .abs => .fixedFromWord type
+        | .rep => .fixedToWord type)
+  | some other => .error (.operatorNotSupported "Typedef" other)
+  | none => .error (.operatorNotSupported "Typedef" state.fresh.1)
+
 /-- Result of checking every explicit case in source order. -/
 structure MatchCasesResult where
   cases : List TypedMatchCase
@@ -1814,12 +1849,20 @@ mutual
                           pure <| recordSelectedCall expression callee displayName
                             arguments attempt
                       | none =>
-                          let (calleeResult, state) ←
-                            inferExprFuel fuel context callee none state
-                          let result ← applyFunctionType context id calleeResult.type
-                            arguments expected state
-                          pure <| recordIndirectCall expression calleeResult
-                            arguments result
+                          match typedefCall? namespacePath name with
+                          | some call =>
+                              let function ← typedefFunction call arguments
+                                expected state
+                              recordBuiltinFunctionCall expression callee
+                                function.spelling function arguments id expected
+                                state
+                          | none =>
+                              let (calleeResult, state) ←
+                                inferExprFuel fuel context callee none state
+                              let result ← applyFunctionType context id
+                                calleeResult.type arguments expected state
+                              pure <| recordIndirectCall expression calleeResult
+                                arguments result
               | none =>
                   match calleeIdentifier? callee with
                   | some name =>
