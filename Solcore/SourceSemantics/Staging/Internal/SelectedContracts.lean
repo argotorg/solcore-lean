@@ -652,6 +652,37 @@ theorem projected_write_compound {context : Context} {before middle after : Heap
       exact ⟨rhs.heap_typed.write currentRead (.some updatedCell) heapWrite,
         rhs.heap_extends.trans (HeapTypesExtend.of_write heapWrite)⟩
 
+/-- A projected `<<=` or `>>=` write keeps the target's type, whatever the amount's. -/
+theorem projected_write_shift {context : Context} {before middle after : Heap}
+    {target : ResolvedPlace} {root leaf targetType rightType : Ty} {value updated : Dynamic.Value}
+    {operator : Syntax.ValueAssignOp}
+    (kind : ShiftCompoundAssignmentOperator operator) (targetKind : ShiftValueType leaf)
+    (targetEq : targetType = leaf)
+    (targetTyped : ResolvedPlaceHasType context before target root leaf)
+    (rhs : ExpressionEvaluationPreserved context before middle value rightType)
+    (write : ResolvedPlaceWrites
+      (fun _ replacement => CompoundAssignmentApplies targetType operator target.selected value replacement)
+      middle target updated after) :
+    HeapWellTyped context after ∧ HeapTypesExtend before after := by
+  have currentTarget := targetTyped.mono rhs.heap_extends
+  cases write with
+  | intro currentRead rootType initialValue update heapWrite =>
+      rename_i currentCell initial
+      have initialTyped := initialValue.preserves (rhs.heap_typed _ currentRead.member)
+      have initialRoot : OptionalValueHasType context middle initial root := by
+        rw [← currentTarget.root_type, ← rootType]
+        exact initialTyped
+      have modification : LeafModificationPreservesType context middle
+          (fun _ replacement => CompoundAssignmentApplies targetType operator target.selected value replacement) leaf := by
+        intro current replacement _ applies
+        exact applies.shiftPreserves kind targetKind targetEq currentTarget.selected
+      have updatedTyped := update.preserves currentTarget.projections initialRoot modification
+      have updatedCell : ValueHasType context middle updated currentCell.type := by
+        rw [rootType, currentTarget.root_type]
+        exact updatedTyped
+      exact ⟨rhs.heap_typed.write currentRead (.some updatedCell) heapWrite,
+        rhs.heap_extends.trans (HeapTypesExtend.of_write heapWrite)⟩
+
 /-- Unary assignment writes at the actual getter heap without an RHS phase. -/
 theorem projected_write_bitNot {context : Context} {before after : Heap}
     {target : ResolvedPlace} {root : Ty} {updated : Dynamic.Value}

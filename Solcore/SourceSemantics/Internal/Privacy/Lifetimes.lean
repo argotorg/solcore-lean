@@ -372,21 +372,18 @@ theorem assignedValue_place
        cases Except.ok.inj fitting
        exact placeWF)
     | exact unify_preserves_requirementsWellFormed fitting placeWF
-  have expectedSafe : Safe binder.scheme.quantified fitted (assignmentExpected operator fitted place.type) := by
+  have expectedSafe : ∀ expected ∈ assignmentExpected operator fitted place.type,
+      Safe binder.scheme.quantified fitted expected := by
     have resolvedSafe := safe_resolved fitProperties.2.1 (fittedLife.values place.type (by simp))
-    by_cases equalOp : operator = .equal
-    · subst equalOp
-      exact resolvedSafe
-    · have expectedEq : assignmentExpected operator fitted place.type =
-          compoundOperandType operator (fitted.resolve place.type) := by
-        cases operator <;> first | exact absurd rfl equalOp | rfl
-      rw [expectedEq]
-      exact safe_compoundOperandType resolvedSafe
+    intro expected member
+    cases operator <;>
+      simp only [assignmentExpected, Option.mem_def, Option.some.injEq, reduceCtorEq] at member
+    all_goals subst member
+    all_goals first | exact resolvedSafe | exact safe_compoundOperandType resolvedSafe
   have valueProperties := inferExprFuel_inferenceProperties fitProperties.2.1 catalog.formation catalog.canonical
-    (by intro type member; cases member; exact fitProperties.2.2) valueAccepted
+    fitProperties.2.2 valueAccepted
   have after := fittedLife.inferExpr fitProperties.2.1 fittedWF catalog
-    (by intro type member; cases member; exact fitProperties.2.2)
-    (by intro type member; cases member; exact expectedSafe) valueAccepted
+    fitProperties.2.2 expectedSafe valueAccepted
   apply after.replaceOutputs
   intro type member
   rcases List.mem_cons.mp member with rfl | member
@@ -402,7 +399,7 @@ theorem assignedValue_value
     (placeAccepted : inferPlaceFuel fuel context target initial = .ok (place, targetState))
     (fitting : assignmentFit operator targetState place.type =
       (Except.ok fitted : Except Error State))
-    (valueAccepted : inferExprFuel fuel context value (some (assignmentExpected operator fitted place.type)) fitted = .ok (childValue, childFinal))
+    (valueAccepted : inferExprFuel fuel context value (assignmentExpected operator fitted place.type) fitted = .ok (childValue, childFinal))
     (accepted : inferAssignedValueFuel fuel context target operator value initial = .ok (assignment, inferred, final))
     (lifetime : GeneralizationLifetime event fitted.inference.next childFinal [childValue.type]) :
     GeneralizationLifetime event initial.inference.next final [assignment.target.type, inferred.type] := by
@@ -416,7 +413,7 @@ theorem assignedValue_value
   have placeProperties := inferPlaceFuel_inferenceProperties ready catalog.formation catalog.canonical placeAccepted
   have fitProperties := assignmentFit_properties placeProperties.2.1 placeProperties.2.2 fitting
   have valueProperties := inferExprFuel_inferenceProperties fitProperties.2.1 catalog.formation catalog.canonical
-    (by intro type member; cases member; exact fitProperties.2.2) valueAccepted
+    fitProperties.2.2 valueAccepted
   have after := lifetime.weaken_entry (placeProperties.1.trans fitProperties.1).next_le
   apply after.replaceOutputs
   intro type member

@@ -147,7 +147,7 @@ theorem reflects_with_rhs (budget : Nat)
           (faults := faults) (id := id) (node := node) (lowered := lowered)
           snapshot sourceSize outcome after value finalStore finalMap finalWorld ∧
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -194,7 +194,7 @@ theorem reflects_with_rhs (budget : Nat)
           rename_i right
           rename_i rhsStore
           have rightRep : ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-            .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+            rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
           have plain := cell_rhs_of_expression snapshot ordinaryCells ordinary
             (faults := fun _ _ => False) (.value result.trace.sound.value_plain) result.evaluated
             (.value payload) result.heaps result.maps result.worlds result.frame result.metadata result.effect
@@ -303,7 +303,7 @@ theorem preserves_value_with_rhs
           (faults := faults) (id := id) (node := node) (lowered := lowered)
           snapshot sourceSize (.value right) middle value finalStore finalMap finalWorld ∧
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, middle, finalStore, canonical⟩)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -336,7 +336,7 @@ theorem preserves_value_with_rhs
   | value payload =>
     rename_i rightValue
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-      .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
     have plain := cell_rhs_of_expression snapshot ordinaryCells ordinary
       (faults := fun _ _ => False) (.value sourceTrace.sound.value_plain) result.evaluated
       (.value payload) result.heaps result.maps result.worlds result.frame result.metadata result.effect
@@ -424,7 +424,7 @@ theorem preserves_operands_with_rhs
           (faults := faults) (id := id) (node := node) (lowered := lowered)
           snapshot sourceSize (.value right) after value finalStore finalMap finalWorld ∧
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -456,7 +456,7 @@ theorem preserves_operands_with_rhs
   | value payload =>
     rename_i rightValue
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-      .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
     rcases CompatibleBareWordModifier.modifier_total profile
       (snapshot.represented.extend result.maps result.worlds) rightRep
       (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
@@ -492,7 +492,7 @@ theorem preserves_panic_with_rhs
           (faults := faults) (id := id) (node := node) (lowered := lowered)
           snapshot sourceSize (.value right) after value finalStore finalMap finalWorld ∧
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -522,7 +522,7 @@ theorem preserves_panic_with_rhs
   | value payload =>
     rename_i rightValue
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-      .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
     have plain := cell_rhs_of_expression snapshot ordinaryCells ordinary
       (faults := fun _ _ => False) (.value result.trace.sound.value_plain) result.evaluated
       (.value payload) result.heaps result.maps result.worlds result.frame result.metadata result.effect

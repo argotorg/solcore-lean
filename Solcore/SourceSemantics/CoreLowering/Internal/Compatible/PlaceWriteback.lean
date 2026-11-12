@@ -630,9 +630,9 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
@@ -664,7 +664,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     cases represented : rhsResult.represented with
     | @value _ rightValue rightRep =>
       have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-        .compatible rhsView (by simpa only [payloadModel, rhsCoreType] using rightRep)
+        rhsView.rep (by simpa only [payloadModel, rhsCoreType] using rightRep)
       have snapshotRep := rhsResult.saved_snapshot
       have keyRep := resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
       have reference := resolution.reference.extend rhsResult.maps rhsResult.worlds
@@ -1025,9 +1025,9 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
@@ -1065,7 +1065,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
   cases represented : rhsResult.represented with
   | @value _ rightValue rightRep =>
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      .compatible rhsView (by simpa only [payloadModel, rhsCoreType] using rightRep)
+      rhsView.rep (by simpa only [payloadModel, rhsCoreType] using rightRep)
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep := resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
     have reference := resolution.reference.extend rhsResult.maps rhsResult.worlds
@@ -1787,9 +1787,9 @@ theorem preserves_from_source {compilation : SourceCoreCompatibleDataPlaces.Cont
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}

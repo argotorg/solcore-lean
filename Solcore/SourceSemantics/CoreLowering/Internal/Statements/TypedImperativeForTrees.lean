@@ -102,7 +102,7 @@ inductive Syntax (source : TypedSource) :
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (remaining : Syntax source context (.statements mode rest) expected) : Syntax source context (.statements mode (id :: rest)) expected
@@ -147,7 +147,7 @@ inductive Syntax (source : TypedSource) :
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (remaining : Syntax source context (.initializers rest condition post statements) expected) : Syntax source context (.initializers (.assignValue assignment operator rhs :: rest) condition post statements) expected
@@ -1802,7 +1802,7 @@ inductive UnarySyntax (source : TypedSource) :
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (remaining : UnarySyntax source context (.statements mode rest) expected) : UnarySyntax source context (.statements mode (id :: rest)) expected
@@ -1847,7 +1847,7 @@ inductive UnarySyntax (source : TypedSource) :
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (remaining : UnarySyntax source context (.initializers rest condition post statements) expected) : UnarySyntax source context (.initializers (.assignValue assignment operator rhs :: rest) condition post statements) expected

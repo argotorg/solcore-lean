@@ -2330,7 +2330,7 @@ variable {targetPrepared : Prepared} {index : Nat} {node : ExpressionNode} {lowe
   (ordinary : (∀ key value, targetPrepared.route.rootSourceType ≠ .mapping key value) → targetPrepared.route.rootMapping = none)
   (generated : NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt scope rhs lowered)
   (found : source.lookupExpression? rhs = some node)
-  (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
+  (rhsView : AssignedRhsView operator leaf node.type)
   (rhsCore : lowered.type = targetPrepared.route.leafType)
   (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
   (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, targetPrepared.route.rootType))

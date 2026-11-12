@@ -1979,10 +1979,14 @@ mutual
     let state ← match operator with
       | .equal => pure state
       | _ => unify state target.type (compoundOperandType operator (state.resolve target.type))
-    let expected := match operator with
-      | .equal => state.resolve target.type
-      | _ => compoundOperandType operator (state.resolve target.type)
-    let (value, state) ← inferExprFuel fuel context value (some expected) state
+    -- A shift's amount is typed on its own, as upstream's `x = x << n` types it.
+    let (value, state) ← inferExprFuel fuel context value
+      (match operator with
+        | .equal => some (state.resolve target.type)
+        | .shiftLeft | .shiftRight => none
+        | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr
+        | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide
+        | .uncheckedModulo => some (compoundOperandType operator (state.resolve target.type))) state
     pure ({ target := { target with type := state.resolve target.type } }, value,
       state)
 

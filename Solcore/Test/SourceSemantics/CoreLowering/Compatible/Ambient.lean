@@ -399,7 +399,7 @@ theorem checked_run_reflects {compilation : SourceCoreCompatibleDataPlaces.Conte
     (unique : NodeOccurrencesUnique source) (signatures : context.signatures = compilation.checked.signatures)
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (rootTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (nonempty : assignment.target.projections ≠ [])
@@ -1357,9 +1357,9 @@ theorem whole_success_under_indexed {compilation : SourceCoreCompatibleDataPlace
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
@@ -1525,7 +1525,7 @@ theorem preserves_prefix [FunctionCalls.FaultTokens faults]
       faults (.missingMappingDefault value) ((reasonAt id).add tag))
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1566,7 +1566,7 @@ theorem preserves_fault [FunctionCalls.FaultTokens faults]
       faults (.missingMappingDefault value) ((reasonAt id).add tag))
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1606,7 +1606,7 @@ theorem reflects [FunctionCalls.FaultTokens faults]
       faults (.missingMappingDefault value) ((reasonAt id).add tag))
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)

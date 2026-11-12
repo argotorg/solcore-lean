@@ -188,7 +188,7 @@ def assign
     (same : head.invalid = invalidOperand site assignment.target.root operator)
     (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (remaining : ProducedExtractionFor diagnosticPolicy layouts owner active frame globals onError values source factory expressionSyntax certificates definitions administrative solved
@@ -309,7 +309,7 @@ def initializerAssign
     (same : head.invalid = invalidOperand site assignment.target.root operator)
     (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (remaining : ProducedExtractionFor diagnosticPolicy layouts owner active frame globals onError values source factory expressionSyntax certificates definitions administrative solved
@@ -532,7 +532,7 @@ def assign
     (same : head.invalid = invalidOperand site assignment.target.root operator)
     (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (remaining : TokenExtractionFor diagnosticPolicy layouts owner active frame globals onError values source factory invalidUnary expressionSyntax certificates definitions administrative solved
@@ -635,7 +635,7 @@ def initializerAssign
     (same : head.invalid = invalidOperand site assignment.target.root operator)
     (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (remaining : TokenExtractionFor diagnosticPolicy layouts owner active frame globals onError values source factory invalidUnary expressionSyntax certificates definitions administrative solved
@@ -839,7 +839,7 @@ inductive Coupled (factory : AssignmentDiagnosticOrigins.Factory tracked diagnos
       (sameToken : head.invalid = invalidOperand site assignment.target.root operator)
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (fuel : Nat)
@@ -936,7 +936,7 @@ inductive Coupled (factory : AssignmentDiagnosticOrigins.Factory tracked diagnos
       (sameToken : head.invalid = invalidOperand site assignment.target.root operator)
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (fuel : Nat)
@@ -1214,7 +1214,7 @@ def assign
     (same : head.invalid = invalidOperand site assignment.target.root operator)
     (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (headFuel : Nat)
@@ -1320,7 +1320,7 @@ def initializerAssign
     (same : head.invalid = invalidOperand site assignment.target.root operator)
     (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (headFuel : Nat)

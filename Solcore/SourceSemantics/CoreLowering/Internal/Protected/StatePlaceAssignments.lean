@@ -891,7 +891,7 @@ theorem preserves_prefix_bounded_with_rhs (budget : Nat)
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (_generated : certificate scope id lowered) (_found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -927,7 +927,7 @@ theorem preserves_prefix_bounded_with_rhs (budget : Nat)
     cases related : result.represented with
     | @value _ rightValue payload =>
       have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
       have saved := snapshot.represented.extend result.maps result.worlds
       cases written with
       | intro read sameType initial update written =>
@@ -966,7 +966,7 @@ theorem preserves_prefix_bounded (budget : Nat)
       ProtectedStateTransition.PreservesAt protocol (payloadModel compilation.checked registry functions) program context evidence source certificate faults size))
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1006,7 +1006,7 @@ theorem preserves_prefix_bounded (budget : Nat)
       RecursiveNamedBoundedContracts.PreservesAt size (payloadModel compilation.checked registry functions) program context evidence source certificate faults entry))
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1046,7 +1046,7 @@ theorem preserves_prefix
     (meaning : ProtectedExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults entry)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1123,7 +1123,7 @@ theorem preserves_fault_reachable_bounded_with_rhs (budget : Nat)
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (_generated : certificate scope id lowered) (_found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1171,7 +1171,7 @@ theorem preserves_fault_reachable_bounded_with_rhs (budget : Nat)
     cases represented : result.represented with
     | @value _ rightValue payload =>
       have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
       rcases modifier_total observations profile (snapshot.represented.extend result.maps result.worlds) rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
@@ -1193,7 +1193,7 @@ theorem preserves_fault_reachable_bounded_with_rhs (budget : Nat)
     cases represented : result.represented with
     | @value _ rightValue payload =>
       have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
       rcases modifier_total observations profile (snapshot.represented.extend result.maps result.worlds) rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
@@ -1232,7 +1232,7 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
       ProtectedStateTransition.PreservesAt protocol (payloadModel compilation.checked registry functions) program context evidence source certificate faults size))
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1272,7 +1272,7 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
       RecursiveNamedBoundedContracts.PreservesAt size (payloadModel compilation.checked registry functions) program context evidence source certificate faults entry))
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1312,7 +1312,7 @@ theorem preserves_fault_reachable
     (meaning : ProtectedExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults entry)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1350,7 +1350,7 @@ theorem preserves_fault
     (meaning : ProtectedExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults entry)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)

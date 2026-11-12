@@ -885,9 +885,9 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (_rhsGenerated : certificate scope rhs lowered) (_found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -932,7 +932,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
   cases represented : rhsResult.represented with
   | @value _ rightValue rightRep =>
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+      rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
     obtain ⟨rhsState, rhsRelated⟩ := rhsPost
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
@@ -1216,9 +1216,9 @@ theorem preserves_structural {compilation : SourceCoreCompatibleDataPlaces.Conte
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (_rhsGenerated : certificate scope rhs lowered) (_found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -1266,7 +1266,7 @@ theorem preserves_structural {compilation : SourceCoreCompatibleDataPlaces.Conte
   | @value _ rightValue rightRep =>
     obtain ⟨rhsState, rhsRelated⟩ := rhsPost
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+      rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
       simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
@@ -1378,9 +1378,9 @@ theorem preserves_panic {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (_rhsGenerated : certificate scope rhs lowered) (_found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -1422,7 +1422,7 @@ theorem preserves_panic {compilation : SourceCoreCompatibleDataPlaces.Context}
   | @value _ rightValue rightRep =>
     obtain ⟨rhsState, rhsRelated⟩ := rhsPost
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+      rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
       simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
@@ -1632,7 +1632,7 @@ theorem reflects_with_rhs (budget : Nat)
           (faults := faults) (id := id) (node := node) (lowered := lowered)
           snapshot sourceSize outcome after value finalStore finalMap finalWorld ∧
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -1677,7 +1677,7 @@ theorem reflects_with_rhs (budget : Nat)
           rename_i right
           rename_i rhsStore
           have rightRep : ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-            .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+            rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
           obtain ⟨plain, _⟩ := ProtectedBareAssignment.rhs_of_expression snapshot protocol initial
             (faults := fun _ _ => False) (.value result.trace.sound.value_plain) result.evaluated
             (.value payload) result.heaps result.maps result.worlds result.frame result.metadata rhsPost
@@ -1786,7 +1786,7 @@ theorem preserves_value_with_rhs
           (faults := faults) (id := id) (node := node) (lowered := lowered)
           snapshot sourceSize (.value right) middle value finalStore finalMap finalWorld ∧
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, middle, finalStore, canonical⟩)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -1816,7 +1816,7 @@ theorem preserves_value_with_rhs
   | value payload =>
     rename_i rightValue
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-      .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
     obtain ⟨plain, _⟩ := ProtectedBareAssignment.rhs_of_expression snapshot protocol initial
       (faults := fun _ _ => False) (.value sourceTrace.sound.value_plain) result.evaluated
       (.value payload) result.heaps result.maps result.worlds result.frame result.metadata rhsPost
@@ -1901,7 +1901,7 @@ theorem preserves_operands_with_rhs
           (faults := faults) (id := id) (node := node) (lowered := lowered)
           snapshot sourceSize (.value right) after value finalStore finalMap finalWorld ∧
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -1930,7 +1930,7 @@ theorem preserves_operands_with_rhs
   | value payload =>
     rename_i rightValue
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-      .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
     rcases CompatibleBareWordModifier.modifier_total profile
       (snapshot.represented.extend result.maps result.worlds) rightRep
       (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
@@ -1966,7 +1966,7 @@ theorem preserves_panic_with_rhs
           (faults := faults) (id := id) (node := node) (lowered := lowered)
           snapshot sourceSize (.value right) after value finalStore finalMap finalWorld ∧
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
@@ -1993,7 +1993,7 @@ theorem preserves_panic_with_rhs
   | value payload =>
     rename_i rightValue
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-      .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
     obtain ⟨plain, _⟩ := ProtectedBareAssignment.rhs_of_expression snapshot protocol initial
       (faults := fun _ _ => False) (.value result.trace.sound.value_plain) result.evaluated
       (.value payload) result.heaps result.maps result.worlds result.frame result.metadata post

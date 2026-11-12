@@ -2147,19 +2147,40 @@ theorem inferPlaceFuel_success_sound
       | error =>
           simp [Detail.inferPlaceFuel, targetEq] at success
 
+/-- A type that finalization admits as a shift's value is `word` or one of the
+twelve types. -/
+theorem shiftValue_of_fits {type : TypeSystem.Ty} (fits : Detail.shiftValueFits type = true) :
+    type = .word ∨ ∃ fixed, type = .fixed fixed := by
+  unfold Detail.shiftValueFits at fits
+  split at fits
+  · exact .inl rfl
+  · exact .inr ⟨_, rfl⟩
+  · cases fits
+
+/-- A type that finalization admits as a shift's amount is a shift-amount type. -/
+theorem shiftAmountType_of_fits {type : TypeSystem.Ty} (fits : Detail.shiftAmountFits type = true) :
+    ShiftAmountType type := by
+  unfold Detail.shiftAmountFits at fits
+  split at fits
+  · exact .word
+  · exact .unsigned (by simpa using fits)
+  · cases fits
+
 /-- A compound assignment's operand type is Word's, or the target's
-fixed-width integer type for an operator of `FixedCompoundAssignmentOperator`. -/
+fixed-width integer type for an operator of `FixedCompoundAssignmentOperator` or
+a shift, whose value is the target. -/
 theorem compoundOperandConstructor_cases (operator : Syntax.ValueAssignOp)
     (target : TypeSystem.Ty) :
     Detail.compoundOperandConstructor operator target = .builtin .word ∨
       ∃ type, Detail.compoundOperandConstructor operator target = .builtin (.fixed type) ∧
-        FixedCompoundAssignmentOperator operator := by
+        (FixedCompoundAssignmentOperator operator ∨ ShiftCompoundAssignmentOperator operator) := by
   unfold Detail.compoundOperandConstructor
   split
   · rename_i type
     cases operator <;> first
       | exact .inl rfl
-      | exact .inr ⟨type, rfl, by constructor⟩
+      | exact .inr ⟨type, rfl, .inl (by constructor)⟩
+      | exact .inr ⟨type, rfl, .inr (by constructor)⟩
   · exact .inl rfl
 
 /-- Away from the operators that take a fixed-width target's type, the operand
@@ -2174,9 +2195,10 @@ theorem compoundOperandConstructor_of_not_takes {operator : Syntax.ValueAssignOp
 
 /-- A target type that fits its compound operator (`compoundTargetFits`) is
 Word, or a fixed-width integer type for an operator of
-`FixedCompoundAssignmentOperator`. -/
+`FixedCompoundAssignmentOperator`; the shifts are `shiftValueType_of_compoundTargetFits`'s. -/
 theorem compoundTargetFits_cases {operator : Syntax.ValueAssignOp}
     {type : TypeSystem.Ty} (notEqual : operator ≠ .equal)
+    (notShift : Detail.isShiftAssign operator = false)
     (fits : Detail.compoundTargetFits operator type = true) :
     type = .word ∨
       ∃ fixed, type = .fixed fixed ∧ FixedCompoundAssignmentOperator operator := by
@@ -2184,12 +2206,28 @@ theorem compoundTargetFits_cases {operator : Syntax.ValueAssignOp}
       (Detail.compoundOperandConstructor operator type) = type := by
     cases operator <;> simp_all [Detail.compoundTargetFits]
   rcases compoundOperandConstructor_cases operator type with
-    word | ⟨fixed, fixedEq, kind⟩
+    word | ⟨fixed, fixedEq, kind | shift⟩
   · left
     rw [← fitsEq, word]
     rfl
   · right
     exact ⟨fixed, by rw [← fitsEq, fixedEq]; rfl, kind⟩
+  · cases shift <;> simp [Detail.isShiftAssign] at notShift
+
+/-- A shift's target type that fits its operator is a shift's value type:
+`word` or one of the twelve fixed-width integer types. -/
+theorem shiftValueType_of_compoundTargetFits {operator : Syntax.ValueAssignOp}
+    {type : TypeSystem.Ty} (kind : ShiftCompoundAssignmentOperator operator)
+    (fits : Detail.compoundTargetFits operator type = true) :
+    ShiftValueType type := by
+  have fitsEq : TypeSystem.Ty.constructor
+      (Detail.compoundOperandConstructor operator type) = type := by
+    cases kind <;> simp_all [Detail.compoundTargetFits]
+  rcases compoundOperandConstructor_cases operator type with word | ⟨fixed, fixedEq, _⟩
+  · rw [← fitsEq, word]
+    exact .word
+  · rw [← fitsEq, fixedEq]
+    exact .fixed fixed
 
 /-- Where the final target type fits its compound operator, the final
 substitution of the operand type is that target type: an open target's operand
@@ -2255,6 +2293,98 @@ target's type is known only then. -/
 def SourceAssignmentTargetsFit (source : TypedSource) : Prop :=
   ∀ {id : StatementId} {node : StatementNode},
     ContainsStatement source id node → StatementAssignmentTargetsFit node.form
+
+/-- A compound shift's amount, by its node in a typed source, has an amount
+type: `word` or an unsigned one of the twelve types. Finalization checks it
+(`Detail.validateShiftAmount`), since an open amount's type is known only then. -/
+def AssignmentAmountFits (source : TypedSource) (operator : Syntax.ValueAssignOp)
+    (value : ExpressionId) : Prop :=
+  Detail.isShiftAssign operator = true →
+    ∀ node, ContainsExpression source value node → Detail.shiftAmountFits node.type = true
+
+/-- A `for` header item that is a compound shift with that amount. -/
+def ForItemAssignsShiftAmount (value : ExpressionId) : ForItemForm → Prop
+  | .assignValue _ operator item => Detail.isShiftAssign operator = true ∧ item = value
+  | _ => False
+
+/-- A statement form with a compound shift of that amount: an assignment
+statement's, or a `for` header item's. -/
+def StatementAssignsShiftAmount (value : ExpressionId) : StatementForm → Prop
+  | .assignValue _ operator item => Detail.isShiftAssign operator = true ∧ item = value
+  | .forLoop initializer _ post _ =>
+      (∃ item ∈ initializer, ForItemAssignsShiftAmount value item) ∨
+        ∃ item ∈ post, ForItemAssignsShiftAmount value item
+  | _ => False
+
+/-- Every compound shift's amount in a typed source has an amount type.
+Finalization establishes it for the finalized source
+(`FinalInferenceResources.shift_amounts_fit`). -/
+def SourceShiftAmountsFit (source : TypedSource) : Prop :=
+  ∀ {id : StatementId} {statement : StatementNode} {value : ExpressionId}
+    {node : ExpressionNode},
+    ContainsStatement source id statement → StatementAssignsShiftAmount value statement.form →
+    ContainsExpression source value node → Detail.shiftAmountFits node.type = true
+
+/-- An assignment statement's amount fits. -/
+theorem SourceShiftAmountsFit.assignment {source : TypedSource} (fits : SourceShiftAmountsFit source)
+    {id : StatementId} {statement : StatementNode} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {value : ExpressionId}
+    (contains : ContainsStatement source id statement)
+    (form : statement.form = .assignValue assignment operator value) :
+    AssignmentAmountFits source operator value := by
+  intro shift node valueContains
+  exact fits contains (by rw [form]; exact ⟨shift, rfl⟩) valueContains
+
+/-- A `for` header item's amount fits. -/
+theorem SourceShiftAmountsFit.forItem {source : TypedSource} (fits : SourceShiftAmountsFit source)
+    {id : StatementId} {statement : StatementNode} {initializer post : List ForItemForm}
+    {condition : ExpressionId} {body : List StatementId}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {value : ExpressionId}
+    (contains : ContainsStatement source id statement)
+    (form : statement.form = .forLoop initializer condition post body)
+    (member : .assignValue assignment operator value ∈ initializer ∨
+      .assignValue assignment operator value ∈ post) :
+    AssignmentAmountFits source operator value := by
+  intro shift node valueContains
+  refine fits contains ?_ valueContains
+  rw [form]
+  rcases member with member | member
+  · exact .inl ⟨_, member, shift, rfl⟩
+  · exact .inr ⟨_, member, shift, rfl⟩
+
+/-- A `for` header item's amount fits, if the item is a value assignment. -/
+def ForItemAmountFits (source : TypedSource) : ForItemForm → Prop
+  | .assignValue _ operator value => AssignmentAmountFits source operator value
+  | _ => True
+
+/-- Substitution keeps a header item's operator and amount. -/
+@[simp] theorem forItemAmountFits_applySubstitution {source : TypedSource}
+    {substitution : TypeSystem.Substitution} {item : ForItemForm} :
+    ForItemAmountFits source (item.applySubstitution substitution) =
+      ForItemAmountFits source item := by
+  cases item <;> rfl
+
+/-- A `for` loop's header items' amounts fit. -/
+theorem SourceShiftAmountsFit.forLoop {source : TypedSource} (fits : SourceShiftAmountsFit source)
+    {id : StatementId} {statement : StatementNode} {initializer post : List ForItemForm}
+    {condition : ExpressionId} {body : List StatementId}
+    (contains : ContainsStatement source id statement)
+    (form : statement.form = .forLoop initializer condition post body) :
+    (∀ item ∈ initializer, ForItemAmountFits source item) ∧
+      ∀ item ∈ post, ForItemAmountFits source item := by
+  constructor
+  · intro item member
+    cases item with
+    | assignValue assignment operator value => exact fits.forItem contains form (.inl member)
+    | letDecl _ _ => trivial
+    | expression _ => trivial
+    | assignBitNot _ => trivial
+  · intro item member
+    cases item with
+    | assignValue assignment operator value => exact fits.forItem contains form (.inr member)
+    | letDecl _ _ => trivial
+    | expression _ => trivial
+    | assignBitNot _ => trivial
 
 /-- One successful assignment check gives the fit under the checked state's
 substitution. -/
@@ -2407,7 +2537,9 @@ theorem inferAssignedValueFuel_success_sound
       targetExpression operator value initial =
         .ok (assignment, inferredValue, final))
     (targetFits : AssignmentTargetFits (assignment.applySubstitution outer)
-      operator) :
+      operator)
+    (amountFits : AssignmentAmountFits (source.applySubstitution outer) operator
+      inferredValue.id) :
     SourceAssignmentHasType (source.applySubstitution outer) target
       (assignment.applySubstitution outer) operator inferredValue.id := by
   unfold Detail.inferAssignedValueFuel at success
@@ -2531,12 +2663,107 @@ theorem inferAssignedValueFuel_success_sound
                     (outer.apply place.type) := by
                   rw [storedPlaceEq]
                   exact placeType
-                rcases compoundTargetFits_cases notEqual fitsHere with
+                rcases compoundTargetFits_cases notEqual (by cases operatorKind <;> rfl) fitsHere with
                   word | ⟨type, fixed, kind⟩
                 · rw [word] at storedPlaceTyped valueTyped
                   exact .wordCompound operatorKind storedPlaceTyped valueTyped rfl
                 · rw [fixed] at storedPlaceTyped valueTyped
                   exact .fixedCompound kind storedPlaceTyped valueTyped rfl
+      have finishShift
+          (shiftKind : ShiftCompoundAssignmentOperator operator)
+          (tailSuccess :
+            (do
+              let fittedState ← Detail.unify placeState place.type
+                (Detail.compoundOperandType operator (placeState.resolve place.type))
+              let (inferredValue, finalState) ←
+                Detail.inferExprFuel fuel inferenceContext value none fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue, finalState)) =
+                .ok (assignment, inferredValue, final)) :
+          SourceAssignmentHasType (source.applySubstitution outer) target
+            (assignment.applySubstitution outer) operator inferredValue.id := by
+        have expectedBelow :
+            (placeState.resolve place.type).VariablesBelow
+              placeState.inference.next :=
+          placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2
+        cases unifyResult : Detail.unify placeState place.type
+            (Detail.compoundOperandType operator (placeState.resolve place.type)) with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+            simp only [unifyResult, bind, Except.bind] at tailSuccess
+            have fitProgress := Detail.unify_inferenceProgress
+              placeProperties.2.1.solved placeProperties.2.2
+              (Detail.compoundOperandType_variablesBelow expectedBelow) unifyResult
+            have fittedReady := Detail.unify_preserves_inferenceReady
+              placeProperties.2.1 placeProperties.2.2
+              (Detail.compoundOperandType_variablesBelow expectedBelow) unifyResult
+            cases valueResult : Detail.inferExprFuel fuel inferenceContext
+                value none fittedState with
+            | error error =>
+                simp [valueResult] at tailSuccess
+            | ok valuePair =>
+                rcases valuePair with ⟨inferred, finalState⟩
+                simp only [valueResult, pure, Pure.pure, Except.pure]
+                  at tailSuccess
+                injection tailSuccess with resultEq
+                injection resultEq with assignmentEq valueStateEq
+                injection valueStateEq with inferredEq finalEq
+                subst assignment
+                subst inferredValue
+                subst final
+                have valueProperties :=
+                  Detail.inferExprFuel_inferenceProperties fittedReady
+                    signatureFormation functionsCanonical (by
+                      intro expectedType member
+                      simp at member)
+                    valueResult
+                have outerFitted : outer.SemanticallyExtends
+                    fittedState.inference.substitution :=
+                  TypeSystem.Substitution.SemanticallyExtends.trans
+                    outerExtension valueProperties.1.substitution_extends
+                have outerPlace : outer.SemanticallyExtends
+                    placeState.inference.substitution :=
+                  TypeSystem.Substitution.SemanticallyExtends.trans
+                    outerFitted fitProgress.substitution_extends
+                have placeType := inferPlaceFuel_success_sound ready
+                  signatureFormation functionsCanonical invariant outerPlace
+                  expressionSound placeResult
+                have resolvedFinal :
+                    outer.apply (finalState.resolve place.type) =
+                      outer.apply place.type := by
+                  simpa [Frontend.SourceInference.State.resolve,
+                    TypeSystem.InferState.resolve] using
+                      outerExtension place.type
+                have fitsHere : Detail.compoundTargetFits operator
+                    (outer.apply place.type) = true := by
+                  simpa [AssignmentTargetFits,
+                    AssignmentResolution.applySubstitution,
+                    PlaceResolution.applySubstitution, resolvedFinal]
+                    using targetFits
+                have storedPlaceEq :
+                    ({ place with type := finalState.resolve place.type } :
+                      PlaceResolution).applySubstitution outer =
+                        place.applySubstitution outer := by
+                  cases place
+                  simp [PlaceResolution.applySubstitution, resolvedFinal]
+                have storedPlaceTyped : SourcePlaceHasType
+                    (source.applySubstitution outer) target
+                    (({ place with type := finalState.resolve place.type } :
+                      PlaceResolution).applySubstitution outer)
+                    (outer.apply place.type) := by
+                  rw [storedPlaceEq]
+                  exact placeType
+                -- The amount has its own type, which finalization admitted (`amountFits`).
+                have valueTyped := expressionSound valueResult
+                obtain ⟨valueNode, valueContains, valueNodeType⟩ := valueTyped.stored_type
+                have amountHere : Detail.shiftAmountFits (outer.apply inferred.type) = true := by
+                  rw [← valueNodeType]
+                  exact amountFits (by cases shiftKind <;> rfl) valueNode valueContains
+                exact .shiftCompound shiftKind storedPlaceTyped
+                  (shiftValueType_of_compoundTargetFits shiftKind fitsHere) valueTyped
+                  (shiftAmountType_of_fits amountHere) rfl
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
@@ -2617,8 +2844,8 @@ theorem inferAssignedValueFuel_success_sound
       | bitAnd => exact finishNonEqual .bitAnd success
       | bitXor => exact finishNonEqual .bitXor success
       | bitOr => exact finishNonEqual .bitOr success
-      | shiftLeft => exact finishNonEqual .shiftLeft success
-      | shiftRight => exact finishNonEqual .shiftRight success
+      | shiftLeft => exact finishShift .shiftLeft success
+      | shiftRight => exact finishShift .shiftRight success
       | uncheckedAdd => exact finishNonEqual .uncheckedAdd success
       | uncheckedSubtract => exact finishNonEqual .uncheckedSubtract success
       | uncheckedMultiply => exact finishNonEqual .uncheckedMultiply success
@@ -8262,6 +8489,8 @@ theorem inferStatementFuel_success_assignValue_deep_sound
             ((result.state.toTypedSource roots).applySubstitution outer)
             target inferred.id (outer.apply inferred.type))
     (targetsFit : SourceAssignmentTargetsFit
+      ((result.state.toTypedSource roots).applySubstitution outer))
+    (amountsFit : SourceShiftAmountsFit
       ((result.state.toTypedSource roots).applySubstitution outer)) :
     ActiveLocalContextInvariant result.state outer target ∧
       StatementHasType
@@ -8308,6 +8537,10 @@ theorem inferStatementFuel_success_assignValue_deep_sound
   have assignmentType := inferAssignedValueFuel_success_sound allocatedReady
     signatureFormation functionsCanonical allocatedInvariant
     assignmentExtension expressionSound assignmentSuccess targetFits
+    (fun shift _ valueContains => amountsFit
+      (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+      (by simpa [StatementNode.applySubstitution, StatementForm.applySubstitution,
+        StatementAssignsShiftAmount] using shift) valueContains)
   refine ⟨assignmentInvariant.recordNode _, ?_, ?_⟩
   · exact assignValueStatementHasType_afterSubstitution contains
       assignmentType
@@ -10778,6 +11011,11 @@ structure StatementInferenceSoundnessCallbacks
   assignmentTargetsFit :
     SourceAssignmentTargetsFit
       ((result.state.toTypedSource roots).applySubstitution outer)
+  /-- Every compound shift's amount of the statement's eventual typed source has
+  an amount type, as finalization checks. -/
+  shiftAmountsFit :
+    SourceShiftAmountsFit
+      ((result.state.toTypedSource roots).applySubstitution outer)
   unannotatedInitializedLet :
     ∀ {name : Syntax.Identifier} {initializer : Syntax.Expr}
       {inferred : InferredExpression}
@@ -11021,7 +11259,7 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
           exact inferStatementFuel_success_assignValue_deep_sound rfl
             allocationEq success ready signatureFormation functionsCanonical
             invariant outerExtension roots callbacks.expression
-            callbacks.assignmentTargetsFit
+            callbacks.assignmentTargetsFit callbacks.shiftAmountsFit
       | assignBitNot targetExpression operatorSpan =>
           refine ⟨target, {
               type := .unit
@@ -18592,25 +18830,6 @@ theorem binaryOperatorTrait_hasTypeAfterSubstitution
     exact solveRequirements_correspondingSequenceProves corresponds
       solve_success solved_eq valid
 
-/-- A type that finalization admits as a shift's value is `word` or one of the
-twelve types. -/
-theorem shiftValue_of_fits {type : TypeSystem.Ty} (fits : Detail.shiftValueFits type = true) :
-    type = .word ∨ ∃ fixed, type = .fixed fixed := by
-  unfold Detail.shiftValueFits at fits
-  split at fits
-  · exact .inl rfl
-  · exact .inr ⟨_, rfl⟩
-  · cases fits
-
-/-- A type that finalization admits as a shift's amount is a shift-amount type. -/
-theorem shiftAmountType_of_fits {type : TypeSystem.Ty} (fits : Detail.shiftAmountFits type = true) :
-    ShiftAmountType type := by
-  unfold Detail.shiftAmountFits at fits
-  split at fits
-  · exact .word
-  · exact .unsigned (by simpa using fits)
-  · cases fits
-
 /-- Every retained binary inference branch becomes declarative operator
 typing after whole-body substitution and scoped requirement solving.  The
 literal fallback is split between a still-deferred literal target, whose
@@ -25906,6 +26125,175 @@ theorem finalize_assignmentTargetsFit
       exact statementAssignmentTargetsFit_of_validate
         (validateAssignmentTargets_member witness.assignmentValidation rawMember)
 
+/-- One successful assignment check passes its shift-amount check. -/
+theorem validateShiftAmount_of_validate {state : Frontend.SourceInference.State}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
+    {value : ExpressionId}
+    (success : Detail.validateAssignmentTarget state assignment operator value = .ok ()) :
+    Detail.validateShiftAmount state operator value = .ok () := by
+  unfold Detail.validateAssignmentTarget at success
+  by_cases fits : Detail.compoundTargetFits operator
+      (state.resolve assignment.target.type) = true
+  · simpa [fits] using success
+  · simp [fits] at success
+
+/-- One successful shift-amount check gives the amount's fit under the checked
+state's substitution. -/
+theorem shiftAmountFits_of_validate {state : Frontend.SourceInference.State}
+    {operator : Syntax.ValueAssignOp} {value : ExpressionId} {valueNode : ExpressionNode}
+    (success : Detail.validateShiftAmount state operator value = .ok ())
+    (shift : Detail.isShiftAssign operator = true)
+    (member : Node.expression valueNode ∈ state.nodes) (valueId : valueNode.id = value) :
+    Detail.shiftAmountFits (state.inference.substitution.apply valueNode.type) = true := by
+  simp only [Detail.validateShiftAmount, shift, Bool.true_and] at success
+  split at success
+  · cases success
+  · rename_i fits
+    have ok : Detail.operandMisfits state value Detail.shiftAmountFits
+        (.expression valueNode) = false := by
+      cases misfit : Detail.operandMisfits state value Detail.shiftAmountFits (.expression valueNode)
+      · rfl
+      · exact absurd (List.any_eq_true.mpr ⟨_, member, misfit⟩) fits
+    simpa only [Detail.operandMisfits, valueId, decide_true, Bool.true_and,
+      Bool.not_eq_eq_eq_not, Bool.not_false, Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using ok
+
+/-- A successful check of a `for` header's items checks each value assignment. -/
+theorem validateForItemAssignmentTargets_member {state : Frontend.SourceInference.State}
+    {items : List ForItemForm} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {value : ExpressionId}
+    (success : Detail.validateForItemAssignmentTargets state items = .ok ())
+    (member : .assignValue assignment operator value ∈ items) :
+    Detail.validateAssignmentTarget state assignment operator value = .ok () := by
+  induction items with
+  | nil => cases member
+  | cons head tail induction =>
+      cases head with
+      | assignValue headAssignment headOperator headValue =>
+          simp only [Detail.validateForItemAssignmentTargets, bind, Except.bind] at success
+          cases headResult :
+              Detail.validateAssignmentTarget state headAssignment headOperator headValue with
+          | error error => simp [headResult] at success
+          | ok checked =>
+              cases checked
+              rcases List.mem_cons.mp member with same | tailMember
+              · cases same
+                exact headResult
+              · exact induction (by simpa [headResult] using success) tailMember
+      | letDecl binder initializer =>
+          rcases List.mem_cons.mp member with same | tailMember
+          · cases same
+          · exact induction (by simpa [Detail.validateForItemAssignmentTargets] using success)
+              tailMember
+      | expression expression =>
+          rcases List.mem_cons.mp member with same | tailMember
+          · cases same
+          · exact induction (by simpa [Detail.validateForItemAssignmentTargets] using success)
+              tailMember
+      | assignBitNot assignment =>
+          rcases List.mem_cons.mp member with same | tailMember
+          · cases same
+          · exact induction (by simpa [Detail.validateForItemAssignmentTargets] using success)
+              tailMember
+
+/-- A `for` item after a substitution is a compound shift of that amount when it
+was before it. -/
+theorem forItemAssignsShiftAmount_of_applySubstitution {substitution : TypeSystem.Substitution}
+    {value : ExpressionId} {items : List ForItemForm}
+    (assigns : ∃ item ∈ items.map (ForItemForm.applySubstitution substitution),
+      ForItemAssignsShiftAmount value item) :
+    ∃ assignment operator, Detail.isShiftAssign operator = true ∧
+      .assignValue assignment operator value ∈ items := by
+  obtain ⟨item, member, assignsItem⟩ := assigns
+  obtain ⟨raw, rawMember, rawEq⟩ := List.mem_map.mp member
+  subst rawEq
+  cases raw with
+  | assignValue assignment operator item =>
+      obtain ⟨shift, same⟩ := assignsItem
+      subst same
+      exact ⟨assignment, operator, shift, rawMember⟩
+  | letDecl _ _ | expression _ | assignBitNot _ => cases assignsItem
+
+/-- Finalization checks every compound shift's amount, so in the finalized
+source each has an amount type. -/
+theorem finalize_shiftAmountsFit
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    SourceShiftAmountsFit result.typedSource := by
+  let witness := Detail.finalize_success_witness success
+  have sourceEq : result.typedSource =
+      (witness.finalState.toTypedSource roots).applySubstitution
+        witness.finalState.inference.substitution :=
+    congrArg Frontend.SourceInference.Result.typedSource witness.result_eq
+  intro id statement value node contains assigns valueContains
+  rw [sourceEq] at contains valueContains
+  obtain ⟨raw, rawMember, rawEq⟩ := List.mem_map.mp contains.1
+  obtain ⟨rawValue, rawValueMember, rawValueEq⟩ := List.mem_map.mp valueContains.1
+  cases raw with
+  | expression _ => cases rawEq
+  | statement rawNode =>
+    cases rawValue with
+    | statement _ => cases rawValueEq
+    | expression rawValueNode =>
+      simp only [Node.applySubstitution, Node.statement.injEq, Node.expression.injEq]
+        at rawEq rawValueEq
+      subst rawEq rawValueEq
+      have check := validateAssignmentTargets_member witness.assignmentValidation rawMember
+      have valueId : rawValueNode.id = value := by
+        simpa [ExpressionNode.applySubstitution] using valueContains.2
+      have amountCheck : ∃ operator, Detail.isShiftAssign operator = true ∧
+          Detail.validateShiftAmount witness.finalState operator value = .ok () := by
+        simp only [Detail.validateAssignmentTargetNode] at check
+        cases form : rawNode.form with
+        | assignValue assignment operator item =>
+            rw [form] at check
+            have assignsRaw : Detail.isShiftAssign operator = true ∧ item = value := by
+              simpa [StatementNode.applySubstitution, StatementForm.applySubstitution, form,
+                StatementAssignsShiftAmount] using assigns
+            obtain ⟨shift, same⟩ := assignsRaw
+            subst same
+            exact ⟨operator, shift, validateShiftAmount_of_validate check⟩
+        | forLoop initializer condition post body =>
+            rw [form] at check
+            simp only [bind, Except.bind] at check
+            cases initializerResult :
+                Detail.validateForItemAssignmentTargets witness.finalState initializer with
+            | error error => simp [initializerResult] at check
+            | ok checked =>
+                cases checked
+                have postResult :
+                    Detail.validateForItemAssignmentTargets witness.finalState post = .ok () := by
+                  simpa [initializerResult] using check
+                have assignsRaw :
+                    (∃ item ∈ initializer.map
+                        (ForItemForm.applySubstitution witness.finalState.inference.substitution),
+                      ForItemAssignsShiftAmount value item) ∨
+                    ∃ item ∈ post.map
+                        (ForItemForm.applySubstitution witness.finalState.inference.substitution),
+                      ForItemAssignsShiftAmount value item := by
+                  simpa [StatementNode.applySubstitution, StatementForm.applySubstitution, form,
+                    StatementAssignsShiftAmount] using assigns
+                rcases assignsRaw with inInitializer | inPost
+                · obtain ⟨assignment, operator, shift, member⟩ :=
+                    forItemAssignsShiftAmount_of_applySubstitution inInitializer
+                  exact ⟨operator, shift, validateShiftAmount_of_validate
+                    (validateForItemAssignmentTargets_member initializerResult member)⟩
+                · obtain ⟨assignment, operator, shift, member⟩ :=
+                    forItemAssignsShiftAmount_of_applySubstitution inPost
+                  exact ⟨operator, shift, validateShiftAmount_of_validate
+                    (validateForItemAssignmentTargets_member postResult member)⟩
+        | _ =>
+            exfalso
+            simp [StatementNode.applySubstitution, StatementForm.applySubstitution, form,
+              StatementAssignsShiftAmount] at assigns
+      obtain ⟨operator, shift, amountOk⟩ := amountCheck
+      simpa [ExpressionNode.applySubstitution] using
+        shiftAmountFits_of_validate amountOk shift rawValueMember valueId
+
 /-- An unchecked operator that waited for an open literal operand (it owns no
 requirement besides its coercions') has a left operand that is not `integer`,
 for which upstream defines no unchecked instance. Finalization establishes it
@@ -26136,6 +26524,8 @@ structure FinalInferenceResources
   unchecked_operands_fit : SourceUncheckedOperandsFit result.typedSource
   /-- Every shift's value and amount have types that its builtin typing takes. -/
   shift_operands_fit : SourceShiftOperandsFit result.typedSource
+  /-- Every compound shift's amount has an amount type, which finalization checks. -/
+  shift_amounts_fit : SourceShiftAmountsFit result.typedSource
 
 namespace FinalInferenceResources
 
@@ -26190,6 +26580,7 @@ def ofFinalize
     assignment_targets_fit := finalize_assignmentTargetsFit success
     unchecked_operands_fit := finalize_uncheckedOperandsFit success
     shift_operands_fit := finalize_shiftOperandsFit success
+    shift_amounts_fit := finalize_shiftAmountsFit success
   }
   · intro ready
     have originsBelow := Detail.finalize_numericOriginsBelowNext success

@@ -2040,25 +2040,26 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
           (sameNodes : fitted.nodes = placeState.nodes)
           (sameBinders : fitted.localBinders = placeState.localBinders)
           (sameRows : fitted.requirements = placeState.requirements)
-          (expected : Ty) (expectedBelow : expected.VariablesBelow fitted.inference.next)
+          (expected : Option Ty)
+          (expectedBelow : ∀ candidate ∈ expected, candidate.VariablesBelow fitted.inference.next)
           (expectedFormed : outer.SemanticallyExtends fitted.inference.substitution →
             TypeAdmissible semantic (outer.apply place.type) →
-            TypeAdmissible semantic (outer.apply expected))
-          (child : InferExprFuelFormation semantic outer fuel context value (some expected) fitted)
+            ∀ candidate ∈ expected, TypeAdmissible semantic (outer.apply candidate))
+          (child : InferExprFuelFormation semantic outer fuel context value expected fitted)
           (accepted : (do
-            let (inferred, finalState) ← inferExprFuel fuel context value (some expected) fitted
+            let (inferred, finalState) ← inferExprFuel fuel context value expected fitted
             pure (({target := {place with type := finalState.resolve place.type}} : AssignmentResolution), inferred, finalState)) = .ok result) :
           TypeAdmissible semantic (outer.apply result.1.target.type) ∧
             TypeAdmissible semantic (outer.apply result.2.1.type) ∧
             NormalizedStateFormation semantic outer result.2.2 := by
-        cases valueRun : inferExprFuel fuel context value (some expected) fitted with
+        cases valueRun : inferExprFuel fuel context value expected fitted with
         | error error => simp [valueRun, bind, Except.bind] at accepted
         | ok pair =>
           rcases pair with ⟨inferred, finalState⟩
           simp only [valueRun, bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
           cases accepted
           have valueProperties := inferExprFuel_inferenceProperties fitReady
-            formation.validated formation.functionShapes (by simpa using expectedBelow) valueRun
+            formation.validated formation.functionShapes expectedBelow valueRun
           have fitContinuation := continuation.trans valueProperties.1.substitution_extends
           have fitCapture : NoCaptureNodes outer fitted.nodes :=
             captures.of_prefix (inferExprFuel_preserves_nodesPrefix (result := (inferred, finalState)) valueRun
@@ -2068,7 +2069,7 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
             (fitContinuation.trans progress.substitution_extends) placeCapture
           have valueFormation := child fitReady fitNodes
             (placeFormation.2.congr sameBinders sameRows) formation
-            (by simpa using expectedBelow) (by simpa using expectedFormed fitContinuation placeFormation.1)
+            expectedBelow (expectedFormed fitContinuation placeFormation.1)
             _ valueRun continuation captures
           exact ⟨(continuation place.type).symm ▸ placeFormation.1, valueFormation⟩
       have finishNonEqual
@@ -2097,10 +2098,14 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
             exact placeNodes node member
           exact finishValue fitted progress fitReady fitNodes (unify_occurrenceState_eq fitRun).1
             (congrArg LexicalScope.binders (unify_preserves_lexicalScope fitRun)) (unify_requirements_eq fitRun)
-            (Detail.compoundOperandType operator (fitted.resolve place.type))
-            (Detail.compoundOperandType_variablesBelow
-              (progress.resolve_variablesBelow placeProperties.2.2))
-            (fun extension formedType => by
+            (some (Detail.compoundOperandType operator (fitted.resolve place.type)))
+            (by
+              intro candidate member
+              cases Option.mem_def.mp member
+              exact Detail.compoundOperandType_variablesBelow
+                (progress.resolve_variablesBelow placeProperties.2.2))
+            (fun extension formedType candidate member => by
+              cases Option.mem_def.mp member
               rcases Detail.compoundOperandType_cases operator (fitted.resolve place.type) with
                 ⟨openEq, _, _⟩ | closedEq
               · rw [openEq]
@@ -2114,13 +2119,47 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
                     | exact TypeAdmissible.word formation.scope.binders
                 · exact TypeAdmissible.word formation.scope.binders)
             (child fitted) accepted
+      have finishShift
+          (child : ∀ fitted, InferExprFuelFormation semantic outer fuel context value none fitted)
+          (accepted : (do
+            let fitted ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
+            let (inferred, finalState) ← inferExprFuel fuel context value none fitted
+            pure (({target := {place with type := finalState.resolve place.type}} : AssignmentResolution), inferred, finalState)) = .ok result) :
+          TypeAdmissible semantic (outer.apply result.1.target.type) ∧
+            TypeAdmissible semantic (outer.apply result.2.1.type) ∧
+            NormalizedStateFormation semantic outer result.2.2 := by
+        cases fitRun : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
+        | error error => simp [fitRun, bind, Except.bind] at accepted
+        | ok fitted =>
+          simp only [fitRun, bind, Except.bind] at accepted
+          have operandBelow := Detail.compoundOperandType_variablesBelow (operator := operator)
+            (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
+          have progress := unify_inferenceProgress placeProperties.2.1.solved
+            placeProperties.2.2 operandBelow fitRun
+          have fitReady := unify_preserves_inferenceReady placeProperties.2.1
+            placeProperties.2.2 operandBelow fitRun
+          have fitNodes : fitted.NodesBelowNextOccurrence := by
+            intro node member
+            rw [(unify_occurrenceState_eq fitRun).1] at member
+            rw [(unify_occurrenceState_eq fitRun).2]
+            exact placeNodes node member
+          exact finishValue fitted progress fitReady fitNodes (unify_occurrenceState_eq fitRun).1
+            (congrArg LexicalScope.binders (unify_preserves_lexicalScope fitRun)) (unify_requirements_eq fitRun)
+            none (by intro candidate member; simp at member)
+            (fun _ _ candidate member => by simp at member)
+            (child fitted) accepted
       cases operator with
       | equal =>
         simp only [pure, Pure.pure, Except.pure] at success
         exact finishValue placeState (.refl placeProperties.2.1.solved) placeProperties.2.1
-          placeNodes rfl rfl rfl (placeState.resolve place.type)
-          (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
-          (fun extension formedType => (extension place.type).symm ▸ formedType)
+          placeNodes rfl rfl rfl (some (placeState.resolve place.type))
+          (by
+            intro candidate member
+            cases Option.mem_def.mp member
+            exact placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
+          (fun extension formedType candidate member => by
+            cases Option.mem_def.mp member
+            exact (extension place.type).symm ▸ formedType)
           (valueIH place placeState) success
       | add => exact finishNonEqual (valueIH place) success
       | subtract => exact finishNonEqual (valueIH place) success
@@ -2130,8 +2169,8 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
       | bitAnd => exact finishNonEqual (valueIH place) success
       | bitXor => exact finishNonEqual (valueIH place) success
       | bitOr => exact finishNonEqual (valueIH place) success
-      | shiftLeft => exact finishNonEqual (valueIH place) success
-      | shiftRight => exact finishNonEqual (valueIH place) success
+      | shiftLeft => exact finishShift (valueIH place) success
+      | shiftRight => exact finishShift (valueIH place) success
       | uncheckedAdd => exact finishNonEqual (valueIH place) success
       | uncheckedSubtract => exact finishNonEqual (valueIH place) success
       | uncheckedMultiply => exact finishNonEqual (valueIH place) success

@@ -609,7 +609,8 @@ theorem rhs_reflects_bounded_with_rhs (budget size : Nat) {checked : Checked} {r
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
     {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (_generated : certificate scope id lowered) (_found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
+    {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
     (coreType : lowered.type = prepared.route.leafType)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store}
@@ -623,7 +624,7 @@ theorem rhs_reflects_bounded_with_rhs (budget size : Nat) {checked : Checked} {r
       (faults := faults) (id := id) (node := node) (lowered := lowered) (environment := environment)
       (coreEnvironment := coreEnvironment) (ξ := ξ) protocol initialState budget)
     (_locals : Dynamic.EnvironmentAgrees before context.locals environment)
-    {next : Expr} {outputType : Ty} {operator : Syntax.ValueAssignOp} {invalid : Word} {result : Value}
+    {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
     (resolution : ProtectedStatePlaceAssignmentContracts.PrefixResultAt protocol size checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes
       place leaf environment coreEnvironment before store mapping world scope canonical initialState (lowered.expression.rename ξ) next outputType
       (binaryOperator (prepared.route.leafType = .integer) operator) false invalid result finalStore) (bounded : size ≤ budget) :
@@ -669,7 +670,7 @@ theorem rhs_reflects_bounded_with_rhs (budget size : Nat) {checked : Checked} {r
               mapping := rhsMap
               world := rhsWorld
               meaning := rhsResult
-              related := .compatible rhsView (by simpa only [payloadModel, renamed, coreType] using payload) } sourceRhs (by omega) remaining ⟨rhsState, protocol.trans resolutionRelated rhsRelated⟩
+              related := rhsView.rep (by simpa only [payloadModel, renamed, coreType] using payload) } sourceRhs (by omega) remaining ⟨rhsState, protocol.trans resolutionRelated rhsRelated⟩
 
 private theorem rhs_reflects_bounded (budget size : Nat) {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions}
@@ -682,7 +683,8 @@ private theorem rhs_reflects_bounded (budget size : Nat) {checked : Checked} {re
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.ReflectsAt protocol (payloadModel checked registry functions) program context evidence source certificate faults size))
     {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
+    {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
     (coreType : lowered.type = prepared.route.leafType)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store}
@@ -691,7 +693,7 @@ private theorem rhs_reflects_bounded (budget size : Nat) {checked : Checked} {re
     (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
     (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
-    {next : Expr} {outputType : Ty} {operator : Syntax.ValueAssignOp} {invalid : Word} {result : Value}
+    {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
     (resolution : ProtectedStatePlaceAssignmentContracts.PrefixResultAt protocol size checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes
       place leaf environment coreEnvironment before store mapping world scope canonical initialState (lowered.expression.rename ξ) next outputType
       (binaryOperator (prepared.route.leafType = .integer) operator) false invalid result finalStore) (bounded : size ≤ budget) :
@@ -727,7 +729,8 @@ private theorem rhs_reflects_bounded (budget size : Nat) {checked : Checked} {re
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size (payloadModel checked registry functions) program context evidence source certificate faults entry))
     {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
+    {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
     (coreType : lowered.type = prepared.route.leafType)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store}
@@ -736,7 +739,7 @@ private theorem rhs_reflects_bounded (budget size : Nat) {checked : Checked} {re
     (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
     (installed : entry scope mapping world before store canonical)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
-    {next : Expr} {outputType : Ty} {operator : Syntax.ValueAssignOp} {invalid : Word} {result : Value}
+    {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
     (resolution : RecursiveNamedPlaceAssignmentContracts.PrefixResultAt size checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes
       place leaf environment coreEnvironment before store mapping world (lowered.expression.rename ξ) next outputType
       (binaryOperator (prepared.route.leafType = .integer) operator) false invalid result finalStore) (bounded : size ≤ budget) :
@@ -775,9 +778,9 @@ theorem reflects_bounded_with_producers_with_diagnostics (budget : Nat) {compila
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -854,9 +857,9 @@ theorem reflects_bounded_with_producers (budget : Nat) {compilation : SourceCore
     [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -917,9 +920,9 @@ theorem reflects_bounded_with_diagnostics (budget : Nat) {compilation : SourceCo
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -1001,9 +1004,9 @@ theorem reflects_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataP
     [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -1052,9 +1055,9 @@ theorem reflects_bounded (budget : Nat) {compilation : SourceCoreCompatibleDataP
     [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -1100,9 +1103,9 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}

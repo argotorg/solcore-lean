@@ -55,7 +55,7 @@ structure Head (values : ValuesContext) (source : TypedSource)
   writable : WritableLocal context assignment.target.root prepared.route.rootSourceType
   found : source.lookupExpression? rhs = some node
   right : certificate scope rhs lowered
-  rightView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type
+  rightView : AssignedRhsView operator leaf node.type
   rightType : lowered.type = prepared.route.leafType
   profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false
   /-- The target is not a checked compound assignment's fixed-width target. -/
@@ -133,14 +133,6 @@ open Core Frontend SourceInference SourceCoreCompatibleDataPlaces
 open CompatibleEncoding (bind_ok)
 open DataPatternValues DataPlaceCertificates CompatibleMixedRoute CompatiblePlaceCompilerCertificates
 
-private theorem stored_type {source : TypedSource} {context : SourceSemantics.Context} {rhs : ExpressionId}
-    {node : ExpressionNode} {type : TypeSystem.Ty}
-    (unique : NodeOccurrencesUnique source) (found : source.lookupExpression? rhs = some node)
-    (typed : ExpressionHasType source context rhs type) : node.type = type := by
-  obtain ⟨actual, contains, same⟩ := typed.stored_type
-  have identical := Option.some.inj (found.symm.trans (lookupExpression?_complete unique contains))
-  exact identical ▸ same
-
 /-- The bare path compiles only its RHS. Its receipt therefore requires no
 certificate for unrelated source occurrences or nonexistent key computations. -/
 theorem Head.of_lower_bare_with_token {values : ValuesContext} {source : TypedSource}
@@ -152,7 +144,7 @@ theorem Head.of_lower_bare_with_token {values : ValuesContext} {source : TypedSo
     (bare : assignment.target.projections = [])
     (unique : NodeOccurrencesUnique source)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ lowered, expression fuel source scope rhs reasonAt = .ok lowered → ∃ node,
@@ -165,10 +157,9 @@ theorem Head.of_lower_bare_with_token {values : ValuesContext} {source : TypedSo
     CompatibleBareAssignment.of_lower bare accepted
   rw [assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)] at codeEq
   obtain ⟨node, found, tree⟩ := extract lowered generated
-  have rawType := stored_type unique found rightTyped
   refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
     .bare bare layout, slot, rootType ▸ writable binder binding, found, tree,
-    by simpa only [rawType] using rawView, sameType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩, codeEq, rfl⟩
+    (rightTyped.view unique found).transport rawView, sameType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩, codeEq, rfl⟩
   rcases profile with equal | word | ⟨integer, notWordOnly⟩
   · exact .inl equal
   · exact .inr (.inl (rawView.trans word))
@@ -184,7 +175,7 @@ theorem Head.of_lower_bare {values : ValuesContext} {source : TypedSource}
     (bare : assignment.target.projections = [])
     (unique : NodeOccurrencesUnique source)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ lowered, expression fuel source scope rhs reasonAt = .ok lowered → ∃ node,
@@ -236,7 +227,7 @@ theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSour
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
@@ -289,10 +280,9 @@ theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSour
           intro notMapping
           rw [routeEq]
           exact description.ordinary (fun k v same => notMapping k v (rootEq.trans same))
-        have rawType := stored_type unique found rightTyped
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
-          found, certified, by simpa only [rawType] using leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩,
+          found, certified, (rightTyped.view unique found).transport leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩,
           by simp [Head.emit, routeEq, SourceCoreCompatibleDataPlaces.placeModifier,
             assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)], rfl, ?_⟩
         · rcases profile with equal | word | ⟨integer, notWordOnly⟩
@@ -312,7 +302,7 @@ theorem Head.of_lower_with_token {values : ValuesContext} {source : TypedSource}
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
@@ -340,7 +330,7 @@ theorem Head.of_lower {values : ValuesContext} {source : TypedSource}
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
@@ -546,7 +536,7 @@ theorem Head.of_prepared_policy
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered → ∃ child,

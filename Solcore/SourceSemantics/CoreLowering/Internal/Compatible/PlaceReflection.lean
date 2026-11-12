@@ -95,13 +95,14 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     (meaning : Reflects (payloadModel checked registry functions) program context evidence source certificate faults)
     {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
+    {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
     (coreType : lowered.type = prepared.route.leafType)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
-    {next : Expr} {outputType : Ty} {operator : Syntax.ValueAssignOp} {invalid : Word} {result : Value}
+    {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
     (resolution : CompatiblePlacePrefixReflection.Result checked registry functions program context evidence source faults prepared codes sourceTypes
       place leaf environment coreEnvironment before store mapping world lowered.expression next outputType
       (binaryOperator (prepared.route.leafType = .integer) operator) false invalid result finalStore) :
@@ -141,7 +142,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
             mapping := rhsMap
             world := rhsWorld
             meaning := rhsResult
-            related := .compatible rhsView (by simpa only [payloadModel, coreType] using payload) } remaining
+            related := rhsView.rep (by simpa only [payloadModel, coreType] using payload) } remaining
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceRhsReflection
 end
@@ -756,9 +757,9 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
@@ -868,7 +869,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
     (unique : NodeOccurrencesUnique source) (signatures : context.signatures = compilation.checked.signatures)
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (nonempty : assignment.target.projections ≠ [])
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id code ∧
@@ -887,7 +888,8 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
       ((∀ k v, prepared.route.rootSourceType ≠ .mapping k v) → prepared.route.rootMapping = none) ∧
       expression fuel source scope rhs reasonAt = .ok right ∧
       source.lookupExpression? rhs = some node ∧ certificate scope rhs right ∧
-      SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type ∧
+      SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type ∧
+      AssignedRhsView operator leaf node.type ∧
       right.type = prepared.route.leafType ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments codes) right.expression next outputType
         (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand
@@ -904,12 +906,9 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
         of_describe_prepare unique signatures sourceTyped nonempty described preparedBy generated
           (fun id code compiled => let ⟨node, found, certified, _⟩ := extract id code compiled; ⟨node, found, certified⟩)
           typed (by simpa only [rhsType] using rhsTyped)
-      obtain ⟨typedNode, contains, nodeType⟩ := rightTyped.stored_type
-      have same := Option.some.inj (found.symm.trans (lookupExpression?_complete unique contains))
-      have nodeType : node.type = assignment.target.type := by simpa only [same] using nodeType
       exact ⟨binder, leaf, prepared, codes, sourceTypes, index, right, node, ⟨route, described, preparedBy⟩, binding, rootEq,
         by simpa only [routeEq] using lookup, layout, ordinary, rhsGenerated, found, certified,
-        by simpa only [nodeType] using leafView, rhsType, by simp [routeEq, placeModifier]⟩
+        leafView, (rightTyped.view unique found).transport leafView, rhsType, by simp [routeEq, placeModifier]⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceLayoutCertificates
 end
@@ -2227,7 +2226,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (unique : NodeOccurrencesUnique source) (signatures : context.signatures = compilation.checked.signatures)
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (rootTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (nonempty : assignment.target.projections ≠ [])
@@ -2259,13 +2258,9 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     CompatiblePlaceTailReflection.Result compilation.checked registry functions program context evidence source faults assignment.target operator rhs
       environment coreEnvironment before store mapping world next outputType result finalStore := by
   obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, right, node, actualPreparation, binding, rootEq, slot, layout, ordinary,
-      generated, found, certified, rhsView, rhsType, lowering⟩ :=
+      generated, found, certified, leafView, rhsView, rhsType, lowering⟩ :=
     CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped nonempty extract accepted typed
   rw [assignmentModifier_plain (checkedCompound_of_profile operatorProfile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile operatorProfile)] at lowering
-  obtain ⟨typedNode, contains, nodeType⟩ := rightTyped.stored_type
-  have same := Option.some.inj (found.symm.trans (lookupExpression?_complete unique contains))
-  have leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type := by
-    simpa only [same, nodeType] using rhsView
   have profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false := by
     simpa only [leafView] using operatorProfile
   have invalidEq : prepared.invalidProjection = invalid := by

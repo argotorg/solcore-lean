@@ -1266,9 +1266,9 @@ theorem assignedValue_value
       (accepted : (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).Accepted)
       (targetAccepted : inferPlaceFuel fuel context target initial = .ok (place, targetState))
       (fitting : (match operator with | .equal => pure targetState | _ => unify targetState place.type (compoundOperandType operator (targetState.resolve place.type))) = (Except.ok fitted : Except Error State))
-      (child : (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal).Accepted)
+      (child : (CallIndex.expression fuel context value (assignmentExpected operator fitted place.type) fitted childValue childFinal).Accepted)
     (inputs : (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).Inputs) :
-    (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal).final.InferenceProgress (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).final := by
+    (CallIndex.expression fuel context value (assignmentExpected operator fitted place.type) fitted childValue childFinal).final.InferenceProgress (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).final := by
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.final] at ⊢
   have childReady := ((ChildStep.assignedValue_value accepted targetAccepted fitting child).inputs inputs).progress child
@@ -1297,7 +1297,7 @@ theorem assignedValue_place
   have placeProperties := inferPlaceFuel_inferenceProperties inputs.ready inputs.catalog.formation inputs.catalog.canonical child
   have fitProperties := assignmentFit_properties placeProperties.2.1 placeProperties.2.2 fitting
   have valueProperties := inferExprFuel_inferenceProperties fitProperties.2.1 inputs.catalog.formation inputs.catalog.canonical
-    (by intro type member; cases member; exact fitProperties.2.2) valueAccepted
+    fitProperties.2.2 valueAccepted
   exact fitProperties.1.trans valueProperties.1
 
 theorem place_index_base

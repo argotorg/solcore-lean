@@ -496,7 +496,8 @@ theorem bare_head (index : ActualBodyInvocation.Index compiled bodyRelation) {ta
   have lowered := index.assignment_lowered receipt.accepted
   obtain ⟨_, writable, rightTyped, profile⟩ :=
     ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare receipt.sourceProfile typed
-  obtain ⟨node, found, _, _⟩ := CellAwareInvocationAcceptedSourceFacts.expression_node unique rightTyped
+  obtain ⟨_, rhsTyped, _⟩ := id rightTyped
+  obtain ⟨node, found, _, _⟩ := CellAwareInvocationAcceptedSourceFacts.expression_node unique rhsTyped
   exact GenericAssignmentStatements.Head.of_lower_bare_with_token receipt.bare unique writable rightTyped profile
     (fun _ generated => ⟨node, found, generated⟩) lowered
 
@@ -570,7 +571,8 @@ theorem projected_head (index : ActualBodyInvocation.Index compiled bodyRelation
     (fun id _ member generated _ => by
       rcases List.mem_cons.mp member with same | member
       · subst id
-        obtain ⟨node, found, _, _⟩ := CellAwareInvocationAcceptedSourceFacts.expression_node unique rightTyped
+        obtain ⟨_, rhsTyped, _⟩ := id rightTyped
+        obtain ⟨node, found, _, _⟩ := CellAwareInvocationAcceptedSourceFacts.expression_node unique rhsTyped
         exact ⟨node, found, generated⟩
       · obtain ⟨node, found, _⟩ := route.key_typed unique (sourceTyped _ receipt.description.binding) member
         exact ⟨node, found, generated⟩) lowered native

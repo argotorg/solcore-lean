@@ -839,7 +839,10 @@ theorem assignment_payload {values : SourceCoreCompatibleValues.Context} {contex
   cases receipt with
   | intro site origin same sourceTyped rightTyped profile fuel prepared =>
     refine .intro site (assignment_occurs edited origin) same ?_
-      (CallableLambdaViewStaticTyping.expression edited avoids unique rightTyped (reached rhs (by simp))) profile fuel
+      (by
+        obtain ⟨type, typed, rhsView⟩ := rightTyped
+        exact ⟨type, CallableLambdaViewStaticTyping.expression edited avoids unique typed (reached rhs (by simp)),
+          rhsView⟩) profile fuel
       (assignment_prepared_at edited avoids (expressions context) prepared reached)
     intro binder declared
     have original := sourceTyped binder ((CallableLambdaBodyReachability.rootBinder edited.metadata _).trans declared)

@@ -34,17 +34,25 @@ theorem assignmentFit_properties
     (accepted : assignmentFit operator state type =
       (Except.ok fitted : Except Error State)) :
     state.InferenceProgress fitted ∧ fitted.InferenceReady ∧
-    (assignmentExpected operator fitted type).VariablesBelow fitted.inference.next := by
+    ∀ expected ∈ assignmentExpected operator fitted type,
+      expected.VariablesBelow fitted.inference.next := by
   cases operator <;> simp only [assignmentFit] at accepted ⊢
   all_goals first
   | (change Except.ok state = Except.ok fitted at accepted
      cases Except.ok.inj accepted
-     exact ⟨.refl ready.solved, ready, ready.solved.variablesBelow_apply below⟩)
+     refine ⟨.refl ready.solved, ready, ?_⟩
+     intro expected member
+     simp only [assignmentExpected, Option.mem_def, Option.some.injEq] at member
+     subst member
+     exact ready.solved.variablesBelow_apply below)
   | (have progress := unify_inferenceProgress ready.solved below
        (compoundOperandType_variablesBelow (ready.solved.variablesBelow_apply below)) accepted
-     exact ⟨progress, unify_preserves_inferenceReady ready below
-       (compoundOperandType_variablesBelow (ready.solved.variablesBelow_apply below)) accepted,
-       compoundOperandType_variablesBelow (progress.resolve_variablesBelow below)⟩)
+     refine ⟨progress, unify_preserves_inferenceReady ready below
+       (compoundOperandType_variablesBelow (ready.solved.variablesBelow_apply below)) accepted, ?_⟩
+     intro expected member
+     -- A shift's amount has no expected type, so `member` is absurd there.
+     simp only [assignmentExpected, Option.mem_def, Option.some.injEq, reduceCtorEq] at member
+     all_goals (subst member; exact compoundOperandType_variablesBelow (progress.resolve_variablesBelow below)))
 
 end Solcore.SourceSemantics.SourceInferenceExecution
 end
@@ -941,6 +949,7 @@ def ActualInferForItemFuelRootedSoundness (fuel : Nat) : Prop :=
     (∀ reference ∈ inferred.references, ActualContext.Covers finalized frames reference) →
     ActualForItemBindings finalized frames inferred →
     ForItemAssignmentTargetFits (inferred.applySubstitution finalized.substitution) →
+    ForItemAmountFits semanticSource inferred →
     ∃ finalContext,
       RecursiveStatementInvariant wholeContext expectedReturn finalized
         final finalContext ∧
@@ -1002,6 +1011,7 @@ def ActualInferForItemsFuelRootedSoundness (fuel : Nat) : Prop :=
     ActualForItemsBindings finalized frames result.items →
     (∀ item ∈ result.items,
       ForItemAssignmentTargetFits (item.applySubstitution finalized.substitution)) →
+    (∀ item ∈ result.items, ForItemAmountFits semanticSource item) →
     ∃ finalContext,
       RecursiveStatementInvariant wholeContext expectedReturn finalized
         result.state finalContext ∧

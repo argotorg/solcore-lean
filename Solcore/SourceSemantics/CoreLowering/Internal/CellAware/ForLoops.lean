@@ -509,7 +509,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
       (profile : operator = .equal ∨ assignment.target.type = .word)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
-      (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
+      (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type) (value : approved rhs)
       (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment operator rhs :: rest)
 
   | assignProjected {assignment operator rhs rhsNode binder rest}
@@ -519,7 +519,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
-      (rhsType : rhsNode.type = assignment.target.type)
+      (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type)
       (value : approved rhs)
       (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment operator rhs :: rest)
 
@@ -578,7 +578,9 @@ def scan? (source : TypedSource) {approved : ExpressionId → Prop}
         match rhsFound : source.lookupExpression? rhs with
         | none => none
         | some rhsNode =>
-          if rhsType : rhsNode.type = assignment.target.type then do
+          match AssignedRhsView.decide? operator assignment.target.type rhsNode.type with
+          | none => none
+          | some ⟨rhsType⟩ => do
             let ⟨value⟩ ← expression rhs
             let ⟨remaining⟩ ← scan? source expression rest
             if bare : assignment.target.projections = [] then
@@ -589,7 +591,6 @@ def scan? (source : TypedSource) {approved : ExpressionId → Prop}
               let ⟨route⟩ ← AcceptedProjectedAssignmentRoute.check source binder.scheme.body assignment.target.projections assignment.target.type
               let ⟨keys⟩ ← CellAwareForHeaderAdmission.approvedKeys? expression (DataPlaceKeyOrder.sourceKeys assignment.target.projections)
               pure ⟨.assignProjected declaration route profile bare keys rhsFound rhsType value remaining⟩
-          else none
       else none
   | .assignBitNot _ :: _ => none
 
@@ -626,7 +627,7 @@ inductive Syntax (source : TypedSource) (approved : ExpressionId → Prop) :
       (profile : operator = .equal ∨ assignment.target.type = .word)
       (bare : assignment.target.projections = [])
       (found : source.lookupExpression? rhs = some node)
-      (sourceType : node.type = assignment.target.type)
+      (sourceType : AssignedRhsView operator assignment.target.type node.type)
       (typed : SourceAssignmentHasType source context assignment operator rhs)
       (value : approved rhs)
       (remaining : Syntax source approved context rest final) :
@@ -639,7 +640,7 @@ inductive Syntax (source : TypedSource) (approved : ExpressionId → Prop) :
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
-      (rhsType : rhsNode.type = assignment.target.type)
+      (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type)
       (typed : SourceAssignmentHasType source context assignment operator rhs)
       (value : approved rhs)
       (remaining : Syntax source approved context rest final) :
@@ -971,7 +972,7 @@ theorem collected
       obtain ⟨_, rhsNative⟩ := (CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_children
         (codeEq ▸ nativeTyped)).1
       have child : certificates context scope rhs lowered :=
-        children context declarations value found (sourceType.symm ▸ rightTyped) generated rhsNative
+        children context declarations value found (rightTyped.node_typed unique found) generated rhsNative
       obtain ⟨head, emitted, token⟩ := GenericAssignmentStatements.Head.of_lower_bare_with_token
         (administrative := administrative) (definitions := prepared.layouts.definitions)
         bare unique writable rightTyped runtimeProfile (fun actual acceptedRight => by
@@ -1004,7 +1005,7 @@ theorem collected
             rcases List.mem_cons.mp member with same | member
             · subst child
               exact ⟨rhsNode, rhsFound, children context declarations value rhsFound
-                (rhsType.symm ▸ rightTyped) generated native⟩
+                (rightTyped.node_typed unique rhsFound) generated native⟩
             · obtain ⟨node, found, childTyped⟩ := route.key_typed unique (sourceTyped binder declaration) member
               exact ⟨node, found, children context declarations (keys _ member) found childTyped generated native⟩)
           accepted nativeTyped

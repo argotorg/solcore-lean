@@ -710,6 +710,19 @@ mutual
         (value_type : ExpressionHasType source context value (.fixed type))
         (requirements_eq : assignment.requirements = []) :
         SourceAssignmentHasType source context assignment operator value
+    /-- `<<=` and `>>=`: the target is the shift's value and the right-hand side
+    its amount, at an amount type of its own (upstream's `x = x << n`). -/
+    | shiftCompound
+        {context : Context} {assignment : AssignmentResolution}
+        {operator : Syntax.ValueAssignOp} {value : ExpressionId}
+        {targetType amountType : TypeSystem.Ty}
+        (operator_kind : ShiftCompoundAssignmentOperator operator)
+        (target_type : SourcePlaceHasType source context assignment.target targetType)
+        (target_kind : ShiftValueType targetType)
+        (value_type : ExpressionHasType source context value amountType)
+        (amount : ShiftAmountType amountType)
+        (requirements_eq : assignment.requirements = []) :
+        SourceAssignmentHasType source context assignment operator value
 
   /-- Bit-not assignment in the current executable source profile. -/
   inductive SourceBitNotAssignmentValid (source : TypedSource) :
@@ -1267,6 +1280,10 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
     (fun operatorKind targetType valueType requirementsEq targetInduction
         valueInduction =>
       .fixedCompound operatorKind targetInduction valueInduction requirementsEq)
+    (fun operatorKind targetType targetKind valueType amount requirementsEq
+        targetInduction valueInduction =>
+      .shiftCompound operatorKind targetInduction targetKind valueInduction amount
+        requirementsEq)
     (fun targetType requirementsEq targetInduction =>
       .intro targetInduction requirementsEq)
     (fun contains formEq monomorphic generalizes binderExtension typeEq =>

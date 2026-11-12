@@ -2267,6 +2267,7 @@ def main : IO UInt32 := do
   Tests.RustHullCreationFaultCorrespondence.run
   Tests.SourceCoreGeneralizedExport.AcceptedTickRuntime.run
   Tests.SourceCoreShiftSubset.run
+  Tests.SourceCoreCompoundShiftSubset.run
   Tests.SourceLoopMeaning.testSourceLoopMeaning
   Tests.SourceForwardedCallEmitter.testSourceForwardedCallEmitter
   Tests.SourceForwardedCallCases.testSourceForwardedCallCases

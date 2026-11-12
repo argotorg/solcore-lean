@@ -2421,7 +2421,8 @@ theorem assignment_child_source {source : TypedSource} {context : SourceSemantic
     ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type := by
   have child : ∃ type, ExpressionHasType source context id type := by
     cases typed with
-    | equal target right _ | wordCompound _ target right _ | fixedCompound _ target right _ =>
+    | equal target right _ | wordCompound _ target right _ | fixedCompound _ target right _
+    | shiftCompound _ target _ right _ _ =>
       rcases List.mem_cons.mp member with rfl | member
       · exact ⟨_, right⟩
       · cases target with

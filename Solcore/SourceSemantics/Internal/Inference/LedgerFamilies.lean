@@ -393,7 +393,8 @@ theorem inferPlaceFuel_ledgerPreservation :
           simp [Detail.inferPlaceFuel, targetEq] at success
 
 /-- Assignment first traverses the place, optionally unifies it with `Word`,
-then infers the right-hand side at the resulting expected type. -/
+then infers the right-hand side at the resulting expected type, or a shift's
+amount with none. -/
 theorem inferAssignedValueFuel_ledgerPreservation
     {fuel : Nat}
     (placeLedger : InferPlaceFuelLedgerPreservation fuel)
@@ -439,6 +440,36 @@ theorem inferAssignedValueFuel_ledgerPreservation
                 subst final
                 exact expressionLedger valueResult
                   (placeTracked.unify unifyResult)
+      have finishShift
+          (tailSuccess :
+            (do
+              let fittedState ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
+              let (inferredValue, finalState) ←
+                Detail.inferExprFuel fuel context value none
+                  fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue, finalState)) =
+                .ok (assignment, inferred, final)) :
+          RecursiveLedgerInvariant final pending := by
+        cases unifyResult : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+            simp only [unifyResult, bind, Except.bind] at tailSuccess
+            cases valueResult : Detail.inferExprFuel fuel context value
+                none fittedState with
+            | error error => simp [valueResult] at tailSuccess
+            | ok valuePair =>
+                rcases valuePair with ⟨inferredValue, finalState⟩
+                simp only [valueResult, pure, Pure.pure, Except.pure]
+                  at tailSuccess
+                injection tailSuccess with resultEq
+                injection resultEq with _ valueStateEq
+                injection valueStateEq with _ finalEq
+                subst final
+                exact expressionLedger valueResult
+                  (placeTracked.unify unifyResult)
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
@@ -461,8 +492,8 @@ theorem inferAssignedValueFuel_ledgerPreservation
       | bitAnd => exact finishNonEqual success
       | bitXor => exact finishNonEqual success
       | bitOr => exact finishNonEqual success
-      | shiftLeft => exact finishNonEqual success
-      | shiftRight => exact finishNonEqual success
+      | shiftLeft => exact finishShift success
+      | shiftRight => exact finishShift success
       | uncheckedAdd => exact finishNonEqual success
       | uncheckedSubtract => exact finishNonEqual success
       | uncheckedMultiply => exact finishNonEqual success

@@ -2423,6 +2423,7 @@ theorem write_rhs_typed {key : Key} (shape : WriteShape header.function.source k
       cases assigned with
       | wordCompound _ _ typed _ => exact typed
       | fixedCompound _ place _ _ => exact absurd (place.type_eq.symm.trans shape.targetType) (by intro same; cases same)
+      | shiftCompound kind _ _ _ _ _ => cases kind
     | _ =>
       have same := Option.some.inj ((lookupStatement?_complete header.unique (by assumption)).symm.trans shape.assignedFound)
       cases same

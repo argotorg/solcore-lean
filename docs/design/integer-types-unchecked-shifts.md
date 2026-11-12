@@ -445,7 +445,8 @@ the operator and panic plumbing first.
   shifts](#row-1s-shifts-on-the-twelve-types-the-amount-takes-its-own-type)).
 - **Semantics.** `BinaryPrimitiveApplies` gains the two `word` shifts, and
   the compound forms apply them. A shift of any other value is an operand
-  fault. Since step 8d the twelve types have their own shifts.
+  fault. Since step 8d the twelve types have their own shifts, binary and
+  compound.
 - **Lowering.** Shifts lower to `wordShl` and `wordShr`, and since step 8d,
   on the twelve types, through the type's shift bodies. A compound shift of
   a local uses a frontend copy of Core's compound-assignment shape, so Core is
@@ -1239,7 +1240,33 @@ Made on 2026-11-12, during step 8d.
   `fixedShift` (mode `checked`). So a Word shift by a literal amount, now a
   `uint256`, stays in the closed subset, and the fixed-width shifts join it,
   as step 8a's unchecked arithmetic did.
-- **Compound shifts** stay `word`-only until the step's second part.
+- **Compound shifts**, the step's second part. `<<=` and `>>=` type as
+  upstream's rewrite of `x <<= n` to `x = x << n` types them: the target is
+  the shift's value and keeps its type, `word` or one of the twelve types
+  (`ShiftValueType`), and the amount is typed on its own, at `word` or an
+  unsigned type. One rule types them, `SourceAssignmentHasType.shiftCompound`;
+  `WordCompoundAssignmentOperator` no longer lists them, so no compound
+  assignment has two rules. An open target takes its own type and waits, as
+  step 7b's compound targets do, and its mention and the amount's count for
+  the `uint256` default. Finalization admits a `word` or fixed-width shift
+  target (`compoundTargetFits`) and rejects an amount of another type with
+  `operatorNotSupported` and `"shl"` or `"shr"` (`Detail.validateShiftAmount`),
+  which `FinalInferenceResources.shift_amounts_fit` records for the proofs.
+  At a fixed-width target the meaning is the binary shift's
+  (`CompoundAssignmentApplies.shiftLeft`, `shiftRight`), written back through
+  step 8b's leaf wrap: `wordShl` then the type's wrap for `<<=`, `wordSar` or
+  `wordShr` for `>>=`, and no check. Fixed-width targets stay outside the
+  meaning proofs (`FixedCheckedCompound` lists the shifts, so `targetPlain`
+  excludes them), as step 3d's compound targets do. A `Word` target stays in
+  them with an amount of its own type: the statement trees take the
+  right-hand side through `AssignedOperandTyped`, and the assignment head's
+  `rightView` is an `AssignedRhsView`, at the leaf's runtime type or, for a
+  shift, an amount whose word the shift reads (`AssignedRhsView.rep`, as
+  `amount_word_fields` reads a binary shift's). The statement checkers that
+  compared the right-hand side's type with the target's decide the view
+  instead (`AssignedRhsView.decide?`). So `w <<= 3`, whose amount is a
+  `uint256` now, `w <<= n` by a `Word` and `w >>= n` by a `uint8` pass the
+  statement shape check.
 
 ### Row 1: steps
 
@@ -1300,7 +1327,7 @@ first planned after the literals and moved before them for this reason
      rewrite to `x = x op e` types them, and finalization checks the type the
      target resolves to ([row 1's `uint256`
      default](#row-1s-uint256-default-chosen-by-the-literals-uses)). The place
-     is still evaluated once. Compound shifts stay `word`-only until step 8.
+     is still evaluated once. Compound shifts stayed `word`-only until step 8d.
 8. **Unchecked operators and shifts on the twelve types**, and ports of the
    upstream fixtures.
    - 8a. **Unchecked `+ - * / %`** on the twelve types, and `-x` in a block

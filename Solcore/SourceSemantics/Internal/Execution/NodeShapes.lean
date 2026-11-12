@@ -1025,8 +1025,8 @@ private theorem assignedValue_value
       (accepted : (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).Accepted)
       (targetAccepted : inferPlaceFuel fuel context target initial = .ok (place, targetState))
       (fitting : (match operator with | .equal => pure targetState | _ => unify targetState place.type (compoundOperandType operator (targetState.resolve place.type))) = (Except.ok fitted : Except Error State))
-      (child : (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal).Accepted)  :
-    NodeShapesPreserved (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal).final.nodes (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).final.nodes := by
+      (child : (CallIndex.expression fuel context value (assignmentExpected operator fitted place.type) fitted childValue childFinal).Accepted)  :
+    NodeShapesPreserved (CallIndex.expression fuel context value (assignmentExpected operator fitted place.type) fitted childValue childFinal).final.nodes (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).final.nodes := by
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.final] at ⊢
   obtain ⟨actualPlace, actualState, actualFitted, actualPlaceAccepted, actualFitting, actualValueAccepted, _⟩ := assignedValue_actual_prefix accepted

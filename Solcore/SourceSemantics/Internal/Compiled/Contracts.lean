@@ -1398,6 +1398,8 @@ structure ForItemBoundary (selected : BodySelection compiled row fuel)
   finalization checks for the enclosing `for` loop. -/
   targetsFit : ForItemAssignmentTargetFits
     (inferred.applySubstitution selected.body.finalized.substitution)
+  /-- The item's amount, if it is a compound shift, has an amount type. -/
+  amountsFit : ForItemAmountFits selected.body.finalized.typedSource inferred
 
 def ForItemConclusion (selected : BodySelection compiled row fuel)
     (inferenceContext : SourceInference.Context) (expectedReturn : Ty)
@@ -1440,6 +1442,8 @@ structure ForItemsBoundary (selected : BodySelection compiled row fuel)
   /-- Every item's value assignment takes its operator. -/
   targetsFit : ∀ item ∈ result.items,
     ForItemAssignmentTargetFits (item.applySubstitution selected.body.finalized.substitution)
+  /-- Every item's compound shift amount has an amount type. -/
+  amountsFit : ∀ item ∈ result.items, ForItemAmountFits selected.body.finalized.typedSource item
 
 def ForItemsConclusion (selected : BodySelection compiled row fuel)
     (inferenceContext : SourceInference.Context) (expectedReturn : Ty)

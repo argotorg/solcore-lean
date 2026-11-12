@@ -1148,7 +1148,7 @@ theorem preserves_write_fault [RecursiveStageMeaning.FaultTokens faults] (budget
       cases failed with
       | operands read rootType initialValue pathRead invalidOperands =>
         have rightRep : ValueRep values.checked registry functions rhsMap rhsWorld leaf right native prepared.route.leafType :=
-          .compatible rightView (by simpa only [payloadModel, renamed, rightType] using rightRep)
+          rightView.rep (by simpa only [payloadModel, renamed, rightType] using rightRep)
         have valid := CompatiblePlaceModifier.initialized_valid observations profile ordinaryRhs.saved_snapshot rightRep
         rw [resolution.selectedEq] at invalidOperands
         exact (valid invalidOperands).elim
@@ -1328,7 +1328,7 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
             (.value result.trace.sound.value_plain) result.evaluated (.value payload)
             result.heaps result.maps result.worlds result.frame result.metadata ⟨rhsState, rhsRelated⟩
           have rightRep : CompatiblePayload.ValueRep values.checked registry functions finalMap finalWorld leaf right rightValue prepared.route.leafType :=
-            .compatible rightView (by simpa only [payloadModel, rightType] using payload)
+            rightView.rep (by simpa only [payloadModel, rightType] using payload)
           let rightExecution : CompatiblePlaceRhsReflection.Execution values.checked registry functions program context
               invocation.evidence invocation.source (fun reason token => faults (.semantic reason) token) environment
               prepared (renamedCodes codes ξ) sourceTypes assignment.target leaf _ actual store mapping world before _
@@ -1630,7 +1630,7 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
       exact .success snapshot trace write finalHeaps maps worlds preservation metadata count
         (by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
           Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed)
-        reached related ⟨CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped rightView profile
+        reached related ⟨CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped rightView profile targetPlain
           locals snapshot middleTyped rightTyped write,
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation⟩ strict remaining
 include transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped bare in
@@ -1669,7 +1669,7 @@ theorem preserves_value {sourceSize : Nat}
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count,
       by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
         Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed,
-      ⟨reached, related, CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped rightView profile
+      ⟨reached, related, CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped rightView profile targetPlain
         locals snapshot middleTyped rightTyped write,
         StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩,
       agreement⟩

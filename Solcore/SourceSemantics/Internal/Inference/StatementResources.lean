@@ -318,7 +318,9 @@ theorem inferAssignedValueFuel_success_sound_of_typed_result
       targetExpression operator value initial =
         .ok (assignment, inferredValue, final))
     (targetFits : AssignmentTargetFits (assignment.applySubstitution outer)
-      operator) :
+      operator)
+    (amountFits : AssignmentAmountFits (source.applySubstitution outer) operator
+      inferredValue.id) :
     SourceAssignmentHasType (source.applySubstitution outer) target
       (assignment.applySubstitution outer) operator inferredValue.id := by
   unfold Detail.inferAssignedValueFuel at success
@@ -429,12 +431,93 @@ theorem inferAssignedValueFuel_success_sound_of_typed_result
                     (outer.apply place.type) := by
                   rw [← valueExpectedEq]
                   exact valueTyped
-                rcases compoundTargetFits_cases notEqual fitsHere with
+                rcases compoundTargetFits_cases notEqual (by cases operatorKind <;> rfl) fitsHere with
                   word | ⟨type, fixed, kind⟩
                 · rw [word] at placeAt valueAt
                   exact .wordCompound operatorKind placeAt valueAt rfl
                 · rw [fixed] at placeAt valueAt
                   exact .fixedCompound kind placeAt valueAt rfl
+      have finishShift
+          (shiftKind : ShiftCompoundAssignmentOperator operator)
+          (tailSuccess :
+            (do
+              let fittedState ← Detail.unify placeState place.type
+                (Detail.compoundOperandType operator (placeState.resolve place.type))
+              let (inferredValue, finalState) ←
+                Detail.inferExprFuel fuel inferenceContext value none fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue, finalState)) =
+                .ok (assignment, inferredValue, final)) :
+          SourceAssignmentHasType (source.applySubstitution outer) target
+            (assignment.applySubstitution outer) operator inferredValue.id := by
+        have expectedBelow :
+            (placeState.resolve place.type).VariablesBelow
+              placeState.inference.next :=
+          placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2
+        cases unifyResult : Detail.unify placeState place.type
+            (Detail.compoundOperandType operator (placeState.resolve place.type)) with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+            simp only [unifyResult, bind, Except.bind] at tailSuccess
+            have fitProgress := Detail.unify_inferenceProgress
+              placeProperties.2.1.solved placeProperties.2.2
+              (Detail.compoundOperandType_variablesBelow expectedBelow) unifyResult
+            have fittedReady := Detail.unify_preserves_inferenceReady
+              placeProperties.2.1 placeProperties.2.2
+              (Detail.compoundOperandType_variablesBelow expectedBelow) unifyResult
+            cases valueResult : Detail.inferExprFuel fuel inferenceContext
+                value none fittedState with
+            | error error =>
+                simp [valueResult] at tailSuccess
+            | ok valuePair =>
+                rcases valuePair with ⟨inferred, finalState⟩
+                simp only [valueResult, pure, Pure.pure, Except.pure]
+                  at tailSuccess
+                injection tailSuccess with resultEq
+                injection resultEq with assignmentEq valueStateEq
+                injection valueStateEq with inferredEq finalEq
+                subst assignment
+                subst inferredValue
+                subst final
+                have valueProperties :=
+                  Detail.inferExprFuel_inferenceProperties fittedReady
+                    signatureFormation functionsCanonical (by
+                      intro expectedType member
+                      simp at member)
+                    valueResult
+                have outerFitted : outer.SemanticallyExtends
+                    fittedState.inference.substitution :=
+                  Substitution.SemanticallyExtends.trans outerExtension
+                    valueProperties.1.substitution_extends
+                have resolvedFinal :
+                    outer.apply (finalState.resolve place.type) =
+                      outer.apply place.type := by
+                  simpa [Frontend.SourceInference.State.resolve,
+                    TypeSystem.InferState.resolve] using
+                      outerExtension place.type
+                have fitsHere : Detail.compoundTargetFits operator
+                    (outer.apply place.type) = true := by
+                  simpa [AssignmentTargetFits,
+                    AssignmentResolution.applySubstitution,
+                    PlaceResolution.applySubstitution, resolvedFinal]
+                    using targetFits
+                have placeAt : SourcePlaceHasType
+                    (source.applySubstitution outer) target
+                    (({ place with type := finalState.resolve place.type } :
+                      PlaceResolution).applySubstitution outer)
+                    (outer.apply place.type) := by
+                  rw [← resolvedFinal]
+                  exact placeTyped
+                -- The amount has its own type, which finalization admitted (`amountFits`).
+                obtain ⟨valueNode, valueContains, valueNodeType⟩ := valueTyped.stored_type
+                have amountHere : Detail.shiftAmountFits (outer.apply inferred.type) = true := by
+                  rw [← valueNodeType]
+                  exact amountFits (by cases shiftKind <;> rfl) valueNode valueContains
+                exact .shiftCompound shiftKind placeAt
+                  (shiftValueType_of_compoundTargetFits shiftKind fitsHere) valueTyped
+                  (shiftAmountType_of_fits amountHere) rfl
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
@@ -498,8 +581,8 @@ theorem inferAssignedValueFuel_success_sound_of_typed_result
       | bitAnd => exact finishNonEqual .bitAnd success
       | bitXor => exact finishNonEqual .bitXor success
       | bitOr => exact finishNonEqual .bitOr success
-      | shiftLeft => exact finishNonEqual .shiftLeft success
-      | shiftRight => exact finishNonEqual .shiftRight success
+      | shiftLeft => exact finishShift .shiftLeft success
+      | shiftRight => exact finishShift .shiftRight success
       | uncheckedAdd => exact finishNonEqual .uncheckedAdd success
       | uncheckedSubtract => exact finishNonEqual .uncheckedSubtract success
       | uncheckedMultiply => exact finishNonEqual .uncheckedMultiply success
@@ -547,7 +630,9 @@ theorem inferStatementFuel_success_assignValue_sound_of_typed_children
       ((result.state.toTypedSource roots).applySubstitution outer) target
       inferred.id (outer.apply inferred.type))
     (targetFits : AssignmentTargetFits (assignment.applySubstitution outer)
-      operator.value) :
+      operator.value)
+    (amountFits : AssignmentAmountFits
+      ((result.state.toTypedSource roots).applySubstitution outer) operator.value inferred.id) :
     ActiveLocalContextInvariant result.state outer target ∧
       StatementHasType
         ((result.state.toTypedSource roots).applySubstitution outer)
@@ -581,7 +666,7 @@ theorem inferStatementFuel_success_assignValue_sound_of_typed_children
   have assignmentTyped :=
     inferAssignedValueFuel_success_sound_of_typed_result allocatedReady
       signatureFormation functionsCanonical assignmentExtension placeTyped
-      valueTyped assignmentSuccess targetFits
+      valueTyped assignmentSuccess targetFits amountFits
   exact inferStatementFuel_success_assignValue_sound_of_actual_child
     statementEq allocationEq success invariant roots assignmentSuccess
     assignmentTyped
@@ -622,6 +707,7 @@ theorem inferStatementFuel_success_assignValue_bounded_scoped
       (.statement result.id))
     (closed : OccurrenceGraphClosed coverageSource)
     (targetsFit : SourceAssignmentTargetsFit coverageSource)
+    (amountsFit : SourceShiftAmountsFit coverageSource)
     (resultExtension : TypingSourceExtends
       ((result.state.toTypedSource roots).applySubstitution outer)
       coverageSource)
@@ -737,10 +823,17 @@ theorem inferStatementFuel_success_assignValue_bounded_scoped
     have fit := targetsFit containsFinal
     simpa [StatementNode.applySubstitution, StatementForm.applySubstitution,
       StatementAssignmentTargetsFit] using fit
+  have amountFits : AssignmentAmountFits
+      ((result.state.toTypedSource roots).applySubstitution outer) operator.value inferred.id := by
+    intro shift node valueContains
+    exact amountsFit containsFinal
+      (by simpa [StatementNode.applySubstitution, StatementForm.applySubstitution,
+        StatementAssignsShiftAmount] using shift)
+      (resultExtension.containsExpression valueContains)
   exact inferStatementFuel_success_assignValue_sound_of_typed_children
     statementEq allocationEq success assignmentSuccess ready
     signatureFormation functionsCanonical invariant outerExtension roots
-    placeTyped valueTyped targetFits
+    placeTyped valueTyped targetFits amountFits
 
 /-- Bit-not assignment has only the actual place traversal as a recursive
 child.  Its indexed keys inherit the final graph's template scope from the
@@ -1206,6 +1299,74 @@ theorem inferAssignedValueFuel_success_place_state_provenance
                   exact Detail.inferExprFuel_integerPatterns_subset valueResult
                 · exact (Detail.unify_requirements_subset unifyResult).trans
                     (Detail.inferExprFuel_requirements_subset valueResult)
+      have finishShift
+          (tailSuccess :
+            (do
+              let fittedState ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
+              let (inferredValue, finalState) ←
+                Detail.inferExprFuel fuel inferenceContext value none
+                  fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue, finalState)) =
+                .ok (assignment, inferredValue, final)) :
+          ∃ actualPlace actualState,
+            (Except.ok (place, placeState) : Except Frontend.SourceInference.Error
+              (PlaceResolution × Frontend.SourceInference.State)) =
+                .ok (actualPlace, actualState) ∧
+            actualState.NodesBelowNextOccurrence ∧
+            TypingSourceExtends (actualState.toTypedSource roots)
+              (final.toTypedSource roots) ∧
+            actualState.integerLiterals ⊆ final.integerLiterals ∧
+            actualState.integerPatterns ⊆ final.integerPatterns ∧
+            actualState.requirements ⊆ final.requirements := by
+        cases unifyResult : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+            simp only [unifyResult, bind, Except.bind] at tailSuccess
+            cases valueResult : Detail.inferExprFuel fuel inferenceContext
+                value none fittedState with
+            | error error =>
+                simp [valueResult] at tailSuccess
+            | ok valuePair =>
+                rcases valuePair with ⟨inferred, finalState⟩
+                simp only [valueResult, pure, Pure.pure, Except.pure]
+                  at tailSuccess
+                injection tailSuccess with resultEq
+                injection resultEq with assignmentEq valueStateEq
+                injection valueStateEq with inferredEq finalEq
+                subst assignment
+                subst inferredValue
+                subst final
+                have fittedBelow : fittedState.NodesBelowNextOccurrence :=
+                  (Detail.unify_occurrenceBoundExtends
+                    unifyResult).nodesBelowNextOccurrence placeBelow
+                have placeToFitted : TypingSourceExtends
+                    (placeState.toTypedSource roots)
+                    (fittedState.toTypedSource roots) := by
+                  constructor
+                  · have headerEq := Detail.unify_state_header unifyResult
+                    have ownerEq :=
+                      congrArg Frontend.SourceInference.State.Header.owner
+                        headerEq
+                    simpa [Frontend.SourceInference.State.toTypedSource,
+                      Frontend.SourceInference.State.header] using ownerEq
+                  · have nodesEq :=
+                      (Detail.unify_occurrenceState_eq unifyResult).1
+                    change placeState.nodes <+: fittedState.nodes
+                    rw [nodesEq]
+                    exact List.prefix_rfl
+                refine ⟨place, placeState, rfl, placeBelow,
+                  placeToFitted.trans
+                    (inferExprFuel_success_typingSourceExtends valueResult
+                      fittedBelow roots), ?_, ?_, ?_⟩
+                · rw [← Detail.unify_integerLiterals unifyResult]
+                  exact Detail.inferExprFuel_integerLiterals_subset valueResult
+                · rw [← Detail.unify_integerPatterns unifyResult]
+                  exact Detail.inferExprFuel_integerPatterns_subset valueResult
+                · exact (Detail.unify_requirements_subset unifyResult).trans
+                    (Detail.inferExprFuel_requirements_subset valueResult)
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
@@ -1236,8 +1397,8 @@ theorem inferAssignedValueFuel_success_place_state_provenance
       | bitAnd => exact finishNonEqual success
       | bitXor => exact finishNonEqual success
       | bitOr => exact finishNonEqual success
-      | shiftLeft => exact finishNonEqual success
-      | shiftRight => exact finishNonEqual success
+      | shiftLeft => exact finishShift success
+      | shiftRight => exact finishShift success
       | uncheckedAdd => exact finishNonEqual success
       | uncheckedSubtract => exact finishNonEqual success
       | uncheckedMultiply => exact finishNonEqual success
@@ -1449,7 +1610,7 @@ theorem inferAssignedValueFuel_success_value_provenance
     (below : initial.NodesBelowNextOccurrence)
     (roots : List NodeId := []) :
     ∃ expected valueInitial,
-      Detail.inferExprFuel fuel inferenceContext value (some expected)
+      Detail.inferExprFuel fuel inferenceContext value expected
         valueInitial = .ok (inferredValue, final) ∧
       valueInitial.NodesBelowNextOccurrence ∧
       TypingSourceExtends (valueInitial.toTypedSource roots)
@@ -1480,7 +1641,7 @@ theorem inferAssignedValueFuel_success_value_provenance
                   AssignmentResolution), inferredValue, finalState)) =
                 .ok (assignment, inferredValue, final)) :
           ∃ expected valueInitial,
-            Detail.inferExprFuel fuel inferenceContext value (some expected)
+            Detail.inferExprFuel fuel inferenceContext value expected
               valueInitial = .ok (inferredValue, final) ∧
             valueInitial.NodesBelowNextOccurrence ∧
             TypingSourceExtends (valueInitial.toTypedSource roots)
@@ -1510,7 +1671,56 @@ theorem inferAssignedValueFuel_success_value_provenance
                 have fittedBelow : fittedState.NodesBelowNextOccurrence :=
                   (Detail.unify_occurrenceBoundExtends
                     unifyResult).nodesBelowNextOccurrence placeBelow
-                exact ⟨Detail.compoundOperandType operator (fittedState.resolve place.type), fittedState,
+                exact ⟨some (Detail.compoundOperandType operator (fittedState.resolve place.type)), fittedState,
+                  valueResult, fittedBelow,
+                  inferExprFuel_success_typingSourceExtends valueResult
+                    fittedBelow roots,
+                  Detail.inferExprFuel_integerLiterals_subset valueResult,
+                  Detail.inferExprFuel_integerPatterns_subset valueResult,
+                  Detail.inferExprFuel_requirements_subset valueResult⟩
+      have finishShift
+          (tailSuccess :
+            (do
+              let fittedState ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
+              let (inferredValue, finalState) ←
+                Detail.inferExprFuel fuel inferenceContext value none
+                  fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue, finalState)) =
+                .ok (assignment, inferredValue, final)) :
+          ∃ expected valueInitial,
+            Detail.inferExprFuel fuel inferenceContext value expected
+              valueInitial = .ok (inferredValue, final) ∧
+            valueInitial.NodesBelowNextOccurrence ∧
+            TypingSourceExtends (valueInitial.toTypedSource roots)
+              (final.toTypedSource roots) ∧
+            valueInitial.integerLiterals ⊆ final.integerLiterals ∧
+            valueInitial.integerPatterns ⊆ final.integerPatterns ∧
+            valueInitial.requirements ⊆ final.requirements := by
+        cases unifyResult : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+            simp only [unifyResult, bind, Except.bind] at tailSuccess
+            cases valueResult : Detail.inferExprFuel fuel inferenceContext
+                value none fittedState with
+            | error error =>
+                simp [valueResult] at tailSuccess
+            | ok valuePair =>
+                rcases valuePair with ⟨inferred, finalState⟩
+                simp only [valueResult, pure, Pure.pure, Except.pure]
+                  at tailSuccess
+                injection tailSuccess with resultEq
+                injection resultEq with assignmentEq valueStateEq
+                injection valueStateEq with inferredEq finalEq
+                subst assignment
+                subst inferredValue
+                subst final
+                have fittedBelow : fittedState.NodesBelowNextOccurrence :=
+                  (Detail.unify_occurrenceBoundExtends
+                    unifyResult).nodesBelowNextOccurrence placeBelow
+                exact ⟨none, fittedState,
                   valueResult, fittedBelow,
                   inferExprFuel_success_typingSourceExtends valueResult
                     fittedBelow roots,
@@ -1533,7 +1743,7 @@ theorem inferAssignedValueFuel_success_value_provenance
               subst assignment
               subst inferredValue
               subst final
-              exact ⟨placeState.resolve place.type, placeState, valueResult,
+              exact ⟨some (placeState.resolve place.type), placeState, valueResult,
                 placeBelow,
                 inferExprFuel_success_typingSourceExtends valueResult
                   placeBelow roots,
@@ -1548,8 +1758,8 @@ theorem inferAssignedValueFuel_success_value_provenance
       | bitAnd => exact finishNonEqual success
       | bitXor => exact finishNonEqual success
       | bitOr => exact finishNonEqual success
-      | shiftLeft => exact finishNonEqual success
-      | shiftRight => exact finishNonEqual success
+      | shiftLeft => exact finishShift success
+      | shiftRight => exact finishShift success
       | uncheckedAdd => exact finishNonEqual success
       | uncheckedSubtract => exact finishNonEqual success
       | uncheckedMultiply => exact finishNonEqual success

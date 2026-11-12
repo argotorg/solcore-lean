@@ -1206,9 +1206,10 @@ theorem Items.scan {policy : SourceCoreLoops.Policy} {source : TypedSource}
         | assignValue assignment =>
           obtain ⟨_, _, value, _⟩ :=
             ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare receipt.sourceProfile assignment
-          obtain ⟨node, contains, same⟩ := value.stored_type
+          obtain ⟨_, valueTyped, valueView⟩ := value
+          obtain ⟨node, contains, same⟩ := valueTyped.stored_type
           exact .assign receipt.declaration targetType receipt.sourceProfile receipt.bare
-            (lookupExpression?_complete unique contains) same
+            (lookupExpression?_complete unique contains) (by rw [same]; exact valueView)
             (children ⟨_, _, _, receipt.child, receipt.generated⟩ (by simp [Items.children]))
             (ih closed (fun child member => children child (by simp [Items.children, member]))
               (fun binding member => bindings binding (by simpa only [Items.bindings] using member)) tail)
@@ -1220,9 +1221,10 @@ theorem Items.scan {policy : SourceCoreLoops.Policy} {source : TypedSource}
         | assignValue assignment =>
           obtain ⟨_, _, value, _⟩ :=
             ScopedSourceForItemsAdmission.projected_assignment_facts unique receipt.description.binding route receipt.sourceProfile assignment
-          obtain ⟨node, contains, same⟩ := value.stored_type
+          obtain ⟨_, valueTyped, valueView⟩ := value
+          obtain ⟨node, contains, same⟩ := valueTyped.stored_type
           refine .assignProjected receipt.description.binding route receipt.sourceProfile receipt.projected ?_
-            (lookupExpression?_complete unique contains) same
+            (lookupExpression?_complete unique contains) (by rw [same]; exact valueView)
             (children ⟨_, _, _, receipt.child, receipt.generated⟩ (by simp [Items.children]))
             (ih closed (fun child member => children child (by simp [Items.children, member]))
               (fun binding member => bindings binding (by simpa only [Items.bindings] using member)) tail)
@@ -1446,9 +1448,10 @@ theorem Tree.scan_complete {policy : SourceCoreLoops.Policy} {checked : SourceCo
       | assignValue assignment =>
         obtain ⟨_, _, value, _⟩ :=
           ScopedSourceForItemsAdmission.assignment_facts receipt.declaration targetType receipt.bare receipt.sourceProfile assignment
-        obtain ⟨node, contains, same⟩ := value.stored_type
+        obtain ⟨_, valueTyped, valueView⟩ := value
+        obtain ⟨node, contains, same⟩ := valueTyped.stored_type
         exact .assign found form receipt.declaration targetType receipt.sourceProfile receipt.bare
-          (lookupExpression?_complete unique contains) same
+          (lookupExpression?_complete unique contains) (by rw [same]; exact valueView)
           (children ⟨_, _, _, receipt.child, receipt.generated⟩ (by simp [Tree.children]))
           (ih closed (fun child member => children child (by simp [Tree.children, member]))
             (fun binding member => bindings binding (by simpa only [Tree.bindings] using member)) tail)
@@ -1461,9 +1464,10 @@ theorem Tree.scan_complete {policy : SourceCoreLoops.Policy} {checked : SourceCo
       | assignValue assignment =>
         obtain ⟨_, _, value, _⟩ :=
           ScopedSourceForItemsAdmission.projected_assignment_facts unique receipt.description.binding route receipt.sourceProfile assignment
-        obtain ⟨node, contains, same⟩ := value.stored_type
+        obtain ⟨_, valueTyped, valueView⟩ := value
+        obtain ⟨node, contains, same⟩ := valueTyped.stored_type
         refine .assignProjected found form receipt.description.binding route receipt.sourceProfile receipt.projected ?_
-          (lookupExpression?_complete unique contains) same
+          (lookupExpression?_complete unique contains) (by rw [same]; exact valueView)
           (children ⟨_, _, _, receipt.child, receipt.generated⟩ (by simp [Tree.children]))
           (ih closed (fun child member => children child (by simp [Tree.children, member]))
             (fun binding member => bindings binding (by simpa only [Tree.bindings] using member)) tail)

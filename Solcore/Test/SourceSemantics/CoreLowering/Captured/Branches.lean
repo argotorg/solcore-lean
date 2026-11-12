@@ -1126,6 +1126,7 @@ private theorem assigned {source : TypedSource} {context : SourceSemantics.Conte
     GenericImperativeMatch.Syntax source approved context (.statements mode (id :: rest)) .word := by
   cases typed with
   | wordCompound operator _ _ _ | fixedCompound operator _ _ _ => cases operator
+  | shiftCompound operator _ _ _ _ _ => cases operator
   | equal target rhs _requirements =>
       cases target with
       | intro writable projections target =>
@@ -1142,7 +1143,7 @@ private theorem assigned {source : TypedSource} {context : SourceSemantics.Conte
             cases projections
             have word := target.symm.trans targetType
             simpa only [word, scheme, TypeSystem.Scheme.mono] using writable
-          · simpa only [target] using rhs
+          · rw [target]; exact .of_type rhs
           · exact .inl rfl
           · intro child member
             simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
@@ -3382,6 +3383,7 @@ private theorem assigned {source : TypedSource} {context : SourceSemantics.Conte
     GenericImperativeMatch.Syntax source approved context (.statements mode (id :: rest)) .word := by
   cases typed with
   | wordCompound operator _ _ _ | fixedCompound operator _ _ _ => cases operator
+  | shiftCompound operator _ _ _ _ _ => cases operator
   | equal target rhs _requirements =>
       cases target with
       | intro writable projections target =>
@@ -3398,7 +3400,7 @@ private theorem assigned {source : TypedSource} {context : SourceSemantics.Conte
             cases projections
             have word := target.symm.trans targetType
             simpa only [word, scheme, TypeSystem.Scheme.mono] using writable
-          · simpa only [target] using rhs
+          · rw [target]; exact .of_type rhs
           · exact .inl rfl
           · intro child member
             simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member

@@ -12675,14 +12675,15 @@ private theorem inferFuel_inferenceProperties_internal :
         (place, placeState) placeResult
       have finishValue (fittedState : State)
           (fitProgress : placeState.InferenceProgress fittedState)
-          (fittedReady : fittedState.InferenceReady) (expected : Ty)
-          (expectedBelow : expected.VariablesBelow fittedState.inference.next)
+          (fittedReady : fittedState.InferenceReady) (expected : Option Ty)
+          (expectedBelow : ∀ candidate ∈ expected,
+            candidate.VariablesBelow fittedState.inference.next)
           (valueProperties : InferExprFuelInferenceProperties fuel context
-            value (some expected) fittedState)
+            value expected fittedState)
           (tailSuccess :
             (do
               let (inferredValue, finalState) ← inferExprFuel fuel context
-                value (some expected) fittedState
+                value expected fittedState
               pure (({ target := { place with
                 type := finalState.resolve place.type } } :
                   AssignmentResolution), inferredValue,
@@ -12693,7 +12694,7 @@ private theorem inferFuel_inferenceProperties_internal :
               result.2.2.inference.next ∧
             result.2.1.type.VariablesBelow
               result.2.2.inference.next := by
-        cases valueResult : inferExprFuel fuel context value (some expected)
+        cases valueResult : inferExprFuel fuel context value expected
             fittedState with
         | error error =>
             simp [valueResult, bind, Except.bind] at tailSuccess
@@ -12705,12 +12706,7 @@ private theorem inferFuel_inferenceProperties_internal :
           rw [← resultEq]
           have inferredProperties := valueProperties fittedReady validated
             canonical
-            (by
-              intro candidate member
-              simp only [Option.mem_def] at member
-              injection member with typeEq
-              subst candidate
-              exact expectedBelow)
+            expectedBelow
             (inferredValue, finalState) valueResult
           have throughValue := fitProgress.trans inferredProperties.1
           have targetBelow :=
@@ -12750,18 +12746,63 @@ private theorem inferFuel_inferenceProperties_internal :
           have fittedReady := unify_preserves_inferenceReady
             placeProperties.2.1 placeProperties.2.2
             operandBelow unifyResult
-          exact finishValue fittedState fitProgress fittedReady (compoundOperandType operator (fittedState.resolve place.type))
-            (compoundOperandType_variablesBelow
-              (fitProgress.resolve_variablesBelow placeProperties.2.2))
+          exact finishValue fittedState fitProgress fittedReady (some (compoundOperandType operator (fittedState.resolve place.type)))
+            (by
+              intro candidate member
+              simp only [Option.mem_def] at member
+              injection member with typeEq
+              subst candidate
+              exact (compoundOperandType_variablesBelow
+              (fitProgress.resolve_variablesBelow placeProperties.2.2)))
+            (valueProperties fittedState) tailSuccess
+      have finishShift (operator : Syntax.ValueAssignOp)
+          (valueProperties : ∀ fittedState : State,
+            InferExprFuelInferenceProperties fuel context value
+              none fittedState)
+          (tailSuccess :
+            (do
+              let fittedState ← unify placeState place.type (compoundOperandType operator (placeState.resolve place.type))
+              let (inferredValue, finalState) ← inferExprFuel fuel context
+                value none fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue,
+                finalState)) = .ok result) :
+          initial.InferenceProgress result.2.2 ∧
+            result.2.2.InferenceReady ∧
+            result.1.target.type.VariablesBelow
+              result.2.2.inference.next ∧
+            result.2.1.type.VariablesBelow
+              result.2.2.inference.next := by
+        cases unifyResult : unify placeState place.type (compoundOperandType operator (placeState.resolve place.type)) with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+          simp only [unifyResult, bind, Except.bind] at tailSuccess
+          have operandBelow :=
+            compoundOperandType_variablesBelow (operator := operator)
+              (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
+          have fitProgress := unify_inferenceProgress
+            placeProperties.2.1.solved placeProperties.2.2
+            operandBelow unifyResult
+          have fittedReady := unify_preserves_inferenceReady
+            placeProperties.2.1 placeProperties.2.2
+            operandBelow unifyResult
+          exact finishValue fittedState fitProgress fittedReady none
+            (by intro candidate member; simp at member)
             (valueProperties fittedState) tailSuccess
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
           exact finishValue placeState
             (State.InferenceProgress.refl placeProperties.2.1.solved)
-            placeProperties.2.1 (placeState.resolve place.type)
-            (placeProperties.2.1.solved.variablesBelow_apply
-              placeProperties.2.2)
+            placeProperties.2.1 (some (placeState.resolve place.type))
+            (by
+              intro candidate member
+              simp only [Option.mem_def] at member
+              injection member with typeEq
+              subst candidate
+              exact (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2))
             (valueInduction place placeState) success
       | add => exact finishNonEqual .add (valueInduction place) success
       | subtract => exact finishNonEqual .subtract (valueInduction place) success
@@ -12771,8 +12812,8 @@ private theorem inferFuel_inferenceProperties_internal :
       | bitAnd => exact finishNonEqual .bitAnd (valueInduction place) success
       | bitXor => exact finishNonEqual .bitXor (valueInduction place) success
       | bitOr => exact finishNonEqual .bitOr (valueInduction place) success
-      | shiftLeft => exact finishNonEqual .shiftLeft (valueInduction place) success
-      | shiftRight => exact finishNonEqual .shiftRight (valueInduction place) success
+      | shiftLeft => exact finishShift .shiftLeft (valueInduction place) success
+      | shiftRight => exact finishShift .shiftRight (valueInduction place) success
       | uncheckedAdd => exact finishNonEqual .uncheckedAdd (valueInduction place) success
       | uncheckedSubtract => exact finishNonEqual .uncheckedSubtract (valueInduction place) success
       | uncheckedMultiply => exact finishNonEqual .uncheckedMultiply (valueInduction place) success
@@ -14092,19 +14133,19 @@ private theorem inferFuel_preserves_lexicalScope_internal :
       have placeScope := placeInduction (place, placeState) placeResult
       have finishValue (fittedState : State)
           (fittedScope : fittedState.lexicalScope = placeState.lexicalScope)
-          (expected : Ty)
+          (expected : Option Ty)
           (valueProperties : PreservesLexicalScope Prod.snd fittedState
-            (inferExprFuel fuel context value (some expected) fittedState))
+            (inferExprFuel fuel context value expected fittedState))
           (tailSuccess :
             (do
               let (inferredValue, finalState) ← inferExprFuel fuel context
-                value (some expected) fittedState
+                value expected fittedState
               pure (({ target := { place with
                 type := finalState.resolve place.type } } :
                   AssignmentResolution), inferredValue,
                 finalState)) = .ok result) :
           result.2.2.lexicalScope = initial.lexicalScope := by
-        cases valueResult : inferExprFuel fuel context value (some expected)
+        cases valueResult : inferExprFuel fuel context value expected
             fittedState with
         | error error =>
             simp [valueResult, bind, Except.bind] at tailSuccess
@@ -14136,12 +14177,34 @@ private theorem inferFuel_preserves_lexicalScope_internal :
         | ok fittedState =>
           simp only [unifyResult, bind, Except.bind] at tailSuccess
           exact finishValue fittedState
-            (unify_preserves_lexicalScope unifyResult) (compoundOperandType operator (fittedState.resolve place.type))
+            (unify_preserves_lexicalScope unifyResult) (some (compoundOperandType operator (fittedState.resolve place.type)))
+            (valueProperties fittedState) tailSuccess
+      have finishShift (operator : Syntax.ValueAssignOp)
+          (valueProperties : ∀ fittedState : State,
+            PreservesLexicalScope Prod.snd fittedState
+              (inferExprFuel fuel context value none fittedState))
+          (tailSuccess :
+            (do
+              let fittedState ← unify placeState place.type (compoundOperandType operator (placeState.resolve place.type))
+              let (inferredValue, finalState) ← inferExprFuel fuel context
+                value none fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue,
+                finalState)) = .ok result) :
+          result.2.2.lexicalScope = initial.lexicalScope := by
+        cases unifyResult : unify placeState place.type (compoundOperandType operator (placeState.resolve place.type)) with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+          simp only [unifyResult, bind, Except.bind] at tailSuccess
+          exact finishValue fittedState
+            (unify_preserves_lexicalScope unifyResult) none
             (valueProperties fittedState) tailSuccess
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
-          exact finishValue placeState rfl (placeState.resolve place.type)
+          exact finishValue placeState rfl (some (placeState.resolve place.type))
             (valueInduction place placeState) success
       | add => exact finishNonEqual .add (valueInduction place) success
       | subtract => exact finishNonEqual .subtract (valueInduction place) success
@@ -14151,8 +14214,8 @@ private theorem inferFuel_preserves_lexicalScope_internal :
       | bitAnd => exact finishNonEqual .bitAnd (valueInduction place) success
       | bitXor => exact finishNonEqual .bitXor (valueInduction place) success
       | bitOr => exact finishNonEqual .bitOr (valueInduction place) success
-      | shiftLeft => exact finishNonEqual .shiftLeft (valueInduction place) success
-      | shiftRight => exact finishNonEqual .shiftRight (valueInduction place) success
+      | shiftLeft => exact finishShift .shiftLeft (valueInduction place) success
+      | shiftRight => exact finishShift .shiftRight (valueInduction place) success
       | uncheckedAdd => exact finishNonEqual .uncheckedAdd (valueInduction place) success
       | uncheckedSubtract => exact finishNonEqual .uncheckedSubtract (valueInduction place) success
       | uncheckedMultiply => exact finishNonEqual .uncheckedMultiply (valueInduction place) success

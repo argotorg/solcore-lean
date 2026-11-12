@@ -680,6 +680,7 @@ theorem Shape.loop_trace {program : SourceSemantics.Program} {source : TypedSour
               cases assigned with
               | wordCompound _ _ value _ => exact value
               | fixedCompound _ place _ _ => exact absurd place.type_eq (by intro same; cases same)
+              | shiftCompound kind _ _ _ _ _ => cases kind
             have allocated : Dynamic.Heap.Allocates (outerHeap base true (Word.ofNatModulo 0))
                 shape.active.scheme.body (some (.bool flag)) ⟨base.cells.length+2⟩
                 (phaseHeap base flag true (Word.ofNatModulo 0)) := by
@@ -2172,6 +2173,7 @@ theorem Shape.loop_trace {program : SourceSemantics.Program} {source : TypedSour
         cases assigned with
         | wordCompound _ _ value _ => exact value
         | fixedCompound _ place _ _ => exact absurd place.type_eq (by intro same; cases same)
+        | shiftCompound kind _ _ _ _ _ => cases kind
       apply Dynamic.StatementExecutes.whileLoop (finalContext := context)
         (outcome := .fallthrough (phaseEnvironment shape base environment))
         (lookupStatement?_sound shape.loop.found) shape.loop.formEq

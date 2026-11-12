@@ -5114,6 +5114,20 @@ theorem StatementsHaveType.applyParameters
         targetInduction catalog contextValid)
       (by simpa using valueInduction catalog contextValid)
       (by simpa [applyAssignmentResolution] using requirementsEq)
+  · intro context assignment operator value targetType amountType operatorKind targetTyped
+      targetKind valueType amount requirementsEq targetInduction valueInduction catalog
+      contextValid
+    -- The value and amount types are closed, so they are their own images.
+    exact .shiftCompound operatorKind
+      (by simpa [applyAssignmentResolution, applyPlaceResolution] using
+        targetInduction catalog contextValid)
+      (by cases targetKind <;> constructor)
+      (by simpa using valueInduction catalog contextValid)
+      (by
+        cases amount with
+        | word => exact .word
+        | unsigned unsigned => exact .unsigned unsigned)
+      (by simpa [applyAssignmentResolution] using requirementsEq)
   · intro context assignment targetType requirementsEq targetInduction catalog
       contextValid
     exact .intro
@@ -12400,6 +12414,20 @@ theorem StatementsHaveType.applySubstitution
         PlaceResolution.applySubstitution] using
           targetInduction targetContext catalog contextValid)
       (by simpa using valueInduction targetContext catalog contextValid)
+      (by simpa [AssignmentResolution.applySubstitution] using requirementsEq)
+  · intro context assignment operator value targetType amountType operatorKind targetTyped
+      targetKind valueType amount requirementsEq targetInduction valueInduction
+      targetContext catalog contextValid
+    -- The value and amount types are closed, so they are their own images.
+    exact .shiftCompound operatorKind
+      (by simpa [AssignmentResolution.applySubstitution, PlaceResolution.applySubstitution] using
+        targetInduction targetContext catalog contextValid)
+      (by cases targetKind <;> constructor)
+      (by simpa using valueInduction targetContext catalog contextValid)
+      (by
+        cases amount with
+        | word => exact .word
+        | unsigned unsigned => exact .unsigned unsigned)
       (by simpa [AssignmentResolution.applySubstitution] using requirementsEq)
   · intro context assignment targetType requirementsEq targetInduction
       targetContext catalog contextValid

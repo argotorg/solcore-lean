@@ -245,8 +245,9 @@ inductive AssignmentValueApplies : Syntax.ValueAssignOp →
       AssignmentValueApplies .uncheckedModulo (some left) right result
 
 /-- A value assignment at its target's static type: Word's, Integer's or plain
-assignment where the meaning is that, and checked `+= -= *= /= %=` at a
-fixed-width integer target, whose result is the exact one in the type's range. -/
+assignment where the meaning is that, and at a fixed-width integer target
+checked `+= -= *= /= %=`, whose result is the exact one in the type's range,
+their unchecked forms, which wrap, and `<<= >>=`, the type's shifts. -/
 inductive CompoundAssignmentApplies (targetType : TypeSystem.Ty) :
     Syntax.ValueAssignOp → Option Value → Value → Value → Prop where
   | primitive {operator : Syntax.ValueAssignOp} {current : Option Value} {right result : Value}
@@ -293,6 +294,14 @@ inductive CompoundAssignmentApplies (targetType : TypeSystem.Ty) :
       (target : targetType = .fixed type)
       (applies : FixedBinaryApplies type .uncheckedModulo left right result) :
       CompoundAssignmentApplies targetType .uncheckedModulo (some left) right result
+  | shiftLeft {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .shiftLeft left right result) :
+      CompoundAssignmentApplies targetType .shiftLeft (some left) right result
+  | shiftRight {type : TypeSystem.FixedInteger} {left right result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedBinaryApplies type .shiftRight left right result) :
+      CompoundAssignmentApplies targetType .shiftRight (some left) right result
 
 namespace CompoundAssignmentApplies
 
@@ -326,6 +335,8 @@ theorem eq_of_plain {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignO
     | uncheckedMultiply target _ => exact absurd .uncheckedMultiply (plain _ target)
     | uncheckedDivide target _ => exact absurd .uncheckedDivide (plain _ target)
     | uncheckedModulo target _ => exact absurd .uncheckedModulo (plain _ target)
+    | shiftLeft target _ => exact absurd .shiftLeft (plain _ target)
+    | shiftRight target _ => exact absurd .shiftRight (plain _ target)
   · exact .primitive plain
 
 end CompoundAssignmentApplies

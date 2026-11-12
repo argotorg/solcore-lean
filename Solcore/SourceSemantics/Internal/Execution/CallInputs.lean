@@ -620,10 +620,7 @@ theorem inputs_assignedValue
            cases Except.ok.inj fitting
            exact placeWF)
         | exact unify_preserves_requirementsWellFormed fitting placeWF
-      refine ⟨fitProperties.2.1, fittedWF, inputs.catalog, ?_⟩
-      intro type member
-      cases member
-      exact fitProperties.2.2
+      exact ⟨fitProperties.2.1, fittedWF, inputs.catalog, fitProperties.2.2⟩
 
 end ChildStep
 end Solcore.SourceSemantics.SourceInferenceExecution

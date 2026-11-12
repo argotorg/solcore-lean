@@ -192,7 +192,7 @@ theorem whole {route : Route} {prepared : Prepared}
     .cons reference (.nil .nil)
   have writable : WritableLocal context binder.id prepared.route.rootSourceType := rootEq ▸ rootWritable
   exact CompatiblePlaceContinuation.preserves_from_source (compilation := compilation) (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (node := node) (nextNode := node) (index := 0) layout (.refl _) childMeaning faithful observations
-    ⟨rfl, rfl⟩ (by cbv) leafView leafEq.symm (.inl rfl) environments heaps localAgrees (by simp [scope, SourceCoreLocalCell.lookup?, assignment])
+    ⟨rfl, rfl⟩ (by cbv) (.same leafView) leafEq.symm (.inl rfl) environments heaps localAgrees (by simp [scope, SourceCoreLocalCell.lookup?, assignment])
     writable sourceAssignment Word.zero ⟨rfl, rfl⟩ (by cbv) (.value (keyEvaluates environment after))
 
 /-- Staging changes the retained source type, while the actual modifier uses
@@ -448,7 +448,7 @@ theorem whole {route : Route} {prepared : Prepared}
   exact CompatiblePlaceAssignmentReflection.reflects (node := node) (index := 0) layout ordinary registryExtension
     (childReflects registry _) functionViews faithful observations
     (fun receipt => .inl ⟨_, _, _, receipt⟩) (fun location => .inr (.inl ⟨location, rfl, rfl⟩))
-    ⟨rfl, rfl⟩ (by cbv) leafView leafEq.symm (.inl rfl) environments heaps (localAgrees initial)
+    ⟨rfl, rfl⟩ (by cbv) (.same leafView) leafEq.symm (.inl rfl) environments heaps (localAgrees initial)
     (by simp [scope, SourceCoreLocalCell.lookup?, assignment]) (rootEq ▸ rootWritable) completed
 
 /-- A successful whole run with this compiled literal continuation yields an
@@ -626,7 +626,7 @@ private theorem syntaxTree (mode : Bool) : CompatibleAssignmentStatements.Syntax
     have same := Except.ok.inj (this.symm.trans found)
     cases same
     exact writable
-  · exact booleanTyped
+  · exact .of_type booleanTyped
   · exact .inl rfl
   · exact .tail (.body (.returnValue [] rfl rfl rfl rfl rfl booleanTyped (.fragment (.fragment (.fragment (.fragment (.primitive (.product (.literal rfl (.bool "true" true))))))))))
 
@@ -829,9 +829,9 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (rhsGenerated : (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -892,9 +892,9 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -963,9 +963,9 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
     (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
@@ -2554,9 +2554,9 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (rhsGenerated : (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
@@ -2615,9 +2615,9 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
@@ -2823,9 +2823,9 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)

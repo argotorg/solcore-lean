@@ -47,7 +47,7 @@ inductive Syntax (source : TypedSource) : SourceSemantics.Context → List ForIt
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (remaining : Syntax source context rest) : Syntax source context (.assignValue assignment operator rhs :: rest)
@@ -1043,7 +1043,7 @@ inductive UnarySyntax (source : TypedSource) : SourceSemantics.Context → List 
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (remaining : UnarySyntax source context rest) : UnarySyntax source context (.assignValue assignment operator rhs :: rest)

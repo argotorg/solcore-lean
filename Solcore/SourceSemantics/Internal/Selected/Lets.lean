@@ -1096,7 +1096,7 @@ theorem actualInferForItemFuelRootedSoundness_step {fuel : Nat}
     (placeSound : ActualInferPlaceFuelRootedSoundness fuel) :
     ActualInferForItemFuelRootedSoundness (fuel + 1) := by
   intro wholeContext inferenceContext wholeReturn expectedReturn item initial final inferred evidenceState roots
-    finalized semanticSource frames semanticContext control success resources interfaces signaturesEq ownerEq parametersEq assumptionsEq formation functions catalog parameters invariant actual operational returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered bindings actualCovered actualBindings targetsFit
+    finalized semanticSource frames semanticContext control success resources interfaces signaturesEq ownerEq parametersEq assumptionsEq formation functions catalog parameters invariant actual operational returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered bindings actualCovered actualBindings targetsFit amountsFit
   cases form : item.value with
   | letDecl name annotation initializer =>
     cases annotation with
@@ -1114,7 +1114,7 @@ theorem actualInferForItemFuelRootedSoundness_step {fuel : Nat}
   | expression expression =>
     exact actualInferForItemFuelRootedSoundness_expression expressionSound form success resources interfaces signaturesEq ownerEq parametersEq assumptionsEq formation functions catalog parameters invariant actual operational returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered bindings actualCovered actualBindings
   | assignValue target operator value =>
-    exact actualInferForItemFuelRootedSoundness_assignValue placeSound expressionSound form success resources interfaces signaturesEq ownerEq parametersEq assumptionsEq formation functions catalog parameters invariant actual operational returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered bindings actualCovered actualBindings targetsFit
+    exact actualInferForItemFuelRootedSoundness_assignValue placeSound expressionSound form success resources interfaces signaturesEq ownerEq parametersEq assumptionsEq formation functions catalog parameters invariant actual operational returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered bindings actualCovered actualBindings targetsFit amountsFit
   | assignBitNot target operator =>
     exact actualInferForItemFuelRootedSoundness_assignBitNot placeSound form success resources interfaces signaturesEq ownerEq parametersEq assumptionsEq formation functions catalog parameters invariant actual operational returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered bindings actualCovered actualBindings
 

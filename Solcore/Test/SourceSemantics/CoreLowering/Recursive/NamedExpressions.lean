@@ -589,7 +589,7 @@ variable {targetPrepared : Prepared} {index : Nat} {node : ExpressionNode} {lowe
   (bare : assignment.target.projections = [])
   (generated : NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt scope rhs lowered)
   (found : source.lookupExpression? rhs = some node)
-  (rhsView : SourceCoreRawMetadata.runtimeType targetPrepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+  (rhsView : AssignedRhsView operator targetPrepared.route.rootSourceType node.type)
   (rhsCore : lowered.type = targetPrepared.route.leafType)
   (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType targetPrepared.route.rootSourceType = .word ∨
     SourceCoreRawMetadata.runtimeType targetPrepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)

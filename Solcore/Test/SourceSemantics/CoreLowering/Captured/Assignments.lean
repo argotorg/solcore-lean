@@ -1032,6 +1032,7 @@ theorem ObservedFactory.body_syntax {fixture : CompiledFixture} (observed : Obse
             cases sameRhs
             cases typedAssignment with
             | wordCompound operator _ _ _ | fixedCompound operator _ _ _ => cases operator
+            | shiftCompound operator _ _ _ _ _ => cases operator
             | equal target rhs requirements =>
               cases target with
               | intro writable projections targetType =>
@@ -1050,7 +1051,7 @@ theorem ObservedFactory.body_syntax {fixture : CompiledFixture} (observed : Obse
                   cases projections
                   have word := targetType.symm.trans observed.shape.targetType
                   simpa only [word, observed.binderScheme, TypeSystem.Scheme.mono] using writable
-                · simpa only [targetType] using rhs
+                · rw [targetType]; exact .of_type rhs
                 · exact .inl rfl
                 · intro id member
                   simp only [observed.shape.targetBare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member

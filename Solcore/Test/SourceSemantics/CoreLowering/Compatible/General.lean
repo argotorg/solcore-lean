@@ -2214,7 +2214,7 @@ theorem actual_lower_reflects {code : Expr}
   -- The trivial relation relates every panic too.
   haveI : FunctionCalls.FaultTokens (fun _ _ => True) := ⟨fun _ => trivial⟩
   have reflected := CompatiblePlaceLowerReflection.reflects (compilation := compilation) (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (certificate := Child)
-    unique rfl (fun actual found => by cases binding actual found; exact .index keyTyped (.nil _)) keyTyped
+    unique rfl (fun actual found => by cases binding actual found; exact .index keyTyped (.nil _)) (.of_type keyTyped)
     (fun actual found => by cases binding actual found; exact rootWritable) (by simp [assignment]) childReceipt accepted typed
     (.refl _) (childReflects compilation.registry (fun _ _ => True)) functionViews faithful observations
     (fun _ _ => True.intro) (fun _ => True.intro) (.inl rfl) environments heaps localAgrees completed

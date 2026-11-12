@@ -2517,37 +2517,27 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
           (fitPrivacy : SafeTransport protectedVars placeState fitted)
           (fitLive : LiveBindersSafe protectedVars fitted)
           (fitRows : fitted.requirements = placeState.requirements)
-          (expected : Ty) (expectedBelow : expected.VariablesBelow fitted.inference.next)
-          (expectedSafe : Safe protectedVars fitted expected)
-          (ih : InferExprFuelPrivacy protectedVars fuel context value (some expected) fitted)
+          (expected : Option Ty)
+          (expectedBelow : ∀ candidate ∈ expected, candidate.VariablesBelow fitted.inference.next)
+          (expectedSafe : ∀ candidate ∈ expected, Safe protectedVars fitted candidate)
+          (ih : InferExprFuelPrivacy protectedVars fuel context value expected fitted)
           (accepted : (do
-            let (inferredValue, finalState) ← inferExprFuel fuel context value (some expected) fitted
+            let (inferredValue, finalState) ← inferExprFuel fuel context value expected fitted
             pure (({ target := { place with type := finalState.resolve place.type } } : AssignmentResolution), inferredValue, finalState)) = .ok result) :
           SafeTransport protectedVars initial result.2.2 ∧
             Safe protectedVars result.2.2 result.1.target.type ∧
             Safe protectedVars result.2.2 result.2.1.type ∧ LiveBindersSafe protectedVars result.2.2 ∧
             ∀ row ∈ result.2.2.requirements, row ∉ initial.requirements → PredicateSafe protectedVars result.2.2 row.predicate := by
-        cases valueRun : inferExprFuel fuel context value (some expected) fitted with
+        cases valueRun : inferExprFuel fuel context value expected fitted with
         | error error => simp [valueRun, bind, Except.bind] at accepted
         | ok pair =>
           rcases pair with ⟨inferredValue, finalState⟩
           simp only [valueRun, bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
           cases accepted
-          have expectedBelow' : ∀ type ∈ some expected, type.VariablesBelow fitted.inference.next := by
-            intro type member
-            simp only [Option.mem_def] at member
-            injection member with same
-            subst type
-            exact expectedBelow
-          have valueProperties := inferExprFuel_inferenceProperties fitReady validated canonical expectedBelow' valueRun
+          have valueProperties := inferExprFuel_inferenceProperties fitReady validated canonical expectedBelow valueRun
           have valuePrivacy := ih fitReady fitWF
             (fun metavariable member => Nat.lt_of_lt_of_le (bound metavariable member) (placeProperties.1.trans fitProgress).next_le)
-            fitLive catalog validated canonical expectedBelow' (by
-              intro type member
-              simp only [Option.mem_def] at member
-              injection member with same
-              subst type
-              exact expectedSafe) _ valueRun
+            fitLive catalog validated canonical expectedBelow expectedSafe _ valueRun
           have allRows := new_requirements_trans placePrivacy.2.2.2
             (new_requirements_trans (new_rows_of_eq fitRows) valuePrivacy.2.2.2 valuePrivacy.1)
             (fitPrivacy.trans valuePrivacy.1)
@@ -2582,18 +2572,60 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
             fittedReady
             (unify_preserves_requirementsWellFormed fittedRun placeWF) fittedPrivacy
             (placePrivacy.2.2.1.unify placePrivacy.2.1 wordSafe fittedRun) (unify_requirements fittedRun)
-            (Detail.compoundOperandType operator (fitted.resolve place.type))
-            (Detail.compoundOperandType_variablesBelow
-              (fittedProgress.resolve_variablesBelow placeProperties.2.2))
-            (safe_compoundOperandType (safe_resolved fittedReady (fittedPrivacy _ placePrivacy.2.1)))
+            (some (Detail.compoundOperandType operator (fitted.resolve place.type)))
+            (by
+              intro candidate member
+              cases Option.mem_def.mp member
+              exact Detail.compoundOperandType_variablesBelow
+                (fittedProgress.resolve_variablesBelow placeProperties.2.2))
+            (by
+              intro candidate member
+              cases Option.mem_def.mp member
+              exact safe_compoundOperandType (safe_resolved fittedReady (fittedPrivacy _ placePrivacy.2.1)))
+            (ih fitted) accepted
+      have finishShift
+          (ih : ∀ fitted, InferExprFuelPrivacy protectedVars fuel context value none fitted)
+          (accepted : (do
+            let fitted ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
+            let (inferredValue, finalState) ← inferExprFuel fuel context value none fitted
+            pure (({ target := { place with type := finalState.resolve place.type } } : AssignmentResolution), inferredValue, finalState)) = .ok result) :
+          SafeTransport protectedVars initial result.2.2 ∧
+            Safe protectedVars result.2.2 result.1.target.type ∧
+            Safe protectedVars result.2.2 result.2.1.type ∧ LiveBindersSafe protectedVars result.2.2 ∧
+            ∀ row ∈ result.2.2.requirements, row ∉ initial.requirements → PredicateSafe protectedVars result.2.2 row.predicate := by
+        cases fittedRun : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
+        | error error => simp [fittedRun, bind, Except.bind] at accepted
+        | ok fitted =>
+          simp only [fittedRun, bind, Except.bind] at accepted
+          have wordSafe : Safe protectedVars placeState (Detail.compoundOperandType operator (placeState.resolve place.type)) :=
+            safe_compoundOperandType (safe_resolved placeProperties.2.1 placePrivacy.2.1)
+          have fittedPrivacy := ProtectedVariables.unify placePrivacy.2.1 wordSafe fittedRun
+          have operandBelow := Detail.compoundOperandType_variablesBelow (operator := operator)
+            (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
+          have fittedProgress := unify_inferenceProgress placeProperties.2.1.solved placeProperties.2.2
+            operandBelow fittedRun
+          have fittedReady := unify_preserves_inferenceReady placeProperties.2.1 placeProperties.2.2
+            operandBelow fittedRun
+          exact finishValue fitted
+            fittedProgress
+            fittedReady
+            (unify_preserves_requirementsWellFormed fittedRun placeWF) fittedPrivacy
+            (placePrivacy.2.2.1.unify placePrivacy.2.1 wordSafe fittedRun) (unify_requirements fittedRun)
+            none (by intro candidate member; simp at member) (by intro candidate member; simp at member)
             (ih fitted) accepted
       cases operator with
       | equal =>
         simp only [pure, Pure.pure, Except.pure] at success
         exact finishValue placeState (.refl placeProperties.2.1.solved) placeProperties.2.1 placeWF
-          (.refl _ _) placePrivacy.2.2.1 rfl (placeState.resolve place.type)
-          (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
-          (safe_resolved placeProperties.2.1 placePrivacy.2.1) (valueIH place placeState) success
+          (.refl _ _) placePrivacy.2.2.1 rfl (some (placeState.resolve place.type))
+          (by
+            intro candidate member
+            cases Option.mem_def.mp member
+            exact placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
+          (by
+            intro candidate member
+            cases Option.mem_def.mp member
+            exact safe_resolved placeProperties.2.1 placePrivacy.2.1) (valueIH place placeState) success
       | add => exact finishNonEqual (valueIH place) success
       | subtract => exact finishNonEqual (valueIH place) success
       | multiply => exact finishNonEqual (valueIH place) success
@@ -2602,8 +2634,8 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
       | bitAnd => exact finishNonEqual (valueIH place) success
       | bitXor => exact finishNonEqual (valueIH place) success
       | bitOr => exact finishNonEqual (valueIH place) success
-      | shiftLeft => exact finishNonEqual (valueIH place) success
-      | shiftRight => exact finishNonEqual (valueIH place) success
+      | shiftLeft => exact finishShift (valueIH place) success
+      | shiftRight => exact finishShift (valueIH place) success
       | uncheckedAdd => exact finishNonEqual (valueIH place) success
       | uncheckedSubtract => exact finishNonEqual (valueIH place) success
       | uncheckedMultiply => exact finishNonEqual (valueIH place) success

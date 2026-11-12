@@ -492,24 +492,34 @@ def fixedUnaryOperator (operator : Syntax.UnaryOp) : Ty → Bool
 /-- The type constructor of a compound assignment's operand type at a target
 type. Compound assignment takes the target's type where its binary operator is
 a builtin there: `+= -= *= /= %=` (checked), their unchecked forms in a block
-(which wrap) and `&= |= ^=` (Word's on canonical words) at a fixed-width
-integer type. Elsewhere the compound operators are Word's. -/
+(which wrap), `&= |= ^=` (Word's on canonical words) and `<<= >>=` at a
+fixed-width integer type. Elsewhere the compound operators are Word's. A
+shift's amount is not this operand: it is typed on its own
+(`inferAssignedValueFuel`), and this type is the shift's value, the target itself. -/
 def compoundOperandConstructor (operator : Syntax.ValueAssignOp) : Ty → TypeSystem.TypeConstructorId
   | .constructor (.builtin (.fixed type)) =>
       match operator with
       | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr
+      | .shiftLeft | .shiftRight
       | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide
       | .uncheckedModulo => .builtin (.fixed type)
       | _ => .builtin .word
   | _ => .builtin .word
 
 /-- The compound operators that take a fixed-width integer target's type:
-checked `+= -= *= /= %=`, their unchecked forms and `&= |= ^=`. The shifts are
-Word's. -/
+checked `+= -= *= /= %=`, their unchecked forms, `&= |= ^=`, and `<<= >>=`,
+whose value is the target. -/
 def compoundTakesTargetType : Syntax.ValueAssignOp → Bool
   | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr
+  | .shiftLeft | .shiftRight
   | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide
   | .uncheckedModulo => true
+  | _ => false
+
+/-- Whether a compound assignment is `<<=` or `>>=`, whose amount is typed on
+its own, as upstream's rewrite of `x <<= n` to `x = x << n` types it. -/
+def isShiftAssign : Syntax.ValueAssignOp → Bool
+  | .shiftLeft | .shiftRight => true
   | _ => false
 
 /-- The operand type of a compound assignment at a target type, built from
@@ -579,6 +589,20 @@ theorem compoundOperandType_idem (operator : Syntax.ValueAssignOp) (target : Ty)
     show Ty.constructor (compoundOperandConstructor operator
       (.constructor (compoundOperandConstructor operator target))) = _
     rw [← closedEq, compoundOperandConstructor_idem, closedEq]
+
+/-- Whether a type is a shift's value type: `word` or one of the twelve
+fixed-width integer types. -/
+def shiftValueFits : Ty → Bool
+  | .constructor (.builtin .word) => true
+  | .constructor (.builtin (.fixed _)) => true
+  | _ => false
+
+/-- Whether a type is a shift amount's type: `word` or an unsigned one of the
+twelve types, which upstream's `ShiftAmount` instances cover. -/
+def shiftAmountFits : Ty → Bool
+  | .constructor (.builtin .word) => true
+  | .constructor (.builtin (.fixed type)) => !type.signed
+  | _ => false
 
 /-- A value assignment's target type takes its operator once inference is
 done: `=` takes any type, and a compound operator a type at which its operand

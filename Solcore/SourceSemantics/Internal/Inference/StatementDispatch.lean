@@ -59,11 +59,11 @@ theorem inferAssignedValueFuel_children_invariants
         .ok (place, placeState) ∧
       RecursiveExpressionInvariant wholeContext finalized placeState
         semanticContext ∧
-      Detail.inferExprFuel fuel inferenceContext value (some expected)
+      Detail.inferExprFuel fuel inferenceContext value expected
         valueInitial = .ok (inferred, final) ∧
       RecursiveExpressionInvariant wholeContext finalized valueInitial
         semanticContext ∧
-      expected.VariablesBelow valueInitial.inference.next ∧
+      (∀ candidate ∈ expected, candidate.VariablesBelow valueInitial.inference.next) ∧
       assignment.target.references = place.references ∧
       assignment.target = { place with type := final.resolve place.type } := by
   unfold Detail.inferAssignedValueFuel at success
@@ -95,11 +95,11 @@ theorem inferAssignedValueFuel_children_invariants
               .ok (actualPlace, actualPlaceState) ∧
             RecursiveExpressionInvariant wholeContext finalized
               actualPlaceState semanticContext ∧
-            Detail.inferExprFuel fuel inferenceContext value (some expected)
+            Detail.inferExprFuel fuel inferenceContext value expected
               valueInitial = .ok (inferred, final) ∧
             RecursiveExpressionInvariant wholeContext finalized valueInitial
               semanticContext ∧
-            expected.VariablesBelow valueInitial.inference.next ∧
+            (∀ candidate ∈ expected, candidate.VariablesBelow valueInitial.inference.next) ∧
             assignment.target.references = actualPlace.references ∧
             assignment.target =
               { actualPlace with type := final.resolve actualPlace.type } := by
@@ -161,10 +161,95 @@ theorem inferAssignedValueFuel_children_invariants
                     operandBelow
                     outerFitted unifyResult
                 exact ⟨place, placeState,
-                  Detail.compoundOperandType operator (fittedState.resolve place.type), fittedState, rfl,
+                  some (Detail.compoundOperandType operator (fittedState.resolve place.type)), fittedState, rfl,
                   placeInvariant, valueResult, fittedInvariant,
-                  Detail.compoundOperandType_variablesBelow
-                    (earlyProgress.resolve_variablesBelow placeTypeBelow), rfl, rfl⟩
+                  (by
+                    intro candidate member
+                    cases Option.mem_def.mp member
+                    exact Detail.compoundOperandType_variablesBelow
+                      (earlyProgress.resolve_variablesBelow placeTypeBelow)), rfl, rfl⟩
+      have finishShift
+          (tailSuccess :
+            (do
+              let fittedState ← Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type))
+              let (inferredValue, finalState) ←
+                Detail.inferExprFuel fuel inferenceContext value none
+                  fittedState
+              pure (({ target := { place with
+                type := finalState.resolve place.type } } :
+                  AssignmentResolution), inferredValue, finalState)) =
+              .ok (assignment, inferred, final)) :
+          ∃ actualPlace actualPlaceState expected valueInitial,
+            (Except.ok (place, placeState) : Except
+              Frontend.SourceInference.Error (PlaceResolution × State)) =
+              .ok (actualPlace, actualPlaceState) ∧
+            RecursiveExpressionInvariant wholeContext finalized
+              actualPlaceState semanticContext ∧
+            Detail.inferExprFuel fuel inferenceContext value expected
+              valueInitial = .ok (inferred, final) ∧
+            RecursiveExpressionInvariant wholeContext finalized valueInitial
+              semanticContext ∧
+            (∀ candidate ∈ expected, candidate.VariablesBelow valueInitial.inference.next) ∧
+            assignment.target.references = actualPlace.references ∧
+            assignment.target =
+              { actualPlace with type := final.resolve actualPlace.type } := by
+        cases unifyResult : Detail.unify placeState place.type (Detail.compoundOperandType operator (placeState.resolve place.type)) with
+        | error error =>
+            simp [unifyResult, bind, Except.bind] at tailSuccess
+        | ok fittedState =>
+            simp only [unifyResult, bind, Except.bind] at tailSuccess
+            have operandBelow := Detail.compoundOperandType_variablesBelow (operator := operator)
+              (placeProperties.2.1.solved.variablesBelow_apply placeTypeBelow)
+            have earlyProgress := Detail.unify_inferenceProgress
+              placeProperties.2.1.solved placeTypeBelow operandBelow unifyResult
+            cases valueResult : Detail.inferExprFuel fuel inferenceContext
+                value none fittedState with
+            | error error => simp [valueResult] at tailSuccess
+            | ok valuePair =>
+                rcases valuePair with ⟨inferredValue, finalState⟩
+                simp only [valueResult, pure, Pure.pure, Except.pure]
+                  at tailSuccess
+                injection tailSuccess with resultEq
+                injection resultEq with assignmentEq valueEq
+                injection valueEq with inferredEq finalEq
+                subst assignment
+                subst inferred
+                subst final
+                have fittedReady : fittedState.InferenceReady :=
+                  Detail.unify_preserves_inferenceReady
+                    placeProperties.2.1 placeTypeBelow
+                    operandBelow
+                    unifyResult
+                have valueProperties := Detail.inferExprFuel_inferenceProperties
+                  fittedReady signatureFormation functionsCanonical (by
+                    intro expectedType member
+                    simp at member) valueResult
+                have outerFitted :
+                    finalized.substitution.SemanticallyExtends
+                      fittedState.inference.substitution :=
+                  Substitution.SemanticallyExtends.trans
+                    finalSubstitutionExtension
+                    valueProperties.1.substitution_extends
+                have unifyProgress := Detail.unify_inferenceProgress
+                  placeProperties.2.1.solved placeTypeBelow
+                  operandBelow
+                  unifyResult
+                have outerPlace : finalized.substitution.SemanticallyExtends
+                    placeState.inference.substitution :=
+                  Substitution.SemanticallyExtends.trans outerFitted
+                    unifyProgress.substitution_extends
+                have placeInvariant : RecursiveExpressionInvariant
+                    wholeContext finalized placeState semanticContext :=
+                  initialInvariant.ofPlace signatureFormation
+                    functionsCanonical outerPlace placeResult
+                have fittedInvariant : RecursiveExpressionInvariant
+                    wholeContext finalized fittedState semanticContext :=
+                  placeInvariant.unify placeTypeBelow
+                    operandBelow
+                    outerFitted unifyResult
+                exact ⟨place, placeState, none, fittedState, rfl,
+                  placeInvariant, valueResult, fittedInvariant,
+                  (by intro candidate member; simp at member), rfl, rfl⟩
       cases operator with
       | equal =>
           simp only [pure, Pure.pure, Except.pure] at success
@@ -199,9 +284,12 @@ theorem inferAssignedValueFuel_children_invariants
                   finalized placeState semanticContext :=
                 initialInvariant.ofPlace signatureFormation
                   functionsCanonical outerPlace placeResult
-              exact ⟨place, placeState, placeState.resolve place.type,
+              exact ⟨place, placeState, some (placeState.resolve place.type),
                 placeState, rfl, placeInvariant, valueResult, placeInvariant,
-                expectedBelow, rfl, rfl⟩
+                (by
+                  intro candidate member
+                  cases Option.mem_def.mp member
+                  exact expectedBelow), rfl, rfl⟩
       | add => exact finishNonEqual success
       | subtract => exact finishNonEqual success
       | multiply => exact finishNonEqual success
@@ -210,8 +298,8 @@ theorem inferAssignedValueFuel_children_invariants
       | bitAnd => exact finishNonEqual success
       | bitXor => exact finishNonEqual success
       | bitOr => exact finishNonEqual success
-      | shiftLeft => exact finishNonEqual success
-      | shiftRight => exact finishNonEqual success
+      | shiftLeft => exact finishShift success
+      | shiftRight => exact finishShift success
       | uncheckedAdd => exact finishNonEqual success
       | uncheckedSubtract => exact finishNonEqual success
       | uncheckedMultiply => exact finishNonEqual success
@@ -349,11 +437,7 @@ theorem inferAssignedValueFuel_children_scopedSound
       (finalized.substitution.apply inferred.type) :=
     expressionSound valueSuccess resources assignmentSubstitutionExtension
       signaturesEq ownerEq parametersEq assumptionsEq signatureFormation
-      functionsCanonical catalog signatureParameters valueInvariant
-      (by intro candidate member
-          simp only [Option.mem_def] at member
-          cases member
-          exact expectedBelow)
+      functionsCanonical catalog signatureParameters valueInvariant expectedBelow
       (assignmentToParent.applySubstitution finalized.substitution)
       parentToFinal (assignmentToParent.trans parentToEvidence)
       assignmentPatternsSubset assignmentLiteralsSubset
@@ -460,7 +544,7 @@ theorem inferStatementFuel_success_assignValue_recursive_scoped
   apply inferStatementFuel_success_assignValue_bounded_scoped
     statementEq allocationEq success ready initialBelow signatureFormation
     functionsCanonical invariant outerExtension roots parentCovered closed
-    resources.assignment_targets_fit
+    resources.assignment_targets_fit resources.shift_amounts_fit
     resultExtension resultIntegerPatternsSubset resultIntegerLiteralsSubset
     resultRequirementsSubset
   intro assignment inferred assignmentState assignmentSuccess

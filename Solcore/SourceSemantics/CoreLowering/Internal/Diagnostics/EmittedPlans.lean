@@ -184,6 +184,9 @@ theorem raw_profile {context : SourceSemantics.Context} {assignment : Assignment
   | wordCompound _ place _ _ | fixedCompound _ place _ _ =>
     cases place with
     | intro _ _ same => exact .inr (by rw [same]; rfl)
+  | shiftCompound _ place kind _ _ _ =>
+    cases place with
+    | intro _ _ same => cases kind <;> exact .inr (by rw [same]; rfl)
 
 theorem Occurs.prepared {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     {first : Nat} {table : SourceCoreAssignmentFaultSites.Table} {faults : FunctionCalls.FaultRep}
@@ -305,7 +308,7 @@ inductive Plan (factory : AssignmentDiagnosticOrigins.Factory tracked diagnostic
       (same : head.invalid = invalidOperand site assignment.target.root operator)
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false) : Plan factory
   | unary {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope} {assignment : AssignmentResolution}
@@ -342,7 +345,7 @@ structure LocalReceipts (registry : SourceCoreRawMetadata.Registry) (faults : Fu
     (_same : head.invalid = invalidOperand site assignment.target.root operator)
     (_sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-    (_rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (_rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (_profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false), factory.residual head registry faults
   unary : ∀ {context scope assignment} (head : CompatibleBitNotStatements.Head context scope assignment)
@@ -481,7 +484,7 @@ inductive TokensFor : Plan factory → Prop where
       (same : head.invalid = invalidOperand site assignment.target.root operator)
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false) :
       TokensFor (.assignment head site origin same sourceTyped rightTyped profile)
@@ -540,7 +543,7 @@ def PlaceReceipts (registry : SourceCoreRawMetadata.Registry) (faults : Function
     head.invalid = invalidOperand site assignment.target.root operator →
     (∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type) →
-    ExpressionHasType source context rhs assignment.target.type →
+    AssignedOperandTyped source context operator rhs assignment.target.type →
     (operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false) →
     PlaceErrors head registry faults

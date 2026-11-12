@@ -141,7 +141,7 @@ private theorem assignment_references {context : SourceSemantics.Context} {assig
     rcases List.mem_append.mp member with member | member
     · exact place_references place member
     · exact expression_single right member
-  | wordCompound _ place right _ | fixedCompound _ place right _ =>
+  | wordCompound _ place right _ | fixedCompound _ place right _ | shiftCompound _ place _ right _ _ =>
     rcases List.mem_append.mp member with member | member
     · exact place_references place member
     · exact expression_single right member

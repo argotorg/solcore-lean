@@ -122,10 +122,16 @@ inductive AnnotationExpected (context : SourceInference.Context) :
       (accepted : resolveSourceType context source = .ok type) :
       AnnotationExpected context (some source) (some type)
 
-def assignmentExpected (operator : Syntax.ValueAssignOp) (state : State) (type : Ty) : Ty :=
+/-- The type a value assignment's right-hand side is inferred against
+(`inferAssignedValueFuel`): the target's for `=`, none for a shift's amount,
+which is typed on its own, and the compound operand type otherwise. -/
+def assignmentExpected (operator : Syntax.ValueAssignOp) (state : State) (type : Ty) : Option Ty :=
   match operator with
-  | .equal => state.resolve type
-  | _ => compoundOperandType operator (state.resolve type)
+  | .equal => some (state.resolve type)
+  | .shiftLeft | .shiftRight => none
+  | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr
+  | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide
+  | .uncheckedModulo => some (compoundOperandType operator (state.resolve type))
 
 /-- The actual dispatch tests selecting an indirect callee after its arguments. -/
 def IndirectCalleeAt (context : SourceInference.Context) (callee : Syntax.Expr)
@@ -467,8 +473,8 @@ inductive ChildStep : CallIndex → CallIndex → Prop where
       (accepted : (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).Accepted)
       (targetAccepted : inferPlaceFuel fuel context target initial = .ok (place, targetState))
       (fitting : (match operator with | .equal => pure targetState | _ => unify targetState place.type (compoundOperandType operator (targetState.resolve place.type))) = (Except.ok fitted : Except Error State))
-      (child : (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal).Accepted) :
-      ChildStep (CallIndex.assignedValue fuel context target operator value initial assignment inferred final) (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal)
+      (child : (CallIndex.expression fuel context value (assignmentExpected operator fitted place.type) fitted childValue childFinal).Accepted) :
+      ChildStep (CallIndex.assignedValue fuel context target operator value initial assignment inferred final) (CallIndex.expression fuel context value (assignmentExpected operator fitted place.type) fitted childValue childFinal)
   | place_group
       {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
       {initial final : State} {result : PlaceResolution}
@@ -1559,7 +1565,7 @@ theorem assignedValue_actual_prefix
       inferPlaceFuel fuel context target initial = .ok (place, placeState) ∧
       (match operator with | .equal => pure placeState | _ => unify placeState place.type (compoundOperandType operator (placeState.resolve place.type))) =
         (Except.ok fitted : Except Error State) ∧
-      inferExprFuel fuel context value (some (assignmentExpected operator fitted place.type)) fitted =
+      inferExprFuel fuel context value (assignmentExpected operator fitted place.type) fitted =
         .ok (inferred, final) ∧
       assignment.target = { place with type := final.resolve place.type } := by
   unfold inferAssignedValueFuel at accepted

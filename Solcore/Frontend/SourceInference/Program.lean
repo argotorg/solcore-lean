@@ -396,15 +396,22 @@ def expressionTypeAt? (state : State) (expression : ExpressionId) : Option Ty :=
     | .statement _ => none
 
 /-- Whether a type variable occurs in a compound assignment's target type, for
-an operator that takes its target's type (`compoundTakesTargetType`). -/
+an operator that takes its target's type (`compoundTakesTargetType`), or in a
+compound shift's amount type: upstream reads `x <<= n` as `x = x << n`, whose
+value and amount are both a shift's operands. -/
 def assignmentMentions (state : State) (typeVar : TypeVarId)
-    (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) : Bool :=
-  compoundTakesTargetType operator &&
-    (state.resolve assignment.target.type).freeVariables.contains typeVar
+    (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp)
+    (value : ExpressionId) : Bool :=
+  (compoundTakesTargetType operator &&
+    (state.resolve assignment.target.type).freeVariables.contains typeVar) ||
+  (isShiftAssign operator &&
+    match expressionTypeAt? state value with
+    | some type => type.freeVariables.contains typeVar
+    | none => false)
 
 /-- Whether a type variable occurs in a `for` item's compound target type. -/
 def forItemMentions (state : State) (typeVar : TypeVarId) : ForItemForm → Bool
-  | .assignValue assignment operator _ => assignmentMentions state typeVar assignment operator
+  | .assignValue assignment operator value => assignmentMentions state typeVar assignment operator value
   | _ => false
 
 /-- Whether a type variable occurs in an operand type of a unary or binary
@@ -425,8 +432,8 @@ def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
         | _ => false
     | .statement node =>
         match node.form with
-        | .assignValue assignment operator _ =>
-            assignmentMentions state typeVar assignment operator
+        | .assignValue assignment operator value =>
+            assignmentMentions state typeVar assignment operator value
         | .forLoop initializer _ post _ =>
             initializer.any (forItemMentions state typeVar) ||
               post.any (forItemMentions state typeVar)
@@ -575,12 +582,31 @@ def validateIntegerLiteralTargets (state : State) :
       validateIntegerLiteralTarget origin state
       validateIntegerLiteralTargets state rest
 
+/-- Whether a node is an expression at one identity whose resolved type does
+not fit. -/
+def operandMisfits (state : State) (operand : ExpressionId) (fits : Ty → Bool) :
+    Node → Bool
+  | .expression candidate =>
+      decide (candidate.id = operand) && !fits (state.resolve candidate.type)
+  | .statement _ => false
+
+/-- A compound shift's amount has `word` or an unsigned type, as a binary
+shift's does (`validateShiftOperands`): upstream reads `x <<= n` as
+`x = x << n`. Other assignments are not checked here. -/
+def validateShiftAmount (state : State) (operator : Syntax.ValueAssignOp)
+    (value : ExpressionId) : Except Error Unit :=
+  if isShiftAssign operator && state.nodes.any (operandMisfits state value shiftAmountFits) then
+    throw (.operatorNotSupported (match operator with | .shiftLeft => "shl" | _ => "shr")
+      ((expressionTypeAt? state value).getD .word))
+  else .ok ()
+
 /-- Check one value assignment's target type once the defaults are in
-(`compoundTargetFits`), naming the assigned value. -/
+(`compoundTargetFits`), naming the assigned value, and a compound shift's amount
+(`validateShiftAmount`). -/
 def validateAssignmentTarget (state : State) (assignment : AssignmentResolution)
     (operator : Syntax.ValueAssignOp) (value : ExpressionId) : Except Error Unit :=
   let type := state.resolve assignment.target.type
-  if compoundTargetFits operator type then pure ()
+  if compoundTargetFits operator type then validateShiftAmount state operator value
   else throw (.compoundTargetNotSupported value operator type)
 
 /-- Check the value assignments among a `for` header's items. -/
@@ -615,28 +641,6 @@ def validateUncheckedOperand (state : State) (node : ExpressionNode) : Except Er
         throw (.operatorNotSupported (binaryOperatorName operator) .integer)
       else .ok ()
   | _ => .ok ()
-
-/-- Whether a type is a shift's value type: `word` or one of the twelve
-fixed-width integer types. -/
-def shiftValueFits : Ty → Bool
-  | .constructor (.builtin .word) => true
-  | .constructor (.builtin (.fixed _)) => true
-  | _ => false
-
-/-- Whether a type is a shift amount's type: `word` or an unsigned one of the
-twelve types, which upstream's `ShiftAmount` instances cover. -/
-def shiftAmountFits : Ty → Bool
-  | .constructor (.builtin .word) => true
-  | .constructor (.builtin (.fixed type)) => !type.signed
-  | _ => false
-
-/-- Whether a node is an expression at one identity whose resolved type does
-not fit. -/
-def operandMisfits (state : State) (operand : ExpressionId) (fits : Ty → Bool) :
-    Node → Bool
-  | .expression candidate =>
-      decide (candidate.id = operand) && !fits (state.resolve candidate.type)
-  | .statement _ => false
 
 /-- A shift types its value and its amount on their own and waits for both
 (`inferBinaryOperator`): once the defaults are in, its value must have `word` or

@@ -852,10 +852,10 @@ theorem assignedValue_value
       (accepted : (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).Accepted)
       (targetAccepted : inferPlaceFuel fuel context target initial = .ok (place, targetState))
       (fitting : (match operator with | .equal => pure targetState | _ => unify targetState place.type (compoundOperandType operator (targetState.resolve place.type))) = (Except.ok fitted : Except Error State))
-      (child : (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal).Accepted)
+      (child : (CallIndex.expression fuel context value (assignmentExpected operator fitted place.type) fitted childValue childFinal).Accepted)
       (inputs : (CallIndex.assignedValue fuel context target operator value initial assignment inferred final).Inputs)
-      (backed : LiveTemplatesBacked initial) : LiveTemplatesBacked (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal).initial := by
-  have step : ChildStep (CallIndex.assignedValue fuel context target operator value initial assignment inferred final) (CallIndex.expression fuel context value (some (assignmentExpected operator fitted place.type)) fitted childValue childFinal) := .assignedValue_value accepted targetAccepted fitting child
+      (backed : LiveTemplatesBacked initial) : LiveTemplatesBacked (CallIndex.expression fuel context value (assignmentExpected operator fitted place.type) fitted childValue childFinal).initial := by
+  have step : ChildStep (CallIndex.assignedValue fuel context target operator value initial assignment inferred final) (CallIndex.expression fuel context value (assignmentExpected operator fitted place.type) fitted childValue childFinal) := .assignedValue_value accepted targetAccepted fitting child
   have childInputs := step.inputs inputs
   have before := ChildStep.inputs inputs (.assignedValue_place accepted targetAccepted)
   have targetBacked := ActualTemplateBacking.place before backed targetAccepted

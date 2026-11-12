@@ -2680,7 +2680,7 @@ inductive PreparedAssignment
       (same : head.invalid = invalidOperand site assignment.target.root operator)
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (fuel : Nat)

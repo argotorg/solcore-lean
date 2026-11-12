@@ -57,6 +57,8 @@ theorem sourceAssignment_transportExpressions {before after : TypedSource}
     exact .wordCompound operator (place target) (children _ (by simp) _ value) requirements
   | fixedCompound operator target value requirements =>
     exact .fixedCompound operator (place target) (children _ (by simp) _ value) requirements
+  | shiftCompound operator target targetKind value amount requirements =>
+    exact .shiftCompound operator (place target) targetKind (children _ (by simp) _ value) amount requirements
 
 theorem ActualStateInvariant.ofForItemPreservingBinders
     {fuel : Nat} {context : Frontend.SourceInference.Context}
@@ -210,6 +212,7 @@ theorem actualInferForItemFuelRootedSoundness_assignValue {fuel : Nat}
     (∀ reference ∈ inferred.references, ActualContext.Covers finalized frames reference) →
     ActualForItemBindings finalized frames inferred →
     ForItemAssignmentTargetFits (inferred.applySubstitution finalized.substitution) →
+    ForItemAmountFits semanticSource inferred →
     ∃ finalContext,
       RecursiveStatementInvariant wholeContext expectedReturn finalized
         final finalContext ∧
@@ -221,7 +224,7 @@ theorem actualInferForItemFuelRootedSoundness_assignValue {fuel : Nat}
   intro wholeContext inferenceContext wholeReturn expectedReturn item target valueExpression operator initial final inferred
     evidenceState roots finalized semanticSource frames semanticContext control itemEq success resources interfaces
     signaturesEq ownerEq parametersEq assumptionsEq formation functions catalog canonical invariant actual operational
-    _returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered _bindings actualCovered _actualBindings targetsFit
+    _returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered _bindings actualCovered _actualBindings targetsFit amountsFit
   obtain ⟨assignment, value, resultState, child, resultEq⟩ := inferForItemFuel_success_assignValue_facts itemEq success
   have sameItem : inferred = .assignValue assignment operator.value value.id := congrArg Prod.fst resultEq
   have sameState : final = resultState := congrArg Prod.snd resultEq
@@ -243,8 +246,16 @@ theorem actualInferForItemFuelRootedSoundness_assignValue {fuel : Nat}
   have targetFits : AssignmentTargetFits (assignment.applySubstitution finalized.substitution)
       operator.value := by
     simpa [ForItemForm.applySubstitution, ForItemAssignmentTargetFits] using targetsFit
+  -- The amount's node is kept in the semantic source, whose fit the loop header gives.
+  have amountFits : AssignmentAmountFits
+      ((resultState.toTypedSource roots).applySubstitution finalized.substitution)
+      operator.value value.id := by
+    intro shift node valueContains
+    have semanticFits : AssignmentAmountFits semanticSource operator.value value.id := amountsFit
+    exact semanticFits shift node
+      ((semantic (.expression value.id) rhsMember).subgraph.containsExpression valueContains (.inl rfl))
   have typedLocal := inferAssignedValueFuel_success_sound_of_typed_result invariant.ready formation functions
-    extension placeTyped valueTyped child targetFits
+    extension placeTyped valueTyped child targetFits amountFits
   have typed := sourceAssignment_transportExpressions typedLocal (after := semanticSource) (fun id member type typing =>
     (semantic (.expression id) (by simpa [ForItemForm.references, AssignmentResolution.references,
       AssignmentResolution.applySubstitution, PlaceResolution.references, PlaceResolution.applySubstitution] using member)).subgraph.expression typing (.inl rfl))
@@ -387,7 +398,7 @@ theorem actualInferForItemsFuelRootedSoundness_of_itemSoundness
     catalog signatureParameters initialInvariant actual operational returnAdmissible substitutionExtension
     resultExtension rawResultExtension
     integerPatternsSubset integerLiteralsSubset requirementsSubset
-    sourceOwner covered bindingsRetained actualCovered actualBindings targetsFit
+    sourceOwner covered bindingsRetained actualCovered actualBindings targetsFit amountsFit
   induction items generalizing initial result semanticContext with
   | nil =>
       simp only [Detail.inferForItemsFuel, pure, Pure.pure, Except.pure]
@@ -478,7 +489,7 @@ theorem actualInferForItemsFuelRootedSoundness_of_itemSoundness
                   itemLiteralsSubset itemRequirementsSubset sourceOwner
                   itemCovered itemBindingsRetained
                   (actualCovered inferredItem (by simp)) (actualBindings inferredItem (by simp))
-                  (targetsFit inferredItem (by simp))
+                  (targetsFit inferredItem (by simp)) (amountsFit inferredItem (by simp))
               have tailOwner : semanticSource.owner = itemState.owner :=
                 sourceOwner.trans
                   (Detail.inferForItemFuel_preserves_owner itemSuccess).symm
@@ -515,6 +526,7 @@ theorem actualInferForItemsFuelRootedSoundness_of_itemSoundness
                   (fun next member => actualCovered next (by simp [member]))
                   (fun next member => actualBindings next (by simp [member]))
                   (fun next member => targetsFit next (by simp [member]))
+                  (fun next member => amountsFit next (by simp [member]))
               refine ⟨finalContext, finalInvariant, finalActual, finalOperational, ?_⟩
               exact ForItemsHaveType.cons itemTyping tailTyping
 
@@ -1034,6 +1046,33 @@ theorem actualInferStatementFuel_success_forLoop_rooted
     intro item member reference present
     simp only [StatementForm.references, List.mem_append, List.mem_cons]
     exact .inl (.inr (List.mem_flatMap.mpr ⟨item, member, present⟩))
+  -- A header item's amount is a direct child of the loop, whose subtree the final source keeps.
+  have headerAmounts :
+      (∀ item ∈ initializerResult.items, ForItemAmountFits
+        ((result.state.toTypedSource roots).applySubstitution finalized.substitution) item) ∧
+      (∀ item ∈ postResult.items, ForItemAmountFits
+        ((result.state.toTypedSource roots).applySubstitution finalized.substitution) item) := by
+    have fit := SourceShiftAmountsFit.forLoop resources.shift_amounts_fit (resultExtension.containsStatement containsRaw) rfl
+    have toLocal : ∀ item,
+        (∀ reference ∈ item.references, reference ∈ (StatementForm.forLoop initializerResult.items
+          inferredCondition.id postResult.items bodyResult.statements).references) →
+        ForItemAmountFits finalized.typedSource item →
+        ForItemAmountFits ((result.state.toTypedSource roots).applySubstitution finalized.substitution) item := by
+      intro item references fits
+      cases item with
+      | assignValue assignment operator value =>
+          intro shift node valueContains
+          have edge := directChild_statement_reference containsRaw
+            (references (.expression value) (by simp [ForItemForm.references]))
+          exact fits shift node
+            ((resultExtension.child edge).subgraph.containsExpression valueContains (.inl rfl))
+      | letDecl _ _ => trivial
+      | expression _ => trivial
+      | assignBitNot _ => trivial
+    exact ⟨fun item member => toLocal item (initializerReference item member)
+        (by simpa using fit.1 _ (List.mem_map.mpr ⟨item, member, rfl⟩)),
+      fun item member => toLocal item (postReference item member)
+        (by simpa using fit.2 _ (List.mem_map.mpr ⟨item, member, rfl⟩))⟩
   have initializerSourceOwner :
       ((result.state.toTypedSource roots).applySubstitution
         finalized.substitution).owner = allocated.owner := by
@@ -1060,7 +1099,7 @@ theorem actualInferStatementFuel_success_forLoop_rooted
       initializerSourceOwner headerCovered.1 headerBindings.1
       (fun item member reference present => parentActualCovered.preserved_statement_reference containsRaw
         resultExtension (initializerReference item member reference present)) headerActualBindings.1
-      headerFits.1)
+      headerFits.1 headerAmounts.1)
   have loopAssumptionsEq : loopContext.assumptions =
       semanticContext.assumptions :=
     forItemsHaveType_assumptions_eq initializerTyping
@@ -1197,7 +1236,7 @@ theorem actualInferStatementFuel_success_forLoop_rooted
       postSourceOwner postCovered headerBindings.2
       (fun item member reference present => parentActualCovered.preserved_statement_reference containsRaw
         resultExtension (postReference item member reference present)) headerActualBindings.2
-      headerFits.2)
+      headerFits.2 headerAmounts.2)
   have assembled : ∃ finalContext facts,
       RecursiveStatementInvariant wholeContext expectedReturn finalized result.state finalContext ∧
       StatementHasType ((result.state.toTypedSource roots).applySubstitution finalized.substitution)

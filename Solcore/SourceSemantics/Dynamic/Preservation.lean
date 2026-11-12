@@ -899,7 +899,7 @@ theorem equalPreserves
   cases applies
   exact right_typed
 
-/-- Every currently supported compound assignment is a homogeneous Word
+/-- Every Word compound assignment other than the shifts is a homogeneous Word
 operation. -/
 theorem wordCompoundPreserves
     {context : Context} {heap : Heap} {operator : Syntax.ValueAssignOp}
@@ -965,20 +965,6 @@ theorem wordCompoundPreserves
           cases current_typed with
           | some left_typed =>
               exact primitive.preserves (.wordArithmetic .bitOr) left_typed
-                right_typed
-  | shiftLeft =>
-      cases applies with
-      | shiftLeft primitive =>
-          cases current_typed with
-          | some left_typed =>
-              exact primitive.preserves (.wordShift .shiftLeft) left_typed
-                right_typed
-  | shiftRight =>
-      cases applies with
-      | shiftRight primitive =>
-          cases current_typed with
-          | some left_typed =>
-              exact primitive.preserves (.wordShift .shiftRight) left_typed
                 right_typed
   | uncheckedAdd =>
       cases applies with
@@ -1088,7 +1074,7 @@ theorem preserves
       | primitive _ applies => exact applies.wordCompoundPreserves kind current_typed right_typed
       | add target _ | subtract target _ | multiply target _ | divide target _ | modulo target _
       | uncheckedAdd target _ | uncheckedSubtract target _ | uncheckedMultiply target _
-      | uncheckedDivide target _ | uncheckedModulo target _ =>
+      | uncheckedDivide target _ | uncheckedModulo target _ | shiftLeft target _ | shiftRight target _ =>
           cases target
   | fixed kind =>
       cases applies with
@@ -1117,6 +1103,53 @@ theorem preserves
           | uncheckedDivision _ _ _ _ =>
             exact .fixed _ (fixed_canonical_ofInt (fixedWrap_inRange _ _).1 (fixedWrap_inRange _ _).2)
           | checked kind | division kind | unchecked kind => cases kind
+      | shiftLeft _ _ | shiftRight _ _ => cases kind
+
+/-- `<<=` and `>>=` keep their target's type, whatever the amount's: Word's
+shifts at a Word target, and at a fixed-width target the type's, whose `<<`
+wraps to the type's width and whose `>>` keeps a canonical word canonical. -/
+theorem shiftPreserves
+    {context : Context} {heap : Heap} {targetType leaf : Ty} {operator : Syntax.ValueAssignOp}
+    {current : Option Value} {right result : Value}
+    (kind : ShiftCompoundAssignmentOperator operator)
+    (target_kind : ShiftValueType leaf)
+    (targetEq : targetType = leaf)
+    (current_typed : OptionalValueHasType context heap current leaf)
+    (applies : CompoundAssignmentApplies targetType operator current right result) :
+    ValueHasType context heap result leaf := by
+  subst targetEq
+  cases target_kind with
+  | word =>
+      cases applies with
+      | primitive _ applies =>
+          cases kind <;> cases applies <;> rename_i primitive <;> cases primitive <;> exact .word _
+      | add target _ | subtract target _ | multiply target _ | divide target _ | modulo target _
+      | uncheckedAdd target _ | uncheckedSubtract target _ | uncheckedMultiply target _
+      | uncheckedDivide target _ | uncheckedModulo target _ | shiftLeft target _ | shiftRight target _ =>
+          cases target
+  | fixed type =>
+      cases applies with
+      | primitive plain _ =>
+          cases kind
+          · exact absurd FixedCheckedCompound.shiftLeft (plain type rfl)
+          · exact absurd FixedCheckedCompound.shiftRight (plain type rfl)
+      | shiftLeft target applies =>
+          cases target
+          cases applies with
+          | shiftLeft left right =>
+            exact .fixed _ (fixed_canonical_ofInt (fixedWrap_inRange _ _).1 (fixedWrap_inRange _ _).2)
+          | checked other | division other | unchecked other | uncheckedDivision other => cases other
+      | shiftRight target applies =>
+          cases target
+          cases current_typed with
+          | some left_typed =>
+            cases applies with
+            | shiftRight left right =>
+              exact .fixed _ (fixed_canonical_shiftRight (fixed_word_canonical left_typed) right)
+            | checked other | division other | unchecked other | uncheckedDivision other => cases other
+      | add _ _ | subtract _ _ | multiply _ _ | divide _ _ | modulo _ _ | uncheckedAdd _ _
+      | uncheckedSubtract _ _ | uncheckedMultiply _ _ | uncheckedDivide _ _ | uncheckedModulo _ _ =>
+          cases kind
 
 end CompoundAssignmentApplies
 
@@ -2524,16 +2557,17 @@ private theorem compound_preserves
     (environment_agrees :
       EnvironmentAgrees before context.locals environment)
     (before_typed : HeapWellTyped context before)
-    (kind : CompoundAssignmentTyping operator leaf)
+    {rightType : Ty}
+    (modifies : ∀ {heap : Heap} {current : Option Value} {rightValue result : Value},
+      OptionalValueHasType context heap current leaf → ValueHasType context heap rightValue rightType →
+      CompoundAssignmentApplies assignment.target.type operator current rightValue result →
+      ValueHasType context heap result leaf)
     (target_type : SourcePlaceHasType source context assignment.target leaf)
-    (value_type : ExpressionHasType source context right leaf)
+    (value_type : ExpressionHasType source context right rightType)
     (execution : SourcePlaceAssignment program context evidence source
       (CompoundAssignmentApplies assignment.target.type operator) environment before
       assignment.target right updatedRoot after) :
     HeapWellTyped context after /\ HeapTypesExtend before after := by
-  have targetEq : assignment.target.type = leaf := by
-    cases target_type with
-    | intro _ _ stored_type_eq => exact stored_type_eq
   cases execution with
   | @intro _ _ _ _ _ _ targetHeap rhsHeap _ _ target _ rightValue _
       resolve evaluate_right write =>
@@ -2559,7 +2593,7 @@ private theorem compound_preserves
                 CompoundAssignmentApplies assignment.target.type operator target.selected
                   rightValue updated) leaf := by
             intro current updated current_typed applies
-            exact applies.preserves kind targetEq target_rhs_typed.selected right_typed
+            exact modifies target_rhs_typed.selected right_typed applies
           have updated_typed := update.preserves
             target_rhs_typed.projections initial_root_typed modify_typed
           have updated_cell_typed :
@@ -2630,10 +2664,16 @@ theorem preserves
                   (HeapTypesExtend.of_write heap_write)⟩
   | wordCompound kind target_type value_type _ =>
       exact compound_preserves expression_preserves evidence_covers environment_agrees
-        before_typed (.word kind) target_type value_type execution
+        before_typed (fun current right applies => applies.preserves (.word kind) target_type.type_eq
+          current right) target_type value_type execution
   | fixedCompound kind target_type value_type _ =>
       exact compound_preserves expression_preserves evidence_covers environment_agrees
-        before_typed (.fixed kind) target_type value_type execution
+        before_typed (fun current right applies => applies.preserves (.fixed kind) target_type.type_eq
+          current right) target_type value_type execution
+  | shiftCompound kind target_type target_kind value_type _ _ =>
+      exact compound_preserves expression_preserves evidence_covers environment_agrees
+        before_typed (fun current _ applies => applies.shiftPreserves kind target_kind target_type.type_eq
+          current) target_type value_type execution
 
 end SourcePlaceAssignment
 

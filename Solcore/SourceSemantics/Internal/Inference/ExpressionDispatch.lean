@@ -2657,7 +2657,7 @@ theorem inferAssignedValueFuel_success_value_childProvenance
   refine ⟨{
     fuel := fuel
     expression := value
-    expected := some expected
+    expected := expected
     initial := valueInitial
     final := final
     inferred := inferredValue

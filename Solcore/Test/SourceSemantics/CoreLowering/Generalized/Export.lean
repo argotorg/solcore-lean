@@ -4497,3 +4497,53 @@ def run : IO Unit := do
 
 end Tests.SourceCoreShiftSubset
 end
+
+section
+/-! Step 8d's compound shifts at a Word target stay in the statement-level
+meaning proofs: the accepted trees and the assignment head take a shift's
+amount at its own type (`AssignedOperandTyped`, `AssignedRhsView`), so the
+statement shape check, which reads only the Source, admits `w <<= 3`, whose
+amount is a `uint256`, `w <<= n` by a `Word` and `w >>= n` by a `uint8`. -/
+set_option autoImplicit false
+namespace Tests.SourceCoreCompoundShiftSubset
+open Solcore Frontend SourceInference SourceSemantics CoreLowering
+
+private def workspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    "function wordByLiteral(w: Word) returns (Word) { let r: Word = w; r <<= 3; return r; }",
+    "function wordByWord(w: Word, n: Word) returns (Word) { let r: Word = w; r <<= n; return r; }",
+    "function wordByNarrow(w: Word, n: uint8) returns (Word) { let r: Word = w; r >>= n; return r; }" ]}] }
+private def options : SourceCoreCompiler.Options :=
+  {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
+private def names : List String := ["wordByLiteral", "wordByWord", "wordByNarrow"]
+
+def run : IO Unit := do
+  let program ← match checkProgram workspace options.checkingFuel with
+    | .ok program => pure program
+    | .error errors => throw (IO.userError s!"compound shift subset check: {reprStr errors}")
+  let source ← match SourceCoreCompiler.compileChecked program
+      (program.signatures.functions.map fun signature => SourceCompiler.Seed.declaration signature.id) options with
+    | .ok source => pure source
+    | .error error => throw (IO.userError s!"compound shift subset compilation: {reprStr error}")
+  let some cached := source.artifact? | throw (IO.userError "compound shift subset cache absent")
+  for name in names do
+    let some signature := cached.sourceProgram.signatures.functions.find? (·.name == name)
+      | throw (IO.userError s!"compound shift subset signature {name}")
+    let some original := cached.validationPlan.specializations.find?
+        (fun row => decide (row.function.typedBody.owner = signature.id))
+      | throw (IO.userError s!"compound shift subset original row {name}")
+    let some named := cached.indexed.base.functions.find?
+        (fun named => decide (named.signature.key = original.key))
+      | throw (IO.userError s!"compound shift subset cache row {name}")
+    let body := original.function.typedBody
+    let statements := body.roots.filterMap fun root =>
+      match root with
+      | .statement id => some id
+      | .expression _ => none
+    if (CellAwareInvocationAcceptedBodyShape.shape? cached.indexed named body original.function.inferredBodyType
+        (body.nodes.length + 1) true statements).isNone then
+      throw (IO.userError s!"{name} is outside the statement subset")
+  IO.println "SOURCE_CORE_COMPOUND_SHIFT_SUBSET_PASS: the statement shape check admits w <<= 3, w <<= n at Word and w >>= n by a uint8"
+
+end Tests.SourceCoreCompoundShiftSubset
+end

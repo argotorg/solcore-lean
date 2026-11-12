@@ -1084,6 +1084,50 @@ mutual
                 exact ⟨final_typed,
                   (target_extension.trans rhs_extension).trans
                     (HeapTypesExtend.of_write heap_write)⟩
+      | @shiftCompound _ _ _ _ targetType amountType kind target_type target_kind value_type _
+          requirements_eq =>
+            have targetEq : assignment.target.type = targetType := target_type.type_eq
+            have aligned_target_type : SourcePlaceHasType source context place targetType :=
+              place_eq.symm ▸ target_type
+            have aligned_value_type :
+                ExpressionHasType source context rightExpression amountType :=
+              right_eq.symm ▸ value_type
+            rcases preservePlaceRec program_well_formed runtime
+                evidence_covers environment_agrees before_typed aligned_target_type
+                resolve with
+              ⟨rootType, target_typed, target_heap_typed, target_extension⟩
+            rcases preserveExpressionRec program_well_formed runtime
+                evidence_covers (environment_agrees.mono target_extension)
+                target_heap_typed aligned_value_type evaluate_right with
+              ⟨_right_typed, rhs_heap_typed, rhs_extension⟩
+            have target_rhs_typed := target_typed.mono rhs_extension
+            cases write with
+            | intro current_read root_type_eq initial_value update heap_write =>
+                rename_i currentCell initial
+                have initial_typed :=
+                  initial_value.preserves (rhs_heap_typed _ current_read.member)
+                have initial_root_typed :
+                    OptionalValueHasType context rhsHeap initial rootType := by
+                  rw [← target_rhs_typed.root_type, ← root_type_eq]
+                  exact initial_typed
+                have modify_typed : LeafModificationPreservesType context rhsHeap
+                    (fun _ updated => combine target.selected rightValue updated)
+                    targetType := by
+                  intro current updated current_typed applies
+                  rw [combine_eq] at applies
+                  exact applies.shiftPreserves kind target_kind targetEq
+                    target_rhs_typed.selected
+                have updated_typed := update.preserves
+                  target_rhs_typed.projections initial_root_typed modify_typed
+                have updated_cell_typed :
+                    ValueHasType context rhsHeap updatedRoot currentCell.type := by
+                  rw [root_type_eq, target_rhs_typed.root_type]
+                  exact updated_typed
+                have final_typed := rhs_heap_typed.write current_read
+                  (.some updated_cell_typed) heap_write
+                exact ⟨final_typed,
+                  (target_extension.trans rhs_extension).trans
+                    (HeapTypesExtend.of_write heap_write)⟩
   private theorem preserveSnapshotRec
       {program : Program}
       (program_well_formed : ProgramWellFormed program)

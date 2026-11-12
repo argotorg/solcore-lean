@@ -735,9 +735,9 @@ def binaryOperator (integer : Bool) : Syntax.ValueAssignOp → Option Modifier
   | .uncheckedModulo => some ⟨.wordMod, .divisor⟩
 
 /-- The compound assignments with the type's own meaning at a target type:
-checked `+= -= *= /= %=` and their unchecked forms at a fixed-width integer
-type, with the type and the binary operator. The match tests the operator
-first, so every other operator reduces to `none` at any target. -/
+checked `+= -= *= /= %=`, their unchecked forms and `<<= >>=` at a fixed-width
+integer type, with the type and the binary operator. The match tests the
+operator first, so every other operator reduces to `none` at any target. -/
 def checkedCompound (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) :
     Option (TypeSystem.FixedInteger × Syntax.BinaryOp) :=
   match operator, target with
@@ -751,25 +751,31 @@ def checkedCompound (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) :
   | .uncheckedMultiply, .constructor (.builtin (.fixed type)) => some (type, .uncheckedMultiply)
   | .uncheckedDivide, .constructor (.builtin (.fixed type)) => some (type, .uncheckedDivide)
   | .uncheckedModulo, .constructor (.builtin (.fixed type)) => some (type, .uncheckedModulo)
+  | .shiftLeft, .constructor (.builtin (.fixed type)) => some (type, .shiftLeft)
+  | .shiftRight, .constructor (.builtin (.fixed type)) => some (type, .shiftRight)
   | _, _ => none
 
 /-- Word's operation for checked `+ - * / %` at a fixed-width integer type: in
 the type's range, and by a nonzero divisor, it is the exact result's word.
 `/ %` are signed on the signed types. For unchecked `+ - * / %` it is the same
-operation, whose low `N` bits are those of the exact result (`wrapLeaf`). -/
+operation, whose low `N` bits are those of the exact result (`wrapLeaf`). `<<`
+is Word's shift, whose low `N` bits are the type's (`wrapLeaf`), and `>>` the
+arithmetic shift on the signed types and Word's otherwise. -/
 def checkedWordOperation (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → Core.BinaryOp
   | .add | .uncheckedAdd => .wordAdd
   | .subtract | .uncheckedSubtract => .wordSub
   | .divide | .uncheckedDivide => if type.signed then .wordSdiv else .wordDiv
   | .modulo | .uncheckedModulo => if type.signed then .wordSmod else .wordMod
+  | .shiftLeft => .wordShl
+  | .shiftRight => if type.signed then .wordSar else .wordShr
   | _ => .wordMul
 
 /-- The check of a compound assignment with the type's own meaning: checked
 arithmetic tests the exact result against the type's range (`/ %` a zero
 divisor first), unchecked `/= %=` test a zero divisor, and unchecked
-`+= -= *=` test nothing. -/
+`+= -= *=` and `<<= >>=` test nothing. -/
 def fixedCheck (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → Check
-  | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply => .total
+  | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .shiftLeft | .shiftRight => .total
   | .uncheckedDivide | .uncheckedModulo => .divisor
   | binary => .range type binary
 
@@ -823,14 +829,14 @@ signed one, are the wrapped result's word. Without a type it is the result. -/
       else .binary .wordAnd result (.word (Core.Word.ofNatModulo (2 ^ type.width.bits - 1)))
 
 /-- The type a value assignment's result is wrapped to: the target's, for
-unchecked `+= -= *= /= %=` at a fixed-width integer type; none for every other
-assignment and for in-place `~`. -/
+unchecked `+= -= *= /= %=` and `<<=` at a fixed-width integer type; none for
+every other assignment and for in-place `~`. -/
 def placeWrap (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) (bitNot : Bool) :
     Option TypeSystem.FixedInteger :=
   if bitNot then none
   else match checkedCompound target operator with
     | some (type, .uncheckedAdd) | some (type, .uncheckedSubtract) | some (type, .uncheckedMultiply)
-    | some (type, .uncheckedDivide) | some (type, .uncheckedModulo) => some type
+    | some (type, .uncheckedDivide) | some (type, .uncheckedModulo) | some (type, .shiftLeft) => some type
     | _ => none
 
 /-- Without the type's own compound meaning there is nothing to wrap. -/

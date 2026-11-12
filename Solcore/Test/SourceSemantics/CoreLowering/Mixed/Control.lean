@@ -1789,8 +1789,8 @@ private def compound : (operator : Syntax.ValueAssignOp) → IO (PLift (WordComp
   | .bitAnd => pure ⟨.bitAnd⟩
   | .bitXor => pure ⟨.bitXor⟩
   | .bitOr => pure ⟨.bitOr⟩
-  | .shiftLeft => pure ⟨.shiftLeft⟩
-  | .shiftRight => pure ⟨.shiftRight⟩
+  -- A compound shift has its own rule (`shiftCompound`); these fixtures have none.
+  | .shiftLeft | .shiftRight => throw (IO.userError "mixed compound shift")
   | .uncheckedAdd => pure ⟨.uncheckedAdd⟩
   | .uncheckedSubtract => pure ⟨.uncheckedSubtract⟩
   | .uncheckedMultiply => pure ⟨.uncheckedMultiply⟩

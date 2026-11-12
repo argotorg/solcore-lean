@@ -1357,6 +1357,9 @@ def writes {invocation : Staging.Recursive.Scope}
       | wordCompound _ place _ _ | fixedCompound _ place _ _ =>
         cases place with
         | intro _ _ same => exact .inr (by rw [same]; rfl)
+      | shiftCompound _ place kind _ _ _ =>
+        cases place with
+        | intro _ _ same => cases kind <;> exact .inr (by rw [same]; rfl)
     exact PreparedBranchingAssignmentDiagnostics.operands_target prepared
       (fun _ _ represented => CallableIndexedOwnedIssuedAssignmentRecipes.operands generation issued receiver represented)
       origin raw

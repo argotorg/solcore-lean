@@ -702,6 +702,7 @@ private theorem Shape.header_add {program : SourceSemantics.Program} {source : T
       (phaseHeap base (some (old.add (Word.ofNatModulo right.resolution.rawValue))) active suffix) := by
   cases typed with
   | fixedCompound _ place _ _ => exact absurd place.type_eq (by intro same; cases same)
+  | shiftCompound kind _ _ _ _ _ => cases kind
   | wordCompound _ place rightTyped _ =>
     obtain ⟨_,keyTyped⟩ := projected_key_typed place
     have keyTrace := key.evaluates (program := program) evidence (phaseEnvironment shape base environment)
@@ -967,6 +968,7 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
           · intro expression impossible; rw [shape.returned.formEq] at impossible; cases impossible
           · exact returned
     | wordCompound impossible _ _ _ | fixedCompound impossible _ _ _ => cases impossible
+    | shiftCompound impossible _ _ _ _ _ => cases impossible
 
 end Tests.SourceCoreMixedIndexRead
 end
@@ -2302,6 +2304,7 @@ private theorem Shape.header_add {program : SourceSemantics.Program} {source : T
       (phaseHeap base (some (old.add (Word.ofNatModulo right.resolution.rawValue))) active suffix) := by
   cases typed with
   | fixedCompound _ place _ _ => exact absurd place.type_eq (by intro same; cases same)
+  | shiftCompound kind _ _ _ _ _ => cases kind
   | wordCompound _ place rightTyped _ =>
     obtain ⟨_,keyTyped⟩ := projected_key_typed place
     have keyTrace := key.evaluates (program := program) evidence (phaseEnvironment shape base environment)
@@ -2541,6 +2544,7 @@ theorem Shape.body_from_source {program : SourceSemantics.Program} {source : Typ
           · intro expression impossible; rw [shape.returned.formEq] at impossible; cases impossible
           · exact returned
     | wordCompound impossible _ _ _ | fixedCompound impossible _ _ _ => cases impossible
+    | shiftCompound impossible _ _ _ _ _ => cases impossible
 
 end Tests.SourceCoreMixedProjected
 end

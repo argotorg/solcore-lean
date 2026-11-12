@@ -2504,6 +2504,12 @@ theorem compound_raw_target (different : operator ≠ .equal)
   | equal => exact (different rfl).elim
   | wordCompound _ target _ _ => cases target with | intro _ _ same => exact .inl same
   | fixedCompound _ target _ _ => cases target with | intro _ _ same => exact .inr ⟨_, same⟩
+  | shiftCompound _ target kind _ _ _ =>
+    cases target with
+    | intro _ _ same =>
+      cases kind with
+      | word => exact .inl same
+      | fixed _ => exact .inr ⟨_, same⟩
 
 /-- A normalized alias cannot silently satisfy the actual table guard. -/
 theorem comptime_word_not_compound (different : operator ≠ .equal)

@@ -148,7 +148,7 @@ inductive Scan (locals : Catalog) (caller : Key) (active : Substitution)
       (profile : operator = .equal ∨ assignment.target.type = .word)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
-      (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
+      (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type) (value : approved rhs)
       (remaining : Scan locals caller active source approved expected mode rest) :
       Scan locals caller active source approved expected mode (id :: rest)
 
@@ -167,7 +167,7 @@ inductive Scan (locals : Catalog) (caller : Key) (active : Substitution)
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
-      (rhsType : rhsNode.type = assignment.target.type)
+      (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type)
       (value : approved rhs)
       (remaining : Scan locals caller active source approved expected mode rest) :
       Scan locals caller active source approved expected mode (id :: rest)
@@ -269,7 +269,9 @@ def scan? (locals : Catalog) (caller : Key) (active : Substitution)
             match rhsFound : source.lookupExpression? rhs with
             | none => none
             | some rhsNode =>
-              if rhsType : rhsNode.type = assignment.target.type then do
+              match AssignedRhsView.decide? operator assignment.target.type rhsNode.type with
+              | none => none
+              | some ⟨rhsType⟩ => do
                 let ⟨value⟩ ← expression rhs
                 let ⟨remaining⟩ ← scan? locals caller active source expression expected fuel mode rest
                 if bare : assignment.target.projections = [] then
@@ -280,7 +282,6 @@ def scan? (locals : Catalog) (caller : Key) (active : Substitution)
                   let ⟨route⟩ ← AcceptedProjectedAssignmentRoute.check source binder.scheme.body assignment.target.projections assignment.target.type
                   let ⟨keys⟩ ← CellAwareForHeaderAdmission.approvedKeys? expression (DataPlaceKeyOrder.sourceKeys assignment.target.projections)
                   pure ⟨.assignProjected found form declaration route profile bare keys rhsFound rhsType value remaining⟩
-              else none
           else none
       | .letDecl binder (some initializer) =>
         if sourceType : node.type = .unit then
@@ -433,7 +434,7 @@ inductive Syntax (locals : Catalog) (caller : Key) (active : Substitution)
       (profile : operator = .equal ∨ assignment.target.type = .word)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
-      (rhsType : rhsNode.type = assignment.target.type)
+      (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type)
       (typed : SourceAssignmentHasType source context assignment operator rhs) (value : approved rhs)
       (remaining : Syntax locals caller active source approved expected context mode rest) :
       Syntax locals caller active source approved expected context mode (id :: rest)
@@ -453,7 +454,7 @@ inductive Syntax (locals : Catalog) (caller : Key) (active : Substitution)
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
-      (rhsType : rhsNode.type = assignment.target.type)
+      (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type)
       (typed : SourceAssignmentHasType source context assignment operator rhs)
       (value : approved rhs)
       (remaining : Syntax locals caller active source approved expected context mode rest) :
@@ -818,7 +819,7 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked}
       (head : GenericAssignmentStatements.Head (.initial checked) (source named) sourceContext
         (certificates sourceContext) scope administrative prepared.layouts.definitions assignment operator expression)
       (bare : assignment.target.projections = [])
-      (rightTyped : ExpressionHasType (source named) sourceContext expression assignment.target.type)
+      (rightTyped : AssignedOperandTyped (source named) sourceContext operator expression assignment.target.type)
       (operands : AssignmentOperandDiagnostics.OperandsLaw
         (GenericAssignmentDiagnostics.OperandRep compiled.own.assignments) operator head.invalid)
       (remaining : Tree prepared named compiled certificates administrative reasonAt
@@ -832,7 +833,7 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked}
       (head : GenericAssignmentStatements.Head (.initial checked) (source named) sourceContext
         (certificates sourceContext) scope administrative prepared.layouts.definitions assignment operator expression)
       (projected : assignment.target.projections ≠ [])
-      (rightTyped : ExpressionHasType (source named) sourceContext expression assignment.target.type)
+      (rightTyped : AssignedOperandTyped (source named) sourceContext operator expression assignment.target.type)
       (site : ∀ registry, PreparedBranchingCatalogSites.AssignmentSite
         (fun site root => diagnostics.placeReason named.signature.key site root none)
         (fun site root raw => diagnostics.placeReason named.signature.key site root (some raw))
@@ -1350,7 +1351,7 @@ theorem collected
       obtain ⟨_, rhsNative⟩ := (CallableIndexedOwnedPreparedNativeAssignmentChildren.execute_children
         (codeEq ▸ nativeTyped)).1
       have child : certificates sourceContext scope rhs lowered :=
-        children sourceContext declarations value rhsFound (rhsType.symm ▸ rightTyped) generated rhsNative
+        children sourceContext declarations value rhsFound (rightTyped.node_typed unique rhsFound) generated rhsNative
       obtain ⟨head, emitted, token⟩ := GenericAssignmentStatements.Head.of_lower_bare_with_token
         (administrative := administrative) (definitions := prepared.layouts.definitions)
         bare unique writable rightTyped runtimeProfile (fun actual acceptedRight => by
@@ -1393,7 +1394,7 @@ theorem collected
             rcases List.mem_cons.mp member with same | member
             · subst child
               exact ⟨rhsNode, rhsFound, children sourceContext declarations value rhsFound
-                (rhsType.symm ▸ rightTyped) generated native⟩
+                (rightTyped.node_typed unique rhsFound) generated native⟩
             · obtain ⟨node, found, childTyped⟩ := route.key_typed unique (sourceTyped binder declaration) member
               exact ⟨node, found, children sourceContext declarations (keys _ member) found childTyped generated native⟩)
           accepted nativeTyped

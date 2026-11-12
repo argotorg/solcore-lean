@@ -682,7 +682,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
       (profile : operator = .equal ∨ assignment.target.type = .word)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
-      (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
+      (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type) (value : approved rhs)
       (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment operator rhs :: rest)
   | bitNotProjected {assignment binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
@@ -698,7 +698,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
-      (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
+      (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type) (value : approved rhs)
       (remaining : Scan source approved rest) : Scan source approved (.assignValue assignment operator rhs :: rest)
   | bitNot {assignment binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
@@ -757,18 +757,25 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
       SourceProjectionsHaveType source context actual.scheme.body assignment.target.projections assignment.target.type) ∧
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       WritableLocal context assignment.target.root actual.scheme.body) ∧
-    ExpressionHasType source context rhs assignment.target.type ∧
+    AssignedOperandTyped source context operator rhs assignment.target.type ∧
     (operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false) := by
   have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
-      ExpressionHasType source context rhs type ∧ (operator = .equal ∨ type = .word) := by
+      AssignedOperandTyped source context operator rhs type ∧ (operator = .equal ∨ type = .word) := by
     cases typed with
-    | equal place value _ => exact ⟨_, place, value, .inl rfl⟩
-    | wordCompound _ place value _ => exact ⟨_, place, value, .inr rfl⟩
+    | equal place value _ => exact ⟨_, place, .of_type value, .inl rfl⟩
+    | wordCompound _ place value _ => exact ⟨_, place, .of_type value, .inr rfl⟩
     | fixedCompound kind place value _ =>
       rcases sourceProfile with rfl | word
       · cases kind
       · cases word.symm.trans place.type_eq
+    | shiftCompound kind place targetKind value amount _ =>
+      -- A Word target's shift amount keeps its own type.
+      rcases sourceProfile with rfl | word
+      · cases kind
+      · cases targetKind with
+        | fixed type => cases word.symm.trans place.type_eq
+        | word => exact ⟨_, place, ⟨_, value, .shiftAmount kind rfl amount⟩, .inr rfl⟩
   obtain ⟨type, place, value, profile⟩ := original
   cases place with
   | intro writable projections target =>
@@ -799,18 +806,25 @@ theorem projected_assignment_facts {source : TypedSource} {context : SourceSeman
       SourceProjectionsHaveType source context actual.scheme.body assignment.target.projections assignment.target.type) ∧
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       WritableLocal context assignment.target.root actual.scheme.body) ∧
-    ExpressionHasType source context rhs assignment.target.type ∧
+    AssignedOperandTyped source context operator rhs assignment.target.type ∧
     (operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false) := by
   have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
-      ExpressionHasType source context rhs type ∧ (operator = .equal ∨ type = .word) := by
+      AssignedOperandTyped source context operator rhs type ∧ (operator = .equal ∨ type = .word) := by
     cases typed with
-    | equal place value _ => exact ⟨_, place, value, .inl rfl⟩
-    | wordCompound _ place value _ => exact ⟨_, place, value, .inr rfl⟩
+    | equal place value _ => exact ⟨_, place, .of_type value, .inl rfl⟩
+    | wordCompound _ place value _ => exact ⟨_, place, .of_type value, .inr rfl⟩
     | fixedCompound kind place value _ =>
       rcases sourceProfile with rfl | word
       · cases kind
       · cases word.symm.trans place.type_eq
+    | shiftCompound kind place targetKind value amount _ =>
+      -- A Word target's shift amount keeps its own type.
+      rcases sourceProfile with rfl | word
+      · cases kind
+      · cases targetKind with
+        | fixed type => cases word.symm.trans place.type_eq
+        | word => exact ⟨_, place, ⟨_, value, .shiftAmount kind rfl amount⟩, .inr rfl⟩
   obtain ⟨type, place, value, profile⟩ := original
   cases place with
   | intro writable projections target =>
@@ -907,7 +921,7 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
           · intro child member
             simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
             subst child
-            exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
+            exact ⟨value, _, rhsFound, (by obtain ⟨_, typed, _⟩ := rightTyped; exact expression_at unique rhsFound typed)⟩
           · exact ih tail
 
   | assignProjected declaration route profile projected keys rhsFound rhsType value remaining ih =>
@@ -921,7 +935,7 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
           · intro child member
             rcases List.mem_cons.mp member with equal | member
             · subst child
-              exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
+              exact ⟨value, _, rhsFound, (by obtain ⟨_, typed, _⟩ := rightTyped; exact expression_at unique rhsFound typed)⟩
             · obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
               exact ⟨keys child member, node, found, typed⟩
           · exact ih tail
@@ -1106,7 +1120,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (profile : operator = .equal ∨ assignment.target.type = .word)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
-      (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
+      (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type) (value : approved rhs)
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
 
   | bitNotProjected {mode id node assignment binder rest}
@@ -1126,7 +1140,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
-      (rhsType : rhsNode.type = assignment.target.type) (value : approved rhs)
+      (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type) (value : approved rhs)
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
 
   | bitNot {mode id node assignment binder rest}
@@ -1318,7 +1332,7 @@ theorem Scan.syntax {source approved expected mode statements}
         · intro child member
           simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
           subst child
-          exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
+          exact ⟨value, _, rhsFound, (by obtain ⟨_, typed, _⟩ := rightTyped; exact expression_at unique rhsFound typed)⟩
         · exact ih result tail
 
   | assignProjected found form declaration route profile projected keys rhsFound rhsType value _ ih =>
@@ -1333,7 +1347,7 @@ theorem Scan.syntax {source approved expected mode statements}
         · intro child member
           rcases List.mem_cons.mp member with equal | member
           · subst child
-            exact ⟨value, _, rhsFound, expression_at unique rhsFound rightTyped⟩
+            exact ⟨value, _, rhsFound, (by obtain ⟨_, typed, _⟩ := rightTyped; exact expression_at unique rhsFound typed)⟩
           · obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
             exact ⟨keys child member, node, found, typed⟩
         · exact ih result tail
@@ -1537,11 +1551,12 @@ def scan? (source : TypedSource) {approved : ExpressionId → Prop}
                 match rhsFound : source.lookupExpression? rhs with
                 | none => none
                 | some rhsNode =>
-                  if rhsType : rhsNode.type = assignment.target.type then do
+                  match AssignedRhsView.decide? operator assignment.target.type rhsNode.type with
+                  | none => none
+                  | some ⟨rhsType⟩ => do
                     let ⟨approved⟩ ← expression rhs
                     let ⟨remaining⟩ ← scan? source expression expected fuel mode rest
                     pure ⟨.assign found form declaration targetType profile bare rhsFound rhsType approved remaining⟩
-                  else none
               else none
           else none
         else none

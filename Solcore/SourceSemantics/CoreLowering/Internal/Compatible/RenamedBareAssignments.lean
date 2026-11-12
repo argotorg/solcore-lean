@@ -407,7 +407,8 @@ private theorem rhs_reflects {checked : Checked} {registry : SourceCoreRawMetada
     (meaning : TypedGenericExpressionMeaning.Reflects (payloadModel checked registry functions) program context evidence source certificate faults)
     {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
+    {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
     (coreType : lowered.type = prepared.route.leafType)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store}
@@ -415,7 +416,7 @@ private theorem rhs_reflects {checked : Checked} {registry : SourceCoreRawMetada
     (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
     (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
-    {next : Expr} {outputType : Ty} {operator : Syntax.ValueAssignOp} {invalid : Word} {result : Value}
+    {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
     (resolution : CompatiblePlacePrefixReflection.Result checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes
       place leaf environment coreEnvironment before store mapping world (lowered.expression.rename ξ) next outputType
       (binaryOperator (prepared.route.leafType = .integer) operator) false invalid result finalStore) :
@@ -455,7 +456,7 @@ private theorem rhs_reflects {checked : Checked} {registry : SourceCoreRawMetada
             mapping := rhsMap
             world := rhsWorld
             meaning := rhsResult
-            related := .compatible rhsView (by simpa only [payloadModel, renamed, coreType] using payload) } remaining
+            related := rhsView.rep (by simpa only [payloadModel, renamed, coreType] using payload) } remaining
 
 theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
@@ -478,9 +479,9 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -853,9 +854,9 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -899,7 +900,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
   cases represented : rhsResult.represented with
   | @value _ rightValue rightRep =>
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+      rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
       simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
@@ -1012,9 +1013,9 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
@@ -1055,7 +1056,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
   cases represented : rhsResult.represented with
   | @value _ rightValue rightRep =>
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+      rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
       simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
@@ -1160,9 +1161,9 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     [FunctionCalls.FaultTokens faults] (invalidTokens : ∀ location, faults (.uninitializedLocation location) prepared.invalidProjection)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
     (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
       SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
     (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
@@ -1233,7 +1234,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     cases represented : rhsResult.represented with
     | @value _ rightValue rightRep =>
       have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf _ rightValue prepared.route.leafType :=
-        .compatible rhsView (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+        rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
       have valid := CompatiblePlaceModifier.initialized_valid observations operatorProfile rhsResult.saved_snapshot rightRep
       rw [resolution.selectedEq] at invalidOperands
       exact (valid invalidOperands).elim
@@ -1293,7 +1294,7 @@ theorem preserves_prefix
     (meaning : TypedGenericExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1327,7 +1328,7 @@ theorem preserves_prefix
     cases related : result.represented with
     | @value _ rightValue payload =>
       have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
       have saved := snapshot.represented.extend result.maps result.worlds
       cases written with
       | intro read sameType initial update written =>
@@ -1389,7 +1390,7 @@ theorem preserves_fault_reachable
     (meaning : TypedGenericExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1434,7 +1435,7 @@ theorem preserves_fault_reachable
     cases represented : result.represented with
     | @value _ rightValue payload =>
       have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
       rcases modifier_total observations profile (snapshot.represented.extend result.maps result.worlds) rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
@@ -1455,7 +1456,7 @@ theorem preserves_fault_reachable
     cases represented : result.represented with
     | @value _ rightValue payload =>
       have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        .compatible rhsView (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
       rcases modifier_total observations profile (snapshot.represented.extend result.maps result.worlds) rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
@@ -1494,7 +1495,7 @@ theorem preserves_fault
     (meaning : TypedGenericExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
-    (rhsView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType node.type)
+    (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
       SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer ∧ operator.wordOnly = false)
@@ -1568,7 +1569,7 @@ structure Head (readFuel : Nat) (values : ValuesContext) (source : TypedSource)
   writable : WritableLocal context assignment.target.root prepared.route.rootSourceType
   found : source.lookupExpression? rhs = some node
   right : CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt scope rhs lowered
-  rightView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType node.type
+  rightView : AssignedRhsView operator leaf node.type
   rightType : lowered.type = prepared.route.leafType
   profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false
   /-- The target is not a checked compound assignment's fixed-width target. -/
@@ -1654,14 +1655,6 @@ namespace Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatements
 open Core Frontend SourceInference SourceCoreCompatibleDataPlaces
 open CompatibleEncoding (bind_ok)
 
-private theorem stored_type {source : TypedSource} {context : SourceSemantics.Context} {rhs : ExpressionId}
-    {node : ExpressionNode} {type : TypeSystem.Ty}
-    (unique : NodeOccurrencesUnique source) (found : source.lookupExpression? rhs = some node)
-    (typed : ExpressionHasType source context rhs type) : node.type = type := by
-  obtain ⟨actual, contains, same⟩ := typed.stored_type
-  have identical := Option.some.inj (found.symm.trans (lookupExpression?_complete unique contains))
-  exact identical ▸ same
-
 theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedSource}
     {context : SourceSemantics.Context} {solved : List SolvedRequirement} {reasonAt : ExpressionId → Word}
     {scope : Scope} {administrative : Core.Context} {definitions : DataEnvironment}
@@ -1672,7 +1665,7 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ id lowered, expression fuel source scope id reasonAt = .ok lowered → ∃ node,
@@ -1689,27 +1682,24 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
       CompatibleBareAssignment.of_lower bare accepted
     rw [assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)] at codeEq
     obtain ⟨node, found, tree, _⟩ := extract rhs lowered generated
-    have rawType := stored_type unique found rightTyped
     refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
       .bare bare layout, slot, rootType ▸ writable binder binding, found, tree,
-      by simpa only [rawType] using rawView, sameType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩, codeEq⟩
+      (rightTyped.view unique found).transport rawView, sameType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩, codeEq⟩
     rcases profile with equal | word | ⟨integer, notWordOnly⟩
     · exact .inl equal
     · exact .inr (.inl (rawView.trans word))
     · exact .inr (.inr ⟨rawView.trans integer, notWordOnly⟩)
   · obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, lowered, node, _, binding, rootType, slot, layout, ordinary,
-      _, found, tree, rawView, sameType, codeEq⟩ :=
+      _, found, tree, targetView, rawView, sameType, codeEq⟩ :=
       CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped bare extract accepted typed
     rw [assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)] at codeEq
-    have rawType := stored_type unique found rightTyped
     refine ⟨⟨prepared, index, codes, leaf, lowered, node, invalidOperand,
       .projected layout ordinary, slot, rootType ▸ writable binder binding, found, tree, rawView, sameType, ?_,
       CompatiblePlaceModifier.plain_of_profile profile⟩, codeEq⟩
-    rw [rawType] at rawView
     rcases profile with equal | word | ⟨integer, notWordOnly⟩
     · exact .inl equal
-    · exact .inr (.inl (rawView.trans word))
-    · exact .inr (.inr ⟨rawView.trans integer, notWordOnly⟩)
+    · exact .inr (.inl (targetView.trans word))
+    · exact .inr (.inr ⟨targetView.trans integer, notWordOnly⟩)
 
 /-- Static source obligations for the ordinary assignment branch. General
 functions, unary assignments and loop syntax are deliberately separate. -/
@@ -1721,7 +1711,7 @@ inductive Syntax (source : TypedSource) (context : SourceSemantics.Context) : Bo
       (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
-      (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+      (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
       (remaining : Syntax source context mode rest expected) : Syntax source context mode (id :: rest) expected

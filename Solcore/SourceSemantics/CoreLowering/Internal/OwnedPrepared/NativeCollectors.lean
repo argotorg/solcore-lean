@@ -321,14 +321,6 @@ open Core Frontend SourceInference SourceCoreCompatibleDataPlaces
 open DataPatternValues DataPlaceCertificates CompatibleMixedRoute CompatiblePlaceCompilerCertificates
 open GenericAssignmentStatements CallableIndexedOwnedPreparedNativeAssignmentChildren
 
-private theorem stored_type {source : TypedSource} {context : SourceSemantics.Context} {rhs : ExpressionId}
-    {node : ExpressionNode} {type : TypeSystem.Ty}
-    (unique : NodeOccurrencesUnique source) (found : source.lookupExpression? rhs = some node)
-    (typed : ExpressionHasType source context rhs type) : node.type = type := by
-  obtain ⟨actual, contains, same⟩ := typed.stored_type
-  have identical := Option.some.inj (found.symm.trans (lookupExpression?_complete unique contains))
-  exact identical ▸ same
-
 /-- The same real Head.PreparedAt is produced with the original layout.
 The expression factory receives the actual raw Core witness at this Source
 occurrence, from this lowering, scope, context and compiler fuel. -/
@@ -342,7 +334,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
-    (rightTyped : ExpressionHasType source context rhs assignment.target.type)
+    (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
@@ -409,10 +401,9 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
           intro notMapping
           rw [routeEq]
           exact description.ordinary (fun k v same => notMapping k v (rootEq.trans same))
-        have rawType := stored_type unique found rightTyped
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
-          found, certified, by simpa only [rawType] using leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩,
+          found, certified, (rightTyped.view unique found).transport leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩,
           by simp [Head.emit, routeEq, placeModifier, assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)], rfl, ?_⟩
         · rcases profile with equal | word | ⟨integer, notWordOnly⟩
           · exact .inl equal
@@ -3522,10 +3513,6 @@ theorem tree
         (prepared := prepared) (reference := .var index) (keys := SourceCoreCalls.packArguments [])
         (rhs := value.expression) (next := body) (output := LocalLoop.controlType type) (result := nativeType)
         (operator := .equal) (codeEq ▸ nativeTyped)
-      have rhsType : rhsNode.type = assignment.target.type := by
-        obtain ⟨actualNode, contains, actualType⟩ := rightTyped.stored_type
-        have sameNode := Option.some.inj (rhsFound.symm.trans (lookupExpression?_complete unique contains))
-        exact sameNode ▸ actualType
       let originalHead : GenericAssignmentStatements.Head values source context
           (TypedCertificate source certificates context) scope administrative definitions assignment .equal rhs := {
         prepared := prepared
@@ -3540,7 +3527,7 @@ theorem tree
         writable := _rootType ▸ writable binder ((rootBinder edited.metadata _).trans _binding)
         found := rhsFound
         right := ⟨rhsNode, rhsFound, rhsTyped, children context fields declarations rhsSyntax accessible rhsFound rhsTyped generated rhsNative⟩
-        rightView := by simpa only [rhsType] using _rawView
+        rightView := (rightTyped.view unique rhsFound).transport _rawView
         rightType := _sameType
         profile := .inl rfl
         targetPlain := CompatiblePlaceModifier.plain_of_profile (.inl rfl) }

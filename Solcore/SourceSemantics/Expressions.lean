@@ -1275,8 +1275,9 @@ theorem components
 
 end PlaceHasType
 
-/-- The compound assignment spellings supported by the current source
-runtime.  Every one is the homogeneous Word operation. -/
+/-- The compound assignment spellings that are the homogeneous Word operation
+at a Word target. The shifts have their own rule (`AssignmentHasType.shiftCompound`),
+since a shift's amount has its own type. -/
 inductive WordCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
   | add : WordCompoundAssignmentOperator .add
   | subtract : WordCompoundAssignmentOperator .subtract
@@ -1286,8 +1287,6 @@ inductive WordCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
   | bitAnd : WordCompoundAssignmentOperator .bitAnd
   | bitXor : WordCompoundAssignmentOperator .bitXor
   | bitOr : WordCompoundAssignmentOperator .bitOr
-  | shiftLeft : WordCompoundAssignmentOperator .shiftLeft
-  | shiftRight : WordCompoundAssignmentOperator .shiftRight
   | uncheckedAdd : WordCompoundAssignmentOperator .uncheckedAdd
   | uncheckedSubtract : WordCompoundAssignmentOperator .uncheckedSubtract
   | uncheckedMultiply : WordCompoundAssignmentOperator .uncheckedMultiply
@@ -1314,19 +1313,32 @@ inductive FixedCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
   | uncheckedModulo : FixedCompoundAssignmentOperator .uncheckedModulo
 
 /-- The compound assignments whose meaning on a fixed-width integer target is
-the type's own, not Word's: checked `+= -= *= /= %=`, and their unchecked forms,
-which wrap to the type's width. -/
+the type's own, not Word's: checked `+= -= *= /= %=`, their unchecked forms,
+which wrap to the type's width, and `<<= >>=`, which are the type's shifts. -/
 inductive FixedCheckedCompound : Syntax.ValueAssignOp → Prop where
   | add : FixedCheckedCompound .add
   | subtract : FixedCheckedCompound .subtract
   | multiply : FixedCheckedCompound .multiply
   | divide : FixedCheckedCompound .divide
   | modulo : FixedCheckedCompound .modulo
+  | shiftLeft : FixedCheckedCompound .shiftLeft
+  | shiftRight : FixedCheckedCompound .shiftRight
   | uncheckedAdd : FixedCheckedCompound .uncheckedAdd
   | uncheckedSubtract : FixedCheckedCompound .uncheckedSubtract
   | uncheckedMultiply : FixedCheckedCompound .uncheckedMultiply
   | uncheckedDivide : FixedCheckedCompound .uncheckedDivide
   | uncheckedModulo : FixedCheckedCompound .uncheckedModulo
+
+/-- `<<=` and `>>=`, whose amount has its own type. -/
+inductive ShiftCompoundAssignmentOperator : Syntax.ValueAssignOp → Prop where
+  | shiftLeft : ShiftCompoundAssignmentOperator .shiftLeft
+  | shiftRight : ShiftCompoundAssignmentOperator .shiftRight
+
+/-- A shift's value type, which is its result's: `word` or one of the twelve
+fixed-width integer types. -/
+inductive ShiftValueType : TypeSystem.Ty → Prop where
+  | word : ShiftValueType .word
+  | fixed (type : TypeSystem.FixedInteger) : ShiftValueType (.fixed type)
 
 /-- The operand type of a compound assignment: Word's operators at a Word
 target, or the fixed-width ones at a target of a fixed-width integer type. -/
@@ -1374,6 +1386,21 @@ inductive AssignmentHasType
       (value_type : ExpressionTyping value (.fixed type))
       (requirements_eq : assignment.requirements = []) :
       AssignmentHasType context ExpressionTyping assignment operator value
+  /-- `<<=` and `>>=`: the target is the shift's value, and the right-hand side
+  its amount, at an amount type of its own (upstream's `x = x << n`). -/
+  | shiftCompound
+      {assignment : AssignmentResolution}
+      {operator : Syntax.ValueAssignOp}
+      {value : ExpressionId}
+      {targetType amountType : TypeSystem.Ty}
+      (operator_kind : ShiftCompoundAssignmentOperator operator)
+      (target_type : PlaceHasType context ExpressionTyping
+        assignment.target targetType)
+      (target_kind : ShiftValueType targetType)
+      (value_type : ExpressionTyping value amountType)
+      (amount : ShiftAmountType amountType)
+      (requirements_eq : assignment.requirements = []) :
+      AssignmentHasType context ExpressionTyping assignment operator value
 
 namespace AssignmentHasType
 
@@ -1389,8 +1416,8 @@ theorem requirements_empty
     assignment.requirements = [] := by
   cases typing <;> assumption
 
-/-- Both plain and compound assignments type the right-hand occurrence at the
-final place type. -/
+/-- Plain and compound assignments other than the shifts type the right-hand
+occurrence at the final place type; a shift types it at an amount type. -/
 theorem operand_types
     {context : Context}
     {ExpressionTyping : ExpressionId → TypeSystem.Ty → Prop}
@@ -1399,15 +1426,18 @@ theorem operand_types
     {value : ExpressionId}
     (typing : AssignmentHasType context ExpressionTyping
       assignment operator value) :
-    ∃ type,
+    ∃ type valueType,
       PlaceHasType context ExpressionTyping assignment.target type ∧
-      ExpressionTyping value type := by
+      ExpressionTyping value valueType ∧
+      (valueType = type ∨ ShiftAmountType valueType) := by
   cases typing with
-  | equal target_type value_type => exact ⟨_, target_type, value_type⟩
+  | equal target_type value_type => exact ⟨_, _, target_type, value_type, .inl rfl⟩
   | wordCompound _ target_type value_type =>
-      exact ⟨.word, target_type, value_type⟩
+      exact ⟨.word, _, target_type, value_type, .inl rfl⟩
   | fixedCompound _ target_type value_type =>
-      exact ⟨_, target_type, value_type⟩
+      exact ⟨_, _, target_type, value_type, .inl rfl⟩
+  | shiftCompound _ target_type _ value_type amount =>
+      exact ⟨_, _, target_type, value_type, .inr amount⟩
 
 end AssignmentHasType
 

@@ -566,6 +566,16 @@ theorem heap_after_assignment
       have rightSource := storedType ▸ rightTyped
       exact (SelectedPreservation.projected_write_compound (.fixed kind) targetTyped.type_eq savedTyped
         ⟨rightSource, heapTyped, rhsMetadata⟩ write).1
+  | shiftCompound kind targetTyped targetKind rhsTyped _ _ =>
+      obtain ⟨actual, contains, storedType⟩ := rhsTyped.stored_type
+      have sameNode : actual = node := Option.some.inj
+        ((lookupExpression?_complete unique contains).symm.trans found)
+      subst actual
+      obtain ⟨root, savedTyped⟩ := SelectedPreservation.projected_target_typed unique locals
+        getterHeap getterMetadata targetTyped row keyValues snapshot
+      have rightSource := storedType ▸ rightTyped
+      exact (SelectedPreservation.projected_write_shift kind targetKind targetTyped.type_eq savedTyped
+        ⟨rightSource, heapTyped, rhsMetadata⟩ write).1
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStagedProjectedAssignmentAdmission
 end

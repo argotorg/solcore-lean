@@ -14,6 +14,95 @@ This file stays below the compiler's encoder, because this relation is stated in
 -/
 
 section
+/-! How an assignment's right-hand side stands for the value its operation
+reads at the target: at the target's runtime type, or, for a compound shift at
+a Word target, as an amount of its own type whose word the shift reads. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics
+open Frontend Frontend.SourceInference
+
+/-- How a right-hand side at type `rhs` stands for the value that the
+assignment `operator` reads at the leaf type `leaf`: at the leaf's runtime
+type, or, for a compound shift, as an amount (`ShiftAmountType`) whose word a
+Word leaf reads. -/
+inductive AssignedRhsView (operator : Syntax.ValueAssignOp) (leaf rhs : TypeSystem.Ty) : Prop where
+  | same (view : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType rhs)
+  | shiftAmount (shift : ShiftCompoundAssignmentOperator operator)
+      (leafWord : SourceCoreRawMetadata.runtimeType leaf = .word) (amount : ShiftAmountType rhs)
+
+/-- An assignment's right-hand side is typed at a type that stands for the
+target's: the target's own type, or a compound shift's amount type. -/
+def AssignedOperandTyped (source : TypedSource) (context : SourceSemantics.Context)
+    (operator : Syntax.ValueAssignOp) (rhs : ExpressionId) (target : TypeSystem.Ty) : Prop :=
+  ∃ type, ExpressionHasType source context rhs type ∧ AssignedRhsView operator target type
+
+/-- A leaf with the target's runtime type reads the right-hand side as the target does. -/
+theorem AssignedRhsView.transport {operator : Syntax.ValueAssignOp} {leaf target rhs : TypeSystem.Ty}
+    (view : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType target)
+    (rhsView : AssignedRhsView operator target rhs) : AssignedRhsView operator leaf rhs := by
+  cases rhsView with
+  | same same => exact .same (view.trans same)
+  | shiftAmount shift targetWord amount => exact .shiftAmount shift (view.trans targetWord) amount
+
+/-- A right-hand side typed at the target's own type. -/
+theorem AssignedOperandTyped.of_type {source : TypedSource} {context : SourceSemantics.Context}
+    {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {target : TypeSystem.Ty}
+    (typed : ExpressionHasType source context rhs target) :
+    AssignedOperandTyped source context operator rhs target :=
+  ⟨target, typed, .same rfl⟩
+
+/-- The right-hand side's stored node stands for the target. -/
+theorem AssignedOperandTyped.view {source : TypedSource} {context : SourceSemantics.Context}
+    {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {target : TypeSystem.Ty} {node : ExpressionNode}
+    (typed : AssignedOperandTyped source context operator rhs target) (unique : NodeOccurrencesUnique source)
+    (found : source.lookupExpression? rhs = some node) : AssignedRhsView operator target node.type := by
+  obtain ⟨type, typed, view⟩ := typed
+  obtain ⟨actual, contains, same⟩ := typed.stored_type
+  have identical : node = actual :=
+    Option.some.inj (found.symm.trans (lookupExpression?_complete unique contains))
+  subst identical
+  rw [same]
+  exact view
+
+/-- The right-hand side is typed at its stored node's type. -/
+theorem AssignedOperandTyped.node_typed {source : TypedSource} {context : SourceSemantics.Context}
+    {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {target : TypeSystem.Ty} {node : ExpressionNode}
+    (typed : AssignedOperandTyped source context operator rhs target) (unique : NodeOccurrencesUnique source)
+    (found : source.lookupExpression? rhs = some node) : ExpressionHasType source context rhs node.type := by
+  obtain ⟨type, typed, _⟩ := typed
+  obtain ⟨actual, contains, same⟩ := typed.stored_type
+  have identical : node = actual :=
+    Option.some.inj (found.symm.trans (lookupExpression?_complete unique contains))
+  subst identical
+  rw [same]
+  exact typed
+
+/-- A shift amount's type, decided: `word` or an unsigned type. -/
+private def shiftAmountType? (rhs : TypeSystem.Ty) : Option (PLift (ShiftAmountType rhs)) :=
+  if word : rhs = .word then some ⟨by rw [word]; exact .word⟩
+  else
+    match rhs with
+    | .constructor (.builtin (.fixed type)) =>
+        if unsigned : type.signed = false then some ⟨.unsigned unsigned⟩ else none
+    | _ => none
+
+/-- The view the statement checkers accept, decided: the target's own type, or
+a compound shift's amount at a Word target. -/
+def AssignedRhsView.decide? (operator : Syntax.ValueAssignOp) (leaf rhs : TypeSystem.Ty) :
+    Option (PLift (AssignedRhsView operator leaf rhs)) :=
+  if same : rhs = leaf then some ⟨.same (congrArg SourceCoreRawMetadata.runtimeType same.symm)⟩
+  else if leafWord : SourceCoreRawMetadata.runtimeType leaf = .word then
+    match operator with
+    | .shiftLeft => (shiftAmountType? rhs).map fun ⟨amount⟩ => ⟨.shiftAmount .shiftLeft leafWord amount⟩
+    | .shiftRight => (shiftAmountType? rhs).map fun ⟨amount⟩ => ⟨.shiftAmount .shiftRight leafWord amount⟩
+    | .equal | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr
+    | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide | .uncheckedModulo => none
+  else none
+
+end Solcore.SourceSemantics
+end
+
+section
 -- leanmerge: from Solcore.SourceSemantics.CoreLowering.CompatiblePayload
 /-! Independent data representation for the source-compatible native profile.
 Raw proxy and constructor metadata is retained through authenticated registry
@@ -282,6 +371,49 @@ theorem constructor_authenticated {metadata : DataConstructorInstantiation} {id 
     (owner : registry.signatures = checked.signatures) :
     SourceCoreRawMetadata.constructorAuthentic checked.signatures metadata = true := by
   simpa only [SourceCoreRawMetadata.Metadata.authentic, owner] using related.authenticated
+
+/-- A value represented at an unsigned fixed-width type is a word, at Core type `word`. -/
+private theorem unsigned_word_fields {sourceType : TypeSystem.Ty} {type : TypeSystem.FixedInteger}
+    {source : Dynamic.Value} {value : Value} {coreType : Ty}
+    (related : ValueRep checked registry functions mapping world sourceType source value coreType)
+    (view : SourceCoreRawMetadata.runtimeType sourceType = .fixed type) :
+    ∃ word, source = .word word ∧ value = .word word ∧ coreType = .word := by
+  revert view
+  induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
+    (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
+  | @fixed actual word _ =>
+      intro view
+      cases view
+      exact ⟨word, rfl, rfl, rfl⟩
+  | compatible same _ ih => intro view; exact ih (same.symm.trans view)
+  | @constructed metadata id tag sources values types _ _ _ projected _ _ _ =>
+      intro view
+      have scalar : checked.catalog.project metadata.resultType = .ok .word := by
+        rw [← checked.catalog.project_runtimeType, view]
+        rfl
+      cases Except.ok.inj (projected.symm.trans scalar)
+  | unit | bool | word | integer | product | function | proxy | mappingValue =>
+      intro view
+      cases view
+  | nil | cons | empty | entry | absent | present => trivial
+
+/-- A right-hand side's value stands at the leaf: through the runtime view, or,
+for a shift amount, as the word it is. -/
+theorem _root_.Solcore.SourceSemantics.AssignedRhsView.rep {operator : Syntax.ValueAssignOp}
+    {leaf rhs : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
+    (view : AssignedRhsView operator leaf rhs)
+    (related : ValueRep checked registry functions mapping world rhs source value type) :
+    ValueRep checked registry functions mapping world leaf source value type := by
+  cases view with
+  | same view => exact .compatible view related
+  | shiftAmount _ leafWord amount =>
+      have wordView : SourceCoreRawMetadata.runtimeType leaf =
+          SourceCoreRawMetadata.runtimeType TypeSystem.Ty.word := leafWord
+      cases amount with
+      | word => exact .compatible wordView related
+      | unsigned _ =>
+          obtain ⟨word, rfl, rfl, rfl⟩ := unsigned_word_fields related rfl
+          exact .compatible wordView (.word word)
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePayload
 end
