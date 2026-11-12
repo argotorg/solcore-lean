@@ -397,7 +397,7 @@ theorem statement_assignBitNot_for
   have formation := boundary.scope.formation checked
   have canonical := boundary.scope.functionsCanonical checked
   have allocatedInvariant := boundary.invariant.allocateStatementId rfl
-  obtain ⟨place, placeState, unified, placeAccepted, unifiedAccepted, resolvedWord, resultEq, containsRaw⟩ :=
+  obtain ⟨place, placeState, unified, placeAccepted, unifiedAccepted, _, resultEq, containsRaw⟩ :=
     inferStatementFuel_success_assignBitNot_facts form rfl boundary.accepted (bodyRoots selected)
   have placeToParent : TypingSourceExtends (placeState.toTypedSource (bodyRoots selected))
       (result.state.toTypedSource (bodyRoots selected)) := by
@@ -413,9 +413,11 @@ theorem statement_assignBitNot_for
   have properties := Detail.inferPlaceFuel_inferenceProperties allocatedInvariant.ready formation canonical placeAccepted
   have unifiedExtension : selected.body.finalized.substitution.SemanticallyExtends unified.inference.substitution := by
     simpa only [resultEq, State.recordNode] using boundary.extension
+  have targetBelow := Detail.bitNotTargetType_variablesBelow
+    (properties.2.1.solved.variablesBelow_apply properties.2.2)
   have placeExtension := unifiedExtension.trans
     (Detail.unify_inferenceProgress properties.2.1.solved properties.2.2
-      (Ty.variablesBelow_constructor _ _) unifiedAccepted).substitution_extends
+      targetBelow unifiedAccepted).substitution_extends
   have finalized := boundary.rawSubtree.finalized resources
   have reference : ∀ key, .expression key ∈ place.references →
       (.expression key : NodeId) ∈ (StatementForm.assignBitNot
@@ -453,9 +455,9 @@ theorem statement_assignBitNot_for
     PlaceBoundary selected childFuel inferenceContext targetExpression initial.allocateStatementId.2
       place placeState frames target)
   have unifiedOperational := placeOperational.unify properties.2.1 properties.2.2
-    (Ty.variablesBelow_constructor _ _) placeSafe
-    (fun binder _ => ProtectedVariables.safe_closed binder.scheme.quantified placeState
-      (Ty.variablesBelow_constructor 0 _)) unifiedAccepted
+    targetBelow placeSafe
+    (fun binder member => ProtectedVariables.safe_bitNotTargetType
+      (ProtectedVariables.safe_resolved properties.2.1 (placeSafe binder member))) unifiedAccepted
   have operational : GeneralizedActualStateInvariant result.state (evidenceSource selected) := by
     rw [resultEq]
     exact unifiedOperational.recordStatement _ rfl
@@ -465,9 +467,15 @@ theorem statement_assignBitNot_for
   have resolvedFinal : selected.body.finalized.substitution.apply (unified.resolve place.type) =
       selected.body.finalized.substitution.apply place.type := by
     simpa [State.resolve, InferState.resolve] using unifiedExtension place.type
-  have placeWord : selected.body.finalized.substitution.apply place.type = .word := by
-    rw [← resolvedFinal, resolvedWord]
-    rfl
+  have kind : BitNotTargetType (selected.body.finalized.substitution.apply place.type) := by
+    have fit := resources.assignment_targets_fit (finalized.containsStatement containsRaw)
+    have fits : Detail.bitNotTargetFits
+        (selected.body.finalized.substitution.apply (unified.resolve place.type)) = true := by
+      simpa [StatementNode.applySubstitution, StatementForm.applySubstitution,
+        StatementAssignmentTargetsFit, BitNotTargetFits,
+        AssignmentResolution.applySubstitution, PlaceResolution.applySubstitution] using fit
+    rw [resolvedFinal] at fits
+    exact bitNotTargetType_of_fits fits
   have storedPlaceEq :
       ({ place with type := unified.resolve place.type } : PlaceResolution).applySubstitution
         selected.body.finalized.substitution = place.applySubstitution selected.body.finalized.substitution := by
@@ -476,11 +484,11 @@ theorem statement_assignBitNot_for
   have assignmentTyping : SourceBitNotAssignmentValid selected.body.finalized.typedSource target
       (({ target := { place with type := unified.resolve place.type } } : AssignmentResolution).applySubstitution
         selected.body.finalized.substitution) := by
-    apply SourceBitNotAssignmentValid.intro ?_ rfl
+    apply SourceBitNotAssignmentValid.intro ?_ kind rfl
     change SourcePlaceHasType _ _
       (({ place with type := unified.resolve place.type } : PlaceResolution).applySubstitution
-        selected.body.finalized.substitution) .word
-    rw [storedPlaceEq, ← placeWord]
+        selected.body.finalized.substitution) _
+    rw [storedPlaceEq]
     exact placeTyping
   have typing : StatementHasType selected.body.finalized.typedSource
       { returnType := selected.body.finalized.substitution.apply expectedReturn, loopDepth := inferenceContext.loopDepth }

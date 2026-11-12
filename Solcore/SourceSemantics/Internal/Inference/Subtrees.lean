@@ -320,7 +320,7 @@ local macro "transport_rooted" "(" recursor:term "," before:term ","
     (fun operator _ _ requirements target value refs => .wordCompound operator (target (by rooted_live(refs))) (value (by rooted_live(refs))) requirements)
     (fun operator _ _ requirements target value refs => .fixedCompound operator (target (by rooted_live(refs))) (value (by rooted_live(refs))) requirements)
     (fun operator _ targetKind _ amount requirements target value refs => .shiftCompound operator (target (by rooted_live(refs))) targetKind (value (by rooted_live(refs))) amount requirements)
-    (fun _ requirements target refs => .intro (target (by rooted_live(refs))) requirements)
+    (fun _ kind requirements target refs => .intro (target (by rooted_live(refs))) kind requirements)
     (fun contains form mono generalizes binding type live => by
       have refs := ($transport).statement_children contains live
       rw [form] at refs

@@ -1441,16 +1441,25 @@ theorem operand_types
 
 end AssignmentHasType
 
-/-- Bit-not assignment is valid only at a Word place and, like the other
-current assignment forms, owns no requirements. -/
+/-- The target type of an in-place `~`, which upstream reads as `x = ~x`: `word`,
+or one of the fixed-width integer types on which `~` is Word's (`FixedWordBitNot`:
+the signed ones and `uint256`). -/
+inductive BitNotTargetType : TypeSystem.Ty → Prop where
+  | word : BitNotTargetType .word
+  | fixed {type : TypeSystem.FixedInteger} (kind : FixedWordBitNot type) :
+      BitNotTargetType (.fixed type)
+
+/-- Bit-not assignment is valid at a place of a bit-not target type and, like
+the other current assignment forms, owns no requirements. -/
 inductive BitNotAssignmentValid
     (context : Context)
     (ExpressionTyping : ExpressionId → TypeSystem.Ty → Prop) :
     AssignmentResolution → Prop where
   | intro
-      {assignment : AssignmentResolution}
+      {assignment : AssignmentResolution} {targetType : TypeSystem.Ty}
       (target_type : PlaceHasType context ExpressionTyping
-        assignment.target .word)
+        assignment.target targetType)
+      (target_kind : BitNotTargetType targetType)
       (requirements_eq : assignment.requirements = []) :
       BitNotAssignmentValid context ExpressionTyping assignment
 
@@ -1465,14 +1474,15 @@ theorem requirements_empty
   cases valid
   assumption
 
-theorem target_word
+theorem target_typed
     {context : Context}
     {ExpressionTyping : ExpressionId → TypeSystem.Ty → Prop}
     {assignment : AssignmentResolution}
     (valid : BitNotAssignmentValid context ExpressionTyping assignment) :
-    PlaceHasType context ExpressionTyping assignment.target .word := by
-  cases valid
-  assumption
+    ∃ type, PlaceHasType context ExpressionTyping assignment.target type ∧
+      BitNotTargetType type := by
+  cases valid with
+  | intro target_type target_kind _ => exact ⟨_, target_type, target_kind⟩
 
 end BitNotAssignmentValid
 

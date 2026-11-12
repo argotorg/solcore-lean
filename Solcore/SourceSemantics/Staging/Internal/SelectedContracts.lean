@@ -683,10 +683,12 @@ theorem projected_write_shift {context : Context} {before middle after : Heap}
       exact ⟨rhs.heap_typed.write currentRead (.some updatedCell) heapWrite,
         rhs.heap_extends.trans (HeapTypesExtend.of_write heapWrite)⟩
 
-/-- Unary assignment writes at the actual getter heap without an RHS phase. -/
+/-- Unary assignment writes at the actual getter heap without an RHS phase, at
+the target's bit-not target type. -/
 theorem projected_write_bitNot {context : Context} {before after : Heap}
-    {target : ResolvedPlace} {root : Ty} {updated : Dynamic.Value}
-    (targetTyped : ResolvedPlaceHasType context before target root .word)
+    {target : ResolvedPlace} {root leaf : Ty} {updated : Dynamic.Value}
+    (kind : BitNotTargetType leaf)
+    (targetTyped : ResolvedPlaceHasType context before target root leaf)
     (heap : HeapWellTyped context before)
     (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
       before target updated after) :
@@ -699,9 +701,9 @@ theorem projected_write_bitNot {context : Context} {before after : Heap}
         rw [← targetTyped.root_type, ← rootEq]
         exact initialTyped
       have modification : LeafModificationPreservesType context before
-          (fun _ replacement => BitNotSnapshot target.selected replacement) .word := by
+          (fun _ replacement => BitNotSnapshot target.selected replacement) leaf := by
         intro current replacement _ applies
-        exact applies.preserves targetTyped.selected
+        exact applies.preserves_target kind targetTyped.selected
       have updatedTyped := update.preserves targetTyped.projections initialRoot modification
       have updatedCell : ValueHasType context before updated currentCell.type := by
         rw [rootEq, targetTyped.root_type]

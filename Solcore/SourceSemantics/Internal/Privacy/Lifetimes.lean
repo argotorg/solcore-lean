@@ -702,14 +702,18 @@ theorem forItem_bitnot
     (ready : initial.InferenceReady) (catalog : LifetimeInferenceContext context)
     (form : source.value = .assignBitNot target operator)
     (childAccepted : inferPlaceFuel fuel context target initial = .ok child)
-    (fitting : Detail.unify child.2 child.1.type .word = .ok fitted)
+    (fitting : Detail.unify child.2 child.1.type
+      (bitNotTargetType (child.2.resolve child.1.type)) = .ok fitted)
     (accepted : inferForItemFuel (fuel + 1) context source initial = .ok result)
     (lifetime : GeneralizationLifetime event initial.inference.next child.2 [child.1.type]) :
     GeneralizationLifetime event initial.inference.next result.2 [] := by
   have properties := inferPlaceFuel_inferenceProperties ready catalog.formation catalog.canonical childAccepted
   have after := lifetime.unify properties.2.1 properties.2.2
-    (Ty.variablesBelow_constructor _ _) (lifetime.values _ (List.mem_singleton_self _))
-    (safe_closed _ _ (Ty.variablesBelow_constructor 0 _)) fitting
+    (bitNotTargetType_variablesBelow
+      (properties.2.1.solved.variablesBelow_apply properties.2.2))
+    (lifetime.values _ (List.mem_singleton_self _))
+    (safe_bitNotTargetType (safe_resolved properties.2.1
+      (lifetime.values _ (List.mem_singleton_self _)))) fitting
   have resultEq :
       (.assignBitNot { target := { child.1 with type := fitted.resolve child.1.type } }, fitted) = result := by
     simpa only [inferForItemFuel, form, childAccepted, fitting, bind, Except.bind,

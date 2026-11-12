@@ -133,7 +133,8 @@ theorem inferStatementFuel_success_assignBitNot_child_provenance
     ∃ place placeState unified,
       Detail.inferPlaceFuel fuel inferenceContext targetExpression allocated =
         .ok (place, placeState) ∧
-      Detail.unify placeState place.type .word = .ok unified ∧
+      Detail.unify placeState place.type
+        (Detail.bitNotTargetType (placeState.resolve place.type)) = .ok unified ∧
       allocated.NodesBelowNextOccurrence ∧
       TypingSourceExtends
         ((placeState.toTypedSource roots).applySubstitution outer)
@@ -263,7 +264,8 @@ theorem inferStatementFuel_success_assignBitNot_sound_of_actual_child
       targetExpression allocated = .ok (place, placeState))
     (placeTyped : SourcePlaceHasType
       ((result.state.toTypedSource roots).applySubstitution outer)
-      target (place.applySubstitution outer) (outer.apply place.type)) :
+      target (place.applySubstitution outer) (outer.apply place.type))
+    (kind : BitNotTargetType (outer.apply place.type)) :
     ActiveLocalContextInvariant result.state outer target ∧
       StatementHasType
         ((result.state.toTypedSource roots).applySubstitution outer)
@@ -281,10 +283,14 @@ theorem inferStatementFuel_success_assignBitNot_sound_of_actual_child
       } := by
   apply inferStatementFuel_success_assignBitNot_sound statementEq allocationEq
     success invariant outerExtension roots
-  intro actualPlace actualState actualSuccess
-  rw [placeSuccess] at actualSuccess
-  obtain ⟨rfl, rfl⟩ := (Except.ok.inj actualSuccess).symm
-  exact placeTyped
+  · intro actualPlace actualState actualSuccess
+    rw [placeSuccess] at actualSuccess
+    obtain ⟨rfl, rfl⟩ := (Except.ok.inj actualSuccess).symm
+    exact placeTyped
+  · intro actualPlace actualState actualSuccess
+    rw [placeSuccess] at actualSuccess
+    obtain ⟨rfl, rfl⟩ := (Except.ok.inj actualSuccess).symm
+    exact kind
 
 /-- Assignment inference needs only the typing of the place and value it
 actually returned.  The executable expectation and unification checks
@@ -859,6 +865,7 @@ theorem inferStatementFuel_success_assignBitNot_bounded_scoped
     (parentCovered : TemplateScopeCovered coverageSource target
       (.statement result.id))
     (closed : OccurrenceGraphClosed coverageSource)
+    (targetsFit : SourceAssignmentTargetsFit coverageSource)
     (resultExtension : TypingSourceExtends
       ((result.state.toTypedSource roots).applySubstitution outer)
       coverageSource)
@@ -951,9 +958,27 @@ theorem inferStatementFuel_success_assignBitNot_bounded_scoped
         using member
   have placeTyped := actualPlaceSound placeSuccess placeExtension
     patternsSubset literalsSubset requirementsSubset keysCovered
+  have kind : BitNotTargetType (outer.apply place.type) := by
+    have unifiedExtension : outer.SemanticallyExtends
+        unified.inference.substitution := by
+      rw [resultEq] at outerExtension
+      exact outerExtension
+    have resolvedFinal : outer.apply (unified.resolve place.type) =
+        outer.apply place.type := by
+      simpa [Frontend.SourceInference.State.resolve, InferState.resolve] using
+        unifiedExtension place.type
+    have fit := targetsFit containsFinal
+    have fits : Detail.bitNotTargetFits
+        (outer.apply (unified.resolve place.type)) = true := by
+      simpa [StatementNode.applySubstitution, StatementForm.applySubstitution,
+        StatementAssignmentTargetsFit, BitNotTargetFits,
+        AssignmentResolution.applySubstitution,
+        PlaceResolution.applySubstitution] using fit
+    rw [resolvedFinal] at fits
+    exact bitNotTargetType_of_fits fits
   exact inferStatementFuel_success_assignBitNot_sound_of_actual_child
     statementEq allocationEq success invariant outerExtension roots
-    placeSuccess placeTyped
+    placeSuccess placeTyped kind
 
 /-- The assignment branch does not introduce a visible binder; the actual
 place/RHS traversal preserves the declaration-local binder cutoff. -/

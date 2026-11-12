@@ -2268,6 +2268,7 @@ def main : IO UInt32 := do
   Tests.SourceCoreGeneralizedExport.AcceptedTickRuntime.run
   Tests.SourceCoreShiftSubset.run
   Tests.SourceCoreCompoundShiftSubset.run
+  Tests.SourceCoreBitNotSubset.run
   Tests.SourceLoopMeaning.testSourceLoopMeaning
   Tests.SourceForwardedCallEmitter.testSourceForwardedCallEmitter
   Tests.SourceForwardedCallCases.testSourceForwardedCallCases

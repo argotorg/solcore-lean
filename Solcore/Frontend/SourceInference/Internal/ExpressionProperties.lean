@@ -11189,18 +11189,19 @@ private theorem inferFuel_inferenceProperties_internal :
         simp only [placeResult, bind, Except.bind, Prod.eta] at success
         have placeProperties := placeInduction allocationProperties.2
           validated canonical (inferredTarget, placeState) placeResult
-        cases unifyResult : unify placeState inferredTarget.type .word with
+        cases unifyResult : unify placeState inferredTarget.type
+            (bitNotTargetType (placeState.resolve inferredTarget.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at success
         | ok unifiedState =>
             simp only [unifyResult, bind, Except.bind, pure, Pure.pure,
               Except.pure] at success
+            have targetBelow := bitNotTargetType_variablesBelow
+              (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
             have unifyProgress := unify_inferenceProgress
-              placeProperties.2.1.solved placeProperties.2.2
-              (Ty.variablesBelow_constructor _ _) unifyResult
+              placeProperties.2.1.solved placeProperties.2.2 targetBelow unifyResult
             have unifiedReady := unify_preserves_inferenceReady
-              placeProperties.2.1 placeProperties.2.2
-              (Ty.variablesBelow_constructor _ _) unifyResult
+              placeProperties.2.1 placeProperties.2.2 targetBelow unifyResult
             injection success with resultEq
             rw [← resultEq]
             refine ⟨allocationProperties.1.trans
@@ -12532,7 +12533,8 @@ private theorem inferFuel_inferenceProperties_internal :
         simp only [placeResult, bind, Except.bind, Prod.eta] at success
         have placeProperties := placeInduction ready validated canonical
           (place, placeState) placeResult
-        cases unifyResult : unify placeState place.type .word with
+        cases unifyResult : unify placeState place.type
+            (bitNotTargetType (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult, bind, Except.bind] at success
         | ok unifiedState =>
@@ -12540,12 +12542,12 @@ private theorem inferFuel_inferenceProperties_internal :
               Except.pure] at success
             injection success with resultEq
             rw [← resultEq]
+            have targetBelow := bitNotTargetType_variablesBelow
+              (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)
             have unifyProgress := unify_inferenceProgress
-              placeProperties.2.1.solved placeProperties.2.2
-              (Ty.variablesBelow_constructor _ _) unifyResult
+              placeProperties.2.1.solved placeProperties.2.2 targetBelow unifyResult
             have unifiedReady := unify_preserves_inferenceReady
-              placeProperties.2.1 placeProperties.2.2
-              (Ty.variablesBelow_constructor _ _) unifyResult
+              placeProperties.2.1 placeProperties.2.2 targetBelow unifyResult
             exact ⟨placeProperties.1.trans unifyProgress, unifiedReady⟩
   case case63 =>
     simp [InferPlaceFuelInferenceProperties, inferPlaceFuel]
@@ -14888,7 +14890,8 @@ theorem inferForItemFuel_preserves_localBindersBelowNextLocal
         | ok placePair =>
             rcases placePair with ⟨place, placeState⟩
             simp only [placeResult, bind, Except.bind, Prod.eta] at success
-            cases unifyResult : unify placeState place.type .word with
+            cases unifyResult : unify placeState place.type
+                (bitNotTargetType (placeState.resolve place.type)) with
             | error error =>
                 simp [unifyResult, bind, Except.bind] at success
             | ok unifiedState =>

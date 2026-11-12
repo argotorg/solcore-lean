@@ -724,12 +724,17 @@ mutual
         (requirements_eq : assignment.requirements = []) :
         SourceAssignmentHasType source context assignment operator value
 
-  /-- Bit-not assignment in the current executable source profile. -/
+  /-- Bit-not assignment in the current executable source profile: the target
+  keeps its type, `word` or one of the fixed-width integer types on which `~` is
+  Word's (`BitNotTargetType`), as upstream's rewrite of `x ~=` to `x = ~x` types
+  it. -/
   inductive SourceBitNotAssignmentValid (source : TypedSource) :
       Context → AssignmentResolution → Prop where
     | intro
         {context : Context} {assignment : AssignmentResolution}
-        (target_type : SourcePlaceHasType source context assignment.target .word)
+        {targetType : TypeSystem.Ty}
+        (target_type : SourcePlaceHasType source context assignment.target targetType)
+        (target_kind : BitNotTargetType targetType)
         (requirements_eq : assignment.requirements = []) :
         SourceBitNotAssignmentValid source context assignment
 
@@ -1284,8 +1289,8 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
         targetInduction valueInduction =>
       .shiftCompound operatorKind targetInduction targetKind valueInduction amount
         requirementsEq)
-    (fun targetType requirementsEq targetInduction =>
-      .intro targetInduction requirementsEq)
+    (fun targetType targetKind requirementsEq targetInduction =>
+      .intro targetInduction targetKind requirementsEq)
     (fun contains formEq monomorphic generalizes binderExtension typeEq =>
       .letUninitialized (($sourceExtension).containsStatement contains) formEq
         monomorphic generalizes
@@ -1446,6 +1451,22 @@ theorem SourceAssignmentHasType.weakenSource
     SourceAssignmentHasType after context assignment operator value :=
   weaken_source_static(SourceAssignmentHasType.rec, before, after,
     sourceExtension, typing)
+
+/-- At a `Word` target, a valid bit-not assignment types its place at `Word`:
+the place's stored type is its type. -/
+theorem SourceBitNotAssignmentValid.place_word
+    {source : TypedSource} {context : Context} {assignment : AssignmentResolution}
+    (typing : SourceBitNotAssignmentValid source context assignment)
+    (word : assignment.target.type = .word) :
+    SourcePlaceHasType source context assignment.target .word := by
+  cases typing with
+  | @intro _ _ targetType place _ _ =>
+    have stored : assignment.target.type = targetType := by
+      cases place
+      assumption
+    rw [stored] at word
+    subst word
+    exact place
 
 theorem SourceBitNotAssignmentValid.weakenSource
     {before after : TypedSource} {context : Context}

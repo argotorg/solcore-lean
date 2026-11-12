@@ -1150,8 +1150,8 @@ mutual
     | @SourcePlaceSnapshotUpdate.intro _ _ _ _ _ _ _ selectedHeap _ _ target _
         resolve write => by
       cases typing with
-      | intro target_type requirements_eq =>
-            have aligned_target_type : SourcePlaceHasType source context place .word :=
+      | @intro _ _ targetType target_type target_kind requirements_eq =>
+            have aligned_target_type : SourcePlaceHasType source context place targetType :=
               place_eq.symm ▸ target_type
             rcases preservePlaceRec program_well_formed runtime
                 evidence_covers environment_agrees before_typed aligned_target_type
@@ -1168,10 +1168,10 @@ mutual
                   exact initial_typed
                 have modify_typed : LeafModificationPreservesType context
                     selectedHeap
-                    (fun _ updated => modify target.selected updated) .word := by
+                    (fun _ updated => modify target.selected updated) targetType := by
                   intro current updated current_typed modifies
                   rw [modify_eq] at modifies
-                  exact modifies.preserves target_typed.selected
+                  exact modifies.preserves_target target_kind target_typed.selected
                 have updated_typed := update.preserves target_typed.projections
                   initial_root_typed modify_typed
                 have updated_cell_typed : ValueHasType context selectedHeap

@@ -320,6 +320,7 @@ theorem actualInferForItemFuelRootedSoundness_assignBitNot {fuel : Nat}
     ForItemBindingRetained (evidenceState.toTypedSource roots) inferred →
     (∀ reference ∈ inferred.references, ActualContext.Covers finalized frames reference) →
     ActualForItemBindings finalized frames inferred →
+    ForItemAssignmentTargetFits (inferred.applySubstitution finalized.substitution) →
     ∃ finalContext,
       RecursiveStatementInvariant wholeContext expectedReturn finalized
         final finalContext ∧
@@ -332,6 +333,7 @@ theorem actualInferForItemFuelRootedSoundness_assignBitNot {fuel : Nat}
     evidenceState roots finalized semanticSource frames semanticContext control itemEq success resources interfaces
     signaturesEq ownerEq parametersEq assumptionsEq formation functions catalog canonical invariant actual operational
     _returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered _bindings actualCovered _actualBindings
+    targetsFit
   obtain ⟨place, placeState, unified, placeSuccess, unifySuccess, resultEq⟩ :=
     inferForItemFuel_success_assignBitNot_facts itemEq success
   have sameItem := congrArg Prod.fst resultEq
@@ -348,7 +350,17 @@ theorem actualInferForItemFuelRootedSoundness_assignBitNot {fuel : Nat}
   have properties := Detail.inferPlaceFuel_inferenceProperties invariant.ready formation functions placeSuccess
   have placeExtension := extension.trans
     (Detail.unify_inferenceProgress properties.2.1.solved properties.2.2
-      (Ty.variablesBelow_constructor _ _) unifySuccess).substitution_extends
+      (Detail.bitNotTargetType_variablesBelow
+        (properties.2.1.solved.variablesBelow_apply properties.2.2)) unifySuccess).substitution_extends
+  have kind : BitNotTargetType (finalized.substitution.apply place.type) := by
+    have resolvedFinal : finalized.substitution.apply (unified.resolve place.type) =
+        finalized.substitution.apply place.type := by
+      simpa [State.resolve, InferState.resolve] using extension place.type
+    have fits := targetsFit
+    simp only [ForItemForm.applySubstitution, ForItemAssignmentTargetFits, BitNotTargetFits,
+      AssignmentResolution.applySubstitution, PlaceResolution.applySubstitution] at fits
+    rw [resolvedFinal] at fits
+    exact bitNotTargetType_of_fits fits
   have keyMember : ∀ key, .expression key ∈ place.references →
       (.expression key : NodeId) ∈ (ForItemForm.assignBitNot
         {target := {place with type := unified.resolve place.type}}).references := by
@@ -368,7 +380,8 @@ theorem actualInferForItemFuelRootedSoundness_assignBitNot {fuel : Nat}
   have placeTyped := sourcePlace_transportExpressions placeLocal (after := semanticSource) (fun id member type typing =>
     (semantic (.expression id) (keyMember id (by simpa [PlaceResolution.references, PlaceResolution.applySubstitution] using member))).subgraph.expression typing (.inl rfl))
   obtain ⟨finalContext, finalInvariant, typing⟩ := inferForItemFuel_success_assignBitNot_of_certificate
-    success formation functions invariant extension ⟨place, placeState, unified, placeSuccess, unifySuccess, rfl, placeTyped⟩
+    success formation functions invariant extension ⟨place, placeState, unified, placeSuccess, unifySuccess, rfl, placeTyped,
+      kind⟩
   have bindersEq : unified.localBinders = initial.localBinders := by
     exact (congrArg LexicalScope.binders (Detail.unify_preserves_lexicalScope unifySuccess)).trans
       (congrArg LexicalScope.binders (Detail.inferPlaceFuel_success_lexicalScope_eq placeSuccess))

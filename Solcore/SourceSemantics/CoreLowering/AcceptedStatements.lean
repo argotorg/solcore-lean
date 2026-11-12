@@ -501,13 +501,15 @@ theorem bare_head (index : ActualBodyInvocation.Index compiled bodyRelation) {ta
   exact GenericAssignmentStatements.Head.of_lower_bare_with_token receipt.bare unique writable rightTyped profile
     (fun _ generated => ⟨node, found, generated⟩) lowered
 
-/-- Checker validity of a bare bit-not target gives its writable declaration
-and Word representation. -/
+/-- Checker validity of a bare bit-not target gives its writable declaration,
+and the compiler profile's `Word` target (`sourceProfile`) its Word
+representation. -/
 theorem bitNot_facts {source : TypedSource} {context : SourceSemantics.Context}
     {assignment : AssignmentResolution} {binder : TypedBinder}
     (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
     (targetType : binder.scheme.body = assignment.target.type)
     (bare : assignment.target.projections = [])
+    (sourceProfile : assignment.target.type = .word)
     (typed : SourceBitNotAssignmentValid source context assignment) :
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       WritableLocal context assignment.target.root actual.scheme.body) ∧
@@ -517,7 +519,7 @@ theorem bitNot_facts {source : TypedSource} {context : SourceSemantics.Context}
   | intro place _ =>
   cases place with
   | intro writable projections target =>
-    refine ⟨?_, .inl (by rw [target]; rfl)⟩
+    refine ⟨?_, .inl (by rw [sourceProfile]; rfl)⟩
     intro actual actualFound
     cases Except.ok.inj (declaration.symm.trans actualFound)
     rw [bare] at projections
@@ -538,7 +540,8 @@ theorem bitNot_head (index : ActualBodyInvocation.Index compiled bodyRelation) {
       code = head.emit next output ∧ head.invalid = index.invalidUnary site assignment.target.root := by
   subst target
   have lowered := index.bitNot_lowered receipt.selected receipt.accepted
-  obtain ⟨writable, profile⟩ := bitNot_facts receipt.declaration targetType receipt.bare typed
+  obtain ⟨writable, profile⟩ := bitNot_facts receipt.declaration targetType receipt.bare
+    receipt.sourceProfile typed
   exact CompatibleBitNotStatements.Head.of_lower_with_token writable receipt.bare profile lowered
 
 /-- A projected write's head retains the compiler's ordered key and right-hand
@@ -577,16 +580,6 @@ theorem projected_head (index : ActualBodyInvocation.Index compiled bodyRelation
       · obtain ⟨node, found, _⟩ := route.key_typed unique (sourceTyped _ receipt.description.binding) member
         exact ⟨node, found, generated⟩) lowered native
 
-theorem bitNot_word {source : TypedSource} {context : SourceSemantics.Context} {assignment : AssignmentResolution}
-    (typed : SourceBitNotAssignmentValid source context assignment) :
-    SourceCoreRawMetadata.runtimeType assignment.target.type = .word := by
-  cases typed with
-  | intro place _ =>
-  cases place with
-  | intro _ _ target =>
-    rw [target]
-    rfl
-
 /-- The projected unary head keeps the absent operand literal; only ordered
 keys are compiler children, each certified by its own accepted lowering. -/
 theorem projected_bitNot_head (index : ActualBodyInvocation.Index compiled bodyRelation) {target : TypedSource}
@@ -612,7 +605,8 @@ theorem projected_bitNot_head (index : ActualBodyInvocation.Index compiled bodyR
   obtain ⟨sourceTyped, writable⟩ :=
     ScopedSourceForItemsAdmission.projected_bitNot_facts unique receipt.description.binding route typed
   exact CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
-    unique signatures sourceTyped writable receipt.projected (.inl (bitNot_word typed))
+    unique signatures sourceTyped writable receipt.projected
+    (.inl (by rw [receipt.sourceProfile]; rfl))
     (fun id _ member generated _ => by
       obtain ⟨node, found, _⟩ := route.key_typed unique (sourceTyped _ receipt.description.binding) member
       exact ⟨node, found, generated⟩) lowered native

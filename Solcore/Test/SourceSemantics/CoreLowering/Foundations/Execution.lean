@@ -4073,8 +4073,8 @@ and one above the type's greatest value is rejected. A prefix `-` on a literal
 folds into it, through groups and repeated, and the range is checked with the
 sign; any other `-e` reads as `0 - e`. Unchecked `+ - * / %` wrap to the
 type's width (`runUnchecked`), and `<< >>` are Word's shifts read at the
-type (`runShifts`), and so are `<<= >>=` (`runCompoundShifts`); in-place `~` is
-still rejected. -/
+type (`runShifts`), and so are `<<= >>=` (`runCompoundShifts`); in-place `~`
+takes the target's type (`runBitNotAssignments`). -/
 set_option autoImplicit false
 namespace Tests.SourceCoreFixedIntegerOperators
 open Solcore Solcore.Frontend SourceCoreExecution
@@ -4472,7 +4472,20 @@ def runDefaulting : IO Unit := do
       require (operator == .add) s!"a generalized lambda's compound target named {reprStr operator}"
   | .ok _ => throw (IO.userError "a compound on a generalized lambda parameter was accepted")
   | .error errors => throw (IO.userError s!"a compound on a generalized lambda parameter gave {reprStr errors}")
-  IO.println "SOURCE_CORE_UINT256_DEFAULT_PASS: open literals in comparisons, operators, requirements and matches default to uint256 with checked arithmetic, a generic call's literal takes the return's type, a shift's open literals defaulted to uint256, numeric patterns at uint256 up to 2^256 - 1, unconstrained literals rejected as ambiguous, an open -1 and a defaulted 2^256 out of uint256's range, an unsolved Mark<uint256> rejected, compound assignments on an open target typed with their operand and defaulted to uint256 with checked += -= *= /= %= and Word's &= |= ^=, a later use's uint8 and int8, uint256 and Word for loop counters, compound shifts still Word and an open unchecked compound uint256, an integer compound target rejected, lambda parameters as compound targets typed by a captured Word, a declaration or a literal operand, and one that nothing types rejected, numeric patterns on the other eleven types rejected, a 2^256 pattern at uint256 rejected by inference, declared or defaulted, upstream's poly_int_defaulting rejected at its Int bound and its unbounded form as ambiguous"
+  -- So are an in-place `~` (step 9a) and a compound shift (step 8d) on such a parameter.
+  match checkProgram (workspaceOf
+      ["function bad() returns (Word) { let f = lam(x) { x ~=; return x; }; return 0; }"]) with
+  | .error [.inference ⟨_, .operatorNotSupported name (.variable _)⟩] =>
+      require (name == "BitNot") s!"a generalized lambda's in-place ~ named {name}"
+  | .ok _ => throw (IO.userError "an in-place ~ on a generalized lambda parameter was accepted")
+  | .error errors => throw (IO.userError s!"an in-place ~ on a generalized lambda parameter gave {reprStr errors}")
+  match checkProgram (workspaceOf
+      ["function bad() returns (Word) { let f = lam(x) { x <<= 1; return x; }; return 0; }"]) with
+  | .error [.inference ⟨_, .compoundTargetNotSupported _ operator (.variable _)⟩] =>
+      require (operator == .shiftLeft) s!"a generalized lambda's compound shift named {reprStr operator}"
+  | .ok _ => throw (IO.userError "a compound shift on a generalized lambda parameter was accepted")
+  | .error errors => throw (IO.userError s!"a compound shift on a generalized lambda parameter gave {reprStr errors}")
+  IO.println "SOURCE_CORE_UINT256_DEFAULT_PASS: open literals in comparisons, operators, requirements and matches default to uint256 with checked arithmetic, a generic call's literal takes the return's type, a shift's open literals defaulted to uint256, numeric patterns at uint256 up to 2^256 - 1, unconstrained literals rejected as ambiguous, an open -1 and a defaulted 2^256 out of uint256's range, an unsolved Mark<uint256> rejected, compound assignments on an open target typed with their operand and defaulted to uint256 with checked += -= *= /= %= and Word's &= |= ^=, a later use's uint8 and int8, uint256 and Word for loop counters, compound shifts still Word and an open unchecked compound uint256, an integer compound target rejected, lambda parameters as compound targets typed by a captured Word, a declaration or a literal operand, and one that nothing types rejected, as are an in-place ~ and a compound shift on one, numeric patterns on the other eleven types rejected, a 2^256 pattern at uint256 rejected by inference, declared or defaulted, upstream's poly_int_defaulting rejected at its Int bound and its unbounded form as ambiguous"
 
 /-- Step 8a's fixture: unchecked `+ - * / %` on the twelve types, in a block. -/
 private def uncheckedWorkspace : Workspace.RawWorkspace := workspaceOf [
@@ -4853,6 +4866,92 @@ def runCompoundShifts : IO Unit := do
   | .error errors => throw (IO.userError s!"an integer <<= target gave {reprStr errors}")
   IO.println "SOURCE_CORE_FIXED_COMPOUND_SHIFTS_PASS: <<= and >>= on signed and unsigned fixed-width locals and Word by Word and unsigned amounts of other types, uintN <<= keeping the low N bits, intN <<= sign-extending them and intN >>= arithmetic, literal amounts defaulted to uint256, a uint8 mapping element, open targets typed by a later use or defaulted to uint256, compound shifts in an unchecked block and in a for loop's header and body, signed, integer and Bool amounts, an open amount made signed, integer and Bool targets and an open target made integer rejected"
 
+/-- Step 9a's fixture: in-place `~` (`x ~=;`) on `uint256`, the signed types and
+`Word`, where Word's `~` is the type's, on locals, a mapping element, open
+targets and in a `for` loop's header and body. -/
+private def bitNotWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function not256u(x: uint256) returns (uint256) { let r: uint256 = x; r ~=; return r; }",
+  "function not8s(x: int8) returns (int8) { let r: int8 = x; r ~=; return r; }",
+  "function not16s(x: int16) returns (int16) { let r: int16 = x; r ~=; return r; }",
+  "function not32s(x: int32) returns (int32) { let r: int32 = x; r ~=; return r; }",
+  "function not64s(x: int64) returns (int64) { let r: int64 = x; r ~=; return r; }",
+  "function not128s(x: int128) returns (int128) { let r: int128 = x; r ~=; return r; }",
+  "function not256s(x: int256) returns (int256) { let r: int256 = x; r ~=; return r; }",
+  "function notWord(w: Word) returns (Word) { let r: Word = w; r ~=; return r; }",
+  "function notMapped8s(x: int8) returns (int8) { let m: mapping(Bool => int8); m[true] = x; m[true] ~=; return m[true]; }",
+  "function notOpenDefault() returns (bool) { let x = 0; x ~=; return x > 5; }",
+  "function notOpenLater8s() returns (int8) { let x = 5; x ~=; let y: int8 = x; return y; }",
+  "function notOpenReturn256s() returns (int256) { let x = 0; x ~=; return x; }",
+  "function notOpenWord() returns (Word) { let x = 1; x ~=; let w: Word = x; return w; }",
+  "function notTwice8s(x: int8) returns (int8) { let r: int8 = x; r ~=; r ~=; return r; }",
+  "function notForPost8s(x: int8) returns (int8) { let r: int8 = x; for (let i: Word = 0; i < 1; r ~=) { i += 1; } return r; }",
+  "function notForBody256u(x: uint256) returns (uint256) { let r: uint256 = x; for (let i: Word = 0; i < 3; i += 1) { r ~=; } return r; }"]
+
+private def bitNotNames : List String := [
+  "not256u", "not8s", "not16s", "not32s", "not64s", "not128s", "not256s", "notWord", "notMapped8s",
+  "notOpenDefault", "notOpenLater8s", "notOpenReturn256s", "notOpenWord", "notTwice8s", "notForPost8s",
+  "notForBody256u"]
+
+/-- Finalization rejects an in-place `~` whose target has a type that no
+`BitNot` instance takes, naming the trait and that type. -/
+private def rejectedBitNot (label : String) (expected : TypeSystem.Ty) (lines : List String) : IO Unit :=
+  match checkProgram (workspaceOf lines) with
+  | .error [.inference ⟨_, .operatorNotSupported actual type⟩] =>
+      require (actual == "BitNot" && decide (type = expected)) s!"{label} named {actual} and {reprStr type}"
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+/-- Step 9a, in-place `~`, through the public API, as upstream's rewrite of `x ~=`
+to `x = ~x` gives it: the target keeps its type and takes that type's `~`, Word's
+on `uint256`, the signed types and `Word`; an open target waits for its type and
+defaults to `uint256`. The place is evaluated once. -/
+def runBitNotAssignments : IO Unit := do
+  let program ← get "bit-not check" (checkProgram bitNotWorkspace)
+  let seeds ← bitNotNames.mapM (seed program)
+  let compiled ← get "bit-not compilation"
+    (compile bitNotWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (index : Nat) : IO Key := match compiled.keys[index]? with
+    | some key => pure key | none => throw (IO.userError "bit-not root missing")
+  let max := modulus - 1
+  let mut session ← boot (← compiled.open)
+  let cases : List (Nat × List Value × Value) := [
+    -- `uint256` is Word's `~`.
+    (0, [word 5], word (modulus - 6)), (0, [word 0], word max), (0, [word max], word 0),
+    -- On the signed types `~x` is `-x - 1`, sign-extended.
+    (1, [word 5], word (modulus - 6)), (1, [word max], word 0), (1, [word (modulus - 128)], word 127),
+    (1, [word 127], word (modulus - 128)),
+    (2, [word 0], word max), (2, [word 32767], word (modulus - 32768)),
+    (3, [word (modulus - 2 ^ 31)], word (2 ^ 31 - 1)),
+    (4, [word 1], word (modulus - 2)),
+    (5, [word (2 ^ 127 - 1)], word (modulus - 2 ^ 127)),
+    (6, [word 0], word max), (6, [word (2 ^ 255 - 1)], word (2 ^ 255)),
+    -- A `Word` target, as before.
+    (7, [word 0], word max), (7, [word 0xff], word (max - 0xff)),
+    -- A mapping element of `int8`.
+    (8, [word 5], word (modulus - 6)),
+    -- An open target defaults to `uint256`, or takes a later use's `int8`, the return's `int256` or a `Word`.
+    (9, [], boolean true), (10, [], word (modulus - 6)), (11, [], word max), (12, [], word (max - 1)),
+    -- Twice is the identity; in a `for` loop's header and body.
+    (13, [word (modulus - 3)], word (modulus - 3)), (14, [word 5], word (modulus - 6)),
+    (15, [word 5], word (max - 5))]
+  for (index, arguments, expected) in cases do
+    let completed ← execute session (← key index) arguments
+    require (completed.value == expected)
+      s!"{bitNotNames[index]?} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  -- `~` on `uint8` … `uint128` keeps the low `N` bits, which in-place `~` does not yet do.
+  rejectedBitNot "~= on uint8" (.fixed ⟨false, .w8⟩)
+    ["function bad(x: uint8) returns (uint8) { let r: uint8 = x; r ~=; return r; }"]
+  -- Upstream defines no `BitNot` on `integer` or `Bool`: a closed target of those types fails to
+  -- unify with `Word`, and an open one that a later use makes `integer` is rejected at finalization.
+  rejectedByInference "~= on integer"
+    ["function bad(n: integer) returns (integer) { let r: integer = n; r ~=; return r; }"]
+  rejectedByInference "~= on Bool"
+    ["function bad(b: Bool) returns (Bool) { let r: Bool = b; r ~=; return r; }"]
+  rejectedBitNot "an open ~= target made integer" .integer
+    ["function bad() returns (Word) { let x = 1; x ~=; let y: integer = x; return 0; }"]
+  IO.println "SOURCE_CORE_FIXED_BIT_NOT_ASSIGNMENTS_PASS: in-place ~ on uint256, the signed fixed-width types and Word as Word's ~, sign-extended on the signed types, on locals, an int8 mapping element and in a for loop's header and body, open targets defaulted to uint256 or typed by a later use, the return or a Word, uint8 not yet accepted, integer and Bool targets and an open target made integer rejected"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -4860,7 +4959,8 @@ contract storage, as top-level functions, and the ones that convert only to
 reach a type adapted where the meaning is kept: `uint256(0)` is `0` at
 `uint256`, a `Typedef.abs(Typedef.rep(s))` amount or value is a parameter of
 the converted type, and a result converted to `uint256` is returned at its own
-type, whose word the API returns. The lane's notes have the table. -/
+type, whose word the API returns. Step 9a adds `basic`'s `bnoteq`, its one
+`~=` that needs no contract storage. The lane's notes have the table. -/
 private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function addU256(a: uint256, b: uint256) returns (uint256) { return a + b; }",
   "function subU256(a: uint256, b: uint256) returns (uint256) { return a - b; }",
@@ -4922,7 +5022,8 @@ private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function negI32(x: int32) returns (int32) { return -x; }",
   "function negI64(x: int64) returns (int64) { return -x; }",
   "function negI128(x: int128) returns (int128) { return -x; }",
-  "function negI256(x: int256) returns (int256) { return -x; }"]
+  "function negI256(x: int256) returns (int256) { return -x; }",
+  "function bnoteq(x: uint256) returns (uint256) { let acc: uint256 = x; acc ~=; return acc; }"]
 
 private def fixtureNames : List String := [
   "addU256", "subU256", "mulU256", "divU256", "modU256", "addU8", "subU8", "mulU8", "divU8", "modU8",
@@ -4932,7 +5033,7 @@ private def fixtureNames : List String := [
   "precedence", "comparisons", "negate8", "addI32", "mulNeg", "ltSigned", "divSigned", "implicitSuccess",
   "negateSigned", "negateWord", "runtimePatterns", "implicitAdd", "implicitSub", "implicitMul", "implicitDiv",
   "implicitMod", "implicitNeg", "implicitCompound", "explicitWord", "negUnsigned", "negI8", "negI16", "negI32",
-  "negI64", "negI128", "negI256"]
+  "negI64", "negI128", "negI256", "bnoteq"]
 
 /-- Step 8e, the upstream fixtures' cases through the public API: each value
 and each panic code is the fixture's. -/
@@ -5000,7 +5101,9 @@ def runUpstreamFixtures : IO Unit := do
     ("negI128", [word 0], word 0), ("negI128", [word max], word 1),
     ("negI128", [word (2 ^ 127 - 1)], word (modulus - (2 ^ 127 - 1))),
     ("negI256", [word 0], word 0), ("negI256", [word max], word 1),
-    ("negI256", [word (2 ^ 255 - 1)], word (2 ^ 255 + 1))]
+    ("negI256", [word (2 ^ 255 - 1)], word (2 ^ 255 + 1)),
+    -- basic: `bnoteq(10)` is `~10`.
+    ("bnoteq", [word 10], word (modulus - 11))]
   for (name, arguments, expected) in cases do
     let completed ← execute session (← key name) arguments
     require (completed.value == expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
@@ -5033,7 +5136,7 @@ def runUpstreamFixtures : IO Unit := do
     ("implicitCompound", [word 4]), ("implicitCompound", [word 5])]
   for (name, arguments) in zero do
     session ← panics session (← key name) arguments SourceCorePanics.divisionByZero s!"{name} on {reprStr arguments}"
-  IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no conversion and no contract storage, and of their conversion-only functions adapted with the meaning kept, give the fixtures' values and panic codes"
+  IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no conversion and no contract storage, of their conversion-only functions adapted with the meaning kept, and of basic's bnoteq give the fixtures' values and panic codes"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)
@@ -5244,6 +5347,7 @@ def run : IO Unit := do
   runUnchecked
   runShifts
   runCompoundShifts
+  runBitNotAssignments
   runUpstreamFixtures
 
 end Tests.SourceCoreFixedIntegerOperators

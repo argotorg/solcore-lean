@@ -421,8 +421,8 @@ theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : 
       obtain ⟨_word, tailShape⟩ := shape.unary_tail found form
       have assignmentTyped := ProtectedStateImperativeTypedSourceSites.bit_not unique
         (ProtectedStateImperativeTypedSourceSites.head sourceTyped) found form
-      have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
-        cases assignmentTyped with | intro typed _ => exact typed
+      obtain ⟨_, targetTyped⟩ : ∃ type, SourcePlaceHasType invocation.source context assignment.target type := by
+        cases assignmentTyped with | intro typed _ _ => exact ⟨_, typed⟩
       have typedChildren (size : Nat) (smaller : size < budget) : PreservesAt bridge context model stages invocation
           (TypedCertificate invocation.source certificates context) faults size := by
         intro scope id lowered generated node found typed
@@ -1040,8 +1040,8 @@ theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : 
       intro shape sourceTyped projection size within mapping world actualContext environment canonical actual before store ξ contextLocation native environments heaps locals agrees actualTyped reference read unmapped initial conditioned admitted outcome after trace
       obtain ⟨_word, tailShape⟩ := shape.1.unary_tail
       have assignmentTyped := (InitializerTyping.bitNot sourceTyped).1
-      have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
-        cases assignmentTyped with | intro typed _ => exact typed
+      obtain ⟨_, targetTyped⟩ : ∃ type, SourcePlaceHasType invocation.source context assignment.target type := by
+        cases assignmentTyped with | intro typed _ _ => exact ⟨_, typed⟩
       have typedChildren (size : Nat) (smaller : size < budget) : PreservesAt bridge context model stages invocation
           (TypedCertificate invocation.source certificates context) faults size := by
         intro scope id lowered generated node found typed

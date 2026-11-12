@@ -576,8 +576,9 @@ theorem inferStatementFuel_success_assignValue_recursive_scoped
     assignmentLiteralsSubset assignmentRequirementsSubset keysCovered
     rhsCovered placeSound expressionSound
 
-/-- Bit-not assignment traverses an actual place, then unifies its type with
-`Word`.  The place's indexed keys are typed before that final unification. -/
+/-- Bit-not assignment traverses an actual place, then unifies its type with its
+bit-not target type.  The place's indexed keys are typed before that final
+unification, and finalization's check gives the target type's kind. -/
 theorem inferStatementFuel_success_assignBitNot_recursive_scoped
     {fuel : Nat}
     {wholeContext inferenceContext : Frontend.SourceInference.Context}
@@ -654,8 +655,8 @@ theorem inferStatementFuel_success_assignBitNot_recursive_scoped
         } := by
   apply inferStatementFuel_success_assignBitNot_bounded_scoped
     statementEq allocationEq success initialBelow invariant outerExtension
-    roots parentCovered closed resultExtension resultIntegerPatternsSubset
-    resultIntegerLiteralsSubset resultRequirementsSubset
+    roots parentCovered closed resources.assignment_targets_fit resultExtension
+    resultIntegerPatternsSubset resultIntegerLiteralsSubset resultRequirementsSubset
   intro place placeState placeSuccess _placeExtension placePatternsSubset
     placeLiteralsSubset placeRequirementsSubset keysCovered
   obtain ⟨actualPlace, actualState, unified, actualSuccess,
@@ -692,7 +693,8 @@ theorem inferStatementFuel_success_assignBitNot_recursive_scoped
     placeSuccess
   have unifyProgress := Detail.unify_inferenceProgress
     placeProperties.2.1.solved placeProperties.2.2
-    (Ty.variablesBelow_constructor _ _) unifySuccess
+    (Detail.bitNotTargetType_variablesBelow
+      (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)) unifySuccess
   have placeSubstitutionExtension :
       finalized.substitution.SemanticallyExtends
         placeState.inference.substitution :=

@@ -1601,14 +1601,19 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
           (place, placeState) placeResult
         have placeFixed := placeInduction ready wellFormed bound live fixed catalog validated canonical
           (place, placeState) placeResult
-        cases unifyResult : Detail.unify placeState place.type .word with
+        cases unifyResult : Detail.unify placeState place.type
+            (Detail.bitNotTargetType (placeState.resolve place.type)) with
         | error error =>
             simp [unifyResult] at success
         | ok unifiedState =>
             simp only [unifyResult, pure, Pure.pure, Except.pure] at success
             injection success with resultEq
             rw [← resultEq]
-            have wordSafe : Safe protectedVars placeState .word := safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+            have placeReady :=
+              (inferPlaceFuel_inferenceProperties ready validated canonical placeResult).2.1
+            have wordSafe : Safe protectedVars placeState
+                (Detail.bitNotTargetType (placeState.resolve place.type)) :=
+              safe_bitNotTargetType (safe_resolved placeReady placeProperties.2.1)
             exact unify_fixes_protected placeFixed placeProperties.2.1 wordSafe unifyResult
   case case42 =>
     intros context statement expectedReturn initial fuel id allocated
@@ -1644,12 +1649,17 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
           allocationPrivacy.2.1 catalog validated canonical (inferredTarget, placeState) placeResult
         have placeFixed := placeInduction allocationProperties.2 wfAllocated boundAllocated
           allocationPrivacy.2.1 fixedAllocated catalog validated canonical (inferredTarget, placeState) placeResult
-        cases unifyResult : Detail.unify placeState inferredTarget.type .word with
+        cases unifyResult : Detail.unify placeState inferredTarget.type
+            (Detail.bitNotTargetType (placeState.resolve inferredTarget.type)) with
         | error error =>
             simp [unifyResult] at success
         | ok unifiedState =>
             simp only [unifyResult, pure, Pure.pure, Except.pure] at success
-            have wordSafe : Safe protectedVars placeState .word := safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+            have placeReady := (inferPlaceFuel_inferenceProperties allocationProperties.2
+              validated canonical placeResult).2.1
+            have wordSafe : Safe protectedVars placeState
+                (Detail.bitNotTargetType (placeState.resolve inferredTarget.type)) :=
+              safe_bitNotTargetType (safe_resolved placeReady placePrivacy.2.1)
             have unifiedFixed := unify_fixes_protected placeFixed placePrivacy.2.1 wordSafe unifyResult
             injection success with resultEq
             rw [← resultEq]

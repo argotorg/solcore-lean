@@ -1116,7 +1116,7 @@ theorem actualInferForItemFuelRootedSoundness_step {fuel : Nat}
   | assignValue target operator value =>
     exact actualInferForItemFuelRootedSoundness_assignValue placeSound expressionSound form success resources interfaces signaturesEq ownerEq parametersEq assumptionsEq formation functions catalog parameters invariant actual operational returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered bindings actualCovered actualBindings targetsFit amountsFit
   | assignBitNot target operator =>
-    exact actualInferForItemFuelRootedSoundness_assignBitNot placeSound form success resources interfaces signaturesEq ownerEq parametersEq assumptionsEq formation functions catalog parameters invariant actual operational returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered bindings actualCovered actualBindings
+    exact actualInferForItemFuelRootedSoundness_assignBitNot placeSound form success resources interfaces signaturesEq ownerEq parametersEq assumptionsEq formation functions catalog parameters invariant actual operational returnAdmissible extension semantic raw patterns literals requirements sourceOwner covered bindings actualCovered actualBindings targetsFit
 
 end Solcore.SourceSemantics.SourceInferenceSoundness
 end

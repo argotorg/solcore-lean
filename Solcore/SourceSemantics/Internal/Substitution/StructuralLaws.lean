@@ -5128,11 +5128,14 @@ theorem StatementsHaveType.applyParameters
         | word => exact .word
         | unsigned unsigned => exact .unsigned unsigned)
       (by simpa [applyAssignmentResolution] using requirementsEq)
-  · intro context assignment targetType requirementsEq targetInduction catalog
+  · intro context assignment targetTy targetType targetKind requirementsEq targetInduction catalog
       contextValid
     exact .intro
       (by simpa [applyAssignmentResolution, applyPlaceResolution] using
         targetInduction catalog contextValid)
+      (by cases targetKind with
+        | word => exact .word
+        | fixed kind => exact .fixed kind)
       (by simpa [applyAssignmentResolution] using requirementsEq)
   · intro control context final id node binder contains formEq monomorphic
       generalizes extension typeEq catalog contextValid
@@ -12429,12 +12432,15 @@ theorem StatementsHaveType.applySubstitution
         | word => exact .word
         | unsigned unsigned => exact .unsigned unsigned)
       (by simpa [AssignmentResolution.applySubstitution] using requirementsEq)
-  · intro context assignment targetType requirementsEq targetInduction
+  · intro context assignment targetTy targetType targetKind requirementsEq targetInduction
       targetContext catalog contextValid
     exact .intro
       (by simpa [AssignmentResolution.applySubstitution,
         PlaceResolution.applySubstitution] using
           targetInduction targetContext catalog contextValid)
+      (by cases targetKind with
+        | word => exact .word
+        | fixed kind => exact .fixed kind)
       (by simpa [AssignmentResolution.applySubstitution] using requirementsEq)
   · intro control context final id node binder contains formEq monomorphic
       generalizes extension typeEq targetContext catalog contextValid

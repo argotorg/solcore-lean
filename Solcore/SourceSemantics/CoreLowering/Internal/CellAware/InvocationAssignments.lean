@@ -1635,7 +1635,7 @@ theorem preserves_value (budget : Nat)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   have _nonempty := projected
   cases assignmentTyped with
-  | intro targetTyped word =>
+  | intro targetTyped kind requirements =>
     obtain ⟨originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
     have keyTyped := CellAwareInvocationProjectedAssignmentHeads.tree_typed head.layout.children unique originalKeyTyped
     obtain ⟨resolution, sameSources, keyValues, keyHeap, coreLookup, resolutionState, resolutionRelated, _resolutionAdmission⟩ :=
@@ -1653,7 +1653,7 @@ theorem preserves_value (budget : Nat)
       resolution.frame.trans commit.frame, resolution.metadata.trans commit.metadata,
       resolution.effect.trans commit.effect, rfl, typed,
       ⟨reached, related, ?_, ?_⟩, ?_⟩
-    · exact CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped word)
+    · exact CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped kind requirements)
         locals (by simpa only [Staging.Recursive.ProjectedTarget.keys_eq_sourceKeys] using keyTyped)
         keyValues keyHeap resolution.metadata snapshot write
     · exact StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows
@@ -1839,7 +1839,7 @@ theorem reflects_bounded (budget : Nat)
       before store mapping world initial (next.rename ξ) output value finalStore := by
   have _nonempty := projected
   cases assignmentTyped with
-  | intro targetTyped word =>
+  | intro targetTyped kind requirements =>
     obtain ⟨originalTypes, keyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
     have keyRow : ExpressionsHaveTypes invocation.source context
         (Staging.Recursive.ProjectedTarget.keys assignment.target.projections) head.sourceTypes := by
@@ -1897,7 +1897,7 @@ theorem reflects_bounded (budget : Nat)
         (slots := [.unit, commit.value, commit.replacement, .unit, .inRight .unit resolution.snapshot,
           packValues resolution.values, .cellRef (OptionalCell.cellType head.prepared.route.rootType) resolution.target])
         rfl typed reached related
-        ⟨CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped word)
+        ⟨CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped kind requirements)
           locals keyRow keyValues getterHeap resolution.metadata snapshot write,
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows
             (resolution.frame.trans commit.frame)⟩

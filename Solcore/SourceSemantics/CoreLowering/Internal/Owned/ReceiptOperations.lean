@@ -422,10 +422,10 @@ theorem heap_after_bitNot
       getter target updated after) :
     Dynamic.HeapWellTyped context after := by
   cases typed with
-  | intro targetTyped _ =>
+  | intro targetTyped kind _ =>
       obtain ⟨root, savedTyped⟩ := SelectedPreservation.projected_target_typed unique locals
         getterHeap getterMetadata targetTyped row keyValues snapshot
-      exact (SelectedPreservation.projected_write_bitNot savedTyped getterHeap write).1
+      exact (SelectedPreservation.projected_write_bitNot kind savedTyped getterHeap write).1
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedStagedProjectedBitNotAdmission
 end

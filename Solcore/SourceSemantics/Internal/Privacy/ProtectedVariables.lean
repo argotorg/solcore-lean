@@ -191,6 +191,17 @@ theorem safe_compoundOperandType {protectedVars : List TypeVarId} {state : State
   · rw [closedEq]
     exact safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
 
+/-- An in-place `~`'s target type is safe where its target type is: the target's
+own type, or `Word`. -/
+theorem safe_bitNotTargetType {protectedVars : List TypeVarId} {state : State}
+    {type : Ty} (safe : Safe protectedVars state type) :
+    Safe protectedVars state (Detail.bitNotTargetType type) := by
+  rcases Detail.bitNotTargetType_cases type with same | word
+  · rw [same]
+    exact safe
+  · rw [word]
+    exact safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+
 theorem safe_applyMany (protectedVars : List TypeVarId) (state : State) (base : Ty) (arguments : List Ty)
     (baseSafe : Safe protectedVars state base)
     (argumentsSafe : ∀ argument ∈ arguments, Safe protectedVars state argument) :

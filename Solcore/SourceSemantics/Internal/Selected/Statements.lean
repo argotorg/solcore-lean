@@ -1005,7 +1005,8 @@ theorem actualInferStatementFuelRootedSoundness_assignBitNot {fuel : Nat}
     simpa only [resultEq, State.recordNode] using extension
   have placeExtension := unifiedExtension.trans
     (Detail.unify_inferenceProgress placeProperties.2.1.solved placeProperties.2.2
-      (Ty.variablesBelow_constructor _ _) unifySuccess).substitution_extends
+      (Detail.bitNotTargetType_variablesBelow
+        (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)) unifySuccess).substitution_extends
   have final := raw.finalized resources
   have reference : ∀ key, .expression key ∈ place.references →
       (.expression key : NodeId) ∈ (StatementForm.assignBitNot
@@ -1033,8 +1034,20 @@ theorem actualInferStatementFuelRootedSoundness_assignBitNot {fuel : Nat}
     (fun key member => raw.child (directChild_statement_reference contains (reference key member)))
     placePatterns placeLiterals placeRequirements keysCovered
     (fun key member => actualCovered.preserved_statement_reference contains final (reference key member))
+  have kind : BitNotTargetType (finalized.substitution.apply place.type) := by
+    have resolvedFinal : finalized.substitution.apply (unified.resolve place.type) =
+        finalized.substitution.apply place.type := by
+      simpa [State.resolve, InferState.resolve] using unifiedExtension place.type
+    have fit := resources.assignment_targets_fit (final.containsStatement contains)
+    have fits : Detail.bitNotTargetFits
+        (finalized.substitution.apply (unified.resolve place.type)) = true := by
+      simpa [StatementNode.applySubstitution, StatementForm.applySubstitution,
+        StatementAssignmentTargetsFit, BitNotTargetFits,
+        AssignmentResolution.applySubstitution, PlaceResolution.applySubstitution] using fit
+    rw [resolvedFinal] at fits
+    exact bitNotTargetType_of_fits fits
   obtain ⟨active, typing, agreement⟩ := inferStatementFuel_success_assignBitNot_sound_of_actual_child
-    statementEq allocationEq success invariant.active extension roots placeSuccess placeTyped
+    statementEq allocationEq success invariant.active extension roots placeSuccess placeTyped kind
   have bindersEq : result.state.localBinders = initial.localBinders := by
     have placeBinders := congrArg LexicalScope.binders (Detail.inferPlaceFuel_success_lexicalScope_eq placeSuccess)
     have unifiedBinders := congrArg LexicalScope.binders (Detail.unify_preserves_lexicalScope unifySuccess)

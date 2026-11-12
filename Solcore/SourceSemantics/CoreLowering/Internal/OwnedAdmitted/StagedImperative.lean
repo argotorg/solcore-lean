@@ -724,9 +724,8 @@ theorem reflects_position [RecursiveStageMeaning.FaultTokens faults] {budget : N
       have projected : assignment.target.projections ≠ [] := by
         cases headSite with
         | projected _ _ nonempty _ => exact nonempty
-      have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
-        cases assignmentTyped with
-        | intro typed _ => exact typed
+      obtain ⟨_, targetTyped⟩ : ∃ type, SourcePlaceHasType invocation.source context assignment.target type := by
+        cases assignmentTyped with | intro typed _ _ => exact ⟨_, typed⟩
       have typedChildren : ReflectsBelow bridge context model stages invocation
           (TypedCertificate invocation.source certificates context) faults budget := by
         intro size smaller scope id lowered generated node found typed
@@ -1043,9 +1042,8 @@ theorem reflects_position [RecursiveStageMeaning.FaultTokens faults] {budget : N
       have projected : assignment.target.projections ≠ [] := by
         cases headSite with
         | projected _ _ nonempty _ => exact nonempty
-      have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
-        cases assignmentTyped with
-        | intro typed _ => exact typed
+      obtain ⟨_, targetTyped⟩ : ∃ type, SourcePlaceHasType invocation.source context assignment.target type := by
+        cases assignmentTyped with | intro typed _ _ => exact ⟨_, typed⟩
       have typedChildren : ReflectsBelow bridge context model stages invocation
           (TypedCertificate invocation.source certificates context) faults budget := by
         intro size smaller scope id lowered generated node found typed

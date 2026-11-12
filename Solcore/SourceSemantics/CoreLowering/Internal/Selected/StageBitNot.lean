@@ -369,8 +369,8 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
   intro size within mapping world actualContext environment canonical actual before store ξ
     contextLocation native environments heaps locals agrees actualTyped reference read unmapped
     initial conditioned admitted finalContext outcome after trace
-  have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
-    cases assignmentTyped with | intro typed _ => exact typed
+  obtain ⟨_, targetTyped⟩ : ∃ type, SourcePlaceHasType invocation.source context assignment.target type := by
+    cases assignmentTyped with | intro typed _ _ => exact ⟨_, typed⟩
   obtain ⟨originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
   let layout := head.layout
   have ordinary := head.ordinary
@@ -572,8 +572,8 @@ theorem bitNotProjected {budget : Nat} {context : SourceSemantics.Context} {scop
   intro size within environment canonical actual actualContext ξ contextLocation native before after ready outcome trace
   obtain ⟨mapping, world, store, environments, heaps, locals, agrees, actualTyped, reference, read, unmapped,
     initial, conditioned, admitted⟩ := ready
-  have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
-    cases assignmentTyped with | intro typed _ => exact typed
+  obtain ⟨_, targetTyped⟩ : ∃ type, SourcePlaceHasType invocation.source context assignment.target type := by
+    cases assignmentTyped with | intro typed _ _ => exact ⟨_, typed⟩
   obtain ⟨originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
   let layout := head.layout
   have ordinary := head.ordinary

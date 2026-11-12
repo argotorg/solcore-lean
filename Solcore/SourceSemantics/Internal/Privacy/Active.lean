@@ -1199,14 +1199,16 @@ private theorem header_nonlet_binders
       | ok pair =>
         rcases pair with ⟨place,state⟩
         simp only [child] at accepted
-        cases unified : Detail.unify state place.type .word with
+        cases unified : Detail.unify state place.type
+            (Detail.bitNotTargetType (state.resolve place.type)) with
         | error error => simp [unified] at accepted
         | ok final =>
           simp only [unified,pure,Pure.pure,Except.pure,Except.ok.injEq] at accepted
           subst result
           have same : final.localBinders = state.localBinders := by
             unfold Detail.unify at unified
-            cases inference : liftUnification (state.inference.unify place.type .word) with
+            cases inference : liftUnification (state.inference.unify place.type
+                (Detail.bitNotTargetType (state.resolve place.type))) with
             | error error => simp [inference,bind,Except.bind] at unified
             | ok solved =>
               simp only [inference,bind,Except.bind,pure,Pure.pure,Except.pure] at unified

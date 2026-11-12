@@ -780,7 +780,8 @@ private theorem statement_bitnot
     NodeShapesPreserved (CallIndex.place fuel context target allocated place final).final.nodes (CallIndex.statement (fuel + 1) context source expectedReturn initial result).final.nodes := by
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.final] at ⊢
-  cases fitting : Detail.unify final place.type .word with
+  cases fitting : Detail.unify final place.type
+      (Detail.bitNotTargetType (final.resolve place.type)) with
   | error error => simp [inferStatementFuel, allocation, form, child, fitting, bind, Except.bind] at accepted
   | ok fitted =>
     unfold inferStatementFuel at accepted
@@ -799,7 +800,8 @@ private theorem forItem_bitnot
     NodeShapesPreserved (CallIndex.place fuel context target initial place childFinal).final.nodes (CallIndex.forItem (fuel + 1) context source initial result final).final.nodes := by
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.final] at ⊢
-  cases fitting : Detail.unify childFinal place.type .word with
+  cases fitting : Detail.unify childFinal place.type
+      (Detail.bitNotTargetType (childFinal.resolve place.type)) with
   | error error => simp [inferForItemFuel, form, child, fitting, bind, Except.bind] at accepted
   | ok fitted =>
     unfold inferForItemFuel at accepted

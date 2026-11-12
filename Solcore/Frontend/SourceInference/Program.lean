@@ -409,15 +409,24 @@ def assignmentMentions (state : State) (typeVar : TypeVarId)
     | some type => type.freeVariables.contains typeVar
     | none => false)
 
-/-- Whether a type variable occurs in a `for` item's compound target type. -/
+/-- Whether a type variable occurs in an in-place `~` target's type: upstream
+reads `x ~=` as `x = ~x`, whose operand is the target. -/
+def bitNotMentions (state : State) (typeVar : TypeVarId)
+    (assignment : AssignmentResolution) : Bool :=
+  (state.resolve assignment.target.type).freeVariables.contains typeVar
+
+/-- Whether a type variable occurs in a `for` item's compound or in-place `~`
+target type. -/
 def forItemMentions (state : State) (typeVar : TypeVarId) : ForItemForm → Bool
   | .assignValue assignment operator value => assignmentMentions state typeVar assignment operator value
+  | .assignBitNot assignment => bitNotMentions state typeVar assignment
   | _ => false
 
 /-- Whether a type variable occurs in an operand type of a unary or binary
 operator (a builtin operator deferred on an open literal, or a comparison), or
-in the target type of a compound assignment that takes its target's type, a
-statement's or a `for` item's: upstream reads `x op= e` as `x = x op e`. -/
+in the target type of a compound assignment that takes its target's type or of
+an in-place `~`, a statement's or a `for` item's: upstream reads `x op= e` as
+`x = x op e` and `x ~=` as `x = ~x`. -/
 def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
   let mentions (operand : ExpressionId) : Bool :=
     match expressionTypeAt? state operand with
@@ -434,6 +443,7 @@ def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
         match node.form with
         | .assignValue assignment operator value =>
             assignmentMentions state typeVar assignment operator value
+        | .assignBitNot assignment => bitNotMentions state typeVar assignment
         | .forLoop initializer _ post _ =>
             initializer.any (forItemMentions state typeVar) ||
               post.any (forItemMentions state typeVar)
@@ -609,12 +619,26 @@ def validateAssignmentTarget (state : State) (assignment : AssignmentResolution)
   if compoundTargetFits operator type then validateShiftAmount state operator value
   else throw (.compoundTargetNotSupported value operator type)
 
-/-- Check the value assignments among a `for` header's items. -/
+/-- Check one in-place `~` target's type once the defaults are in
+(`bitNotTargetFits`): upstream reads `x ~=` as `x = ~x`, and defines `BitNot` on
+`word` and the twelve types only, so an `integer` target, one that nothing
+fixes, and any other type are rejected with the trait's name, as an unchecked
+operator's `integer` operand is. -/
+def validateBitNotTarget (state : State) (assignment : AssignmentResolution) :
+    Except Error Unit :=
+  let type := state.resolve assignment.target.type
+  if bitNotTargetFits type then .ok () else throw (.operatorNotSupported "BitNot" type)
+
+/-- Check the value and in-place `~` assignments among a `for` header's
+items. -/
 def validateForItemAssignmentTargets (state : State) :
     List ForItemForm → Except Error Unit
   | [] => .ok ()
   | .assignValue assignment operator value :: rest => do
       validateAssignmentTarget state assignment operator value
+      validateForItemAssignmentTargets state rest
+  | .assignBitNot assignment :: rest => do
+      validateBitNotTarget state assignment
       validateForItemAssignmentTargets state rest
   | _ :: rest => validateForItemAssignmentTargets state rest
 
@@ -668,23 +692,25 @@ def validateExpressionNode (state : State) (node : ExpressionNode) : Except Erro
   validateShiftOperands state node
 
 /-- The finalization checks of one node: an assignment statement's value
-assignment, a `for` loop's header items, an unchecked operator's operand type
-and a shift's operand types. -/
+assignment or in-place `~`, a `for` loop's header items, an unchecked operator's
+operand type and a shift's operand types. -/
 def validateAssignmentTargetNode (state : State) : Node → Except Error Unit
   | .statement node =>
       match node.form with
       | .assignValue assignment operator value =>
           validateAssignmentTarget state assignment operator value
+      | .assignBitNot assignment => validateBitNotTarget state assignment
       | .forLoop initializer _ post _ => do
           validateForItemAssignmentTargets state initializer
           validateForItemAssignmentTargets state post
       | _ => .ok ()
   | .expression node => validateExpressionNode state node
 
-/-- Check every value assignment's target type, every unchecked operator that
-waited for a literal operand, and every shift's operand types. An open compound
-target or operand waits for its type (`compoundOperandType`, `binaryDefers`, a
-shift), so a literal it holds may default to `uint256` first. -/
+/-- Check every value assignment's and in-place `~`'s target type, every
+unchecked operator that waited for a literal operand, and every shift's operand
+types. An open compound or in-place `~` target or operand waits for its type
+(`compoundOperandType`, `bitNotTargetType`, `binaryDefers`, a shift), so a
+literal it holds may default to `uint256` first. -/
 def validateAssignmentTargets (state : State) : List Node → Except Error Unit
   | [] => .ok ()
   | node :: rest => do

@@ -2272,19 +2272,40 @@ def AssignmentTargetFits (assignment : AssignmentResolution)
     (operator : Syntax.ValueAssignOp) : Prop :=
   Detail.compoundTargetFits operator assignment.target.type = true
 
-/-- A `for` header item takes its operator, if it is a value assignment. -/
+/-- An in-place `~`'s final target type takes `~` as a builtin
+(`Detail.bitNotTargetFits`). -/
+def BitNotTargetFits (assignment : AssignmentResolution) : Prop :=
+  Detail.bitNotTargetFits assignment.target.type = true
+
+/-- A `for` header item takes its operator, if it is a value assignment, or
+`~`, if it is an in-place `~`. -/
 def ForItemAssignmentTargetFits : ForItemForm → Prop
   | .assignValue assignment operator _ => AssignmentTargetFits assignment operator
+  | .assignBitNot assignment => BitNotTargetFits assignment
   | _ => True
 
-/-- The value assignments of one statement form take their operators: an
-assignment statement's, or a `for` loop's header items. -/
+/-- The value and in-place `~` assignments of one statement form take their
+operators: an assignment statement's, or a `for` loop's header items. -/
 def StatementAssignmentTargetsFit : StatementForm → Prop
   | .assignValue assignment operator _ => AssignmentTargetFits assignment operator
+  | .assignBitNot assignment => BitNotTargetFits assignment
   | .forLoop initializer _ post _ =>
       (∀ item ∈ initializer, ForItemAssignmentTargetFits item) ∧
         ∀ item ∈ post, ForItemAssignmentTargetFits item
   | _ => True
+
+/-- A final type that takes `~` is a bit-not target type. -/
+theorem bitNotTargetType_of_fits {type : TypeSystem.Ty}
+    (fits : Detail.bitNotTargetFits type = true) : BitNotTargetType type := by
+  unfold Detail.bitNotTargetFits at fits
+  split at fits
+  · exact .word
+  · rename_i fixed
+    refine .fixed ?_
+    rcases Bool.or_eq_true _ _ |>.mp fits with signed | full
+    · exact .signed signed
+    · exact .full (of_decide_eq_true full)
+  · cases fits
 
 /-- Every value assignment of a typed source takes its operator. Finalization
 establishes it for the finalized source
@@ -2386,6 +2407,19 @@ theorem SourceShiftAmountsFit.forLoop {source : TypedSource} (fits : SourceShift
     | expression _ => trivial
     | assignBitNot _ => trivial
 
+/-- One successful in-place `~` check gives the fit under the checked state's
+substitution. -/
+theorem bitNotTargetFits_of_validate {state : Frontend.SourceInference.State}
+    {assignment : AssignmentResolution}
+    (success : Detail.validateBitNotTarget state assignment = .ok ()) :
+    BitNotTargetFits (assignment.applySubstitution state.inference.substitution) := by
+  simp only [Detail.validateBitNotTarget] at success
+  by_cases fits : Detail.bitNotTargetFits (state.resolve assignment.target.type) = true
+  · simpa [BitNotTargetFits, AssignmentResolution.applySubstitution,
+      PlaceResolution.applySubstitution, Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using fits
+  · simp [fits] at success
+
 /-- One successful assignment check gives the fit under the checked state's
 substitution. -/
 theorem assignmentTargetFits_of_validate {state : Frontend.SourceInference.State}
@@ -2445,12 +2479,19 @@ theorem forItemAssignmentTargetsFit_of_validate
               (by simpa [Detail.validateForItemAssignmentTargets] using success)
               item tailMember
       | assignBitNot assignment =>
-          intro item member
-          rcases List.mem_cons.mp member with rfl | tailMember
-          · trivial
-          · exact induction
-              (by simpa [Detail.validateForItemAssignmentTargets] using success)
-              item tailMember
+          simp only [Detail.validateForItemAssignmentTargets, bind, Except.bind]
+            at success
+          cases headResult : Detail.validateBitNotTarget state assignment with
+          | error error => simp [headResult] at success
+          | ok checked =>
+              cases checked
+              have tailResult :
+                  Detail.validateForItemAssignmentTargets state tail = .ok () := by
+                simpa [headResult] using success
+              intro item member
+              rcases List.mem_cons.mp member with rfl | tailMember
+              · exact bitNotTargetFits_of_validate headResult
+              · exact induction tailResult item tailMember
 
 /-- A successful check of one statement node gives its fit under the checked
 state's substitution. -/
@@ -2466,6 +2507,8 @@ theorem statementAssignmentTargetsFit_of_validate
   cases formEq : node.form with
   | assignValue assignment operator value =>
       exact assignmentTargetFits_of_validate (by simpa [formEq] using success)
+  | assignBitNot assignment =>
+      exact bitNotTargetFits_of_validate (by simpa [formEq] using success)
   | forLoop initializer condition post body =>
       simp only [formEq, bind, Except.bind] at success
       cases initializerResult :
@@ -5162,8 +5205,9 @@ theorem inferStatementFuel_success_assignValue_facts
         recordNode_containsStatement assignmentState _ roots⟩
 
 /-- A successful bit-not assignment exposes place inference, the exact
-unification forcing the place to `Word`, and the finalized assignment target
-stored in the recorded statement node. -/
+unification of the place with its bit-not target type (`Detail.bitNotTargetType`:
+its own type when open or fixed-width, `Word` otherwise), and the finalized
+assignment target stored in the recorded statement node. -/
 theorem inferStatementFuel_success_assignBitNot_facts
     {fuel : Nat} {context : Frontend.SourceInference.Context}
     {statement : Syntax.Statement} {targetExpression : Syntax.Expr}
@@ -5179,8 +5223,10 @@ theorem inferStatementFuel_success_assignBitNot_facts
     ∃ place placeState unified,
       Detail.inferPlaceFuel fuel context targetExpression allocated =
         .ok (place, placeState) ∧
-      Detail.unify placeState place.type .word = .ok unified ∧
-      unified.resolve place.type = .word ∧
+      Detail.unify placeState place.type
+        (Detail.bitNotTargetType (placeState.resolve place.type)) = .ok unified ∧
+      unified.resolve place.type =
+        unified.resolve (Detail.bitNotTargetType (placeState.resolve place.type)) ∧
       result = {
         id
         type := .unit
@@ -5212,14 +5258,16 @@ theorem inferStatementFuel_success_assignBitNot_facts
   | ok placeResult =>
       rcases placeResult with ⟨place, placeState⟩
       simp only [placeSuccess] at success
-      cases unifySuccess : Detail.unify placeState place.type .word with
+      cases unifySuccess : Detail.unify placeState place.type
+          (Detail.bitNotTargetType (placeState.resolve place.type)) with
       | error error =>
           simp [unifySuccess] at success
       | ok unified =>
           simp only [unifySuccess, pure, Pure.pure, Except.pure] at success
           injection success with resultEq
-          have resolvedEq : unified.resolve place.type = .word :=
-            (Detail.unify_resolve_eq unifySuccess).trans (by rfl)
+          have resolvedEq : unified.resolve place.type =
+              unified.resolve (Detail.bitNotTargetType (placeState.resolve place.type)) :=
+            Detail.unify_resolve_eq unifySuccess
           rw [← resultEq]
           exact ⟨place, placeState, unified, rfl, unifySuccess, resolvedEq, rfl,
             recordNode_containsStatement unified _ roots⟩
@@ -7079,9 +7127,41 @@ theorem assignValueStatementHasType_afterSubstitution
     (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
     rfl assignmentType (by simp [StatementNode.applySubstitution])
 
-/-- A retained bit-not assignment is well typed after successful `Word`
-unification.  Semantic extension transports the inferred place type and the
-stored resolved target annotation to the same finalized `Word` type. -/
+/-- Finalization's check of a retained bit-not assignment gives its final target
+type's kind: the stored target type is the place's type under the final
+substitution. -/
+theorem bitNotTargetType_of_assignmentTargetsFit
+    {source : TypedSource} {outer : TypeSystem.Substitution}
+    {id : StatementId} {span : Syntax.SourceSpan}
+    {place : PlaceResolution} {unified : Frontend.SourceInference.State}
+    (targetsFit : SourceAssignmentTargetsFit (source.applySubstitution outer))
+    (contains : ContainsStatement source id {
+      id
+      span
+      type := .unit
+      form := .assignBitNot {
+        target := { place with type := unified.resolve place.type }
+      }
+    })
+    (extension : outer.SemanticallyExtends unified.inference.substitution) :
+    BitNotTargetType (outer.apply place.type) := by
+  have fit := targetsFit
+    (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
+  have resolvedFinal :
+      outer.apply (unified.resolve place.type) = outer.apply place.type := by
+    simpa [Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] using extension place.type
+  have fits : Detail.bitNotTargetFits (outer.apply (unified.resolve place.type)) = true := by
+    simpa [StatementNode.applySubstitution, StatementForm.applySubstitution,
+      StatementAssignmentTargetsFit, BitNotTargetFits,
+      AssignmentResolution.applySubstitution, PlaceResolution.applySubstitution] using fit
+  rw [resolvedFinal] at fits
+  exact bitNotTargetType_of_fits fits
+
+/-- A retained bit-not assignment is well typed at its final target type, a
+bit-not target type by finalization's check (`kind`). Semantic extension
+transports the inferred place type and the stored resolved target annotation to
+the same final type. -/
 theorem assignBitNotStatementHasType_afterSubstitution
     {source : TypedSource} {target : SourceSemantics.Context}
     {outer : TypeSystem.Substitution} {control : ControlContext}
@@ -7097,7 +7177,7 @@ theorem assignBitNotStatementHasType_afterSubstitution
     })
     (placeType : SourcePlaceHasType (source.applySubstitution outer) target
       (place.applySubstitution outer) (outer.apply place.type))
-    (resolvedEq : unified.resolve place.type = .word)
+    (kind : BitNotTargetType (outer.apply place.type))
     (extension : outer.SemanticallyExtends
       unified.inference.substitution) :
     StatementHasType (source.applySubstitution outer) control target id target {
@@ -7110,9 +7190,6 @@ theorem assignBitNotStatementHasType_afterSubstitution
       outer.apply (unified.resolve place.type) = outer.apply place.type := by
     simpa [Frontend.SourceInference.State.resolve,
       TypeSystem.InferState.resolve] using extension place.type
-  have placeWord : outer.apply place.type = .word := by
-    rw [← resolvedFinal, resolvedEq]
-    rfl
   have storedPlaceEq :
       ({ place with type := unified.resolve place.type } : PlaceResolution
         ).applySubstitution outer = place.applySubstitution outer := by
@@ -7121,14 +7198,14 @@ theorem assignBitNotStatementHasType_afterSubstitution
   have storedPlaceType : SourcePlaceHasType
       (source.applySubstitution outer) target
       (({ place with type := unified.resolve place.type } : PlaceResolution
-        ).applySubstitution outer) .word := by
-    rw [storedPlaceEq, ← placeWord]
+        ).applySubstitution outer) (outer.apply place.type) := by
+    rw [storedPlaceEq]
     exact placeType
   have assignmentType : SourceBitNotAssignmentValid
       (source.applySubstitution outer) target
       (({ target := { place with type := unified.resolve place.type } } :
         AssignmentResolution).applySubstitution outer) := by
-    exact .intro storedPlaceType rfl
+    exact .intro storedPlaceType kind rfl
   exact .assignBitNot
     (FlexibleSubstitution.ContainsStatement.applySubstitution outer contains)
     rfl assignmentType (by simp [StatementNode.applySubstitution])
@@ -8547,8 +8624,9 @@ theorem inferStatementFuel_success_assignValue_deep_sound
   · exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit outer id _
 
 /-- A successful bit-not assignment is compositional modulo recursive place
-soundness.  The statement layer discharges the `Word` unification, transports
-the finalized place annotation, and preserves the active lexical context. -/
+soundness and the final target type's kind (`placeKind`), which finalization
+checks; the statement layer transports the finalized place annotation and
+preserves the active lexical context. -/
 theorem inferStatementFuel_success_assignBitNot_sound
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {statement : Syntax.Statement} {targetExpression : Syntax.Expr}
@@ -8573,7 +8651,13 @@ theorem inferStatementFuel_success_assignBitNot_sound
             .ok (place, placeState) →
           SourcePlaceHasType
             ((result.state.toTypedSource roots).applySubstitution outer)
-            target (place.applySubstitution outer) (outer.apply place.type)) :
+            target (place.applySubstitution outer) (outer.apply place.type))
+    (placeKind :
+      ∀ {place : PlaceResolution}
+        {placeState : Frontend.SourceInference.State},
+        Detail.inferPlaceFuel fuel inferenceContext targetExpression allocated =
+            .ok (place, placeState) →
+          BitNotTargetType (outer.apply place.type)) :
     ActiveLocalContextInvariant result.state outer target ∧
       StatementHasType
         ((result.state.toTypedSource roots).applySubstitution outer)
@@ -8592,7 +8676,7 @@ theorem inferStatementFuel_success_assignBitNot_sound
   have allocatedInvariant :
       ActiveLocalContextInvariant allocated outer target :=
     invariant.allocateStatementId allocationEq
-  obtain ⟨place, placeState, unified, placeSuccess, unifySuccess, resolvedEq,
+  obtain ⟨place, placeState, unified, placeSuccess, unifySuccess, _,
       resultEq, contains⟩ :=
     inferStatementFuel_success_assignBitNot_facts statementEq allocationEq
       success roots
@@ -8601,6 +8685,7 @@ theorem inferStatementFuel_success_assignBitNot_sound
   have unifiedInvariant : ActiveLocalContextInvariant unified outer target :=
     placeInvariant.unify unifySuccess
   have placeTyping := placeSound placeSuccess
+  have kind := placeKind placeSuccess
   subst result
   have unifiedExtension : outer.SemanticallyExtends
       unified.inference.substitution := by
@@ -8608,11 +8693,12 @@ theorem inferStatementFuel_success_assignBitNot_sound
     exact outerExtension
   refine ⟨unifiedInvariant.recordNode _, ?_, ?_⟩
   · exact assignBitNotStatementHasType_afterSubstitution contains placeTyping
-      resolvedEq unifiedExtension
+      kind unifiedExtension
   · exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit outer id _
 
 /-- The deep bit-not assignment branch reconstructs its place typing directly
-from executable place inference and the final `Word` unification. -/
+from executable place inference, and the final target type's kind from
+finalization's check (`targetsFit`). -/
 theorem inferStatementFuel_success_assignBitNot_deep_sound
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {statement : Syntax.Statement} {targetExpression : Syntax.Expr}
@@ -8647,7 +8733,9 @@ theorem inferStatementFuel_success_assignBitNot_deep_sound
             expected expressionInitial = .ok (inferred, expressionFinal) →
           ExpressionHasType
             ((result.state.toTypedSource roots).applySubstitution outer)
-            target inferred.id (outer.apply inferred.type)) :
+            target inferred.id (outer.apply inferred.type))
+    (targetsFit : SourceAssignmentTargetsFit
+      ((result.state.toTypedSource roots).applySubstitution outer)) :
     ActiveLocalContextInvariant result.state outer target ∧
       StatementHasType
         ((result.state.toTypedSource roots).applySubstitution outer)
@@ -8671,7 +8759,7 @@ theorem inferStatementFuel_success_assignBitNot_deep_sound
       Frontend.SourceInference.State.InferenceReady.allocateStatementId ready
     rw [allocationEq] at preserved
     exact preserved
-  obtain ⟨place, placeState, unified, placeSuccess, unifySuccess, resolvedEq,
+  obtain ⟨place, placeState, unified, placeSuccess, unifySuccess, _,
       resultEq, contains⟩ :=
     inferStatementFuel_success_assignBitNot_facts statementEq allocationEq
       success roots
@@ -8683,7 +8771,8 @@ theorem inferStatementFuel_success_assignBitNot_deep_sound
     allocatedReady signatureFormation functionsCanonical placeSuccess
   have unifyProgress := Detail.unify_inferenceProgress
     placeProperties.2.1.solved placeProperties.2.2
-    (TypeSystem.Ty.variablesBelow_constructor _ _) unifySuccess
+    (Detail.bitNotTargetType_variablesBelow
+      (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)) unifySuccess
   subst result
   have unifiedExtension : outer.SemanticallyExtends
       unified.inference.substitution := by
@@ -8697,9 +8786,11 @@ theorem inferStatementFuel_success_assignBitNot_deep_sound
   have placeType := inferPlaceFuel_success_sound allocatedReady
     signatureFormation functionsCanonical allocatedInvariant placeExtension
     expressionSound placeSuccess
+  have kind := bitNotTargetType_of_assignmentTargetsFit targetsFit contains
+    unifiedExtension
   refine ⟨unifiedInvariant.recordNode _, ?_, ?_⟩
   · exact assignBitNotStatementHasType_afterSubstitution contains placeType
-      resolvedEq unifiedExtension
+      kind unifiedExtension
   · exact StatementResultMatchesFactsAfterSubstitution.ordinaryUnit outer id _
 
 /-- A successful bare return preserves the active lexical context and is
@@ -10035,6 +10126,23 @@ structure ForItemInferenceSoundnessCallbacks
         .ok (place, final) →
       SourcePlaceHasType (source.applySubstitution outer) semanticContext
         (place.applySubstitution outer) (outer.apply place.type)
+  /-- An in-place `~` item's assignment, whose final target type finalization
+  checks, as `assignedValue`'s is. -/
+  bitNotAssignment :
+    ∀ {childFuel : Nat} {semanticContext : SourceSemantics.Context}
+      {targetExpression : Syntax.Expr}
+      {initial placeState unified : Frontend.SourceInference.State}
+      {place : PlaceResolution},
+      initial.InferenceReady →
+      ActiveLocalContextInvariant initial outer semanticContext →
+      outer.SemanticallyExtends unified.inference.substitution →
+      Detail.inferPlaceFuel childFuel inferenceContext targetExpression initial =
+        .ok (place, placeState) →
+      Detail.unify placeState place.type
+          (Detail.bitNotTargetType (placeState.resolve place.type)) = .ok unified →
+      SourceBitNotAssignmentValid (source.applySubstitution outer) semanticContext
+        (({ target := { place with type := unified.resolve place.type } } :
+          AssignmentResolution).applySubstitution outer)
 
 /-- Uniform callback evidence available in an intermediate typed source
 remains valid after later inference appends nodes.  This transports an already
@@ -10073,6 +10181,10 @@ theorem ForItemInferenceSoundnessCallbacks.weakenSource
       ready invariant outerExtension success
     exact SourcePlaceHasType.weakenSource appliedExtension
       (callbacks.place ready invariant outerExtension success)
+  · intro childFuel semanticContext targetExpression initial placeState unified place
+      ready invariant outerExtension success unifySuccess
+    exact SourceBitNotAssignmentValid.weakenSource appliedExtension
+      (callbacks.bitNotAssignment ready invariant outerExtension success unifySuccess)
 
 private theorem forItemHasType_context_fields
     {source : TypedSource} {control : ControlContext}
@@ -10585,7 +10697,8 @@ theorem inferForItemFuel_success_forItemHasType_of_callbacks
           | ok placePair =>
               rcases placePair with ⟨place, placeState⟩
               simp only [placeResult] at success
-              cases unifyResult : Detail.unify placeState place.type .word with
+              cases unifyResult : Detail.unify placeState place.type
+                  (Detail.bitNotTargetType (placeState.resolve place.type)) with
               | error error => simp [unifyResult] at success
               | ok unifiedState =>
                   simp only [unifyResult, pure, Pure.pure, Except.pure]
@@ -10594,52 +10707,9 @@ theorem inferForItemFuel_success_forItemHasType_of_callbacks
                   injection resultEq with inferredEq finalEq
                   subst inferred
                   subst final
-                  have placeProperties :=
-                    Detail.inferPlaceFuel_inferenceProperties ready
-                      signatureFormation functionsCanonical placeResult
-                  have unifyProgress := Detail.unify_inferenceProgress
-                    placeProperties.2.1.solved placeProperties.2.2
-                    (TypeSystem.Ty.variablesBelow_constructor _ _) unifyResult
-                  have placeExtension : outer.SemanticallyExtends
-                      placeState.inference.substitution :=
-                    TypeSystem.Substitution.SemanticallyExtends.trans
-                      outerExtension unifyProgress.substitution_extends
-                  have placeType := callbacks.place ready invariant
-                    placeExtension placeResult
-                  have resolvedWord :
-                      unifiedState.resolve place.type = .word :=
-                    (Detail.unify_resolve_eq unifyResult).trans (by rfl)
-                  have resolvedFinal : outer.apply
-                      (unifiedState.resolve place.type) =
-                        outer.apply place.type := by
-                    simpa [Frontend.SourceInference.State.resolve,
-                      TypeSystem.InferState.resolve] using
-                        outerExtension place.type
-                  have placeWord : outer.apply place.type = .word := by
-                    rw [← resolvedFinal, resolvedWord]
-                    rfl
-                  have storedPlaceEq :
-                      ({ place with type := unifiedState.resolve place.type } :
-                        PlaceResolution).applySubstitution outer =
-                          place.applySubstitution outer := by
-                    cases place
-                    simp [PlaceResolution.applySubstitution, resolvedFinal]
-                  have assignmentType : SourceBitNotAssignmentValid
-                      (source.applySubstitution outer) target
-                      (({ target := { place with
-                        type := unifiedState.resolve place.type } } :
-                          AssignmentResolution).applySubstitution outer) := by
-                    apply SourceBitNotAssignmentValid.intro
-                    · change SourcePlaceHasType
-                        (source.applySubstitution outer) target
-                        (({ place with
-                          type := unifiedState.resolve place.type } :
-                            PlaceResolution).applySubstitution outer) .word
-                      rw [storedPlaceEq, ← placeWord]
-                      exact placeType
-                    · rfl
                   exact ⟨target, (invariant.inferPlaceFuel placeResult).unify
-                    unifyResult, .assignBitNot assignmentType⟩
+                    unifyResult, .assignBitNot (callbacks.bitNotAssignment ready
+                      invariant outerExtension placeResult unifyResult)⟩
 
 /-- Source-ordered `for`-item inference composes the single-item callback
 dispatcher, threading both executable and declarative lexical contexts.  All
@@ -11270,6 +11340,7 @@ private theorem inferStatementFuel_success_sound_of_callbacks_and_match_cases
           exact inferStatementFuel_success_assignBitNot_deep_sound rfl
             allocationEq success ready signatureFormation functionsCanonical
             invariant outerExtension roots callbacks.expression
+            callbacks.assignmentTargetsFit
       | matchWith scrutinees arms =>
           cases defaultEq : arms.value.defaultBody with
           | none =>
@@ -26191,10 +26262,14 @@ theorem validateForItemAssignmentTargets_member {state : Frontend.SourceInferenc
           · exact induction (by simpa [Detail.validateForItemAssignmentTargets] using success)
               tailMember
       | assignBitNot assignment =>
-          rcases List.mem_cons.mp member with same | tailMember
-          · cases same
-          · exact induction (by simpa [Detail.validateForItemAssignmentTargets] using success)
-              tailMember
+          simp only [Detail.validateForItemAssignmentTargets, bind, Except.bind] at success
+          cases headResult : Detail.validateBitNotTarget state assignment with
+          | error error => simp [headResult] at success
+          | ok checked =>
+              cases checked
+              rcases List.mem_cons.mp member with same | tailMember
+              · cases same
+              · exact induction (by simpa [headResult] using success) tailMember
 
 /-- A `for` item after a substitution is a compound shift of that amount when it
 was before it. -/

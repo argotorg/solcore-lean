@@ -1368,12 +1368,12 @@ def writes {invocation : Staging.Recursive.Scope}
     obtain ⟨first, prepared⟩ := assignments
     rw [sourceEq] at origin typed
     cases typed with
-    | intro place _ =>
+    | intro place kind _ =>
       cases place with
-      | intro _ _ word =>
-        exact GenericAssignmentUnaryDiagnostics.prepared_unary_included prepared
+      | intro _ _ same =>
+        exact GenericAssignmentUnaryDiagnostics.prepared_unary_included_target prepared
           (fun _ _ represented => CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.compilation_unary
-            generation issued receiver represented) origin word
+            generation issued receiver represented) origin (by rw [same]; cases kind <;> rfl)
   identities := CallableIndexedLambdaValues.Identity whole.indexed
   faithful := CallableIndexedLambdaValues.identity_faithful whole.indexed
   observations := CellAwarePhysicalFunctionOrigins.observations profile

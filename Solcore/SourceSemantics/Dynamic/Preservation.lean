@@ -1165,6 +1165,26 @@ theorem preserves
   | word => exact .word _
   | integer => cases current_typed with | some typed => cases typed
 
+/-- At a bit-not target type, Word's `~` keeps the leaf's type: a fixed-width
+target is one on which `~` is Word's (`FixedWordBitNot`), so the word stays
+canonical. -/
+theorem preserves_target
+    {context : Context} {heap : Heap} {current : Option Value}
+    {result : Value} {type : Ty} (kind : BitNotTargetType type)
+    (current_typed : OptionalValueHasType context heap current type)
+    (applies : BitNotSnapshot current result) :
+    ValueHasType context heap result type := by
+  cases kind with
+  | word => exact preserves current_typed applies
+  | fixed kind =>
+    cases applies with
+    | word value =>
+      cases current_typed with
+      | some typed =>
+        cases typed with
+        | fixed _ canonical => exact .fixed _ (fixed_canonical_bitNot kind canonical)
+    | integer => cases current_typed with | some typed => cases typed
+
 end BitNotSnapshot
 
 namespace PrimitiveCoercionApplies
@@ -2695,7 +2715,7 @@ theorem bitNotPreserves
       BitNotSnapshot environment before assignment.target updatedRoot after) :
     HeapWellTyped context after /\ HeapTypesExtend before after := by
   cases typing with
-  | intro target_type requirements_eq =>
+  | @intro _ _ targetType target_type target_kind requirements_eq =>
       cases execution with
       | @intro _ _ _ _ _ _ selectedHeap _ _ target _ resolve write =>
           rcases resolve.preserves expression_preserves evidence_covers
@@ -2712,9 +2732,9 @@ theorem bitNotPreserves
                 exact initial_typed
               have modify_typed : LeafModificationPreservesType context
                   selectedHeap (fun _ updated =>
-                    BitNotSnapshot target.selected updated) .word := by
+                    BitNotSnapshot target.selected updated) targetType := by
                 intro current updated current_typed modifies
-                exact modifies.preserves target_typed.selected
+                exact modifies.preserves_target target_kind target_typed.selected
               have updated_typed := update.preserves target_typed.projections
                 initial_root_typed modify_typed
               have updated_cell_typed : ValueHasType context selectedHeap

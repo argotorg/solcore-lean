@@ -1752,34 +1752,54 @@ theorem UnaryOccursFor.statement {tracked : Bool} {source : TypedSource}
   | false => trivial
   | true => exact UnaryOccurs.statement found form
 
-/-- The existing table traversal includes actual unary statement and header sites. -/
+/-- The existing table traversal includes actual unary statement and header
+sites whose target type has an operand diagnostic (`operandTarget`): `Word`,
+`integer` and the twelve fixed-width types. -/
+theorem prepared_unary_at_target {source : TypedSource} {first : Nat} {table : Table}
+    {node : StatementNode} {assignment : AssignmentResolution}
+    (prepared : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
+    (occurs : Certificates.UnaryAt node assignment)
+    (rawTarget : operandTarget assignment.target.type = true) :
+    UnaryRep table (.invalidUnaryOperand .bitNot)
+      (unaryToken table (.occurrence node.id.occurrence) assignment.target.root) := by
+  obtain ⟨site, _, _, _, kind, reason, diagnostic⟩ :=
+    Certificates.prepare_unary prepared member occurs rawTarget
+  refine ⟨site.diagnostic, ?_, ?_⟩
+  · simpa only [unaryToken, reason] using diagnostic
+  · simp only [Site.diagnostic, kind]
+
+/-- The table traversal includes actual unary sites at a Word target. -/
 theorem prepared_unary_at {source : TypedSource} {first : Nat} {table : Table}
     {node : StatementNode} {assignment : AssignmentResolution}
     (prepared : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
     (occurs : Certificates.UnaryAt node assignment)
     (rawWord : assignment.target.type = .word) :
     UnaryRep table (.invalidUnaryOperand .bitNot)
-      (unaryToken table (.occurrence node.id.occurrence) assignment.target.root) := by
-  obtain ⟨site, _, _, _, kind, reason, diagnostic⟩ :=
-    Certificates.prepare_unary prepared member occurs (.inl rawWord)
-  refine ⟨site.diagnostic, ?_, ?_⟩
-  · simpa only [unaryToken, reason] using diagnostic
-  · simp only [Site.diagnostic, kind]
+      (unaryToken table (.occurrence node.id.occurrence) assignment.target.root) :=
+  prepared_unary_at_target prepared member occurs (operandTarget_of_scalar (.inl rawWord))
 
-theorem prepared_unary {source : TypedSource} {first : Nat} {table : Table}
+theorem prepared_unary_target {source : TypedSource} {first : Nat} {table : Table}
     {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
     (prepared : prepare source first = .ok table)
-    (origin : UnaryOccurs source site assignment) (rawWord : assignment.target.type = .word) :
+    (origin : UnaryOccurs source site assignment)
+    (rawTarget : operandTarget assignment.target.type = true) :
     UnaryRep table (.invalidUnaryOperand .bitNot) (unaryToken table site assignment.target.root) := by
   cases origin with
   | statement found form =>
     have present := lookupStatement?_sound found
     rw [← present.2]
-    exact prepared_unary_at prepared present.1 (.statement form) rawWord
+    exact prepared_unary_at_target prepared present.1 (.statement form) rawTarget
   | header found form member =>
     have present := lookupStatement?_sound found
     rw [← present.2]
-    exact prepared_unary_at prepared present.1 (.header form member) rawWord
+    exact prepared_unary_at_target prepared present.1 (.header form member) rawTarget
+
+theorem prepared_unary {source : TypedSource} {first : Nat} {table : Table}
+    {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    (prepared : prepare source first = .ok table)
+    (origin : UnaryOccurs source site assignment) (rawWord : assignment.target.type = .word) :
+    UnaryRep table (.invalidUnaryOperand .bitNot) (unaryToken table site assignment.target.root) :=
+  prepared_unary_target prepared origin (operandTarget_of_scalar (.inl rawWord))
 
 /-- The receiving relation gets only the actual prepared unary entry. -/
 theorem prepared_unary_included {source : TypedSource} {first : Nat} {table : Table}
@@ -1790,6 +1810,17 @@ theorem prepared_unary_included {source : TypedSource} {first : Nat} {table : Ta
     (origin : UnaryOccurs source site assignment) (rawWord : assignment.target.type = .word) :
     faults (.invalidUnaryOperand .bitNot) (unaryToken table site assignment.target.root) :=
   included _ _ (prepared_unary prepared origin rawWord)
+
+/-- So does every unary site whose target type has an operand diagnostic. -/
+theorem prepared_unary_included_target {source : TypedSource} {first : Nat} {table : Table}
+    {faults : FunctionCalls.FaultRep}
+    (prepared : prepare source first = .ok table)
+    (included : ∀ reason token, UnaryRep table reason token → faults reason token)
+    {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    (origin : UnaryOccurs source site assignment)
+    (rawTarget : operandTarget assignment.target.type = true) :
+    faults (.invalidUnaryOperand .bitNot) (unaryToken table site assignment.target.root) :=
+  included _ _ (prepared_unary_target prepared origin rawTarget)
 
 end Solcore.SourceSemantics.CoreLowering.GenericAssignmentUnaryDiagnostics
 

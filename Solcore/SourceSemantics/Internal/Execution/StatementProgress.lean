@@ -379,11 +379,14 @@ theorem statement_bitnot
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.final] at ⊢
   have properties := ((ChildStep.statement_bitnot accepted form allocation child).inputs inputs).progress child
-  cases fitting : Detail.unify final place.type .word with
+  cases fitting : Detail.unify final place.type
+      (Detail.bitNotTargetType (final.resolve place.type)) with
   | error error => simp [inferStatementFuel, allocation, form, child, fitting, bind, Except.bind] at accepted
   | ok fitted =>
-    have after := unify_inferenceProgress properties.2.1.solved (properties.2.2 _ (List.mem_singleton_self _)) (Ty.variablesBelow_constructor _ _) fitting
-    have ready := unify_preserves_inferenceReady properties.2.1 (properties.2.2 _ (List.mem_singleton_self _)) (Ty.variablesBelow_constructor _ _) fitting
+    have targetBelow := Detail.bitNotTargetType_variablesBelow
+      (properties.2.1.solved.variablesBelow_apply (properties.2.2 _ (List.mem_singleton_self _)))
+    have after := unify_inferenceProgress properties.2.1.solved (properties.2.2 _ (List.mem_singleton_self _)) targetBelow fitting
+    have ready := unify_preserves_inferenceReady properties.2.1 (properties.2.2 _ (List.mem_singleton_self _)) targetBelow fitting
     unfold inferStatementFuel at accepted
     simp only [allocation, form, child, fitting, bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
     cases accepted
@@ -401,11 +404,14 @@ theorem forItem_bitnot
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.final] at ⊢
   have properties := ((ChildStep.forItem_bitnot accepted form child).inputs inputs).progress child
-  cases fitting : Detail.unify childFinal place.type .word with
+  cases fitting : Detail.unify childFinal place.type
+      (Detail.bitNotTargetType (childFinal.resolve place.type)) with
   | error error => simp [inferForItemFuel, form, child, fitting, bind, Except.bind] at accepted
   | ok fitted =>
-    have after := unify_inferenceProgress properties.2.1.solved (properties.2.2 _ (List.mem_singleton_self _)) (Ty.variablesBelow_constructor _ _) fitting
-    have ready := unify_preserves_inferenceReady properties.2.1 (properties.2.2 _ (List.mem_singleton_self _)) (Ty.variablesBelow_constructor _ _) fitting
+    have targetBelow := Detail.bitNotTargetType_variablesBelow
+      (properties.2.1.solved.variablesBelow_apply (properties.2.2 _ (List.mem_singleton_self _)))
+    have after := unify_inferenceProgress properties.2.1.solved (properties.2.2 _ (List.mem_singleton_self _)) targetBelow fitting
+    have ready := unify_preserves_inferenceReady properties.2.1 (properties.2.2 _ (List.mem_singleton_self _)) targetBelow fitting
     unfold inferForItemFuel at accepted
     simp only [form, child, fitting, bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
     cases accepted
@@ -1610,14 +1616,17 @@ theorem statement_bitnot
     GeneralizationLifetime event (CallIndex.statement (fuel + 1) context source expectedReturn initial result).initial.inference.next (CallIndex.statement (fuel + 1) context source expectedReturn initial result).final (CallIndex.statement (fuel + 1) context source expectedReturn initial result).outputTypes := by
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.initial, CallIndex.final, CallIndex.outputTypes] at lifetime ⊢
-  cases fitting : Detail.unify final place.type .word with
+  cases fitting : Detail.unify final place.type
+      (Detail.bitNotTargetType (final.resolve place.type)) with
   | error error => simp [inferStatementFuel, allocation, form, child, fitting, bind, Except.bind] at accepted
   | ok fitted =>
     have childInputs := (ChildStep.statement_bitnot accepted form allocation child).inputs inputs
     have properties := childInputs.progress child
     have after := lifetime.unify properties.2.1 (properties.2.2 _ (List.mem_singleton_self _))
-      (Ty.variablesBelow_constructor _ _) (lifetime.values _ (List.mem_singleton_self _))
-      (safe_closed _ _ (Ty.variablesBelow_constructor _ _)) fitting
+      (Detail.bitNotTargetType_variablesBelow
+        (properties.2.1.solved.variablesBelow_apply (properties.2.2 _ (List.mem_singleton_self _))))
+      (lifetime.values _ (List.mem_singleton_self _))
+      (safe_bitNotTargetType (safe_resolved properties.2.1 (lifetime.values _ (List.mem_singleton_self _)))) fitting
     unfold inferStatementFuel at accepted
     simp only [allocation, form, child, fitting, bind, Except.bind, pure, Pure.pure, Except.pure, Except.ok.injEq] at accepted
     cases accepted
@@ -1854,7 +1863,8 @@ theorem forItem_bitnot
     GeneralizationLifetime event (CallIndex.forItem (fuel + 1) context source initial result final).initial.inference.next (CallIndex.forItem (fuel + 1) context source initial result final).final (CallIndex.forItem (fuel + 1) context source initial result final).outputTypes := by
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.initial, CallIndex.final, CallIndex.outputTypes] at lifetime ⊢
-  cases fitting : Detail.unify childFinal place.type .word with
+  cases fitting : Detail.unify childFinal place.type
+      (Detail.bitNotTargetType (childFinal.resolve place.type)) with
   | error error => simp [inferForItemFuel, form, child, fitting, bind, Except.bind] at accepted
   | ok fitted => exact lifetime.forItem_bitnot inputs.ready inputs.catalog form child fitting accepted
 

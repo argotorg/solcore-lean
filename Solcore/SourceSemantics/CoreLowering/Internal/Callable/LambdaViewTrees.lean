@@ -1537,7 +1537,7 @@ local macro "transport_static" "(" recursor:term "," before:term "," after:term 
     (fun operator _ targetKind _ amount requirements target value h => by
       simp only [within_append, within_cons, within_nil, and_true] at h
       exact .shiftCompound operator (target h.1) targetKind (value h.2) amount requirements)
-    (fun _ requirements ih h => .intro (ih h) requirements)
+    (fun _ kind requirements ih h => .intro (ih h) kind requirements)
     (fun contains form mono generalizes extended type _ =>
       .letUninitialized (statement_contains $edited $unique contains) form mono generalizes (binder $edited extended) type)
     (fun contains form _ mono generalizes extended type ih h => by

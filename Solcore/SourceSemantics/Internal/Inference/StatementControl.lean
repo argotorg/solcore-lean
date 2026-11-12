@@ -235,9 +235,10 @@ theorem inferForItemFuel_success_assignValue_facts
       rw [← resultEq]
       exact ⟨assignment, inferredValue, resultState, rfl, rfl⟩
 
-/-- A bit-not assignment first infers its actual place and then performs
-the word-type unification.  Keeping both equalities is essential: the final
-state may be later than the place state even though no expression id changes. -/
+/-- A bit-not assignment first infers its actual place and then unifies it
+with its bit-not target type (`Detail.bitNotTargetType`).  Keeping both
+equalities is essential: the final state may be later than the place state even
+though no expression id changes. -/
 theorem inferForItemFuel_success_assignBitNot_facts
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {item : Syntax.ForItem} {target : Syntax.Expr}
@@ -249,7 +250,8 @@ theorem inferForItemFuel_success_assignBitNot_facts
     ∃ place placeState unifiedState,
       Detail.inferPlaceFuel fuel inferenceContext target initial =
         .ok (place, placeState) ∧
-      Detail.unify placeState place.type .word = .ok unifiedState ∧
+      Detail.unify placeState place.type
+        (Detail.bitNotTargetType (placeState.resolve place.type)) = .ok unifiedState ∧
       result = (.assignBitNot {
         target := { place with type := unifiedState.resolve place.type }
       }, unifiedState) := by
@@ -261,7 +263,8 @@ theorem inferForItemFuel_success_assignBitNot_facts
   | ok child =>
       rcases child with ⟨place, placeState⟩
       simp only [placeSuccess] at success
-      cases unifySuccess : Detail.unify placeState place.type .word with
+      cases unifySuccess : Detail.unify placeState place.type
+          (Detail.bitNotTargetType (placeState.resolve place.type)) with
       | error error => simp [unifySuccess] at success
       | ok unifiedState =>
           simp only [unifySuccess, pure, Pure.pure, Except.pure] at success
@@ -883,8 +886,9 @@ theorem inferForItemFuel_success_assignValue_of_certificate
     resultActive resultIsolated substitutionExtension typing
   exact ⟨semanticContext, finalInvariant, typing⟩
 
-/-- The actual place and word-unification trace of a bit-not assignment,
-with declarative typing for precisely that place occurrence. -/
+/-- The actual place and unification trace of a bit-not assignment, with
+declarative typing for precisely that place occurrence and its final target
+type's kind, which finalization checks (`BitNotTargetFits`). -/
 def ActualBitNotForItemCertificate
     (fuel : Nat) (inferenceContext : Frontend.SourceInference.Context)
     (target : Syntax.Expr) (initial : State)
@@ -895,15 +899,17 @@ def ActualBitNotForItemCertificate
   ∃ place placeState unifiedState,
     Detail.inferPlaceFuel fuel inferenceContext target initial =
       .ok (place, placeState) ∧
-    Detail.unify placeState place.type .word = .ok unifiedState ∧
+    Detail.unify placeState place.type
+      (Detail.bitNotTargetType (placeState.resolve place.type)) = .ok unifiedState ∧
     result = (.assignBitNot {
       target := { place with type := unifiedState.resolve place.type }
     }, unifiedState) ∧
     SourcePlaceHasType semanticSource semanticContext
-      (place.applySubstitution outer) (outer.apply place.type)
+      (place.applySubstitution outer) (outer.apply place.type) ∧
+    BitNotTargetType (outer.apply place.type)
 
-/-- The actual bit-not header item combines place typing with its recorded
-word unification, then closes the recursive state invariant. -/
+/-- The actual bit-not header item combines place typing with its final target
+type's kind, then closes the recursive state invariant. -/
 theorem inferForItemFuel_success_assignBitNot_of_certificate
     {fuel : Nat}
     {wholeContext inferenceContext : Frontend.SourceInference.Context}
@@ -936,20 +942,15 @@ theorem inferForItemFuel_success_assignBitNot_of_certificate
         (result.1.applySubstitution finalized.substitution)
         finalContext := by
   obtain ⟨place, placeState, unifiedState, placeSuccess, unifySuccess,
-    resultEq, placeTyping⟩ := actual
+    resultEq, placeTyping, kind⟩ := actual
   have unifiedExtension : finalized.substitution.SemanticallyExtends
       unifiedState.inference.substitution := by
     simpa [resultEq] using substitutionExtension
-  have resolvedWord : unifiedState.resolve place.type = .word :=
-    (Detail.unify_resolve_eq unifySuccess).trans (by rfl)
   have resolvedFinal : finalized.substitution.apply
       (unifiedState.resolve place.type) =
         finalized.substitution.apply place.type := by
     simpa [State.resolve, InferState.resolve] using
       unifiedExtension place.type
-  have placeWord : finalized.substitution.apply place.type = .word := by
-    rw [← resolvedFinal, resolvedWord]
-    rfl
   have storedPlaceEq :
       ({ place with type := unifiedState.resolve place.type } :
         PlaceResolution).applySubstitution finalized.substitution =
@@ -963,11 +964,13 @@ theorem inferForItemFuel_success_assignBitNot_of_certificate
           AssignmentResolution).applySubstitution
             finalized.substitution) := by
     apply SourceBitNotAssignmentValid.intro
+      (targetType := finalized.substitution.apply place.type)
     · change SourcePlaceHasType semanticSource semanticContext
         (({ place with type := unifiedState.resolve place.type } :
-          PlaceResolution).applySubstitution finalized.substitution) .word
-      rw [storedPlaceEq, ← placeWord]
+          PlaceResolution).applySubstitution finalized.substitution) _
+      rw [storedPlaceEq]
       exact placeTyping
+    · exact kind
     · rfl
   have placeActive : ActiveLocalContextInvariant placeState
       finalized.substitution semanticContext :=

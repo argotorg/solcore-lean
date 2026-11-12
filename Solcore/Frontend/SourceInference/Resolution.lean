@@ -604,6 +604,46 @@ def shiftAmountFits : Ty → Bool
   | .constructor (.builtin (.fixed type)) => !type.signed
   | _ => false
 
+/-- The type an in-place `~` unifies its target with. Upstream reads `x ~=` as
+`x = ~x`, so the target keeps its own type: an open target keeps it and waits,
+as step 7b's compound targets do, and a fixed-width integer type is its own.
+Any other type is `word`'s, as before. Finalization checks the type the target
+resolves to (`bitNotTargetFits`). -/
+def bitNotTargetType (target : Ty) : Ty :=
+  match target with
+  | .variable _ => target
+  | .constructor (.builtin (.fixed _)) => target
+  | _ => .constructor (.builtin .word)
+
+/-- The bit-not target type is the target itself or `word`. -/
+theorem bitNotTargetType_cases (target : Ty) :
+    bitNotTargetType target = target ∨
+      bitNotTargetType target = .constructor (.builtin .word) := by
+  unfold bitNotTargetType
+  split
+  · exact .inl rfl
+  · exact .inl rfl
+  · exact .inr rfl
+
+/-- The bit-not target type has no variable that its target type lacks. -/
+theorem bitNotTargetType_variablesBelow {target : Ty} {next : Nat}
+    (below : target.VariablesBelow next) :
+    (bitNotTargetType target).VariablesBelow next := by
+  rcases bitNotTargetType_cases target with same | word
+  · rw [same]
+    exact below
+  · rw [word]
+    exact Ty.variablesBelow_constructor _ _
+
+/-- Whether an in-place `~` target's final type takes `~` as a builtin: `word`,
+or one of the fixed-width integer types on which `~` is Word's, the signed ones
+and `uint256`. An open target, `integer`, `bool` and any other type fail, as
+upstream defines no `BitNot` instance for them. -/
+def bitNotTargetFits : Ty → Bool
+  | .constructor (.builtin .word) => true
+  | .constructor (.builtin (.fixed type)) => type.signed || decide (type.width = .w256)
+  | _ => false
+
 /-- A value assignment's target type takes its operator once inference is
 done: `=` takes any type, and a compound operator a type at which its operand
 type is the target's own, `word` or, for `compoundTakesTargetType`, a

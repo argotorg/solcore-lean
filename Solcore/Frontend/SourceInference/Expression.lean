@@ -2032,7 +2032,7 @@ mutual
             pure (.assignValue assignment operator.value value.id, state)
         | .assignBitNot target _ => do
             let (target, state) ← inferPlaceFuel fuel context target state
-            let state ← unify state target.type .word
+            let state ← unify state target.type (bitNotTargetType (state.resolve target.type))
             pure (.assignBitNot {
               target := { target with type := state.resolve target.type }
             }, state)
@@ -2243,7 +2243,7 @@ mutual
           }
       | .assignBitNot target _ => do
           let (target, state) ← inferPlaceFuel fuel context target state
-          let state ← unify state target.type .word
+          let state ← unify state target.type (bitNotTargetType (state.resolve target.type))
           let state := state.recordNode (.statement {
             id
             span := statement.span

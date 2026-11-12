@@ -1,4 +1,5 @@
 import Solcore.Test.Frontend.Source.CompilerFeatureSupport
+import Solcore.SourceSemantics.CoreLowering.Internal.Accepted.CompilerProfiles
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.NamedBodies
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.CatalogAndSpecialization
 import Solcore.SourceSemantics.CoreLowering.Internal.Callable.CallEvidence
@@ -4546,4 +4547,46 @@ def run : IO Unit := do
   IO.println "SOURCE_CORE_COMPOUND_SHIFT_SUBSET_PASS: the statement shape check admits w <<= 3, w <<= n at Word and w >>= n by a uint8"
 
 end Tests.SourceCoreCompoundShiftSubset
+end
+
+section
+/-! Step 9a's in-place `~` at a Word target stays in the statement-level meaning
+proofs: the compiler body profile (`AcceptedCompilerBodyProfile.validate`, whose
+`~=` profiles are `BitNotAssignable` and `ProjectedBitNotAssignable`) admits a
+bare `w ~=;` and a mapping element's `m[k] ~=;`. A fixed-width target is
+compiled but outside them, as step 3d's compound targets are: those profiles take
+only a Word target. (The invocation body shape, `shape?`, has no `~=` form.) -/
+set_option autoImplicit false
+namespace Tests.SourceCoreBitNotSubset
+open Solcore Frontend SourceInference SourceSemantics CoreLowering
+
+private def workspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    "function wordBare(w: Word) returns (Word) { let r: Word = w; r ~=; return r; }",
+    "function wordElement(m: mapping(Word => Word), k: Word) returns (Word) { m[k] ~=; return m[k]; }",
+    "function fixedBare(x: int8) returns (int8) { let r: int8 = x; r ~=; return r; }" ]}] }
+private def options : SourceCoreCompiler.Options :=
+  {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
+
+def run : IO Unit := do
+  let program ← match checkProgram workspace options.checkingFuel with
+    | .ok program => pure program
+    | .error errors => throw (IO.userError s!"bit-not subset check: {reprStr errors}")
+  let source ← match SourceCoreCompiler.compileChecked program
+      (program.signatures.functions.map fun signature => SourceCompiler.Seed.declaration signature.id) options with
+    | .ok source => pure source
+    | .error error => throw (IO.userError s!"bit-not subset compilation: {reprStr error}")
+  let some cached := source.artifact? | throw (IO.userError "bit-not subset cache absent")
+  for (name, inside) in [("wordBare", true), ("wordElement", true), ("fixedBare", false)] do
+    let some signature := cached.sourceProgram.signatures.functions.find? (·.name == name)
+      | throw (IO.userError s!"bit-not subset signature {name}")
+    let some original := cached.validationPlan.specializations.find?
+        (fun row => decide (row.function.typedBody.owner = signature.id))
+      | throw (IO.userError s!"bit-not subset original row {name}")
+    let admitted := (AcceptedCompilerBodyProfile.validate original.function.typedBody (fun _ => True)).isSome
+    if admitted != inside then
+      throw (IO.userError s!"{name}: the body profile admitted {admitted}, expected {inside}")
+  IO.println "SOURCE_CORE_BIT_NOT_SUBSET_PASS: the compiler body profile admits w ~= and m[k] ~= at Word and keeps an int8 target outside"
+
+end Tests.SourceCoreBitNotSubset
 end

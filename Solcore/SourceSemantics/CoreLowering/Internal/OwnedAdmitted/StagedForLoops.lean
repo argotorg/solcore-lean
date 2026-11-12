@@ -184,7 +184,7 @@ theorem preserves_value (budget : Nat)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   have _nonempty := projected
   cases assignmentTyped with
-  | intro targetTyped word =>
+  | intro targetTyped kind requirements =>
     obtain ⟨originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
     have keyTyped := CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.tree_typed head.layout.children unique originalKeyTyped
     obtain ⟨resolution, sameSources, keyValues, keyHeap, coreLookup, resolutionState, resolutionRelated, _resolutionAdmission⟩ :=
@@ -201,7 +201,7 @@ theorem preserves_value (budget : Nat)
       commit.heaps, resolution.maps, resolution.worlds.trans commit.worlds,
       resolution.frame.trans commit.frame, resolution.metadata.trans commit.metadata, rfl, typed,
       ⟨reached, related, ?_, ?_⟩, ?_⟩
-    · exact CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped word)
+    · exact CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped kind requirements)
         locals (by simpa only [Staging.Recursive.ProjectedTarget.keys_eq_sourceKeys] using keyTyped)
         keyValues keyHeap resolution.metadata snapshot write
     · exact StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows
@@ -377,7 +377,7 @@ theorem reflects_bounded (budget : Nat)
       before store mapping world initial (next.rename ξ) output value finalStore := by
   have _nonempty := projected
   cases assignmentTyped with
-  | intro targetTyped word =>
+  | intro targetTyped kind requirements =>
     obtain ⟨originalTypes, keyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
     have keyRow : ExpressionsHaveTypes invocation.source context
         (Staging.Recursive.ProjectedTarget.keys assignment.target.projections) head.sourceTypes := by
@@ -434,7 +434,7 @@ theorem reflects_bounded (budget : Nat)
         (slots := [.unit, commit.value, commit.replacement, .unit, .inRight .unit resolution.snapshot,
           packValues resolution.values, .cellRef (OptionalCell.cellType head.prepared.route.rootType) resolution.target])
         rfl typed reached related
-        ⟨CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped word)
+        ⟨CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped kind requirements)
           locals keyRow keyValues getterHeap resolution.metadata snapshot write,
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows
             (resolution.frame.trans commit.frame)⟩
@@ -2933,8 +2933,8 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
   | @bitNotProjected context scope assignment rest body head remaining tailSites headErrors ih =>
       obtain ⟨_profile, tailShape⟩ := shape.unary_tail
       have assignmentTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).1
-      have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
-        cases assignmentTyped with | intro typed _ => exact typed
+      obtain ⟨_, targetTyped⟩ : ∃ type, SourcePlaceHasType invocation.source context assignment.target type := by
+        cases assignmentTyped with | intro typed _ _ => exact ⟨_, typed⟩
       have errors := PreparedAssignmentReachedDiagnostics.unary_errors (environment := environment)
         headErrors diagnostics targetTyped initial
       have typedChildren : ReflectsBelow bridge context model stages invocation
@@ -3463,8 +3463,8 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
   | @bitNotProjected context scope assignment rest body head remaining tailSites headErrors ih =>
       obtain ⟨_word, tailShape⟩ := shape.unary_tail
       have assignmentTyped := (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).1
-      have targetTyped : SourcePlaceHasType invocation.source context assignment.target .word := by
-        cases assignmentTyped with | intro typed _ => exact typed
+      obtain ⟨_, targetTyped⟩ : ∃ type, SourcePlaceHasType invocation.source context assignment.target type := by
+        cases assignmentTyped with | intro typed _ _ => exact ⟨_, typed⟩
       have errors := PreparedAssignmentReachedDiagnostics.unary_errors (environment := environment)
         headErrors diagnostics targetTyped initial
       have typedChildren (size : Nat) (smaller : size < budget) : PreservesAt bridge context model stages invocation

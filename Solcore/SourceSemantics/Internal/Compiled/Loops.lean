@@ -282,7 +282,17 @@ theorem forItem_assignBitNot_for
     (boundary.scope.formation checked) (boundary.scope.functionsCanonical checked) placeSuccess
   have placeExtension := boundary.extension.trans
     (Detail.unify_inferenceProgress properties.2.1.solved properties.2.2
-      (Ty.variablesBelow_constructor _ _) unifySuccess).substitution_extends
+      (Detail.bitNotTargetType_variablesBelow
+        (properties.2.1.solved.variablesBelow_apply properties.2.2)) unifySuccess).substitution_extends
+  have kind : BitNotTargetType (selected.body.finalized.substitution.apply place.type) := by
+    have fits := boundary.targetsFit
+    have resolvedFinal : selected.body.finalized.substitution.apply (unified.resolve place.type) =
+        selected.body.finalized.substitution.apply place.type := by
+      simpa [State.resolve, InferState.resolve] using boundary.extension place.type
+    simp only [ForItemForm.applySubstitution, ForItemAssignmentTargetFits, BitNotTargetFits,
+      AssignmentResolution.applySubstitution, PlaceResolution.applySubstitution] at fits
+    rw [resolvedFinal] at fits
+    exact bitNotTargetType_of_fits fits
   have keyMember : ∀ key, .expression key ∈ place.references →
       (.expression key : NodeId) ∈ (ForItemForm.assignBitNot
         {target := {place with type := unified.resolve place.type}}).references := by
@@ -305,7 +315,8 @@ theorem forItem_assignBitNot_for
   } : PlaceBoundary selected childFuel inferenceContext expression initial place placeState frames target)
   obtain ⟨finalContext, finalInvariant, typing⟩ := inferForItemFuel_success_assignBitNot_of_certificate
     boundary.accepted (boundary.scope.formation checked) (boundary.scope.functionsCanonical checked)
-    boundary.invariant boundary.extension ⟨place, placeState, unified, placeSuccess, unifySuccess, rfl, placeTyped⟩
+    boundary.invariant boundary.extension ⟨place, placeState, unified, placeSuccess, unifySuccess, rfl, placeTyped,
+      kind⟩
   have binders : unified.localBinders = initial.localBinders :=
     (congrArg LexicalScope.binders (Detail.unify_preserves_lexicalScope unifySuccess)).trans
       (congrArg LexicalScope.binders (Detail.inferPlaceFuel_success_lexicalScope_eq placeSuccess))

@@ -1271,6 +1271,60 @@ Made on 2026-11-12, during step 8d.
   `uint256` now, `w <<= n` by a `Word` and `w >>= n` by a `uint8` pass the
   statement shape check.
 
+### Row 1's in-place `~`: the target keeps its type
+
+Made on 2026-11-12, during step 9a.
+
+- **Typing.**
+  - Upstream's parser rewrites `x ~=` to `x = ~x`
+    (`crates/parser/src/parse/stmt.rs:83-97`). So the target keeps its own type and takes that
+    type's `BitNot` instance:
+    - masked at `uint8` … `uint128` (`std/unsigned.sol:69-73` and the other widths);
+    - sign-extended at `int8` … `int128` (`std/signed.sol:79-83` and the others);
+    - Word's at `word`, `uint256` and `int256` (`std/std.sol:948-952`, `std/std.sol:1074-1078`,
+      `std/signed.sol:951-955`).
+  - Inference unifies the target with `Detail.bitNotTargetType`. An open target keeps its type and
+    waits, as step 7b's compound targets do. A fixed-width type is its own target type, and any
+    other type is `word`'s, as before.
+  - The target counts as an operator use for the `uint256` default (`Detail.bitNotMentions`, part
+    of `operatorMentions`). So `let x = 0; x ~=;` is `uint256`, and a later use can give the target
+    another type.
+- **Finalization.**
+  - Once the defaults are in, `Detail.validateBitNotTarget`, in step 7b's pass over the nodes,
+    rejects a target whose type has no builtin `~` (`Detail.bitNotTargetFits`). The diagnostic is
+    `operatorNotSupported` with the trait's name, `"BitNot"`, and the type, as steps 8c and 8d name
+    an operator's trait or function.
+  - Upstream defines no `BitNot` on `integer` or `bool` (`integer`'s instances are
+    `std/std.sol:954-978`). Its solver reports the unsolved constraint (`SC0207`,
+    `crates/hir-ty/src/infer/diagnostics.rs:176`). A closed target of such a type keeps Lean's
+    unification error.
+  - `FinalInferenceResources.assignment_targets_fit` records the check: `StatementAssignmentTargetsFit`
+    and `ForItemAssignmentTargetFits` gain the bit-not forms (`BitNotTargetFits`).
+  - A lambda parameter that only an in-place `~` types stays open after local generalization. So
+    `lam(x) { x ~=; return x; }` is rejected, as step 7b's and step 8d's lambda cases are.
+- **Static semantics.** `SourceBitNotAssignmentValid` types the target at a `BitNotTargetType`:
+  `word`, or a fixed-width type on which `~` is Word's (`FixedWordBitNot`), the signed ones and
+  `uint256`.
+- **Meaning.** On those types the meaning is Word's `~` on the snapshot (`BitNotSnapshot`). It
+  keeps a canonical word canonical (`fixed_canonical_bitNot`, `BitNotSnapshot.preserves_target`),
+  so the dynamic rule and the lowering are unchanged.
+- **Proofs.**
+  - The bit-not statement and `for`-item soundness takes the final target type's kind from
+    finalization's check:
+    - the deep statement theorem from its callbacks' `assignmentTargetsFit`;
+    - the scoped theorems from `FinalInferenceResources.assignment_targets_fit`, through the
+      enclosing statement's containment;
+    - the `for`-item certificate (`ActualBitNotForItemCertificate`) carries the kind itself.
+  - Fixed-width targets stay outside the meaning proofs, as step 3d's compound targets do. The
+    compiler profiles of `~=` (`BitNotAssignable`, `ProjectedBitNotAssignable`) take only a `Word`
+    target. So the proofs that read `Word` from the static rule read it from the receipt's
+    `sourceProfile` instead (`bitNot_facts`, `projected_bitNot_head`).
+  - The unary fault-site certificate takes `operandTarget`, as the value assignments' does.
+  - `w ~=;` and `m[k] ~=;` stay in the compiler body profile that the meaning proofs take
+    (`AcceptedCompilerBodyProfile.validate`), and an `int8` target is outside it
+    (`Tests.SourceCoreBitNotSubset`). The invocation body shape (`shape?`), which step 8d part 2
+    pinned `w <<= 3` with, has no `~=` form.
+
 ### Row 1: steps
 
 Row 1 is committed in steps, each through the full gate, so that each can be
@@ -1355,3 +1409,11 @@ first planned after the literals and moved before them for this reason
      the meaning is kept, run through the public API with the fixtures' values
      and panic codes (`runUpstreamFixtures` in
      `Tests.SourceCoreFixedIntegerOperators`).
+9. **The rest of row 1.**
+   - 9a. **In-place `~` at the twelve types**, as upstream's rewrite of `x ~=` to `x = ~x` gives it
+     ([row 1's in-place `~`](#row-1s-in-place--the-target-keeps-its-type)), committed in two
+     parts:
+     - first the typing, with the types on which `~` is Word's (`uint256` and the signed ones);
+     - then `uint8` … `uint128`, whose `~` keeps the low `N` bits.
+
+     `basic`'s `bnoteq` is ported with 8e's functions.

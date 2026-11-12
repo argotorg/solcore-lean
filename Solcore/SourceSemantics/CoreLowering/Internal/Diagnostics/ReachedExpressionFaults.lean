@@ -1465,7 +1465,7 @@ inductive UnaryAt (node : StatementNode) (assignment : AssignmentResolution) : P
 private theorem statement_unary_lookup {owner : Resolved.DeclarationId} {first : Nat} {sites next : List Site}
     {node : StatementNode} {assignment : AssignmentResolution}
     (occurs : UnaryAt node assignment)
-    (rawScalar : assignment.target.type = .word ∨ assignment.target.type = .integer)
+    (rawScalar : operandTarget assignment.target.type = true)
     (accepted : addStatement owner first sites node = .ok next) :
     ∃ site, next.find? (Matches (.occurrence node.id.occurrence) assignment.target.root .bitNot) = some site := by
   by_cases owned : node.id.occurrence.owner = owner
@@ -1473,7 +1473,7 @@ private theorem statement_unary_lookup {owner : Resolved.DeclarationId} {first :
     cases occurs with
     | statement form =>
       simp only [form] at accepted
-      exact add_lookup (operandTarget_of_scalar rawScalar) accepted
+      exact add_lookup rawScalar accepted
     | header form member =>
       simp only [form] at accepted
       apply fold_contains (selected := ForItemForm.assignBitNot assignment)
@@ -1481,7 +1481,7 @@ private theorem statement_unary_lookup {owner : Resolved.DeclarationId} {first :
       · intro sites item next ⟨site, found⟩ step
         exact ⟨site, item_preserves step found⟩
       · intro sites next step
-        exact add_lookup (operandTarget_of_scalar rawScalar) step
+        exact add_lookup rawScalar step
   · simp [addStatement, owned, throw, bind, Except.bind] at accepted
 
 /-- The saved original table fold also authenticates actual unary occurrences.
@@ -1490,7 +1490,7 @@ theorem prepare_unary {source : TypedSource} {first : Nat} {table : Table}
     {node : StatementNode} {assignment : AssignmentResolution}
     (accepted : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
     (occurs : UnaryAt node assignment)
-    (rawScalar : assignment.target.type = .word ∨ assignment.target.type = .integer) :
+    (rawScalar : operandTarget assignment.target.type = true) :
     ∃ site, table.sites.find? (Matches (.occurrence node.id.occurrence) assignment.target.root .bitNot) = some site ∧
       site.site = .occurrence node.id.occurrence ∧ site.binder = assignment.target.root ∧ site.kind = .bitNot ∧
       table.reasonAt (.occurrence node.id.occurrence) assignment.target.root .bitNot = site.reason ∧

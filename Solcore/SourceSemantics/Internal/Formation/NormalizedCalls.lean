@@ -1939,7 +1939,8 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
     | ok pair =>
       rcases pair with ⟨place, placeState⟩
       simp only [placeRun] at success
-      cases unified : Detail.unify placeState place.type .word with
+      cases unified : Detail.unify placeState place.type
+          (Detail.bitNotTargetType (placeState.resolve place.type)) with
       | error error => simp [unified] at success
       | ok unifiedState =>
         simp only [unified, pure, Pure.pure, Except.pure] at success
@@ -1948,7 +1949,8 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
         have placeProperties := inferPlaceFuel_inferenceProperties ready
           formation.validated formation.functionShapes placeRun
         have progress := unify_inferenceProgress placeProperties.2.1.solved
-          placeProperties.2.2 (Ty.variablesBelow_constructor _ _) unified
+          placeProperties.2.2 (bitNotTargetType_variablesBelow
+            (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)) unified
         have placeFormation := placeIH ready nodes formed formation _ placeRun
           (continuation.trans progress.substitution_extends) (captures.before_unify unified)
         exact placeFormation.2.unify unified
@@ -1965,7 +1967,8 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
     | ok pair =>
       rcases pair with ⟨place, placeState⟩
       simp only [placeRun] at success
-      cases unified : Detail.unify placeState place.type .word with
+      cases unified : Detail.unify placeState place.type
+          (Detail.bitNotTargetType (placeState.resolve place.type)) with
       | error error => simp [unified] at success
       | ok unifiedState =>
         simp only [unified, pure, Pure.pure, Except.pure] at success
@@ -1974,7 +1977,8 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
         have placeProperties := inferPlaceFuel_inferenceProperties allocation.1
           formation.validated formation.functionShapes placeRun
         have progress := unify_inferenceProgress placeProperties.2.1.solved
-          placeProperties.2.2 (Ty.variablesBelow_constructor _ _) unified
+          placeProperties.2.2 (bitNotTargetType_variablesBelow
+            (placeProperties.2.1.solved.variablesBelow_apply placeProperties.2.2)) unified
         have placeFormation := placeIH allocation.1 allocation.2.1 allocation.2.2.1 formation _ placeRun
           (continuation.trans progress.substitution_extends)
           (captures.before_recordNode.before_unify unified)

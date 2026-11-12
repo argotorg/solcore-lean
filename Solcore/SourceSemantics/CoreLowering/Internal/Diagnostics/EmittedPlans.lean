@@ -435,11 +435,15 @@ def UnaryTyped (source : TypedSource) : Prop :=
   ∀ {site assignment}, UnaryOccurs source site assignment →
     ∃ context, SourceBitNotAssignmentValid source context assignment
 
-theorem unary_raw_type {context : SourceSemantics.Context}
-    (typed : SourceBitNotAssignmentValid source context assignment) : assignment.target.type = .word := by
+theorem unary_operand_target {context : SourceSemantics.Context}
+    (typed : SourceBitNotAssignmentValid source context assignment) :
+    SourceCoreAssignmentFaultSites.operandTarget assignment.target.type = true := by
   cases typed with
-  | intro place => cases place with
-    | intro _ _ same => exact same
+  | intro place kind _ =>
+    cases place with
+    | intro _ _ same =>
+      rw [same]
+      cases kind <;> rfl
 
 /-- Only authentic unary table entries belong to this concrete relation. -/
 def UnaryRep (table : SourceCoreAssignmentFaultSites.Table) : FunctionCalls.FaultRep
@@ -453,7 +457,7 @@ theorem UnaryOccurs.prepared {first : Nat} {table : SourceCoreAssignmentFaultSit
     (issued : SourceCoreAssignmentFaultSites.prepare source first = .ok table) :
     UnaryRep table (.invalidUnaryOperand .bitNot) (table.reasonAt site assignment.target.root .bitNot) := by
   obtain ⟨context, sourceTyped⟩ := typed origin
-  have scalar : assignment.target.type = .word ∨ assignment.target.type = .integer := .inl (unary_raw_type sourceTyped)
+  have scalar := unary_operand_target sourceTyped
   cases origin with
   | statement found form =>
     have present := lookupStatement?_sound found
