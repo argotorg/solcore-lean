@@ -87,7 +87,9 @@ Shifts needed nothing in TypeSystem, whose builtin types are `TypeSystem.Builtin
   `binaryOperatorDispatch` maps shifts to no trait method. Row 1's step 8d (0e5e82583) later typed
   the value and the amount on their own, as upstream's `Shl` and `Shr` do: the branch now unifies
   nothing and gives the value's type, and finalization checks the two types
-  (`validateShiftOperands`).
+  (`validateShiftOperands`). Its second part (2f616db3a) typed `x <<= n` the same way, as upstream's
+  rewrite to `x = x << n` does: the target keeps its own type, `inferAssignedValueFuel` infers the
+  amount with no expected type, and finalization checks it (`validateShiftAmount`).
 - In [`SourceInference/Expression.lean`](../../Solcore/Frontend/SourceInference/Expression.lean),
   `inferBinaryOperator_shift_result` and `inferBinaryOperator_shift_projection` state that branch
   once, for every proof to use.
@@ -101,17 +103,18 @@ Shifts needed nothing in TypeSystem, whose builtin types are `TypeSystem.Builtin
 - In `SourceSemantics/Internal/Inference/Soundness.lean`, `inferBinaryOperator_success_case` types a
   shift by `BinaryOperatorHasType.wordShift`; since step 8d it gives a shift its own case,
   `BinaryOperatorInferenceCase.shift`, which the binary typing theorems type by `wordShift` or, on
-  the twelve types, `fixedShift`. The literal-only case
-  `BinaryOperatorInferenceCase.literalFallback` gained a `not_shift` field for its staged `integer`
-  typing, `binaryInteger_hasType`: shifts have no `integer` typing.
+  the twelve types, `fixedShift`, and `inferAssignedValueFuel_success_sound` types `<<=` and `>>=`
+  by `SourceAssignmentHasType.shiftCompound`, with the amount's fit (`amountFits`). The literal-only
+  case `BinaryOperatorInferenceCase.literalFallback` gained a `not_shift` field for its staged
+  `integer` typing, `binaryInteger_hasType`: shifts have no `integer` typing.
 
 ### Source semantics and preservation
 
 | File | What shifts added |
 | --- | --- |
-| [`SourceSemantics/Expressions.lean`](../../Solcore/SourceSemantics/Expressions.lean) | `ShiftBinaryOperator`; the typing rule `BinaryOperatorHasType.wordShift`, with `word` operands and result and no requirements (since step 8d, an amount of any `ShiftAmountType`, beside `fixedShift` on the twelve types); the shifts in `WordCompoundAssignmentOperator` |
+| [`SourceSemantics/Expressions.lean`](../../Solcore/SourceSemantics/Expressions.lean) | `ShiftBinaryOperator`; the typing rule `BinaryOperatorHasType.wordShift`, with `word` operands and result and no requirements (since step 8d, an amount of any `ShiftAmountType`, beside `fixedShift` on the twelve types); the shifts in `WordCompoundAssignmentOperator` (since step 8d's second part, `ShiftCompoundAssignmentOperator` and `SourceAssignmentHasType.shiftCompound`, the amount at its own `ShiftAmountType`) |
 | [`Dynamic/Primitive.lean`](../../Solcore/SourceSemantics/Dynamic/Primitive.lean) | the shifts in `StrictBinaryOperator`; `BinaryPrimitiveApplies.wordShiftLeft` and `wordShiftRight`, defined by Core's `Word.shiftLeft` and `Word.shiftRight`; `IntegerStrictBinaryOperator`, the strict operators other than shifts |
-| [`Dynamic/Evaluation.lean`](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean) | `AssignmentValueApplies.shiftLeft` and `shiftRight` |
+| [`Dynamic/Evaluation.lean`](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean) | `AssignmentValueApplies.shiftLeft` and `shiftRight` (since step 8d, `CompoundAssignmentApplies.shiftLeft` and `shiftRight` at fixed-width targets) |
 | [`Dynamic/Fault.lean`](../../Solcore/SourceSemantics/Dynamic/Fault.lean) | `WordPair`, `WordBinaryOperator` and `BinaryPrimitiveOperandsInvalid.word`: a shift of anything but two words is an operand fault |
 
 **Proofs that changed.** No preservation statement changed. `PrimitiveBinaryHasType` gained a
@@ -126,7 +129,7 @@ Shifts needed nothing in TypeSystem, whose builtin types are `TypeSystem.Builtin
 | File | What shifts added |
 | --- | --- |
 | [`Frontend/SourceCore/Lowering.lean`](../../Solcore/Frontend/SourceCore/Lowering.lean) | `SourceCorePrimitive.strictBinaryBody` lowers shifts to `wordShl` and `wordShr`; `SourceCoreInteger.strictBinaryBody` has a placeholder, since typing never puts a shift at `integer`; `SourceCoreAssignments.wordOnly?` and `wordOnlyCompound` lower a compound shift of a local |
-| [`SourceCore/DataPlaces.lean`](../../Solcore/Frontend/SourceCore/DataPlaces.lean), [`SourceCore/Compatible.lean`](../../Solcore/Frontend/SourceCore/Compatible.lean) | `binaryOperator` maps the compound shifts to `wordShl` and `wordShr`; `lower` refuses them at `integer` leaves |
+| [`SourceCore/DataPlaces.lean`](../../Solcore/Frontend/SourceCore/DataPlaces.lean), [`SourceCore/Compatible.lean`](../../Solcore/Frontend/SourceCore/Compatible.lean) | `binaryOperator` maps the compound shifts to `wordShl` and `wordShr`; `lower` refuses them at `integer` leaves; since step 8d, at fixed-width targets `checkedCompound` and `checkedWordOperation` give `wordShl`, wrapped by `placeWrap`, and `wordSar` or `wordShr` |
 | [`Frontend/SourceCoreElaboration.lean`](../../Solcore/Frontend/SourceCoreElaboration.lean) | `directBinary` maps the shifts too |
 | `Frontend/Fragments/Internal/` | The historical strict-`word` evaluators leave shifts out; their soundness proofs gained the cases |
 
@@ -157,11 +160,14 @@ predicate that classifies operators (`IntegerStrictBinaryOperator`, or `ValueAss
   ([Core lowering](core-lowering.md#making-changes)).
 - **Compound assignment.** The data-place theorems share an assignment profile, of the form
   `operator = .equal ∨ T = .word ∨ T = .integer` for the leaf type `T`. Its last disjunct gained
-  `∧ operator.isShift = false`, now `operator.wordOnly = false`; proofs that destructure the
-  profile pass the conjunct on. `DataPlaceModifier.integer_success` (`Data/PlaceReflection.lean`)
-  takes the conjunct as a premise and refutes the shift cases, and `word_success` gained them. The
-  receipts in [`AcceptedTrees.lean`](../../Solcore/SourceSemantics/CoreLowering/AcceptedTrees.lean)
-  carry the profile in `operatorType`.
+  `∧ operator.isShift = false`, now `operator.wordOnly = false`; proofs that destructure the profile
+  pass the conjunct on. `DataPlaceModifier.integer_success` (`Data/PlaceReflection.lean`) takes the
+  conjunct as a premise and refutes the shift cases, and `word_success` gained them. The receipts in
+  [`AcceptedTrees.lean`](../../Solcore/SourceSemantics/CoreLowering/AcceptedTrees.lean) carry the
+  profile in `operatorType`. Step 8d's second part (2f616db3a) replaced the head's
+  `runtimeType leaf = runtimeType node.type` (`rightView`) with `AssignedRhsView`, and the trees'
+  right-hand typing at the target's type with `AssignedOperandTyped`, so a `Word` target's `<<=` and
+  `>>=` stay in the proofs with an amount of its own type.
 
 ### The public API
 

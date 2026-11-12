@@ -143,20 +143,27 @@ depends on the change.
     into `Syntax.ValueAssignOp.wordOnly`; `DataPlaceModifier.word_success` gains its case and
     `integer_success` refutes it. The place lowering chooses the modifier from the target's static
     type (`SourceCoreDataPlaces.assignmentModifier`): checked `+= -= *= /= %=` at a fixed-width
-    target compute Word's operation (`wordSdiv` and `wordSmod` for `/= %=` on the signed types),
-    and `guard` tests the exact result against the type's range after the setter (`Check.range`),
-    for `/= %=` after a zero test that fails with `Panic(0x12)`. Their unchecked forms compute the
-    same operation, and `guard` makes only the zero test of `/= %=` (`fixedCheck`). Since Word's
-    operation keeps only the low `N` bits of the exact result, the modified leaf is wrapped to the
-    type's width before the setter writes it: `execute` and `modified` take an optional last
-    argument `wrap` (`none` by default), which `lower` sets to `placeWrap`, and `wrapLeaf` masks
-    the leaf with `wordAnd` on an unsigned type or sign-extends it with `wordSignExtend` on a
-    signed one. The profile leaves those targets out, so they are compiled but not covered by
-    the meaning proofs; inside it, `assignmentModifier_plain` gives back `binaryOperator`'s
-    modifier and `placeWrap_plain` no wrap. The
-    [design note](../design/integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs)
-    says what bringing them in takes, and
-    [why the wrap belongs to the leaf](../design/integer-types-unchecked-shifts.md#row-1s-unchecked-compound-assignments-the-wrap-belongs-to-the-leaf).
+    target compute Word's operation (`wordSdiv` and `wordSmod` for `/= %=` on the signed types), and
+    `guard` tests the exact result against the type's range after the setter (`Check.range`), for
+    `/= %=` after a zero test that fails with `Panic(0x12)`. Their unchecked forms compute the same
+    operation, and `guard` makes only the zero test of `/= %=` (`fixedCheck`). `<<=` and `>>=` at a
+    fixed-width target compute `wordShl`, or `wordSar` on a signed type and `wordShr` otherwise
+    (`checkedWordOperation`), and `guard` tests nothing. Since Word's operation keeps only the low
+    `N` bits of the exact result, the modified leaf is wrapped to the type's width before the setter
+    writes it: `execute` and `modified` take an optional last argument `wrap` (`none` by default),
+    which `lower` sets to `placeWrap`, and `wrapLeaf` masks the leaf with `wordAnd` on an unsigned
+    type or sign-extends it with `wordSignExtend` on a signed one. `<<=`'s leaf is wrapped too;
+    `>>=`'s needs no wrap. The profile leaves those targets out, so they are compiled but not
+    covered by the meaning proofs; inside it, `assignmentModifier_plain` gives back
+    `binaryOperator`'s modifier and `placeWrap_plain` no wrap. A `Word` target's `<<=` and `>>=`
+    stay inside it with an amount of its own type: the assignment head's `rightView` is an
+    `AssignedRhsView`, under which the right-hand side has the leaf's runtime type or is a
+    `ShiftAmountType` amount whose word the shift reads (`AssignedRhsView.rep`); the statement trees
+    take the right-hand side through `AssignedOperandTyped`, and the statement checkers decide the
+    view (`AssignedRhsView.decide?`). The [design
+    note](../design/integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs)
+    says what bringing the fixed-width targets in takes, and [why the wrap belongs to the
+    leaf](../design/integer-types-unchecked-shifts.md#row-1s-unchecked-compound-assignments-the-wrap-belongs-to-the-leaf).
   - The public-API tests go in [Foundations/Execution](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean);
     the `example` in `Tests.SourceCorePrimitiveExpressions` (`Foundations/Statements`) runs every
     `StrictBinaryOperator` through `PrimitiveExpressions.lowerExpression_preserves`.
