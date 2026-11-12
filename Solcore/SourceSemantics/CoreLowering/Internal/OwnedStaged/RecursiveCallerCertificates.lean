@@ -675,14 +675,14 @@ inductive Certificate (policy : SourceCoreFunctions.Policy) (body : SourceCoreFu
       (child : Certificate policy body compilation readFuel values source context reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Certificate policy body compilation readFuel values source context reasonAt scope id
         ⟨core.resultType, core.lower childCode⟩
-  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary {id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       (metadata : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
       (leftFound : source.lookupExpression? left = some leftNode)
       (rightFound : source.lookupExpression? right = some rightNode)
-      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = amountType)
       (outputType : node.type = resultType)
-      (profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode)
+      (profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType amountType resultType mode)
       (first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
       (second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩) :
       Certificate policy body compilation readFuel values source context reasonAt scope id
@@ -807,22 +807,22 @@ inductive Calls {fuel : Nat} {callScope : SourceCoreLocalCell.Scope}
       {child : Certificate policy body compilation readFuel values source context reasonAt scope operand ⟨core.operandType, childCode⟩}
       (inside : Calls compiler child) :
       Calls compiler (.unary actual form found inputType outputType profile child)
-  | binary_left {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary_left {scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
       {form : node.form = .binary left operator right}
       {leftFound : source.lookupExpression? left = some leftNode} {rightFound : source.lookupExpression? right = some rightNode}
-      {leftType : leftNode.type = operandType} {rightType : rightNode.type = operandType} {outputType : node.type = resultType}
-      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
+      {leftType : leftNode.type = operandType} {rightType : rightNode.type = amountType} {outputType : node.type = resultType}
+      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType amountType resultType mode}
       {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
       {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
       (inside : Calls compiler first) :
       Calls compiler (.binary actual form leftFound rightFound leftType rightType outputType profile first second)
-  | binary_right {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary_right {scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
       {form : node.form = .binary left operator right}
       {leftFound : source.lookupExpression? left = some leftNode} {rightFound : source.lookupExpression? right = some rightNode}
-      {leftType : leftNode.type = operandType} {rightType : rightNode.type = operandType} {outputType : node.type = resultType}
-      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
+      {leftType : leftNode.type = operandType} {rightType : rightNode.type = amountType} {outputType : node.type = resultType}
+      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType amountType resultType mode}
       {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
       {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
       (inside : Calls compiler second) :
@@ -978,22 +978,22 @@ inductive DirectCalls {fuel : Nat} {callScope : SourceCoreLocalCell.Scope}
       {child : Certificate policy body compilation readFuel values source context reasonAt scope operand ⟨core.operandType, childCode⟩}
       (inside : DirectCalls compiler child) :
       DirectCalls compiler (.unary actual form found inputType outputType profile child)
-  | binary_left {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary_left {scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
       {form : node.form = .binary left operator right}
       {leftFound : source.lookupExpression? left = some leftNode} {rightFound : source.lookupExpression? right = some rightNode}
-      {leftType : leftNode.type = operandType} {rightType : rightNode.type = operandType} {outputType : node.type = resultType}
-      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
+      {leftType : leftNode.type = operandType} {rightType : rightNode.type = amountType} {outputType : node.type = resultType}
+      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType amountType resultType mode}
       {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
       {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
       (inside : DirectCalls compiler first) :
       DirectCalls compiler (.binary actual form leftFound rightFound leftType rightType outputType profile first second)
-  | binary_right {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary_right {scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
       {form : node.form = .binary left operator right}
       {leftFound : source.lookupExpression? left = some leftNode} {rightFound : source.lookupExpression? right = some rightNode}
-      {leftType : leftNode.type = operandType} {rightType : rightNode.type = operandType} {outputType : node.type = resultType}
-      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
+      {leftType : leftNode.type = operandType} {rightType : rightNode.type = amountType} {outputType : node.type = resultType}
+      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType amountType resultType mode}
       {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
       {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
       (inside : DirectCalls compiler second) :
@@ -1148,22 +1148,22 @@ inductive MethodCalls {fuel : Nat} {callScope : SourceCoreLocalCell.Scope}
       {child : Certificate policy body compilation readFuel values source context reasonAt scope operand ⟨core.operandType, childCode⟩}
       (inside : MethodCalls compiler child) :
       MethodCalls compiler (.unary actual form found inputType outputType profile child)
-  | binary_left {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary_left {scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
       {form : node.form = .binary left operator right}
       {leftFound : source.lookupExpression? left = some leftNode} {rightFound : source.lookupExpression? right = some rightNode}
-      {leftType : leftNode.type = operandType} {rightType : rightNode.type = operandType} {outputType : node.type = resultType}
-      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
+      {leftType : leftNode.type = operandType} {rightType : rightNode.type = amountType} {outputType : node.type = resultType}
+      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType amountType resultType mode}
       {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
       {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
       (inside : MethodCalls compiler first) :
       MethodCalls compiler (.binary actual form leftFound rightFound leftType rightType outputType profile first second)
-  | binary_right {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary_right {scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
       {form : node.form = .binary left operator right}
       {leftFound : source.lookupExpression? left = some leftNode} {rightFound : source.lookupExpression? right = some rightNode}
-      {leftType : leftNode.type = operandType} {rightType : rightNode.type = operandType} {outputType : node.type = resultType}
-      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
+      {leftType : leftNode.type = operandType} {rightType : rightNode.type = amountType} {outputType : node.type = resultType}
+      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType amountType resultType mode}
       {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
       {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
       (inside : MethodCalls compiler second) :
@@ -1338,22 +1338,22 @@ inductive Indexes {indexScope : SourceCoreLocalCell.Scope}
       {child : Certificate policy body compilation readFuel values source context reasonAt scope operand ⟨core.operandType, childCode⟩}
       (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType child) :
       Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.unary actual form found inputType outputType profile child)
-  | binary_left {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary_left {scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
       {form : node.form = .binary left operator right}
       {leftFound : source.lookupExpression? left = some leftNode} {rightFound : source.lookupExpression? right = some rightNode}
-      {leftType : leftNode.type = operandType} {rightType : rightNode.type = operandType} {outputType : node.type = resultType}
-      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
+      {leftType : leftNode.type = operandType} {rightType : rightNode.type = amountType} {outputType : node.type = resultType}
+      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType amountType resultType mode}
       {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
       {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
       (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType first) :
       Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType (.binary actual form leftFound rightFound leftType rightType outputType profile first second)
-  | binary_right {scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary_right {scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       {actual : CompatibleExpressionPrimitives.Metadata values.checked source id node (mode.resultType operator)}
       {form : node.form = .binary left operator right}
       {leftFound : source.lookupExpression? left = some leftNode} {rightFound : source.lookupExpression? right = some rightNode}
-      {leftType : leftNode.type = operandType} {rightType : rightNode.type = operandType} {outputType : node.type = resultType}
-      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode}
+      {leftType : leftNode.type = operandType} {rightType : rightNode.type = amountType} {outputType : node.type = resultType}
+      {profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType amountType resultType mode}
       {first : Certificate policy body compilation readFuel values source context reasonAt scope left ⟨mode.operandType operator, leftCode⟩}
       {second : Certificate policy body compilation readFuel values source context reasonAt scope right ⟨mode.operandType operator, rightCode⟩}
       (inside : Indexes (indexScope := indexScope) indexed indexKeyFound indexForm indexSourceType second) :
@@ -1731,7 +1731,7 @@ theorem of_functions_on_projected {scope : SourceCoreLocalCell.Scope}
       cases step with
       | @binary operator left right first second otherForm metadata firstGenerated secondGenerated leftChecked rightChecked =>
         obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (form.symm.trans otherForm)
-        obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, sameType, leftTyped, rightTyped, profile⟩ :=
+        obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, leftTyped, rightTyped, profile⟩ :=
           CompatibleExpressionPrimitives.binary_source_types unique originalFound form metadata.coercions metadata.requirements typed
         obtain ⟨firstTree, projected⟩ := leftIH leftFound leftTyped firstGenerated
           (closed admitted originalFound (by simp [form, ExpressionForm.references]))
@@ -1744,7 +1744,7 @@ theorem of_functions_on_projected {scope : SourceCoreLocalCell.Scope}
         obtain ⟨secondType, rightCode⟩ := second
         dsimp only at leftChecked rightChecked firstTree secondTree ⊢
         subst firstType secondType
-        exact ⟨.binary metadata form leftFound rightFound rfl sameType.symm rfl profile firstTree secondTree, metadata.projected⟩
+        exact ⟨.binary metadata form leftFound rightFound rfl rfl rfl profile firstTree secondTree, metadata.projected⟩
       | unary otherForm _ _ _ | group otherForm _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ => simp [form] at otherForm
   | conditional originalFound form conditionSyntax thenSyntax elseSyntax conditionIH thenIH elseIH =>
     intro admitted
@@ -2093,7 +2093,7 @@ theorem of_method_steps_functions_on_projected {directSites : DeclarationInstant
         cases step with
         | @binary operator left right first second otherForm metadata firstGenerated secondGenerated leftChecked rightChecked =>
           obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (form.symm.trans otherForm)
-          obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, sameType, leftTyped, rightTyped, profile⟩ :=
+          obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, leftTyped, rightTyped, profile⟩ :=
             CompatibleExpressionPrimitives.binary_source_types unique originalFound form metadata.coercions metadata.requirements typed
           obtain ⟨firstTree, projected⟩ := leftIH leftFound leftTyped firstGenerated
             (closed admitted originalFound (by simp [form, ExpressionForm.references]))
@@ -2106,7 +2106,7 @@ theorem of_method_steps_functions_on_projected {directSites : DeclarationInstant
           obtain ⟨secondType, rightCode⟩ := second
           dsimp only at leftChecked rightChecked firstTree secondTree ⊢
           subst firstType secondType
-          exact ⟨.binary metadata form leftFound rightFound rfl sameType.symm rfl profile firstTree secondTree, metadata.projected⟩
+          exact ⟨.binary metadata form leftFound rightFound rfl rfl rfl profile firstTree secondTree, metadata.projected⟩
         | unary otherForm _ _ _ | group otherForm _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ => simp [form] at otherForm
       · obtain ⟨compiler⟩ := methodCompiler
         have originalSame := Option.some.inj (compiler.metadata.found.symm.trans originalFound)
@@ -2771,9 +2771,9 @@ theorem no_direct_of_syntax
     · simp [outer.originalForm, ExpressionForm.references, (List.of_mem_zip remaining).1]
   | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
   | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
@@ -2820,9 +2820,9 @@ theorem no_indexes_of_syntax
     · simp [outer.originalForm, ExpressionForm.references, (List.of_mem_zip remaining).1]
   | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
   | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
@@ -2901,9 +2901,9 @@ theorem indexes_reached
     · simp [outer.originalForm, ExpressionForm.references, (List.of_mem_zip remaining).1]
   | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
     exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
   | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
@@ -2957,9 +2957,9 @@ theorem calls_syntax_of {directSites : DeclarationInstantiation → Prop} {callF
     · simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, outer.originalForm, ExpressionForm.references, (List.of_mem_zip remaining).1]
   | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
   | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
@@ -3026,9 +3026,9 @@ theorem direct_calls_syntax_of {directSites : DeclarationInstantiation → Prop}
     · simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, outer.originalForm, ExpressionForm.references, (List.of_mem_zip remaining).1]
   | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
   | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
@@ -3094,9 +3094,9 @@ theorem method_calls_syntax_of {directSites : DeclarationInstantiation → Prop}
     · simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, outer.originalForm, ExpressionForm.references, (List.of_mem_zip remaining).1]
   | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
   | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.syntax_child tree metadata.found (by simp [CallableIndexedOwnedPreparedStagedRecursiveCallerCertificates.GeneralSyntax.RuntimeChild, form, ExpressionForm.references]))
@@ -3147,9 +3147,9 @@ theorem method_calls_reached {callFuel : Nat} {callScope : SourceCoreLocalCell.S
     · simp [outer.originalForm, ExpressionForm.references, (List.of_mem_zip remaining).1]
   | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
     exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
   | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (.expression reached metadata.found (by simp [form, ExpressionForm.references]))
@@ -3332,15 +3332,15 @@ theorem parent_typed
       CompatibleExpressionPrimitives.unary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih childTyped
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     have originalTyped := typed_at_lookup unique metadata.found typed
-    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, leftTyped, rightTyped, actualProfile⟩ :=
       CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih leftTyped
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     have originalTyped := typed_at_lookup unique metadata.found typed
-    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, leftTyped, rightTyped, actualProfile⟩ :=
       CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih rightTyped
@@ -3460,15 +3460,15 @@ theorem direct_parent_typed
       CompatibleExpressionPrimitives.unary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih childTyped
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     have originalTyped := typed_at_lookup unique metadata.found typed
-    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, leftTyped, rightTyped, actualProfile⟩ :=
       CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih leftTyped
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     have originalTyped := typed_at_lookup unique metadata.found typed
-    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, leftTyped, rightTyped, actualProfile⟩ :=
       CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih rightTyped
@@ -3592,15 +3592,15 @@ theorem index_parent_typed
       CompatibleExpressionPrimitives.unary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih childTyped
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     have originalTyped := typed_at_lookup unique metadata.found typed
-    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, leftTyped, rightTyped, actualProfile⟩ :=
       CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih leftTyped
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     have originalTyped := typed_at_lookup unique metadata.found typed
-    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, leftTyped, rightTyped, actualProfile⟩ :=
       CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih rightTyped
@@ -3711,15 +3711,15 @@ theorem method_parent_typed
       CompatibleExpressionPrimitives.unary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih childTyped
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     have originalTyped := typed_at_lookup unique metadata.found typed
-    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, leftTyped, rightTyped, actualProfile⟩ :=
       CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih leftTyped
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     have originalTyped := typed_at_lookup unique metadata.found typed
-    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, leftTyped, rightTyped, actualProfile⟩ :=
       CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih rightTyped

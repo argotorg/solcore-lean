@@ -2169,6 +2169,19 @@ theorem ordinaryBinary_expressionTypingBase_under_ambient_bounded
       leftContains
     rw [leftNodeType] at fits
     simpa only [← resources.substitution_eq] using fits
+  have shiftFits : Detail.isShiftOperator operator.value = true →
+      Detail.shiftValueFits (resources.finalState.inference.substitution.apply leftResult.type) = true ∧
+        Detail.shiftAmountFits (resources.finalState.inference.substitution.apply rightResult.type) = true := by
+    intro shift
+    obtain ⟨coercions, recordedContains⟩ :=
+      recordExpressionWithExpected_success_containsExpression recordSuccess roots
+    have finalContains := parentToSemantic.containsExpression
+      (FlexibleSubstitution.ContainsExpression.applySubstitution finalized.substitution recordedContains)
+    obtain ⟨leftNode, leftContains, leftNodeType⟩ := leftType.stored_type
+    obtain ⟨rightNode, rightContains, rightNodeType⟩ := rightType.stored_type
+    have fits := resources.shift_operands_fit finalContains rfl shift leftContains rightContains
+    rw [leftNodeType, rightNodeType] at fits
+    simpa only [← resources.substitution_eq] using fits
   simpa only [← resources.substitution_eq] using
     (inferBinaryOperator_recordExpressionWithExpected_success_expressionTypingBase_scoped_of_retained
       (later := resources.finalState)
@@ -2177,7 +2190,7 @@ theorem ordinaryBinary_expressionTypingBase_under_ambient_bounded
       (by simpa only [← resources.substitution_eq] using leftType)
       (by simpa only [← resources.substitution_eq] using rightType)
       rightReady leftBelow rightBelow expectedBelow integerLiteralsSubset
-      integerLiteralTargetsSupported uncheckedFits finalSubstitutionExtends
+      integerLiteralTargetsSupported uncheckedFits shiftFits finalSubstitutionExtends
       finalRequirementsSubset retained activeCatalog activeBinders
       traitSuccess profileSuccess catalog finalContextValid signaturesEq
       selectedTraitName traitName resources.solve_success

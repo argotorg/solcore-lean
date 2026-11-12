@@ -382,7 +382,7 @@ theorem preserves_reached [FunctionCalls.FaultTokens semanticFaults]
       apply CallableIndexedOwnedPreparedStagedOperatorBounds.preserves_at
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .unary metadata form found inputType outputType unaryProfile (by exact ⟨rfl, by simp⟩)
-  | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
       intro reached noMethods noDirect noIndexes ports size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression left) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])
@@ -687,7 +687,7 @@ theorem reflects_reached [FunctionCalls.FaultTokens semanticFaults] (stageEq : s
       apply CallableIndexedOwnedPreparedStagedOperatorBounds.reflects_at
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .unary metadata form found inputType outputType unaryProfile (by exact ⟨rfl, by simp⟩)
-  | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
       intro reached noMethods noDirect noIndexes ports size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression left) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])

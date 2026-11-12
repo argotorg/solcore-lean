@@ -746,13 +746,13 @@ def inferBinaryOperator (context : Context) (operator : Syntax.BinaryOp)
     (integerLiterals : List IntegerLiteralOrigin) (state : State) :
     Except Error OperatorInferenceResult := do
   if isShiftOperator operator then
-    -- A shift types its amount independently of its value, and its result
-    -- has the value's type; both are Words, so open literal operands are
-    -- Words at once. Upstream's `Shl` and `Shr` take two parameters, so
-    -- shifts never dispatch to a program's one-parameter traits.
-    let state ← unify state left .word
-    let state ← unify state right .word
-    return { type := .word, requirements := [], state }
+    -- A shift types its value and its amount on their own, as upstream's
+    -- two-parameter `Shl<t, n>` and `Shr<t, n>` do, and its result has the
+    -- value's type. Both wait for their types: an open literal among them
+    -- defaults to `uint256` as an operator use, and finalization checks them
+    -- (`validateShiftOperands`). Shifts never dispatch to a program's
+    -- one-parameter traits.
+    return { type := state.resolve left, requirements := [], state }
   let hasOpenLiteralOperand :=
     isOpenIntegerLiteralTarget state integerLiterals left ||
       isOpenIntegerLiteralTarget state integerLiterals right

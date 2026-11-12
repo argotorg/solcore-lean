@@ -553,9 +553,9 @@ theorem inferBinaryOperator_preserves {relation : State → State → Prop}
   let openLiteral := isOpenIntegerLiteralTarget state integerLiterals left ||
     isOpenIntegerLiteralTarget state integerLiterals right
   by_cases shift : isShiftOperator operator = true
-  · obtain ⟨_, _, valued, valueResult, amountResult⟩ :=
-      inferBinaryOperator_shift_result shift success
-    exact trans (unified valueResult) (unified amountResult)
+  · obtain ⟨_, _, stateEq⟩ := inferBinaryOperator_shift_result shift success
+    rw [stateEq]
+    exact refl state
   by_cases unchecked : isUncheckedOperator operator = true
   · obtain ⟨_, prepared, unifyResult, prepare, tailResult⟩ :=
       inferBinaryOperator_unchecked_result unchecked success

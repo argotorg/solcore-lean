@@ -16681,6 +16681,14 @@ inductive BinaryOperatorInferenceCase
         result.type result.requirements) :
       BinaryOperatorInferenceCase inferenceContext semanticContext initial
         operator left right integerLiterals result
+  /-- A shift, which types its value and its amount on their own and waits for
+  both; finalization checks their types (`Detail.validateShiftOperands`). -/
+  | shift
+      (shift : Detail.isShiftOperator operator = true)
+      (requirements_eq : result.requirements = [])
+      (type_eq : result.type = result.state.resolve left) :
+      BinaryOperatorInferenceCase inferenceContext semanticContext initial
+        operator left right integerLiterals result
   | literalFallback
       (requirements_eq : result.requirements = [])
       (operands_eq : result.state.resolve left = result.state.resolve right)
@@ -16746,7 +16754,7 @@ theorem binaryBuiltin_hasType
   cases operator <;>
     simp [Detail.binaryBuiltinType, Detail.binaryResultIsBool]
   all_goals first
-    | exact .wordShift (by constructor)
+    | exact .wordShift (by constructor) .word
     | exact .wordUnchecked (by constructor)
     | (constructor <;> constructor)
 
@@ -17218,19 +17226,10 @@ theorem inferBinaryOperator_success_case
     BinaryOperatorInferenceCase inferenceContext semanticContext initial
       operator left right integerLiterals result := by
   by_cases shift : Detail.isShiftOperator operator = true
-  · obtain ⟨requirementsEq, typeEq, valued, valueResult, amountResult⟩ :=
+  · obtain ⟨requirementsEq, typeEq, stateEq⟩ :=
       Detail.inferBinaryOperator_shift_result shift success
-    have leftWord : result.state.resolve left = .word := by
-      have valueEq := Detail.unify_preserves_resolve_eq
-        (Detail.unify_resolve_eq valueResult) amountResult
-      simpa [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve,
-        TypeSystem.Ty.word] using valueEq
-    have rightWord : result.state.resolve right = .word := by
-      simpa [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve,
-        TypeSystem.Ty.word] using Detail.unify_resolve_eq amountResult
-    refine .primitive ?_
-    rw [leftWord, rightWord, typeEq, requirementsEq]
-    exact .wordShift (shiftBinaryOperator_of_isShiftOperator shift)
+    refine .shift shift requirementsEq ?_
+    rw [typeEq, stateEq]
   have not_shift : Detail.isShiftOperator operator = false :=
     Bool.eq_false_iff.mpr shift
   by_cases unchecked : Detail.isUncheckedOperator operator = true
@@ -18593,10 +18592,30 @@ theorem binaryOperatorTrait_hasTypeAfterSubstitution
     exact solveRequirements_correspondingSequenceProves corresponds
       solve_success solved_eq valid
 
+/-- A type that finalization admits as a shift's value is `word` or one of the
+twelve types. -/
+theorem shiftValue_of_fits {type : TypeSystem.Ty} (fits : Detail.shiftValueFits type = true) :
+    type = .word ∨ ∃ fixed, type = .fixed fixed := by
+  unfold Detail.shiftValueFits at fits
+  split at fits
+  · exact .inl rfl
+  · exact .inr ⟨_, rfl⟩
+  · cases fits
+
+/-- A type that finalization admits as a shift's amount is a shift-amount type. -/
+theorem shiftAmountType_of_fits {type : TypeSystem.Ty} (fits : Detail.shiftAmountFits type = true) :
+    ShiftAmountType type := by
+  unfold Detail.shiftAmountFits at fits
+  split at fits
+  · exact .word
+  · exact .unsigned (by simpa using fits)
+  · cases fits
+
 /-- Every retained binary inference branch becomes declarative operator
 typing after whole-body substitution and scoped requirement solving.  The
 literal fallback is split between a still-deferred literal target, whose
-final carrier may be Word or Integer, and the already staged Integer carrier. -/
+final carrier may be Word or Integer, and the already staged Integer carrier;
+a shift takes its operands' final types from finalization's check. -/
 theorem binaryOperatorInferenceCase_hasType_afterFinalization_scoped
     {inferenceContext : Frontend.SourceInference.Context}
     {sourceContext base active : SourceSemantics.Context}
@@ -18620,6 +18639,9 @@ theorem binaryOperatorInferenceCase_hasType_afterFinalization_scoped
         (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (uncheckedFits : Detail.isUncheckedOperator operator = true → result.requirements = [] →
       later.inference.substitution.apply left ≠ .integer)
+    (shiftFits : Detail.isShiftOperator operator = true →
+      Detail.shiftValueFits (later.inference.substitution.apply left) = true ∧
+        Detail.shiftAmountFits (later.inference.substitution.apply right) = true)
     (catalog : SignatureCatalogWellFormed sourceContext.signatures)
     (contextValid : FlexibleSubstitution.ContextSubstitutionValid
       later.inference.substitution closedVariables sourceContext active)
@@ -18665,6 +18687,20 @@ theorem binaryOperatorInferenceCase_hasType_afterFinalization_scoped
         FlexibleSubstitution.BinaryOperatorHasType.applySubstitution catalog
           contextValid typing
       simpa only [resolvedLeftEq, resolvedRightEq] using mapped
+  | shift shift requirementsEq typeEq =>
+      have fits := shiftFits shift
+      have resultEq : later.inference.substitution.apply result.type =
+          later.inference.substitution.apply left := by
+        rw [typeEq]
+        exact resolvedLeftEq
+      rw [resultEq, requirementsEq]
+      have kind := shiftBinaryOperator_of_isShiftOperator shift
+      have amount := shiftAmountType_of_fits fits.2
+      rcases shiftValue_of_fits fits.1 with valueWord | ⟨type, valueFixed⟩
+      · rw [valueWord]
+        exact .wordShift kind amount
+      · rw [valueFixed]
+        exact .fixedShift kind amount
   | literalFallback requirementsEq operandsEq typeEq fallback notShift notUnchecked =>
       have finalOperandsEq :
           later.inference.substitution.apply left =
@@ -24181,20 +24217,9 @@ theorem inferUnaryOperator_recordExpressionWithExpected_success_expressionTyping
       signaturesEq traitName solveSuccess solvedEq ledger ownership
       activeSignaturesEq activeRequirementsEq assumptionsMono covered
 
-/-- Declarative binary-operator typing always uses one common operand type. -/
-private theorem binaryOperatorHasType_operand_types_eq
-    {context : SourceSemantics.Context} {operator : Syntax.BinaryOp}
-    {left right result : TypeSystem.Ty}
-    {requirements : List RequirementId}
-    (typing : BinaryOperatorHasType context operator left right result
-      requirements) :
-    left = right := by
-  cases typing <;> rfl
-
-/-- The analogous ordinary-recording tail for a binary operator.  Successful
-operator inference proves that both final operand types coincide; that fact is
-used only here to fit the two recursive typings to the declarative binary
-form rule. -/
+/-- The analogous ordinary-recording tail for a binary operator: the two
+recursive typings fit the declarative binary form rule, each at its own final
+type (one type for every operator but the shifts). -/
 theorem inferBinaryOperator_recordExpressionWithExpected_success_expressionTypingBase_scoped_of_retained
     {inferenceContext : Frontend.SourceInference.Context}
     {expression : Syntax.Expr} {id : ExpressionId}
@@ -24232,6 +24257,9 @@ theorem inferBinaryOperator_recordExpressionWithExpected_success_expressionTypin
         (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (uncheckedFits : Detail.isUncheckedOperator operator = true → inferred.requirements = [] →
       later.inference.substitution.apply left.type ≠ .integer)
+    (shiftFits : Detail.isShiftOperator operator = true →
+      Detail.shiftValueFits (later.inference.substitution.apply left.type) = true ∧
+        Detail.shiftAmountFits (later.inference.substitution.apply right.type) = true)
     (substitutionExtends :
       later.inference.substitution.SemanticallyExtends
         result.2.inference.substitution)
@@ -24313,35 +24341,20 @@ theorem inferBinaryOperator_recordExpressionWithExpected_success_expressionTypin
     binaryOperatorInferenceCase_hasType_afterFinalization_scoped inferenceCase
       operatorProperties.1 inferredSubstitutionExtends
       inferredRequirementsSubset integerLiteralsSubset
-      integerLiteralTargetsSupported uncheckedFits catalog contextValid signaturesEq
+      integerLiteralTargetsSupported uncheckedFits shiftFits catalog contextValid signaturesEq
       selectedTraitName solveSuccess solvedEq ledger ownership
       activeSignaturesEq activeRequirementsEq assumptionsMono covered
       operatorRequirementsOccur
-  have operandTypesEq :
-      later.inference.substitution.apply left.type =
-        later.inference.substitution.apply right.type :=
-    binaryOperatorHasType_operand_types_eq operatorType
-  have rightTypeAsLeft : ExpressionHasType semanticSource active right.id
-      (later.inference.substitution.apply left.type) := by
-    rw [operandTypesEq]
-    exact rightType
-  have operatorTypeAsLeft : BinaryOperatorHasType active operator
-      (later.inference.substitution.apply left.type)
-      (later.inference.substitution.apply left.type)
-      (later.inference.substitution.apply inferred.type)
-      inferred.requirements := by
-    rwa [← operandTypesEq] at operatorType
   have formType : ExpressionFormHasRawType semanticSource active
       ((ExpressionForm.binary left.id operator right.id).applySubstitution
         later.inference.substitution)
       (later.inference.substitution.apply inferred.type)
       (.ordinary inferred.requirements) := by
     simpa [ExpressionForm.applySubstitution] using
-      (ExpressionFormHasRawType.binary leftType rightTypeAsLeft
-        operatorTypeAsLeft)
+      (ExpressionFormHasRawType.binary leftType rightType operatorType)
   have rawAdmissible : TypeAdmissible active
       (later.inference.substitution.apply inferred.type) :=
-    operatorTypeAsLeft.result_type_admissible activeCatalog activeBinders
+    operatorType.result_type_admissible_of_left activeCatalog activeBinders
       leftType.type_admissible
   exact
     recordExpressionWithExpected_success_ordinaryExpressionTypingBase_scoped_of_retained
@@ -25905,6 +25918,19 @@ def SourceUncheckedOperandsFit (source : TypedSource) : Prop :=
     node.requirements = Detail.coercionRequirements node.coercions →
     ContainsExpression source left leftNode → leftNode.type ≠ .integer
 
+/-- A successful node check is both of its checks. -/
+theorem validateExpressionNode_ok {state : Frontend.SourceInference.State}
+    {node : ExpressionNode}
+    (success : Detail.validateAssignmentTargetNode state (.expression node) = .ok ()) :
+    Detail.validateUncheckedOperand state node = .ok () ∧
+      Detail.validateShiftOperands state node = .ok () := by
+  simp only [Detail.validateAssignmentTargetNode, Detail.validateExpressionNode] at success
+  cases unchecked : Detail.validateUncheckedOperand state node with
+  | error error => simp [unchecked, bind, Except.bind] at success
+  | ok _ =>
+    simp only [unchecked, bind, Except.bind] at success
+    exact ⟨rfl, success⟩
+
 /-- One successful check of an unchecked operator gives its left operand's fit
 under the checked state's substitution. -/
 theorem uncheckedOperandFits_of_validate {state : Frontend.SourceInference.State}
@@ -25948,8 +25974,8 @@ theorem finalize_uncheckedOperandsFit
     | expression rawLeftNode =>
       simp only [Node.applySubstitution, Node.expression.injEq] at rawEq rawLeftEq
       subst rawEq rawLeftEq
-      have check := validateAssignmentTargets_member witness.assignmentValidation rawMember
-      simp only [Detail.validateAssignmentTargetNode] at check
+      have check := (validateExpressionNode_ok
+        (validateAssignmentTargets_member witness.assignmentValidation rawMember)).1
       have formRaw : rawNode.form = .binary left operator right := by
         cases rawForm : rawNode.form <;>
           simp_all [ExpressionNode.applySubstitution, ExpressionForm.applySubstitution]
@@ -25961,6 +25987,95 @@ theorem finalize_uncheckedOperandsFit
         simpa [ExpressionNode.applySubstitution] using leftContains.2
       simpa [ExpressionNode.applySubstitution] using
         uncheckedOperandFits_of_validate check formRaw unchecked requirementsRaw rawLeftMember leftIdRaw
+
+/-- A shift's value and amount have types that its builtin typing takes: the
+value `word` or one of the twelve types, the amount `word` or an unsigned one.
+Finalization establishes it for the finalized source
+(`FinalInferenceResources.shift_operands_fit`). -/
+def SourceShiftOperandsFit (source : TypedSource) : Prop :=
+  ∀ {id left right : ExpressionId} {operator : Syntax.BinaryOp}
+    {node leftNode rightNode : ExpressionNode},
+    ContainsExpression source id node → node.form = .binary left operator right →
+    Detail.isShiftOperator operator = true →
+    ContainsExpression source left leftNode → ContainsExpression source right rightNode →
+    Detail.shiftValueFits leftNode.type = true ∧ Detail.shiftAmountFits rightNode.type = true
+
+/-- One successful shift check gives both operands' fits under the checked
+state's substitution. -/
+theorem shiftOperandFits_of_validate {state : Frontend.SourceInference.State}
+    {node leftNode rightNode : ExpressionNode} {left right : ExpressionId}
+    {operator : Syntax.BinaryOp}
+    (success : Detail.validateShiftOperands state node = .ok ())
+    (form : node.form = .binary left operator right)
+    (shift : Detail.isShiftOperator operator = true)
+    (leftMember : Node.expression leftNode ∈ state.nodes) (leftId : leftNode.id = left)
+    (rightMember : Node.expression rightNode ∈ state.nodes) (rightId : rightNode.id = right) :
+    Detail.shiftValueFits (state.inference.substitution.apply leftNode.type) = true ∧
+      Detail.shiftAmountFits (state.inference.substitution.apply rightNode.type) = true := by
+  simp only [Detail.validateShiftOperands, form, shift, ↓reduceIte] at success
+  split at success
+  · cases success
+  · split at success
+    · cases success
+    · rename_i leftFits rightFits
+      have leftOk : Detail.operandMisfits state left Detail.shiftValueFits
+          (.expression leftNode) = false := by
+        cases misfit : Detail.operandMisfits state left Detail.shiftValueFits (.expression leftNode)
+        · rfl
+        · exact absurd (List.any_eq_true.mpr ⟨_, leftMember, misfit⟩) leftFits
+      have rightOk : Detail.operandMisfits state right Detail.shiftAmountFits
+          (.expression rightNode) = false := by
+        cases misfit : Detail.operandMisfits state right Detail.shiftAmountFits (.expression rightNode)
+        · rfl
+        · exact absurd (List.any_eq_true.mpr ⟨_, rightMember, misfit⟩) rightFits
+      simp only [Detail.operandMisfits, leftId, rightId, decide_true, Bool.true_and,
+        Bool.not_eq_eq_eq_not, Bool.not_false, Frontend.SourceInference.State.resolve,
+        TypeSystem.InferState.resolve] at leftOk rightOk
+      exact ⟨leftOk, rightOk⟩
+
+/-- Finalization checks every shift, so its operands in the finalized source
+have types that its builtin typing takes. -/
+theorem finalize_shiftOperandsFit
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    SourceShiftOperandsFit result.typedSource := by
+  let witness := Detail.finalize_success_witness success
+  have sourceEq : result.typedSource =
+      (witness.finalState.toTypedSource roots).applySubstitution
+        witness.finalState.inference.substitution :=
+    congrArg Frontend.SourceInference.Result.typedSource witness.result_eq
+  intro id left right operator node leftNode rightNode contains form shift leftContains rightContains
+  rw [sourceEq] at contains leftContains rightContains
+  obtain ⟨raw, rawMember, rawEq⟩ := List.mem_map.mp contains.1
+  obtain ⟨rawLeft, rawLeftMember, rawLeftEq⟩ := List.mem_map.mp leftContains.1
+  obtain ⟨rawRight, rawRightMember, rawRightEq⟩ := List.mem_map.mp rightContains.1
+  cases raw with
+  | statement _ => cases rawEq
+  | expression rawNode =>
+    cases rawLeft with
+    | statement _ => cases rawLeftEq
+    | expression rawLeftNode =>
+      cases rawRight with
+      | statement _ => cases rawRightEq
+      | expression rawRightNode =>
+        simp only [Node.applySubstitution, Node.expression.injEq] at rawEq rawLeftEq rawRightEq
+        subst rawEq rawLeftEq rawRightEq
+        have check := (validateExpressionNode_ok
+          (validateAssignmentTargets_member witness.assignmentValidation rawMember)).2
+        have formRaw : rawNode.form = .binary left operator right := by
+          cases rawForm : rawNode.form <;>
+            simp_all [ExpressionNode.applySubstitution, ExpressionForm.applySubstitution]
+        have leftIdRaw : rawLeftNode.id = left := by
+          simpa [ExpressionNode.applySubstitution] using leftContains.2
+        have rightIdRaw : rawRightNode.id = right := by
+          simpa [ExpressionNode.applySubstitution] using rightContains.2
+        simpa [ExpressionNode.applySubstitution] using
+          shiftOperandFits_of_validate check formRaw shift rawLeftMember leftIdRaw
+            rawRightMember rightIdRaw
 
 /-- The reusable whole-body resources exposed by one successful finalization.
 
@@ -26019,6 +26134,8 @@ structure FinalInferenceResources
   /-- Every unchecked operator that waited for a literal operand has a left
   operand that is not `integer`. -/
   unchecked_operands_fit : SourceUncheckedOperandsFit result.typedSource
+  /-- Every shift's value and amount have types that its builtin typing takes. -/
+  shift_operands_fit : SourceShiftOperandsFit result.typedSource
 
 namespace FinalInferenceResources
 
@@ -26072,6 +26189,7 @@ def ofFinalize
       Detail.finalize_localBinderInstantiationNoCapture success
     assignment_targets_fit := finalize_assignmentTargetsFit success
     unchecked_operands_fit := finalize_uncheckedOperandsFit success
+    shift_operands_fit := finalize_shiftOperandsFit success
   }
   · intro ready
     have originsBelow := Detail.finalize_numericOriginsBelowNext success

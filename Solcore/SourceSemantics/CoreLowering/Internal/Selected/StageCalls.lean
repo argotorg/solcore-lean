@@ -1856,7 +1856,7 @@ theorem laws [FunctionCalls.FaultTokens semanticFaults] (budget : Nat) {rootScop
         (children := RecursiveStageTupleMeaning.Entries rootScope [(base, first), (key, second)])
         ⟨rfl, by simp⟩ ⟨rfl, by simp⟩ size
         (fun child smaller => childMeaning.2 child (Nat.le_trans (Nat.le_of_lt smaller) within)) childMeaning.1
-  | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
       intro reached directHeads methodHeads indexReady indirectHeads
       refine ⟨preserves bridge receiver functions runtime unique observations functionTypes indexObservations extension semantic
         sameLedger runtimeLedger uninitializedOn (.binary metadata form leftFound rightFound leftType rightType outputType binaryProfile first second) reached

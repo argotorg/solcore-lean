@@ -1530,7 +1530,10 @@ private theorem binary_primitive_substitution {context target : SourceSemantics.
       (substitution.apply right) (substitution.apply result) requirements := by
   cases typed with
   | wordArithmetic kind => exact .wordArithmetic kind
-  | wordShift kind => exact .wordShift kind
+  | wordShift kind amount =>
+      cases amount with
+      | word => exact .wordShift kind .word
+      | unsigned unsigned => exact .wordShift kind (.unsigned unsigned)
   | wordUnchecked kind => exact .wordUnchecked kind
   | integerArithmetic kind => exact .integerArithmetic kind
   | wordComparison kind => exact .wordComparison kind
@@ -1541,6 +1544,10 @@ private theorem binary_primitive_substitution {context target : SourceSemantics.
   | fixedArithmetic kind => exact .fixedArithmetic kind
   | fixedDivision kind => exact .fixedDivision kind
   | fixedUnchecked kind => exact .fixedUnchecked kind
+  | fixedShift kind amount =>
+      cases amount with
+      | word => exact .fixedShift kind .word
+      | unsigned unsigned => exact .fixedShift kind (.unsigned unsigned)
   | booleanAnd => exact .booleanAnd
   | booleanOr => exact .booleanOr
   | trait dispatch profile evidence =>
@@ -1697,6 +1704,9 @@ theorem binaryOperatorInferenceCase_hasType_in_active
         (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (uncheckedFits : Detail.isUncheckedOperator operator = true → result.requirements = [] →
       later.inference.substitution.apply left ≠ .integer)
+    (shiftFits : Detail.isShiftOperator operator = true →
+      Detail.shiftValueFits (later.inference.substitution.apply left) = true ∧
+        Detail.shiftAmountFits (later.inference.substitution.apply right) = true)
     (catalog : SignatureCatalogWellFormed active.signatures)
     (signaturesEq : active.signatures = inferenceContext.signatures)
     (operatorNames : OperatorNamesAt inferenceContext.signatures solved result.requirements
@@ -1736,6 +1746,20 @@ theorem binaryOperatorInferenceCase_hasType_in_active
       have mapped :=
         binary_primitive_substitution (target := active) (substitution := later.inference.substitution) rfl typing
       simpa only [resolvedLeftEq, resolvedRightEq] using mapped
+  | shift shift requirementsEq typeEq =>
+      have fits := shiftFits shift
+      have resultEq : later.inference.substitution.apply result.type =
+          later.inference.substitution.apply left := by
+        rw [typeEq]
+        exact resolvedLeftEq
+      rw [resultEq, requirementsEq]
+      have kind := shiftBinaryOperator_of_isShiftOperator shift
+      have amount := shiftAmountType_of_fits fits.2
+      rcases shiftValue_of_fits fits.1 with valueWord | ⟨type, valueFixed⟩
+      · rw [valueWord]
+        exact .wordShift kind amount
+      · rw [valueFixed]
+        exact .fixedShift kind amount
   | literalFallback requirementsEq operandsEq typeEq fallback notShift notUnchecked =>
       have finalOperandsEq :
           later.inference.substitution.apply left =
@@ -2161,16 +2185,6 @@ theorem inferUnaryOperator_recordExpressionWithExpected_typing_from_interfaces
       activeSignaturesEq activeRequirementsEq assumptionsMono covered
 
 
-private theorem binaryOperatorHasType_operand_types_eq
-    {context : SourceSemantics.Context} {operator : Syntax.BinaryOp}
-    {left right result : TypeSystem.Ty}
-    {requirements : List RequirementId}
-    (typing : BinaryOperatorHasType context operator left right result
-      requirements) :
-    left = right := by
-  cases typing <;> rfl
-
-
 theorem inferBinaryOperator_recordExpressionWithExpected_typing_from_interfaces
     {inferenceContext solverContext : Frontend.SourceInference.Context}
     {expression : Syntax.Expr} {id : ExpressionId}
@@ -2204,6 +2218,9 @@ theorem inferBinaryOperator_recordExpressionWithExpected_typing_from_interfaces
         (later.inference.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier)
     (uncheckedFits : Detail.isUncheckedOperator operator = true → inferred.requirements = [] →
       later.inference.substitution.apply left.type ≠ .integer)
+    (shiftFits : Detail.isShiftOperator operator = true →
+      Detail.shiftValueFits (later.inference.substitution.apply left.type) = true ∧
+        Detail.shiftAmountFits (later.inference.substitution.apply right.type) = true)
     (substitutionExtends :
       later.inference.substitution.SemanticallyExtends
         result.2.inference.substitution)
@@ -2278,35 +2295,20 @@ theorem inferBinaryOperator_recordExpressionWithExpected_typing_from_interfaces
     binaryOperatorInferenceCase_hasType_in_active inferenceCase
       operatorProperties.1 inferredSubstitutionExtends
       inferredRequirementsSubset
-      integerLiteralTargetsSupported uncheckedFits activeCatalog signaturesEq
+      integerLiteralTargetsSupported uncheckedFits shiftFits activeCatalog signaturesEq
       operatorNames solveSuccess solvedEq ledger ownership
       activeSignaturesEq activeRequirementsEq assumptionsMono covered
       operatorRequirementsOccur
-  have operandTypesEq :
-      later.inference.substitution.apply left.type =
-        later.inference.substitution.apply right.type :=
-    binaryOperatorHasType_operand_types_eq operatorType
-  have rightTypeAsLeft : ExpressionHasType semanticSource active right.id
-      (later.inference.substitution.apply left.type) := by
-    rw [operandTypesEq]
-    exact rightType
-  have operatorTypeAsLeft : BinaryOperatorHasType active operator
-      (later.inference.substitution.apply left.type)
-      (later.inference.substitution.apply left.type)
-      (later.inference.substitution.apply inferred.type)
-      inferred.requirements := by
-    rwa [← operandTypesEq] at operatorType
   have formType : ExpressionFormHasRawType semanticSource active
       ((ExpressionForm.binary left.id operator right.id).applySubstitution
         later.inference.substitution)
       (later.inference.substitution.apply inferred.type)
       (.ordinary inferred.requirements) := by
     simpa [ExpressionForm.applySubstitution] using
-      (ExpressionFormHasRawType.binary leftType rightTypeAsLeft
-        operatorTypeAsLeft)
+      (ExpressionFormHasRawType.binary leftType rightType operatorType)
   have rawAdmissible : TypeAdmissible active
       (later.inference.substitution.apply inferred.type) :=
-    operatorTypeAsLeft.result_type_admissible activeCatalog activeBinders
+    operatorType.result_type_admissible_of_left activeCatalog activeBinders
       leftType.type_admissible
   exact
     recordExpressionWithExpected_success_ordinaryExpressionTypingBase_from_interfaces

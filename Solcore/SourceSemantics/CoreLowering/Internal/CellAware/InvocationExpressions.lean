@@ -1966,7 +1966,7 @@ theorem preserves_at_selected [RecursiveStageMeaning.FaultTokens faults] (budget
           rw [inputType] at payload
           obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
           exact False.elim (failed.excludes_value applied)
-    | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
+    | @binary node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
       have same := Option.some.inj (metadata.found.symm.trans found)
       subst root
       have leftIH := fun n (bound : n < budget) => @meaning n bound _ _ _ leftTree _ leftFound
@@ -2182,7 +2182,7 @@ theorem reflects_at_selected [RecursiveStageMeaning.FaultTokens faults] (budget 
           have childTrace := trace
           exact ⟨_, _, after, finalMap, finalWorld, .unary occurrence childTrace applied,
             .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, effect, ⟨reached, related⟩⟩
-    | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
+    | @binary node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
       have same := Option.some.inj (metadata.found.symm.trans found)
       subst root
       have leftIH := fun n (bound : n < budget) => @meaning n bound _ _ _ leftTree _ leftFound

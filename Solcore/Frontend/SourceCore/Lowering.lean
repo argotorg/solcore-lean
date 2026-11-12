@@ -1224,8 +1224,9 @@ def signedOrdering : Option TypeSystem.Ty → Syntax.BinaryOp → Bool
   | _, _ => false
 
 /-- The fixed-width integer type at which a binary operator on operands of the
-given static type is the type's own arithmetic, if any: checked `+ - * / %`, and
-unchecked `+ - * / %`, which wrap to the type's width. -/
+given static type is the type's own arithmetic, if any: checked `+ - * / %`,
+unchecked `+ - * / %`, which wrap to the type's width, and the shifts of a value
+of the type, which keep its width. -/
 def checkedArithmetic : Option TypeSystem.Ty → Syntax.BinaryOp → Option TypeSystem.FixedInteger
   | some (.constructor (.builtin (.fixed type))), .add
   | some (.constructor (.builtin (.fixed type))), .subtract
@@ -1236,13 +1237,16 @@ def checkedArithmetic : Option TypeSystem.Ty → Syntax.BinaryOp → Option Type
   | some (.constructor (.builtin (.fixed type))), .uncheckedSubtract
   | some (.constructor (.builtin (.fixed type))), .uncheckedMultiply
   | some (.constructor (.builtin (.fixed type))), .uncheckedDivide
-  | some (.constructor (.builtin (.fixed type))), .uncheckedModulo => some type
+  | some (.constructor (.builtin (.fixed type))), .uncheckedModulo
+  | some (.constructor (.builtin (.fixed type))), .shiftLeft
+  | some (.constructor (.builtin (.fixed type))), .shiftRight => some type
   | _, _ => none
 
 /-- How a requirement-free binary node lowers: Integer's operations when its
 left operand is an Integer, the arithmetic of a fixed-width integer type
-(`checked`: checked `+ - * / %` and unchecked `+ - * / %`, which wrap) and the
-signed orderings on the fixed-width integer types, and Word's otherwise. -/
+(`checked`: checked `+ - * / %`, unchecked `+ - * / %`, which wrap, and the
+shifts, which keep the type's width) and the signed orderings on the fixed-width
+integer types, and Word's otherwise. -/
 inductive BinaryLowering where
   | word
   | integer
@@ -1374,10 +1378,25 @@ def uncheckedDivisionBody (type : TypeSystem.FixedInteger) (operator : Syntax.Bi
         (.letE (truncatedDivision (uncheckedDivisionOperator operator))
           (Core.LanguageResult.success (.unary .integerToWord (fixedWrapInteger type (.var 0)))))))
 
+/-- `<<` on a fixed-width integer type, under the amount's payload, the value's
+payload and the outer scope: Word's shift, then the low `N` bits read at the type
+(`fixedWrapInteger` of the shifted word's Integer), as upstream's `std` masks an
+unsigned result and sign-extends a signed one. -/
+def shiftLeftBody (type : TypeSystem.FixedInteger) : Core.Expr :=
+  Core.LanguageResult.success (.unary .integerToWord (fixedWrapInteger type
+    (fixedInteger type.signed (.binary .wordShl (.var 1) (.var 0)))))
+
+/-- `>>` on a fixed-width integer type, under the amount's payload, the value's
+payload and the outer scope: Word's shift on an unsigned type, the arithmetic
+shift on a signed one, which keep a canonical word canonical. -/
+def shiftRightBody (type : TypeSystem.FixedInteger) : Core.Expr :=
+  Core.LanguageResult.success
+    (.binary (if type.signed then .wordSar else .wordShr) (.var 1) (.var 0))
+
 /-- The arithmetic of a fixed-width integer type evaluates both operands, then
 runs its body: checked `+ - *` the checked body, checked `/ %` the division
-body, and unchecked `+ - * / %` the wrapping bodies; every other operator lowers
-as Word's. -/
+body, unchecked `+ - * / %` the wrapping bodies, and the shifts their shift
+bodies; every other operator lowers as Word's. -/
 def checkedBinary (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) (left right : Core.Expr) :
     Core.Expr :=
   match operator with
@@ -1393,6 +1412,12 @@ def checkedBinary (type : TypeSystem.FixedInteger) (operator : Syntax.BinaryOp) 
   | .uncheckedDivide | .uncheckedModulo =>
       Core.LanguageResult.bind .word left
         (Core.LanguageResult.bind .word (right.weakenAt 0) (uncheckedDivisionBody type operator))
+  | .shiftLeft =>
+      Core.LanguageResult.bind .word left
+        (Core.LanguageResult.bind .word (right.weakenAt 0) (shiftLeftBody type))
+  | .shiftRight =>
+      Core.LanguageResult.bind .word left
+        (Core.LanguageResult.bind .word (right.weakenAt 0) (shiftRightBody type))
   | _ => binary operator left right
 
 theorem fixedInteger_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
@@ -1479,6 +1504,20 @@ theorem uncheckedDivisionBody_hasType {definitions : Core.DataEnvironment} {scop
         (.letE (truncatedDivision_hasType _)
           (Core.LanguageResult.success_hasType (.unary (fixedWrapInteger_hasType (.var rfl)))))))
 
+theorem shiftLeftBody_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    (type : TypeSystem.FixedInteger) :
+    Core.HasType (.word :: .word :: scope) (shiftLeftBody type)
+      (Core.LanguageResult.resultType .word) definitions :=
+  Core.LanguageResult.success_hasType
+    (.unary (fixedWrapInteger_hasType (fixedInteger_hasType (.binary (.var rfl) (.var rfl)))))
+
+theorem shiftRightBody_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
+    (type : TypeSystem.FixedInteger) :
+    Core.HasType (.word :: .word :: scope) (shiftRightBody type)
+      (Core.LanguageResult.resultType .word) definitions := by
+  unfold shiftRightBody
+  split <;> exact Core.LanguageResult.success_hasType (.binary (.var rfl) (.var rfl))
+
 theorem checkedBinary_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
     {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp} {left right : Core.Expr}
     (leftTyped : Core.HasType scope left (Core.LanguageResult.resultType (binaryOperandType operator)) definitions)
@@ -1529,11 +1568,25 @@ theorem checkedBinary_hasType {definitions : Core.DataEnvironment} {scope : Core
     apply Core.LanguageResult.bind_hasType .word
     · simpa [Core.Context.insertAt] using rightWord.weakenAt (inserted := .word) 0
     · exact uncheckedDivisionBody_hasType type operator
+  have shifted : ∀ {body : Core.Expr},
+      Core.HasType (.word :: .word :: scope) body (Core.LanguageResult.resultType .word) definitions →
+      Core.HasType scope left (Core.LanguageResult.resultType .word) definitions →
+      Core.HasType scope right (Core.LanguageResult.resultType .word) definitions →
+      Core.HasType scope (Core.LanguageResult.bind .word left
+        (Core.LanguageResult.bind .word (right.weakenAt 0) body))
+        (Core.LanguageResult.resultType .word) definitions := by
+    intro body bodyTyped leftWord rightWord
+    apply Core.LanguageResult.bind_hasType .word leftWord
+    apply Core.LanguageResult.bind_hasType .word
+    · simpa [Core.Context.insertAt] using rightWord.weakenAt (inserted := .word) 0
+    · exact bodyTyped
   cases operator <;> first
     | exact checked leftTyped rightTyped
     | exact division leftTyped rightTyped
     | exact unchecked leftTyped rightTyped
     | exact uncheckedDivision leftTyped rightTyped
+    | exact shifted (shiftLeftBody_hasType type) leftTyped rightTyped
+    | exact shifted (shiftRightBody_hasType type) leftTyped rightTyped
     | exact binary_hasType leftTyped rightTyped
 
 /-- Renaming leaves the checked body alone: it reads only its two payloads. -/
@@ -1566,6 +1619,43 @@ theorem uncheckedDivisionBody_rename (type : TypeSystem.FixedInteger) (operator 
       uncheckedDivisionBody type operator := by
   unfold uncheckedDivisionBody uncheckedDivisionOperator truncatedDivision magnitude fixedWrapInteger fixedInteger
   cases type.signed <;> cases operator <;> rfl
+
+/-- Renaming leaves the `<<` body alone: it reads only its two payloads. -/
+theorem shiftLeftBody_rename (type : TypeSystem.FixedInteger) (ξ : Core.Renaming) :
+    (shiftLeftBody type).rename (Core.Renaming.lift (Core.Renaming.lift ξ)) = shiftLeftBody type := by
+  unfold shiftLeftBody fixedWrapInteger fixedInteger
+  cases type.signed <;> rfl
+
+/-- Renaming leaves the `>>` body alone: it reads only its two payloads. -/
+theorem shiftRightBody_rename (type : TypeSystem.FixedInteger) (ξ : Core.Renaming) :
+    (shiftRightBody type).rename (Core.Renaming.lift (Core.Renaming.lift ξ)) = shiftRightBody type := by
+  unfold shiftRightBody
+  cases type.signed <;> rfl
+
+/-- An operand that fails first makes a shift on a fixed-width integer type fail
+the same way. -/
+theorem checkedBinary_left_failure_shift {environment : Core.Environment}
+    {before after : Core.Store} {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+    {left right : Core.Expr} {reason : Core.Word}
+    (shift : operator = .shiftLeft ∨ operator = .shiftRight)
+    (evaluation : Core.Evaluates environment before left (.inLeft .word (.word reason)) after) :
+    Core.Evaluates environment before (checkedBinary type operator left right)
+      (.inLeft .word (.word reason)) after := by
+  rcases shift with rfl | rfl <;> exact Core.LanguageResult.bind_failure _ evaluation
+
+/-- A right operand that fails after the left one makes a shift on a fixed-width
+integer type fail the same way. -/
+theorem checkedBinary_right_failure_shift {environment : Core.Environment}
+    {before middle after : Core.Store} {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
+    {left right : Core.Expr} {leftValue : Core.Value} {reason : Core.Word}
+    (shift : operator = .shiftLeft ∨ operator = .shiftRight)
+    (leftEvaluation : Core.Evaluates environment before left (.inRight .word leftValue) middle)
+    (rightEvaluation : Core.Evaluates (leftValue :: environment) middle (right.weakenAt 0)
+      (.inLeft .word (.word reason)) after) :
+    Core.Evaluates environment before (checkedBinary type operator left right)
+      (.inLeft .word (.word reason)) after := by
+  rcases shift with rfl | rfl <;>
+    exact Core.LanguageResult.bind_success _ leftEvaluation (Core.LanguageResult.bind_failure _ rightEvaluation)
 
 /-- An operand that fails first makes unchecked `+ - * / %` fail the same way. -/
 theorem checkedBinary_left_failure_unchecked {environment : Core.Environment}

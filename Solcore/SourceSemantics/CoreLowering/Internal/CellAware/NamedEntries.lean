@@ -804,7 +804,7 @@ theorem preserves_tree_selected [FunctionCalls.FaultTokens readFaults]
     exact CellAwareScopeOperatorBounds.preserves_at_selected bridge functionModel size size (Nat.le_refl _)
       unique selectedBodies runtime covers children
       (.unary metadata form childFound inputType outputType operatorProfile ⟨rfl, rfl, rfl⟩)
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode
       metadata form leftFound rightFound leftType rightType outputType operatorProfile leftTree rightTree leftIH rightIH =>
     have children : PreservesBelow bridge context valueModel named stages invocation
         (Two scope left right ⟨mode.operandType operator, leftCode⟩ ⟨mode.operandType operator, rightCode⟩) callFaults size := by
@@ -922,7 +922,7 @@ theorem reflects_tree_selected [FunctionCalls.FaultTokens readFaults]
     exact CellAwareScopeOperatorBounds.reflects_at_selected bridge functionModel size size (Nat.le_refl _)
       unique selectedBodies runtime covers children
       (.unary metadata form childFound inputType outputType operatorProfile ⟨rfl, rfl, rfl⟩)
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode
       metadata form leftFound rightFound leftType rightType outputType operatorProfile leftTree rightTree leftIH rightIH =>
     have children : ReflectsBelow bridge context valueModel named stages invocation
         (Two scope left right ⟨mode.operandType operator, leftCode⟩ ⟨mode.operandType operator, rightCode⟩) callFaults size := by
@@ -1986,7 +1986,7 @@ theorem tree_selected {rootFuel : Nat} {scope : SourceCoreLocalCell.Scope} {id :
       (childCode := ⟨core.operandType, childCode⟩)
       metadata form unique childFound (children := Point _ operand ⟨core.operandType, childCode⟩)
       ⟨rfl, rfl, rfl⟩ (fun childSize _smaller => ih childSize) ⟨rfl, rfl, rfl⟩
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode
       metadata form leftFound rightFound leftType rightType outputType operatorProfile leftTree rightTree leftIH rightIH =>
     have children : ∀ childSize, childSize < size → LiftsAt bridge context model named stages invocation
         (Two scope left right ⟨mode.operandType operator, leftCode⟩ ⟨mode.operandType operator, rightCode⟩) childSize := by

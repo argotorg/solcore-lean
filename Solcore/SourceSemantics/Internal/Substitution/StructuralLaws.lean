@@ -3457,7 +3457,10 @@ theorem BinaryOperatorHasType.applyParameters
       (substitution.apply result) requirements := by
   cases typing with
   | wordArithmetic kind => exact .wordArithmetic kind
-  | wordShift kind => exact .wordShift kind
+  | wordShift kind amount =>
+      cases amount with
+      | word => exact .wordShift kind .word
+      | unsigned unsigned => exact .wordShift kind (.unsigned unsigned)
   | wordUnchecked kind => exact .wordUnchecked kind
   | integerArithmetic kind => exact .integerArithmetic kind
   | wordComparison kind => exact .wordComparison kind
@@ -3468,6 +3471,10 @@ theorem BinaryOperatorHasType.applyParameters
   | fixedArithmetic kind => exact .fixedArithmetic kind
   | fixedDivision kind => exact .fixedDivision kind
   | fixedUnchecked kind => exact .fixedUnchecked kind
+  | fixedShift kind amount =>
+      cases amount with
+      | word => exact .fixedShift kind .word
+      | unsigned unsigned => exact .fixedShift kind (.unsigned unsigned)
   | booleanAnd => exact .booleanAnd
   | booleanOr => exact .booleanOr
   | trait dispatch profile evidence =>
@@ -4986,7 +4993,7 @@ theorem StatementsHaveType.applyParameters
     exact .unary (operandInduction catalog contextValid)
       (StructuralSubstitution.UnaryOperatorHasType.applyParameters catalog
         contextValid operatorType)
-  · intro context operator left right operandType resultType requirements
+  · intro context operator left right leftOperandType rightOperandType resultType requirements
       leftType rightType operatorType leftInduction rightInduction catalog
       contextValid
     exact .binary (leftInduction catalog contextValid)
@@ -6276,8 +6283,31 @@ namespace Solcore.SourceSemantics.BinaryOperatorHasType
 open Frontend.SourceInference
 open TypeSystem
 
-/-- A declaratively valid binary operator preserves admissibility from its
-common operand type to its result, including trait-backed overloads. -/
+/-- A declaratively valid binary operator preserves admissibility from its left
+operand's type to its result, including trait-backed overloads: a shift's result
+has its value's type, and every other operator's operands share a type. -/
+theorem result_type_admissible_of_left
+    {context : Context} {operator : Syntax.BinaryOp}
+    {left right result : Ty} {requirements : List RequirementId}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (binders : TypeParameterBindersWellFormed context)
+    (leftAdmissible : TypeAdmissible context left)
+    (typing : BinaryOperatorHasType context operator left right result
+      requirements) :
+    TypeAdmissible context result := by
+  cases typing with
+  | wordArithmetic | wordShift | wordUnchecked => exact TypeAdmissible.word binders
+  | integerArithmetic => exact TypeAdmissible.integer binders
+  | wordComparison | integerComparison | fixedComparison | fixedSignedComparison =>
+      exact TypeAdmissible.bool binders
+  | fixedBitwise | fixedArithmetic | fixedDivision | fixedUnchecked | fixedShift =>
+      exact TypeAdmissible.fixed binders _
+  | booleanAnd | booleanOr => exact TypeAdmissible.bool binders
+  | trait _ profile _ =>
+      exact profile.return_types_admissible catalog binders leftAdmissible
+        result (by simp)
+
+/-- The one-type form, for the operators whose operands share a type. -/
 theorem result_type_admissible
     {context : Context} {operator : Syntax.BinaryOp}
     {operand result : Ty} {requirements : List RequirementId}
@@ -6286,17 +6316,8 @@ theorem result_type_admissible
     (operandAdmissible : TypeAdmissible context operand)
     (typing : BinaryOperatorHasType context operator operand operand result
       requirements) :
-    TypeAdmissible context result := by
-  cases typing with
-  | wordArithmetic | wordShift | wordUnchecked => exact TypeAdmissible.word binders
-  | integerArithmetic => exact TypeAdmissible.integer binders
-  | wordComparison | integerComparison | fixedComparison | fixedSignedComparison =>
-      exact TypeAdmissible.bool binders
-  | fixedBitwise | fixedArithmetic | fixedDivision | fixedUnchecked => exact TypeAdmissible.fixed binders _
-  | booleanAnd | booleanOr => exact TypeAdmissible.bool binders
-  | trait _ profile _ =>
-      exact profile.return_types_admissible catalog binders operandAdmissible
-        result (by simp)
+    TypeAdmissible context result :=
+  result_type_admissible_of_left catalog binders operandAdmissible typing
 
 end Solcore.SourceSemantics.BinaryOperatorHasType
 
@@ -11328,7 +11349,10 @@ theorem BinaryOperatorHasType.applySubstitution
       (substitution.apply right) (substitution.apply result) requirements := by
   cases typing with
   | wordArithmetic kind => exact .wordArithmetic kind
-  | wordShift kind => exact .wordShift kind
+  | wordShift kind amount =>
+      cases amount with
+      | word => exact .wordShift kind .word
+      | unsigned unsigned => exact .wordShift kind (.unsigned unsigned)
   | wordUnchecked kind => exact .wordUnchecked kind
   | integerArithmetic kind => exact .integerArithmetic kind
   | wordComparison kind => exact .wordComparison kind
@@ -11339,6 +11363,10 @@ theorem BinaryOperatorHasType.applySubstitution
   | fixedArithmetic kind => exact .fixedArithmetic kind
   | fixedDivision kind => exact .fixedDivision kind
   | fixedUnchecked kind => exact .fixedUnchecked kind
+  | fixedShift kind amount =>
+      cases amount with
+      | word => exact .fixedShift kind .word
+      | unsigned unsigned => exact .fixedShift kind (.unsigned unsigned)
   | booleanAnd => exact .booleanAnd
   | booleanOr => exact .booleanOr
   | trait dispatch profile evidence =>
@@ -12247,7 +12275,7 @@ theorem StatementsHaveType.applySubstitution
       contextValid
     exact .unary (operandInduction targetContext catalog contextValid)
       (UnaryOperatorHasType.applySubstitution catalog contextValid operatorType)
-  · intro context operator left right operandType resultType requirements
+  · intro context operator left right leftOperandType rightOperandType resultType requirements
       leftType rightType operatorType leftInduction rightInduction targetContext
       catalog contextValid
     exact .binary (leftInduction targetContext catalog contextValid)

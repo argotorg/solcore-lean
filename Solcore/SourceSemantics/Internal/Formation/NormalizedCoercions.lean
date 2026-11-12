@@ -1256,10 +1256,9 @@ theorem inferBinaryOperator_normalized_issuance
   let openLiteral := Detail.isOpenIntegerLiteralTarget state integerLiterals left ||
     Detail.isOpenIntegerLiteralTarget state integerLiterals right
   by_cases shift : Detail.isShiftOperator operator = true
-  · obtain ⟨_, _, valued, valueResult, amountResult⟩ :=
-      Detail.inferBinaryOperator_shift_result shift accepted
+  · obtain ⟨_, _, stateEq⟩ := Detail.inferBinaryOperator_shift_result shift accepted
     intro row member fresh
-    rw [unify_requirements amountResult, unify_requirements valueResult] at member
+    rw [stateEq] at member
     exact absurd member fresh
   by_cases unchecked : Detail.isUncheckedOperator operator = true
   · obtain ⟨unifiedState, prepared, unified, prepare, tailSuccess⟩ :=

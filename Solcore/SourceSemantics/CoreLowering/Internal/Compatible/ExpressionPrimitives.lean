@@ -356,6 +356,16 @@ theorem fixed_fields {sourceType : TypeSystem.Ty} {type : TypeSystem.FixedIntege
       cases view
   | nil | cons | empty | entry | absent | present => trivial
 
+/-- A shift amount's value is a Word, whatever its shift-amount type. -/
+theorem amount_word_fields {amount : TypeSystem.Ty} (amountType : ShiftAmountType amount)
+    (represented : ValueRep checked registry functions mapping world amount source value .word) :
+    ∃ word, source = .word word ∧ value = .word word := by
+  cases amountType with
+  | word => exact word_fields represented
+  | unsigned _ =>
+    obtain ⟨word, rfl, rfl, _, _⟩ := fixed_fields represented rfl
+    exact ⟨word, rfl, rfl⟩
+
 /-- Empty evidence admits exactly these scalar unary profiles, each with the
 compiler's lowering choice. -/
 inductive UnaryProfile : Syntax.UnaryOp → TypeSystem.Ty → TypeSystem.Ty →
@@ -490,56 +500,68 @@ def scalarSource : Ty → TypeSystem.Ty
   | .integer => .integer
   | _ => .unit
 
-inductive BinaryProfile : Syntax.BinaryOp → TypeSystem.Ty → TypeSystem.Ty → Mode → Prop where
+inductive BinaryProfile : Syntax.BinaryOp → TypeSystem.Ty → TypeSystem.Ty → TypeSystem.Ty → Mode →
+    Prop where
   | word {operator} (strict : Dynamic.StrictBinaryOperator operator) :
-      BinaryProfile operator .word (scalarSource (SourceCorePrimitive.binaryResultType operator)) .word
+      BinaryProfile operator .word .word (scalarSource (SourceCorePrimitive.binaryResultType operator)) .word
   | integer {operator} (strict : Dynamic.IntegerStrictBinaryOperator operator) :
-      BinaryProfile operator .integer (scalarSource (SourceCoreInteger.binaryResultType operator)) .integer
+      BinaryProfile operator .integer .integer (scalarSource (SourceCoreInteger.binaryResultType operator)) .integer
   /-- Unchecked `/` and `%` on Words, which panic on a zero divisor. -/
   | panicking {operator} (panicking : Dynamic.PanickingBinaryOperator operator) :
-      BinaryProfile operator .word .word .word
-  | logicalAnd : BinaryProfile .logicalAnd .bool .bool .word
-  | logicalOr : BinaryProfile .logicalOr .bool .bool .word
+      BinaryProfile operator .word .word .word .word
+  | logicalAnd : BinaryProfile .logicalAnd .bool .bool .bool .word
+  | logicalOr : BinaryProfile .logicalOr .bool .bool .bool .word
   /-- Comparisons on a fixed-width integer type that are Word's on its
   canonical words. -/
   | fixedComparison {operator} {type : TypeSystem.FixedInteger}
       (kind : FixedWordComparison type operator) :
-      BinaryProfile operator (.fixed type) .bool .word
+      BinaryProfile operator (.fixed type) (.fixed type) .bool .word
   /-- Bitwise operators on a fixed-width integer type, which are Word's and
   keep words canonical. -/
   | fixedBitwise {operator} {type : TypeSystem.FixedInteger}
       (kind : FixedWordBitwise type operator) :
-      BinaryProfile operator (.fixed type) (.fixed type) .word
+      BinaryProfile operator (.fixed type) (.fixed type) (.fixed type) .word
   /-- The orderings on a signed fixed-width integer type, which compare
   signed. -/
   | fixedSigned {operator} {type : TypeSystem.FixedInteger}
       (kind : FixedSignedComparison type operator) :
-      BinaryProfile operator (.fixed type) .bool .signed
+      BinaryProfile operator (.fixed type) (.fixed type) .bool .signed
   /-- Checked `+ - *` on a fixed-width integer type. -/
   | fixedChecked {operator} {type : TypeSystem.FixedInteger}
       (kind : FixedCheckedArithmetic operator) :
-      BinaryProfile operator (.fixed type) (.fixed type) (.checked type)
+      BinaryProfile operator (.fixed type) (.fixed type) (.fixed type) (.checked type)
   /-- Checked `/ %` on a fixed-width integer type. -/
   | fixedDivision {operator} {type : TypeSystem.FixedInteger}
       (kind : FixedCheckedDivision operator) :
-      BinaryProfile operator (.fixed type) (.fixed type) (.checked type)
+      BinaryProfile operator (.fixed type) (.fixed type) (.fixed type) (.checked type)
   /-- Unchecked `+ - *` on a fixed-width integer type, which wrap. -/
   | fixedUnchecked {operator} {type : TypeSystem.FixedInteger}
       (kind : FixedUncheckedArithmetic operator) :
-      BinaryProfile operator (.fixed type) (.fixed type) (.checked type)
+      BinaryProfile operator (.fixed type) (.fixed type) (.fixed type) (.checked type)
   /-- Unchecked `/ %` on a fixed-width integer type, which wrap and panic on a
   zero divisor. -/
   | fixedUncheckedDivision {operator} {type : TypeSystem.FixedInteger}
       (kind : FixedUncheckedDivision operator) :
-      BinaryProfile operator (.fixed type) (.fixed type) (.checked type)
+      BinaryProfile operator (.fixed type) (.fixed type) (.fixed type) (.checked type)
+  /-- A shift of a Word by an amount of any shift-amount type: Word's shift. -/
+  | wordShift {operator} {amount : TypeSystem.Ty} (kind : ShiftBinaryOperator operator)
+      (amountType : ShiftAmountType amount) :
+      BinaryProfile operator .word amount .word .word
+  /-- A shift of a fixed-width integer value by an amount of any shift-amount
+  type, through the type's shift bodies. -/
+  | fixedShift {operator} {type : TypeSystem.FixedInteger} {amount : TypeSystem.Ty}
+      (kind : ShiftBinaryOperator operator) (amountType : ShiftAmountType amount) :
+      BinaryProfile operator (.fixed type) amount (.fixed type) (.checked type)
 
 theorem BinaryProfile.of_typing {context : SourceSemantics.Context} {operator : Syntax.BinaryOp}
-    {operand result : TypeSystem.Ty} (typed : BinaryOperatorHasType context operator operand operand result []) :
-    ∃ mode, BinaryProfile operator operand result mode := by
+    {operand amount result : TypeSystem.Ty}
+    (typed : BinaryOperatorHasType context operator operand amount result []) :
+    ∃ mode, BinaryProfile operator operand amount result mode := by
   cases typed with
   | wordArithmetic kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
   | wordComparison kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
-  | wordShift kind => cases kind <;> exact ⟨_, .word (by constructor)⟩
+  | wordShift kind amountType => exact ⟨_, .wordShift kind amountType⟩
+  | fixedShift kind amountType => exact ⟨_, .fixedShift kind amountType⟩
   | wordUnchecked kind =>
     cases kind <;> first | exact ⟨_, .word (by constructor)⟩ | exact ⟨_, .panicking (by constructor)⟩
   | integerArithmetic kind => cases kind <;> exact ⟨_, .integer (by constructor)⟩
@@ -1304,14 +1326,14 @@ inductive Tree (fuel : Nat) (values : ValuesContext) (source : TypedSource)
       (child : Tree fuel values source context solved reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Tree fuel values source context solved reasonAt scope id
         ⟨core.resultType, core.lower childCode⟩
-  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary {id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       (metadata : Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
       (leftFound : source.lookupExpression? left = some leftNode)
       (rightFound : source.lookupExpression? right = some rightNode)
-      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = amountType)
       (outputType : node.type = resultType)
-      (profile : BinaryProfile operator operandType resultType mode)
+      (profile : BinaryProfile operator operandType amountType resultType mode)
       (first : Tree fuel values source context solved reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
       (second : Tree fuel values source context solved reasonAt scope right ⟨mode.operandType operator, rightCode⟩) :
       Tree fuel values source context solved reasonAt scope id
@@ -1356,9 +1378,9 @@ theorem binary_source_types {source : TypedSource} {context : SourceSemantics.Co
     (form : node.form = .binary left operator right) (coercions : node.coercions = [])
     (requirements : node.requirements = []) (typed : ExpressionHasType source context id node.type) :
     ∃ leftNode rightNode mode, source.lookupExpression? left = some leftNode ∧
-      source.lookupExpression? right = some rightNode ∧ leftNode.type = rightNode.type ∧
+      source.lookupExpression? right = some rightNode ∧
       ExpressionHasType source context left leftNode.type ∧ ExpressionHasType source context right rightNode.type ∧
-      BinaryProfile operator leftNode.type node.type mode := by
+      BinaryProfile operator leftNode.type rightNode.type node.type mode := by
   generalize typeEq : node.type = type at typed
   cases typed with
   | @intro _ _ actualNode rawType plan contains raw _ _ _ valid =>
@@ -1379,9 +1401,10 @@ theorem binary_source_types {source : TypedSource} {context : SourceSemantics.Co
         obtain ⟨leftNode, leftContains, leftType⟩ := first.stored_type
         obtain ⟨rightNode, rightContains, rightType⟩ := second.stored_type
         obtain ⟨mode, profile⟩ := BinaryProfile.of_typing operatorTyped
-        exact ⟨leftNode, rightNode, mode, lookupExpression?_complete unique leftContains,
-          lookupExpression?_complete unique rightContains, leftType.trans rightType.symm,
-          leftType ▸ first, rightType ▸ second, leftType ▸ (resultEq ▸ profile)⟩
+        refine ⟨leftNode, rightNode, mode, lookupExpression?_complete unique leftContains,
+          lookupExpression?_complete unique rightContains, leftType ▸ first, rightType ▸ second, ?_⟩
+        rw [leftType, rightType]
+        exact profile
 
 
 private theorem product_projection {fuel : Nat} {values : ValuesContext} {source : TypedSource}
@@ -1449,6 +1472,8 @@ def Mode.continuation (mode : Mode) (operator : Syntax.BinaryOp) : Expr :=
       SourceCorePrimitive.uncheckedBody type operator
   | .checked type, .uncheckedDivide | .checked type, .uncheckedModulo =>
       SourceCorePrimitive.uncheckedDivisionBody type operator
+  | .checked type, .shiftLeft => SourceCorePrimitive.shiftLeftBody type
+  | .checked type, .shiftRight => SourceCorePrimitive.shiftRightBody type
   | _, _ => LanguageResult.success (mode.body operator)
 
 def Mode.tail (mode : Mode) (operator : Syntax.BinaryOp) (right : Expr) : Expr :=
@@ -1468,7 +1493,8 @@ theorem Mode.binary_rename (mode : Mode) (operator : Syntax.BinaryOp) (left righ
     simp [Mode.binary, SourceCorePrimitive.binary, SourceCorePrimitive.signedBinary,
       SourceCorePrimitive.checkedBinary, SourceCorePrimitive.checkedBody_rename,
       SourceCorePrimitive.divisionBody_rename, SourceCorePrimitive.uncheckedBody_rename,
-      SourceCorePrimitive.uncheckedDivisionBody_rename,
+      SourceCorePrimitive.uncheckedDivisionBody_rename, SourceCorePrimitive.shiftLeftBody_rename,
+      SourceCorePrimitive.shiftRightBody_rename,
       SourceCorePrimitive.binaryPanicking, SourceCoreInteger.binary,
       LocalPrimitiveResults.binaryWith, LocalPrimitiveResults.logicalAnd, LocalPrimitiveResults.logicalOr,
       LocalControl.choose, LanguageResult.bind, LanguageResult.success, LanguageResult.failure, Expr.rename,
@@ -1479,7 +1505,7 @@ theorem Mode.binary_rename (mode : Mode) (operator : Syntax.BinaryOp) (left righ
 variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
   {ambient : AmbientDefinitions checked.catalog.definitions} {functions : FunctionModel checked.catalog ambient}
   {mapping : LocationMap} {world : StoreTyping} {operator : Syntax.BinaryOp}
-  {operand result : TypeSystem.Ty} {mode : Mode} {a b : Dynamic.Value} {x y : Value}
+  {operand amount result : TypeSystem.Ty} {mode : Mode} {a b : Dynamic.Value} {x y : Value}
 
 theorem _root_.Solcore.SourceSemantics.FixedWordComparison.strict {type : TypeSystem.FixedInteger}
     {operator : Syntax.BinaryOp}
@@ -1534,6 +1560,10 @@ theorem _root_.Solcore.SourceSemantics.FixedCheckedDivision.strict {operator : S
 
 theorem _root_.Solcore.SourceSemantics.FixedUncheckedArithmetic.strict {operator : Syntax.BinaryOp}
     (kind : FixedUncheckedArithmetic operator) : Dynamic.StrictBinaryOperator operator := by
+  cases kind <;> constructor
+
+theorem _root_.Solcore.SourceSemantics.ShiftBinaryOperator.strict {operator : Syntax.BinaryOp}
+    (kind : ShiftBinaryOperator operator) : Dynamic.StrictBinaryOperator operator := by
   cases kind <;> constructor
 
 theorem _root_.Solcore.SourceSemantics.FixedUncheckedDivision.panicking {operator : Syntax.BinaryOp}
@@ -1722,22 +1752,22 @@ theorem division_body_overflow {environment : Environment} {store : Store}
 
 /-- Outside the signed and checked modes, Word's (Integer's, Boolean's) meaning
 applies at the profile's operand type. -/
-theorem BinaryProfile.word_meaning (profile : BinaryProfile operator operand result mode)
+theorem BinaryProfile.word_meaning (profile : BinaryProfile operator operand amount result mode)
     (notSigned : mode ≠ .signed) (notChecked : mode.checkedType? = none) :
     Dynamic.BinaryWordMeaning (some operand) operator := by
   intro type operandEq own
   cases profile with
-  | word | integer | panicking | logicalAnd | logicalOr => cases operandEq
+  | word | integer | panicking | logicalAnd | logicalOr | wordShift => cases operandEq
   | fixedComparison kind =>
     cases operandEq
     cases kind <;> cases own <;> simp_all
   | fixedBitwise kind => cases kind <;> cases own
   | fixedSigned => exact notSigned rfl
-  | fixedChecked | fixedDivision | fixedUnchecked | fixedUncheckedDivision =>
+  | fixedChecked | fixedDivision | fixedUnchecked | fixedUncheckedDivision | fixedShift =>
     simp [Mode.checkedType?] at notChecked
 
 
-theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand result mode)
+theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand amount result mode)
     (represented : ValueRep checked registry functions mapping world operand a x (mode.operandType operator)) :
     (∃ output, Dynamic.ShortCircuits operator a output) ∨ Dynamic.EvaluatesRightOperand operator a := by
   cases profile with
@@ -1751,6 +1781,7 @@ theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand re
   | fixedDivision kind => exact .inr (.strict kind.strict)
   | fixedUnchecked kind => exact .inr (.strict kind.strict)
   | fixedUncheckedDivision kind => exact .inr (.panicking kind.panicking)
+  | wordShift kind _ | fixedShift kind _ => exact .inr (.strict kind.strict)
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases boolean
@@ -1762,7 +1793,7 @@ theorem BinaryProfile.left_progress (profile : BinaryProfile operator operand re
     · exact .inr .orFalse
     · exact .inl ⟨_, .orTrue⟩
 
-theorem BinaryProfile.left_valid (profile : BinaryProfile operator operand result mode)
+theorem BinaryProfile.left_valid (profile : BinaryProfile operator operand amount result mode)
     (represented : ValueRep checked registry functions mapping world operand a x (mode.operandType operator)) :
     ¬ Dynamic.BinaryLeftOperandInvalid operator a := by
   intro invalid
@@ -1777,6 +1808,7 @@ theorem BinaryProfile.left_valid (profile : BinaryProfile operator operand resul
   | fixedDivision kind => cases invalid <;> cases kind
   | fixedUnchecked kind => cases invalid <;> cases kind
   | fixedUncheckedDivision kind => cases invalid <;> cases kind
+  | wordShift kind _ | fixedShift kind _ => cases invalid <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases invalid with | logicalAnd invalid => exact invalid trivial
@@ -1803,9 +1835,11 @@ theorem Mode.left_failure {environment : Environment} {before after : Store} {le
     | exact SourceCorePrimitive.checkedBinary_left_failure_unchecked (.inr (.inr (.inl rfl))) evaluated
     | exact SourceCorePrimitive.checkedBinary_left_failure_unchecked (.inr (.inr (.inr (.inl rfl)))) evaluated
     | exact SourceCorePrimitive.checkedBinary_left_failure_unchecked (.inr (.inr (.inr (.inr rfl)))) evaluated
+    | exact SourceCorePrimitive.checkedBinary_left_failure_shift (.inl rfl) evaluated
+    | exact SourceCorePrimitive.checkedBinary_left_failure_shift (.inr rfl) evaluated
 
 theorem BinaryProfile.short {environment : Environment} {before after : Store} {left right : Expr} {output : Dynamic.Value}
-    (profile : BinaryProfile operator operand result mode)
+    (profile : BinaryProfile operator operand amount result mode)
     (represented : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
     (circuit : Dynamic.ShortCircuits operator a output)
     (evaluated : Evaluates environment before left (.inRight .word x) after) :
@@ -1822,6 +1856,7 @@ theorem BinaryProfile.short {environment : Environment} {before after : Store} {
   | fixedDivision kind => cases circuit <;> cases kind
   | fixedUnchecked kind => cases circuit <;> cases kind
   | fixedUncheckedDivision kind => cases circuit <;> cases kind
+  | wordShift kind _ | fixedShift kind _ => cases circuit <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -1833,7 +1868,7 @@ theorem BinaryProfile.short {environment : Environment} {before after : Store} {
 
 theorem BinaryProfile.right_failure {environment : Environment} {before middle after : Store}
     {left right : Expr} {reason : Word}
-    (profile : BinaryProfile operator operand result mode)
+    (profile : BinaryProfile operator operand amount result mode)
     (represented : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (first : Evaluates environment before left (.inRight .word x) middle)
@@ -1868,6 +1903,12 @@ theorem BinaryProfile.right_failure {environment : Environment} {before middle a
     · exact SourceCorePrimitive.checkedBinary_right_failure_unchecked (.inr (.inr (.inr (.inr rfl)))) first second
   | panicking panicking =>
     cases panicking <;> exact SourceCorePrimitive.binaryPanicking_right_failure first second
+  | wordShift kind _ =>
+    rw [Mode.binary_strict _ kind.strict rfl]; exact LocalPrimitiveResults.binaryWith_right_failure first second
+  | fixedShift kind _ =>
+    cases kind
+    · exact SourceCorePrimitive.checkedBinary_right_failure_shift (.inl rfl) first second
+    · exact SourceCorePrimitive.checkedBinary_right_failure_shift (.inr rfl) first second
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
@@ -1884,10 +1925,10 @@ operation either applies or, for unchecked `/` and `%` with a zero divisor,
 panics. -/
 theorem BinaryProfile.right_outcome_primitive {environment : Environment} {before middle after : Store}
     {left right : Expr}
-    (profile : BinaryProfile operator operand result mode) (notSigned : mode ≠ .signed)
+    (profile : BinaryProfile operator operand amount result mode) (notSigned : mode ≠ .signed)
     (notChecked : mode.checkedType? = none)
     (leftRep : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
-    (rightRep : ValueRep checked registry functions mapping world operand b y (mode.operandType operator))
+    (rightRep : ValueRep checked registry functions mapping world amount b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (first : Evaluates environment before left (.inRight .word x) middle)
     (second : Evaluates (x :: environment) middle (right.weakenAt 0) (.inRight .word y) after) :
@@ -1983,8 +2024,20 @@ theorem BinaryProfile.right_outcome_primitive {environment : Environment} {befor
     cases continues with
     | strict strict | panicking strict => cases strict
     | orFalse => exact ⟨_, _, .logicalOr false b, .bool b, LocalPrimitiveResults.logicalOr_right first second⟩
+  | wordShift kind amountType =>
+    refine .inl ?_
+    have strict := kind.strict
+    have operandEq := PrimitiveExpressions.strict_operand_word strict
+    obtain ⟨a, rfl, rfl⟩ := word_fields (by simpa only [Mode.operandType, operandEq] using leftRep)
+    obtain ⟨b, rfl, rfl⟩ := amount_word_fields amountType (by simpa only [Mode.operandType, operandEq] using rightRep)
+    obtain ⟨sourceResult, coreResult, applied, represented, body⟩ := word_body (functions := functions) (registry := registry)
+      (mapping := mapping) (world := world) strict a b
+    refine ⟨sourceResult, coreResult, applied, ?_, by
+      rw [Mode.binary_strict _ strict rfl]
+      exact LocalPrimitiveResults.binaryWith_success first second (body _ _)⟩
+    cases kind <;> exact represented
   | fixedSigned => exact absurd rfl notSigned
-  | fixedChecked | fixedDivision | fixedUnchecked | fixedUncheckedDivision =>
+  | fixedChecked | fixedDivision | fixedUnchecked | fixedUncheckedDivision | fixedShift =>
     simp [Mode.checkedType?] at notChecked
 
 /-- Checked `+ - *` after both operands: the result's word in the type's range,
@@ -2076,6 +2129,70 @@ theorem unchecked_outcome {environment : Environment} {before middle after : Sto
     .fixed _ (Dynamic.fixed_canonical_ofInt (Dynamic.fixedWrap_inRange _ _).1 (Dynamic.fixedWrap_inRange _ _).2),
     LanguageResult.bind_success _ first (LanguageResult.bind_success _ second (unchecked_body kind))⟩
 
+/-- `fixedInteger` reads the Integer of any word-valued expression that keeps the
+store. -/
+theorem fixed_integer_of {environment : Environment} {store : Store} {expression : Expr} {word : Word}
+    (type : TypeSystem.FixedInteger) (evaluated : Evaluates environment store expression (.word word) store) :
+    Evaluates environment store (SourceCorePrimitive.fixedInteger type.signed expression)
+      (.integer (Dynamic.fixedValue type word)) store := by
+  unfold SourceCorePrimitive.fixedInteger Dynamic.fixedValue
+  cases signed : type.signed
+  · simp only [Bool.false_eq_true, ↓reduceIte]
+    exact .unary evaluated rfl
+  · simp only [↓reduceIte]
+    unfold Dynamic.wordSigned
+    by_cases small : word.val < 2 ^ 255
+    · simp only [small, ↓reduceIte]
+      exact .letE (.unary evaluated rfl)
+        (.ifTrue (.binary (.var rfl) .integer (by simp [BinaryOp.apply]; omega)) (.var rfl))
+    · simp only [small, ↓reduceIte]
+      exact .letE (.unary evaluated rfl)
+        (.ifFalse (.binary (.var rfl) .integer (by simp [BinaryOp.apply]; omega))
+          (.binary (.var rfl) .integer rfl))
+
+/-- The `<<` body gives Word's shift wrapped to the type's width. -/
+theorem shift_left_body {environment : Environment} {store : Store}
+    {type : TypeSystem.FixedInteger} {left right : Word} :
+    Evaluates (.word right :: .word left :: environment) store (SourceCorePrimitive.shiftLeftBody type)
+      (.inRight .word (.word (Word.ofIntModulo (Dynamic.fixedWrap type
+        (Dynamic.fixedValue type (left.shiftLeft right)))))) store :=
+  .inRight (.unary (SourceCorePrimitive.fixedWrapInteger_evaluates
+    (fixed_integer_of type (.binary (.var rfl) (.var rfl) rfl))) rfl)
+
+/-- The `>>` body gives Word's shift on an unsigned type and the arithmetic shift
+on a signed one. -/
+theorem shift_right_body {environment : Environment} {store : Store}
+    {type : TypeSystem.FixedInteger} {left right : Word} :
+    Evaluates (.word right :: .word left :: environment) store (SourceCorePrimitive.shiftRightBody type)
+      (.inRight .word (.word (if type.signed then left.shiftArithmeticRight right else left.shiftRight right)))
+      store := by
+  unfold SourceCorePrimitive.shiftRightBody
+  cases type.signed <;> exact .inRight (.binary (.var rfl) (.var rfl) rfl)
+
+/-- A shift on a fixed-width integer type after both operands: `<<` gives Word's
+shift wrapped to the type's width, and `>>` Word's shift or the arithmetic one;
+neither panics. -/
+theorem shift_outcome {environment : Environment} {before middle after : Store} {left right : Expr}
+    {type : TypeSystem.FixedInteger} {lookup : Option TypeSystem.Ty} {a b : Word}
+    (kind : ShiftBinaryOperator operator) (operandEq : lookup = some (.fixed type))
+    (leftCanonical : type.canonical a.val = true)
+    (first : Evaluates environment before left (.inRight .word (.word a)) middle)
+    (second : Evaluates (.word a :: environment) middle (right.weakenAt 0) (.inRight .word (.word b)) after) :
+    ∃ sourceResult coreResult, Dynamic.BinaryValueApplies lookup operator (.word a) (.word b) sourceResult ∧
+      ValueRep checked registry functions mapping world (.fixed type) sourceResult coreResult
+        ((Mode.checked type).resultType operator) ∧
+      Evaluates environment before ((Mode.checked type).binary operator left right) (.inRight .word coreResult)
+        after := by
+  cases kind with
+  | shiftLeft =>
+    exact ⟨_, _, .fixed operandEq (.shiftLeft a b),
+      .fixed _ (Dynamic.fixed_canonical_ofInt (Dynamic.fixedWrap_inRange _ _).1 (Dynamic.fixedWrap_inRange _ _).2),
+      LanguageResult.bind_success _ first (LanguageResult.bind_success _ second shift_left_body)⟩
+  | shiftRight =>
+    exact ⟨_, _, .fixed operandEq (.shiftRight a b),
+      .fixed _ (Dynamic.fixed_canonical_shiftRight leftCanonical b),
+      LanguageResult.bind_success _ first (LanguageResult.bind_success _ second shift_right_body)⟩
+
 /-- Unchecked `/ %` after both operands: `Panic(0x12)` by a zero divisor, and
 otherwise the word of the exact quotient or remainder wrapped to the type's
 width. -/
@@ -2115,9 +2232,9 @@ theorem unchecked_division_outcome {environment : Environment} {before middle af
 either applies or, for unchecked `/` and `%` with a zero divisor, panics. -/
 theorem BinaryProfile.right_outcome {environment : Environment} {before middle after : Store} {left right : Expr}
     {lookup : Option TypeSystem.Ty}
-    (profile : BinaryProfile operator operand result mode)
+    (profile : BinaryProfile operator operand amount result mode)
     (leftRep : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
-    (rightRep : ValueRep checked registry functions mapping world operand b y (mode.operandType operator))
+    (rightRep : ValueRep checked registry functions mapping world amount b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (first : Evaluates environment before left (.inRight .word x) middle)
     (second : Evaluates (x :: environment) middle (right.weakenAt 0) (.inRight .word y) after)
@@ -2163,6 +2280,11 @@ theorem BinaryProfile.right_outcome {environment : Environment} {before middle a
         obtain ⟨a, rfl, rfl, _, _⟩ := fixed_fields leftRep rfl
         obtain ⟨b, rfl, rfl, _, _⟩ := fixed_fields rightRep rfl
         exact unchecked_division_outcome kind operandEq first second
+      | fixedShift kind amountType =>
+        obtain ⟨a, rfl, rfl, _, leftCanonical⟩ := fixed_fields leftRep rfl
+        obtain ⟨b, rfl, rfl⟩ := amount_word_fields amountType
+          (by simpa only [Mode.operandType, PrimitiveExpressions.strict_operand_word kind.strict] using rightRep)
+        exact .inl (shift_outcome kind operandEq leftCanonical first second)
     | none =>
       rcases profile.right_outcome_primitive signedMode checkedMode leftRep rightRep continues first second with
         ⟨sourceResult, coreResult, applied, represented, evaluated⟩ | ⟨code, panicked, evaluated⟩
@@ -2173,9 +2295,9 @@ theorem BinaryProfile.right_outcome {environment : Environment} {before middle a
 /-- An operation that the source applies also completes in Core. -/
 theorem BinaryProfile.right_success {environment : Environment} {before middle after : Store} {left right : Expr}
     {output : Dynamic.Value}
-    (profile : BinaryProfile operator operand result mode)
+    (profile : BinaryProfile operator operand amount result mode)
     (leftRep : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
-    (rightRep : ValueRep checked registry functions mapping world operand b y (mode.operandType operator))
+    (rightRep : ValueRep checked registry functions mapping world amount b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (first : Evaluates environment before left (.inRight .word x) middle)
     (second : Evaluates (x :: environment) middle (right.weakenAt 0) (.inRight .word y) after)
@@ -2192,9 +2314,9 @@ theorem BinaryProfile.right_success {environment : Environment} {before middle a
 /-- A source panic is the same Core panic. -/
 theorem BinaryProfile.right_panic {environment : Environment} {before middle after : Store} {left right : Expr}
     {code : UInt8} {lookup : Option TypeSystem.Ty}
-    (profile : BinaryProfile operator operand result mode)
+    (profile : BinaryProfile operator operand amount result mode)
     (leftRep : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
-    (rightRep : ValueRep checked registry functions mapping world operand b y (mode.operandType operator))
+    (rightRep : ValueRep checked registry functions mapping world amount b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (first : Evaluates environment before left (.inRight .word x) middle)
     (second : Evaluates (x :: environment) middle (right.weakenAt 0) (.inRight .word y) after)
@@ -2211,7 +2333,7 @@ theorem BinaryProfile.right_panic {environment : Environment} {before middle aft
 /-- In a branch selected by the independent left-value rule, native completion
 contains a real right-operand derivation at the single inserted payload slot. -/
 theorem BinaryProfile.right_evaluated {environment : Environment} {before after : Store} {right : Expr} {value : Value}
-    (profile : BinaryProfile operator operand result mode)
+    (profile : BinaryProfile operator operand amount result mode)
     (represented : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (evaluated : Evaluates (x :: environment) before (mode.tail operator right) value after) :
@@ -2227,6 +2349,7 @@ theorem BinaryProfile.right_evaluated {environment : Environment} {before after 
   | fixedDivision kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | fixedUnchecked kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | fixedUncheckedDivision kind => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
+  | wordShift kind _ | fixedShift kind _ => cases kind <;> cases evaluated <;> exact ⟨_, _, by assumption⟩
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
@@ -2300,14 +2423,14 @@ inductive Tree.LiteralSites (literals : GenericExpressionMeaning.Certificate) :
       (child : Tree fuel values source context solved reasonAt scope operand ⟨core.operandType, childCode⟩)
       (childSites : Tree.LiteralSites literals child) :
       LiteralSites literals (Tree.unary (scope := scope) metadata form found inputType outputType profile child)
-  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary {id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       (metadata : Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
       (leftFound : source.lookupExpression? left = some leftNode)
       (rightFound : source.lookupExpression? right = some rightNode)
-      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = amountType)
       (outputType : node.type = resultType)
-      (profile : BinaryProfile operator operandType resultType mode)
+      (profile : BinaryProfile operator operandType amountType resultType mode)
       (first : Tree fuel values source context solved reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
       (second : Tree fuel values source context solved reasonAt scope right ⟨mode.operandType operator, rightCode⟩)
       (firstSites : Tree.LiteralSites literals first) (secondSites : Tree.LiteralSites literals second) :
@@ -2484,7 +2607,7 @@ theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
         obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload
           (Dynamic.operandType?_of_found childFound inputType)
         exact False.elim (unary_fault_excluded applied failed)
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
     intro root found mapping world administrative environment canonical actual before store ξ outcome after environments heaps locals agrees trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
@@ -2658,7 +2781,7 @@ theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace applied),
             .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
     intro root found mapping world administrative environment canonical actual before store ξ value finalStore environments heaps locals agrees evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
@@ -2835,9 +2958,9 @@ private theorem UnaryProfile.selected {catalog : SourceCoreCompatibleCatalog.Cat
         SourceCorePrimitive.narrowBitNotMask?, SourceCorePrimitive.unaryOperator, TypeSystem.Ty.fixed,
         Dynamic.fixedLowMask])
 private theorem BinaryProfile.selected {catalog : SourceCoreCompatibleCatalog.Catalog}
-    {operator : Syntax.BinaryOp} {operand result : TypeSystem.Ty} {mode : Mode} {type : Ty}
+    {operator : Syntax.BinaryOp} {operand amount result : TypeSystem.Ty} {mode : Mode} {type : Ty}
     {lookup : Option TypeSystem.Ty}
-    (profile : BinaryProfile operator operand result mode) (projected : catalog.project operand = .ok type)
+    (profile : BinaryProfile operator operand amount result mode) (projected : catalog.project operand = .ok type)
     (lookupEq : lookup = some operand) :
     selectedMode (SourceCorePrimitive.binaryLowering type lookup operator) = mode := by
   subst lookupEq
@@ -2845,7 +2968,9 @@ private theorem BinaryProfile.selected {catalog : SourceCoreCompatibleCatalog.Ca
   all_goals first
     | rfl
     | (rename_i kind; cases kind <;> simp_all [selectedMode, SourceCorePrimitive.binaryLowering,
-        SourceCorePrimitive.signedOrdering, SourceCorePrimitive.checkedArithmetic, TypeSystem.Ty.fixed])
+        SourceCorePrimitive.signedOrdering, SourceCorePrimitive.checkedArithmetic, TypeSystem.Ty.fixed]; done)
+    | (rename_i kind _; cases kind <;> simp_all [selectedMode, SourceCorePrimitive.binaryLowering,
+        SourceCorePrimitive.signedOrdering, SourceCorePrimitive.checkedArithmetic, TypeSystem.Ty.fixed]; done)
     | (rename_i strict; cases strict <;> rfl)
 
 private inductive Compound : ExpressionForm → Prop where
@@ -3039,7 +3164,7 @@ theorem tree_of_functions_with_literals
       cases step with
       | @binary operator left right first second otherForm metadata firstGenerated secondGenerated leftChecked rightChecked =>
         obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (form.symm.trans otherForm)
-        obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, sameType, leftTyped, rightTyped, profile⟩ :=
+        obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, leftTyped, rightTyped, profile⟩ :=
           binary_source_types unique originalFound form metadata.coercions metadata.requirements typed
         obtain ⟨firstTree, firstTreeSites⟩ := leftIH leftFound leftTyped firstGenerated
         obtain ⟨secondTree, secondTreeSites⟩ := rightIH rightFound rightTyped secondGenerated
@@ -3050,7 +3175,7 @@ theorem tree_of_functions_with_literals
         obtain ⟨secondType, rightCode⟩ := second
         dsimp only at leftChecked rightChecked firstTree secondTree ⊢
         subst firstType secondType
-        exact ⟨_, .binary metadata form leftFound rightFound rfl sameType.symm rfl profile firstTree secondTree firstTreeSites secondTreeSites⟩
+        exact ⟨_, .binary metadata form leftFound rightFound rfl rfl rfl profile firstTree secondTree firstTreeSites secondTreeSites⟩
       | unary otherForm _ _ _ | group otherForm _ _ | pair otherForm _ _ _ => simp [form] at otherForm
   | group originalFound form child ih =>
     have same := Option.some.inj (originalFound.symm.trans found)

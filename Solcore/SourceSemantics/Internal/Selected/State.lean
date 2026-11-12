@@ -1474,9 +1474,11 @@ theorem OperatorNamesAt.of_retained
     (dispatchAt : ∀ name, dispatch name → operatorDispatch node name) :
     OperatorNamesAt signatures solved requirements dispatch := by
   intro primary companions name headEq selected
-  obtain ⟨finalNode, finalFound, finalLayout, finalDispatch, _⟩ :=
-    retained found (primary :: companions) name (by simpa only [headEq] using layout) (dispatchAt name selected)
-  exact interfaces.operators finalNode finalFound.1 primary companions name finalLayout finalDispatch
+  obtain ⟨finalNode, finalFound, finalLayout, finalForm⟩ :=
+    retained found (primary :: companions) (by simpa only [headEq] using layout)
+      (operatorApplicationForm_of_dispatch (dispatchAt name selected))
+  exact interfaces.operators finalNode finalFound.1 primary companions name finalLayout
+    (operatorDispatch_of_form finalForm (dispatchAt name selected))
 
 theorem operatorTraitPredicates_primary
     {context : Frontend.SourceInference.Context} {trait : Resolved.DeclarationId}
@@ -1882,24 +1884,9 @@ theorem inferBinaryOperator
     isOpenIntegerLiteralTarget state integerLiterals left ||
       isOpenIntegerLiteralTarget state integerLiterals right
   by_cases shift : Detail.isShiftOperator operator = true
-  · obtain ⟨_, typeEq, valued, valueResult, amountResult⟩ :=
-      Detail.inferBinaryOperator_shift_result shift success
-    have wordResolved : ∀ any : State, Resolved cutoff roots any .word := by
-      intro any metavariable member
-      simp [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve, TypeSystem.Ty.word,
-        TypeSystem.Ty.freeVariables] at member
-    have valueTransport := unify ready leftBelow (TypeSystem.Ty.variablesBelow_constructor _ _)
-      leftSupported (wordResolved state) valueResult
-    have valuedReady := Detail.unify_preserves_inferenceReady ready leftBelow
-      (TypeSystem.Ty.variablesBelow_constructor _ _) valueResult
-    have valueProgress := Detail.unify_inferenceProgress ready.solved leftBelow
-      (TypeSystem.Ty.variablesBelow_constructor _ _) valueResult
-    have amountTransport := unify valuedReady (rightBelow.weaken valueProgress.next_le)
-      (TypeSystem.Ty.variablesBelow_constructor _ _) (valueTransport right rightSupported)
-      (wordResolved valued) amountResult
-    rw [typeEq]
-    exact ⟨fun type supported => amountTransport type (valueTransport type supported),
-      wordResolved result.state⟩
+  · obtain ⟨_, typeEq, stateEq⟩ := Detail.inferBinaryOperator_shift_result shift success
+    rw [typeEq, stateEq]
+    exact ⟨fun _ supported => supported, resolved_normalized ready leftSupported⟩
   by_cases unchecked : Detail.isUncheckedOperator operator = true
   · obtain ⟨unifiedState, prepared, unifyResult, prepare, tailSuccess⟩ :=
       Detail.inferBinaryOperator_unchecked_result unchecked success

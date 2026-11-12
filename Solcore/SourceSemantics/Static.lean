@@ -526,14 +526,17 @@ mutual
           resultType requirements) :
         ExpressionFormHasRawType source context (.unary operator operand)
           resultType (.ordinary requirements)
+    /-- A binary operator's operands have their own types: one type for every
+    operator but the shifts, whose amount has a type of its own
+    (`BinaryOperatorHasType` relates them). -/
     | binary
         {context : Context} {operator : Syntax.BinaryOp}
-        {left right : ExpressionId} {operandType resultType : TypeSystem.Ty}
+        {left right : ExpressionId} {leftType rightType resultType : TypeSystem.Ty}
         {requirements : List RequirementId}
-        (left_type : ExpressionHasType source context left operandType)
-        (right_type : ExpressionHasType source context right operandType)
-        (operator_type : BinaryOperatorHasType context operator operandType
-          operandType resultType requirements) :
+        (left_type : ExpressionHasType source context left leftType)
+        (right_type : ExpressionHasType source context right rightType)
+        (operator_type : BinaryOperatorHasType context operator leftType
+          rightType resultType requirements) :
         ExpressionFormHasRawType source context (.binary left operator right)
           resultType (.ordinary requirements)
     | conditional

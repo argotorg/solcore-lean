@@ -2754,9 +2754,9 @@ private theorem unary_result_typed {operator : Syntax.UnaryOp} {operand result :
     | obtain ⟨word, rfl, _⟩ := word_fields represented; exact .word word
     | obtain ⟨integer, rfl, _⟩ := integer_fields represented; exact .integer integer
 
-private theorem binary_result_typed {operator : Syntax.BinaryOp} {operand result : TypeSystem.Ty}
+private theorem binary_result_typed {operator : Syntax.BinaryOp} {operand amount result : TypeSystem.Ty}
     {mode : Mode} {source : Dynamic.Value} {value : Value} {mapping : LocationMap} {world : StoreTyping}
-    {heap : Dynamic.Heap} (profile : BinaryProfile operator operand result mode)
+    {heap : Dynamic.Heap} (profile : BinaryProfile operator operand amount result mode)
     (represented : ValueRep compiled.compatible.checked registry functions mapping world result source value (mode.resultType operator)) :
     Dynamic.ValueHasType context heap source result := by
   cases profile with
@@ -2776,6 +2776,11 @@ private theorem binary_result_typed {operator : Syntax.BinaryOp} {operand result
   | fixedSigned kind => cases kind <;>
     (obtain ⟨flag, rfl, _⟩ := bool_fields represented; exact .bool flag)
   | fixedChecked kind | fixedDivision kind | fixedUnchecked kind | fixedUncheckedDivision kind =>
+    obtain ⟨word, rfl, _, _, canonical⟩ := fixed_fields represented rfl
+    exact .fixed word canonical
+  | wordShift kind _ => cases kind <;>
+    (obtain ⟨word, rfl, _⟩ := word_fields represented; exact .word word)
+  | fixedShift kind _ =>
     obtain ⟨word, rfl, _, _, canonical⟩ := fixed_fields represented rfl
     exact .fixed word canonical
   | logicalAnd | logicalOr =>
@@ -2849,7 +2854,7 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] (budget size : N
           rw [inputType] at payload
           obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
           exact False.elim (failed.excludes_value applied)
-    | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
+    | @binary node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
       have same := Option.some.inj (metadata.found.symm.trans found)
       subst root
       have leftIH := fun n (bound : n < budget) => @meaning n bound _ _ _ leftTree _ leftFound
@@ -3063,7 +3068,7 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] (budget size : Na
           have childTrace := trace
           exact ⟨_, _, after, finalMap, finalWorld, .unary occurrence childTrace applied,
             .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, ⟨reached, related, successful bridge (outputType ▸ unary_result_typed functions profile resultRep) post.at_value.2⟩⟩
-    | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
+    | @binary node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
       have same := Option.some.inj (metadata.found.symm.trans found)
       subst root
       have leftIH := fun n (bound : n < budget) => @meaning n bound _ _ _ leftTree _ leftFound

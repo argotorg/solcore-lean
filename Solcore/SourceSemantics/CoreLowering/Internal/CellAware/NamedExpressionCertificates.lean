@@ -640,14 +640,14 @@ inductive Tree {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepa
       (child : Tree compiled rootFuel source sourceContext reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Tree compiled rootFuel source sourceContext reasonAt scope id
         ⟨core.resultType, core.lower childCode⟩
-  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary {id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       (metadata : CompatibleExpressionPrimitives.Metadata checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
       (leftFound : source.lookupExpression? left = some leftNode)
       (rightFound : source.lookupExpression? right = some rightNode)
-      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = amountType)
       (outputType : node.type = resultType)
-      (profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType resultType mode)
+      (profile : CompatibleExpressionPrimitives.BinaryProfile operator operandType amountType resultType mode)
       (first : Tree compiled rootFuel source sourceContext reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
       (second : Tree compiled rootFuel source sourceContext reasonAt scope right ⟨mode.operandType operator, rightCode⟩) :
       Tree compiled rootFuel source sourceContext reasonAt scope id
@@ -1038,7 +1038,7 @@ theorem of_policy {id : ExpressionId}
       cases step with
       | @binary operator left right first second otherForm metadata firstGenerated secondGenerated leftChecked rightChecked =>
         obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (form.symm.trans otherForm)
-        obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, sameType, leftTyped, rightTyped, profile⟩ :=
+        obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, leftTyped, rightTyped, profile⟩ :=
           CompatibleExpressionPrimitives.binary_source_types unique site.found form metadata.coercions metadata.requirements typed
         have firstTree := firstIH leftFound leftTyped firstGenerated
         have secondTree := secondIH rightFound rightTyped secondGenerated
@@ -1052,7 +1052,7 @@ theorem of_policy {id : ExpressionId}
         obtain ⟨secondType, rightCode⟩ := second
         dsimp only at leftChecked rightChecked firstTree secondTree ⊢
         subst firstType secondType
-        exact .binary metadata form leftFound rightFound rfl sameType.symm rfl profile firstTree secondTree
+        exact .binary metadata form leftFound rightFound rfl rfl rfl profile firstTree secondTree
       | unary otherForm _ _ _ | group otherForm _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ =>
         simp [form] at otherForm
   | conditional site form test yes no testIH thenIH elseIH =>

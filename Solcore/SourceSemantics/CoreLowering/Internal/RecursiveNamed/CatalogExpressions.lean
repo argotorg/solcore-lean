@@ -371,9 +371,9 @@ private theorem unary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
         SourceCorePrimitive.narrowBitNotMask?, SourceCorePrimitive.unaryOperator, TypeSystem.Ty.fixed,
         Dynamic.fixedLowMask])
 private theorem binary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
-    {operator : Syntax.BinaryOp} {operand result : TypeSystem.Ty} {mode : Mode} {type : Ty}
+    {operator : Syntax.BinaryOp} {operand amount result : TypeSystem.Ty} {mode : Mode} {type : Ty}
     {lookup : Option TypeSystem.Ty}
-    (profile : BinaryProfile operator operand result mode) (projected : catalog.project operand = .ok type)
+    (profile : BinaryProfile operator operand amount result mode) (projected : catalog.project operand = .ok type)
     (lookupEq : lookup = some operand) :
     selectedMode (SourceCorePrimitive.binaryLowering type lookup operator) = mode := by
   subst lookupEq
@@ -381,7 +381,9 @@ private theorem binary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
   all_goals first
     | rfl
     | (rename_i kind; cases kind <;> simp_all [selectedMode, SourceCorePrimitive.binaryLowering,
-        SourceCorePrimitive.signedOrdering, SourceCorePrimitive.checkedArithmetic, TypeSystem.Ty.fixed])
+        SourceCorePrimitive.signedOrdering, SourceCorePrimitive.checkedArithmetic, TypeSystem.Ty.fixed]; done)
+    | (rename_i kind _; cases kind <;> simp_all [selectedMode, SourceCorePrimitive.binaryLowering,
+        SourceCorePrimitive.signedOrdering, SourceCorePrimitive.checkedArithmetic, TypeSystem.Ty.fixed]; done)
     | (rename_i strict; cases strict <;> rfl)
 
 private inductive Compound : ExpressionForm → Prop where
@@ -1033,7 +1035,7 @@ theorem tree_of_functions_at_runtime_with_children
         cases step with
         | @binary actualOperator actualLeft actualRight first second otherForm metadata firstGenerated secondGenerated leftChecked rightChecked =>
           obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (form.symm.trans otherForm)
-          obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, sameType, leftTyped, rightTyped, sourceProfile⟩ :=
+          obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, leftTyped, rightTyped, sourceProfile⟩ :=
             binary_source_types unique found form metadata.coercions metadata.requirements typed
           have firstTree := ih (children left (by simp [evaluationChildren, form])) leftFound leftTyped firstGenerated
           have secondTree := ih (children right (by simp [evaluationChildren, form])) rightFound rightTyped secondGenerated
@@ -1045,7 +1047,7 @@ theorem tree_of_functions_at_runtime_with_children
           obtain ⟨secondType, rightCode⟩ := second
           dsimp only at leftChecked rightChecked firstTree secondTree ⊢
           subst firstType secondType
-          exact runtime_node_for (entries := [(left, ⟨mode.operandType operator, leftCode⟩), (right, ⟨mode.operandType operator, rightCode⟩)]) (.primitive (.binary metadata form leftFound rightFound rfl sameType.symm rfl sourceProfile
+          exact runtime_node_for (entries := [(left, ⟨mode.operandType operator, leftCode⟩), (right, ⟨mode.operandType operator, rightCode⟩)]) (.primitive (.binary metadata form leftFound rightFound rfl rfl rfl sourceProfile
             ⟨rfl, by simp⟩ ⟨rfl, by simp⟩)) (cons_certificates firstTree (cons_certificates secondTree (by simp)))
         | unary otherForm _ _ _ | group otherForm _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ => simp [form] at otherForm
       | tuple items =>

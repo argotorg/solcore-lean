@@ -490,7 +490,7 @@ theorem sourceTyping {context : Context} {operator : Syntax.BinaryOp}
     BinaryOperatorHasType context operator operand operand result [] := by
   cases typing with
   | wordArithmetic kind => exact .wordArithmetic kind
-  | wordShift kind => exact .wordShift kind
+  | wordShift kind => exact .wordShift kind .word
   | wordUnchecked kind => exact .wordUnchecked kind
   | integerArithmetic kind => exact .integerArithmetic kind
   | wordComparison kind => exact .wordComparison kind
@@ -641,6 +641,62 @@ theorem signed_canonical_range {type : TypeSystem.FixedInteger}
   unfold TypeSystem.FixedInteger.canonical
   simp [signed]
 
+/-- Half the width's power is at most `2^255`. -/
+theorem halfWidth_pow_le (width : TypeSystem.IntegerWidth) :
+    2 ^ (width.bits - 1) ≤ 2 ^ 255 := by
+  cases width <;> simp [TypeSystem.IntegerWidth.bits]
+
+/-- Word's right shift never grows its value. -/
+theorem shiftRight_val_le (left right : Core.Word) :
+    (left.shiftRight right).val ≤ left.val := by
+  unfold Core.Word.shiftRight
+  split
+  · show (left >>> right).val ≤ left.val
+    calc (left >>> right).val ≤ Nat.shiftRight left.val right.val := Nat.mod_le _ _
+      _ = left.val / 2 ^ right.val := Nat.shiftRight_eq_div_pow _ _
+      _ ≤ left.val := Nat.div_le_self _ _
+  · simp [Core.Word.zero]
+
+/-- `>>` keeps a canonical word canonical: Word's shift on an unsigned type,
+the arithmetic shift on a signed one. -/
+theorem fixed_canonical_shiftRight {type : TypeSystem.FixedInteger} {left : Core.Word}
+    (canonical : type.canonical left.val = true) (right : Core.Word) :
+    type.canonical (if type.signed then left.shiftArithmeticRight right
+      else left.shiftRight right).val = true := by
+  obtain ⟨signed, width⟩ := type
+  have leftBound := left.isLt
+  simp only [Core.wordModulus] at leftBound
+  have widthBound := halfWidth_pow_le width
+  have widthPos : 0 < 2 ^ (width.bits - 1) := Nat.two_pow_pos _
+  cases signed with
+  | false =>
+    simp only [TypeSystem.FixedInteger.canonical, Bool.false_eq_true, ↓reduceIte,
+      decide_eq_true_eq] at canonical ⊢
+    exact Nat.lt_of_le_of_lt (shiftRight_val_le left right) canonical
+  | true =>
+    simp only [TypeSystem.FixedInteger.canonical, ↓reduceIte, Bool.or_eq_true,
+      decide_eq_true_eq] at canonical ⊢
+    generalize 2 ^ (width.bits - 1) = P at canonical widthBound widthPos ⊢
+    unfold Core.Word.shiftArithmeticRight
+    split
+    · split
+      · have quotient := Nat.div_le_self left.val (2 ^ right.val)
+        generalize left.val / 2 ^ right.val = q at quotient ⊢
+        left
+        simp only [Core.Word.ofNatModulo, Core.wordModulus]
+        rw [Nat.mod_eq_of_lt (by omega)]
+        omega
+      · have quotient := Nat.div_le_self (Core.wordModulus - 1 - left.val) (2 ^ right.val)
+        generalize (Core.wordModulus - 1 - left.val) / 2 ^ right.val = q at quotient ⊢
+        simp only [Core.wordModulus] at quotient ⊢
+        right
+        simp only [Core.Word.ofNatModulo, Core.wordModulus]
+        rw [Nat.mod_eq_of_lt (by omega)]
+        omega
+    · split
+      · left; simp [Core.Word.zero]; omega
+      · right; simp [Core.Word.maximum, Core.wordModulus]; omega
+
 /-- An integer in a fixed-width integer type's range becomes a canonical word
 of the type. -/
 theorem fixed_canonical_ofInt {type : TypeSystem.FixedInteger} {value : Int}
@@ -703,6 +759,10 @@ theorem preserves
       | uncheckedDivision kind =>
           obtain ⟨rfl, rfl⟩ := typing.unchecked_result kind.unchecked
           exact .word _
+      | shiftLeft | shiftRight =>
+          -- Among the primitive typings only Word's shift types a shift.
+          cases typing
+          all_goals first | exact .word _ | (rename_i kind; cases kind)
 
 /-- Checked `+ - *` keep their result canonical at the operands' static type. -/
 theorem preserves_checked
@@ -722,7 +782,8 @@ theorem preserves_checked
     | division other => exact (kind.not_division other).elim
     | unchecked other => exact (kind.not_unchecked other.unchecked).elim
     | uncheckedDivision other => exact (kind.not_unchecked other.unchecked).elim
-    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual | shiftLeft | shiftRight =>
+      cases kind
 
 /-- Checked `/ %` keep their result canonical at the operands' static type. -/
 theorem preserves_division
@@ -742,7 +803,8 @@ theorem preserves_division
     | checked other => exact (other.not_division kind).elim
     | unchecked other => exact (kind.not_unchecked other.unchecked).elim
     | uncheckedDivision other => exact (kind.not_unchecked other.unchecked).elim
-    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual | shiftLeft | shiftRight =>
+      cases kind
 
 /-- Unchecked `+ - * / %` keep their result canonical at the operands' static
 type: the exact result wrapped to the type's width lies in its range. -/
@@ -768,6 +830,34 @@ theorem preserves_unchecked
       exact .fixed _ (fixed_canonical_ofInt (fixedWrap_inRange _ _).1 (fixedWrap_inRange _ _).2)
     | checked other => exact (other.not_unchecked kind).elim
     | division other => exact (other.not_unchecked kind).elim
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual | shiftLeft | shiftRight =>
+      cases kind
+
+/-- A shift keeps its value's type canonical: `<<` wraps the shifted word to the
+type's width, and `>>` keeps a canonical word canonical. -/
+theorem preserves_shift
+    {context : Context} {heap : Heap} {operator : Syntax.BinaryOp}
+    {left right result : Value} {type : TypeSystem.FixedInteger} {lookup : Option Ty}
+    (kind : ShiftBinaryOperator operator)
+    (lookupEq : lookup = some (.fixed type))
+    (left_typed : ValueHasType context heap left (.fixed type))
+    (application : BinaryValueApplies lookup operator left right result) :
+    ValueHasType context heap result (.fixed type) := by
+  cases application with
+  | primitive plain _ =>
+    cases kind
+    · exact absurd FixedBinaryOwn.shiftLeft (plain type lookupEq)
+    · exact absurd FixedBinaryOwn.shiftRight (plain type lookupEq)
+  | fixed operandEq applies =>
+    rw [lookupEq] at operandEq
+    cases Option.some.inj operandEq
+    cases applies with
+    | shiftLeft left right =>
+      exact .fixed _ (fixed_canonical_ofInt (fixedWrap_inRange _ _).1 (fixedWrap_inRange _ _).2)
+    | shiftRight left right =>
+      exact .fixed _ (fixed_canonical_shiftRight (fixed_word_canonical left_typed) right)
+    | checked other | division other | unchecked other | uncheckedDivision other =>
+      cases kind <;> cases other
     | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
 
 end BinaryValueApplies
@@ -2638,14 +2728,14 @@ application. -/
 def BinaryOperationExecutionPreserves
     (program : Program) (context : Context) (evidence : EvidenceEnvironment) :
     Prop :=
-  forall before after operator lookup requirements left right output operandType
-      resultType,
+  forall before after operator lookup requirements left right output leftType
+      rightType resultType,
     HeapWellTyped context before ->
-    ValueHasType context before left operandType ->
-    ValueHasType context before right operandType ->
-    BinaryOperatorHasType context operator operandType operandType resultType
+    ValueHasType context before left leftType ->
+    ValueHasType context before right rightType ->
+    BinaryOperatorHasType context operator leftType rightType resultType
       requirements ->
-    lookup = some operandType ->
+    lookup = some leftType ->
     BinaryOperationApplies program context evidence before operator lookup
       requirements left right output after ->
     ValueHasType context after output resultType /\
@@ -2920,9 +3010,11 @@ theorem preservesWith
               environment_agrees before_typed left_type left_evaluates with
             ⟨left_typed, after_typed, extension⟩
           cases circuit <;> cases operator_type
-          all_goals try { rename_i kind; cases kind }
-          all_goals try { rename_i dispatch profile proof; cases dispatch }
-          all_goals exact ⟨.bool _, after_typed, extension⟩
+          all_goals first
+            | exact ⟨.bool _, after_typed, extension⟩
+            | (rename_i kind; cases kind; done)
+            | (rename_i kind _; cases kind; done)
+            | (rename_i dispatch profile proof; cases dispatch; done)
       | binaryEvaluateRight layout left_evaluates evaluate_right right_evaluates
           applies =>
           have owned_eq := ordinaryRequirementLayout_eq requirements_valid layout
@@ -2934,7 +3026,7 @@ theorem preservesWith
               (environment_agrees.mono left_extension) left_heap_typed right_type
               right_evaluates with
             ⟨right_typed, right_heap_typed, right_extension⟩
-          rcases binary_preserves _ _ _ _ _ _ _ _ _ _ right_heap_typed
+          rcases binary_preserves _ _ _ _ _ _ _ _ _ _ _ right_heap_typed
               (left_typed.mono right_extension) right_typed operator_type
               (operandType?_of_typing graph.nodeOccurrencesUnique left_type) applies with
             ⟨result_typed, after_typed, operation_extension⟩

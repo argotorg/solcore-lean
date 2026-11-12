@@ -842,9 +842,9 @@ theorem calls_syntax {callFuel : Nat} {callScope : SourceCoreLocalCell.Scope}
     · simp [outer.originalForm, ExpressionForm.references, (List.of_mem_zip remaining).1]
   | @unary_child scope id node operand childNode operator operandType resultType core childCode metadata form found inputType outputType profile child inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))
   | @conditional_condition scope id node condition thenId elseId conditionNode thenNode elseNode type conditionCode thenCode elseCode metadata form conditionFound thenFound elseFound conditionType thenType elseType conditionTree thenTree elseTree inside ih =>
     exact ih (syntax_child tree metadata.found (by simp [form, ExpressionForm.references]))

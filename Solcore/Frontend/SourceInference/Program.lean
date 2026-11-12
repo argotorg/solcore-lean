@@ -616,9 +616,56 @@ def validateUncheckedOperand (state : State) (node : ExpressionNode) : Except Er
       else .ok ()
   | _ => .ok ()
 
+/-- Whether a type is a shift's value type: `word` or one of the twelve
+fixed-width integer types. -/
+def shiftValueFits : Ty → Bool
+  | .constructor (.builtin .word) => true
+  | .constructor (.builtin (.fixed _)) => true
+  | _ => false
+
+/-- Whether a type is a shift amount's type: `word` or an unsigned one of the
+twelve types, which upstream's `ShiftAmount` instances cover. -/
+def shiftAmountFits : Ty → Bool
+  | .constructor (.builtin .word) => true
+  | .constructor (.builtin (.fixed type)) => !type.signed
+  | _ => false
+
+/-- Whether a node is an expression at one identity whose resolved type does
+not fit. -/
+def operandMisfits (state : State) (operand : ExpressionId) (fits : Ty → Bool) :
+    Node → Bool
+  | .expression candidate =>
+      decide (candidate.id = operand) && !fits (state.resolve candidate.type)
+  | .statement _ => false
+
+/-- A shift types its value and its amount on their own and waits for both
+(`inferBinaryOperator`): once the defaults are in, its value must have `word` or
+one of the twelve types, and its amount `word` or an unsigned one, as upstream's
+`Shl` and `Shr` instances take them. A signed, `integer` or `bool` amount is
+rejected, as upstream's `shift_by_signed_amount` fixture has it. -/
+def validateShiftOperands (state : State) (node : ExpressionNode) : Except Error Unit :=
+  match node.form with
+  | .binary left operator right =>
+      if isShiftOperator operator then
+        if state.nodes.any (operandMisfits state left shiftValueFits) then
+          throw (.operatorNotSupported (binaryOperatorName operator)
+            ((expressionTypeAt? state left).getD .word))
+        else if state.nodes.any (operandMisfits state right shiftAmountFits) then
+          throw (.operatorNotSupported (binaryOperatorName operator)
+            ((expressionTypeAt? state right).getD .word))
+        else .ok ()
+      else .ok ()
+  | _ => .ok ()
+
+/-- The finalization checks of one expression node: an unchecked operator's
+operand type and a shift's operand types. -/
+def validateExpressionNode (state : State) (node : ExpressionNode) : Except Error Unit := do
+  validateUncheckedOperand state node
+  validateShiftOperands state node
+
 /-- The finalization checks of one node: an assignment statement's value
-assignment, a `for` loop's header items, and an unchecked operator's operand
-type. -/
+assignment, a `for` loop's header items, an unchecked operator's operand type
+and a shift's operand types. -/
 def validateAssignmentTargetNode (state : State) : Node → Except Error Unit
   | .statement node =>
       match node.form with
@@ -628,12 +675,12 @@ def validateAssignmentTargetNode (state : State) : Node → Except Error Unit
           validateForItemAssignmentTargets state initializer
           validateForItemAssignmentTargets state post
       | _ => .ok ()
-  | .expression node => validateUncheckedOperand state node
+  | .expression node => validateExpressionNode state node
 
-/-- Check every value assignment's target type, and every unchecked operator
-that waited for a literal operand. An open compound target or operand waits for
-its type (`compoundOperandType`, `binaryDefers`), so a literal it holds may
-default to `uint256` first. -/
+/-- Check every value assignment's target type, every unchecked operator that
+waited for a literal operand, and every shift's operand types. An open compound
+target or operand waits for its type (`compoundOperandType`, `binaryDefers`, a
+shift), so a literal it holds may default to `uint256` first. -/
 def validateAssignmentTargets (state : State) : List Node → Except Error Unit
   | [] => .ok ()
   | node :: rest => do

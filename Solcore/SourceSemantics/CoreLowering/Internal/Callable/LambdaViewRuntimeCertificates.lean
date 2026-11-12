@@ -98,7 +98,7 @@ private theorem primitives_sites {id : ExpressionId} {lowered : SourceCoreBasic.
       .expression reached receipt.found (by simp [form, ExpressionForm.references])
     exact .unary (CallableLambdaViewExpressionLeaves.metadata edited avoids reached receipt) form
       ((expression_lookup edited avoids child).symm.trans found) inputType outputType profile (CallableLambdaViewScalarTrees.primitives edited avoids tree child) (ih child)
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode receipt form leftFound rightFound leftType rightType outputType profile first second firstSites secondSites firstIH secondIH =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode receipt form leftFound rightFound leftType rightType outputType profile first second firstSites secondSites firstIH secondIH =>
     intro reached
     have leftReached : Reaches source roots (.expression left) :=
       .expression reached receipt.found (by simp [form, ExpressionForm.references])
@@ -142,7 +142,7 @@ private theorem conditionals_sites {id : ExpressionId} {lowered : SourceCoreBasi
       .expression reached receipt.found (by simp [form, ExpressionForm.references])
     exact .unary (CallableLambdaViewExpressionLeaves.metadata edited avoids reached receipt) form
       ((expression_lookup edited avoids child).symm.trans found) inputType outputType profile (CallableLambdaViewScalarTrees.conditionals edited avoids tree child) (ih child)
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode receipt form leftFound rightFound leftType rightType outputType profile first second firstSites secondSites firstIH secondIH =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode receipt form leftFound rightFound leftType rightType outputType profile first second firstSites secondSites firstIH secondIH =>
     intro reached
     have leftReached : Reaches source roots (.expression left) :=
       .expression reached receipt.found (by simp [form, ExpressionForm.references])
@@ -233,7 +233,7 @@ private theorem recursive_sites {id : ExpressionId} {lowered : SourceCoreBasic.L
       .expression reached receipt.found (by simp [form, ExpressionForm.references])
     exact .unary (CallableLambdaViewExpressionLeaves.metadata edited avoids reached receipt) form
       ((expression_lookup edited avoids child).symm.trans found) inputType outputType profile (CallableLambdaViewRecursiveTrees.recursive edited avoids tree child) (ih child)
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode receipt form leftFound rightFound leftType rightType outputType profile first second firstSites secondSites firstIH secondIH =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode receipt form leftFound rightFound leftType rightType outputType profile first second firstSites secondSites firstIH secondIH =>
     intro reached
     have leftReached : Reaches source roots (.expression left) :=
       .expression reached receipt.found (by simp [form, ExpressionForm.references])
@@ -306,7 +306,7 @@ private theorem general_sites {id : ExpressionId} {lowered : SourceCoreBasic.Low
       .expression reached receipt.found (by simp [form, ExpressionForm.references])
     exact .unary (CallableLambdaViewExpressionLeaves.metadata edited avoids reached receipt) form
       ((expression_lookup edited avoids child).symm.trans found) inputType outputType profile (CallableLambdaViewIndexedTrees.general edited avoids tree child) (ih child)
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode receipt form leftFound rightFound leftType rightType outputType profile first second firstSites secondSites firstIH secondIH =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode receipt form leftFound rightFound leftType rightType outputType profile first second firstSites secondSites firstIH secondIH =>
     intro reached
     have leftReached : Reaches source roots (.expression left) :=
       .expression reached receipt.found (by simp [form, ExpressionForm.references])
@@ -388,7 +388,7 @@ private theorem builtins_sites {id : ExpressionId} {lowered : SourceCoreBasic.Lo
       .expression reached receipt.found (by simp [form, ExpressionForm.references])
     exact .unary (CallableLambdaViewExpressionLeaves.metadata edited avoids reached receipt) form
       ((expression_lookup edited avoids child).symm.trans found) inputType outputType profile (CallableLambdaViewBuiltinTrees.builtins edited avoids tree child) (ih child)
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode receipt form leftFound rightFound leftType rightType outputType profile first second firstSites secondSites firstIH secondIH =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode receipt form leftFound rightFound leftType rightType outputType profile first second firstSites secondSites firstIH secondIH =>
     intro reached
     have leftReached : Reaches source roots (.expression left) :=
       .expression reached receipt.found (by simp [form, ExpressionForm.references])

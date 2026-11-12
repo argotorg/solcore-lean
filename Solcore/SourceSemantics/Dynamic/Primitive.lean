@@ -630,10 +630,11 @@ theorem fixedWrap_inRange (type : TypeSystem.FixedInteger) (value : Int) :
 
 /-- The binary operators whose meaning on a fixed-width integer type differs
 from Word's on its canonical words: the orderings on the signed types, checked
-`+ - * / %` on every type, and unchecked `+ - * / %` on every type, which wrap
-to the type's width. On `uint256`, and for `+ - *` on `int256`, the unchecked
-meaning is Word's; it is the type's all the same, so the evaluation rules choose
-it from the operands' static type alone. -/
+`+ - * / %` on every type, unchecked `+ - * / %` on every type, which wrap to the
+type's width, and the shifts on every type, which keep the type's width. On
+`uint256`, for `+ - *` on `int256`, and for the shifts on `uint256` and `<<` on
+`int256`, the meaning is Word's; it is the type's all the same, so the
+evaluation rules choose it from the value's static type alone. -/
 inductive FixedBinaryOwn (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → Prop where
   | less (signed : type.signed = true) : FixedBinaryOwn type .less
   | greater (signed : type.signed = true) : FixedBinaryOwn type .greater
@@ -649,6 +650,8 @@ inductive FixedBinaryOwn (type : TypeSystem.FixedInteger) : Syntax.BinaryOp → 
   | uncheckedMultiply : FixedBinaryOwn type .uncheckedMultiply
   | uncheckedDivide : FixedBinaryOwn type .uncheckedDivide
   | uncheckedModulo : FixedBinaryOwn type .uncheckedModulo
+  | shiftLeft : FixedBinaryOwn type .shiftLeft
+  | shiftRight : FixedBinaryOwn type .shiftRight
 
 theorem _root_.Solcore.SourceSemantics.FixedSignedComparison.own {type : TypeSystem.FixedInteger}
     {operator : Syntax.BinaryOp} (kind : FixedSignedComparison type operator) :
@@ -684,7 +687,13 @@ Word's on its canonical words. The orderings on the signed types compare the
 integers the words stand for, and checked `+ - *`, and `/ %` by a nonzero
 divisor, give the exact result, as a canonical word, when it lies in the type's
 range. Unchecked `+ - *`, and `/ %` by a nonzero divisor, give the exact result
-wrapped to the type's width (`fixedWrap`), so `MIN / -1` gives `MIN`. -/
+wrapped to the type's width (`fixedWrap`), so `MIN / -1` gives `MIN`. The
+shifts are upstream's `std` instances at the pin: `<<` is Word's shift, then the
+low `N` bits read at the type (the mask on an unsigned type, `signextend` on a
+signed one), and `>>` is Word's shift on an unsigned type and the arithmetic
+shift on a signed one. The amount is any canonical word of a shift-amount type,
+read as a number; an amount of at least the width gives 0, or -1 for `>>` of a
+negative value, and a shift never panics. -/
 inductive FixedBinaryApplies (type : TypeSystem.FixedInteger) :
     Syntax.BinaryOp → Value → Value → Value → Prop where
   | signedLess (signed : type.signed = true) (left right : Core.Word) :
@@ -717,6 +726,12 @@ inductive FixedBinaryApplies (type : TypeSystem.FixedInteger) :
       FixedBinaryApplies type operator (.word left) (.word right)
         (.word (Core.Word.ofIntModulo
           (fixedWrap type (uncheckedDivisionResult operator (fixedValue type left) (fixedValue type right)))))
+  | shiftLeft (left right : Core.Word) :
+      FixedBinaryApplies type .shiftLeft (.word left) (.word right)
+        (.word (Core.Word.ofIntModulo (fixedWrap type (fixedValue type (left.shiftLeft right)))))
+  | shiftRight (left right : Core.Word) :
+      FixedBinaryApplies type .shiftRight (.word left) (.word right)
+        (.word (if type.signed then left.shiftArithmeticRight right else left.shiftRight right))
 
 namespace FixedBinaryApplies
 
@@ -731,25 +746,37 @@ theorem functional {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
     | checked => rfl
     | division other => exact (kind.not_division other).elim
     | unchecked other | uncheckedDivision other => cases kind <;> cases other
-    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual | shiftLeft | shiftRight =>
+      cases kind
   | division kind =>
     cases secondApplication with
     | division => rfl
     | checked other => exact (other.not_division kind).elim
     | unchecked other | uncheckedDivision other => cases kind <;> cases other
-    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual | shiftLeft | shiftRight =>
+      cases kind
   | unchecked kind =>
     cases secondApplication with
     | unchecked => rfl
     | uncheckedDivision other => exact (kind.not_division other).elim
     | checked other | division other => cases kind <;> cases other
-    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual | shiftLeft | shiftRight =>
+      cases kind
   | uncheckedDivision kind =>
     cases secondApplication with
     | uncheckedDivision => rfl
     | unchecked other => exact (other.not_division kind).elim
     | checked other | division other => cases kind <;> cases other
-    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual => cases kind
+    | signedLess | signedGreater | signedLessEqual | signedGreaterEqual | shiftLeft | shiftRight =>
+      cases kind
+  | shiftLeft =>
+    cases secondApplication with
+    | shiftLeft => rfl
+    | checked kind | division kind | unchecked kind | uncheckedDivision kind => cases kind
+  | shiftRight =>
+    cases secondApplication with
+    | shiftRight => rfl
+    | checked kind | division kind | unchecked kind | uncheckedDivision kind => cases kind
   | signedLess =>
     cases secondApplication with
     | signedLess => rfl
@@ -781,6 +808,8 @@ theorem kind {type : TypeSystem.FixedInteger} {operator : Syntax.BinaryOp}
   | division kind => exact kind.own
   | unchecked kind => exact kind.own
   | uncheckedDivision kind => exact kind.own
+  | shiftLeft => exact .shiftLeft
+  | shiftRight => exact .shiftRight
 
 /-- The operators with a fixed-width meaning evaluate both operands: they are
 strict, or unchecked `/` and `%`, which may panic. -/

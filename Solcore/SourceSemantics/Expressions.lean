@@ -344,6 +344,13 @@ inductive ShiftBinaryOperator : Syntax.BinaryOp → Prop where
   | shiftLeft : ShiftBinaryOperator .shiftLeft
   | shiftRight : ShiftBinaryOperator .shiftRight
 
+/-- The types of a shift amount: `word` and the unsigned fixed-width integer
+types, as upstream's `ShiftAmount` instances have it. A signed amount is not one. -/
+inductive ShiftAmountType : TypeSystem.Ty → Prop where
+  | word : ShiftAmountType .word
+  | unsigned {type : TypeSystem.FixedInteger} (unsigned : type.signed = false) :
+      ShiftAmountType (.fixed type)
+
 /-- The arithmetic of an `unchecked` block. On `word`, `+`, `-` and `*` wrap
 like the checked operators, and `/` and `%` panic with `0x12` on a zero
 divisor. -/
@@ -570,9 +577,10 @@ inductive BinaryOperatorHasType (context : Context) :
   | integerArithmetic {operator : Syntax.BinaryOp}
       (kind : ArithmeticBinaryOperator operator) :
       BinaryOperatorHasType context operator .integer .integer .integer []
-  | wordShift {operator : Syntax.BinaryOp}
-      (kind : ShiftBinaryOperator operator) :
-      BinaryOperatorHasType context operator .word .word .word []
+  /-- A shift of a Word by an amount of any shift-amount type. -/
+  | wordShift {operator : Syntax.BinaryOp} {amountType : TypeSystem.Ty}
+      (kind : ShiftBinaryOperator operator) (amount : ShiftAmountType amountType) :
+      BinaryOperatorHasType context operator .word amountType .word []
   | wordUnchecked {operator : Syntax.BinaryOp}
       (kind : UncheckedBinaryOperator operator) :
       BinaryOperatorHasType context operator .word .word .word []
@@ -604,6 +612,12 @@ inductive BinaryOperatorHasType (context : Context) :
   | fixedUnchecked {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
       (kind : UncheckedBinaryOperator operator) :
       BinaryOperatorHasType context operator (.fixed type) (.fixed type) (.fixed type) []
+  /-- A shift of a fixed-width integer value by an amount of any shift-amount
+  type: the result has the value's type. -/
+  | fixedShift {operator : Syntax.BinaryOp} {type : TypeSystem.FixedInteger}
+      {amountType : TypeSystem.Ty}
+      (kind : ShiftBinaryOperator operator) (amount : ShiftAmountType amountType) :
+      BinaryOperatorHasType context operator (.fixed type) amountType (.fixed type) []
   | booleanAnd :
       BinaryOperatorHasType context .logicalAnd .bool .bool .bool []
   | booleanOr :
@@ -644,7 +658,7 @@ theorem requirements_valid
   cases typing with
   | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison |
       integerComparison | fixedComparison | fixedBitwise | fixedSignedComparison | fixedArithmetic |
-      fixedDivision | fixedUnchecked | booleanAnd | booleanOr =>
+      fixedDivision | fixedUnchecked | fixedShift | booleanAnd | booleanOr =>
       simp [RequirementIdsValid]
   | trait _ _ evidence => exact evidence.ids_valid
 

@@ -2766,9 +2766,9 @@ theorem choose_children {result : Ty} {condition yes no : Expr}
 
 /-- The actual scalar profile decides strict or Boolean code shape. Short
 circuiting changes evaluation, but both real child syntax typings remain. -/
-theorem profiled_binary_children {operator : Syntax.BinaryOp} {operand result : TypeSystem.Ty}
+theorem profiled_binary_children {operator : Syntax.BinaryOp} {operand amount result : TypeSystem.Ty}
     {mode : Mode} {left right : Expr}
-    (profile : BinaryProfile operator operand result mode)
+    (profile : BinaryProfile operator operand amount result mode)
     (typed : HasType nativeContext (mode.binary operator left right) nativeType definitions) :
     RawTyped nativeContext left definitions ∧ RawTyped nativeContext right definitions := by
   cases profile with
@@ -2827,6 +2827,20 @@ theorem profiled_binary_children {operator : Syntax.BinaryOp} {operand result : 
           (LanguageResult.bind .word (right.weakenAt 0)
             (SourceCorePrimitive.uncheckedDivisionBody type operator)) := by
       cases kind <;> rfl
+    rw [shape] at typed
+    cases typed with
+    | caseE first failure remaining =>
+      cases remaining with
+      | caseE second failure returned => exact ⟨⟨_, first⟩, ⟨_, remove_front second⟩⟩
+  | wordShift kind _ =>
+    rw [Mode.binary_strict .word kind.strict rfl] at typed
+    exact binary_children typed
+  | @fixedShift _ type _ kind _ =>
+    -- Shifts bind both operands before the shift body.
+    have shape : ∃ body, (Mode.checked type).binary operator left right =
+        LanguageResult.bind .word left (LanguageResult.bind .word (right.weakenAt 0) body) := by
+      cases kind <;> exact ⟨_, rfl⟩
+    obtain ⟨body, shape⟩ := shape
     rw [shape] at typed
     cases typed with
     | caseE first failure remaining =>

@@ -4451,3 +4451,49 @@ def run : IO Unit := do
 
 end Tests.SourceCoreGeneralizedExport.SourcePublicSelectedRuntime
 end
+
+section
+/-! Row 1's step 8d keeps shifts in the closed expression subset. A shift's
+amount takes its own type, the meaning proofs' binary node takes the two
+operand types, and `BinaryProfile` has a profile for a Word shift and one for a
+fixed-width shift, so the subset check, which reads only the Source nodes,
+admits every node of a Word shift by a literal amount and by a `Word`, of a
+`uint8` shifted by a `uint256` amount, and of a signed `>>`. -/
+set_option autoImplicit false
+namespace Tests.SourceCoreShiftSubset
+open Solcore Frontend SourceInference SourceSemantics CoreLowering
+
+private def workspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    "function wordByLiteral(w: Word) returns (Word) { return w << 3; }",
+    "function wordByWord(w: Word, n: Word) returns (Word) { return w << n; }",
+    "function narrowByWide(x: uint8, n: uint256) returns (uint8) { return x << n; }",
+    "function signedRight(x: int8, n: uint8) returns (int8) { return x >> n; }" ]}] }
+private def options : SourceCoreCompiler.Options :=
+  {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
+private def names : List String := ["wordByLiteral", "wordByWord", "narrowByWide", "signedRight"]
+
+def run : IO Unit := do
+  let program ← match checkProgram workspace options.checkingFuel with
+    | .ok program => pure program
+    | .error errors => throw (IO.userError s!"shift subset check: {reprStr errors}")
+  let source ← match SourceCoreCompiler.compileChecked program
+      (program.signatures.functions.map fun signature => SourceCompiler.Seed.declaration signature.id) options with
+    | .ok source => pure source
+    | .error error => throw (IO.userError s!"shift subset compilation: {reprStr error}")
+  let some cached := source.artifact? | throw (IO.userError "shift subset cache absent")
+  for name in names do
+    let some signature := cached.sourceProgram.signatures.functions.find? (·.name == name)
+      | throw (IO.userError s!"shift subset signature {name}")
+    let some original := cached.validationPlan.specializations.find?
+        (fun row => decide (row.function.typedBody.owner = signature.id))
+      | throw (IO.userError s!"shift subset original row {name}")
+    let some named := cached.indexed.base.functions.find?
+        (fun named => decide (named.signature.key = original.key))
+      | throw (IO.userError s!"shift subset cache row {name}")
+    if (CellAwareInvocationAcceptedSubsetCheck.nodes? cached.indexed named original.function.typedBody).isNone then
+      throw (IO.userError s!"{name} is outside the closed expression subset")
+  IO.println "SOURCE_CORE_SHIFT_SUBSET_PASS: the subset check admits every node of w << 3, w << n at Word, a uint8 << uint256 and an int8 >> uint8"
+
+end Tests.SourceCoreShiftSubset
+end

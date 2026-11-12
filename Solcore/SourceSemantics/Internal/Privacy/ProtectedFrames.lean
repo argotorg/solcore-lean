@@ -2417,16 +2417,9 @@ theorem inferBinaryOperator_fixes_protected {protectedVars : List TypeVarId}
   let openLiteral := Detail.isOpenIntegerLiteralTarget state integerLiterals left ||
     Detail.isOpenIntegerLiteralTarget state integerLiterals right
   by_cases shift : Detail.isShiftOperator operator = true
-  · obtain ⟨_, _, valued, valueResult, amountResult⟩ :=
-      Detail.inferBinaryOperator_shift_result shift accepted
-    have wordSafe : ∀ any : State, Safe protectedVars any .word := by
-      intro any metavariable member
-      simp [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve, TypeSystem.Ty.word,
-        TypeSystem.Ty.freeVariables] at member
-    have valuedFixed := unify_fixes_protected fixed leftSafe (wordSafe state) valueResult
-    have valuedPrivacy := ProtectedVariables.unify leftSafe (wordSafe state) valueResult
-    exact unify_fixes_protected valuedFixed (valuedPrivacy _ rightSafe) (wordSafe valued)
-      amountResult
+  · obtain ⟨_, _, stateEq⟩ := Detail.inferBinaryOperator_shift_result shift accepted
+    rw [stateEq]
+    exact fixed
   by_cases unchecked : Detail.isUncheckedOperator operator = true
   · obtain ⟨unifiedState, prepared, unified, prepare, tailSuccess⟩ :=
       Detail.inferBinaryOperator_unchecked_result unchecked accepted

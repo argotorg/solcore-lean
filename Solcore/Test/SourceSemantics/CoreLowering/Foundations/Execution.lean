@@ -4055,9 +4055,8 @@ def run : IO Unit := do
   rejectedByInference "uint256 is not Word" ["function bad(x: uint256) returns (Word) { return x; }"]
   rejectedByInference "uint8 is not uint16" ["function bad(x: uint8) returns (uint16) { return x; }"]
   rejectedByInference "int8 is not uint8" ["function bad(x: int8) returns (uint8) { return x; }"]
-  rejectedByInference "no `<<` on uint8 yet" ["function bad(x: uint8) returns (uint8) { return x << x; }"]
   rejectedByInference "a literal above uint8's range" ["function bad() returns (uint8) { return 256; }"]
-  IO.println "SOURCE_CORE_FIXED_TYPES_PASS: the twelve fixed-width integer types as parameters, results, locals and mapping elements hold canonical words, a missing element is zero, non-canonical arguments are rejected before the body runs, the types are distinct from each other and from Word, shifts at them are not yet accepted, and a literal above a type's range is rejected"
+  IO.println "SOURCE_CORE_FIXED_TYPES_PASS: the twelve fixed-width integer types as parameters, results, locals and mapping elements hold canonical words, a missing element is zero, non-canonical arguments are rejected before the body runs, the types are distinct from each other and from Word, and a literal above a type's range is rejected"
 
 end Tests.SourceCoreFixedIntegerTypes
 end
@@ -4073,7 +4072,8 @@ zero, so the results stay canonical. A literal takes the type its uses give it,
 and one above the type's greatest value is rejected. A prefix `-` on a literal
 folds into it, through groups and repeated, and the range is checked with the
 sign; any other `-e` reads as `0 - e`. Unchecked `+ - * / %` wrap to the
-type's width (`runUnchecked`); shifts and in-place `~` are still rejected. -/
+type's width (`runUnchecked`), and `<< >>` are Word's shifts read at the
+type (`runShifts`); compound shifts and in-place `~` are still rejected. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreFixedIntegerOperators
 open Solcore Solcore.Frontend SourceCoreExecution
@@ -4369,7 +4369,8 @@ def runDefaulting : IO Unit := do
   let cases : List (Nat × List Value × Value) := [
     -- Two open literals compared, or added and unused, are `uint256`.
     (0, [], boolean true), (1, [], word 3),
-    -- A literal through a generic call takes the return's type; a shift's literals are Words.
+    -- A literal through a generic call takes the return's type; a shift's open literals default to
+    -- `uint256` too.
     (2, [], word 7), (3, [], word 5), (4, [], boolean true),
     -- A match on an open literal makes it and its pattern `uint256`.
     (5, [], word 1), (6, [], word 0),
@@ -4469,7 +4470,7 @@ def runDefaulting : IO Unit := do
       require (operator == .add) s!"a generalized lambda's compound target named {reprStr operator}"
   | .ok _ => throw (IO.userError "a compound on a generalized lambda parameter was accepted")
   | .error errors => throw (IO.userError s!"a compound on a generalized lambda parameter gave {reprStr errors}")
-  IO.println "SOURCE_CORE_UINT256_DEFAULT_PASS: open literals in comparisons, operators, requirements and matches default to uint256 with checked arithmetic, a generic call's literal takes the return's type, shifts keep Word literals, numeric patterns at uint256 up to 2^256 - 1, unconstrained literals rejected as ambiguous, an open -1 and a defaulted 2^256 out of uint256's range, an unsolved Mark<uint256> rejected, compound assignments on an open target typed with their operand and defaulted to uint256 with checked += -= *= /= %= and Word's &= |= ^=, a later use's uint8 and int8, uint256 and Word for loop counters, compound shifts still Word and an open unchecked compound uint256, an integer compound target rejected, lambda parameters as compound targets typed by a captured Word, a declaration or a literal operand, and one that nothing types rejected, numeric patterns on the other eleven types rejected, a 2^256 pattern at uint256 rejected by inference, declared or defaulted, upstream's poly_int_defaulting rejected at its Int bound and its unbounded form as ambiguous"
+  IO.println "SOURCE_CORE_UINT256_DEFAULT_PASS: open literals in comparisons, operators, requirements and matches default to uint256 with checked arithmetic, a generic call's literal takes the return's type, a shift's open literals defaulted to uint256, numeric patterns at uint256 up to 2^256 - 1, unconstrained literals rejected as ambiguous, an open -1 and a defaulted 2^256 out of uint256's range, an unsolved Mark<uint256> rejected, compound assignments on an open target typed with their operand and defaulted to uint256 with checked += -= *= /= %= and Word's &= |= ^=, a later use's uint8 and int8, uint256 and Word for loop counters, compound shifts still Word and an open unchecked compound uint256, an integer compound target rejected, lambda parameters as compound targets typed by a captured Word, a declaration or a literal operand, and one that nothing types rejected, numeric patterns on the other eleven types rejected, a 2^256 pattern at uint256 rejected by inference, declared or defaulted, upstream's poly_int_defaulting rejected at its Int bound and its unbounded form as ambiguous"
 
 /-- Step 8a's fixture: unchecked `+ - * / %` on the twelve types, in a block. -/
 private def uncheckedWorkspace : Workspace.RawWorkspace := workspaceOf [
@@ -4625,6 +4626,139 @@ def runUnchecked : IO Unit := do
   | .ok _ => throw (IO.userError "an integer unchecked operand was accepted")
   | .error errors => throw (IO.userError s!"an integer unchecked operand gave {reprStr errors}")
   IO.println "SOURCE_CORE_FIXED_UNCHECKED_PASS: unchecked + - * wrapping modulo 2^N on the unsigned types and in two's complement on the signed ones with canonical results, unchecked / % rounding toward zero with MIN / -1 giving MIN and MIN % -1 giving 0, a zero divisor panicking with 0x12, -x in a block as unchecked 0 - x, literal operands typed by the other operand on either side, checked arithmetic again after the block, mixed operand types rejected, unchecked += -= *= /= %= on fixed-width locals, a mapping element and an open target typed later wrapping alike, with 0x12 on a zero divisor and its own diagnostic for an absent operand, an integer target rejected, two open literal operands typed by a later use, the return type or the uint256 default and wrapping there, and open literal operands that a later use makes integer rejected"
+
+/-- Step 8d's fixture: `<<` and `>>` on the twelve types, by amounts of `Word`
+and the unsigned types. -/
+private def shiftWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function shl8u(x: uint8, s: uint8) returns (uint8) { return x << s; }",
+  "function shr8u(x: uint8, s: uint256) returns (uint8) { return x >> s; }",
+  "function shl8s(x: int8, s: uint8) returns (int8) { return x << s; }",
+  "function shr8s(x: int8, s: uint8) returns (int8) { return x >> s; }",
+  "function shl16u(x: uint16, s: Word) returns (uint16) { return x << s; }",
+  "function shl256s(x: int256, s: Word) returns (int256) { return x << s; }",
+  "function shr256s(x: int256, s: uint16) returns (int256) { return x >> s; }",
+  "function shl256u(x: uint256, s: uint8) returns (uint256) { return x << s; }",
+  "function shr256u(x: uint256, s: uint256) returns (uint256) { return x >> s; }",
+  "function shrWordBy8u(w: Word, s: uint8) returns (Word) { return w >> s; }",
+  "function litAmount8u(x: uint8) returns (uint8) { return x << 3; }",
+  "function litAmount8s(x: int8) returns (int8) { return x >> 1; }",
+  "function litPast8u(x: uint8) returns (uint8) { return x << 300; }",
+  "function litValue8u(s: uint8) returns (uint8) { return 1 << s; }",
+  "function litValue8s(s: uint8) returns (int8) { return 1 << s; }",
+  "function litBoth8u() returns (uint8) { return 1 << 7; }",
+  "function openDefault() returns (bool) { let a = 1 << 255; return a > 5; }",
+  "function openPast() returns (bool) { let a = 1 << 256; return a == 0; }",
+  "function openWord() returns (Word) { let a = 1 << 3; let b: Word = a; return b; }",
+  "function precedence8u(x: uint8) returns (uint8) { return x + 1 << 2; }",
+  "function mask8u(x: uint8) returns (uint8) { return x & 0xF << 4; }",
+  "function ushl8u(x: uint8, s: uint8) returns (uint8) { unchecked { return x << s; } }",
+  "function ushr8s(x: int8, s: uint8) returns (int8) { unchecked { return x >> s; } }",
+  "function compare8s(x: int8) returns (bool) { return x >> 1 < x; }"]
+
+private def shiftNames : List String := [
+  "shl8u", "shr8u", "shl8s", "shr8s", "shl16u", "shl256s", "shr256s", "shl256u", "shr256u", "shrWordBy8u",
+  "litAmount8u", "litAmount8s", "litPast8u", "litValue8u", "litValue8s", "litBoth8u", "openDefault",
+  "openPast", "openWord", "precedence8u", "mask8u", "ushl8u", "ushr8s", "compare8s"]
+
+/-- Finalization rejects a shift whose value or amount has a type that no `Shl`
+or `Shr` instance takes, naming the shift's function and that type. -/
+private def rejectedShift (label name : String) (expected : TypeSystem.Ty) (lines : List String) : IO Unit :=
+  match checkProgram (workspaceOf lines) with
+  | .error [.inference ⟨_, .operatorNotSupported actual type⟩] =>
+      require (actual == name && decide (type = expected)) s!"{label} named {actual} and {reprStr type}"
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+/-- Step 8d, `<<` and `>>` on the twelve types, through the public API, as
+upstream's `Shl` and `Shr` instances give them: `uintN <<` is Word's shift
+masked to the low `N` bits, `intN <<` is Word's shift sign-extended from bit
+`N - 1`, `uintN >>` is Word's shift and `intN >>` the arithmetic one, so an
+amount of at least the width gives 0, or -1 for a negative value's `>>`, and
+no shift panics. The amount takes its own type: `Word` or an unsigned type. -/
+def runShifts : IO Unit := do
+  let program ← get "fixed-width shift check" (checkProgram shiftWorkspace)
+  let seeds ← shiftNames.mapM (seed program)
+  let compiled ← get "fixed-width shift compilation"
+    (compile shiftWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (index : Nat) : IO Key := match compiled.keys[index]? with
+    | some key => pure key | none => throw (IO.userError "fixed-width shift root missing")
+  let mut session ← boot (← compiled.open)
+  let cases : List (Nat × List Value × Value) := [
+    -- `uint8 <<` keeps the low 8 bits, and `>>` by a `uint256` amount is Word's.
+    (0, [word 1, word 3], word 8), (0, [word 0x81, word 1], word 2), (0, [word 1, word 7], word 128),
+    (0, [word 1, word 8], word 0), (0, [word 255, word 255], word 0), (0, [word 0xFF, word 4], word 0xF0),
+    (1, [word 0x80, word 7], word 1), (1, [word 0xF0, word 4], word 0x0F), (1, [word 255, word 0], word 255),
+    (1, [word 255, word 300], word 0), (1, [word 255, word (modulus - 1)], word 0),
+    -- `int8 <<` sign-extends the low 8 bits; `>>` is arithmetic and gives -1 for a negative value
+    -- past the width.
+    (2, [word 1, word 7], word (modulus - 128)), (2, [word (modulus - 1), word 1], word (modulus - 2)),
+    (2, [word 0x40, word 1], word (modulus - 128)), (2, [word 3, word 6], word (modulus - 64)),
+    (2, [word (modulus - 128), word 1], word 0), (2, [word 1, word 8], word 0),
+    (2, [word (modulus - 1), word 7], word (modulus - 128)),
+    (3, [word (modulus - 128), word 1], word (modulus - 64)), (3, [word (modulus - 128), word 8], word (modulus - 1)),
+    (3, [word 127, word 8], word 0), (3, [word 127, word 6], word 1), (3, [word 64, word 3], word 8),
+    (3, [word (modulus - 5), word 1], word (modulus - 3)), (3, [word (modulus - 1), word 255], word (modulus - 1)),
+    -- By a `Word` amount, up to `2^256 - 1`.
+    (4, [word 0x8001, word 1], word 2), (4, [word 1, word 15], word 0x8000), (4, [word 1, word 16], word 0),
+    (4, [word 1, word (modulus - 1)], word 0),
+    (5, [word 1, word 255], word (2 ^ 255)), (5, [word 1, word 256], word 0), (5, [word 3, word 255], word (2 ^ 255)),
+    (5, [word (modulus - 1), word 255], word (2 ^ 255)), (5, [word (modulus - 1), word 1], word (modulus - 2)),
+    -- `int256 >>` by a `uint16` amount: `MIN >> 300` is -1.
+    (6, [word (2 ^ 255), word 300], word (modulus - 1)), (6, [word (2 ^ 255), word 255], word (modulus - 1)),
+    (6, [word (2 ^ 255), word 254], word (modulus - 2)), (6, [word (2 ^ 255 - 1), word 254], word 1),
+    (6, [word (2 ^ 255 - 1), word 300], word 0), (6, [word (modulus - 8), word 2], word (modulus - 2)),
+    (7, [word 1, word 255], word (2 ^ 255)), (7, [word (modulus - 1), word 1], word (modulus - 2)),
+    (8, [word (2 ^ 255), word 255], word 1), (8, [word (modulus - 1), word 255], word 1),
+    (8, [word (modulus - 1), word 256], word 0), (8, [word (modulus - 1), word (modulus - 1)], word 0),
+    -- A `Word` value by a `uint8` amount.
+    (9, [word (2 ^ 255), word 255], word 1), (9, [word 0x100, word 8], word 1),
+    -- A literal amount defaults to `uint256`; `x << 300` is 0 at `uint8`.
+    (10, [word 1], word 8), (10, [word 0x20], word 0), (10, [word 0x1F], word 0xF8),
+    (11, [word (modulus - 5)], word (modulus - 3)), (11, [word 127], word 63),
+    (12, [word 1], word 0), (12, [word 255], word 0),
+    -- A literal value takes the return's type.
+    (13, [word 7], word 128), (13, [word 8], word 0), (13, [word 0], word 1),
+    (14, [word 7], word (modulus - 128)), (14, [word 6], word 64), (14, [word 8], word 0),
+    (15, [], word 128),
+    -- Open literals default to `uint256`, where `1 << 256` is 0, or take a later use's `Word`.
+    (16, [], boolean true), (17, [], boolean true), (18, [], word 8),
+    -- `x + 1 << 2` is `(x + 1) << 2`, and `x & 0xF << 4` is `x & (0xF << 4)`.
+    (19, [word 1], word 8), (19, [word 2], word 12), (19, [word 63], word 0), (20, [word 0xAB], word 0xA0),
+    -- In an `unchecked` block a shift is the same.
+    (21, [word 0x81, word 1], word 2), (21, [word 255, word 4], word 0xF0),
+    (22, [word (modulus - 128), word 1], word (modulus - 64)),
+    -- `x >> 1 < x` compares signed.
+    (23, [word (modulus - 128)], boolean false), (23, [word 5], boolean true), (23, [word (modulus - 1)], boolean false)]
+  for (index, arguments, expected) in cases do
+    let completed ← execute session (← key index) arguments
+    require (completed.value == expected)
+      s!"{shiftNames[index]?} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  -- The amount is `Word` or an unsigned type, as upstream's `ShiftAmount` instances are: a signed
+  -- amount is rejected, as upstream's `shift_by_signed_amount` fixture has it, and so are an
+  -- `integer` or `Bool` amount and an `integer` value.
+  rejectedShift "a signed amount" "shl" (.fixed ⟨true, .w8⟩)
+    ["function bad(x: uint8, s: int8) returns (uint8) { return x << s; }"]
+  rejectedShift "an int256 amount on Word" "shr" (.fixed ⟨true, .w256⟩)
+    ["function bad(w: Word, s: int256) returns (Word) { return w >> s; }"]
+  rejectedShift "an integer amount" "shr" .integer
+    ["function bad(x: uint8, n: integer) returns (uint8) { return x >> n; }"]
+  rejectedShift "a Bool amount" "shl" .bool
+    ["function bad(x: uint8, b: Bool) returns (uint8) { return x << b; }"]
+  rejectedShift "an integer value" "shl" .integer
+    ["function bad(n: integer) returns (integer) { return n << 1; }"]
+  -- A negative literal amount defaults to `uint256` and is out of its range, as upstream's.
+  rejectedOutOfRange "a negative literal amount" "uint256" (-1)
+    ["function bad(x: uint8) returns (uint8) { return x << -1; }"]
+  -- A lambda parameter that only a shift's value types: local generalization quantifies it, so its
+  -- type is still open at finalization, as for step 7b's compound targets.
+  match checkProgram (workspaceOf
+      ["function bad() returns (Word) { let f = lam(x) { return x << 1; }; return 0; }"]) with
+  | .error [.inference ⟨_, .operatorNotSupported name (.variable _)⟩] =>
+      require (name == "shl") s!"a generalized lambda's shift named {name}"
+  | .ok _ => throw (IO.userError "a shift of a generalized lambda parameter was accepted")
+  | .error errors => throw (IO.userError s!"a shift of a generalized lambda parameter gave {reprStr errors}")
+  IO.println "SOURCE_CORE_FIXED_SHIFTS_PASS: << and >> on signed and unsigned fixed-width types by Word and unsigned amounts of other types, uintN << keeping the low N bits, intN << sign-extending them, uintN >> as Word's and intN >> arithmetic, amounts past the width giving 0 or -1 for a negative >>, no shift panicking, a Word value by a uint8 amount, literal amounts defaulted to uint256 and literal values typed by the return, open literals defaulted to uint256 or typed by a later use, precedence with + and &, shifts in an unchecked block, signed comparison of a shift's result, signed, integer and Bool amounts, an integer value, a negative literal amount and a generalized lambda parameter rejected"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)
@@ -4835,6 +4969,7 @@ def run : IO Unit := do
   IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * / % on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= /= %= panicking with 0x11 outside the range (MIN / -1 among them, MIN % -1 not), / % /= %= panicking with 0x12 on a zero divisor and rounding toward zero, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, literals at their range edges and as operands, deferred operators and mapping elements, one past each range rejected naming the type, negated literals folded through groups and repeated with their range checked by sign, -x as checked 0 - x panicking for MIN and nonzero unsigned values and wrapping on Word, negated-literal operands and compound forms, unary minus rejected on declared types and Bool, <<= and in-place ~ still rejected"
   runDefaulting
   runUnchecked
+  runShifts
 
 end Tests.SourceCoreFixedIntegerOperators
 end

@@ -458,12 +458,24 @@ theorem expressionRetained_binary_operator_for
       unchecked (by simp [empty]) leftContains
     rw [leftNodeType] at fits
     simpa only [finalSubstitution] using fits
+  have shiftFits : Detail.isShiftOperator operator.value = true →
+      Detail.shiftValueFits (resources.finalState.inference.substitution.apply left.type) = true ∧
+        Detail.shiftAmountFits (resources.finalState.inference.substitution.apply right.type) = true := by
+    intro shift
+    have empty := (Detail.inferBinaryOperator_shift_result shift operatorSuccess).1
+    obtain ⟨leftNode, leftContains, leftNodeType⟩ := leftTyped.stored_type
+    obtain ⟨rightNode, rightContains, rightNodeType⟩ := rightTyped.stored_type
+    have fits := SourceShiftOperandsFit.of_operatorSite
+      (@FinalInferenceResources.shift_operands_fit _ _ _ _ _ resources) boundary.operatorSite contains rfl
+      shift (by simp [empty]) leftContains rightContains
+    rw [leftNodeType, rightNodeType] at fits
+    simpa only [finalSubstitution] using fits
   simpa only [finalSubstitution] using
     (inferBinaryOperator_recordExpressionWithExpected_typing_from_interfaces
       (later := resources.finalState) (base := finalizedRequirementContext wholeContext finalized)
       operatorSuccess recorded (by simpa only [finalSubstitution] using leftTyped)
       (by simpa only [finalSubstitution] using rightTyped)
-      rightProperties.2.1 leftBelow rightProperties.2.2 rightExpected targets uncheckedFits
+      rightProperties.2.1 leftBelow rightProperties.2.2 rightExpected targets uncheckedFits shiftFits
       (by simpa only [finalSubstitution] using resultSubstitutionExtension)
       finalRequirements boundary.expressionRequirements (by simpa only [signaturesEq] using interfaces) boundary.coercionPrimaries boundary.operatorSite
       activeCatalog (invariant.typeParameterBinders wholeCanonical) activeSignatures

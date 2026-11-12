@@ -3478,20 +3478,10 @@ theorem inferBinaryOperator_inferenceProperties
     isOpenIntegerLiteralTarget state integerLiterals left ||
       isOpenIntegerLiteralTarget state integerLiterals right
   by_cases shift : isShiftOperator operator = true
-  · obtain ⟨_, typeEq, valued, valueResult, amountResult⟩ :=
-      inferBinaryOperator_shift_result shift success
-    have valueProgress := unify_inferenceProgress ready.solved leftBelow
-      (Ty.variablesBelow_constructor _ _) valueResult
-    have valuedReady := unify_preserves_inferenceReady ready leftBelow
-      (Ty.variablesBelow_constructor _ _) valueResult
-    have rightAtValued := rightBelow.weaken valueProgress.next_le
-    have amountProgress := unify_inferenceProgress valuedReady.solved rightAtValued
-      (Ty.variablesBelow_constructor _ _) amountResult
-    have amountReady := unify_preserves_inferenceReady valuedReady rightAtValued
-      (Ty.variablesBelow_constructor _ _) amountResult
-    rw [typeEq]
-    exact ⟨valueProgress.trans amountProgress, amountReady,
-      Ty.variablesBelow_constructor _ _⟩
+  · obtain ⟨_, typeEq, stateEq⟩ := inferBinaryOperator_shift_result shift success
+    rw [typeEq, stateEq]
+    exact ⟨State.InferenceProgress.refl ready.solved, ready,
+      ready.solved.variablesBelow_apply leftBelow⟩
   by_cases unchecked : isUncheckedOperator operator = true
   · obtain ⟨unifiedState, prepared, unifyResult, prepare, tailSuccess⟩ :=
       inferBinaryOperator_unchecked_result unchecked success
@@ -6314,8 +6304,7 @@ private theorem inferBinaryOperator_state_header
       integerLiterals state = .ok result) :
     result.state.header = state.header := by
   by_cases shift : isShiftOperator operator = true
-  · exact inferBinaryOperator_shift_projection (fun state => state.header)
-      (fun unified => unify_state_header unified) shift success
+  · exact inferBinaryOperator_shift_projection (fun state => state.header) shift success
   unfold inferBinaryOperator binaryOperatorTail at success
   rw [if_neg shift] at success
   simp_all [bind, Except.bind]
@@ -6335,8 +6324,7 @@ private theorem inferBinaryOperator_lexicalScope
       integerLiterals state = .ok result) :
     result.state.lexicalScope = state.lexicalScope := by
   by_cases shift : isShiftOperator operator = true
-  · exact inferBinaryOperator_shift_projection (fun state => state.lexicalScope)
-      (fun unified => unify_preserves_lexicalScope unified) shift success
+  · exact inferBinaryOperator_shift_projection (fun state => state.lexicalScope) shift success
   unfold inferBinaryOperator binaryOperatorTail at success
   rw [if_neg shift] at success
   simp only [bind, Except.bind] at success
@@ -6363,8 +6351,7 @@ private theorem inferBinaryOperator_nextLocal
       integerLiterals state = .ok result) :
     result.state.nextLocal = state.nextLocal := by
   by_cases shift : isShiftOperator operator = true
-  · exact inferBinaryOperator_shift_projection (fun state => state.nextLocal)
-      (fun unified => unify_preserves_nextLocal unified) shift success
+  · exact inferBinaryOperator_shift_projection (fun state => state.nextLocal) shift success
   unfold inferBinaryOperator binaryOperatorTail at success
   rw [if_neg shift] at success
   simp only [bind, Except.bind] at success

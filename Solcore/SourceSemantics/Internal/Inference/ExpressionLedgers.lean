@@ -1057,9 +1057,9 @@ theorem inferBinaryOperator
     Detail.isOpenIntegerLiteralTarget state integerLiterals left ||
       Detail.isOpenIntegerLiteralTarget state integerLiterals right
   by_cases shift : Detail.isShiftOperator operator = true
-  · obtain ⟨_, _, valued, valueResult, amountResult⟩ :=
-      Detail.inferBinaryOperator_shift_result shift success
-    exact (LedgerEvolution.trans (.unify valueResult) (.unify amountResult)).preserve tracked
+  · obtain ⟨_, _, stateEq⟩ := Detail.inferBinaryOperator_shift_result shift success
+    rw [stateEq]
+    exact tracked
   by_cases unchecked : Detail.isUncheckedOperator operator = true
   · obtain ⟨unifiedState, prepared, unifyResult, prepare, tailSuccess⟩ :=
       Detail.inferBinaryOperator_unchecked_result unchecked success

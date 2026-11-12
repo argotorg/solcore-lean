@@ -78,14 +78,14 @@ inductive Tree (fuel : Nat) (values : ValuesContext) (source : TypedSource)
       (child : Tree fuel values source context solved reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Tree fuel values source context solved reasonAt scope id
         ⟨core.resultType, core.lower childCode⟩
-  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary {id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       (metadata : Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
       (leftFound : source.lookupExpression? left = some leftNode)
       (rightFound : source.lookupExpression? right = some rightNode)
-      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = amountType)
       (outputType : node.type = resultType)
-      (profile : BinaryProfile operator operandType resultType mode)
+      (profile : BinaryProfile operator operandType amountType resultType mode)
       (first : Tree fuel values source context solved reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
       (second : Tree fuel values source context solved reasonAt scope right ⟨mode.operandType operator, rightCode⟩) :
       Tree fuel values source context solved reasonAt scope id
@@ -207,14 +207,14 @@ inductive Tree.LiteralSites (literals : GenericExpressionMeaning.Certificate) :
       (child : Tree fuel values source context solved reasonAt scope operand ⟨core.operandType, childCode⟩)
       (childSites : Tree.LiteralSites literals child) :
       LiteralSites literals (Tree.unary (scope := scope) metadata form found inputType outputType profile child)
-  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary {id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       (metadata : Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
       (leftFound : source.lookupExpression? left = some leftNode)
       (rightFound : source.lookupExpression? right = some rightNode)
-      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = amountType)
       (outputType : node.type = resultType)
-      (profile : BinaryProfile operator operandType resultType mode)
+      (profile : BinaryProfile operator operandType amountType resultType mode)
       (first : Tree fuel values source context solved reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
       (second : Tree fuel values source context solved reasonAt scope right ⟨mode.operandType operator, rightCode⟩)
       (firstSites : Tree.LiteralSites literals first) (secondSites : Tree.LiteralSites literals second) :
@@ -449,7 +449,7 @@ theorem preserves_with_literals_and_post [FunctionCalls.FaultTokens faults]
         rw [inputType] at payload
         obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
         exact False.elim (unary_fault_excluded applied failed)
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
     intro root found mapping world administrative environment canonical actual before store ξ outcome after environments heaps locals agrees trace
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
@@ -780,7 +780,7 @@ theorem reflects_with_literals_and_post [FunctionCalls.FaultTokens faults]
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace applied),
             .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
     intro root found mapping world administrative environment canonical actual before store ξ value finalStore environments heaps locals agrees evaluated
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
@@ -1059,9 +1059,9 @@ private theorem unary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
         SourceCorePrimitive.narrowBitNotMask?, SourceCorePrimitive.unaryOperator, TypeSystem.Ty.fixed,
         Dynamic.fixedLowMask])
 private theorem binary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
-    {operator : Syntax.BinaryOp} {operand result : TypeSystem.Ty} {mode : Mode} {type : Ty}
+    {operator : Syntax.BinaryOp} {operand amount result : TypeSystem.Ty} {mode : Mode} {type : Ty}
     {lookup : Option TypeSystem.Ty}
-    (profile : BinaryProfile operator operand result mode) (projected : catalog.project operand = .ok type)
+    (profile : BinaryProfile operator operand amount result mode) (projected : catalog.project operand = .ok type)
     (lookupEq : lookup = some operand) :
     selectedMode (SourceCorePrimitive.binaryLowering type lookup operator) = mode := by
   subst lookupEq
@@ -1069,7 +1069,9 @@ private theorem binary_selected {catalog : SourceCoreCompatibleCatalog.Catalog}
   all_goals first
     | rfl
     | (rename_i kind; cases kind <;> simp_all [selectedMode, SourceCorePrimitive.binaryLowering,
-        SourceCorePrimitive.signedOrdering, SourceCorePrimitive.checkedArithmetic, TypeSystem.Ty.fixed])
+        SourceCorePrimitive.signedOrdering, SourceCorePrimitive.checkedArithmetic, TypeSystem.Ty.fixed]; done)
+    | (rename_i kind _; cases kind <;> simp_all [selectedMode, SourceCorePrimitive.binaryLowering,
+        SourceCorePrimitive.signedOrdering, SourceCorePrimitive.checkedArithmetic, TypeSystem.Ty.fixed]; done)
     | (rename_i strict; cases strict <;> rfl)
 
 private inductive Compound : ExpressionForm → Prop where
@@ -1348,7 +1350,7 @@ theorem tree_of_functions_with_literals
       cases step with
       | @binary operator left right first second otherForm metadata firstGenerated secondGenerated leftChecked rightChecked =>
         obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (form.symm.trans otherForm)
-        obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, sameType, leftTyped, rightTyped, profile⟩ :=
+        obtain ⟨leftNode, rightNode, mode, leftFound, rightFound, leftTyped, rightTyped, profile⟩ :=
           binary_source_types unique originalFound form metadata.coercions metadata.requirements typed
         obtain ⟨firstTree, firstTreeSites⟩ := leftIH leftFound leftTyped firstGenerated
         obtain ⟨secondTree, secondTreeSites⟩ := rightIH rightFound rightTyped secondGenerated
@@ -1359,7 +1361,7 @@ theorem tree_of_functions_with_literals
         obtain ⟨secondType, rightCode⟩ := second
         dsimp only at leftChecked rightChecked firstTree secondTree ⊢
         subst firstType secondType
-        exact ⟨_, .binary metadata form leftFound rightFound rfl sameType.symm rfl profile firstTree secondTree firstTreeSites secondTreeSites⟩
+        exact ⟨_, .binary metadata form leftFound rightFound rfl rfl rfl profile firstTree secondTree firstTreeSites secondTreeSites⟩
       | unary otherForm _ _ _ | group otherForm _ _ | pair otherForm _ _ _ | conditional otherForm _ _ _ _ => simp [form] at otherForm
   | group originalFound form child ih =>
     have same := Option.some.inj (originalFound.symm.trans found)
@@ -2341,14 +2343,14 @@ inductive Tree (fuel : Nat) (values : ValuesContext) (source : TypedSource)
       (child : Tree fuel values source context solved reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Tree fuel values source context solved reasonAt scope id
         ⟨core.resultType, core.lower childCode⟩
-  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary {id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       (metadata : Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
       (leftFound : source.lookupExpression? left = some leftNode)
       (rightFound : source.lookupExpression? right = some rightNode)
-      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = amountType)
       (outputType : node.type = resultType)
-      (profile : BinaryProfile operator operandType resultType mode)
+      (profile : BinaryProfile operator operandType amountType resultType mode)
       (first : Tree fuel values source context solved reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
       (second : Tree fuel values source context solved reasonAt scope right ⟨mode.operandType operator, rightCode⟩) :
       Tree fuel values source context solved reasonAt scope id
@@ -2497,14 +2499,14 @@ inductive Tree (fuel : Nat) (values : ValuesContext) (source : TypedSource)
       (child : Tree fuel values source context solved reasonAt scope operand ⟨core.operandType, childCode⟩) :
       Tree fuel values source context solved reasonAt scope id
         ⟨core.resultType, core.lower childCode⟩
-  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary {id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       (metadata : Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
       (leftFound : source.lookupExpression? left = some leftNode)
       (rightFound : source.lookupExpression? right = some rightNode)
-      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = amountType)
       (outputType : node.type = resultType)
-      (profile : BinaryProfile operator operandType resultType mode)
+      (profile : BinaryProfile operator operandType amountType resultType mode)
       (first : Tree fuel values source context solved reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
       (second : Tree fuel values source context solved reasonAt scope right ⟨mode.operandType operator, rightCode⟩) :
       Tree fuel values source context solved reasonAt scope id

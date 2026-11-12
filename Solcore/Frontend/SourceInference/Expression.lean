@@ -2442,9 +2442,9 @@ end
 
 section
 -- leanmerge: from Solcore.Frontend.SourceInference.ShiftOperatorInference
-/-! The shift branch of binary-operator inference: a shift unifies its value's
-type and then its amount's type with Word, adds no requirement, and has a Word
-result. -/
+/-! The shift branch of binary-operator inference: a shift leaves the state as
+it is, adds no requirement, and has its value's type; finalization checks the
+value's and the amount's types. -/
 
 set_option autoImplicit false
 
@@ -2459,37 +2459,23 @@ theorem inferBinaryOperator_shift_result {context : Context}
     (shift : isShiftOperator operator = true)
     (success : inferBinaryOperator context operator left right expected
       integerLiterals state = .ok result) :
-    result.requirements = [] ∧ result.type = .word ∧
-      ∃ valued, unify state left .word = .ok valued ∧
-        unify valued right .word = .ok result.state := by
+    result.requirements = [] ∧ result.type = state.resolve left ∧ result.state = state := by
   unfold inferBinaryOperator at success
   rw [if_pos shift] at success
-  cases valueResult : unify state left .word with
-  | error error => simp [valueResult, bind, Except.bind] at success
-  | ok valued =>
-      cases amountResult : unify valued right .word with
-      | error error => simp [valueResult, amountResult, bind, Except.bind] at success
-      | ok amounted =>
-          simp only [valueResult, amountResult, bind, Except.bind, pure, Except.pure,
-            Except.ok.injEq] at success
-          subst success
-          exact ⟨rfl, rfl, valued, rfl, amountResult⟩
+  simp only [pure, Except.pure, Except.ok.injEq] at success
+  subst success
+  exact ⟨rfl, rfl, rfl⟩
 
-/-- A projection of the inference state that unification preserves is also
-preserved by a shift. -/
+/-- A shift preserves every projection of the inference state. -/
 theorem inferBinaryOperator_shift_projection {α : Type} {context : Context}
     {operator : Syntax.BinaryOp} {left right : Ty} {expected : Option Ty}
     {integerLiterals : List IntegerLiteralOrigin} {state : State}
     {result : OperatorInferenceResult} (projection : State → α)
-    (unified : ∀ {before after : State} {first second : Ty},
-      unify before first second = .ok after → projection after = projection before)
     (shift : isShiftOperator operator = true)
     (success : inferBinaryOperator context operator left right expected
       integerLiterals state = .ok result) :
     projection result.state = projection state := by
-  obtain ⟨_, _, valued, valueResult, amountResult⟩ :=
-    inferBinaryOperator_shift_result shift success
-  rw [unified amountResult, unified valueResult]
+  rw [(inferBinaryOperator_shift_result shift success).2.2]
 
 end Solcore.Frontend.SourceInference.Detail
 end

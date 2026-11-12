@@ -546,9 +546,11 @@ mutual
                 left_evaluates with
               ⟨left_typed, after_typed, extension⟩
             cases circuit <;> cases operator_type
-            all_goals try { rename_i kind; cases kind }
-            all_goals try { rename_i dispatch profile proof; cases dispatch }
-            all_goals exact ⟨.bool _, after_typed, extension⟩
+            all_goals first
+              | exact ⟨.bool _, after_typed, extension⟩
+              | (rename_i kind; cases kind; done)
+              | (rename_i kind _; cases kind; done)
+              | (rename_i dispatch profile proof; cases dispatch; done)
     | .binaryEvaluateRight layout left_evaluates evaluate_right right_evaluates
         applies => by
         cases typing with
@@ -1218,14 +1220,14 @@ mutual
       {source : TypedSource} {before after : Heap}
       {operator : Syntax.BinaryOp} {lookup : Option TypeSystem.Ty}
       {requirements : List RequirementId}
-      {left right output : Value} {operandType resultType : Ty}
+      {left right output : Value} {leftType rightType resultType : Ty}
       (runtime : SourceRuntimeValid program context source)
       (before_typed : HeapWellTyped context before)
-      (left_typed : ValueHasType context before left operandType)
-      (right_typed : ValueHasType context before right operandType)
-      (typing : BinaryOperatorHasType context operator operandType operandType
+      (left_typed : ValueHasType context before left leftType)
+      (right_typed : ValueHasType context before right rightType)
+      (typing : BinaryOperatorHasType context operator leftType rightType
         resultType requirements)
-      (lookupEq : lookup = some operandType)
+      (lookupEq : lookup = some leftType)
       (evaluation : BinaryOperationApplies program context evidence before operator
         lookup requirements left right output after) :
       ValueHasType context after output resultType /\
@@ -1239,9 +1241,15 @@ mutual
         | integerArithmetic kind =>
             exact ⟨applies.preserves (.integerArithmetic kind) left_typed right_typed,
               before_typed, .refl before⟩
-        | wordShift kind =>
-            exact ⟨applies.preserves (.wordShift kind) left_typed right_typed,
-              before_typed, .refl before⟩
+        | wordShift kind amount =>
+            -- A Word's shift gives a Word, whatever the amount's type.
+            refine ⟨?_, before_typed, .refl before⟩
+            cases applies with
+            | primitive _ primitive =>
+                cases kind <;> cases primitive <;> first | exact .word _ | cases left_typed
+            | fixed operandEq _ =>
+                rw [lookupEq] at operandEq
+                simp [TypeSystem.Ty.word, TypeSystem.Ty.fixed] at operandEq
         | wordUnchecked kind =>
             exact ⟨applies.preserves (.wordUnchecked kind) left_typed right_typed,
               before_typed, .refl before⟩
@@ -1266,6 +1274,8 @@ mutual
             exact ⟨applies.preserves_division kind lookupEq, before_typed, .refl before⟩
         | fixedUnchecked kind =>
             exact ⟨applies.preserves_unchecked kind lookupEq, before_typed, .refl before⟩
+        | fixedShift kind amount =>
+            exact ⟨applies.preserves_shift kind lookupEq left_typed, before_typed, .refl before⟩
         | booleanAnd =>
             exact ⟨applies.preserves .booleanAnd left_typed right_typed,
               before_typed, .refl before⟩
@@ -1279,7 +1289,7 @@ mutual
         cases typing with
         | wordArithmetic kind => cases selected
         | integerArithmetic kind => cases selected
-        | wordShift kind => cases selected
+        | wordShift kind amount => cases selected
         | wordUnchecked kind => cases selected
         | wordComparison kind => cases selected
         | integerComparison kind => cases selected
@@ -1289,6 +1299,7 @@ mutual
         | fixedArithmetic kind => cases selected
         | fixedDivision kind => cases selected
         | fixedUnchecked kind => cases selected
+        | fixedShift kind amount => cases selected
         | booleanAnd => cases selected
         | booleanOr => cases selected
         | trait static_dispatch profile requirements_prove =>
@@ -1310,7 +1321,7 @@ mutual
               runtime.closed certificate.type_parameters_empty
               runtime.variables_closed certificate.residual_type_variables_open
             have body_arguments_typed : ValuesHaveTypes _ before
-                [left, right] [operandType, operandType] :=
+                [left, right] [_, _] :=
               .cons body_left_typed (.cons body_right_typed .nil)
             have invocation := preserveBodyRec program_well_formed
               certificate (selected_covers selected) body_heap_typed

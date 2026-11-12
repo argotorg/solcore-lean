@@ -1056,9 +1056,9 @@ theorem conditional_inv {condition thenId elseId : ExpressionId} (metadata : Met
 theorem right_evaluated {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions} {functions : FunctionModel checked.catalog ambient}
     {mapping : LocationMap} {world : StoreTyping} {operator : Syntax.BinaryOp}
-    {operand result : TypeSystem.Ty} {mode : Mode} {a : Dynamic.Value} {x : Value}
+    {operand amount result : TypeSystem.Ty} {mode : Mode} {a : Dynamic.Value} {x : Value}
     {actual : Environment} {store finalStore : Store} {right : Expr} {value : Value}
-    (profile : BinaryProfile operator operand result mode)
+    (profile : BinaryProfile operator operand amount result mode)
     (represented : ValueRep checked registry functions mapping world operand a x (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (original : EvaluationSize size (x :: actual) store (mode.tail operator right) value finalStore) :
@@ -1075,6 +1075,8 @@ theorem right_evaluated {registry : SourceCoreRawMetadata.Registry}
   | fixedDivision kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | fixedUnchecked kind => cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | fixedUncheckedDivision kind =>
+    cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
+  | wordShift kind _ | fixedShift kind _ =>
     cases kind <;> cases original <;> refine ⟨_, _, _, by assumption, ?_⟩ <;> omega
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
@@ -1407,7 +1409,7 @@ theorem Head.preserves_at (budget size : Nat) (bounded : size ≤ budget)
         rw [inputType] at payload
         obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
         exact False.elim (unary_fault_excluded applied failed)
-  | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
+  | @binary node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
     have leftIH := fun n (bound : n ≤ budget) => @meaning left (by rw [form]; change left ∈ [left, right]; simp) n bound _ _ _ ⟨rfl, leftTree⟩
@@ -1646,7 +1648,7 @@ theorem Head.reflects_raw_at (budget size : Nat) (bounded : size ≤ budget)
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace.sound applied),
             .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, ProtectedStateTransition.WithReady.Reached.of_value protocol ready transition _⟩
-  | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
+  | @binary node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
     have same := Option.some.inj (metadata.found.symm.trans found)
     subst root
     have leftIH := fun n (bound : n ≤ budget) => @meaning left (by rw [form]; change left ∈ [left, right]; simp) n bound _ _ _ ⟨rfl, leftTree⟩

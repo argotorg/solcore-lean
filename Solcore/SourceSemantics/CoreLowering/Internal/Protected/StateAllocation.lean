@@ -1765,7 +1765,7 @@ theorem Head.preserves [FunctionCalls.FaultTokens faults]
         rw [inputType] at payload
         obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
         exact False.elim (unary_fault_excluded applied failed)
-  | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
+  | @binary node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
     have leftIH := @meaning _ _ _ leftTree
     have rightIH := @meaning _ _ _ rightTree
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after environments heaps locals agrees actualTyped installedEntry trace
@@ -1975,7 +1975,7 @@ theorem Head.reflects [FunctionCalls.FaultTokens faults]
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace applied),
             .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata⟩
-  | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
+  | @binary node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
     have leftIH := @meaning _ _ _ leftTree
     have rightIH := @meaning _ _ _ rightTree
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore environments heaps locals agrees actualTyped installedEntry evaluated

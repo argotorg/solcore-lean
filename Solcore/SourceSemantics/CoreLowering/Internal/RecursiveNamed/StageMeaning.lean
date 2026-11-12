@@ -102,14 +102,14 @@ inductive Supported :
       (child : Tree fuel values source context solved reasonAt scope operand ⟨core.operandType, childCode⟩)
       (childSites : Supported child) :
       Supported (Tree.unary (scope := scope) metadata form found inputType outputType profile child)
-  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary {id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       (metadata : Metadata values.checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
       (leftFound : source.lookupExpression? left = some leftNode)
       (rightFound : source.lookupExpression? right = some rightNode)
-      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = amountType)
       (outputType : node.type = resultType)
-      (profile : BinaryProfile operator operandType resultType mode)
+      (profile : BinaryProfile operator operandType amountType resultType mode)
       (first : Tree fuel values source context solved reasonAt scope left ⟨mode.operandType operator, leftCode⟩)
       (second : Tree fuel values source context solved reasonAt scope right ⟨mode.operandType operator, rightCode⟩)
       (firstSites : Supported first) (secondSites : Supported second) :
@@ -464,10 +464,10 @@ section Tail
 variable {checked : SourceCoreCompatibleCatalog.Checked} {rawRegistry : SourceCoreRawMetadata.Registry}
   {ambient : AmbientDefinitions checked.catalog.definitions} {model : FunctionModel checked.catalog ambient}
   {mapping : LocationMap} {world : StoreTyping} {operator : Syntax.BinaryOp}
-  {operand result : TypeSystem.Ty} {mode : Mode} {a b : Dynamic.Value} {x y : Value}
+  {operand amount result : TypeSystem.Ty} {mode : Mode} {a b : Dynamic.Value} {x y : Value}
   {environment : Environment} {before middle finalStore : Store} {right : Expr} {value : Value}
 
-private theorem tail_short (profile : BinaryProfile operator operand result mode)
+private theorem tail_short (profile : BinaryProfile operator operand amount result mode)
     (represented : ValueRep checked rawRegistry model mapping world operand a x (mode.operandType operator))
     {output : Dynamic.Value} (circuit : Dynamic.ShortCircuits operator a output)
     (evaluated : Evaluates (x :: environment) before (mode.tail operator right) value finalStore) :
@@ -484,6 +484,7 @@ private theorem tail_short (profile : BinaryProfile operator operand result mode
   | fixedDivision kind => cases circuit <;> cases kind
   | fixedUnchecked kind => cases circuit <;> cases kind
   | fixedUncheckedDivision kind => cases circuit <;> cases kind
+  | wordShift kind _ | fixedShift kind _ => cases circuit <;> cases kind
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases circuit
@@ -501,7 +502,7 @@ private theorem tail_short (profile : BinaryProfile operator operand result mode
       cases condition
       cases branch with | inRight payload => cases payload; exact ⟨_, rfl, rfl, .bool _⟩
 
-private theorem tail_fault (profile : BinaryProfile operator operand result mode)
+private theorem tail_fault (profile : BinaryProfile operator operand amount result mode)
     (represented : ValueRep checked rawRegistry model mapping world operand a x (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a) {reason : Word}
     (child : Evaluates (x :: environment) before (right.weakenAt 0) (.inLeft (mode.operandType operator) (.word reason)) middle)
@@ -518,6 +519,7 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
   | fixedDivision kind => cases kind <;> exact bind_failed child evaluated
   | fixedUnchecked kind => cases kind <;> exact bind_failed child evaluated
   | fixedUncheckedDivision kind => cases kind <;> exact bind_failed child evaluated
+  | wordShift kind _ | fixedShift kind _ => cases kind <;> exact bind_failed child evaluated
   | logicalAnd =>
     obtain ⟨boolean, rfl, rfl⟩ := bool_fields represented
     cases continues with
@@ -539,10 +541,10 @@ private theorem tail_fault (profile : BinaryProfile operator operand result mode
         cases condition
         exact evaluation_deterministic branch child
 
-private theorem tail_outcome_primitive (profile : BinaryProfile operator operand result mode)
+private theorem tail_outcome_primitive (profile : BinaryProfile operator operand amount result mode)
     (notSigned : mode ≠ .signed) (notChecked : mode.checkedType? = none)
     (leftRep : ValueRep checked rawRegistry model mapping world operand a x (mode.operandType operator))
-    (rightRep : ValueRep checked rawRegistry model mapping world operand b y (mode.operandType operator))
+    (rightRep : ValueRep checked rawRegistry model mapping world amount b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (child : Evaluates (x :: environment) before (right.weakenAt 0) (.inRight .word y) middle)
     (evaluated : Evaluates (x :: environment) before (mode.tail operator right) value finalStore) :
@@ -666,13 +668,29 @@ private theorem tail_outcome_primitive (profile : BinaryProfile operator operand
         cases condition
         obtain ⟨rfl, rfl⟩ := evaluation_deterministic branch child
         exact ⟨_, _, .logicalOr false b, .bool b, rfl, rfl⟩
+  | wordShift kind amountType =>
+    refine .inl ?_
+    have strict := kind.strict
+    have operandEq := PrimitiveExpressions.strict_operand_word strict
+    obtain ⟨a, rfl, rfl⟩ := word_fields (by simpa only [Mode.operandType, operandEq] using leftRep)
+    obtain ⟨b, rfl, rfl⟩ := amount_word_fields amountType (by simpa only [Mode.operandType, operandEq] using rightRep)
+    obtain ⟨output, native, applied, represented, pure⟩ := word_body (functions := model) (registry := rawRegistry)
+      (mapping := mapping) (world := world) strict a b
+    have body : Evaluates (.word b :: .word a :: environment) middle
+        (LanguageResult.success (Mode.body .word operator)) value finalStore := by
+      cases kind <;> exact (LanguageResult.bind_success_iff child).mp evaluated
+    cases body with
+    | inRight actual =>
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic actual (pure _ _)
+      refine ⟨_, _, applied, ?_, rfl, rfl⟩
+      cases kind <;> exact represented
   | fixedSigned => exact absurd rfl notSigned
-  | fixedChecked | fixedDivision | fixedUnchecked | fixedUncheckedDivision =>
+  | fixedChecked | fixedDivision | fixedUnchecked | fixedUncheckedDivision | fixedShift =>
     simp [Mode.checkedType?] at notChecked
 
-private theorem tail_outcome {lookup : Option TypeSystem.Ty} (profile : BinaryProfile operator operand result mode)
+private theorem tail_outcome {lookup : Option TypeSystem.Ty} (profile : BinaryProfile operator operand amount result mode)
     (leftRep : ValueRep checked rawRegistry model mapping world operand a x (mode.operandType operator))
-    (rightRep : ValueRep checked rawRegistry model mapping world operand b y (mode.operandType operator))
+    (rightRep : ValueRep checked rawRegistry model mapping world amount b y (mode.operandType operator))
     (continues : Dynamic.EvaluatesRightOperand operator a)
     (child : Evaluates (x :: environment) before (right.weakenAt 0) (.inRight .word y) middle)
     (evaluated : Evaluates (x :: environment) before (mode.tail operator right) value finalStore)
@@ -770,6 +788,27 @@ private theorem tail_outcome {lookup : Option TypeSystem.Ty} (profile : BinaryPr
           exact .inl ⟨_, _, .fixed operandEq (.uncheckedDivision kind a b zero),
             .fixed _ (Dynamic.fixed_canonical_ofInt (Dynamic.fixedWrap_inRange _ _).1
               (Dynamic.fixedWrap_inRange _ _).2), rfl, rfl⟩
+      | fixedShift kind amountType =>
+        obtain ⟨a, rfl, rfl, _, leftCanonical⟩ := fixed_fields leftRep rfl
+        obtain ⟨b, rfl, rfl⟩ := amount_word_fields amountType
+          (by simpa only [Mode.operandType, PrimitiveExpressions.strict_operand_word kind.strict] using rightRep)
+        refine .inl ?_
+        cases kind with
+        | shiftLeft =>
+          have body : Evaluates (.word b :: .word a :: environment) middle
+              (SourceCorePrimitive.shiftLeftBody type) value finalStore :=
+            (LanguageResult.bind_success_iff child).mp evaluated
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic body shift_left_body
+          exact ⟨_, _, .fixed operandEq (.shiftLeft a b),
+            .fixed _ (Dynamic.fixed_canonical_ofInt (Dynamic.fixedWrap_inRange _ _).1
+              (Dynamic.fixedWrap_inRange _ _).2), rfl, rfl⟩
+        | shiftRight =>
+          have body : Evaluates (.word b :: .word a :: environment) middle
+              (SourceCorePrimitive.shiftRightBody type) value finalStore :=
+            (LanguageResult.bind_success_iff child).mp evaluated
+          obtain ⟨rfl, rfl⟩ := evaluation_deterministic body shift_right_body
+          exact ⟨_, _, .fixed operandEq (.shiftRight a b),
+            .fixed _ (Dynamic.fixed_canonical_shiftRight leftCanonical b), rfl, rfl⟩
     | none =>
       rcases tail_outcome_primitive profile signedMode checkedMode leftRep rightRep continues child evaluated with
         ⟨output, native, applied, represented, valueEq, storeEq⟩ | ⟨code, panics, valueEq, storeEq⟩
@@ -816,7 +855,7 @@ theorem reflects [FunctionCalls.FaultTokens faults] (sameLedger : context.solved
         obtain ⟨rfl, rfl⟩ := unary_branch coreApplied branch
         exact ⟨_, after, finalMap, finalWorld, .unary owned trace applied, .value (outputType ▸ resultRep),
           finalHeaps, maps, worlds, frame, heapMetadata⟩
-  | @binary id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree firstSites secondSites leftIH rightIH =>
     intro root found mapping world administrative environment canonical actual before store ξ value finalStore environments heaps locals agrees evaluated
     have same := Option.some.inj (metadata.found.symm.trans (sameSource ▸ found))
     subst root

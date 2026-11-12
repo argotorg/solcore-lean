@@ -686,14 +686,14 @@ inductive Head (checked : SourceCoreCompatibleCatalog.Checked) (source : TypedSo
       (child : certificate scope operand ⟨core.operandType, childCode⟩) :
       Head checked source certificate scope id
         ⟨core.resultType, core.lower childCode⟩
-  | binary {id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode}
+  | binary {id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode}
       (metadata : Metadata checked source id node (mode.resultType operator))
       (form : node.form = .binary left operator right)
       (leftFound : source.lookupExpression? left = some leftNode)
       (rightFound : source.lookupExpression? right = some rightNode)
-      (leftType : leftNode.type = operandType) (rightType : rightNode.type = operandType)
+      (leftType : leftNode.type = operandType) (rightType : rightNode.type = amountType)
       (outputType : node.type = resultType)
-      (profile : BinaryProfile operator operandType resultType mode)
+      (profile : BinaryProfile operator operandType amountType resultType mode)
       (first : certificate scope left ⟨mode.operandType operator, leftCode⟩)
       (second : certificate scope right ⟨mode.operandType operator, rightCode⟩) :
       Head checked source certificate scope id
@@ -865,7 +865,7 @@ theorem Head.preserves_with_post [FunctionCalls.FaultTokens faults]
         rw [inputType] at payload
         obtain ⟨_, _, applied, _, _⟩ := profile.preserves payload (Dynamic.operandType?_of_found childFound inputType)
         exact False.elim (unary_fault_excluded applied failed)
-  | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
+  | @binary node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
     have leftIH := @meaning _ _ _ leftTree
     have rightIH := @meaning _ _ _ rightTree
     intro root found mapping world administrative environment canonical actual actualContext before store ξ outcome after environments heaps locals agrees actualTyped trace
@@ -1105,7 +1105,7 @@ theorem Head.reflects_with_post [FunctionCalls.FaultTokens faults]
         | value childTrace =>
           exact ⟨_, after, finalMap, finalWorld, unary_intro metadata form (.value childTrace applied),
             .value (outputType ▸ resultRep), finalHeaps, maps, worlds, frame, heapMetadata, trivial⟩
-  | @binary node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
+  | @binary node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile leftTree rightTree =>
     have leftIH := @meaning _ _ _ leftTree
     have rightIH := @meaning _ _ _ rightTree
     intro root found mapping world administrative environment canonical actual actualContext before store ξ value finalStore environments heaps locals agrees actualTyped evaluated

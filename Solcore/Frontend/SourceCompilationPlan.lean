@@ -1942,22 +1942,35 @@ private def validateBinaryOperatorRequirementLayout
       | _ => throw (.unsupportedRuntimeBinary specialized.key node.id operator)
     let left ← exactExpression specialized.function.typedBody leftId
     let right ← exactExpression specialized.function.typedBody rightId
-    let builtinInput := SourceInference.Detail.binaryBuiltinTypeAt operator left.type
-    let expectedInput :=
-      if builtinInput = Ty.word && left.type = Ty.integer &&
-          right.type = Ty.integer then
-        Ty.integer
-      else
-        builtinInput
-    let expectedInputs := [expectedInput, expectedInput]
-    let actualInputs := [left.type, right.type]
-    unless actualInputs = expectedInputs do
-      throw (.runtimeBinaryInputTypesMismatch specialized.key node.id
-        expectedInputs actualInputs)
-    let expectedResult := runtimeBinaryResultType operator expectedInput
-    unless node.rawType = expectedResult do
-      throw (.runtimeBinaryResultTypeMismatch specialized.key node.id
-        expectedResult node.rawType)
+    if SourceInference.Detail.isShiftOperator operator then
+      -- A shift types its value and its amount on their own, as finalization
+      -- checks them (`validateShiftOperands`): the value is `word` or one of the
+      -- twelve types, the amount `word` or an unsigned one, and the result has
+      -- the value's type.
+      unless SourceInference.Detail.shiftValueFits left.type &&
+          SourceInference.Detail.shiftAmountFits right.type do
+        throw (.runtimeBinaryInputTypesMismatch specialized.key node.id
+          [Ty.word, Ty.word] [left.type, right.type])
+      unless node.rawType = left.type do
+        throw (.runtimeBinaryResultTypeMismatch specialized.key node.id
+          left.type node.rawType)
+    else
+      let builtinInput := SourceInference.Detail.binaryBuiltinTypeAt operator left.type
+      let expectedInput :=
+        if builtinInput = Ty.word && left.type = Ty.integer &&
+            right.type = Ty.integer then
+          Ty.integer
+        else
+          builtinInput
+      let expectedInputs := [expectedInput, expectedInput]
+      let actualInputs := [left.type, right.type]
+      unless actualInputs = expectedInputs do
+        throw (.runtimeBinaryInputTypesMismatch specialized.key node.id
+          expectedInputs actualInputs)
+      let expectedResult := runtimeBinaryResultType operator expectedInput
+      unless node.rawType = expectedResult do
+        throw (.runtimeBinaryResultTypeMismatch specialized.key node.id
+          expectedResult node.rawType)
   else
     if (runtimeBinaryProfile? operator).isNone then
       throw (.unsupportedRuntimeBinary specialized.key node.id operator)

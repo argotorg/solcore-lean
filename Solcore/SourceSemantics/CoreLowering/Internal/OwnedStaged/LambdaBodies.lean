@@ -3070,11 +3070,11 @@ private theorem read_no_calls
     have identity := Option.some.inj (actual.found.symm.trans found)
     rw [identity, form] at otherForm
     cases otherForm
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode actual otherForm leftFound rightFound leftType rightType outputType profile first second inside =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode actual otherForm leftFound rightFound leftType rightType outputType profile first second inside =>
     have identity := Option.some.inj (actual.found.symm.trans found)
     rw [identity, form] at otherForm
     cases otherForm
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode actual otherForm leftFound rightFound leftType rightType outputType profile first second inside =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode actual otherForm leftFound rightFound leftType rightType outputType profile first second inside =>
     have identity := Option.some.inj (actual.found.symm.trans found)
     rw [identity, form] at otherForm
     cases otherForm

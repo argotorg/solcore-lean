@@ -347,7 +347,7 @@ theorem preserves_reached_with_functions [FunctionCalls.FaultTokens semanticFaul
         (children := RecursiveStageTupleMeaning.Entries current [(base, first), (key, second)])
         ⟨rfl, by simp⟩ ⟨rfl, by simp⟩ (port.missing receiver functions keyFound form)
         size childMeaning ⟨rfl, rfl, rfl⟩
-  | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
       intro reached directHeads methodHeads indexReady indirectHeads size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression left) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])
@@ -737,7 +737,7 @@ theorem reflects_reached_with_functions [FunctionCalls.FaultTokens semanticFault
         (children := RecursiveStageTupleMeaning.Entries current [(base, first), (key, second)])
         ⟨rfl, by simp⟩ ⟨rfl, by simp⟩ (port.missing receiver functions keyFound form)
         size childMeaning ⟨rfl, rfl, rfl⟩
-  | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
       intro reached directHeads methodHeads indexReady indirectHeads size within
       have reached0 : Reaches invocation.source [.expression faultRoot] (.expression left) :=
         .expression reached metadata.found (by simp [form, ExpressionForm.references])

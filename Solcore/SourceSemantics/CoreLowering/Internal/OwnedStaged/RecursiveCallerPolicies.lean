@@ -1206,7 +1206,7 @@ theorem preserves [FunctionCalls.FaultTokens semanticFaults] {rootScope : Source
       apply CallableIndexedOwnedPreparedStagedOperatorBounds.preserves_at
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .unary metadata form found inputType outputType unaryProfile (by exact ⟨rfl, by simp⟩)
-  | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
       intro noMethods noDirect noIndexes ports size
       have childMeaning : PreservesBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope [(left, ⟨operatorMode.operandType operator, leftCode⟩), (right, ⟨operatorMode.operandType operator, rightCode⟩)]) callFaults size := by
@@ -1458,7 +1458,7 @@ theorem reflects [FunctionCalls.FaultTokens semanticFaults] (stageEq : stages = 
       apply CallableIndexedOwnedPreparedStagedOperatorBounds.reflects_at
         bridge functions size size (Nat.le_refl _) unique wellFormed runtime covers childMeaning
       exact .unary metadata form found inputType outputType unaryProfile (by exact ⟨rfl, by simp⟩)
-  | @binary id node left right leftNode rightNode operator operandType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
+  | @binary id node left right leftNode rightNode operator operandType amountType resultType operatorMode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType binaryProfile first second ihFirst ihSecond =>
       intro noMethods noDirect noIndexes ports size
       have childMeaning : ReflectsBelow bridge context model stages invocation
           (RecursiveStageTupleMeaning.Entries rootScope [(left, ⟨operatorMode.operandType operator, leftCode⟩), (right, ⟨operatorMode.operandType operator, rightCode⟩)]) callFaults size := by

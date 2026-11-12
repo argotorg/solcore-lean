@@ -176,7 +176,7 @@ private theorem primary_admissible
           generalize targetEq : receipt.node.type = target at path
           cases path
           cases operatorTyped with
-          | wordArithmetic _ | integerArithmetic _ | wordShift _ | wordUnchecked _ | wordComparison _ | integerComparison _ | fixedComparison _ | fixedBitwise _ | fixedSignedComparison _ | fixedArithmetic _ | fixedDivision _ | fixedUnchecked _ | booleanAnd
+          | wordArithmetic _ | integerArithmetic _ | wordShift _ | wordUnchecked _ | wordComparison _ | integerComparison _ | fixedComparison _ | fixedBitwise _ | fixedSignedComparison _ | fixedArithmetic _ | fixedDivision _ | fixedUnchecked _ | fixedShift _ | booleanAnd
           | booleanOr =>
             exact False.elim (receipt.operator.nonempty ownedEq)
           | trait dispatch profile proves =>
@@ -672,15 +672,15 @@ theorem parent_typed
       CompatibleExpressionPrimitives.unary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih childTyped
-  | @binary_left scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_left scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     have originalTyped := typed_at_lookup unique metadata.found typed
-    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, leftTyped, rightTyped, actualProfile⟩ :=
       CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih leftTyped
-  | @binary_right scope id node left right leftNode rightNode operator operandType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
+  | @binary_right scope id node left right leftNode rightNode operator operandType amountType resultType mode leftCode rightCode metadata form leftFound rightFound leftType rightType outputType profile first second inside ih =>
     have originalTyped := typed_at_lookup unique metadata.found typed
-    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, sameType, leftTyped, rightTyped, actualProfile⟩ :=
+    obtain ⟨actualLeft, actualRight, actualMode, firstFound, secondFound, leftTyped, rightTyped, actualProfile⟩ :=
       CompatibleExpressionPrimitives.binary_source_types unique metadata.found form
         metadata.coercions metadata.requirements originalTyped
     exact ih rightTyped

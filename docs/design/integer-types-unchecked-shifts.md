@@ -437,13 +437,17 @@ the operator and panic plumbing first.
 - **Parsing.** One decoder reads an operator from one token or from two
   adjacent ones (`BinaryOp.at?`, `ValueAssignOp.at?`), and the parser and its
   declarative grammar both use it.
-- **Typing.** Inference types a shift before any dispatch: the value and then
-  the amount unify with `word`, so an open literal operand is a `word` at
-  once. The dispatch map gives shifts no trait.
+- **Typing.** Inference types a shift before any dispatch, and the dispatch
+  map gives shifts no trait. Row 3 unified the value and then the amount with
+  `word`, so an open literal operand was a `word` at once. Since row 1's step
+  8d the value and the amount take their own types and an open literal waits
+  ([row 1's
+  shifts](#row-1s-shifts-on-the-twelve-types-the-amount-takes-its-own-type)).
 - **Semantics.** `BinaryPrimitiveApplies` gains the two `word` shifts, and
   the compound forms apply them. A shift of any other value is an operand
-  fault.
-- **Lowering.** Shifts lower to `wordShl` and `wordShr`. A compound shift of
+  fault. Since step 8d the twelve types have their own shifts.
+- **Lowering.** Shifts lower to `wordShl` and `wordShr`, and since step 8d,
+  on the twelve types, through the type's shift bodies. A compound shift of
   a local uses a frontend copy of Core's compound-assignment shape, so Core is
   unchanged.
 - **Integer targets.** The data-place lowering already refused compound
@@ -1013,13 +1017,17 @@ Made on 2026-11-11, during step 7.
   source trait. So upstream's `poly_int_defaulting` is rejected at its
   signature in Lean. This frontend gap predates row 1. Without the bound,
   `poly(7)` with an unused result is ambiguous, as upstream has it.
-- **Shifts and unchecked operators** still make their literal operands `word`
-  at once ([shifts as implemented](#shifts-as-implemented),
+- **Shifts and unchecked operators** made their literal operands `word` at
+  once until step 8 ([shifts as implemented](#shifts-as-implemented),
   [unchecked blocks as implemented](#unchecked-blocks-as-implemented)), so
-  `1 << 3` is a `word`. On the same words, Word's shifts and wrapping
-  arithmetic give what `uint256`'s would, so only the typing differs: such a
-  literal cannot then flow to `uint256`. Step 8, which brings these operators
-  to the twelve types, defaults their literals as the design says.
+  `1 << 3` was a `word`. On the same words, Word's shifts and wrapping
+  arithmetic give what `uint256`'s would, so only the typing differed: such a
+  literal could not then flow to `uint256`. Their literals now wait and
+  default as the design says: the unchecked operators' since step 8c
+  ([row 1's unchecked literal
+  operands](#row-1s-unchecked-literal-operands-they-wait-and-never-take-integer))
+  and the shifts' since step 8d ([row 1's
+  shifts](#row-1s-shifts-on-the-twelve-types-the-amount-takes-its-own-type)).
 - **Compound assignments on an open target (step 7b).** `+= -= *= /= %= &=
   |= ^=` (`compoundTakesTargetType`) on a target whose type is still open take
   that open type as their operand's type (`compoundOperandType`), so the
@@ -1176,6 +1184,63 @@ Made on 2026-11-12, during step 8c.
   to that node later, so `ExpressionOperatorSiteRetainedAt` now keeps any own
   requirement prefix, the empty one included, and the node's form.
 
+### Row 1's shifts on the twelve types: the amount takes its own type
+
+Made on 2026-11-12, during step 8d.
+
+- **Typing.** A shift's value is `word` or one of the twelve types, and the
+  result takes the value's type. The amount is typed on its own: `word` or an
+  unsigned type (`ShiftAmountType`), the types of upstream's `ShiftAmount`
+  instances, so `uint8 << uint256` and `int8 >> uint8` are accepted.
+  `BinaryOperatorHasType.wordShift` takes any such amount, and `fixedShift`
+  is the rule on the twelve types. `ExpressionFormHasRawType.binary` takes
+  the two operand types separately (`leftType`, `rightType`); every other
+  operator rule keeps one operand type, and
+  `BinaryOperatorHasType.result_type_admissible_of_left` gives the result's
+  admissibility from the left operand's. User trait shifts are out of scope:
+  `BinaryOperatorHasType.trait` keeps one operand type.
+- **Open literals.** The shift's branch of `inferBinaryOperator` no longer
+  unifies the operands with `word`: it returns the value's type and no
+  requirement, so a literal operand waits, as upstream's obligations do. A
+  literal value takes the type of the result's use (`return 1 << s;` at
+  `uint8`), and an open literal value or amount defaults to `uint256` as an
+  operator use ([row 1's `uint256`
+  default](#row-1s-uint256-default-chosen-by-the-literals-uses)). So
+  `let a = 1 << 256;` is 0 at `uint256`, `x << 300` is 0 at `uint8`, and a
+  negative literal amount (`x << -1`) defaults to `uint256` and is out of its
+  range, as upstream has it.
+- **Finalization.** Once the defaults are in, `Detail.validateShiftOperands`,
+  in step 7b's pass over the nodes, rejects a shift whose value is not `word`
+  or one of the twelve types, or whose amount is not `word` or unsigned, with
+  `operatorNotSupported`, the shift's function (`"shl"`, `"shr"`) and the
+  type. This covers a signed amount, as upstream's `shift_by_signed_amount`
+  fixture has it, an `integer` or `Bool` operand, and a lambda parameter that
+  only a shift's value types, which row 3 made `word`: local generalization
+  leaves its type open, as for step 7b's compound targets.
+- **Semantics.** `FixedBinaryApplies.shiftLeft` is Word's shift read at the
+  type: the low `N` bits, sign-extended from bit `N - 1` on `intN`.
+  `shiftRight` is Word's shift on the unsigned types and the arithmetic one
+  (`Word.shiftArithmeticRight`) on the signed ones. An amount of at least the
+  width gives 0, or -1 for a negative value's `>>`, and no shift panics. The
+  results stay canonical (`Dynamic.fixed_canonical_shiftRight`,
+  `fixedWrap_inRange`).
+- **Lowering.** On the twelve types `checkedBinary` binds both operands and
+  runs `shiftLeftBody` (Core's `wordShl`, then the type's wrap) or
+  `shiftRightBody` (`wordSar` on the signed types, `wordShr` otherwise). The
+  compiler's plan check of a builtin binary node asked for two operands of
+  one type, which `w << 3` no longer has; it now takes a shift's value and
+  amount as finalization does.
+- **Proofs.** `BinaryOperatorInferenceCase.shift` is a shift's inference
+  case. The binary typing theorems take `shiftFits` from the finalization fact
+  `FinalInferenceResources.shift_operands_fit` (`SourceShiftOperandsFit`),
+  which their callers read at the operator's node, as for step 8c's
+  `uncheckedFits`. The meaning proofs' binary node takes the right operand's
+  own type, and `BinaryProfile` gains `wordShift` (mode `word`) and
+  `fixedShift` (mode `checked`). So a Word shift by a literal amount, now a
+  `uint256`, stays in the closed subset, and the fixed-width shifts join it,
+  as step 8a's unchecked arithmetic did.
+- **Compound shifts** stay `word`-only until the step's second part.
+
 ### Row 1: steps
 
 Row 1 is committed in steps, each through the full gate, so that each can be
@@ -1248,6 +1313,9 @@ first planned after the literals and moved before them for this reason
      and default to `uint256`, and finalization rejects one that becomes
      `integer` ([row 1's unchecked literal
      operands](#row-1s-unchecked-literal-operands-they-wait-and-never-take-integer)).
-   - 8d. Shifts on the twelve types, with their compound forms and literal
-     operands.
+   - 8d. **Shifts on the twelve types**, with their literal operands, by an
+     amount of `word` or an unsigned type ([row 1's
+     shifts](#row-1s-shifts-on-the-twelve-types-the-amount-takes-its-own-type)).
+     The step is committed in two parts: the binary shifts, then the compound
+     forms.
    - 8e. Ports of the upstream fixtures.
