@@ -752,6 +752,37 @@ def fixture_findings(seed, fixtures):
              "reduction": {"status": "not-reproduced", "runs": 1}}]
 
 
+# ignored-builtin-effects' source mutants at e2eef194 as unit 18's run of all 63 recorded them: the step, the site's
+# start, text and replacement, and the words that Hull and Yul, Sonatina O0 and Sonatina O2 return.
+WORD = 2 ** 256
+ALLOCATION_MUTANTS = {
+    "p16": (3, 1869, "0x40", "0x00", ((0x7, 0xc0), (0x7, 0x240), (0x7, 0x180))),
+    "p17": (3, 1869, "0x40", "0x01", ((0x7, 0xc0), (0x7, 0x240), (0x7, 0x180))),
+    "p58": (4, 2695, "2", "1", ((0x87, 0x40), (0x207, 0x40), (0x147, 0x40))),
+    "p62": (4, 2697, "*", "/", ((0x107, 0x40), (0x407, 0x40), (0x287, 0x40))),
+    # Outside the class: memory contents read at 0x80, the pointer's slot read one byte early, and 255 pointers.
+    "p34": (3, 2096, "0x40", "0x80", ((0x7, -0x77 % WORD), (0x7, -0x200 % WORD), (0x7, -0x140 % WORD))),
+    "p39": (4, 2315, "0x40", "0x3f", ((0x107, 0xc0), (0x403, 0x23e), (0x285, 0x17f))),
+    "p18": (3, 1869, "0x40", "0x41", ((0x7, -0x7f40 % WORD), (0x7, -0x1fdc0 % WORD), (0x7, -0x13e80 % WORD))),
+}
+
+
+def words_output(words):
+    return "0x" + "".join(f"{word:064x}" for word in words)
+
+
+def allocation_finding(mutant, reduction=None):
+    """One of ALLOCATION_MUTANTS' path mismatches as semantic-fixtures.py records it."""
+    step, start, text, replacement, (hull, o0, o2) = ALLOCATION_MUTANTS[mutant]
+    observations = {path: {"status": "returned", "output": words_output(words), "logs": []}
+                    for path, words in (("hull", hull), ("sonatina-o0", o0), ("sonatina-o2", o2), ("yul", hull))}
+    return {"fixture": "ignored-builtin-effects", "source": mutant,
+            "edit": {"file": "main.sol", "start": start, "end": start + len(text), "replacement": replacement},
+            "entry": f"{mutant}@{step}", "step": step, "position": step, "category": "path-mismatch",
+            "signature": ["path-mismatch", ["output"], [["hull", "yul"], ["sonatina-o0"], ["sonatina-o2"]]],
+            "observations": observations, "reduction": reduction or {"status": "duplicate", "of": "p2@4"}}
+
+
 class FakeFixtures:
     """Writes a harness-shaped report for each fixtures run, with the findings `scenario(seed, fixtures)` returns."""
 
@@ -931,6 +962,66 @@ class FixtureRunTests(unittest.TestCase):
         for changes in ({"detail": "Solcore.Core.Value.word 7"}, {"path": "yul", "signature": ["path-failure", "yul", "language-failure"]},
                         {"signature": ["path-failure", "hull", "error"]}):
             self.assertNotIn(fuzz.canonical_id(fuzz.fixture_signature_key({**finding, **changes})), fuzz.KNOWN, changes)
+
+    def test_the_first_allocation_class_holds_its_real_occurrences(self):
+        key, _, label = fuzz.FIXTURE_MISMATCH_CLASSES[0]
+        self.assertEqual(fuzz.KNOWN[fuzz.canonical_id(key)], label)
+        for mutant in ("p16", "p17", "p58", "p62"):
+            self.assertEqual(fuzz.fixture_mismatch_class(allocation_finding(mutant)), key, mutant)
+        # p16 returns `after`, each path's pointer past its first allocation of 64 bytes.
+        observations = allocation_finding("p16")["observations"]
+        self.assertEqual({path: fuzz.returned_words(observation["output"])[1] - 0x40 for path, observation in observations.items()},
+                         fuzz.FIRST_ALLOCATION)
+        for mutant in ("p34", "p39", "p18"):
+            self.assertIsNone(fuzz.fixture_mismatch_class(allocation_finding(mutant)), mutant)
+
+    def test_the_first_allocation_class_leaves_near_misses_new(self):
+        finding = allocation_finding("p16")
+        observations, groups = finding["observations"], finding["signature"][2]
+
+        def changed(path, **fields):
+            return {**observations, path: {**observations[path], **fields}}
+        near_misses = {
+            "another difference": {"observations": changed("sonatina-o2", output=words_output((0x7, 0x181)))},
+            "another path pair": {"observations": changed("sonatina-o2", output=observations["hull"]["output"]),
+                                  "signature": ["path-mismatch", ["output"], [["hull", "sonatina-o2", "yul"], ["sonatina-o0"]]]},
+            "another status": {"observations": changed("sonatina-o0", status="reverted"),
+                               "signature": ["path-mismatch", ["output", "status"], groups]},
+            "five first allocations": {"observations": {path: {**observation, "output": words_output(
+                (0x7, 5 * fuzz.FIRST_ALLOCATION[path] + 0x40))} for path, observation in observations.items()}},
+            "a partial word": {"observations": changed("sonatina-o0", output=observations["sonatina-o0"]["output"] + "00")},
+            "another difference field": {"signature": ["path-mismatch", ["storage"], groups]},
+            "no source mutant": {"source": None},
+        }
+        for name, changes in near_misses.items():
+            near_miss = {**finding, **changes}
+            self.assertIsNone(fuzz.fixture_mismatch_class(near_miss), name)
+            self.assertNotIn(fuzz.canonical_id(fuzz.fixture_signature_key(near_miss)), fuzz.KNOWN, name)
+
+    def test_runs_count_first_allocation_class_occurrences_as_known(self):
+        def scenario(seed, fixtures):
+            if seed != 100:
+                return []
+            reduced = allocation_finding("p58", {"status": "reduced", "runs": 3, "steps": []})
+            reduced = {**reduced, "fixture": fixtures[0], "reduction": {**reduced["reduction"], "edit": reduced["edit"]}}
+            return [reduced, *({**allocation_finding(mutant, {"status": "duplicate", "of": reduced["entry"]}), "fixture": fixtures[0]}
+                               for mutant in ("p62", "p34"))]
+        code, fake = self.main("--iterations", "1", fake=FakeFixtures(scenario))
+        self.assertEqual(code, 0)
+        row, = fuzz.State(self.state).ledger()
+        self.assertEqual([(occurrence["case"], occurrence["new"]) for occurrence in row["occurrences"]],
+                         [("p58@4", False), ("p62@4", False), ("p34@3", True)])
+        signatures = fuzz.State(self.state).registry()["signatures"]
+        self.assertEqual(signatures[fuzz.canonical_id(fuzz.FIXTURE_MISMATCH_CLASSES[0][0])]["count"], 2)
+        # Outside the class of the finding it repeats, p34 is its own edit at its step.
+        fixture = fake.calls[0]["fixtures"][0]
+        p34 = {**allocation_finding("p34"), "fixture": fixture}
+        entry = signatures[fuzz.canonical_id(fuzz.fixture_signature_key(p34))]
+        self.assertEqual((entry["count"], entry["key"]["program"]),
+                         (1, fuzz.canonical_id({"fixture": fixture, "edit": p34["edit"], "step": 3})))
+        report = (self.state / "report.md").read_text()
+        self.assertIn("known: the paths' first allocations differ", report)
+        self.assertIn("class offset-by-first-allocations", report)
 
     def test_a_sequence_finding_is_its_reduced_sequence_and_operator(self):
         mismatch = {"fixture": "f", "category": "path-mismatch", "step": 4, "sequence": "s7", "operator": "commit", "change": 3,

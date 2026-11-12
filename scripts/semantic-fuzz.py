@@ -118,7 +118,7 @@ def canonical_id(value):
 # key is a stable symptom taken from a real occurrence through the driver, a crash
 # by its panic and call site, a rejection by its first error line and a path
 # failure by its path and Core value; mismatches, whose keys are reduced programs,
-# are never listed here but in MISMATCH_CLASSES.
+# are never listed here but in MISMATCH_CLASSES and FIXTURE_MISMATCH_CLASSES.
 PRIMITIVE_TYPES = "primitive-types-0.14.0/src/lib.rs:43:1"
 DEMANDED_BITS = ["<sonatina_codegen::analysis::demanded_bits::DemandedBitsQuery>::propagate_binary",
                  "<sonatina_codegen::analysis::demanded_bits::DemandedBitsQuery>::propagate_from_value"]
@@ -185,8 +185,60 @@ MISMATCH_CLASSES = (
      loop_observes_then_slices_or_writes,
      "Sonatina O0 returns other Words for loops that write std memory values (questions.md, 2026-10-29)"),
 )
+
+# Each fixture path's first allocation at the pin (questions.md, 2026-10-31; Sonatina O2's since e2eef194). A
+# differing word may carry at most ALLOCATION_MULTIPLE of them, as `result - 2 / before` carries two.
+FIRST_ALLOCATION = {"hull": 0x80, "yul": 0x80, "sonatina-o0": 0x200, "sonatina-o2": 0x140}
+ALLOCATION_MULTIPLE = 4
+
+
+def returned_words(output):
+    """The 32-byte words of a hex output, else None."""
+    if not isinstance(output, str) or not output.startswith("0x") or (len(output) - 2) % 64:
+        return None
+    with contextlib.suppress(ValueError):
+        return [int(output[index:index + 64], 16) for index in range(2, len(output), 64)]
+    return None
+
+
+def offset_by_first_allocations(finding):
+    """The paths differ only in their returned words, they disagree exactly where their first allocations differ,
+    and each differing word is `k` times the path's first allocation plus one constant on every path, for one
+    `k` with 0 < |k| <= ALLOCATION_MULTIPLE."""
+    _, fields, groups = finding["signature"]
+    observations = finding["observations"]
+    if fields != ["output"] or any(path not in FIRST_ALLOCATION for path in observations):
+        return False
+    by_allocation = {}
+    for path in observations:
+        by_allocation.setdefault(FIRST_ALLOCATION[path], []).append(path)
+    if sorted(map(sorted, groups)) != sorted(map(sorted, by_allocation.values())):
+        return False
+    words = {path: returned_words(observation.get("output")) for path, observation in observations.items()}
+    if any(value is None for value in words.values()) or len({len(value) for value in words.values()}) != 1:
+        return False
+    differing = [index for index in range(len(next(iter(words.values()))))
+                 if len({value[index] for value in words.values()}) > 1]
+    return bool(differing) and all(
+        any(len({(value[index] - k * FIRST_ALLOCATION[path]) % 2 ** 256 for path, value in words.items()}) == 1
+            for k in range(-ALLOCATION_MULTIPLE, ALLOCATION_MULTIPLE + 1) if k)
+        for index in differing)
+
+
+# Recorded differences of the fixtures' paths whose occurrences differ only in their
+# source mutants: a source mutant's step finding counts under a class, never as new,
+# when its own recorded observations have the class's property. Every other fixture
+# finding keeps its key.
+FIXTURE_MISMATCH_CLASSES = (
+    ({"backend": FIXTURES, "category": "path-mismatch", "stage": "execution", "kind": "source-mutant",
+      "class": "offset-by-first-allocations"},
+     offset_by_first_allocations,
+     "the paths' first allocations differ, Hull and solc at 0x80, Sonatina O2 at 0x140 and O0 at 0x200, in source "
+     "mutants that return addresses (questions.md, 2026-10-31)"),
+)
 KNOWN = {canonical_id(key): label for key, label in KNOWN_FINDINGS} | \
-    {canonical_id(key): label for key, _, _, label in MISMATCH_CLASSES}
+    {canonical_id(key): label for key, _, _, label in MISMATCH_CLASSES} | \
+    {canonical_id(key): label for key, _, label in FIXTURE_MISMATCH_CLASSES}
 
 
 def mismatch_class(profile, fingerprint, final):
@@ -199,6 +251,18 @@ def mismatch_class(profile, fingerprint, final):
         with contextlib.suppress(OSError, ValueError, AttributeError, TypeError):
             if final and shares(json.loads((final / "case.json").read_text())):
                 return key
+    return None
+
+
+def fixture_mismatch_class(finding):
+    """The key of the class a source mutant's step finding falls in by its own observations, else None."""
+    for key, shares, _ in FIXTURE_MISMATCH_CLASSES:
+        if finding.get("category") != key["category"] or not finding.get("source"):
+            continue
+        # A finding without well-formed observations stays outside every class.
+        with contextlib.suppress(KeyError, ValueError, TypeError, AttributeError):
+            if shares(finding):
+                return dict(key)
     return None
 
 
@@ -734,12 +798,16 @@ def register_fixture_findings(state, config, epoch, iteration, run_dir, outcome)
     for finding in findings:
         reduction = finding.get("reduction") or {}
         base = entries.get((finding["fixture"], reduction.get("of")), finding) if reduction.get("status") == "duplicate" else finding
-        key = fixture_signature_key(base)
+        # A class holds a finding by its own observations, a duplicate's included; a duplicate outside the
+        # class of the finding it repeats is its own edit at its step.
+        known = fixture_mismatch_class(finding)
+        own = fixture_signature_key(finding if not known and base is not finding and fixture_mismatch_class(base) else base)
+        key = known or own
         sid = canonical_id(key)
         case = finding.get("entry") or finding.get("stage") or "fixture"
         brief = {"iteration": iteration, "backend": FIXTURES, "rootSeed": str(root_seed(config, iteration)),
                  "profile": finding["fixture"], "profileSeed": None, "kind": "primary", "case": case, "epoch": epoch["id"],
-                 "program": key.get("program")}
+                 "program": own.get("program")}
 
         def keep(destination, finding=finding, brief=brief, sid=sid):
             destination.mkdir(parents=True)
