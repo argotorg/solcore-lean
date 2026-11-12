@@ -128,7 +128,12 @@ depends on the change.
     compute the exact result as a Core Integer and wrap it to the type's width with
     `SourceCorePrimitive.fixedWrapInteger` (Core's Euclidean `integerMod` by `2^N`, offset by
     `2^(N-1)` on a signed type) before `integerToWord` (`uncheckedBody`); `/ %` first test a zero
-    divisor and divide with `truncatedDivision` (`uncheckedDivisionBody`). The compiler's
+    divisor and divide with `truncatedDivision` (`uncheckedDivisionBody`). Shifts give
+    `BinaryProfile` the amount's type as its own index, which every other profile sets to the
+    operand's: on `word`, `BinaryProfile.wordShift` in the `word` mode lowers through Word's strict
+    body; on the twelve types, `BinaryProfile.fixedShift` in the `checked` mode lowers through
+    `checkedBinary` with `SourceCorePrimitive.shiftLeftBody`, Core's `wordShl` wrapped to the type,
+    or `shiftRightBody`, `wordSar` on a signed type and `wordShr` otherwise. The compiler's
     `binaryLowering` chooses the mode from the left operand's type and the operator, as the source
     semantics does. `~` on the narrower unsigned types is Word's `~` and the mask from
     `SourceCorePrimitive.narrowBitNotMask?`.

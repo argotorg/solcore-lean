@@ -168,39 +168,47 @@ this area's steps, in order.
 ### Add a primitive operator
 
 As for the shifts (5b8c6e96d) and the unchecked arithmetic (e8d28e957). No preservation statement
-changes; each exhaustive `cases` over operators gains a case, and the build finds them.
+changes; each exhaustive `cases` over operators gains a case, and the build finds them. Since row
+1's step 8d (0e5e82583) the two operands are typed separately, as `leftType` and `rightType` in
+`BinaryOperatorHasType`, `ExpressionFormHasRawType.binary`, `BinaryOperationExecutionPreserves` and
+`preserveBinaryRec`, so an operator whose operands differ in type, as a shift's value and amount
+may, needs no new statement either.
 
 1. **Typing**, in [Expressions](../../Solcore/SourceSemantics/Expressions.lean): an operator class
    (`ShiftBinaryOperator`, `UncheckedBinaryOperator`), a `BinaryOperatorHasType` constructor
-   (`wordShift`, `wordUnchecked`), a `BinaryTraitDispatch` row if the operator dispatches to a trait,
-   and `WordCompoundAssignmentOperator` for the compound form, or `FixedCompoundAssignmentOperator`
-   where the compound form takes a fixed-width target's type.
+   (`wordShift`, `wordUnchecked`), a `BinaryTraitDispatch` row if the operator dispatches to a
+   trait, and `WordCompoundAssignmentOperator` for the compound form, or
+   `FixedCompoundAssignmentOperator` where the compound form takes a fixed-width target's type. A
+   shift's amount is typed on its own: `wordShift`, and `fixedShift` on the twelve types, take an
+   amount of any `ShiftAmountType`, `word` or an unsigned type.
 2. **Evaluation and faults**: `BinaryPrimitiveApplies` and `StrictBinaryOperator` in
    [Primitive](../../Solcore/SourceSemantics/Dynamic/Primitive.lean), leaving a Word-only operator out
    of `IntegerStrictBinaryOperator`; `AssignmentValueApplies` in
    [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean); `WordBinaryOperator` and
    `AssignmentOperatorBinary` in [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean), so that a
    wrong operand faults. An operator whose meaning at a fixed-width integer type differs from Word's
-   on canonical words, as the signed orderings', checked `+ - * / %`'s and unchecked `+ - * / %`'s
-   (which wrap to the type's width, `Dynamic.fixedWrap`) do, also goes into
-   `FixedBinaryApplies` at that type and into `FixedBinaryOwn`, which `BinaryWordMeaning` excludes;
-   its panics, if it has any, go into `FixedBinaryPanics`. The binary rules read the left
-   operand's static type (`operandType?`) and apply `BinaryValueApplies`, which takes one meaning or
-   the other, and their fault rules apply `BinaryValuePanics` the same way. A unary operator has the
-   same three: `FixedUnaryApplies`, `UnaryWordMeaning` and `UnaryValueApplies`. Compound assignment
-   reads the target's static type: `CompoundAssignmentApplies` takes `FixedBinaryApplies` for
-   `+= -= *= /= %=`, checked or unchecked, at a fixed-width target and `AssignmentValueApplies`
-   elsewhere, and `AssignmentOperandsPanic` applies `BinaryValuePanics` at that type.
+   on canonical words, as the signed orderings', checked `+ - * / %`'s, unchecked `+ - * / %`'s
+   (which wrap to the type's width, `Dynamic.fixedWrap`) and the shifts' (Word's shift read at the
+   type) do, also goes into `FixedBinaryApplies` at that type and into `FixedBinaryOwn`, which
+   `BinaryWordMeaning` excludes; its panics, if it has any, go into `FixedBinaryPanics`. The binary
+   rules read the left operand's static type (`operandType?`) and apply `BinaryValueApplies`, which
+   takes one meaning or the other, and their fault rules apply `BinaryValuePanics` the same way. A
+   unary operator has the same three: `FixedUnaryApplies`, `UnaryWordMeaning` and
+   `UnaryValueApplies`. Compound assignment reads the target's static type:
+   `CompoundAssignmentApplies` takes `FixedBinaryApplies` for `+= -= *= /= %=`, checked or
+   unchecked, at a fixed-width target and `AssignmentValueApplies` elsewhere, and
+   `AssignmentOperandsPanic` applies `BinaryValuePanics` at that type.
 3. **Preservation**: `PrimitiveBinaryHasType` and its cases in `PrimitiveBinaryHasType.sourceTyping`,
    `BinaryPrimitiveApplies.preserves` and `AssignmentValueApplies.wordCompoundPreserves`, which
    `CompoundAssignmentApplies.preserves` extends to fixed-width targets, then the binary case of
-   `preserveBinaryRec`. Where Word's result would leave a fixed-width type's range,
-   as for checked and unchecked `+ - * / %` and for `~` on the narrower unsigned types, the proof
-   needs the looked-up type to be the operand's typed type (`BinaryValueApplies.preserves_checked`,
-   `preserves_division` and `preserves_unchecked`, `UnaryValueApplies.preserves_narrow`);
-   `Dynamic.operandType?_of_typing` gives it from the source's unique node occurrences.
+   `preserveBinaryRec`. Where Word's result would leave a fixed-width type's range, as for checked
+   and unchecked `+ - * / %`, for the shifts on the twelve types and for `~` on the narrower
+   unsigned types, the proof needs the looked-up type to be the operand's typed type
+   (`BinaryValueApplies.preserves_checked`, `preserves_division`, `preserves_unchecked` and
+   `preserves_shift`, `UnaryValueApplies.preserves_narrow`); `Dynamic.operandType?_of_typing` gives
+   it from the source's unique node occurrences.
 4. **Substitution and staging**: `StructuralSubstitution.BinaryOperatorHasType.applyParameters`,
-   `BinaryOperatorHasType.result_type_admissible` and
+   `BinaryOperatorHasType.result_type_admissible_of_left`, which gives `result_type_admissible`, and
    `FlexibleSubstitution.BinaryOperatorHasType.applySubstitution` in `StructuralLaws`; the
    `operatorTyped` cases of `Staging/Preservation` and `Staging/Internal/SelectedPreservation`.
 5. **Inference soundness**: `BinaryOperatorInferenceCase`, `binaryBuiltin_hasType`,
@@ -215,7 +223,10 @@ changes; each exhaustive `cases` over operators gains a case, and the build find
    An unchecked operator's open literal operand waits in the same way, so the binary typing theorems
    take `uncheckedFits`, which their callers get from
    `FinalInferenceResources.unchecked_operands_fit`, and
-   `BinaryOperatorInferenceCase.uncheckedFallback` is its case.
+   `BinaryOperatorInferenceCase.uncheckedFallback` is its case. A shift's value and amount wait for
+   their types too, so the same theorems take `shiftFits`, which their callers get from
+   `FinalInferenceResources.shift_operands_fit`, and `BinaryOperatorInferenceCase.shift` is a
+   shift's case.
 6. **Core lowering and tests**: see [Core lowering](core-lowering.md#making-changes). Each commit
    added a public-API test with the probe's results (`Tests.SourceCoreShiftExecution`,
    `Tests.SourceCoreUncheckedExecution`), registered in [Tests/Main.lean](../../Tests/Main.lean).

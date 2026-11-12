@@ -84,7 +84,10 @@ Shifts needed nothing in TypeSystem, whose builtin types are `TypeSystem.Builtin
 - In [`SourceInference/Resolution.lean`](../../Solcore/Frontend/SourceInference/Resolution.lean),
   `inferBinaryOperator` types a shift (`isShiftOperator`) before any dispatch: the value and then
   the amount unify with `word`, and the result is `word`, with no requirements.
-  `binaryOperatorDispatch` maps shifts to no trait method.
+  `binaryOperatorDispatch` maps shifts to no trait method. Row 1's step 8d (0e5e82583) later typed
+  the value and the amount on their own, as upstream's `Shl` and `Shr` do: the branch now unifies
+  nothing and gives the value's type, and finalization checks the two types
+  (`validateShiftOperands`).
 - In [`SourceInference/Expression.lean`](../../Solcore/Frontend/SourceInference/Expression.lean),
   `inferBinaryOperator_shift_result` and `inferBinaryOperator_shift_projection` state that branch
   once, for every proof to use.
@@ -95,8 +98,10 @@ Shifts needed nothing in TypeSystem, whose builtin types are `TypeSystem.Builtin
   `Frontend/SourceInference/Internal/ExpressionProperties.lean` and in `SourceSemantics/Internal/`
   (`Inference`, `Privacy`, `Formation`, `Selected`). Proofs that list compound operators gained
   two cases.
-- In `SourceSemantics/Internal/Inference/Soundness.lean`, `inferBinaryOperator_success_case` types
-  a shift by `BinaryOperatorHasType.wordShift`. The literal-only case
+- In `SourceSemantics/Internal/Inference/Soundness.lean`, `inferBinaryOperator_success_case` types a
+  shift by `BinaryOperatorHasType.wordShift`; since step 8d it gives a shift its own case,
+  `BinaryOperatorInferenceCase.shift`, which the binary typing theorems type by `wordShift` or, on
+  the twelve types, `fixedShift`. The literal-only case
   `BinaryOperatorInferenceCase.literalFallback` gained a `not_shift` field for its staged `integer`
   typing, `binaryInteger_hasType`: shifts have no `integer` typing.
 
@@ -104,7 +109,7 @@ Shifts needed nothing in TypeSystem, whose builtin types are `TypeSystem.Builtin
 
 | File | What shifts added |
 | --- | --- |
-| [`SourceSemantics/Expressions.lean`](../../Solcore/SourceSemantics/Expressions.lean) | `ShiftBinaryOperator`; the typing rule `BinaryOperatorHasType.wordShift`, with `word` operands and result and no requirements; the shifts in `WordCompoundAssignmentOperator` |
+| [`SourceSemantics/Expressions.lean`](../../Solcore/SourceSemantics/Expressions.lean) | `ShiftBinaryOperator`; the typing rule `BinaryOperatorHasType.wordShift`, with `word` operands and result and no requirements (since step 8d, an amount of any `ShiftAmountType`, beside `fixedShift` on the twelve types); the shifts in `WordCompoundAssignmentOperator` |
 | [`Dynamic/Primitive.lean`](../../Solcore/SourceSemantics/Dynamic/Primitive.lean) | the shifts in `StrictBinaryOperator`; `BinaryPrimitiveApplies.wordShiftLeft` and `wordShiftRight`, defined by Core's `Word.shiftLeft` and `Word.shiftRight`; `IntegerStrictBinaryOperator`, the strict operators other than shifts |
 | [`Dynamic/Evaluation.lean`](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean) | `AssignmentValueApplies.shiftLeft` and `shiftRight` |
 | [`Dynamic/Fault.lean`](../../Solcore/SourceSemantics/Dynamic/Fault.lean) | `WordPair`, `WordBinaryOperator` and `BinaryPrimitiveOperandsInvalid.word`: a shift of anything but two words is an operand fault |
@@ -147,7 +152,9 @@ predicate that classifies operators (`IntegerStrictBinaryOperator`, or `ValueAss
   (`Foundations/PrimitiveExpressions.lean`) gained a one-line case per shift, because the semantics
   and Core apply the same `Word` function. The `integer` case of
   `CompatibleExpressionPrimitives.BinaryProfile` (`Compatible/ExpressionPrimitives.lean`) now
-  takes `IntegerStrictBinaryOperator`, so the integer bodies never meet a shift.
+  takes `IntegerStrictBinaryOperator`, so the integer bodies never meet a shift. Step 8d later gave
+  `BinaryProfile` an index for the amount's type and the shift profiles `wordShift` and `fixedShift`
+  ([Core lowering](core-lowering.md#making-changes)).
 - **Compound assignment.** The data-place theorems share an assignment profile, of the form
   `operator = .equal ∨ T = .word ∨ T = .integer` for the leaf type `T`. Its last disjunct gained
   `∧ operator.isShift = false`, now `operator.wordOnly = false`; proofs that destructure the
