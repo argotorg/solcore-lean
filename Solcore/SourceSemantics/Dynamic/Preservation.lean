@@ -1165,27 +1165,57 @@ theorem preserves
   | word => exact .word _
   | integer => cases current_typed with | some typed => cases typed
 
-/-- At a bit-not target type, Word's `~` keeps the leaf's type: a fixed-width
-target is one on which `~` is Word's (`FixedWordBitNot`), so the word stays
-canonical. -/
+/-- On a fixed-width type where `~` is Word's (`FixedWordBitNot`), Word's `~`
+keeps the word canonical. -/
+theorem preserves_fixed
+    {context : Context} {heap : Heap} {current : Option Value}
+    {result : Value} {type : TypeSystem.FixedInteger} (kind : FixedWordBitNot type)
+    (current_typed : OptionalValueHasType context heap current (.fixed type))
+    (applies : BitNotSnapshot current result) :
+    ValueHasType context heap result (.fixed type) := by
+  cases applies with
+  | word value =>
+    cases current_typed with
+    | some typed =>
+      cases typed with
+      | fixed _ canonical => exact .fixed _ (fixed_canonical_bitNot kind canonical)
+  | integer => cases current_typed with | some typed => cases typed
+
+end BitNotSnapshot
+
+namespace BitNotAssignmentApplies
+
+/-- In-place `~` at a bit-not target type keeps the leaf's type: Word's `~` on
+`word` and on the fixed-width types where it is the type's, and the narrow `~`,
+which keeps the low `N` bits, on `uint8` … `uint128`. -/
 theorem preserves_target
     {context : Context} {heap : Heap} {current : Option Value}
     {result : Value} {type : Ty} (kind : BitNotTargetType type)
     (current_typed : OptionalValueHasType context heap current type)
-    (applies : BitNotSnapshot current result) :
+    (applies : BitNotAssignmentApplies type current result) :
     ValueHasType context heap result type := by
-  cases kind with
-  | word => exact preserves current_typed applies
-  | fixed kind =>
-    cases applies with
-    | word value =>
-      cases current_typed with
-      | some typed =>
-        cases typed with
-        | fixed _ canonical => exact .fixed _ (fixed_canonical_bitNot kind canonical)
-    | integer => cases current_typed with | some typed => cases typed
+  cases applies with
+  | primitive plain applies =>
+    cases kind with
+    | word => exact BitNotSnapshot.preserves current_typed applies
+    | fixed fixed =>
+      have wordKind : FixedWordBitNot fixed := by
+        cases signed : fixed.signed
+        · by_cases full : fixed.width = .w256
+          · exact .full full
+          · exact absurd (FixedNarrowBitNot.bitNot signed full) (plain fixed rfl)
+        · exact .signed signed
+      exact BitNotSnapshot.preserves_fixed wordKind current_typed applies
+  | narrow target applies =>
+    cases kind with
+    | word => cases target
+    | fixed fixed =>
+      cases target
+      cases applies with
+      | narrowBitNot unsigned narrow operand =>
+        exact .fixed _ (fixed_canonical_narrowBitNot unsigned narrow operand)
 
-end BitNotSnapshot
+end BitNotAssignmentApplies
 
 namespace PrimitiveCoercionApplies
 
@@ -2712,10 +2742,15 @@ theorem bitNotPreserves
     (before_typed : HeapWellTyped context before)
     (typing : SourceBitNotAssignmentValid source context assignment)
     (execution : SourcePlaceSnapshotUpdate program context evidence source
-      BitNotSnapshot environment before assignment.target updatedRoot after) :
+      (BitNotAssignmentApplies assignment.target.type) environment before assignment.target
+      updatedRoot after) :
     HeapWellTyped context after /\ HeapTypesExtend before after := by
   cases typing with
   | @intro _ _ targetType target_type target_kind requirements_eq =>
+      have stored : assignment.target.type = targetType := by
+        cases target_type
+        assumption
+      rw [stored] at execution
       cases execution with
       | @intro _ _ _ _ _ _ selectedHeap _ _ target _ resolve write =>
           rcases resolve.preserves expression_preserves evidence_covers
@@ -2732,7 +2767,7 @@ theorem bitNotPreserves
                 exact initial_typed
               have modify_typed : LeafModificationPreservesType context
                   selectedHeap (fun _ updated =>
-                    BitNotSnapshot target.selected updated) targetType := by
+                    BitNotAssignmentApplies targetType target.selected updated) targetType := by
                 intro current updated current_typed modifies
                 exact modifies.preserves_target target_kind target_typed.selected
               have updated_typed := update.preserves target_typed.projections

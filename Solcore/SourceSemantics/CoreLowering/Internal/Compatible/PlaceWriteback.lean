@@ -88,6 +88,29 @@ theorem plain_of_profile {target : TypeSystem.Ty} {operator : Syntax.ValueAssign
     ∀ type, target = .fixed type → ¬ FixedCheckedCompound operator :=
   DataPlaceModifier.plain_of_checkedCompound (checkedCompound_of_profile profile)
 
+/-- A target whose runtime type is `Word` or `integer` has no fixed-width type, so
+in-place `~` there is `BitNotSnapshot` (`Dynamic.BitNotAssignmentApplies.eq_of_plain`). -/
+theorem bitNotPlain_of_runtime {target : TypeSystem.Ty}
+    (profile : SourceCoreRawMetadata.runtimeType target = .word ∨
+      SourceCoreRawMetadata.runtimeType target = .integer) :
+    ∀ type, target = .fixed type → ¬ FixedNarrowBitNot type .bitNot := by
+  intro type same _
+  subst same
+  rcases profile with word | integer
+  · cases word
+  · cases integer
+
+/-- Nor does such a target wrap in-place `~`'s leaf. -/
+theorem bitNotWrap_of_runtime {target : TypeSystem.Ty}
+    (profile : SourceCoreRawMetadata.runtimeType target = .word ∨
+      SourceCoreRawMetadata.runtimeType target = .integer) :
+    SourceCoreDataPlaces.bitNotWrap target = none :=
+  SourceCoreDataPlaces.bitNotWrap_of_not_fixed fun type same => by
+    subst same
+    rcases profile with word | integer
+    · cases word
+    · cases integer
+
 /-- A compound assignment that panics gives no result, away from checked
 arithmetic at a fixed-width target. -/
 theorem panic_excludes_applies {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}

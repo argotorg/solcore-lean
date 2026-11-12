@@ -141,7 +141,7 @@ theorem reflects_bounded (errors : head.Errors faults)
       obtain ⟨reached, related⟩ := ProtectedStateTransition.AdministrativeTransport.transition
         callerProtocol transport initial maps worlds frame metadata
       exact .success snapshot write finalHeaps maps worlds frame metadata effect count typed reached related
-        ⟨(Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot write).1,
+        ⟨(Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)).1,
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩ bounded remaining
 
 include transport ordinaryCells environments heaps locals agrees actualTyped initial admitted assignmentTyped in
@@ -166,7 +166,7 @@ theorem preserves_value {target : Dynamic.ResolvedPlace} {updated : Dynamic.Valu
     callerProtocol transport initial maps worlds frame metadata
   exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, effect, count, typed,
     ⟨reached, related,
-      (Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot write).1,
+      (Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)).1,
       StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩, agreement⟩
 
 include transport ordinaryCells environments heaps locals agrees initial admitted in

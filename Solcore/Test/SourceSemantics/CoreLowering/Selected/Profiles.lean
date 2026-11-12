@@ -44,6 +44,7 @@ structure UnaryShape (source : TypedSource) where
   assignmentForm : assignment.form = .assignBitNot resolution
   targetRoot : resolution.target.root = binder.id
   targetBare : resolution.target.projections = []
+  targetType : resolution.target.type = .word
   returnedFound : source.lookupStatement? returned.id = some returned
   returnedForm : returned.form = .returnStmt (some result.node.id)
 
@@ -142,8 +143,9 @@ theorem unary_call (shape : UnaryShape header.function.source)
   have assigned : Dynamic.StatementExecutes (Program.ofChecked compiled.sourceProgram)
       header.context header.function.evidence header.function.source environment (inputHeap before value)
       shape.assignment.id header.context (.fallthrough environment) (resultHeap before value) :=
-    .assignBitNot (lookupStatement?_sound shape.assignmentFound) shape.assignmentForm
-      (.intro resolve (.intro read rfl .initialized (.leaf (.word value)) write))
+    .assignBitNot (lookupStatement?_sound shape.assignmentFound) shape.assignmentForm (by
+      rw [shape.targetType, Dynamic.BitNotAssignmentApplies.eq_word]
+      exact .intro resolve (.intro read rfl .initialized (.leaf (.word value)) write))
   have finalRead : Dynamic.Heap.Reads (resultHeap before value)
       (location before) ⟨.word, some (.word value.bitNot), none⟩ :=
     .intro (Dynamic.Heap.CellAt.append_last before.cells _)
@@ -391,10 +393,11 @@ def observeUnary (source : TypedSource) : IO (UnaryShape source) := do
   let ⟨assignmentForm⟩ ← observed (assignment.form = .assignBitNot resolution) "bitnot original operator"
   let ⟨targetRoot⟩ ← observed (resolution.target.root = binder.id) "bitnot target identity"
   let ⟨targetBare⟩ ← observed (resolution.target.projections = []) "bitnot bare target"
+  let ⟨targetType⟩ ← observed (resolution.target.type = .word) "bitnot target type"
   let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "bitnot return identity"
   let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some result.node.id)) "bitnot return read"
   return ⟨binder, resolution, assignment, returned, result, inputs, scheme, roots,
-    assignmentFound, assignmentForm, targetRoot, targetBare, returnedFound, returnedForm⟩
+    assignmentFound, assignmentForm, targetRoot, targetBare, targetType, returnedFound, returnedForm⟩
 
 def observeMissing (source : TypedSource) : IO (MissingShape source) := do
   let [first, second, third] := source.roots | throw (IO.userError "missing statement count")

@@ -418,11 +418,15 @@ theorem heap_after_bitNot
     (getterMetadata : Dynamic.HeapTypesExtend before getter)
     (snapshot : ProjectedTarget.Snapshot environment before getter assignment.target values target)
     (write : Dynamic.ResolvedPlaceWrites
-      (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
       getter target updated after) :
     Dynamic.HeapWellTyped context after := by
   cases typed with
-  | intro targetTyped kind _ =>
+  | @intro _ _ targetType targetTyped kind _ =>
+      have stored : assignment.target.type = targetType := by
+        cases targetTyped
+        assumption
+      rw [stored] at write
       obtain ⟨root, savedTyped⟩ := SelectedPreservation.projected_target_typed unique locals
         getterHeap getterMetadata targetTyped row keyValues snapshot
       exact (SelectedPreservation.projected_write_bitNot kind savedTyped getterHeap write).1

@@ -38,6 +38,8 @@ structure Head (context : SourceSemantics.Context) (scope : Scope) (assignment :
   writable : WritableLocal context assignment.target.root prepared.route.rootSourceType
   profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
     SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer
+  /-- The target's static type has Word's or Integer's `~`, not a narrow one. -/
+  targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedNarrowBitNot type .bitNot
 
 namespace Head
 variable {context : SourceSemantics.Context} {scope : Scope} {assignment : AssignmentResolution}
@@ -66,7 +68,7 @@ theorem of_lower_with_token {values : ValuesContext} {source : TypedSource} {sit
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
     CompatibleBareBitNotCertificates.of_lower bare profile accepted
   exact ⟨⟨prepared, index, invalidOperand, bare, layout, slot, rootEq ▸ writable binder binding,
-    view ▸ profile⟩, lowering, rfl⟩
+    view ▸ profile, CompatiblePlaceModifier.bitNotPlain_of_runtime profile⟩, lowering, rfl⟩
 
 theorem of_lower {values : ValuesContext} {source : TypedSource} {site : SourceCoreElaboration.ErrorSite}
     {expression : ExpressionLowerer} {fuel : Nat} {next code : Expr} {output : Ty}
@@ -566,6 +568,8 @@ structure Head (values : ValuesContext) (source : TypedSource)
   slot : SourceCoreLocalCell.lookup? scope assignment.target.root = some (index, prepared.route.rootType)
   writable : WritableLocal context assignment.target.root prepared.route.rootSourceType
   profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer
+  /-- The target's static type has Word's or Integer's `~`, not a narrow one. -/
+  targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedNarrowBitNot type .bitNot
 
 namespace Head
 variable {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
@@ -620,9 +624,11 @@ theorem of_lower {site : SourceCoreElaboration.ErrorSite} {expression : Expressi
     ∃ head : Head values source context certificate scope administrative definitions assignment,
       code = head.emit next output ∧ head.invalid = invalidOperand := by
   obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, _, binding, rootEq, view, slot, layout, ordinary, _, emitted⟩ :=
-    CompatiblePlaceBitNotCertificates.of_lower unique signatures sourceTyped nonempty extract accepted typed
+    CompatiblePlaceBitNotCertificates.of_lower unique signatures sourceTyped nonempty profile extract
+      accepted typed
   exact ⟨⟨prepared, index, codes, leaf, sourceTypes, site, invalidOperand, layout, ordinary, slot,
-    rootEq ▸ writable binder binding, view ▸ profile⟩, emitted, rfl⟩
+    rootEq ▸ writable binder binding, view ▸ profile, CompatiblePlaceModifier.bitNotPlain_of_runtime profile⟩,
+    emitted, rfl⟩
 
 end Head
 end Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatements
@@ -823,8 +829,8 @@ include unique contains
 theorem bitNot_view {assignment : AssignmentResolution} (form : node.form = .assignBitNot assignment)
     (evaluated : Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after) :
     finalContext = context ∧ outcome = .fallthrough environment ∧ ∃ updated,
-      Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
-        environment before assignment.target updated after := by
+      Dynamic.SourcePlaceSnapshotUpdate program context evidence source
+        (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated after := by
   have shape := statement_shape unique contains form
   clear contains form
   cases evaluated <;> have actualForm := shape _ (by assumption) <;> simp_all
@@ -874,6 +880,7 @@ theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementN
         TypedLexicalControl.LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
           context scope environment resultContext after := by
     obtain ⟨rfl, same, updated, assigned⟩ := bitNot_view unique (lookupStatement?_sound found) form first
+    rw [Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain] at assigned
     cases same
     obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩ :=
       head.preserves_prefix functions program evidence
@@ -929,7 +936,9 @@ theorem assignment_reflects
         (frame contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using continuation)
     exact ⟨resultContext, outcome, after, finalMap, finalWorld,
-      prepend (lookupStatement?_sound found) (by intro _ _; simp [form]) (.assignBitNot (lookupStatement?_sound found) form trace) tailTrace,
+      prepend (lookupStatement?_sound found) (by intro _ _; simp [form])
+        (.assignBitNot (lookupStatement?_sound found) form
+          (by rw [Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain]; exact trace)) tailTrace,
       represented, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, frame.trans lastFrame, metadata.trans lastMetadata, lexical⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatements

@@ -1441,13 +1441,11 @@ theorem operand_types
 
 end AssignmentHasType
 
-/-- The target type of an in-place `~`, which upstream reads as `x = ~x`: `word`,
-or one of the fixed-width integer types on which `~` is Word's (`FixedWordBitNot`:
-the signed ones and `uint256`). -/
+/-- The target type of an in-place `~`, which upstream reads as `x = ~x`: `word`
+or one of the twelve fixed-width integer types. -/
 inductive BitNotTargetType : TypeSystem.Ty → Prop where
   | word : BitNotTargetType .word
-  | fixed {type : TypeSystem.FixedInteger} (kind : FixedWordBitNot type) :
-      BitNotTargetType (.fixed type)
+  | fixed (type : TypeSystem.FixedInteger) : BitNotTargetType (.fixed type)
 
 /-- Bit-not assignment is valid at a place of a bit-not target type and, like
 the other current assignment forms, owns no requirements. -/

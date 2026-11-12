@@ -34,7 +34,7 @@ private theorem statement_value (unique : NodeOccurrencesUnique source)
       before id finalContext outcome after) :
     ∃ target updated, finalContext = context ∧ outcome = .fallthrough environment ∧
       BareTarget environment before assignment.target target ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         before target updated after := by
   have sameNode : ∀ {other}, ContainsStatement source id other → other = node := by
     intro other contains
@@ -76,7 +76,7 @@ theorem write_and_tail {mode : Bool} {invocation : Staging.Recursive.Scope} {res
         before assignment.target reason before) ∨
     (∃ tailSize target updated written, tailSize < size ∧
       BareTarget environment before assignment.target target ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         before target updated written ∧
       PlainStatements program mode tailSize invocation context environment written rest finalContext outcome after) := by
   rcases SelectedCompilationStageScopedSourceInversion.head_and_tail unique found
@@ -165,7 +165,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
         (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
         (context := context) (scope := scope) (administrative := administrative)
         bridge functions transport head environments heaps locals agrees actualTyped initial admitted assignmentTyped
-        snapshot write
+        snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
     obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
       (Nat.le_trans (Nat.le_of_lt tailStrict) within) (environments.extend maps worlds) middleHeaps
       (locals.mono metadata) (DataPlaceChildExpressions.prefix_agrees agrees slots) nextTyped reference
@@ -199,7 +199,7 @@ theorem statement_value (unique : NodeOccurrencesUnique source)
     (trace : SourceExecutionSize.StatementExecutes program size context evidence source environment before id finalContext outcome after) :
     ∃ assignedSize updated, assignedSize < size ∧ finalContext = context ∧ outcome = .fallthrough environment ∧
       SourceExecutionSize.SourcePlaceSnapshotUpdate program assignedSize context evidence source
-        Dynamic.BitNotSnapshot environment before assignment.target updated after := by
+        (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated after := by
   have sameNode : ∀ {other}, ContainsStatement source id other → other = node := by
     intro other contains
     exact Option.some.inj ((lookupStatement?_complete unique contains).symm.trans found)
@@ -236,7 +236,7 @@ theorem child_and_tail {mode : Bool} {invocation : Staging.Recursive.Scope} {res
         environment before assignment.target reason after) ∨
     (∃ assignedSize tailSize updated written, assignedSize < size ∧ tailSize < size ∧
       SourceExecutionSize.SourcePlaceSnapshotUpdate program assignedSize context invocation.evidence invocation.source
-        Dynamic.BitNotSnapshot environment before assignment.target updated written ∧
+        (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated written ∧
       PlainStatements program mode tailSize invocation context environment written rest finalContext outcome after) := by
   rcases SelectedCompilationStageScopedSourceInversion.head_and_tail unique found
     (by intro expression equal; rw [form] at equal; cases equal) trace with
@@ -266,7 +266,7 @@ theorem item_value {nextEnvironment : Dynamic.Environment}
       before (.assignBitNot assignment) finalContext nextEnvironment after) :
     ∃ assignedSize updated, assignedSize < size ∧ finalContext = context ∧ nextEnvironment = environment ∧
       SourceExecutionSize.SourcePlaceSnapshotUpdate program assignedSize context evidence source
-        Dynamic.BitNotSnapshot environment before assignment.target updated after := by
+        (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated after := by
   cases trace with
   | assignBitNot assigned => exact ⟨_, _, SourceExecutionSize.child_lt_stepSize (by simp), rfl, rfl, assigned⟩
 
@@ -287,7 +287,7 @@ theorem item_and_tail {invocation : Staging.Recursive.Scope} {rest : List ForIte
         environment before assignment.target reason after) ∨
     (∃ assignedSize tailSize updated written, assignedSize < size ∧ tailSize < size ∧
       SourceExecutionSize.SourcePlaceSnapshotUpdate program assignedSize context invocation.evidence invocation.source
-        Dynamic.BitNotSnapshot environment before assignment.target updated written ∧
+        (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated written ∧
       PlainItems program tailSize invocation context environment written rest finalContext outcome after) := by
   cases trace with
   | done trace =>
@@ -466,7 +466,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
             bridge functions extension transport
             faithful observations head projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
             (keyStageSize + 1) (fun n _ => preservation n)
-            measuredKeys (by omega) snapshot write
+            measuredKeys (by omega) snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
         obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
           (Nat.le_trans (Nat.le_of_lt tailStrict) within) (environments.extend maps worlds) middleHeaps
           (locals.mono metadata) (DataPlaceChildExpressions.prefix_agrees agrees slots) nextTyped reference
@@ -500,7 +500,7 @@ theorem bitNotProjected {program : Program} {invocation : Staging.Recursive.Scop
         environment before assignment.target reason after) ∨
     (∃ assignedSize tailSize updated written, assignedSize < size ∧ tailSize < size ∧
       SourceExecutionSize.SourcePlaceSnapshotUpdate program assignedSize context invocation.evidence invocation.source
-        Dynamic.BitNotSnapshot environment before assignment.target updated written ∧
+        (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated written ∧
       PlainInitial program invocation context environment written items test post body tailSize outcome after) := by
   rcases head trace with ⟨_, reason, strict, same, failed⟩ |
     ⟨_, _, _, _, _, _, childStrict, tailStrict, same, executed, tail⟩
@@ -676,7 +676,7 @@ theorem bitNotProjected {budget : Nat} {context : SourceSemantics.Context} {scop
             bridge functions extension transport
             faithful observations head projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
             (keyStageSize + 1) (fun n _ => preservation n)
-            measuredKeys (by omega) snapshot write
+            measuredKeys (by omega) snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
         obtain ⟨nextSize, result, finalHeap, restTrace, restAdapted⟩ := remaining
           (Nat.le_trans (Nat.le_of_lt tailStrict) within)
           ⟨_, _, _, environments.extend maps worlds, middleHeaps,

@@ -1526,11 +1526,12 @@ variable {program : Program} {context : Context} {evidence : EvidenceEnvironment
   {source : TypedSource} {environment : Environment} {before after : Heap}
   {place : PlaceResolution}
 
-theorem bitNot_update_iff {updated : Value} (bare : place.projections = []) :
-    SourcePlaceSnapshotUpdate program context evidence source BitNotSnapshot
+theorem bitNot_update_iff {updated : Value} {modify : Option Value → Value → Prop}
+    (bare : place.projections = []) :
+    SourcePlaceSnapshotUpdate program context evidence source modify
       environment before place updated after ↔
     ∃ target, BareTarget environment before place target ∧
-      ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+      ResolvedPlaceWrites (fun _ replacement => modify target.selected replacement)
         before target updated after := by
   constructor
   · intro executed

@@ -2300,11 +2300,7 @@ theorem bitNotTargetType_of_fits {type : TypeSystem.Ty}
   unfold Detail.bitNotTargetFits at fits
   split at fits
   · exact .word
-  · rename_i fixed
-    refine .fixed ?_
-    rcases Bool.or_eq_true _ _ |>.mp fits with signed | full
-    · exact .signed signed
-    · exact .full (of_decide_eq_true full)
+  · exact .fixed _
   · cases fits
 
 /-- Every value assignment of a typed source takes its operator. Finalization

@@ -172,7 +172,8 @@ theorem bitNot {assignment : AssignmentResolution}
         environment before assignment.target reason before) ∨
     (∃ tailSize target updated written,
       size = Size.stepSize [tailSize] ∧ BareTarget environment before assignment.target target ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      Dynamic.ResolvedPlaceWrites
+        (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         before target updated written ∧
       Size.ForItems program registry tailSize invocation context environment written rest finalContext outcome after) := by
   cases trace with
@@ -1255,7 +1256,7 @@ inductive Result (program : Program) (registry : Registry) (mode : Bool) (invoca
         (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
       (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
       (write : Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+        (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         targetHeap target updated written)
       (next : Size.StatementsIn program registry mode tailSize invocation context environment written rest finalContext outcome after) :
       Result program registry mode invocation context environment before assignment rest
@@ -1483,7 +1484,8 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
         environment before assignment.target reason before) ∨
     (∃ tailSize target updated written,
       size = Size.stepSize [tailSize] ∧ BareTarget environment before assignment.target target ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      Dynamic.ResolvedPlaceWrites
+        (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         before target updated written ∧
       Size.StatementsIn program registry mode tailSize invocation context environment written rest finalContext outcome after) := by
   have shape {other : StatementNode} (present : ContainsStatement invocation.source id other) :

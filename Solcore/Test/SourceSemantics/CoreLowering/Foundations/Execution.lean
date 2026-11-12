@@ -4866,9 +4866,9 @@ def runCompoundShifts : IO Unit := do
   | .error errors => throw (IO.userError s!"an integer <<= target gave {reprStr errors}")
   IO.println "SOURCE_CORE_FIXED_COMPOUND_SHIFTS_PASS: <<= and >>= on signed and unsigned fixed-width locals and Word by Word and unsigned amounts of other types, uintN <<= keeping the low N bits, intN <<= sign-extending them and intN >>= arithmetic, literal amounts defaulted to uint256, a uint8 mapping element, open targets typed by a later use or defaulted to uint256, compound shifts in an unchecked block and in a for loop's header and body, signed, integer and Bool amounts, an open amount made signed, integer and Bool targets and an open target made integer rejected"
 
-/-- Step 9a's fixture: in-place `~` (`x ~=;`) on `uint256`, the signed types and
-`Word`, where Word's `~` is the type's, on locals, a mapping element, open
-targets and in a `for` loop's header and body. -/
+/-- Step 9a's fixture: in-place `~` (`x ~=;`) on the twelve fixed-width types and
+`Word`, on locals, mapping elements, open targets, in an `unchecked` block and
+in a `for` loop's header and body. -/
 private def bitNotWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function not256u(x: uint256) returns (uint256) { let r: uint256 = x; r ~=; return r; }",
   "function not8s(x: int8) returns (int8) { let r: int8 = x; r ~=; return r; }",
@@ -4885,12 +4885,24 @@ private def bitNotWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function notOpenWord() returns (Word) { let x = 1; x ~=; let w: Word = x; return w; }",
   "function notTwice8s(x: int8) returns (int8) { let r: int8 = x; r ~=; r ~=; return r; }",
   "function notForPost8s(x: int8) returns (int8) { let r: int8 = x; for (let i: Word = 0; i < 1; r ~=) { i += 1; } return r; }",
-  "function notForBody256u(x: uint256) returns (uint256) { let r: uint256 = x; for (let i: Word = 0; i < 3; i += 1) { r ~=; } return r; }"]
+  "function notForBody256u(x: uint256) returns (uint256) { let r: uint256 = x; for (let i: Word = 0; i < 3; i += 1) { r ~=; } return r; }",
+  "function not8u(x: uint8) returns (uint8) { let r: uint8 = x; r ~=; return r; }",
+  "function not16u(x: uint16) returns (uint16) { let r: uint16 = x; r ~=; return r; }",
+  "function not32u(x: uint32) returns (uint32) { let r: uint32 = x; r ~=; return r; }",
+  "function not64u(x: uint64) returns (uint64) { let r: uint64 = x; r ~=; return r; }",
+  "function not128u(x: uint128) returns (uint128) { let r: uint128 = x; r ~=; return r; }",
+  "function notMapped8u(x: uint8) returns (uint8) { let m: mapping(Bool => uint8); m[true] = x; m[true] ~=; return m[true]; }",
+  "function notOpenLater8u() returns (uint8) { let x = 5; x ~=; let y: uint8 = x; return y; }",
+  "function notTwice16u(x: uint16) returns (uint16) { let r: uint16 = x; r ~=; r ~=; return r; }",
+  "function notUnchecked8u(x: uint8) returns (uint8) { let r: uint8 = x; unchecked { r ~=; } return r; }",
+  "function notForPost8u(x: uint8) returns (uint8) { let r: uint8 = x; for (let i: Word = 0; i < 1; r ~=) { i += 1; } return r; }",
+  "function notSum8u(x: uint8) returns (uint8) { let r: uint8 = x; r ~=; return r + x; }"]
 
 private def bitNotNames : List String := [
   "not256u", "not8s", "not16s", "not32s", "not64s", "not128s", "not256s", "notWord", "notMapped8s",
   "notOpenDefault", "notOpenLater8s", "notOpenReturn256s", "notOpenWord", "notTwice8s", "notForPost8s",
-  "notForBody256u"]
+  "notForBody256u", "not8u", "not16u", "not32u", "not64u", "not128u", "notMapped8u", "notOpenLater8u",
+  "notTwice16u", "notUnchecked8u", "notForPost8u", "notSum8u"]
 
 /-- Finalization rejects an in-place `~` whose target has a type that no
 `BitNot` instance takes, naming the trait and that type. -/
@@ -4902,9 +4914,10 @@ private def rejectedBitNot (label : String) (expected : TypeSystem.Ty) (lines : 
   | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
 
 /-- Step 9a, in-place `~`, through the public API, as upstream's rewrite of `x ~=`
-to `x = ~x` gives it: the target keeps its type and takes that type's `~`, Word's
-on `uint256`, the signed types and `Word`; an open target waits for its type and
-defaults to `uint256`. The place is evaluated once. -/
+to `x = ~x` gives it: the target keeps its type and takes that type's `~`, the
+low `N` bits of Word's on `uint8` … `uint128`, and Word's on `uint256`, the
+signed types and `Word`; an open target waits for its type and defaults to
+`uint256`. The place is evaluated once. -/
 def runBitNotAssignments : IO Unit := do
   let program ← get "bit-not check" (checkProgram bitNotWorkspace)
   let seeds ← bitNotNames.mapM (seed program)
@@ -4933,15 +4946,22 @@ def runBitNotAssignments : IO Unit := do
     (9, [], boolean true), (10, [], word (modulus - 6)), (11, [], word max), (12, [], word (max - 1)),
     -- Twice is the identity; in a `for` loop's header and body.
     (13, [word (modulus - 3)], word (modulus - 3)), (14, [word 5], word (modulus - 6)),
-    (15, [word 5], word (max - 5))]
+    (15, [word 5], word (max - 5)),
+    -- On `uint8` … `uint128` the low `N` bits of Word's `~`.
+    (16, [word 0], word 255), (16, [word 255], word 0), (16, [word 0x0F], word 0xF0),
+    (17, [word 0], word 0xFFFF), (17, [word 0x1234], word 0xEDCB),
+    (18, [word 1], word 0xFFFFFFFE),
+    (19, [word 0], word (2 ^ 64 - 1)),
+    (20, [word (2 ^ 128 - 1)], word 0), (20, [word 0], word (2 ^ 128 - 1)),
+    -- A mapping element of `uint8`, an open target typed `uint8` by a later use, twice, in an
+    -- `unchecked` block, in a `for` loop's post clause, and a result that checked `+` adds to.
+    (21, [word 5], word 250), (22, [], word 250), (23, [word 0x1234], word 0x1234),
+    (24, [word 0x0F], word 0xF0), (25, [word 5], word 250), (26, [word 0x0F], word 255)]
   for (index, arguments, expected) in cases do
     let completed ← execute session (← key index) arguments
     require (completed.value == expected)
       s!"{bitNotNames[index]?} on {reprStr arguments} gave {reprStr completed.value}"
     session := completed.session
-  -- `~` on `uint8` … `uint128` keeps the low `N` bits, which in-place `~` does not yet do.
-  rejectedBitNot "~= on uint8" (.fixed ⟨false, .w8⟩)
-    ["function bad(x: uint8) returns (uint8) { let r: uint8 = x; r ~=; return r; }"]
   -- Upstream defines no `BitNot` on `integer` or `Bool`: a closed target of those types fails to
   -- unify with `Word`, and an open one that a later use makes `integer` is rejected at finalization.
   rejectedByInference "~= on integer"
@@ -4950,7 +4970,7 @@ def runBitNotAssignments : IO Unit := do
     ["function bad(b: Bool) returns (Bool) { let r: Bool = b; r ~=; return r; }"]
   rejectedBitNot "an open ~= target made integer" .integer
     ["function bad() returns (Word) { let x = 1; x ~=; let y: integer = x; return 0; }"]
-  IO.println "SOURCE_CORE_FIXED_BIT_NOT_ASSIGNMENTS_PASS: in-place ~ on uint256, the signed fixed-width types and Word as Word's ~, sign-extended on the signed types, on locals, an int8 mapping element and in a for loop's header and body, open targets defaulted to uint256 or typed by a later use, the return or a Word, uint8 not yet accepted, integer and Bool targets and an open target made integer rejected"
+  IO.println "SOURCE_CORE_FIXED_BIT_NOT_ASSIGNMENTS_PASS: in-place ~ on the twelve fixed-width types and Word, keeping the low N bits on uint8 … uint128 and as Word's ~ elsewhere, sign-extended on the signed types, on locals, int8 and uint8 mapping elements, in an unchecked block and in a for loop's header and body, with canonical results, open targets defaulted to uint256 or typed by a later use, the return or a Word, integer and Bool targets and an open target made integer rejected"
 
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
@@ -5316,8 +5336,6 @@ def run : IO Unit := do
     (.invalidAssignmentOperands .add none (some (.fixed uint8))) "absentAdd8u"
   rejectedByInference "operands of different types"
     ["function bad(x: uint8, y: uint16) returns (bool) { return x == y; }"]
-  rejectedByInference "in-place ~ on uint8 is not yet defined"
-    ["function bad(x: uint8) returns (uint8) { let r: uint8 = x; r ~=; return r; }"]
   -- One past each type's greatest value is rejected, naming the type.
   rejectedOutOfRange "256 at uint8" "uint8" 256 ["function bad() returns (uint8) { return 256; }"]
   rejectedOutOfRange "2^256 at uint256" "uint256" 115792089237316195423570985008687907853269984665640564039457584007913129639936
@@ -5342,7 +5360,7 @@ def run : IO Unit := do
      "impl Sub<Token> {", "  function sub(left: Token, right: Token) returns (Token) {", "    return left;", "  }", "}",
      "function bad(t: Token) returns (Token) { return -t; }"]
   rejectedByInference "unary minus on Bool" ["function bad(b: Bool) returns (Bool) { return -b; }"]
-  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * / % on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= /= %= panicking with 0x11 outside the range (MIN / -1 among them, MIN % -1 not), / % /= %= panicking with 0x12 on a zero divisor and rounding toward zero, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, literals at their range edges and as operands, deferred operators and mapping elements, one past each range rejected naming the type, negated literals folded through groups and repeated with their range checked by sign, -x as checked 0 - x panicking for MIN and nonzero unsigned values and wrapping on Word, negated-literal operands and compound forms, unary minus rejected on declared types and Bool, in-place ~ still rejected"
+  IO.println "SOURCE_CORE_FIXED_OPERATORS_PASS: == != & | ^ < > <= >= ~ and checked + - * / % on signed and unsigned fixed-width types, signed orderings comparing negative words, ~ keeping the low bits on narrower unsigned types, checked arithmetic and checked += -= *= /= %= panicking with 0x11 outside the range (MIN / -1 among them, MIN % -1 not), / % /= %= panicking with 0x12 on a zero divisor and rounding toward zero, an absent += operand failing with its own diagnostic, &= |= ^= as Word's, with canonical results, and mixed operand types, literals at their range edges and as operands, deferred operators and mapping elements, one past each range rejected naming the type, negated literals folded through groups and repeated with their range checked by sign, -x as checked 0 - x panicking for MIN and nonzero unsigned values and wrapping on Word, negated-literal operands and compound forms, unary minus rejected on declared types and Bool"
   runDefaulting
   runUnchecked
   runShifts

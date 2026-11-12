@@ -203,7 +203,7 @@ theorem preserves_value (budget : Nat)
       ⟨reached, related, ?_, ?_⟩, ?_⟩
     · exact CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped kind requirements)
         locals (by simpa only [Staging.Recursive.ProjectedTarget.keys_eq_sourceKeys] using keyTyped)
-        keyValues keyHeap resolution.metadata snapshot write
+        keyValues keyHeap resolution.metadata snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
     · exact StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows
         (resolution.frame.trans commit.frame)
     · intro next output
@@ -435,7 +435,7 @@ theorem reflects_bounded (budget : Nat)
           packValues resolution.values, .cellRef (OptionalCell.cellType head.prepared.route.rootType) resolution.target])
         rfl typed reached related
         ⟨CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped kind requirements)
-          locals keyRow keyValues getterHeap resolution.metadata snapshot write,
+          locals keyRow keyValues getterHeap resolution.metadata snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write),
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows
             (resolution.frame.trans commit.frame)⟩
         (by omega) continuation
@@ -867,7 +867,7 @@ theorem prepend_projected_bitNot
       (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
     (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
     (write : Dynamic.ResolvedPlaceWrites
-      (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
       targetHeap target updated written)
     (next : Trace program stages invocation context environment written items test post body size outcome after) :
     Trace program stages invocation context environment before (.assignBitNot assignment :: items) test post body
@@ -1007,7 +1007,8 @@ variable {program : Program} {stages : Registry} {invocation : Scope}
 theorem prepend_bitNot {assignment : AssignmentResolution} {target : Dynamic.ResolvedPlace}
     {updated : Dynamic.Value}
     (snapshot : BareTarget environment before assignment.target target)
-    (write : Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+    (write : Dynamic.ResolvedPlaceWrites
+      (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
       before target updated written)
     (next : Trace program stages invocation context environment written items test post body size outcome after) :
     Trace program stages invocation context environment before (.assignBitNot assignment :: items) test post body
@@ -1132,7 +1133,7 @@ theorem reflects_bounded (errors : head.Errors faults)
       obtain ⟨reached, related⟩ := ProtectedStateTransition.AdministrativeTransport.transition
         callerProtocol transport initial maps worlds frame metadata
       exact .success snapshot write finalHeaps maps worlds frame metadata count typed reached related
-        ⟨(Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot write).1,
+        ⟨(Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)).1,
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩ bounded remaining
 
 include transport environments heaps locals agrees actualTyped initial admitted assignmentTyped in
@@ -1156,7 +1157,7 @@ theorem preserves_value {target : Dynamic.ResolvedPlace} {updated : Dynamic.Valu
     callerProtocol transport initial maps worlds frame metadata
   exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed,
     ⟨reached, related,
-      (Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot write).1,
+      (Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)).1,
       StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩, agreement⟩
 
 include transport environments heaps locals agrees initial admitted in
@@ -2926,7 +2927,7 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
               reached conditioned nextAdmitted
               (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
           exact ⟨Staging.Recursive.Size.stepSize [sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-            .bitNot snapshot write trace, represented,
+            .bitNot snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
 
@@ -2970,7 +2971,7 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
             reached conditioned nextAdmitted
             (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
         exact ⟨_, finalContext, outcome, after, finalMap, finalWorld,
-          .projectedBitNot head.projected keysTrace snapshot write trace, represented,
+          .projectedBitNot head.projected keysTrace snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
           finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
           metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
 
@@ -3445,7 +3446,7 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
             (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
             (context := context) (scope := scope) (administrative := administrative)
             bridge functions transport head environments heaps locals agrees actualTyped initial admitted assignmentTyped
-            snapshot write
+            snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
         obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
             finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
           ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).2 tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -3511,7 +3512,7 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
             (context := context) (scope := scope) (administrative := administrative)
             bridge functions extension transport faithful observations head head.projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
             budget typedChildren keysTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
-            snapshot write
+            snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
         obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
             finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
           ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.bitNot sourceTyped).2
@@ -3565,7 +3566,7 @@ inductive Result (program : Program) (registry : Registry) (invocation : Scope)
         (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
       (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
       (write : Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+        (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         targetHeap target updated written)
       (next : Trace program registry invocation context environment written rest test post body tailSize outcome after) :
       Result program registry invocation context environment before assignment rest test post body
@@ -3738,7 +3739,8 @@ theorem bitNot {assignment : AssignmentResolution}
         environment before assignment.target reason before) ∨
     (∃ tailSize target updated written, size = Size.stepSize [tailSize] ∧
       BareTarget environment before assignment.target target ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      Dynamic.ResolvedPlaceWrites
+        (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         before target updated written ∧
       Trace program stages invocation context environment written items test post body tailSize outcome after) := by
   cases trace with

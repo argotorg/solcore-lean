@@ -1141,7 +1141,7 @@ mutual
       (environment_agrees : EnvironmentAgrees before context.locals environment)
       (before_typed : HeapWellTyped context before)
       (typing : SourceBitNotAssignmentValid source context assignment)
-      (modify_eq : modify = BitNotSnapshot)
+      (modify_eq : modify = BitNotAssignmentApplies assignment.target.type)
       (place_eq : place = assignment.target)
       (evaluation : SourcePlaceSnapshotUpdate program context evidence source
         modify environment before place updatedRoot after) :
@@ -1153,6 +1153,9 @@ mutual
       | @intro _ _ targetType target_type target_kind requirements_eq =>
             have aligned_target_type : SourcePlaceHasType source context place targetType :=
               place_eq.symm ▸ target_type
+            have stored : assignment.target.type = targetType := by
+              cases target_type
+              assumption
             rcases preservePlaceRec program_well_formed runtime
                 evidence_covers environment_agrees before_typed aligned_target_type
                 resolve with
@@ -1170,7 +1173,7 @@ mutual
                     selectedHeap
                     (fun _ updated => modify target.selected updated) targetType := by
                   intro current updated current_typed modifies
-                  rw [modify_eq] at modifies
+                  rw [modify_eq, stored] at modifies
                   exact modifies.preserves_target target_kind target_typed.selected
                 have updated_typed := update.preserves target_typed.projections
                   initial_root_typed modify_typed

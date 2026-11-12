@@ -365,8 +365,10 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
         projected, _, callbackSelected, accepted, lowered, route, binder, selected, description,
         place, prepared, routeType, path, index, slot, keys, keysGenerated,
         CompatiblePlaceCompilerCertificates.PreparedPath.key_ids path, leafType, ?_⟩⟩
+      have noWrap : SourceCoreDataPlaces.bitNotWrap assignment.target.type = none :=
+        SourceCoreDataPlaces.bitNotWrap_of_not_fixed fun _ same => by cases sourceProfile.symm.trans same
       simp only [routeType, Option.isNone_none, SourceCoreCompatibleDataPlaces.placeModifier,
-        SourceCoreDataPlaces.placeWrap, ↓reduceIte]
+        SourceCoreDataPlaces.placeWrap, ↓reduceIte, noWrap]
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedProjectedBitNotReceipt
 end

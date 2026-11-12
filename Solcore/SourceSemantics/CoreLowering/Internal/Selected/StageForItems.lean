@@ -385,7 +385,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
             bridge functions extension transport
             faithful observations head projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
             (keyStageSize + 1) (fun n _ => preservation n)
-            measuredKeys (by omega) snapshot write
+            measuredKeys (by omega) snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
         obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
           (Nat.le_trans (Nat.le_of_lt tailStrict) within)
           ⟨_, _, _, environments.extend maps worlds, middleHeaps,
@@ -831,7 +831,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
         (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
         (context := context) (scope := scope) (administrative := administrative)
         bridge functions transport head environments heaps locals agrees actualTyped initial admitted assignmentTyped
-        snapshot write
+        snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
     obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
       (Nat.le_trans (Nat.le_of_lt tailStrict) within)
       ⟨_, _, _, environments.extend maps worlds, middleHeaps,

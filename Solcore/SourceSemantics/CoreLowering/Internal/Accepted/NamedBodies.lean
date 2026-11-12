@@ -62,6 +62,7 @@ def Receipt.head
         cases projections
         simpa only [stored] using writable
   profile := .inl (by rw [receipt.rawType, receipt.sourceProfile]; rfl)
+  targetPlain := fun _ fixed => by cases receipt.sourceProfile.symm.trans fixed
 
 theorem Receipt.head_emitted
     (receipt : Receipt policy fuel compilerSource scope site assignment output next reasonAt code)

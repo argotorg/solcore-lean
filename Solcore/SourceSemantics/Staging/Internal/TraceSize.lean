@@ -533,7 +533,7 @@ mutual
           (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
         (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
         (write : ResolvedPlaceWrites
-          (fun _ replacement => BitNotSnapshot target.selected replacement)
+          (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
           targetHeap target updated written)
         (next : StatementsIn program registry mode nextSize scope context environment written rest finalContext outcome after) :
         StatementsIn program registry mode (stepSize [keysSize, nextSize]) scope context environment before (id :: rest) finalContext outcome after
@@ -678,7 +678,7 @@ mutual
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignBitNot assignment)
         (snapshot : BareTarget environment before assignment.target target)
-        (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+        (write : ResolvedPlaceWrites (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
           before target updated written)
         (next : StatementsIn program registry mode nextSize scope context environment written rest finalContext outcome after) :
         StatementsIn program registry mode (stepSize [nextSize]) scope context environment before (id :: rest) finalContext outcome after
@@ -841,7 +841,7 @@ mutual
           (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
         (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
         (write : ResolvedPlaceWrites
-          (fun _ replacement => BitNotSnapshot target.selected replacement)
+          (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
           targetHeap target updated written)
         (next : ForItems program registry nextSize scope context environment written rest finalContext outcome after) :
         ForItems program registry (stepSize [keysSize, nextSize]) scope context environment before (.assignBitNot assignment :: rest) finalContext outcome after
@@ -952,7 +952,7 @@ mutual
   /-- Finite for iteration runs each post header in the original loop scope.
   Body/post local bindings are restored, while their heap effects persist. -/    | bitNot {nextSize : Nat} {scope context finalContext environment before written after assignment target updated rest outcome}
         (snapshot : BareTarget environment before assignment.target target)
-        (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+        (write : ResolvedPlaceWrites (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
           before target updated written)
         (next : ForItems program registry nextSize scope context environment written rest finalContext outcome after) :
         ForItems program registry (stepSize [nextSize]) scope context environment before (.assignBitNot assignment :: rest) finalContext outcome after

@@ -716,8 +716,8 @@ mutual
         (contains : ContainsStatement source id node)
         (form_eq : node.form = .assignBitNot assignment)
         (assignment_executes : SourcePlaceSnapshotUpdate program size_assignment_executes context evidence
-          source BitNotSnapshot environment before assignment.target updatedRoot
-          after) :
+          source (BitNotAssignmentApplies assignment.target.type) environment before assignment.target
+          updatedRoot after) :
         StatementExecutes program (stepSize [size_assignment_executes]) context evidence source environment before id
           context (.fallthrough environment) after
     | ifTrue
@@ -988,7 +988,8 @@ mutual
         {size_execute : Nat}
         {context evidence source environment before after assignment updatedRoot}
         (execute : SourcePlaceSnapshotUpdate program size_execute context evidence source
-          BitNotSnapshot environment before assignment.target updatedRoot after) :
+          (BitNotAssignmentApplies assignment.target.type) environment before assignment.target
+          updatedRoot after) :
         ForItemExecutes program (stepSize [size_execute]) context evidence source environment before
           (.assignBitNot assignment) context environment after
 

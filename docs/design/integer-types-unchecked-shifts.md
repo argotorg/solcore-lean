@@ -1303,11 +1303,25 @@ Made on 2026-11-12, during step 9a.
   - A lambda parameter that only an in-place `~` types stays open after local generalization. So
     `lam(x) { x ~=; return x; }` is rejected, as step 7b's and step 8d's lambda cases are.
 - **Static semantics.** `SourceBitNotAssignmentValid` types the target at a `BitNotTargetType`:
-  `word`, or a fixed-width type on which `~` is Word's (`FixedWordBitNot`), the signed ones and
-  `uint256`.
-- **Meaning.** On those types the meaning is Word's `~` on the snapshot (`BitNotSnapshot`). It
-  keeps a canonical word canonical (`fixed_canonical_bitNot`, `BitNotSnapshot.preserves_target`),
-  so the dynamic rule and the lowering are unchanged.
+  `word` or one of the twelve types. The step's first part admitted only the types on which `~` is
+  Word's (`FixedWordBitNot`), with no change to the meaning; the second part admits the rest.
+- **Meaning.**
+  - The rules update the place with `BitNotAssignmentApplies` at the target's static type, as
+    compound assignment uses `CompoundAssignmentApplies`.
+  - On `word`, `uint256`, the signed types and `integer` that is Word's or Integer's `~` on the
+    snapshot (`BitNotSnapshot`). On `uint8` … `uint128` it is the narrow `~` of step 3b
+    (`FixedUnaryApplies`): Word's `~` masked to the low `N` bits.
+  - `eq_of_plain` and `eq_word` give back `BitNotSnapshot` where no narrow type is involved.
+  - The results stay canonical (`fixed_canonical_bitNot`, `fixed_canonical_narrowBitNot`,
+    `BitNotAssignmentApplies.preserves_target`).
+  - The sized copy (`Foundations/SourceExecutionSize`) and the staged semantics' `~=` rules take
+    the same relation.
+- **Lowering.**
+  - `placeWrap` gives in-place `~` its target's `bitNotWrap`: the type at `uint8` … `uint128`, none
+    elsewhere.
+  - `modified`'s `~` branch passes Word's `~` through `wrapLeaf`, step 8b's leaf wrap, so the leaf
+    is masked before the setter writes it. Both place lowerings do this.
+  - `placeWrap_plain` now speaks of value assignments (`false`), and `placeWrap_bitNot` of `~`.
 - **Proofs.**
   - The bit-not statement and `for`-item soundness takes the final target type's kind from
     finalization's check:
@@ -1319,6 +1333,14 @@ Made on 2026-11-12, during step 9a.
     compiler profiles of `~=` (`BitNotAssignable`, `ProjectedBitNotAssignable`) take only a `Word`
     target. So the proofs that read `Word` from the static rule read it from the receipt's
     `sourceProfile` instead (`bitNot_facts`, `projected_bitNot_head`).
+  - The bit-not heads carry `targetPlain`, from their `Word` or `integer` profile
+    (`CompatiblePlaceModifier.bitNotPlain_of_runtime`). With it the proofs rewrite a trace's
+    relation to `BitNotSnapshot` and back (`eq_of_plain`), and the emitted code's wrap is none
+    (`bitNotWrap_of_runtime`).
+  - The staged inversions, the staged trace builders (`prepend_bitNot`, `prepend_projected_bitNot`)
+    and the `for` header's readiness transfer (`SnapshotTransfers.ready`, `after_snapshot`) read
+    the write at `BitNotAssignmentApplies`. Word's `~` alone would not keep a narrow target's heap
+    well typed.
   - The unary fault-site certificate takes `operandTarget`, as the value assignments' does.
   - `w ~=;` and `m[k] ~=;` stay in the compiler body profile that the meaning proofs take
     (`AcceptedCompilerBodyProfile.validate`), and an `int8` target is outside it

@@ -712,7 +712,7 @@ theorem reflects_position [RecursiveStageMeaning.FaultTokens faults] {budget : N
               reached conditioned nextAdmitted
               (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
           exact ⟨Staging.Recursive.Size.stepSize [sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-            .bitNotBare (lookupStatement?_sound found) form snapshot write trace, represented,
+            .bitNotBare (lookupStatement?_sound found) form snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
   | @bitNotProjected context scope mode id node assignment rest expected type body found form head remaining remainingErrors headSite ih =>
@@ -765,7 +765,7 @@ theorem reflects_position [RecursiveStageMeaning.FaultTokens faults] {budget : N
               reached conditioned nextAdmitted
               (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
           exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-            .bitNotProjected (lookupStatement?_sound found) form projected keyTrace snapshot write trace, represented,
+            .bitNotProjected (lookupStatement?_sound found) form projected keyTrace snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
   | @forLoop context scope mode id node items test post statements rest expected type initialCode body found form initialTree remaining initialErrors remainingErrors initialIH remainingIH =>
@@ -1032,7 +1032,7 @@ theorem reflects_position [RecursiveStageMeaning.FaultTokens faults] {budget : N
               reached conditioned nextAdmitted
               (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
           exact ⟨Staging.Recursive.Size.stepSize [sourceSize], outcome, after, finalMap, finalWorld,
-            CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_bitNot snapshot write trace, represented,
+            CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_bitNot snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
   | @initializerBitNotProjected context scope assignment rest body test post statements expected type head remaining remainingErrors headSite ih =>
@@ -1083,7 +1083,7 @@ theorem reflects_position [RecursiveStageMeaning.FaultTokens faults] {budget : N
               reached conditioned nextAdmitted
               (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
           exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], outcome, after, finalMap, finalWorld,
-            CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_projected_bitNot projected keyTrace snapshot write trace, represented,
+            CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_projected_bitNot projected keyTrace snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
 

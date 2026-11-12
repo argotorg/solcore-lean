@@ -464,8 +464,8 @@ structure SnapshotTransfers (protocol : Protocol.{u, v} Records) (readiness : Re
     {context : SourceSemantics.Context} {assignment : AssignmentResolution}
     {environment : Dynamic.Environment} {updated : Dynamic.Value},
     readiness.Ready context first → validity context → snapshotFacts context assignment →
-    Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
-      environment initial.heap assignment.target updated final.heap →
+    Dynamic.SourcePlaceSnapshotUpdate program context evidence source
+      (Dynamic.BitNotAssignmentApplies assignment.target.type) environment initial.heap assignment.target updated final.heap →
     Dynamic.EnvironmentAgrees initial.heap context.locals environment →
     AdministrativePreserved initial.mapping initial.store final.mapping final.store → readiness.Ready context last
 

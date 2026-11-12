@@ -725,9 +725,8 @@ mutual
         SourceAssignmentHasType source context assignment operator value
 
   /-- Bit-not assignment in the current executable source profile: the target
-  keeps its type, `word` or one of the fixed-width integer types on which `~` is
-  Word's (`BitNotTargetType`), as upstream's rewrite of `x ~=` to `x = ~x` types
-  it. -/
+  keeps its type, `word` or one of the twelve fixed-width integer types
+  (`BitNotTargetType`), as upstream's rewrite of `x ~=` to `x = ~x` types it. -/
   inductive SourceBitNotAssignmentValid (source : TypedSource) :
       Context → AssignmentResolution → Prop where
     | intro

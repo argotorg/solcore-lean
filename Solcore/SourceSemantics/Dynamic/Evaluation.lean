@@ -349,6 +349,40 @@ inductive BitNotSnapshot : Option Value → Value → Prop where
   | integer (value : Int) :
       BitNotSnapshot (some (.integer value)) (.integer (~~~value))
 
+/-- In-place `~` at its target's static type, as upstream's `x = ~x` gives it:
+Word's or Integer's `~` on the snapshot (`BitNotSnapshot`), except on `uint8` …
+`uint128`, whose `~` keeps the low `N` bits (`FixedUnaryApplies`). -/
+inductive BitNotAssignmentApplies (targetType : TypeSystem.Ty) : Option Value → Value → Prop where
+  | primitive {current : Option Value} {result : Value}
+      (plain : ∀ type, targetType = .fixed type → ¬ FixedNarrowBitNot type .bitNot)
+      (applies : BitNotSnapshot current result) :
+      BitNotAssignmentApplies targetType current result
+  | narrow {type : TypeSystem.FixedInteger} {operand result : Value}
+      (target : targetType = .fixed type)
+      (applies : FixedUnaryApplies type .bitNot operand result) :
+      BitNotAssignmentApplies targetType (some operand) result
+
+namespace BitNotAssignmentApplies
+
+/-- Away from `uint8` … `uint128` the relation is `BitNotSnapshot`. -/
+theorem eq_of_plain {targetType : TypeSystem.Ty}
+    (plain : ∀ type, targetType = .fixed type → ¬ FixedNarrowBitNot type .bitNot) :
+    BitNotAssignmentApplies targetType = BitNotSnapshot := by
+  funext current result
+  apply propext
+  constructor
+  · intro applies
+    cases applies with
+    | primitive _ applies => exact applies
+    | narrow target applies => exact absurd applies.kind (plain _ target)
+  · exact .primitive plain
+
+/-- At a `Word` target the relation is `BitNotSnapshot`. -/
+theorem eq_word : BitNotAssignmentApplies .word = BitNotSnapshot :=
+  eq_of_plain (fun _ target => by cases target)
+
+end BitNotAssignmentApplies
+
 /-- Restore a scoped control result to its entry environment. -/
 def restoreControl (outer : Environment) : ControlOutcome → ControlOutcome
   | .fallthrough _ => .fallthrough outer
@@ -1089,8 +1123,8 @@ mutual
         (contains : ContainsStatement source id node)
         (form_eq : node.form = .assignBitNot assignment)
         (assignment_executes : SourcePlaceSnapshotUpdate program context evidence
-          source BitNotSnapshot environment before assignment.target updatedRoot
-          after) :
+          source (BitNotAssignmentApplies assignment.target.type) environment before
+          assignment.target updatedRoot after) :
         StatementExecutes program context evidence source environment before id
           context (.fallthrough environment) after
     | ifTrue
@@ -1347,7 +1381,8 @@ mutual
     | assignBitNot
         {context evidence source environment before after assignment updatedRoot}
         (execute : SourcePlaceSnapshotUpdate program context evidence source
-          BitNotSnapshot environment before assignment.target updatedRoot after) :
+          (BitNotAssignmentApplies assignment.target.type) environment before
+          assignment.target updatedRoot after) :
         ForItemExecutes program context evidence source environment before
           (.assignBitNot assignment) context environment after
 

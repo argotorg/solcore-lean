@@ -1263,7 +1263,8 @@ def modified (type : Core.Ty) (operator : Option SourceCoreDataPlaces.Modifier) 
     (snapshot rhs : Core.Expr) (invalid : Core.Word) (wrap : Option TypeSystem.FixedInteger := none) :
     Core.Expr :=
   if bitNot then .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
-    (Core.LanguageResult.success (.unary (if type = .integer then .integerNot else .wordNot) (.var 0)))
+    (Core.LanguageResult.success
+      (SourceCoreDataPlaces.wrapLeaf wrap (.unary (if type = .integer then .integerNot else .wordNot) (.var 0))))
   else match operator with
     | none => Core.LanguageResult.success rhs
     | some modifier => .caseE snapshot (Core.LanguageResult.failure type (.word invalid))

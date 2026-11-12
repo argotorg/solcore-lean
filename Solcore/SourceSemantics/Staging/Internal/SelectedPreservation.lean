@@ -403,11 +403,16 @@ theorem bare_write_bitNot
     (heap : HeapWellTyped context before)
     (typed : SourceBitNotAssignmentValid source context assignment)
     (snapshot : BareTarget environment before assignment.target target)
-    (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+    (write : ResolvedPlaceWrites
+      (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
       before target updated after) :
     HeapWellTyped context after ∧ HeapTypesExtend before after := by
   cases typed with
   | @intro _ _ leafType targetTyped kind _ =>
+    have stored : assignment.target.type = leafType := by
+      cases targetTyped
+      assumption
+    rw [stored] at write
     obtain ⟨rootType, targetTyped⟩ := bare_target_typed locals heap targetTyped snapshot
     cases write with
     | intro currentRead rootEq initialValue update heapWrite =>
@@ -417,7 +422,7 @@ theorem bare_write_bitNot
         rw [← targetTyped.root_type, ← rootEq]
         exact initialTyped
       have modification : LeafModificationPreservesType context before
-          (fun _ replacement => BitNotSnapshot target.selected replacement) leafType := by
+          (fun _ replacement => BitNotAssignmentApplies leafType target.selected replacement) leafType := by
         intro current replacement _ applies
         exact applies.preserves_target kind targetTyped.selected
       have updatedTyped := update.preserves targetTyped.projections initialRoot modification
@@ -1633,12 +1638,16 @@ theorem for_items_step (size : Nat)
           cases headTyped with
           | assignBitNot assignmentTyped =>
               cases assignmentTyped with
-              | intro targetTyped kind _ =>
+              | @intro _ _ targetType targetTyped kind _ =>
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                     runtime covers locals heap keyTyped keys
                   obtain ⟨root, savedTyped⟩ := projected_target_typed runtime.graph.nodeOccurrencesUnique
                     locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
+                  have stored : assignment.target.type = targetType := by
+                    cases targetTyped
+                    assumption
+                  rw [stored] at write
                   obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_bitNot kind savedTyped keyPost.heap_typed write
                   have totalExtends := keyPost.heap_extends.trans writtenExtends
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
@@ -2285,12 +2294,16 @@ theorem statements_step (size : Nat)
       cases formTyped with
       | assignBitNot assignmentTyped =>
           cases assignmentTyped with
-          | intro targetTyped kind _ =>
+          | @intro _ _ targetType targetTyped kind _ =>
               obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
               have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap keyTyped keys
               obtain ⟨root, savedTyped⟩ := projected_target_typed runtime.graph.nodeOccurrencesUnique
                 locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
+              have stored : assignment.target.type = targetType := by
+                cases targetTyped
+                assumption
+              rw [stored] at write
               obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_bitNot kind savedTyped keyPost.heap_typed write
               have totalExtends := keyPost.heap_extends.trans writtenExtends
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers

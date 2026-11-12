@@ -1055,7 +1055,8 @@ theorem item_value {nextEnvironment : Dynamic.Environment}
       before (.assignBitNot assignment) finalContext nextEnvironment after) :
     ∃ target updated, finalContext = context ∧ nextEnvironment = environment ∧
       BareTarget environment before assignment.target target ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      Dynamic.ResolvedPlaceWrites
+        (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         before target updated after := by
   cases trace with
   | assignBitNot executed =>
@@ -1079,7 +1080,8 @@ theorem write_and_tail {rest : List ForItemForm}
         before assignment.target reason before) ∨
     (∃ tailSize target updated written, tailSize < size ∧
       BareTarget environment before assignment.target target ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      Dynamic.ResolvedPlaceWrites
+        (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         before target updated written ∧
       PlainItems program tailSize invocation context environment written rest finalContext outcome after) := by
   cases trace with
@@ -1271,7 +1273,8 @@ theorem bitNot {assignment : AssignmentResolution}
         before assignment.target reason before) ∨
     (∃ tailSize target updated written, tailSize < size ∧
       Staging.Recursive.BareTarget environment before assignment.target target ∧
-      Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      Dynamic.ResolvedPlaceWrites
+        (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         before target updated written ∧
       PlainInitial program invocation context environment written items test post body tailSize outcome after) := by
   rcases head trace with ⟨_, reason, _, same, failed⟩ |
@@ -1344,7 +1347,7 @@ theorem bitNot {budget : Nat} {context : SourceSemantics.Context} {scope : Sourc
         (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
         (context := context) (scope := scope) (administrative := administrative)
         bridge functions transport head environments heaps locals agrees actualTyped initial admitted assignmentTyped
-        snapshot write
+        snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
     obtain ⟨_, result, finalHeap, restTrace, restAdapted⟩ := remaining
       (Nat.le_trans (Nat.le_of_lt tailStrict) within)
       ⟨_, _, _, environments.extend maps worlds, middleHeaps,

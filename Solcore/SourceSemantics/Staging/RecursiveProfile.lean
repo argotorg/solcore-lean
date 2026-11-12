@@ -947,7 +947,7 @@ mutual
           (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
         (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
         (write : ResolvedPlaceWrites
-          (fun _ replacement => BitNotSnapshot target.selected replacement)
+          (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
           targetHeap target updated written)
         (next : StatementsIn program registry mode scope context environment written rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
@@ -1092,7 +1092,7 @@ mutual
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignBitNot assignment)
         (snapshot : BareTarget environment before assignment.target target)
-        (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+        (write : ResolvedPlaceWrites (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
           before target updated written)
         (next : StatementsIn program registry mode scope context environment written rest finalContext outcome after) :
         StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
@@ -1257,7 +1257,7 @@ mutual
           (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
         (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
         (write : ResolvedPlaceWrites
-          (fun _ replacement => BitNotSnapshot target.selected replacement)
+          (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
           targetHeap target updated written)
         (next : ForItems program registry scope context environment written rest finalContext outcome after) :
         ForItems program registry scope context environment before (.assignBitNot assignment :: rest) finalContext outcome after
@@ -1366,7 +1366,7 @@ mutual
           (.fault (.semantic (.danglingLocation location))) heap
     | bitNot {scope context finalContext environment before written after assignment target updated rest outcome}
         (snapshot : BareTarget environment before assignment.target target)
-        (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+        (write : ResolvedPlaceWrites (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
           before target updated written)
         (next : ForItems program registry scope context environment written rest finalContext outcome after) :
         ForItems program registry scope context environment before (.assignBitNot assignment :: rest) finalContext outcome after

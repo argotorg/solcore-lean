@@ -1523,9 +1523,11 @@ private theorem syntaxTree (mode : Bool) : TypedImperativeFor.UnarySyntax source
     · exact .bitNot rootWritable rfl (.inl rfl) .nil
   · exact .body (.body (.returnValue [] rfl rfl rfl rfl rfl booleanTyped booleanSyntax))
 
-private theorem sourceFlipped (value : Word) : Dynamic.SourcePlaceSnapshotUpdate program context [] source Dynamic.BitNotSnapshot
+private theorem sourceFlipped (value : Word) : Dynamic.SourcePlaceSnapshotUpdate program context [] source
+    (Dynamic.BitNotAssignmentApplies .word)
     environment ⟨[{type := .word, value := some (.word value)}]⟩ assignment.target (.word value.bitNot)
       ⟨[{type := .word, value := some (.word value.bitNot)}]⟩ := by
+  rw [Dynamic.BitNotAssignmentApplies.eq_word]
   have read : Dynamic.Heap.Reads ⟨[{type := .word, value := some (.word value)}]⟩ ⟨0⟩
       {type := .word, value := some (.word value)} := .intro .head
   refine .intro (selectedHeap := ⟨[{type := .word, value := some (.word value)}]⟩) (target := ⟨⟨0⟩, .word, .word, [], some (.word value)⟩) ?_ ?_

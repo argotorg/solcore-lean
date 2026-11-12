@@ -828,27 +828,52 @@ signed one, are the wrapped result's word. Without a type it is the result. -/
         .binary .wordSignExtend (.word (Core.Word.ofNatModulo (type.width.bits / 8 - 1))) result
       else .binary .wordAnd result (.word (Core.Word.ofNatModulo (2 ^ type.width.bits - 1)))
 
+/-- The type in-place `~`'s result is wrapped to: `uint8` … `uint128`, whose `~`
+keeps the low `N` bits of Word's. Word's `~` is the type's on `word`, `uint256`
+and the signed types, so they need no wrap. -/
+def bitNotWrap : TypeSystem.Ty → Option TypeSystem.FixedInteger
+  | .constructor (.builtin (.fixed type)) =>
+      if type.signed = false ∧ type.width ≠ .w256 then some type else none
+  | _ => none
+
+/-- A target that is not of a fixed-width integer type has no bit-not wrap. -/
+theorem bitNotWrap_of_not_fixed {target : TypeSystem.Ty}
+    (notFixed : ∀ type, target ≠ .fixed type) : bitNotWrap target = none := by
+  unfold bitNotWrap
+  split
+  · rename_i type
+    exact absurd rfl (notFixed type)
+  · rfl
+
 /-- The type a value assignment's result is wrapped to: the target's, for
-unchecked `+= -= *= /= %=` and `<<=` at a fixed-width integer type; none for
-every other assignment and for in-place `~`. -/
+unchecked `+= -= *= /= %=` and `<<=` at a fixed-width integer type, and for
+in-place `~` at `uint8` … `uint128` (`bitNotWrap`); none for every other
+assignment. -/
 def placeWrap (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) (bitNot : Bool) :
     Option TypeSystem.FixedInteger :=
-  if bitNot then none
+  if bitNot then bitNotWrap target
   else match checkedCompound target operator with
     | some (type, .uncheckedAdd) | some (type, .uncheckedSubtract) | some (type, .uncheckedMultiply)
     | some (type, .uncheckedDivide) | some (type, .uncheckedModulo) | some (type, .shiftLeft) => some type
     | _ => none
 
-/-- Without the type's own compound meaning there is nothing to wrap. -/
-theorem placeWrap_plain {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp} {bitNot : Bool}
-    (plain : checkedCompound target operator = none) : placeWrap target operator bitNot = none := by
+/-- Without the type's own compound meaning a value assignment has nothing to
+wrap. -/
+theorem placeWrap_plain {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    (plain : checkedCompound target operator = none) : placeWrap target operator false = none := by
   simp [placeWrap, plain]
+
+/-- In-place `~` wraps exactly at `bitNotWrap`'s types. -/
+theorem placeWrap_bitNot (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) :
+    placeWrap target operator true = bitNotWrap target := by
+  simp [placeWrap]
 
 def modified (type : Core.Ty) (operator : Option Modifier) (bitNot : Bool)
     (snapshot rhs : Core.Expr) (invalid : Core.Word) (wrap : Option TypeSystem.FixedInteger := none) :
     Core.Expr :=
   if bitNot then .caseE snapshot (Core.LanguageResult.failure type (.word invalid))
-    (Core.LanguageResult.success (.unary (if type = .integer then .integerNot else .wordNot) (.var 0)))
+    (Core.LanguageResult.success
+      (wrapLeaf wrap (.unary (if type = .integer then .integerNot else .wordNot) (.var 0))))
   else match operator with
     | none => Core.LanguageResult.success rhs
     | some modifier => .caseE snapshot (Core.LanguageResult.failure type (.word invalid))

@@ -576,7 +576,7 @@ theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {
       cases first with | assignBitNot assigned =>
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
           head.preserves_prefix functions program evidence
-            environments heaps locals agrees actualTyped assigned
+            environments heaps locals agrees actualTyped ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned)
         obtain ⟨tail, lastMaps, lastWorlds, lastFrame, lastMetadata, agreement⟩ :=
           ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
             (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
@@ -591,7 +591,7 @@ theorem Tree.preserves_prefix {context finalContext : SourceSemantics.Context} {
       cases first with | assignBitNot assigned =>
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
           head.preserves_prefix functions extension program evidence (meaning _ valid) faithful observations
-            environments heaps locals agrees actualTyped assigned
+            environments heaps locals agrees actualTyped ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned)
         obtain ⟨tail, lastMaps, lastWorlds, lastFrame, lastMetadata, agreement⟩ :=
           ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
             (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
@@ -732,7 +732,7 @@ theorem Tree.preserves_fault_reachable {context finalContext : SourceSemantics.C
       cases first with | assignBitNot assigned =>
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
           head.preserves_prefix functions program evidence
-            environments heaps locals agrees actualTyped assigned
+            environments heaps locals agrees actualTyped ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned)
         obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata⟩ :=
           ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
             (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
@@ -919,7 +919,7 @@ theorem Tree.reflects_reachable (functionTypes : FunctionRuntimeViews functions)
         ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
         (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval)
-      exact reflected.prepend (.assignBitNot trace) maps worlds preservation metadata
+      exact reflected.prepend (.assignBitNot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace)) maps worlds preservation metadata
 
 include definitions registered extension meaning reflection faithful observations in
 /-- Original API, interpreted through the reachable diagnostic receipt. -/

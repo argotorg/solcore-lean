@@ -875,7 +875,9 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
             compilation.checked.catalog.project_runtimeType]
           exact description.leafProjected))
       refine ⟨binder, prepared, index, description.binding, rootEq, rootEq ▸ view,
-        by simpa only [routeEq] using lookup, ?_, by simp [routeEq, placeModifier, SourceCoreDataPlaces.placeWrap]⟩
+        by simpa only [routeEq] using lookup, ?_, by
+          simp [routeEq, placeModifier, SourceCoreDataPlaces.placeWrap,
+            CompatiblePlaceModifier.bitNotWrap_of_runtime profile]⟩
       exact ⟨steps, routeEq ▸ description.ordinary notMapping, routeEq ▸ types⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleBareBitNotCertificates

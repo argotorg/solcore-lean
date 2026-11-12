@@ -1828,6 +1828,7 @@ theorem unary_call (shape : UnaryShape header.function.source)
       (parameterHeap before ((.word key, .word previous.bitNot) :: tail) key) := by
     apply Dynamic.StatementExecutes.assignBitNot (updatedRoot := replacement)
       (lookupStatement?_sound shape.assignedFound) shape.assignedForm
+    rw [shape.targetType, Dynamic.BitNotAssignmentApplies.eq_word]
     refine .intro resolve ?_
     exact .intro rootRead rfl .initialized
       (.indexFound (.head equalKey) (.leaf (.word previous)) (.update (.head equalKey))) write
@@ -1968,6 +1969,7 @@ structure MissingShape (source : TypedSource) where
   assignedForm : assigned.form = .assignBitNot resolution
   targetRoot : resolution.target.root = table.id
   targetProjections : resolution.target.projections = [.index absentRead.node.id]
+  targetType : resolution.target.type = .word
 
 theorem missing_input_types (shape : MissingShape header.function.source) :
     header.types = [mappingType, .word] := by
@@ -2115,6 +2117,7 @@ theorem default_call (shape : UnaryShape header.function.source)
       (parameterHeap before [(.word key, .word (Word.zero).bitNot)] key) := by
     apply Dynamic.StatementExecutes.assignBitNot (updatedRoot := replacement)
       (lookupStatement?_sound shape.assignedFound) shape.assignedForm
+    rw [shape.targetType, Dynamic.BitNotAssignmentApplies.eq_word]
     refine .intro resolve ?_
     exact .intro rootRead rfl .initialized
       (.indexDefault .nil .word (.leaf (.word Word.zero)) (.append .nil)) write
@@ -2241,6 +2244,7 @@ theorem initializer_call (shape : InitializerShape header.function.source)
       apply Dynamic.ForItemsExecute.cons (nextEnvironment := environment)
         (middle := parameterHeap before ((.word key, .word previous.bitNot) :: tail) key)
       · apply Dynamic.ForItemExecutes.assignBitNot (updatedRoot := replacement)
+        rw [shape.targetType, Dynamic.BitNotAssignmentApplies.eq_word]
         refine .intro resolve ?_
         exact .intro rootRead rfl .initialized
           (.indexFound (.head equalKey) (.leaf (.word previous)) (.update (.head equalKey))) write
@@ -2333,6 +2337,7 @@ structure NestedShape (source : TypedSource) where
   assignedForm : assigned.form = .assignBitNot resolution
   targetRoot : resolution.target.root = table.id
   targetProjections : resolution.target.projections = [.index firstRead.node.id, .index secondRead.node.id]
+  targetType : resolution.target.type = .word
   returnedFound : source.lookupStatement? returned.id = some returned
   returnedForm : returned.form = .returnStmt (some outer.node.id)
 
@@ -2409,6 +2414,7 @@ theorem nested_call (shape : NestedShape header.function.source)
       header.context (.fallthrough environment) (nestedHeap before first second previous.bitNot) := by
     apply Dynamic.StatementExecutes.assignBitNot (updatedRoot := replacement)
       (lookupStatement?_sound shape.assignedFound) shape.assignedForm
+    rw [shape.targetType, Dynamic.BitNotAssignmentApplies.eq_word]
     refine .intro resolve ?_
     exact .intro rootRead rfl .initialized
       (.indexFound (.head firstEqual)
@@ -2702,6 +2708,7 @@ theorem closure_plain (before : Dynamic.Heap) (key previous : Word)
       callContext (.fallthrough environment) after := by
     apply Dynamic.StatementExecutes.assignBitNot (updatedRoot := replacement)
       (lookupStatement?_sound shape.assignedFound) shape.assignedForm
+    rw [shape.targetType, Dynamic.BitNotAssignmentApplies.eq_word]
     exact .intro resolve (.intro rootRead rfl .initialized
       (.indexFound (.head equalKey) (.leaf (.word previous)) (.update (.head equalKey))) write)
   have finalRoot : Dynamic.Heap.Reads after (location initial) ⟨mappingType, some replacement, none⟩ := by
@@ -2921,9 +2928,10 @@ def observeMissing (source : TypedSource) : IO (MissingShape source) := do
   let ⟨assignedForm⟩ ← observed (assigned.form = .assignBitNot resolution) "missing assignment form"
   let ⟨targetRoot⟩ ← observed (resolution.target.root = table.id) "missing target root"
   let ⟨targetProjections⟩ ← observed (resolution.target.projections = [.index absentRead.node.id]) "missing key identity"
+  let ⟨targetType⟩ ← observed (resolution.target.type = .word) "missing raw leaf"
   return ⟨table, key, absent, resolution, declared, assigned, returned, absentRead, inputs,
     tableScheme, keyScheme, absentScheme, keyTable, absentTable, absentKey, roots,
-    declaredFound, declaredForm, assignedFound, assignedForm, targetRoot, targetProjections⟩
+    declaredFound, declaredForm, assignedFound, assignedForm, targetRoot, targetProjections, targetType⟩
 
 def observeCopy (source : TypedSource) : IO (CopyShape source) := do
   let [argument] := source.inputs | throw (IO.userError "copy inputs")
@@ -3021,10 +3029,11 @@ def observeNested (source : TypedSource) : IO (NestedShape source) := do
   let ⟨assignedForm⟩ ← observed (assigned.form = .assignBitNot resolution) "nested assignedForm"
   let ⟨targetRoot⟩ ← observed (resolution.target.root = table.id) "nested targetRoot"
   let ⟨targetProjections⟩ ← observed (resolution.target.projections = [.index firstRead.node.id, .index secondRead.node.id]) "nested targetProjections"
+  let ⟨targetType⟩ ← observed (resolution.target.type = .word) "nested targetType"
   let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "nested returnedFound"
   let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some outer.node.id)) "nested returnedForm"
   return ⟨table, first, second, resolution, assigned, returned, firstRead, secondRead,
-    baseRead, returnFirst, returnSecond, inner, outer, inputs, tableScheme, firstScheme, secondScheme, firstTable, secondTable, secondFirst, roots, assignedFound, assignedForm, targetRoot, targetProjections, returnedFound, returnedForm⟩
+    baseRead, returnFirst, returnSecond, inner, outer, inputs, tableScheme, firstScheme, secondScheme, firstTable, secondTable, secondFirst, roots, assignedFound, assignedForm, targetRoot, targetProjections, targetType, returnedFound, returnedForm⟩
 
 structure ObservedProgram (fixture : CompiledFixture) where
   nestedRow : Row fixture

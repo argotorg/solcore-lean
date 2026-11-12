@@ -690,7 +690,8 @@ theorem projected_write_bitNot {context : Context} {before after : Heap}
     (kind : BitNotTargetType leaf)
     (targetTyped : ResolvedPlaceHasType context before target root leaf)
     (heap : HeapWellTyped context before)
-    (write : ResolvedPlaceWrites (fun _ replacement => BitNotSnapshot target.selected replacement)
+    (write : ResolvedPlaceWrites
+      (fun _ replacement => BitNotAssignmentApplies leaf target.selected replacement)
       before target updated after) :
     HeapWellTyped context after ∧ HeapTypesExtend before after := by
   cases write with
@@ -701,7 +702,7 @@ theorem projected_write_bitNot {context : Context} {before after : Heap}
         rw [← targetTyped.root_type, ← rootEq]
         exact initialTyped
       have modification : LeafModificationPreservesType context before
-          (fun _ replacement => BitNotSnapshot target.selected replacement) leaf := by
+          (fun _ replacement => BitNotAssignmentApplies leaf target.selected replacement) leaf := by
         intro current replacement _ applies
         exact applies.preserves_target kind targetTyped.selected
       have updatedTyped := update.preserves targetTyped.projections initialRoot modification

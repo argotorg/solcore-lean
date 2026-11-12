@@ -635,13 +635,13 @@ theorem bitNotTargetType_variablesBelow {target : Ty} {next : Nat}
   · rw [word]
     exact Ty.variablesBelow_constructor _ _
 
-/-- Whether an in-place `~` target's final type takes `~` as a builtin: `word`,
-or one of the fixed-width integer types on which `~` is Word's, the signed ones
-and `uint256`. An open target, `integer`, `bool` and any other type fail, as
-upstream defines no `BitNot` instance for them. -/
+/-- Whether an in-place `~` target's final type takes `~` as a builtin: `word`
+or one of the twelve fixed-width integer types, upstream's `BitNot` instances.
+An open target, `integer`, `bool` and any other type fail, as upstream defines no
+`BitNot` instance for them. -/
 def bitNotTargetFits : Ty → Bool
   | .constructor (.builtin .word) => true
-  | .constructor (.builtin (.fixed type)) => type.signed || decide (type.width = .w256)
+  | .constructor (.builtin (.fixed _)) => true
   | _ => false
 
 /-- A value assignment's target type takes its operator once inference is

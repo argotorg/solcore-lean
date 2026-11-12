@@ -616,6 +616,8 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (nonempty : assignment.target.projections ≠ [])
+    (targetProfile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
+      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id code)
     (accepted : lower compilation compilation.checked.signatures expression fuel source scope site assignment operator none outputType
@@ -639,6 +641,8 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
     cases rhsGenerated with
     | absent =>
       have routeEq := (CompatibleMixedPreparation.of_prepare preparedBy).1
+      have noWrap := CompatiblePlaceModifier.bitNotWrap_of_runtime targetProfile
+      simp only [Option.isNone_none, SourceCoreDataPlaces.placeWrap_bitNot, noWrap] at typed
       obtain ⟨binder, leaf, sourceTypes, binding, rootEq, leafView, layout, ordinary⟩ :=
         of_describe_prepare unique signatures sourceTyped nonempty described preparedBy generated extract typed
           (LanguageResult.success_hasType .unit)
@@ -647,7 +651,8 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
           operatorValid.imp_right (Or.imp_right And.left)
       exact ⟨binder, leaf, prepared, codes, sourceTypes, index, ⟨route, described, preparedBy⟩, binding, rootEq,
         leafView, by simpa only [routeEq] using lookup, layout, ordinary, profile,
-        by simp [routeEq, placeModifier, SourceCoreDataPlaces.placeWrap]⟩
+        by simp [routeEq, placeModifier, SourceCoreDataPlaces.placeWrap,
+          CompatiblePlaceModifier.bitNotWrap_of_runtime targetProfile]⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotCertificates
 end
@@ -1008,7 +1013,8 @@ theorem reflects_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
       environment coreEnvironment before store mapping world next outputType result finalStore := by
   obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, actualPreparation, binding, rootEq, leafView, slot, layout, ordinary,
       _, lowering⟩ :=
-    CompatiblePlaceBitNotCertificates.of_lower unique signatures sourceTyped nonempty extract accepted typed
+    CompatiblePlaceBitNotCertificates.of_lower unique signatures sourceTyped nonempty operatorProfile extract
+      accepted typed
   have profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer := by
     simpa only [leafView] using operatorProfile
   have invalidEq : prepared.invalidProjection = invalid := by

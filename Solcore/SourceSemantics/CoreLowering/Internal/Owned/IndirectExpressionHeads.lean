@@ -2218,8 +2218,9 @@ theorem after_snapshot {initial reached : ProtectedStateTransition.Index}
     (covers : evidence.Covers context)
     (locals : Dynamic.EnvironmentAgrees initial.heap context.locals environment)
     (typing : SourceBitNotAssignmentValid source context assignment)
-    (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
-      environment initial.heap assignment.target updatedRoot reached.heap)
+    (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source
+      (Dynamic.BitNotAssignmentApplies assignment.target.type) environment initial.heap assignment.target updatedRoot
+      reached.heap)
     (frame : AdministrativePreserved initial.mapping initial.store reached.mapping reached.store) :
     Admission bridge context last ∧ Dynamic.HeapTypesExtend initial.heap reached.heap := by
   have expressionPreserves : Dynamic.ExpressionExecutionPreserves program context evidence source environment := by

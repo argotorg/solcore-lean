@@ -563,8 +563,9 @@ theorem unary_success (unique : NodeOccurrencesUnique source) (found : source.lo
     (form : node.form = .assignBitNot assignment)
     (trace : SourceExecutionSize.StatementExecutes program size context evidence source environment before id finalContext outcome after) :
     finalContext = context ∧ outcome = .fallthrough environment ∧ ∃ child updated,
-      SourceExecutionSize.SourcePlaceSnapshotUpdate program child context evidence source Dynamic.BitNotSnapshot
-        environment before assignment.target updated after ∧ child < size := by
+      SourceExecutionSize.SourcePlaceSnapshotUpdate program child context evidence source
+        (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated after ∧
+        child < size := by
   have shapes := shape unique found
   clear found
   cases trace <;> have same := shapes _ (by assumption) <;> simp_all
@@ -1169,7 +1170,7 @@ theorem preservesAt_match_with_eliminator
         cases same
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩ :=
           head.preserves_prefix functions program evidence
-            environments heaps locals agrees actualTyped assigned.sound
+            environments heaps locals agrees actualTyped ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned.sound)
         let writtenState := stateTransport.extend installed maps worlds frame metadata
         have writtenReady := snapshots.ready installed writtenState
           initialReady contextValid (assignmentSites.snapshot (sites.head sourceFacts) found form) assigned.sound locals frame
@@ -2760,9 +2761,9 @@ theorem reflectsAt_match_with_eliminator
           ⟨stateTransport.extend installed maps worlds frame metadata, stateTransport.related installed maps worlds frame metadata, readiness.fault_after installed _ (readiness.ready_fault initialReady) frame⟩⟩
       · let writtenState := stateTransport.extend installed maps worlds frame metadata
         have writtenReady := snapshots.ready installed writtenState initialReady contextValid
-          (assignmentSites.snapshot (sites.head sourceFacts) found form) trace.sound locals frame
+          (assignmentSites.snapshot (sites.head sourceFacts) found form) ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace.sound) locals frame
         have tailFacts := sites.tail (environment := environment) (before := before) sourceFacts found (by intro _ _; simp [form])
-          (.assignBitNot (lookupStatement?_sound found) form trace.sound)
+          (.assignBitNot (lookupStatement?_sound found) form ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace.sound))
         obtain ⟨tailSourceSize, resultContext, outcome, after, finalMap, finalWorld, tailTrace, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, lexical, tailPost⟩ :=
           ih remainingSize (Nat.lt_trans smaller bounded) contextValid tailFacts (environments.extend maps worlds) middleHeaps (locals.mono metadata)
             (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
@@ -2771,7 +2772,8 @@ theorem reflectsAt_match_with_eliminator
             writtenState guarded writtenReady
             (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using continuation)
         exact ⟨resultContext, outcome, after, finalMap, finalWorld,
-          prepend (lookupStatement?_sound found) (by intro _ _; simp [form]) (.assignBitNot (lookupStatement?_sound found) form trace.sound) tailTrace.sound,
+          prepend (lookupStatement?_sound found) (by intro _ _; simp [form])
+            (.assignBitNot (lookupStatement?_sound found) form ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace.sound)) tailTrace.sound,
           represented, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, frame.trans lastFrame, metadata.trans lastMetadata, lexical, Reached.continue (protocol := protocol) (readiness := readiness) (stateTransport.related installed maps worlds frame metadata) tailPost⟩
     · intro context scope mode id node initializer condition post statements rest expected type initialCode body found form initial remaining initialIH restIH
       intro size bounded contextValid sourceFacts mapping world actualContext environment canonical actual before store finalStore ξ contextLocation native value
