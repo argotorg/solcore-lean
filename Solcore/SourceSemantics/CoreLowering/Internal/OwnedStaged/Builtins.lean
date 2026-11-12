@@ -118,6 +118,7 @@ theorem of_functions
       | some lower => lower compilation child budget source scope id reasonAt) = .ok none)
     (readPolicy : policy.readExpression source id =
       SourceCoreCompatibleDataExpressions.readExpression values.checked source id)
+    (closure : function.conversion? = none)
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body (fuel + 1)
       compilation source scope id reasonAt = .ok lowered) :
     Nonempty (Receipt policy body fuel compilation values source scope id callee ids function reasonAt lowered) := by
@@ -139,7 +140,7 @@ theorem of_functions
       subst other
       obtain ⟨calleeNode, calleeType, calleeCode, codes, expression, validated,
         calleeRead, reference, generated, parameter, result, emitted, rfl⟩ :=
-        BuiltinCalls.call_of_accepted owner found read form (special _ _) original
+        BuiltinCalls.call_of_accepted owner found read form (special _ _) closure original
       obtain ⟨descriptor⟩ := descriptor_exists form (callables ▸ emitted)
       cases reference with
       | @intro index identity calleeExpression _ calleeSourceType inventory identitySelected decorated =>
@@ -362,6 +363,10 @@ theorem source_value {size : Nat} {outcome : Staging.Recursive.Outcome} {after :
     exact False.elim (InputRep.excludes_callable_fault inputs
       (program := program) (context := context) (before := before)
       (caller := []) (invocation := []) (.builtinArgumentType arity mismatch))
+  | builtinFault fault =>
+    exact False.elim (InputRep.excludes_callable_fault inputs
+      (program := program) (context := context) (before := before)
+      (caller := []) (invocation := []) (.builtinFaults fault))
 
 include observations builtin represented in
 /-- The actual primitive yields a finite native trace at the argument store.
@@ -1569,6 +1574,8 @@ theorem preserves_builtin_or_user
             exact False.elim (physical (valuesCount.symm.trans originalCount).symm)
         | builtinType arity mismatch =>
             exact False.elim (physical (arity.trans valuesCount))
+        | builtinFault fault =>
+            exact False.elim (physical (valuesCount.symm.trans (Dynamic.BuiltinFaults.argument_count fault)).symm)
         | builtinArity mismatch =>
             have argumentsWeaken : Evaluates (.unit :: carrier :: actual) calleeStore
                 (((SourceCoreCalls.packArguments compiler.codes).expression.rename ξ).weakenAt 0 |>.weakenAt 0)

@@ -33,6 +33,7 @@ def spelling : BuiltinFunctionId → String
   | .integerLt => "integerLt"
   | .integerMul => "integerMul"
   | .wordToInteger => "wordToInteger"
+  | .fixedFromWord type => type.name
 
 /-- Exact compiler-function spellings remain pairwise distinct. -/
 theorem all_spellings_nodup : (all.map spelling).Nodup := by
@@ -47,6 +48,7 @@ def parameterTypes : BuiltinFunctionId → List TypeSystem.Ty
   | .integerLt
   | .integerMul => [TypeSystem.Ty.integer, TypeSystem.Ty.integer]
   | .wordToInteger => [TypeSystem.Ty.word]
+  | .fixedFromWord _ => [TypeSystem.Ty.word]
 
 /-- Fixed source result type of one compiler-provided function. -/
 def returnType : BuiltinFunctionId → TypeSystem.Ty
@@ -57,6 +59,7 @@ def returnType : BuiltinFunctionId → TypeSystem.Ty
   | .integerLt => TypeSystem.Ty.bool
   | .integerMul => TypeSystem.Ty.integer
   | .wordToInteger => TypeSystem.Ty.integer
+  | .fixedFromWord type => TypeSystem.Ty.fixed type
 
 /-- Exact monomorphic function type of one compiler-provided function. -/
 def type (function : BuiltinFunctionId) : TypeSystem.Ty :=
@@ -69,9 +72,12 @@ def scheme (function : BuiltinFunctionId) : TypeSystem.Scheme :=
 
 end BuiltinFunctionId
 
-/-- Resolve the deliberately small exact bare compiler-function namespace. -/
+/-- Resolve the deliberately small exact bare compiler-function namespace: the
+closures by their spelling, then the conversions by their type's name. -/
 def builtinFunctionNamed? (name : String) : Option BuiltinFunctionId :=
-  BuiltinFunctionId.all.find? fun function => function.spelling == name
+  match BuiltinFunctionId.all.find? fun function => function.spelling == name with
+  | some function => some function
+  | none => (TypeSystem.FixedInteger.ofName? name).map .fixedFromWord
 
 /-- The concrete trait-predicate representation used by whole-program source
 checking. -/

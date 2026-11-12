@@ -382,20 +382,22 @@ inductive Error where
   | compatible (error : SourceCoreCompatibleFunctions.Error)
   | indexed (error : SourceCoreCallableIndexedPrograms.Error)
   | runtime (error : SourceCoreUnifiedRuntime.PrepareError)
-  /-- A fault-site table would issue a reason in the panic range. -/
+  /-- A fault-site table would issue a reason in the reserved range: the
+  dirty-integer reason or the panic range. -/
   | panicRange
   deriving Repr
 
-/-- Every reason that a public fault-site table can issue lies below the panic
-range: the compatible inventory, including its reserved metadata ranges, ends
-below it, and so does every row of the callable inventory. -/
+/-- Every reason that a public fault-site table can issue lies below the
+reserved range (`SourceCorePanics.tableBound`), where the dirty-integer reason and
+the panic range lie: the compatible inventory, including its reserved metadata
+ranges, ends below it, and so does every row of the callable inventory. -/
 def PanicFree {checked : SourceCoreCompatibleCatalog.Checked}
     (prepared : SourceCoreCompatibleFunctions.Prepared checked) : Prop :=
   (match prepared.diagnostics with
-    | some diagnostics => diagnostics.nextReason ≤ SourceCorePanics.base
+    | some diagnostics => diagnostics.nextReason ≤ SourceCorePanics.tableBound
     | none => True) ∧
   match prepared.callableDiagnostics with
-    | some callable => ∀ item ∈ callable.rootTable.additional, item.1.val < SourceCorePanics.base
+    | some callable => ∀ item ∈ callable.rootTable.additional, item.1.val < SourceCorePanics.tableBound
     | none => True
 
 instance {checked : SourceCoreCompatibleCatalog.Checked}

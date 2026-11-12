@@ -2586,6 +2586,8 @@ theorem binary_hasType {definitions : Core.DataEnvironment} {scope : Core.Contex
 def builtinParameter : BuiltinFunctionId → Core.Ty
   | .wordToInteger => .word
   | .wordFromInteger => .integer
+  -- Unused: a conversion is lowered where it is called, never as a closure.
+  | .fixedFromWord _ => .integer
   | _ => .product .integer .integer
 
 def builtinResult : BuiltinFunctionId → Core.Ty
@@ -2601,10 +2603,33 @@ def builtinBody : BuiltinFunctionId → Core.Expr
   | .integerLt => .binary .integerLt (.first (.var 0)) (.second (.var 0))
   | .wordFromInteger => .unary .integerToWord (.var 0)
   | .wordToInteger => .unary .wordToInteger (.var 0)
+  -- Unused: a conversion is lowered where it is called (`conversion`), never as a closure.
+  | .fixedFromWord _ => .var 0
 
 def builtinClosure (function : BuiltinFunctionId) : Core.Expr :=
   .lambda (builtinParameter function) (Core.LanguageResult.resultType (builtinResult function))
     (Core.LanguageResult.success (builtinBody function))
+
+/-- The canonical form of a word for a fixed-width type: its low `N` bits on
+`uintN` and their sign extension on `intN`, as `wrapLeaf` computes them. -/
+def canonicalForm (type : TypeSystem.FixedInteger) (word : Core.Expr) : Core.Expr :=
+  if type.signed then
+    .binary .wordSignExtend (.word (Core.Word.ofNatModulo (type.width.bits / 8 - 1))) word
+  else .binary .wordAnd word (.word (Core.Word.ofNatModulo (2 ^ type.width.bits - 1)))
+
+/-- A conversion's check of the word at `.var 0`: the word when it equals its
+canonical form, and `DirtyHigherBitsForInteger()` otherwise, as upstream's ABI
+decoders check it (`raw == band(raw, mask)`, `raw == signextend(k, raw)`). -/
+def conversionCheck (type : TypeSystem.FixedInteger) : Core.Expr :=
+  .ifE (.binary .wordEq (.var 0) (canonicalForm type (.var 0)))
+    (Core.LanguageResult.success (.var 0))
+    (Core.LanguageResult.failure .word (.word SourceCorePanics.dirtyReason))
+
+/-- A conversion of a lowered word: the word itself at `uint256` and `int256`,
+where every word is canonical, and the checked word at the other ten types. -/
+def conversion (type : TypeSystem.FixedInteger) (argument : Core.Expr) : Core.Expr :=
+  if type.width = .w256 then argument
+  else Core.LanguageResult.bind .word argument (conversionCheck type)
 
 theorem builtinClosure_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
     (function : BuiltinFunctionId) : Core.HasType scope (builtinClosure function)
@@ -2614,6 +2639,7 @@ theorem builtinClosure_hasType {definitions : Core.DataEnvironment} {scope : Cor
       apply Core.LanguageResult.success_hasType <;> first
         | exact .binary (.first (.var rfl)) (.second (.var rfl))
         | exact .unary (.var rfl)
+        | exact Core.HasType.var (by rfl)
 
 end Solcore.Frontend.SourceCoreInteger
 end
@@ -3117,15 +3143,25 @@ def lowerExpressionWithPolicy (policy : Policy) (lowerBody : BodyLowerer) : Nat 
           | .call callee arguments (.builtinFunction function) =>
               (SourceCoreElaboration.validateBuiltinFunctionCall source node callee arguments function)
                 |>.mapError SourceCoreBasic.Error.literalEvidence
-              let (calleeNode, _) ← policy.readExpression source callee
-              let callee ← builtinReference policy.callables context source calleeNode function.spelling function
-              let lowered ← arguments.mapM fun argument =>
-                lowerExpressionWithPolicy policy lowerBody fuel context source scope argument reasonAt
-              let packed := SourceCoreCalls.packArguments lowered
-              SourceCoreBasic.ensureType site (SourceCoreInteger.builtinParameter function) packed.type
-              SourceCoreBasic.ensureType site (SourceCoreInteger.builtinResult function) type
-              let expression ← policy.callables.callCallable context source node type callee.expression packed.expression
-              pure ⟨type, expression⟩
+              match function.conversion? with
+              | some fixed =>
+                  -- A conversion is lowered where it is called: no closure is called.
+                  let lowered ← arguments.mapM fun argument =>
+                    lowerExpressionWithPolicy policy lowerBody fuel context source scope argument reasonAt
+                  let [argument] := lowered | throw (.unsupportedExpression node.id node.form)
+                  SourceCoreBasic.ensureType site .word argument.type
+                  SourceCoreBasic.ensureType site .word type
+                  pure ⟨type, SourceCoreInteger.conversion fixed argument.expression⟩
+              | none =>
+                  let (calleeNode, _) ← policy.readExpression source callee
+                  let callee ← builtinReference policy.callables context source calleeNode function.spelling function
+                  let lowered ← arguments.mapM fun argument =>
+                    lowerExpressionWithPolicy policy lowerBody fuel context source scope argument reasonAt
+                  let packed := SourceCoreCalls.packArguments lowered
+                  SourceCoreBasic.ensureType site (SourceCoreInteger.builtinParameter function) packed.type
+                  SourceCoreBasic.ensureType site (SourceCoreInteger.builtinResult function) type
+                  let expression ← policy.callables.callCallable context source node type callee.expression packed.expression
+                  pure ⟨type, expression⟩
           | .reference _ (.declaration instantiation) =>
               let (index, signature) ← selectedSignature policy context source node instantiation true
               SourceCoreBasic.ensureType site type (policy.callables.functionType signature.parameterType signature.resultType)

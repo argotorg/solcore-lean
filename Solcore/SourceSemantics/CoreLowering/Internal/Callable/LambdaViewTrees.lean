@@ -2413,10 +2413,11 @@ private theorem builtins {id : ExpressionId} (syntaxTree : CompatibleExpressionB
       rcases member with rfl | rfl
       · exact firstTyped
       · exact secondTyped
-  | @builtin id node callee arguments function found form children ih =>
+  | @builtin id node callee arguments function found form children closure ih =>
     have transported := fun child member => ih child member
       (Reaches.expression reached found (by simp [form, ExpressionForm.references, member]))
-    refine ⟨.builtin ((expression_lookup edited avoids reached).symm.trans found) form (fun child member => (transported child member).1),
+    refine ⟨.builtin ((expression_lookup edited avoids reached).symm.trans found) form (fun child member => (transported child member).1)
+        closure,
       step edited avoids unique reached found ?_ ?_⟩
     · simp [form, BodyFree]
     · intro child member

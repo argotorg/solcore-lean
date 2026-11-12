@@ -206,7 +206,9 @@ inductive GeneralSyntaxFor (directSites : DeclarationInstantiation → Prop) (so
       (children : ∀ child, child ∈ ids → GeneralSyntaxFor directSites source child) : GeneralSyntaxFor directSites source id
   | builtin {id node callee ids function} (found : source.lookupExpression? id = some node)
       (form : node.form = .call callee ids (.builtinFunction function))
-      (children : ∀ child, child ∈ ids → GeneralSyntaxFor directSites source child) : GeneralSyntaxFor directSites source id
+      (children : ∀ child, child ∈ ids → GeneralSyntaxFor directSites source child)
+      -- A conversion is outside the subset.
+      (closure : function.conversion? = none := by rfl) : GeneralSyntaxFor directSites source id
   | direct {id node callee ids instantiation}
       (found : source.lookupExpression? id = some node)
       (form : node.form = .call callee ids (.declaration instantiation))
@@ -1943,7 +1945,7 @@ theorem of_method_steps_functions_on_projected {directSites : DeclarationInstant
         (CompatibleExpressionConstructors.sequence_of_nodes count nodes
           (fun child code member => (⟨rfl, member⟩ : RecursiveStageTupleMeaning.Entries scope
             (_root_.List.zip _ _) scope child code))) certified, receipt.metadata.projected⟩
-  | @builtin callId _original _callee _ids function originalFound form children ih =>
+  | @builtin callId _original _callee _ids function originalFound form children closure ih =>
     intro admitted
     have same := Option.some.inj (originalFound.symm.trans found)
     subst node
@@ -1952,8 +1954,8 @@ theorem of_method_steps_functions_on_projected {directSites : DeclarationInstant
     | succ fuel =>
       obtain ⟨compiler⟩ := CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.of_functions
         native active callables originalFound form
-        (policyFor.special _ admitted (.builtin originalFound form children) (by intro actual same callee ids instantiation; cases Option.some.inj (originalFound.symm.trans same); simp [form]) (by intro actual same; cases Option.some.inj (originalFound.symm.trans same); simp [form, OperatorForm]))
-        (policyFor.read _ admitted (.builtin originalFound form children) (by intro actual same callee ids instantiation; cases Option.some.inj (originalFound.symm.trans same); simp [form])) accepted
+        (policyFor.special _ admitted (.builtin originalFound form children closure) (by intro actual same callee ids instantiation; cases Option.some.inj (originalFound.symm.trans same); simp [form]) (by intro actual same; cases Option.some.inj (originalFound.symm.trans same); simp [form, OperatorForm]))
+        (policyFor.read _ admitted (.builtin originalFound form children closure) (by intro actual same callee ids instantiation; cases Option.some.inj (originalFound.symm.trans same); simp [form])) closure accepted
       have originalSame := Option.some.inj (compiler.metadata.found.symm.trans originalFound)
       have parentTyped : ExpressionHasType source context callId compiler.node.type := by
         simpa only [originalSame] using typed
@@ -1964,7 +1966,7 @@ theorem of_method_steps_functions_on_projected {directSites : DeclarationInstant
         (fun child member childNode code childFound childTyped childAccepted =>
           ih child member childFound childTyped childAccepted
             (closed admitted originalFound (by simp [form, ExpressionForm.references, member])))
-      rw [CompatibleBuiltinMeaning.argumentTypes_project function] at projected
+      rw [CompatibleBuiltinMeaning.argumentTypes_project function closure] at projected
       exact ⟨.builtin compiler calleeTyped sourceType (Except.ok.inj projected).symm
         (CompatibleExpressionConstructors.sequence_of_nodes count nodes
           (fun child code member => (⟨rfl, member⟩ : RecursiveStageTupleMeaning.Entries scope
@@ -2612,6 +2614,7 @@ theorem certificate_syntax {scope : SourceCoreLocalCell.Scope}
     exact ih child code paired
   | @builtin id callee ids function fuel lowered compiler calleeTyped sourceType nativeTypes sequence children ih =>
     refine .builtin compiler.metadata.found compiler.form ?_
+      (BuiltinFunctionId.conversion?_of_inventory compiler.inventory)
     intro child member
     obtain ⟨code, paired⟩ := zip_member (sequence_length sequence) member
     exact ih child code paired

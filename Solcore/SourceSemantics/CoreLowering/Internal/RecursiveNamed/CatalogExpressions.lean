@@ -47,7 +47,9 @@ lambdas, methods and output coercions are outside this extraction interface. -/
 def compositionForm : ExpressionForm → Prop
   | .group _ | .unary _ _ | .binary _ _ _ | .conditional _ _ _
     | .tuple [_, _] | .constructor _ _ | .member _ _ _ | .index _ _
-    | .call _ _ (.builtinFunction _) | .call _ _ (.declaration _) => True
+    | .call _ _ (.declaration _) => True
+  -- A conversion is outside the subset.
+  | .call _ _ (.builtinFunction function) => function.conversion? = none
   | _ => False
 
 structure Admission (source : TypedSource) (admitted : ExpressionId → Prop) : Prop where
@@ -1179,13 +1181,14 @@ theorem tree_of_functions_at_runtime_with_children
               have same := Option.some.inj (metadata.found.symm.trans found)
               subst actualNode
               obtain ⟨calleeNode, calleeType, calleeCode, codes, expression, _, _, reference,
-                argumentsAccepted, _, resultType, emitted, rfl⟩ := BuiltinCalls.call_of_accepted owner found read form bypass accepted
+                argumentsAccepted, _, resultType, emitted, rfl⟩ := BuiltinCalls.call_of_accepted owner found read form bypass
+                  (by simpa [runtimeCompositionForm, compositionForm, form] using composition) accepted
               have sourceTypes := builtin_source_types unique found form metadata.coercions typed
               obtain ⟨count, nodes, projected, childTrees⟩  := compiled_child_certificates (fun {_ _} receipt {_} found => tree_projected_for calls projectedCall receipt.choose found) unique sourceTypes.1 argumentsAccepted
                 (fun child member node code childFound childTyped generated =>
                   ih (children child (by simpa [evaluationChildren, form] using member)) childFound childTyped generated)
               cases reference with
-              | @intro index identity calleeExpression _ _ _ _ decorated =>
+              | @intro index identity calleeExpression _ _ inventory _ decorated =>
                 cases selected : SourceCoreCallableContracts.descriptor native.table (.builtin function) with
                 | error error => simp [profile, SourceCoreGeneralFunctions.callablePolicy, selected, Except.mapError, bind, Except.bind] at decorated
                 | ok descriptor =>
@@ -1195,7 +1198,8 @@ theorem tree_of_functions_at_runtime_with_children
                   rw [profile, BuiltinCalls.Typed.builtin_call native active compilation source node callee arguments function nativeType _ _ descriptor form] at emitted
                   cases emitted
                   subst nativeType
-                  rw [CompatibleBuiltinMeaning.argumentTypes_project function] at projected
+                  rw [CompatibleBuiltinMeaning.argumentTypes_project function
+                (BuiltinFunctionId.conversion?_of_inventory inventory)] at projected
                   have sequence := sequence_of_nodes (certificate := CompatibleExpressionCalls.Entries scope (arguments.zip codes)) count nodes
                     (fun child code member => ⟨rfl, member⟩)
                   exact runtime_node_for (entries := arguments.zip codes) (.builtin (.contracted metadata form sourceTypes.2 sequence (Except.ok.inj projected).symm)) childTrees

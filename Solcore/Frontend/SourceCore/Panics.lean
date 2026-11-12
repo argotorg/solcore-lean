@@ -4,9 +4,13 @@ import Solcore.Core.Syntax
 # Panics
 
 Solidity's `Panic(code)` as a Core language failure. Each panic code fails with its own reason
-in the top 256 words, the same in every function. The fault-site tables allocate their reasons
-below that range, and diagnostics decode a reason in it as the panic it names. Main declarations:
-`SourceCorePanics.reason`, `SourceCorePanics.code?` and `SourceCorePanics.revertData`.
+in the top 256 words, the same in every function. The word just below them is the reason of
+`DirtyHigherBitsForInteger()`, upstream's ABI decoders' error, which a conversion of a word that
+is not canonical for its fixed-width type raises. The fault-site tables allocate their reasons
+below both (`tableBound`), and diagnostics decode a reason in that reserved range as the error it
+names. Main declarations: `SourceCorePanics.reason`, `SourceCorePanics.code?`,
+`SourceCorePanics.revertData`, `SourceCorePanics.dirtyReason` and
+`SourceCorePanics.dirtyRevertData`.
 
 The codes that Lean's source language raises are `divisionByZero` (`0x12`, unchecked `/` and `%`
 by zero) and, with the integer types, `arithmetic` (`0x11`).
@@ -60,5 +64,55 @@ def revertData (code : UInt8) : ByteArray :=
 
 theorem revertData_size (code : UInt8) : (revertData code).size = 36 := by
   simp [revertData, ByteArray.size]
+
+/-- The bound below which the fault-site tables allocate their reasons: the reason of
+`DirtyHigherBitsForInteger()` and the panic range lie at or above it. -/
+def tableBound : Nat := base - 1
+
+theorem tableBound_lt_base : tableBound < base := by
+  unfold tableBound base
+  decide
+
+theorem tableBound_lt : tableBound < Core.wordModulus := by
+  unfold tableBound base Core.wordModulus
+  decide
+
+/-- The Core failure reason of `DirtyHigherBitsForInteger()`: the word at `tableBound`, just below
+the panic range. -/
+def dirtyReason : Core.Word := ⟨tableBound, tableBound_lt⟩
+
+theorem dirtyReason_val : dirtyReason.val = tableBound := rfl
+
+/-- The dirty-integer reason is no panic. -/
+theorem code?_dirtyReason : code? dirtyReason = none :=
+  code?_eq_none tableBound_lt_base
+
+/-- A reason below `tableBound` is not the dirty-integer reason. -/
+theorem ne_dirtyReason_of_lt {reason : Core.Word} (below : reason.val < tableBound) :
+    reason ≠ dirtyReason := by
+  intro same
+  rw [same, dirtyReason_val] at below
+  exact Nat.lt_irrefl _ below
+
+/-- A reason below `tableBound` is no panic. -/
+theorem code?_eq_none_of_lt {reason : Core.Word} (below : reason.val < tableBound) :
+    code? reason = none :=
+  code?_eq_none (Nat.lt_trans below tableBound_lt_base)
+
+/-- No panic's reason is the dirty-integer reason. -/
+theorem reason_ne_dirtyReason (code : UInt8) : reason code ≠ dirtyReason := by
+  intro same
+  have value := congrArg Fin.val same
+  have high := base_le_reason code
+  have below := tableBound_lt_base
+  change (reason code).val = tableBound at value
+  omega
+
+/-- Upstream's revert data for `DirtyHigherBitsForInteger()`: its selector `0x6cc54a63`, with no
+arguments. -/
+def dirtyRevertData : ByteArray := ⟨#[0x6c, 0xc5, 0x4a, 0x63]⟩
+
+theorem dirtyRevertData_size : dirtyRevertData.size = 4 := by
+  simp [dirtyRevertData, ByteArray.size]
 
 end Solcore.Frontend.SourceCorePanics

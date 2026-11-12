@@ -5283,7 +5283,7 @@ theorem accepted_literal_builtin_native
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy (policy native) noBody 3 compilation source [] (id 2) reasonAt = .ok code)
     (definitions : DataEnvironment) (administrative : Core.Context) :
     NativeTyping definitions administrative code := by
-  apply of_functions native [] rfl descriptor (by rfl) (by rfl) (by cbv) (by rfl) (by rfl) _ accepted
+  apply of_functions native [] rfl descriptor (by rfl) (by rfl) (by cbv) (by rfl) (by rfl) _ rfl accepted
   intro child member lowered generated
   have same : child = id 0 := by simpa using member
   subst child

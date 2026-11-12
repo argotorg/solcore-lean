@@ -280,10 +280,10 @@ theorem syntax_view {id : ExpressionId} (tree : GeneralSyntax source id directSi
       exact .constructor ((expression_lookup edited avoids reached).symm.trans found) form ranges
         (fun child member => ih child member
           (.expression reached found (by simp [form, ExpressionForm.references, member])))
-  | @builtin id node callee ids function found form children ih =>
+  | @builtin id node callee ids function found form children closure ih =>
       intro reached
       exact .builtin ((expression_lookup edited avoids reached).symm.trans found) form
-        (fun child member => ih child member
+        (closure := closure) (fun child member => ih child member
           (.expression reached found (by simp [form, ExpressionForm.references, member])))
   | @direct id node callee ids instantiation found form monomorphic children ih =>
       intro reached

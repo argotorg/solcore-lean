@@ -329,8 +329,8 @@ theorem Step.of_head
                 · obtain ⟨receipt⟩ := AcceptedCompositeExpressionReceipt.of_head root head selected composite
                   exact ⟨.composite head selected receipt⟩
                 · by_cases builtin : BuiltinForm head.node.form
-                  · obtain ⟨callee, ids, function, form⟩ := builtin
-                    obtain ⟨receipt⟩ := AcceptedOrdinaryExpressionReceipt.builtin_of_head root head selected form
+                  · obtain ⟨callee, ids, function, form, closure⟩ := builtin
+                    obtain ⟨receipt⟩ := AcceptedOrdinaryExpressionReceipt.builtin_of_head root head selected form closure
                     exact ⟨.builtin head selected receipt⟩
                   · by_cases proxy : ProxyForm head.node.form
                     · obtain ⟨inner, form⟩ := proxy
@@ -575,7 +575,8 @@ theorem Trace.syntax_or_boundary
             (grammar left (by simp [form, AcceptedOrdinaryExpressionReceipt.operands]))
             (grammar right (by simp [form, AcceptedOrdinaryExpressionReceipt.operands])))
       | builtin head plain receipt =>
-        refine .inl (.builtin receipt.metadata.found receipt.form ?_)
+        refine .inl (.builtin receipt.metadata.found receipt.form ?_
+          (BuiltinFunctionId.conversion?_of_inventory receipt.inventory))
         intro child member
         obtain ⟨code, present⟩ := (mapM_receipt receipt.generated).2.2 child member
         exact all (child, code) present
@@ -801,7 +802,7 @@ private theorem not_composite {form : ExpressionForm}
 private theorem not_builtin {form : ExpressionForm}
     (allowed : (((LeafForm form ∨ DirectForm form ∨ IndirectForm form ∨ MethodForm form) ∨ IndexForm form) ∨ ConstructorForm form) ∨ CompositeForm form) :
     ¬ BuiltinForm form := by
-  intro ⟨callee, ids, function, same⟩
+  intro ⟨callee, ids, function, same, _⟩
   rcases allowed with (((leaf | ⟨callee, args, inst, rfl⟩ | ⟨callee, args, metadata, rfl⟩ | method) | ⟨base, key, rfl⟩) | ⟨inst, ids, rfl⟩) | composite
   · rcases leaf.view with atomic | ⟨name, binder, rfl⟩
     · cases atomic <;> cases same
@@ -899,7 +900,7 @@ theorem Step.child_reached
   | primitive head plain receipt =>
     exact False.elim (forms_not_method forms present receipt.found receipt.form)
   | builtin head plain receipt =>
-    exact False.elim (not_builtin (by rcases forms id receipt.node present receipt.metadata.found with leaf | direct; exact .inl (.inl (.inl (.inl leaf))); exact .inl (.inl (.inl (.inr (.inl direct))))) ⟨_, _, _, receipt.form⟩)
+    exact False.elim (not_builtin (by rcases forms id receipt.node present receipt.metadata.found with leaf | direct; exact .inl (.inl (.inl (.inl leaf))); exact .inl (.inl (.inl (.inr (.inl direct))))) ⟨_, _, _, receipt.form, BuiltinFunctionId.conversion?_of_inventory receipt.inventory⟩)
 
 /-- The excluded endpoint belongs to this same trace and its actual child path. -/
 theorem Boundary.impossible
@@ -1047,7 +1048,7 @@ theorem Step.child_reached_calls
   | primitive head plain receipt =>
     exact False.elim (callForms_not_method forms present receipt.found receipt.form)
   | builtin head plain receipt =>
-    exact False.elim (not_builtin (by rcases forms id receipt.node present receipt.metadata.found with leaf | direct | indirect; exact .inl (.inl (.inl (.inl leaf))); exact .inl (.inl (.inl (.inr (.inl direct)))); exact .inl (.inl (.inl (.inr (.inr (.inl indirect)))))) ⟨_, _, _, receipt.form⟩)
+    exact False.elim (not_builtin (by rcases forms id receipt.node present receipt.metadata.found with leaf | direct | indirect; exact .inl (.inl (.inl (.inl leaf))); exact .inl (.inl (.inl (.inr (.inl direct)))); exact .inl (.inl (.inl (.inr (.inr (.inl indirect)))))) ⟨_, _, _, receipt.form, BuiltinFunctionId.conversion?_of_inventory receipt.inventory⟩)
 
 theorem Boundary.impossible_calls
     (metadata : MetadataFor compiled.indexed named source directSites)
@@ -1217,7 +1218,7 @@ theorem Step.child_reached_methods
       · exact same ▸ (arguments.2.2 id receipt.node present receipt.found operator left right form).1
       · exact same ▸ (arguments.2.2 id receipt.node present receipt.found operator left right form).2
   | builtin head plain receipt =>
-    exact False.elim (not_builtin (.inl (.inl (.inl (forms id receipt.node present receipt.metadata.found)))) ⟨_, _, _, receipt.form⟩)
+    exact False.elim (not_builtin (.inl (.inl (.inl (forms id receipt.node present receipt.metadata.found)))) ⟨_, _, _, receipt.form, BuiltinFunctionId.conversion?_of_inventory receipt.inventory⟩)
 
 theorem Boundary.impossible_methods
     (metadata : MetadataFor compiled.indexed named source directSites)
@@ -1394,7 +1395,7 @@ theorem Step.child_reached_indices
       · exact same ▸ (arguments.1.2.2 id receipt.node present receipt.found operator left right form).1
       · exact same ▸ (arguments.1.2.2 id receipt.node present receipt.found operator left right form).2
   | builtin head plain receipt =>
-    exact False.elim (not_builtin (.inl (.inl (forms id receipt.node present receipt.metadata.found))) ⟨_, _, _, receipt.form⟩)
+    exact False.elim (not_builtin (.inl (.inl (forms id receipt.node present receipt.metadata.found))) ⟨_, _, _, receipt.form, BuiltinFunctionId.conversion?_of_inventory receipt.inventory⟩)
 
 theorem Boundary.impossible_indices
     (metadata : MetadataFor compiled.indexed named source directSites)
@@ -1598,7 +1599,7 @@ theorem Step.child_reached_constructors
       · exact same ▸ (arguments.1.1.2.2 id receipt.node present receipt.found operator left right form).1
       · exact same ▸ (arguments.1.1.2.2 id receipt.node present receipt.found operator left right form).2
   | builtin head plain receipt =>
-    exact False.elim (not_builtin (.inl (forms id receipt.node present receipt.metadata.found)) ⟨_, _, _, receipt.form⟩)
+    exact False.elim (not_builtin (.inl (forms id receipt.node present receipt.metadata.found)) ⟨_, _, _, receipt.form, BuiltinFunctionId.conversion?_of_inventory receipt.inventory⟩)
 
 theorem Boundary.impossible_constructors
     (metadata : MetadataFor compiled.indexed named source directSites)
@@ -1770,7 +1771,7 @@ theorem Step.child_reached_composites
       · exact same ▸ (arguments.1.1.1.2.2 id receipt.node present receipt.found operator left right form).1
       · exact same ▸ (arguments.1.1.1.2.2 id receipt.node present receipt.found operator left right form).2
   | builtin head plain receipt =>
-    exact False.elim (not_builtin (forms id receipt.node present receipt.metadata.found) ⟨_, _, _, receipt.form⟩)
+    exact False.elim (not_builtin (forms id receipt.node present receipt.metadata.found) ⟨_, _, _, receipt.form, BuiltinFunctionId.conversion?_of_inventory receipt.inventory⟩)
 
 theorem Boundary.impossible_composites
     (metadata : MetadataFor compiled.indexed named source directSites)
@@ -1833,7 +1834,7 @@ theorem ReachedOrdinaryMetadata.of_accepted {checked : SourceCoreCompatibleCatal
     ReachedOrdinaryMetadata prepared named source reached := by
   refine ⟨ReachedCompositeMetadata.of_accepted accepted, ?_⟩
   intro id node _ found form
-  rcases form with ⟨callee, ids, function, form⟩ | ⟨inner, form⟩
+  rcases form with ⟨callee, ids, function, form, -⟩ | ⟨inner, form⟩
   · exact AcceptedNamedExpressionMetadata.at_of_accepted accepted found (form ▸ .builtin callee ids function)
   · exact AcceptedNamedExpressionMetadata.at_of_accepted accepted found (form ▸ .proxy inner)
 

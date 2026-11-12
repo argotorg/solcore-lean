@@ -553,7 +553,7 @@ private theorem builtin_parameters_closed (function : BuiltinFunctionId) :
 
 private theorem builtin_return_closed (function : BuiltinFunctionId) :
     function.returnType.VariablesBelow 0 := by
-  cases function <;> simp [BuiltinFunctionId.returnType, Ty.integer, Ty.word, Ty.bool]
+  cases function <;> simp [BuiltinFunctionId.returnType, Ty.integer, Ty.word, Ty.bool, Ty.fixed]
 
 private def builtin_finish (source callee : Syntax.Expr) (name : String)
     (function : BuiltinFunctionId) (arguments : List InferredExpression) (call : ExpressionId)

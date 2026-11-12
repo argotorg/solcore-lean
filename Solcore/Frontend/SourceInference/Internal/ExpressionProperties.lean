@@ -7878,14 +7878,14 @@ private theorem builtinFunction_parameterTypes_variablesBelow
     (function : BuiltinFunctionId) (next : Nat) :
     ∀ type ∈ function.parameterTypes, type.VariablesBelow next := by
   cases function <;>
-    simp [BuiltinFunctionId.parameterTypes, Ty.integer, Ty.word, Ty.bool]
+    simp [BuiltinFunctionId.parameterTypes, Ty.integer, Ty.word, Ty.bool, Ty.fixed]
 
 /-- The result of a compiler-provided function is a closed builtin type. -/
 private theorem builtinFunction_returnType_variablesBelow
     (function : BuiltinFunctionId) (next : Nat) :
     function.returnType.VariablesBelow next := by
   cases function <;>
-    simp [BuiltinFunctionId.returnType, Ty.integer, Ty.word, Ty.bool]
+    simp [BuiltinFunctionId.returnType, Ty.integer, Ty.word, Ty.bool, Ty.fixed]
 
 /-- Consequently, the complete monomorphic type of a compiler-provided
 function is allocator-bounded at every bound. -/

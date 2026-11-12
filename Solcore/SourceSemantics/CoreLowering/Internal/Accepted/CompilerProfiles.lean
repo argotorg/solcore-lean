@@ -1061,8 +1061,9 @@ private def compositeSupportedForm (directOnly : Bool) (allowIndices : Bool := f
     (form : ExpressionForm) : Bool :=
   legacySupportedForm directOnly allowIndices allowConstructors form || (!directOnly && compositeForm form)
 
+/-- A call of a builtin closure; a conversion is outside the subset. -/
 def builtinForm : ExpressionForm → Bool
-  | .call _ _ (.builtinFunction _) => true
+  | .call _ _ (.builtinFunction function) => function.conversion?.isNone
   | _ => false
 
 def supportedForm (directOnly : Bool) (allowIndices : Bool := false) (allowConstructors : Bool := false)
@@ -1177,6 +1178,7 @@ private theorem builtin_of_true {form : ExpressionForm} (yes : builtinForm form 
   cases form <;> simp_all [builtinForm, BuiltinForm, AcceptedOrdinaryExpressionReceipt.BuiltinForm]
   case call callee ids resolution =>
     cases resolution <;> simp_all
+    case builtinFunction function => exact ⟨callee, ids, function, ⟨rfl, rfl, rfl⟩, yes⟩
 
 private theorem proxy_of_true {form : ExpressionForm} (yes : proxyForm form = true) :
     ProxyForm form := by
@@ -1199,7 +1201,7 @@ private theorem form_of_supported {directOnly allowIndices allowConstructors : B
 private theorem policy_supported {directOnly allowIndices allowConstructors : Bool} {form : ExpressionForm}
     (supported : supportedForm directOnly allowIndices allowConstructors form = true) :
     CallableIndexedOwnedPreparedStagedGeneralCallerPolicyProfiles.SupportedForm form := by
-  rcases form_of_supported supported with ((((leaf | ⟨callee, args, instantiation, rfl⟩ | ⟨_, rest⟩) | ⟨_, _, base, key, rfl⟩) | ⟨_, _, instantiation, ids, rfl⟩) | ⟨_, composite⟩) | ⟨_, (⟨callee, ids, function, rfl⟩ | ⟨inner, rfl⟩)⟩
+  rcases form_of_supported supported with ((((leaf | ⟨callee, args, instantiation, rfl⟩ | ⟨_, rest⟩) | ⟨_, _, base, key, rfl⟩) | ⟨_, _, instantiation, ids, rfl⟩) | ⟨_, composite⟩) | ⟨_, (⟨callee, ids, function, rfl, -⟩ | ⟨inner, rfl⟩)⟩
   · rcases leaf.view with atomic | ⟨name, binder, rfl⟩
     · exact .literal atomic
     · exact .read name binder

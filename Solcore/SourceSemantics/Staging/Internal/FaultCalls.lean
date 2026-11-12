@@ -169,7 +169,7 @@ theorem applies_step (wellFormed : ProgramWellFormed program) (size : Nat)
   intro scope context source before after callable arguments packed failure parameter result
     runtime beforeTyped callableTyped packing packedTyped trace
   cases trace with
-  | builtinArity _ | builtinType _ _ | closureArity _ | globalArity _ _ =>
+  | builtinArity _ | builtinType _ _ | builtinFault _ | closureArity _ | globalArity _ _ =>
       exact ⟨beforeTyped, .refl _⟩
   | @global bodySize scope context before bound after function arguments environment
       parameterTypes bodyContext finalContext bodyInstance roots child outcome result
@@ -419,7 +419,7 @@ theorem applies_step (selectedBodies : SelectedPreservation.GlobalBodiesTyped pr
   intro scope context source before after callable arguments packed failure parameter result
     runtime beforeTyped callableTyped packing packedTyped trace
   cases trace with
-  | builtinArity _ | builtinType _ _ | closureArity _ | globalArity _ _ =>
+  | builtinArity _ | builtinType _ _ | builtinFault _ | closureArity _ | globalArity _ _ =>
       exact ⟨beforeTyped, .refl _⟩
   | @global bodySize scope context before bound after function arguments environment
       parameterTypes bodyContext finalContext bodyInstance roots child outcome result

@@ -581,7 +581,9 @@ inductive Syntax (source : TypedSource) : ExpressionId → Prop where
   | builtin {id node callee arguments function}
       (found : source.lookupExpression? id = some node)
       (form : node.form = .call callee arguments (.builtinFunction function))
-      (children : ∀ child, child ∈ arguments → Syntax source child) : Syntax source id
+      (children : ∀ child, child ∈ arguments → Syntax source child)
+      -- A conversion is outside the subset.
+      (closure : function.conversion? = none := by rfl) : Syntax source id
 
 inductive Tree (fuel : Nat) (values : ValuesContext) (source : TypedSource)
     (context : SourceSemantics.Context) (solved : List SolvedRequirement)
@@ -1987,13 +1989,13 @@ theorem tree_of_functions_with_literals
       exact ⟨_, .index header keyFound form baseType acceptedChild8
         acceptedChild9 acceptedChild8Sites acceptedChild9Sites⟩
 
-  | @builtin id original callee arguments function originalFound form children ih =>
+  | @builtin id original callee arguments function originalFound form children closure ih =>
     have same := Option.some.inj (originalFound.symm.trans found)
     subst node
     cases fuel with
     | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
     | succ fuel =>
-      have syntaxTree : Syntax source id := .builtin originalFound form children
+      have syntaxTree : Syntax source id := .builtin originalFound form children closure
       have bypass := policyFor.special id syntaxTree
         (fun budget childSource childScope childId childReasonAt =>
           SourceCoreFunctions.lowerExpressionWithPolicy policy body (min budget fuel)
@@ -2013,13 +2015,13 @@ theorem tree_of_functions_with_literals
           subst actualNode
           obtain ⟨calleeNode, calleeType, calleeCode, codes, expression, _, _, reference,
             argumentsAccepted, _, resultType, emitted, rfl⟩ :=
-            BuiltinCalls.call_of_accepted owner originalFound read form bypass accepted
+            BuiltinCalls.call_of_accepted owner originalFound read form bypass closure accepted
           have sourceTypes := builtin_source_types unique originalFound form metadata.coercions typed
           obtain ⟨count, nodes, projected, argumentReceipts⟩ := builtin_child_certificates
             (fun {_ _} receipt {_} found => receipt.choose.projected found) unique sourceTypes.1 argumentsAccepted
             (fun id member node code found typed generated => ih id member found typed generated)
           cases reference with
-          | @intro index identity calleeExpression _ _ _ _ decorated =>
+          | @intro index identity calleeExpression _ _ inventory _ decorated =>
             cases selected : SourceCoreCallableContracts.descriptor native.table (.builtin function) with
             | error error =>
               simp [profile, SourceCoreGeneralFunctions.callablePolicy, selected,
@@ -2032,7 +2034,8 @@ theorem tree_of_functions_with_literals
                 nativeType _ _ descriptor form] at emitted
               cases emitted
               subst nativeType
-              rw [CompatibleBuiltinMeaning.argumentTypes_project function] at projected
+              rw [CompatibleBuiltinMeaning.argumentTypes_project function
+                (BuiltinFunctionId.conversion?_of_inventory inventory)] at projected
               let argumentTrees := fun id code (member : (id, code) ∈ arguments.zip codes) => (argumentReceipts id code member).choose
               exact ⟨_, .builtin metadata form sourceTypes.2 count nodes (Except.ok.inj projected).symm argumentTrees (fun id code member => (argumentReceipts id code member).choose_spec)⟩
       · rw [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted

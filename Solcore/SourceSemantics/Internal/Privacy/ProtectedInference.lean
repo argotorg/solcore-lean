@@ -315,7 +315,7 @@ private theorem builtinFunction_type_closed (function : BuiltinFunctionId) :
   constructor
   · apply Ty.variablesBelow_productMany
     cases function <;> simp [BuiltinFunctionId.parameterTypes, Ty.integer, Ty.word]
-  · cases function <;> simp [BuiltinFunctionId.returnType, Ty.integer, Ty.word, Ty.bool]
+  · cases function <;> simp [BuiltinFunctionId.returnType, Ty.integer, Ty.word, Ty.bool, Ty.fixed]
 
 set_option maxHeartbeats 2000000 in
 private theorem functionCandidates_scheme_body_variablesBelow

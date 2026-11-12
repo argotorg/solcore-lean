@@ -877,7 +877,7 @@ theorem builtinFunctionResult
     TypeAdmissible context function.returnType := by
   cases function <;>
     simp [Frontend.BuiltinFunctionId.returnType] <;>
-    first | exact integer binders | exact word binders | exact bool binders
+    first | exact integer binders | exact word binders | exact bool binders | exact fixed binders _
 
 /-- The complete monomorphic type advertised by every compiler-provided
 function is admissible. -/

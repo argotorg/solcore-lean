@@ -1419,6 +1419,8 @@ theorem preserves_builtin_or_user
             exact False.elim (physical (valuesCount.symm.trans originalCount).symm)
         | builtinType arity mismatch =>
             exact False.elim (physical (arity.trans valuesCount))
+        | builtinFault fault =>
+            exact False.elim (physical (valuesCount.symm.trans (Dynamic.BuiltinFaults.argument_count fault)).symm)
         | builtinArity mismatch =>
             have argumentsWeaken : Evaluates (.unit :: carrier :: actual) calleeStore
                 (((SourceCoreCalls.packArguments compiler.codes).expression.rename ξ).weakenAt 0 |>.weakenAt 0)

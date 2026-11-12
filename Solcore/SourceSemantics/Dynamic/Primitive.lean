@@ -1124,6 +1124,40 @@ inductive BuiltinApplies : BuiltinFunctionId → List Value → Value → Prop w
   | wordToInteger (value : Core.Word) :
       BuiltinApplies .wordToInteger [.word value]
         (.integer (Int.ofNat value.val))
+  /-- A word canonical for a fixed-width type is that type's value. -/
+  | fixedFromWord {type : TypeSystem.FixedInteger} {value : Core.Word}
+      (canonical : type.canonical value.val = true) :
+      BuiltinApplies (.fixedFromWord type) [.word value] (.word value)
+
+/-- The failure of one compiler-provided source function: a conversion of a
+word that is not canonical for its type. -/
+inductive BuiltinFaults : BuiltinFunctionId → List Value → SemanticFault → Prop where
+  | fixedFromWord {type : TypeSystem.FixedInteger} {value : Core.Word}
+      (dirty : type.canonical value.val = false) :
+      BuiltinFaults (.fixedFromWord type) [.word value] .dirtyHigherBitsForInteger
+
+/-- A failing application has no result. -/
+theorem BuiltinFaults.excludes_applies {function : BuiltinFunctionId} {arguments : List Value}
+    {reason : SemanticFault} {result : Value} (fault : BuiltinFaults function arguments reason)
+    (applies : BuiltinApplies function arguments result) : False := by
+  cases fault with
+  | fixedFromWord dirty =>
+    cases applies with
+    | fixedFromWord canonical => simp [dirty] at canonical
+
+/-- A failing application takes the function's arguments. -/
+theorem BuiltinFaults.argument_count {function : BuiltinFunctionId} {arguments : List Value}
+    {reason : SemanticFault} (fault : BuiltinFaults function arguments reason) :
+    arguments.length = function.parameterTypes.length := by
+  cases fault
+  rfl
+
+/-- Only a conversion fails. -/
+theorem BuiltinFaults.conversion {function : BuiltinFunctionId} {arguments : List Value}
+    {reason : SemanticFault} (fault : BuiltinFaults function arguments reason) :
+    ∃ type, function.conversion? = some type := by
+  cases fault
+  exact ⟨_, rfl⟩
 
 namespace BuiltinApplies
 

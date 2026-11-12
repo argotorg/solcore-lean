@@ -54,7 +54,7 @@ private theorem suffix_preserved {context : SourceCoreCompatibleDataPlaceFaultSi
     {left right : SourceCoreFaultSites.Table}
     (leftBuilt : program.tableForRegistry registry leftExtension = .ok left)
     (rightBuilt : program.tableForRegistry future rightExtension = .ok right)
-    (bounded : program.nextReason ≤ SourceCorePanics.base)
+    (bounded : program.nextReason ≤ SourceCorePanics.tableBound)
     (preserves : ∀ {oldRows newRows},
       missingDiagnostics registry program.missing = .ok oldRows →
       missingDiagnostics future program.missing = .ok newRows →
@@ -104,10 +104,10 @@ private theorem suffix_preserved {context : SourceCoreCompatibleDataPlaceFaultSi
         cases readAt : base.rootTable.reads.find? (fun site => decide (site.reason = token)) with
         | none =>
           simp only [readAt] at decoded
-          -- The token decodes as a panic, so it lies above every new row.
-          have high : SourceCorePanics.base ≤ token.val := by
+          -- The token decodes as a reserved error, so it lies above every new row.
+          have high : SourceCorePanics.tableBound ≤ token.val := by
             refine Nat.le_of_not_lt fun below => ?_
-            simp [SourceCorePanics.code?_eq_none below] at decoded
+            simp [SourceCorePanics.code?_eq_none_of_lt below, SourceCorePanics.ne_dirtyReason_of_lt below] at decoded
           have absent : newRows.find? (fun item => decide (item.1 = token)) = none := by
             apply List.find?_eq_none.mpr
             intro added addedMember matched
@@ -144,7 +144,7 @@ private theorem issued_preserved_of_rows (compiled : SourceCoreUnifiedCompilatio
     (decoded : left.result.diagnostics.diagnostic? token = some diagnostic) :
     right.result.diagnostics.diagnostic? token = some diagnostic := by
   obtain ⟨root, sources, prepared⟩ := CallableIndexedOwnedPublicDiagnosticReceipts.compiled_diagnostics compiled present
-  have bounded : program.nextReason ≤ SourceCorePanics.base := by
+  have bounded : program.nextReason ≤ SourceCorePanics.tableBound := by
     have bound := compiled.panicFree.1
     simp only [present] at bound
     exact bound

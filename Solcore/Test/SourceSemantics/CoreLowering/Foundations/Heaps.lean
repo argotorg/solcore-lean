@@ -1381,10 +1381,16 @@ def run : IO Unit := do
           require (decide (diagnostic.error = .typeMismatch rawMissingType none) && diagnostic.span.isSome)
             "missing default diagnostic changed raw type or source site"
       | none => throw (IO.userError "missing default reason was not decoded")
-      -- A reason below the panic range that no table issues is unknown.
+      -- A reason below the reserved range that no table issues is unknown.
       require ((← get "unknown reason" (session.diagnostic missingKey
-          (Core.Word.ofNatModulo (Solcore.Frontend.SourceCorePanics.base - 1)))).isNone)
+          (Core.Word.ofNatModulo (Solcore.Frontend.SourceCorePanics.tableBound - 1)))).isNone)
         "unknown language reason was silently accepted"
+      -- The word just below the panic range is `DirtyHigherBitsForInteger()`.
+      match ← get "dirty reason" (session.diagnostic missingKey Solcore.Frontend.SourceCorePanics.dirtyReason) with
+      | some diagnostic =>
+          require (decide (diagnostic.error = .dirtyHigherBitsForInteger))
+            "the dirty-integer reason did not decode as DirtyHigherBitsForInteger()"
+      | none => throw (IO.userError "the dirty-integer reason was not decoded")
       -- A reason in the panic range is that code's panic.
       match ← get "panic reason" (session.diagnostic missingKey (Core.Word.ofNatModulo (Core.wordModulus - 1))) with
       | some diagnostic =>

@@ -1189,6 +1189,7 @@ theorem builtin_application
     | notCallable invalid => exact False.elim (invalid trivial)
     | builtinArity mismatch => exact .builtinArity mismatch
     | builtinArgumentType arity mismatch => exact .builtinType arity mismatch
+    | builtinFaults fault => exact .builtinFault fault
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {headers : List (Header compiled program)} {keys : List (Key compiled program)}

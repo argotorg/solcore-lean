@@ -77,7 +77,7 @@ private theorem certified (native : SourceCoreGeneralFunctions.CallableContext)
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy (policy native) noBody 3 compilation source [] (id 2) reasonAt = .ok code) :
     BuiltinCalls.Typed.Tree 100 values source context [] reasonAt [] (id 2) code := by
   apply BuiltinCalls.Typed.tree_of_functions native [] rfl descriptor
-    (metadata := ⟨by cbv, rfl, rfl, rfl, rfl⟩) rfl rfl (by cbv) (by rfl) _ accepted
+    (metadata := ⟨by cbv, rfl, rfl, rfl, rfl⟩) rfl rfl (by cbv) (by rfl) _ rfl accepted
   intro codes generated
   change [id 0].mapM (fun argument => SourceCoreFunctions.lowerExpressionWithPolicy (policy native) noBody 2 compilation source [] argument reasonAt) = .ok codes at generated
   cases head : SourceCoreFunctions.lowerExpressionWithPolicy (policy native) noBody 2 compilation source [] (id 0) reasonAt with

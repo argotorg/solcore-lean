@@ -131,6 +131,10 @@ inductive SemanticFault where
   /-- Solidity's `Panic(code)`, such as `0x12` for unchecked division by
   zero. Upstream reverts with the code as data. -/
   | panic (code : UInt8)
+  /-- A conversion of a word that is not canonical for its fixed-width type,
+  such as `uint8(256)`: upstream's ABI decoders revert with
+  `DirtyHigherBitsForInteger()`, `Error(0x6cc54a63)`, on such a word. -/
+  | dirtyHigherBitsForInteger
   deriving Repr, DecidableEq
 
 /-- Terminal result of one expression evaluation.  Heap evolution is kept as

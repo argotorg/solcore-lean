@@ -1347,6 +1347,58 @@ Made on 2026-11-12, during step 9a.
     (`Tests.SourceCoreBitNotSubset`). The invocation body shape (`shape?`), which step 8d part 2
     pinned `w <<= 3` with, has no `~=` form.
 
+### Row 1's conversions: a word becomes a value only when canonical
+
+Made on 2026-11-13, during step 9b, on the user's choice (a).
+
+- **Upstream.**
+  - `uint256` is `enum uint256 { uint256(word) }` (`std/std.sol:1010-1012`). The other eleven are
+    one-field structs, `struct uint8 { value: word; }` (`std/unsigned.sol:17-19`,
+    `std/signed.sol:17-19`, and the same at each width).
+  - `uintN(w)` keeps the raw word. Only the ABI decoders check it, and they revert with
+    `DirtyHigherBitsForInteger()` (`revertWithError`, `std/std.sol:272-278`):
+    - `std/unsigned.sol:136, 286, 436, 586, 736`: `raw == band(raw, mask)`;
+    - `std/signed.sol:154, 329, 503, 678, 852`: `raw == signextend(k, raw)`.
+  - Outside std, `x.value` on the eleven struct types is rejected (`SC0205`, "cannot resolve
+    field `value`"), and `case uint256(w)` is accepted. A probe of the pinned driver on
+    2026-11-13 showed both, so `x.value` is no difference from upstream.
+- **Lean.** A conversion checks the word as the decoders do, so a value of the twelve types stays
+  canonical. That is the accepted difference: where upstream keeps a dirty word, Lean reverts.
+- **The constructors (part 1).**
+  - `uint256(w)`, `uintN(w)` and `intN(w)` are builtin functions `word → T`
+    (`BuiltinFunctionId.fixedFromWord`), named by the type, after the program's own functions
+    (`builtinFunctionNamed?`).
+  - The argument is typed by the parameter, so a literal is a word (`uint8(255)`). Any other
+    argument type is rejected, as upstream's constructor rejects it.
+  - The meaning is `BuiltinApplies.fixedFromWord` on a canonical word, and otherwise
+    `BuiltinFaults.fixedFromWord` (`SemanticFault.dirtyHigherBitsForInteger`) through
+    `CallableFaults.builtinFaults`. So a direct and an indirect call fail alike.
+  - A conversion is no closure: it is not in `BuiltinFunctionId.all`. So every program's globals,
+    callable table and closure identities are unchanged.
+  - It is lowered where it is called (`SourceCoreInteger.conversion`):
+    - the word itself at `uint256` and `int256`, where every word is canonical;
+    - otherwise the word if it equals its canonical form, and the dirty reason if not. The
+      canonical form (`canonicalForm`) is the mask or sign extension of step 8b's `wrapLeaf`.
+  - A conversion used as a function value has no closure, so it is not compiled.
+- **The revert.**
+  - `SourceCorePanics.dirtyReason` is the word just below the panic range, `2^256 − 2^8 − 1`.
+  - The fault-site tables allocate below it (`tableBound`). `Table.PanicFree` and preparation's
+    `PanicFree` check that bound.
+  - The decoder gives `RuntimeError.dirtyHigherBitsForInteger` after the tables and before the
+    panics (`Table.dirty_diagnostic`).
+  - `SourceCorePanics.dirtyRevertData` is upstream's `0x6cc54a63`, with no arguments.
+  - The revert is a Frontend convention, as the panics are, so Core, the Hull importer and
+    ContractRuntime are unchanged.
+  - `FaultTokens` has no law for it yet: no proof reads a conversion's revert. The builtin
+    profile that brings the conversions in would add it.
+- **Proofs.** The conversions are compiled but stay outside the closed subset, as the fixed-width
+  compound targets do.
+  - Builtin calls are proved through `InputRep`, which has no conversion.
+  - The builtin-call inversion (`BuiltinCalls.call_of_accepted`) takes
+    `function.conversion? = none`. The proofs get it from the closure's catalog index
+    (`conversion?_of_inventory`) or from the supported syntax.
+  - A builtin profile with the dirty reason's token would bring the conversions in.
+
 ### Row 1: steps
 
 Row 1 is committed in steps, each through the full gate, so that each can be
@@ -1439,3 +1491,11 @@ first planned after the literals and moved before them for this reason
      - then `uint8` … `uint128`, whose `~` keeps the low `N` bits.
 
      `basic`'s `bnoteq` is ported with 8e's functions.
+   - 9b. **Conversions between `word` and the twelve types**, a word becoming a value only when it
+     is canonical ([row 1's conversions](#row-1s-conversions-a-word-becomes-a-value-only-when-canonical)),
+     planned in three parts:
+     - first `uint256(w)`, `uintN(w)` and `intN(w)` with the dirty-integer revert (done);
+     - then `Typedef.abs` and `Typedef.rep`;
+     - then `case uint256(w)`; `x.value` is rejected outside std upstream too.
+
+     Each part ports again the 8e functions it makes possible, as upstream wrote them.

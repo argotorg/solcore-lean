@@ -1453,6 +1453,7 @@ theorem InputRep.excludes_callable_fault {function : BuiltinFunctionId} {argumen
   | builtinArity mismatch =>
     cases inputs <;> exact mismatch rfl
   | builtinArgumentType _ mismatch => exact types_exclude_mismatch (InputRep.source_argument_types inputs) mismatch
+  | builtinFaults fault => cases inputs <;> cases fault
 end Solcore.SourceSemantics.CoreLowering.BuiltinCalls
 end
 
@@ -1469,12 +1470,14 @@ open BuiltinBodyMeaning
 def argumentTypes : BuiltinFunctionId → List Ty
   | .wordToInteger => [.word]
   | .wordFromInteger => [.integer]
+  -- A conversion is no closure; its word has no integer representation.
+  | .fixedFromWord _ => [.integer]
   | _ => [.integer, .integer]
 
 theorem argumentTypes_project {checked : SourceCoreCompatibleCatalog.Checked}
-    (function : BuiltinFunctionId) :
+    (function : BuiltinFunctionId) (closure : function.conversion? = none) :
     function.parameterTypes.mapM checked.catalog.project = .ok (argumentTypes function) := by
-  cases function <;> rfl
+  cases function <;> first | rfl | simp [BuiltinFunctionId.conversion?] at closure
 
 theorem argumentTypes_pack (function : BuiltinFunctionId) :
     SourceCoreCompatibleCatalog.packTypes (argumentTypes function) = SourceCoreInteger.builtinParameter function := by
@@ -1513,6 +1516,9 @@ theorem input_of_values
         | exact .integerEq left right
         | exact .integerLt left right
         | exact .integerMul left right
+    -- A conversion's word argument has no integer representation.
+    | obtain ⟨_, _, _, impossible⟩ := CompatibleRawScalarFields.word_fields head rfl
+      cases impossible
 
 theorem result_represents {function : BuiltinFunctionId} {arguments : List Dynamic.Value}
     {input : Value} (inputs : InputRep function arguments input)

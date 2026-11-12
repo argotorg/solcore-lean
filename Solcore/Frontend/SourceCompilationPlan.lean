@@ -125,6 +125,10 @@ inductive RuntimeError where
   /-- Solidity's `Panic(code)`, such as `0x12` for unchecked division by zero.
   `SourceCorePanics.revertData` gives upstream's revert data. -/
   | panic (code : UInt8)
+  /-- Upstream's `DirtyHigherBitsForInteger()`: a conversion of a word that is not
+  canonical for its fixed-width type. `SourceCorePanics.dirtyRevertData` gives
+  upstream's revert data. -/
+  | dirtyHigherBitsForInteger
   | duplicateCallEdge (caller : Key) (id : ExpressionId) (count : Nat)
   | missingCallEdge (caller : Key) (id : ExpressionId)
   | callRequirementCountMismatch

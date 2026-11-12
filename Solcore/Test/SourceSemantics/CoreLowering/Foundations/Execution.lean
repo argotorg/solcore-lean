@@ -4972,6 +4972,115 @@ def runBitNotAssignments : IO Unit := do
     ["function bad() returns (Word) { let x = 1; x ~=; let y: integer = x; return 0; }"]
   IO.println "SOURCE_CORE_FIXED_BIT_NOT_ASSIGNMENTS_PASS: in-place ~ on the twelve fixed-width types and Word, keeping the low N bits on uint8 … uint128 and as Word's ~ elsewhere, sign-extended on the signed types, on locals, int8 and uint8 mapping elements, in an unchecked block and in a for loop's header and body, with canonical results, open targets defaulted to uint256 or typed by a later use, the return or a Word, integer and Bool targets and an open target made integer rejected"
 
+/-- Step 9b's first part: `uint256(w)`, `uintN(w)` and `intN(w)`, a word as a
+value of one of the twelve types. -/
+private def conversionWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function toU8(w: Word) returns (uint8) { return uint8(w); }",
+  "function toU16(w: Word) returns (uint16) { return uint16(w); }",
+  "function toU32(w: Word) returns (uint32) { return uint32(w); }",
+  "function toU64(w: Word) returns (uint64) { return uint64(w); }",
+  "function toU128(w: Word) returns (uint128) { return uint128(w); }",
+  "function toU256(w: Word) returns (uint256) { return uint256(w); }",
+  "function toI8(w: Word) returns (int8) { return int8(w); }",
+  "function toI16(w: Word) returns (int16) { return int16(w); }",
+  "function toI32(w: Word) returns (int32) { return int32(w); }",
+  "function toI64(w: Word) returns (int64) { return int64(w); }",
+  "function toI128(w: Word) returns (int128) { return int128(w); }",
+  "function toI256(w: Word) returns (int256) { return int256(w); }",
+  "function literalU8() returns (uint8) { return uint8(255); }",
+  "function literalI8() returns (int8) { return int8(0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff); }",
+  "function dirtyU8() returns (uint8) { return uint8(256); }",
+  "function dirtyI8() returns (int8) { return int8(128); }",
+  "function openTarget(w: Word) returns (uint16) { let x = uint16(w); return x; }",
+  "function checkedAfter(w: Word) returns (uint8) { let x: uint8 = uint8(w); return x + 1; }",
+  "function bothBranches(w: Word, flag: Bool) returns (int16) { if (flag) { return int16(w); } else { return int16(0); } }"]
+
+private def conversionNames : List String := [
+  "toU8", "toU16", "toU32", "toU64", "toU128", "toU256", "toI8", "toI16", "toI32", "toI64", "toI128",
+  "toI256", "literalU8", "literalI8", "dirtyU8", "dirtyI8", "openTarget", "checkedAfter", "bothBranches"]
+
+/-- A run that reverts with `DirtyHigherBitsForInteger()`: the reason is the
+reserved one, the diagnostic decodes it, and the revert data is upstream's. -/
+private def dirty {artifact : Artifact} (session : Session artifact) (key : Key) (arguments : List Value)
+    (label : String) : IO (Session artifact) := do
+  let executed ← session.runWithReceipt key arguments {executionFuel := 300000}
+  match executed.val with
+  | .ok (.failed reason next) =>
+      require (reason == SourceCorePanics.dirtyReason) s!"{label} failed with {reprStr reason}"
+      match session.diagnostic key reason with
+      | .ok (some diagnostic) =>
+          require (decide (diagnostic.error = .dirtyHigherBitsForInteger)) s!"{label} decoded {reprStr diagnostic.error}"
+      | other => throw (IO.userError s!"{label} decoded {reprStr other}")
+      require (SourceCorePanics.dirtyRevertData.toList == [0x6c, 0xc5, 0x4a, 0x63])
+        s!"{label} revert data {reprStr SourceCorePanics.dirtyRevertData.toList}"
+      pure next
+  | .ok (.succeeded result) => throw (IO.userError s!"{label} gave {reprStr result.value}")
+  | .ok _ => throw (IO.userError s!"{label} did not fail")
+  | .error error => throw (IO.userError s!"{label}: {reprStr error}")
+
+/-- Step 9b's first part through the public API: a word canonical for its type
+is that type's value, `uint256(w)` and `int256(w)` never fail, and any other
+word reverts with `DirtyHigherBitsForInteger()`, as upstream's ABI decoders check
+it, where upstream's `uintN(w)` keeps the raw word. -/
+def runConversions : IO Unit := do
+  let program ← get "conversion check" (checkProgram conversionWorkspace)
+  let seeds ← conversionNames.mapM (seed program)
+  let compiled ← get "conversion compilation"
+    (compile conversionWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match conversionNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"conversion root {name} missing")
+    | none => throw (IO.userError s!"conversion {name} unknown")
+  let max := modulus - 1
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × List Value × Value) := [
+    -- Canonical words at each unsigned type: up to `2^N - 1`.
+    ("toU8", [word 0], word 0), ("toU8", [word 255], word 255),
+    ("toU16", [word 65535], word 65535), ("toU32", [word (2 ^ 32 - 1)], word (2 ^ 32 - 1)),
+    ("toU64", [word (2 ^ 64 - 1)], word (2 ^ 64 - 1)), ("toU128", [word (2 ^ 128 - 1)], word (2 ^ 128 - 1)),
+    -- `uint256(w)` never fails.
+    ("toU256", [word 0], word 0), ("toU256", [word max], word max),
+    -- Canonical words at each signed type: the sign extension of the low `N` bits.
+    ("toI8", [word 127], word 127), ("toI8", [word max], word max), ("toI8", [word (modulus - 128)], word (modulus - 128)),
+    ("toI16", [word (modulus - 32768)], word (modulus - 32768)), ("toI32", [word (2 ^ 31 - 1)], word (2 ^ 31 - 1)),
+    ("toI64", [word (modulus - 2 ^ 63)], word (modulus - 2 ^ 63)),
+    ("toI128", [word (2 ^ 127 - 1)], word (2 ^ 127 - 1)),
+    -- `int256(w)` never fails.
+    ("toI256", [word (2 ^ 255)], word (2 ^ 255)), ("toI256", [word max], word max),
+    -- Literal arguments are words: `uint8(255)`, and `int8(2^256 - 1)` is -1.
+    ("literalU8", [], word 255), ("literalI8", [], word max),
+    -- An open local takes the conversion's type; checked `+` follows it.
+    ("openTarget", [word 7], word 7), ("checkedAfter", [word 254], word 255),
+    ("bothBranches", [word (modulus - 1), boolean true], word max), ("bothBranches", [word 5, boolean false], word 0)]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) arguments
+    require (completed.value == expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  -- Non-canonical words revert, one past each edge.
+  session ← dirty session (← key "dirtyU8") [] "uint8(256)"
+  session ← dirty session (← key "dirtyI8") [] "int8(128)"
+  session ← dirty session (← key "toU8") [word 256] "uint8 of 256"
+  session ← dirty session (← key "toU16") [word 65536] "uint16 of 2^16"
+  session ← dirty session (← key "toU32") [word (2 ^ 32)] "uint32 of 2^32"
+  session ← dirty session (← key "toU64") [word (2 ^ 64)] "uint64 of 2^64"
+  session ← dirty session (← key "toU128") [word max] "uint128 of 2^256 - 1"
+  session ← dirty session (← key "toI8") [word 128] "int8 of 128"
+  session ← dirty session (← key "toI8") [word (modulus - 129)] "int8 of -129"
+  session ← dirty session (← key "toI16") [word 32768] "int16 of 2^15"
+  session ← dirty session (← key "toI32") [word (modulus - 2 ^ 31 - 1)] "int32 of -2^31 - 1"
+  session ← dirty session (← key "toI64") [word (2 ^ 63)] "int64 of 2^63"
+  session ← dirty session (← key "toI128") [word (2 ^ 128)] "int128 of 2^128"
+  -- A dirty word reverts before checked `+` could panic.
+  session ← dirty session (← key "checkedAfter") [word 256] "checked + after uint8 of 256"
+  let _ := session
+  -- A conversion takes a `Word`: no other type converts.
+  rejectedByInference "uint8 of a uint16"
+    ["function bad(x: uint16) returns (uint8) { return uint8(x); }"]
+  rejectedByInference "uint8 to the wrong type"
+    ["function bad(w: Word) returns (uint16) { return uint8(w); }"]
+  IO.println "SOURCE_CORE_FIXED_CONVERSIONS_PASS: uint256(w), uintN(w) and intN(w) through the public API, canonical words at each of the twelve types kept, uint256 and int256 never failing, literal words as arguments, an open local and checked + after a conversion, every other word reverting with DirtyHigherBitsForInteger() and upstream's revert data 0x6cc54a63, a non-Word argument and a wrong result type rejected"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -4980,7 +5089,9 @@ reach a type adapted where the meaning is kept: `uint256(0)` is `0` at
 `uint256`, a `Typedef.abs(Typedef.rep(s))` amount or value is a parameter of
 the converted type, and a result converted to `uint256` is returned at its own
 type, whose word the API returns. Step 9a adds `basic`'s `bnoteq`, its one
-`~=` that needs no contract storage. The lane's notes have the table. -/
+`~=` that needs no contract storage. Step 9b's first part ports `afterBlock`,
+`ltSigned` and `runtimePatterns` again as upstream wrote them, with `uint256(w)`.
+The lane's notes have the table. -/
 private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function addU256(a: uint256, b: uint256) returns (uint256) { return a + b; }",
   "function subU256(a: uint256, b: uint256) returns (uint256) { return a - b; }",
@@ -5007,7 +5118,7 @@ private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function outside(a: uint256, b: uint256) returns (uint256) { return a + b; }",
   "function inside(a: uint256, b: uint256) returns (uint256) { unchecked { return a + b; } }",
   "function compoundInside(a: uint256, b: uint256) returns (uint256) { let r: uint256 = a; unchecked { r -= b; } return r; }",
-  "function afterBlock(a: uint256, b: uint256) returns (uint256) { let wrapped: uint256 = 0; unchecked { wrapped = a + b; } return wrapped + a + b; }",
+  "function afterBlock(a: uint256, b: uint256) returns (uint256) { let wrapped: uint256 = uint256(0); unchecked { wrapped = a + b; } return wrapped + a + b; }",
   "function calledFunction(a: uint256, b: uint256) returns (uint256) { unchecked { return checkedSum(a, b); } }",
   "function lambdaBody(a: uint256, b: uint256) returns (uint256) { unchecked { return apply(lam (v: uint256) -> uint256 { return v + b; }, a); } }",
   "function divisionByZero(a: uint256, b: uint256) returns (uint256) { unchecked { return a / b; } }",
@@ -5022,12 +5133,12 @@ private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function negate8(x: int8) returns (int8) { return 0 - x; }",
   "function addI32(a: int32, b: int32) returns (int32) { return a + b; }",
   "function mulNeg() returns (int256) { let d: int256 = 5; return (0 - d) * d; }",
-  "function ltSigned() returns (uint256) { let d: int256 = 5; let e: int256 = 0 - d; if (e < d) { return 1; } else { return 0; } }",
+  "function ltSigned() returns (uint256) { let d: int256 = 5; let e: int256 = 0 - d; if (e < d) { return uint256(1); } else { return uint256(0); } }",
   "function divSigned() returns (int256) { let m20: int256 = 0 - 20; let three: int256 = 3; return m20 / three; }",
   "function implicitSuccess() returns (bool) { let value = 6; value *= 7; return value == 42; }",
   "function negateSigned(value: int256) returns (int256) { return -value; }",
   "function negateWord(value: Word) returns (Word) { return -value; }",
-  "function runtimePatterns(choice: uint256) returns (uint256, uint256) { let value = 0; if (choice == 1) { value = 1; } if (choice == 2) { value = 2; } let inferred: uint256; match (value) { case 0 { inferred = 10; } case 1 { inferred = 20; } case _ { inferred = 30; } } let typed: uint256; match (choice) { case 0 { typed = 10; } case 1 { typed = 20; } case _ { typed = 30; } } return (inferred, typed); }",
+  "function runtimePatterns(choice: uint256) returns (uint256, uint256) { let value = 0; if (choice == 1) { value = 1; } if (choice == 2) { value = 2; } let inferred: Word; match (value) { case 0 { inferred = 10; } case 1 { inferred = 20; } case _ { inferred = 30; } } let typed: Word; match (choice) { case 0 { typed = 10; } case 1 { typed = 20; } case _ { typed = 30; } } return (uint256(inferred), uint256(typed)); }",
   "function implicitAdd(fail: bool) returns (bool) { let x = 41; if (fail) { x = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; } let result = x + 1; return result == 42; }",
   "function implicitSub(fail: bool) returns (bool) { let x = 1; if (fail) { x = 0; } let result = x - 1; return result == 0; }",
   "function implicitMul(fail: bool) returns (bool) { let x = 21; if (fail) { x = 0x8000000000000000000000000000000000000000000000000000000000000000; } let result = x * 2; return result == 42; }",
@@ -5156,7 +5267,7 @@ def runUpstreamFixtures : IO Unit := do
     ("implicitCompound", [word 4]), ("implicitCompound", [word 5])]
   for (name, arguments) in zero do
     session ← panics session (← key name) arguments SourceCorePanics.divisionByZero s!"{name} on {reprStr arguments}"
-  IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no conversion and no contract storage, of their conversion-only functions adapted with the meaning kept, and of basic's bnoteq give the fixtures' values and panic codes"
+  IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no contract storage, with afterBlock, ltSigned and runtimePatterns as upstream wrote them with uint256(w), the other conversion-only functions adapted with the meaning kept, and basic's bnoteq, give the fixtures' values and panic codes"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)
@@ -5366,6 +5477,7 @@ def run : IO Unit := do
   runShifts
   runCompoundShifts
   runBitNotAssignments
+  runConversions
   runUpstreamFixtures
 
 end Tests.SourceCoreFixedIntegerOperators

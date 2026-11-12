@@ -146,6 +146,7 @@ theorem call_of_accepted
             SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (min budget fuel)
               compilation childSource childScope childId childReasonAt)
           (fuel + 1) source scope id reasonAt) = .ok none)
+    (closure : function.conversion? = none)
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (fuel + 1)
       compilation source scope id reasonAt = .ok lowered) :
     ∃ calleeNode calleeType calleeCode codes expression,
@@ -162,7 +163,7 @@ theorem call_of_accepted
   cases hook : policy.lowerSpecial? <;> simp only [hook] at special
   all_goals
     unfold SourceCoreFunctions.lowerExpressionWithPolicy at accepted
-    simp only [owner, ne_eq, not_true_eq_false, ↓reduceIte, found, hook, special, form, read,
+    simp only [owner, ne_eq, not_true_eq_false, ↓reduceIte, found, hook, special, form, read, closure,
       bind, Except.bind, pure, Except.pure] at accepted
     obtain ⟨validation, validated, accepted⟩ := bind_ok accepted
     have validatedRaw : SourceCoreElaboration.validateBuiltinFunctionCall source node callee arguments function = .ok () := by
@@ -500,12 +501,13 @@ theorem tree_of_functions
       SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody fuel compilation source scope argument reasonAt) = .ok codes →
       DataExpressionSequence.Tree source (CompatibleExpressionGeneral.Tree readFuel values source sourceContext solved reasonAt)
         scope arguments function.parameterTypes codes)
+    (closure : function.conversion? = none)
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (fuel + 1)
       compilation source scope id reasonAt = .ok lowered) :
     Tree readFuel values source sourceContext solved reasonAt scope id lowered := by
   obtain ⟨calleeNode, calleeType, calleeCode, codes, expression, _, _, reference,
     argumentsAccepted, _, resultType, emitted, rfl⟩ :=
-    call_of_accepted metadata.owner metadata.found read form special accepted
+    call_of_accepted metadata.owner metadata.found read form special closure accepted
   cases reference with
   | @intro index identity calleeExpression _ _ _ _ decorated =>
     rw [profile, ActualCallablePolicy.builtin_decoration native active compilation source calleeNode function
@@ -516,7 +518,7 @@ theorem tree_of_functions
     subst type
     have argumentTrees := children codes argumentsAccepted
     have projected := argument_types argumentTrees
-    rw [CompatibleBuiltinMeaning.argumentTypes_project function] at projected
+    rw [CompatibleBuiltinMeaning.argumentTypes_project function closure] at projected
     have nativeTypes := (Except.ok.inj projected).symm
     exact .contracted metadata form sourceType argumentTrees nativeTypes
 end Solcore.SourceSemantics.CoreLowering.BuiltinCalls.Typed
@@ -615,11 +617,12 @@ theorem of_functions {policy : SourceCoreFunctions.Policy} {lowerBody : SourceCo
     (children : ∀ child, child ∈ arguments → ∀ code,
       SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody fuel compilation source scope child reasonAt = .ok code →
       ∃ node, source.lookupExpression? child = some node ∧ NativeTyping definitions context code)
+    (closure : function.conversion? = none)
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (fuel + 1)
       compilation source scope id reasonAt = .ok lowered) : NativeTyping definitions context lowered := by
   obtain ⟨calleeNode, calleeType, calleeCode, codes, expression, _, _, reference,
     argumentsAccepted, parameter, resultType, emitted, rfl⟩ :=
-    BuiltinCalls.call_of_accepted owner found read form special accepted
+    BuiltinCalls.call_of_accepted owner found read form special closure accepted
   cases reference with
   | @intro index identity calleeExpression _ _ _ _ decorated =>
     rw [profile, ActualCallablePolicy.builtin_decoration native active compilation source calleeNode function
@@ -671,10 +674,11 @@ theorem scalar_of_functions {policy : SourceCoreFunctions.Policy} {lowerBody : S
         ExpressionHasType source sourceContext child node.type)
     (scopeWF : ScopeWellFormed values.checked.catalog.definitions scope)
     (administrative : Core.Context) (extension : values.checked.catalog.definitions.Extends definitions)
+    (closure : function.conversion? = none)
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy lowerBody (fuel + 1)
       compilation source scope id reasonAt = .ok lowered) :
     NativeTyping definitions (SourceCoreLocalCell.coreContext scope ++ administrative) lowered := by
-  apply of_functions native active profile descriptor owner found read form special _ accepted
+  apply of_functions native active profile descriptor owner found read form special _ closure accepted
   intro child member code generated
   obtain ⟨node, found, syntaxTree, typed⟩ := argumentsTyped child member
   exact ⟨node, found, conditionals_native_at scopeWF administrative extension

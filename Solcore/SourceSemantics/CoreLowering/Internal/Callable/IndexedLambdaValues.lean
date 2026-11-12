@@ -436,10 +436,13 @@ inductive Represents {checked : SourceCoreCompatibleCatalog.Checked} (prepared :
         (CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function))
 
 private theorem projected {catalog : SourceCoreCompatibleCatalog.Catalog}
-    (profile : catalog.callableContracts = true) (function : BuiltinFunctionId) :
+    (profile : catalog.callableContracts = true) (function : BuiltinFunctionId)
+    (closure : function.conversion? = none) :
     catalog.project function.type = .ok
       (CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function)) := by
-  cases function <;> simp [BuiltinFunctionId.type, BuiltinFunctionId.parameterTypes, BuiltinFunctionId.returnType,
+  cases function
+  case fixedFromWord => simp [BuiltinFunctionId.conversion?] at closure
+  all_goals simp [BuiltinFunctionId.type, BuiltinFunctionId.parameterTypes, BuiltinFunctionId.returnType,
     TypeSystem.Ty.productMany, TypeSystem.Ty.integer, TypeSystem.Ty.word, TypeSystem.Ty.bool, SourceCoreCompatibleCatalog.Catalog.project, SourceCoreCompatibleCatalog.Catalog.functionType,
     profile, SourceCoreInteger.builtinParameter, SourceCoreInteger.builtinResult]
 
@@ -459,7 +462,10 @@ def model {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared c
     (profile : checked.catalog.callableContracts = true) :
     FunctionModel checked.catalog (CallableIndexedAmbient.ambientDefinitions prepared) where
   Represents := fun _ _ world => Represents prepared world
-  projection := by intro _ _ _ _ _ _ _ related; cases related; exact projected profile _
+  projection := by
+    intro _ _ _ _ _ _ _ related
+    cases related with
+    | builtin selected => exact projected profile _ (BuiltinFunctionId.conversion?_of_inventory selected)
   runtime_hasType := Represents.runtime_hasType
   source_function := by intro _ _ _ _ _ _ _ related; cases related; exact .builtin _
   extend := by

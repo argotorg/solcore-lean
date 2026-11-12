@@ -580,6 +580,7 @@ private theorem builtin_fault_evidence {program : Program} {context : Context}
   | notCallable invalid => exact False.elim (invalid trivial)
   | builtinArity mismatch => exact .builtinArity mismatch
   | builtinArgumentType arity mismatch => exact .builtinArgumentType arity mismatch
+  | builtinFaults fault => exact .builtinFaults fault
 
 local macro "erase_recursive_plain" : tactic =>
   `(tactic| (
@@ -848,6 +849,7 @@ local macro "erase_recursive_plain" : tactic =>
     case builtin primitive => exact ⟨[], .builtin primitive⟩
     case builtinArity mismatch => exact ⟨[], .builtinArity mismatch⟩
     case builtinType arity mismatch => exact ⟨[], .builtinArgumentType arity mismatch⟩
+    case builtinFault fault => exact ⟨[], .builtinFaults fault⟩
     case closureArity mismatch => exact ⟨[], .closureArity mismatch⟩
     case globalArity instantiates mismatch => exact ⟨[], .globalArity instantiates mismatch⟩
     case global instantiates covers roots selected parameters allocate body result ih =>
@@ -2212,6 +2214,7 @@ theorem Applies.semanticFault_plain {program : Program} {registry : Registry} {s
   cases trace with
   | builtinArity mismatch => exact .builtinArity mismatch
   | builtinType arity mismatch => exact .builtinArgumentType arity mismatch
+  | builtinFault fault => exact .builtinFaults fault
   | closureArity mismatch => exact .closureArity mismatch
   | globalArity instantiates mismatch => exact .globalArity instantiates mismatch
   | @global _ _ _ _ _ function _ _ _ _ _ bodyInstance _ child _ _

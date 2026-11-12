@@ -1566,11 +1566,17 @@ private def require := SourceCoreUnifiedCorpusSupport.assertTrue
 private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get α ε _
 private def word (n : Nat) : SourceCorePublicValues.Value := .word (Word.ofNatModulo n)
 
-theorem primitive_forms (left right : ExpressionId) (function : BuiltinFunctionId) (callee : ExpressionId) :
+theorem primitive_forms (left right : ExpressionId) (function : BuiltinFunctionId) (callee : ExpressionId)
+    (closure : function.conversion? = none) :
     AcceptedCompilerExpressionProfile.supportedForm false false false (.unary .bitNot left) = true ∧
     AcceptedCompilerExpressionProfile.supportedForm false false false (.binary left .add right) = true ∧
     AcceptedCompilerExpressionProfile.supportedForm false false false (.call callee [left, right] (.builtinFunction function)) = true :=
-  ⟨rfl, rfl, rfl⟩
+  ⟨rfl, rfl, by simp [AcceptedCompilerExpressionProfile.supportedForm, AcceptedCompilerExpressionProfile.builtinForm, closure]⟩
+
+/-- A conversion is outside the subset. -/
+theorem conversion_form (left : ExpressionId) (type : TypeSystem.FixedInteger) (callee : ExpressionId) :
+    AcceptedCompilerExpressionProfile.supportedForm false false false
+      (.call callee [left] (.builtinFunction (.fixedFromWord type))) = false := rfl
 
 theorem narrow_forms (left right : ExpressionId) (function : BuiltinFunctionId) (callee : ExpressionId) :
     AcceptedCompilerExpressionProfile.supportedForm true false false (.unary .bitNot left) = false ∧

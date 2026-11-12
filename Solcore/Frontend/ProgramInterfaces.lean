@@ -632,21 +632,44 @@ inductive BuiltinFunctionId where
   | integerLt
   | integerMul
   | wordToInteger
+  /-- `uint256(w)`, `uintN(w)` and `intN(w)`: a word as a value of one of the
+  twelve fixed-width integer types. A word that is not canonical for the type
+  reverts with `DirtyHigherBitsForInteger()`. A conversion is no closure: it is
+  lowered where it is called, so it is not in `all`. -/
+  | fixedFromWord (type : TypeSystem.FixedInteger)
   deriving Repr, BEq, DecidableEq
 
 namespace BuiltinFunctionId
 
-/-- Compiler functions implemented by the current frontend, in stable
-append-only introduction order.  Name lookup derives from this list so
-extending the identity type cannot silently leave a separate hand-written
-lookup chain stale. -/
+/-- Compiler functions implemented by the current frontend as closures, in
+stable append-only introduction order. Name lookup derives from this list and
+from the twelve types' names, so extending the identity type cannot silently
+leave a separate hand-written lookup chain stale. -/
 def all : List BuiltinFunctionId :=
   [.integerSub, .wordFromInteger, .integerAdd, .integerEq, .integerLt,
     .integerMul, .wordToInteger]
 
-/-- Every compiler-function identity occurs in the lookup catalog. -/
-theorem all_complete (function : BuiltinFunctionId) : function ∈ all := by
-  cases function <;> simp [all]
+/-- The fixed-width type a conversion gives, or none for a closure. -/
+def conversion? : BuiltinFunctionId → Option TypeSystem.FixedInteger
+  | .fixedFromWord type => some type
+  | _ => none
+
+/-- Every compiler-function identity is a closure of the lookup catalog or a
+conversion. -/
+theorem all_complete (function : BuiltinFunctionId) :
+    function ∈ all ∨ ∃ type, function.conversion? = some type := by
+  cases function <;> simp [all, conversion?]
+
+/-- The catalog's closures are no conversions. -/
+theorem conversion?_of_mem {function : BuiltinFunctionId} (member : function ∈ all) :
+    function.conversion? = none := by
+  cases function <;> simp_all [all, conversion?]
+
+/-- A function found in the catalog's numbering is no conversion. -/
+theorem conversion?_of_inventory {function : BuiltinFunctionId} {index : Nat}
+    (inventory : all.zipIdx.find? (fun item => decide (item.1 = function)) = some (function, index)) :
+    function.conversion? = none := by
+  cases function <;> simp_all [all, conversion?]
 
 /-- The append-only compiler-function catalog contains no repeated identity. -/
 theorem all_nodup : all.Nodup := by

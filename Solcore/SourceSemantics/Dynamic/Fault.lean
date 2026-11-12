@@ -1720,6 +1720,12 @@ mutual
           expected actual) :
         CallableFaults program context callerEvidence invocationEvidence heap
           (.builtin function) arguments (.typeMismatch expected actual) heap
+    /-- A conversion of a word that is not canonical for its type. -/
+    | builtinFaults
+        {context callerEvidence invocationEvidence heap function arguments reason}
+        (fault : BuiltinFaults function.id arguments reason) :
+        CallableFaults program context callerEvidence invocationEvidence heap
+          (.builtin function) arguments reason heap
     | globalSignatureMissing
         {context callerEvidence invocationEvidence heap function arguments}
         (missing : FunctionSignatureMissing program

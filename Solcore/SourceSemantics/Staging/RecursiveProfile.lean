@@ -754,6 +754,11 @@ mutual
         (mismatch : ValuesFirstTypeMismatch arguments function.id.parameterTypes expected actual) :
         Applies program registry scope context heap (.builtin function) arguments
           (.fault (.semantic (.typeMismatch expected actual))) heap
+    /-- A conversion of a word that is not canonical for its type. -/
+    | builtinFault {scope context heap function arguments reason}
+        (fault : BuiltinFaults function.id arguments reason) :
+        Applies program registry scope context heap (.builtin function) arguments
+          (.fault (.semantic reason)) heap
     | closureArity {scope context heap function arguments}
         (mismatch : function.parameters.length ≠ arguments.length) :
         Applies program registry scope context heap (.closure function) arguments

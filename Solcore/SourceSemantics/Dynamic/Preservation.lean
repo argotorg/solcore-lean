@@ -881,7 +881,9 @@ theorem preserves
     (application : BuiltinApplies function arguments result) :
     ValuesHaveTypes context heap arguments function.parameterTypes /\
       ValueHasType context heap result function.returnType := by
-  cases application <;>
+  cases application with
+  | fixedFromWord canonical => exact ⟨.cons (.word _) .nil, .fixed _ canonical⟩
+  | _ =>
     constructor <;>
     repeat' first | exact .nil | apply ValuesHaveTypes.cons | constructor
 

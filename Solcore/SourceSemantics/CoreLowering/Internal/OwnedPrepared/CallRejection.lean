@@ -747,7 +747,7 @@ theorem receiver_lookup (compiled : SourceCoreUnifiedCompilation.Compiled)
   -- in it, every row of the table lies below the token.
   have lookups : token ≠ Word.zero ∧ token ≠ actual.escapedReason ∧
       actual.additional.find? (fun item => decide (item.1 = token)) = none := by
-    by_cases panic : SourceCorePanics.base ≤ token.val
+    by_cases panic : SourceCorePanics.tableBound ≤ token.val
     · obtain ⟨nonzero, notEscaped, additionalAbsent, _⟩ :=
         CallableIndexedOwnedReceivingPreparedShapeInterpretations.panicFree_misses
           (CallableIndexedOwnedReceivingPreparedShapeInterpretations.appendCallable_panicFree receiverFree) panic
@@ -757,7 +757,8 @@ theorem receiver_lookup (compiled : SourceCoreUnifiedCompilation.Compiled)
         | none => rfl
         | some original =>
             have below := CallableIndexedOwnedReceivingPreparedShapeInterpretations.decoded_token_below
-              accepted rebuilt found (SourceCorePanics.code?_eq_none (Nat.lt_of_not_le panic))
+              accepted rebuilt found (SourceCorePanics.code?_eq_none_of_lt (Nat.lt_of_not_le panic))
+              (SourceCorePanics.ne_dirtyReason_of_lt (Nat.lt_of_not_le panic))
             omega
       have nonzero : token ≠ Word.zero := by
         intro zero

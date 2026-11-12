@@ -466,8 +466,9 @@ open CallableIndexedOwnedContextualCompilerPolicyProfiles (RootPolicyReceipt)
 open AcceptedNamedExpressionFlow (Head specialAction)
 abbrev OperatorForm := AcceptedContextualOperatorReceipt.Form
 
+/-- A call of a builtin closure; a conversion is outside the subset. -/
 def BuiltinForm (form : ExpressionForm) : Prop :=
-  ∃ callee ids function, form = .call callee ids (.builtinFunction function)
+  ∃ callee ids function, form = .call callee ids (.builtinFunction function) ∧ function.conversion? = none
 
 def operands : ExpressionForm → List ExpressionId
   | .unary _ operand => [operand]
@@ -507,7 +508,7 @@ theorem read_policy {node : ExpressionNode}
       SourceCoreCompatibleDataExpressions.readExpression compiled.compatible.checked source id := by
   have same : SourceCoreGeneralFunctions.contextualSource compiled.indexed.base.sourceProgram
       (current).plan compiled.indexed.base.locals (current).owner none source id = .ok source := by
-    rcases form with (⟨operator, operand, eq⟩ | ⟨operator, left, right, eq⟩) | ⟨callee, ids, function, eq⟩
+    rcases form with (⟨operator, operand, eq⟩ | ⟨operator, left, right, eq⟩) | ⟨callee, ids, function, eq, -⟩
     all_goals simp [SourceCoreGeneralFunctions.contextualSource, found, eq]
   rw [root.compilerPolicy.readExpression]
   simp only [same, bind, Except.bind]
@@ -574,6 +575,7 @@ private theorem builtin_of_actual
     (special : specialAction policy body fuel compilation source scope id reasonAt = .ok none)
     (readPolicy : policy.readExpression source id =
       SourceCoreCompatibleDataExpressions.readExpression values.checked source id)
+    (closure : function.conversion? = none)
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy policy body (fuel + 1)
       compilation source scope id reasonAt = .ok lowered) :
     Nonempty (CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.Receipt policy body fuel compilation values source scope id callee ids function reasonAt lowered) := by
@@ -593,7 +595,7 @@ private theorem builtin_of_actual
       subst other
       obtain ⟨calleeNode, calleeType, calleeCode, codes, expression, validated,
         calleeRead, reference, generated, parameter, result, emitted, rfl⟩ :=
-        BuiltinCalls.call_of_accepted owner found read form special original
+        BuiltinCalls.call_of_accepted owner found read form special closure original
       obtain ⟨descriptor⟩ := descriptor_exists form (callables ▸ emitted)
       cases reference with
       | @intro index identity calleeExpression _ calleeSourceType inventory identitySelected decorated =>
@@ -633,13 +635,14 @@ theorem builtin_of_head
     {callee : ExpressionId} {ids : List ExpressionId} {function : BuiltinFunctionId}
     (head : Head root.selected.policy root.selected.lowerBody fuel current source scope id reasonAt lowered)
     (plain : head.special = none)
-    (form : head.node.form = .call callee ids (.builtinFunction function)) :
+    (form : head.node.form = .call callee ids (.builtinFunction function))
+    (closure : function.conversion? = none) :
     Nonempty (CallableIndexedOwnedPreparedStagedBuiltinCallCertificates.Receipt root.selected.policy
       root.selected.lowerBody fuel current (.initial compiled.compatible.checked)
       source scope id callee ids function reasonAt lowered) := by
   exact builtin_of_actual compiled.indexed.ancestry.graph.inputs.callable [] root.callables
     head.found form (head.selected.trans (congrArg Except.ok plain))
-    (read_policy root head.found (.inr ⟨callee, ids, function, form⟩)) head.accepted
+    (read_policy root head.found (.inr ⟨callee, ids, function, form, closure⟩)) closure head.accepted
 
 theorem builtin_special_none {node : ExpressionNode}
     (found : source.lookupExpression? id = some node) (form : BuiltinForm node.form)
@@ -648,7 +651,7 @@ theorem builtin_special_none {node : ExpressionNode}
     (match root.selected.policy.lowerSpecial? with
       | none => (Except.ok none : Except SourceCoreBasic.Error (Option SourceCoreBasic.LoweredExpr))
       | some lower => lower current child budget source scope id reasonAt) = .ok none := by
-  obtain ⟨callee, ids, function, eq⟩ := form
+  obtain ⟨callee, ids, function, eq, -⟩ := form
   all_goals
     have same : SourceCoreGeneralFunctions.contextualSource compiled.indexed.base.sourceProgram
         (current).plan compiled.indexed.base.locals (current).owner none source id = .ok source := by

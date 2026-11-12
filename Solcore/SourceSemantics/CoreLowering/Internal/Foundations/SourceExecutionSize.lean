@@ -2905,6 +2905,11 @@ mutual
           expected actual) :
         CallableFaults program (stepSize []) context callerEvidence invocationEvidence heap
           (.builtin function) arguments (.typeMismatch expected actual) heap
+    | builtinFaults
+        {context callerEvidence invocationEvidence heap function arguments reason}
+        (fault : BuiltinFaults function.id arguments reason) :
+        CallableFaults program (stepSize []) context callerEvidence invocationEvidence heap
+          (.builtin function) arguments reason heap
     | globalSignatureMissing
         {context callerEvidence invocationEvidence heap function arguments}
         (missing : FunctionSignatureMissing program
@@ -3848,6 +3853,8 @@ theorem CallableFaults.sound {program : Program} {size : Nat} {a0 : Context} {a1
     exact .builtinArity mismatch
   | .builtinArgumentType arity mismatch =>
     exact .builtinArgumentType arity mismatch
+  | .builtinFaults fault =>
+    exact .builtinFaults fault
   | .globalSignatureMissing missing =>
     exact .globalSignatureMissing missing
   | .globalBodyMissing missing =>
@@ -4279,6 +4286,8 @@ theorem CallableFaults.has_size {program : Program} {a0 : Context} {a1 : Evidenc
     exact ⟨_, .builtinArity mismatch⟩
   | .builtinArgumentType arity mismatch =>
     exact ⟨_, .builtinArgumentType arity mismatch⟩
+  | .builtinFaults fault =>
+    exact ⟨_, .builtinFaults fault⟩
   | .globalSignatureMissing missing =>
     exact ⟨_, .globalSignatureMissing missing⟩
   | .globalBodyMissing missing =>
@@ -4799,6 +4808,8 @@ theorem CallableFaults.children_below {program : Program} {size : Nat} {a0 : Con
   | @builtinArity _ _ _ _ _ _ _ =>
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
   | @builtinArgumentType _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
+  | @builtinFaults _ _ _ _ _ _ _ _ =>
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩
   | @globalSignatureMissing _ _ _ _ _ _ _ =>
     exact ⟨[], rfl, fun _ member => child_lt_stepSize member⟩

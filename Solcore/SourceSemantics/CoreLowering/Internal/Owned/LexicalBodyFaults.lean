@@ -196,7 +196,8 @@ theorem decoded_token_below
     (rebuilt : issued.tableForRegistry registry extension = .ok table)
     {token : Word} {diagnostic : Diagnostic}
     (decoded : table.diagnostic? token = some diagnostic)
-    (notPanic : SourceCorePanics.code? token = none) : token.val < issued.nextReason := by
+    (notPanic : SourceCorePanics.code? token = none)
+    (notDirty : token ≠ SourceCorePanics.dirtyReason) : token.val < issued.nextReason := by
   obtain ⟨base, initialExtra, reserved⟩ := CompatiblePlaceMissingPreparationRanges.prepare_reserved_receipt accepted
   obtain ⟨extra, _extraAccepted, tableEq, origins⟩ := issued.tableForRegistry_receipt rebuilt
   by_cases zero : token = Word.zero
@@ -221,7 +222,7 @@ theorem decoded_token_below
       | none =>
         simp only [first] at decoded
         cases found : table.reads.find? (fun read => decide (read.reason = token)) with
-        | none => simp [found, notPanic] at decoded
+        | none => simp [found, notPanic, notDirty] at decoded
         | some read =>
           have matched : read.reason = token := of_decide_eq_true (List.find?_some
             (p := fun candidate : SourceCoreFaultSites.ReadSite => decide (candidate.reason = token)) found)
@@ -233,7 +234,7 @@ theorem decoded_token_below
 /-- The appended callable rows lie below the panic range, so a panic reason
 decodes in the receiver as in the preappend table. -/
 theorem appendCallable_panic (compiled : SourceCoreUnifiedCompilation.Compiled)
-    {table : SourceCoreFaultSites.Table} {token : Word} (high : SourceCorePanics.base ≤ token.val) :
+    {table : SourceCoreFaultSites.Table} {token : Word} (high : SourceCorePanics.tableBound ≤ token.val) :
     (appendCallable compiled.indexed table).diagnostic? token = table.diagnostic? token := by
   have rows := compiled.panicFree.2
   cases present : compiled.indexed.base.callableDiagnostics with
@@ -251,12 +252,13 @@ theorem appendCallable_panic (compiled : SourceCoreUnifiedCompilation.Compiled)
 /-- A reason in the panic range misses every row of a table free of panic
 reasons. -/
 theorem panicFree_misses {table : SourceCoreFaultSites.Table} (free : table.PanicFree) {token : Word}
-    (high : SourceCorePanics.base ≤ token.val) :
+    (high : SourceCorePanics.tableBound ≤ token.val) :
     token ≠ Word.zero ∧ token ≠ table.escapedReason ∧
       table.additional.find? (fun item => decide (item.1 = token)) = none ∧
       table.reads.find? (fun site => decide (site.reason = token)) = none := by
   obtain ⟨escaped, reads, additional⟩ := free
-  have positive : 0 < SourceCorePanics.base := by unfold SourceCorePanics.base; decide
+  have positive : 0 < SourceCorePanics.tableBound := by
+    unfold SourceCorePanics.tableBound SourceCorePanics.base; decide
   refine ⟨?_, ?_, ?_, ?_⟩
   · intro same
     have value := congrArg Fin.val same
@@ -297,7 +299,8 @@ theorem issued_panicFree (compiled : SourceCoreUnifiedCompilation.Compiled)
     (issued : IssuedAt compiled.indexed entry registry extension table) : table.PanicFree := by
   have free := compiled.panicFree
   obtain ⟨base, rebuilt, rfl⟩ := issued
-  have positive : 0 < SourceCorePanics.base := by unfold SourceCorePanics.base; decide
+  have positive : 0 < SourceCorePanics.tableBound := by
+    unfold SourceCorePanics.tableBound SourceCorePanics.base; decide
   have baseFree : base.PanicFree := by
     cases present : compiled.indexed.base.diagnostics with
     | none =>
@@ -306,7 +309,7 @@ theorem issued_panicFree (compiled : SourceCoreUnifiedCompilation.Compiled)
       exact ⟨positive, by simp, by simp⟩
     | some diagnostics =>
       simp only [present] at rebuilt
-      have next : diagnostics.nextReason ≤ SourceCorePanics.base := by
+      have next : diagnostics.nextReason ≤ SourceCorePanics.tableBound := by
         have bound := free.1
         simp only [present] at bound
         exact bound
@@ -366,12 +369,14 @@ theorem receiver_lookup (compiled : SourceCoreUnifiedCompilation.Compiled)
   rw [present] at actualRebuilt
   have same : actual = table := Except.ok.inj (actualRebuilt.symm.trans rebuilt)
   subst actual
-  by_cases panic : SourceCorePanics.base ≤ token.val
+  by_cases panic : SourceCorePanics.tableBound ≤ token.val
   · rw [tableEq, appendCallable_panic compiled panic]
     exact decoded
   · rw [tableEq, appendCallable_diagnostic_of_below
       ((CompatiblePublicCallableAllocationReceipts.of_compiled compiled present).below
-        (decoded_token_below accepted rebuilt decoded (SourceCorePanics.code?_eq_none (Nat.lt_of_not_le panic))))]
+        (decoded_token_below accepted rebuilt decoded
+          (SourceCorePanics.code?_eq_none_of_lt (Nat.lt_of_not_le panic))
+          (SourceCorePanics.ne_dirtyReason_of_lt (Nat.lt_of_not_le panic))))]
     exact decoded
 
 /-- Both reached-place fields are constructed internally from the same exact

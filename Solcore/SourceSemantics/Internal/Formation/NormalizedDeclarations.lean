@@ -1236,7 +1236,11 @@ theorem recordBuiltinFunctionCall_normalized_formation
   refine ⟨?_,formed.congr fields.1 fields.2.1⟩
   rw [recordBuiltinFunctionCall_success_returnType_eq accepted]
   apply type_applySubstitution_residual formation.residual formation.range
-  cases function <;> first | exact .integer formation.scope.binders | exact .word formation.scope.binders | exact .bool formation.scope.binders
+  cases function <;> first
+    | exact .integer formation.scope.binders
+    | exact .word formation.scope.binders
+    | exact .bool formation.scope.binders
+    | exact .fixed formation.scope.binders _
 
 end Solcore.SourceSemantics.SourceInferenceNormalizedCoercionFormation
 end

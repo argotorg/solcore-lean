@@ -104,7 +104,13 @@ def Table.diagnostic? (table : Table) (reason : Core.Word) : Option Diagnostic :
             site := .occurrence site.expression.occurrence
             span := some site.span
           }
-        | none => (SourceCorePanics.code? reason).map fun code => {
+        | none =>
+          if reason = SourceCorePanics.dirtyReason then some {
+            error := .dirtyHigherBitsForInteger
+            site := .declaration table.owner
+            span := none
+          }
+          else (SourceCorePanics.code? reason).map fun code => {
             error := .panic code
             site := .declaration table.owner
             span := none
@@ -129,12 +135,41 @@ theorem Table.read_diagnostic {table : Table} {site : ReadSite}
       span := some site.span
     } := by simp [Table.diagnostic?, positive, ordinary, noBoundary, found]
 
-/-- No reason of the table lies in the panic range, so the reason of a panic
-decodes as that panic. -/
+/-- No reason of the table lies in the reserved range, at or above
+`SourceCorePanics.tableBound`: the dirty-integer reason and the panic range. So
+those reasons decode as the errors they name. -/
 def Table.PanicFree (table : Table) : Prop :=
-  table.escapedReason.val < SourceCorePanics.base ∧
-    (∀ site ∈ table.reads, site.reason.val < SourceCorePanics.base) ∧
-    ∀ item ∈ table.additional, item.1.val < SourceCorePanics.base
+  table.escapedReason.val < SourceCorePanics.tableBound ∧
+    (∀ site ∈ table.reads, site.reason.val < SourceCorePanics.tableBound) ∧
+    ∀ item ∈ table.additional, item.1.val < SourceCorePanics.tableBound
+
+/-- A reserved reason is none of the table's own reasons. -/
+theorem Table.reserved_lookups {table : Table} (free : table.PanicFree) {token : Core.Word}
+    (high : SourceCorePanics.tableBound ≤ token.val) :
+    token ≠ Core.Word.zero ∧ token ≠ table.escapedReason ∧
+      table.additional.find? (fun site => decide (site.1 = token)) = none ∧
+      table.reads.find? (fun site => decide (site.reason = token)) = none := by
+  obtain ⟨escaped, reads, additional⟩ := free
+  have positive : 0 < SourceCorePanics.tableBound := by
+    unfold SourceCorePanics.tableBound SourceCorePanics.base; decide
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · intro same
+    have value := congrArg Fin.val same
+    change token.val = 0 at value
+    omega
+  · intro same
+    have value := congrArg Fin.val same
+    omega
+  · apply List.find?_eq_none.mpr
+    intro item member matched
+    have value := congrArg Fin.val (of_decide_eq_true matched)
+    have below := additional item member
+    omega
+  · apply List.find?_eq_none.mpr
+    intro site member matched
+    have value := congrArg Fin.val (of_decide_eq_true matched)
+    have below := reads site member
+    omega
 
 /-- A panic reason decodes as its panic, at the table's function. -/
 theorem Table.panic_diagnostic {table : Table} (free : table.PanicFree) (code : UInt8) :
@@ -143,33 +178,22 @@ theorem Table.panic_diagnostic {table : Table} (free : table.PanicFree) (code : 
       site := .declaration table.owner
       span := none
     } := by
-  obtain ⟨escaped, reads, additional⟩ := free
-  have high := SourceCorePanics.base_le_reason code
-  have positive : 0 < SourceCorePanics.base := by unfold SourceCorePanics.base; decide
-  have nonzero : SourceCorePanics.reason code ≠ Core.Word.zero := by
-    intro same
-    have value := congrArg Fin.val same
-    change (SourceCorePanics.reason code).val = 0 at value
-    omega
-  have notEscaped : SourceCorePanics.reason code ≠ table.escapedReason := by
-    intro same
-    have value := congrArg Fin.val same
-    omega
-  have noAdditional :
-      table.additional.find? (fun site => decide (site.1 = SourceCorePanics.reason code)) = none := by
-    apply List.find?_eq_none.mpr
-    intro item member matched
-    have value := congrArg Fin.val (of_decide_eq_true matched)
-    have below := additional item member
-    omega
-  have noRead :
-      table.reads.find? (fun site => decide (site.reason = SourceCorePanics.reason code)) = none := by
-    apply List.find?_eq_none.mpr
-    intro site member matched
-    have value := congrArg Fin.val (of_decide_eq_true matched)
-    have below := reads site member
-    omega
-  simp [Table.diagnostic?, nonzero, notEscaped, noAdditional, noRead, SourceCorePanics.code?_reason]
+  have high : SourceCorePanics.tableBound ≤ (SourceCorePanics.reason code).val :=
+    Nat.le_of_lt (Nat.lt_of_lt_of_le SourceCorePanics.tableBound_lt_base (SourceCorePanics.base_le_reason code))
+  obtain ⟨nonzero, notEscaped, noAdditional, noRead⟩ := table.reserved_lookups free high
+  simp [Table.diagnostic?, nonzero, notEscaped, noAdditional, noRead, SourceCorePanics.code?_reason,
+    SourceCorePanics.reason_ne_dirtyReason code]
+
+/-- The dirty-integer reason decodes as `DirtyHigherBitsForInteger()`, at the table's function. -/
+theorem Table.dirty_diagnostic {table : Table} (free : table.PanicFree) :
+    table.diagnostic? SourceCorePanics.dirtyReason = some {
+      error := .dirtyHigherBitsForInteger
+      site := .declaration table.owner
+      span := none
+    } := by
+  obtain ⟨nonzero, notEscaped, noAdditional, noRead⟩ :=
+    table.reserved_lookups free (Nat.le_of_eq SourceCorePanics.dirtyReason_val.symm)
+  simp [Table.diagnostic?, nonzero, notEscaped, noAdditional, noRead]
 
 theorem Table.escaped_diagnostic (table : Table)
     (positive : table.escapedReason ≠ Core.Word.zero) :

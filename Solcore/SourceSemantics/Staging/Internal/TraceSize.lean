@@ -340,6 +340,10 @@ mutual
         (mismatch : ValuesFirstTypeMismatch arguments function.id.parameterTypes expected actual) :
         Applies program registry (stepSize []) scope context heap (.builtin function) arguments
           (.fault (.semantic (.typeMismatch expected actual))) heap
+    | builtinFault {scope context heap function arguments reason}
+        (fault : BuiltinFaults function.id arguments reason) :
+        Applies program registry (stepSize []) scope context heap (.builtin function) arguments
+          (.fault (.semantic reason)) heap
     | closureArity {scope context heap function arguments}
         (mismatch : function.parameters.length ≠ arguments.length) :
         Applies program registry (stepSize []) scope context heap (.closure function) arguments
@@ -1172,6 +1176,7 @@ local macro "erase_stage_grade" : tactic =>
     case builtin => apply Recursive.Applies.builtin <;> assumption
     case builtinArity => apply Recursive.Applies.builtinArity <;> assumption
     case builtinType => apply Recursive.Applies.builtinType <;> assumption
+    case builtinFault => apply Recursive.Applies.builtinFault <;> assumption
     case closureArity => apply Recursive.Applies.closureArity <;> assumption
     case globalArity => apply Recursive.Applies.globalArity <;> assumption
     case global => apply Recursive.Applies.global <;> assumption
@@ -1507,6 +1512,8 @@ local macro "construct_stage_grade" : tactic =>
       exact ⟨_, .builtinArity mismatch⟩
     case builtinType arity mismatch =>
       exact ⟨_, .builtinType arity mismatch⟩
+    case builtinFault fault =>
+      exact ⟨_, .builtinFault fault⟩
     case closureArity mismatch =>
       exact ⟨_, .closureArity mismatch⟩
     case globalArity instantiates mismatch =>
