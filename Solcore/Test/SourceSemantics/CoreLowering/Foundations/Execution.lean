@@ -4853,6 +4853,188 @@ def runCompoundShifts : IO Unit := do
   | .error errors => throw (IO.userError s!"an integer <<= target gave {reprStr errors}")
   IO.println "SOURCE_CORE_FIXED_COMPOUND_SHIFTS_PASS: <<= and >>= on signed and unsigned fixed-width locals and Word by Word and unsigned amounts of other types, uintN <<= keeping the low N bits, intN <<= sign-extending them and intN >>= arithmetic, literal amounts defaulted to uint256, a uint8 mapping element, open targets typed by a later use or defaulted to uint256, compound shifts in an unchecked block and in a for loop's header and body, signed, integer and Bool amounts, an open amount made signed, integer and Bool targets and an open target made integer rejected"
 
+/-- Step 8e's fixture: the functions of upstream's `checked-arith`,
+`unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
+fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
+contract storage, as top-level functions, and the ones that convert only to
+reach a type adapted where the meaning is kept: `uint256(0)` is `0` at
+`uint256`, a `Typedef.abs(Typedef.rep(s))` amount or value is a parameter of
+the converted type, and a result converted to `uint256` is returned at its own
+type, whose word the API returns. The lane's notes have the table. -/
+private def fixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function addU256(a: uint256, b: uint256) returns (uint256) { return a + b; }",
+  "function subU256(a: uint256, b: uint256) returns (uint256) { return a - b; }",
+  "function mulU256(a: uint256, b: uint256) returns (uint256) { return a * b; }",
+  "function divU256(a: uint256, b: uint256) returns (uint256) { return a / b; }",
+  "function modU256(a: uint256, b: uint256) returns (uint256) { return a % b; }",
+  "function addU8(a: uint8, b: uint8) returns (uint8) { return a + b; }",
+  "function subU8(a: uint8, b: uint8) returns (uint8) { return a - b; }",
+  "function mulU8(a: uint8, b: uint8) returns (uint8) { return a * b; }",
+  "function divU8(a: uint8, b: uint8) returns (uint8) { return a / b; }",
+  "function modU8(a: uint8, b: uint8) returns (uint8) { return a % b; }",
+  "function addI256(a: int256, b: int256) returns (int256) { return a + b; }",
+  "function subI256(a: int256, b: int256) returns (int256) { return a - b; }",
+  "function mulI256(a: int256, b: int256) returns (int256) { return a * b; }",
+  "function divI256(a: int256, b: int256) returns (int256) { return a / b; }",
+  "function modI256(a: int256, b: int256) returns (int256) { return a % b; }",
+  "function addI8(a: int8, b: int8) returns (int8) { return a + b; }",
+  "function subI8(a: int8, b: int8) returns (int8) { return a - b; }",
+  "function mulI8(a: int8, b: int8) returns (int8) { return a * b; }",
+  "function divI8(a: int8, b: int8) returns (int8) { return a / b; }",
+  "function modI8(a: int8, b: int8) returns (int8) { return a % b; }",
+  "function checkedSum(a: uint256, b: uint256) returns (uint256) { return a + b; }",
+  "function apply(f: function (uint256) returns (uint256), x: uint256) returns (uint256) { return f(x); }",
+  "function outside(a: uint256, b: uint256) returns (uint256) { return a + b; }",
+  "function inside(a: uint256, b: uint256) returns (uint256) { unchecked { return a + b; } }",
+  "function compoundInside(a: uint256, b: uint256) returns (uint256) { let r: uint256 = a; unchecked { r -= b; } return r; }",
+  "function afterBlock(a: uint256, b: uint256) returns (uint256) { let wrapped: uint256 = 0; unchecked { wrapped = a + b; } return wrapped + a + b; }",
+  "function calledFunction(a: uint256, b: uint256) returns (uint256) { unchecked { return checkedSum(a, b); } }",
+  "function lambdaBody(a: uint256, b: uint256) returns (uint256) { unchecked { return apply(lam (v: uint256) -> uint256 { return v + b; }, a); } }",
+  "function divisionByZero(a: uint256, b: uint256) returns (uint256) { unchecked { return a / b; } }",
+  "function literalAmount(x: uint256) returns (uint256) { return x << 3; }",
+  "function narrowAmount(x: uint256, k: uint8) returns (uint256) { return x >> k; }",
+  "function wordShift(w: Word, s: Word) returns (Word) { return w << s; }",
+  "function compound(x: uint256, s: uint256) returns (uint256) { let r: uint256 = x; r <<= s; r >>= 1; return r; }",
+  "function neverReverts(x: uint256) returns (uint256) { return x << 255; }",
+  "function insideUnchecked(x: uint256, s: uint256) returns (uint256) { unchecked { return x << s; } }",
+  "function precedence(a: uint256, b: uint256) returns (uint256) { return a + b << 2 & 0xff; }",
+  "function comparisons(a: uint256, b: uint256) returns (bool) { return a > b && a >= b; }",
+  "function negate8(x: int8) returns (int8) { return 0 - x; }",
+  "function addI32(a: int32, b: int32) returns (int32) { return a + b; }",
+  "function mulNeg() returns (int256) { let d: int256 = 5; return (0 - d) * d; }",
+  "function ltSigned() returns (uint256) { let d: int256 = 5; let e: int256 = 0 - d; if (e < d) { return 1; } else { return 0; } }",
+  "function divSigned() returns (int256) { let m20: int256 = 0 - 20; let three: int256 = 3; return m20 / three; }",
+  "function implicitSuccess() returns (bool) { let value = 6; value *= 7; return value == 42; }",
+  "function negateSigned(value: int256) returns (int256) { return -value; }",
+  "function negateWord(value: Word) returns (Word) { return -value; }",
+  "function runtimePatterns(choice: uint256) returns (uint256, uint256) { let value = 0; if (choice == 1) { value = 1; } if (choice == 2) { value = 2; } let inferred: uint256; match (value) { case 0 { inferred = 10; } case 1 { inferred = 20; } case _ { inferred = 30; } } let typed: uint256; match (choice) { case 0 { typed = 10; } case 1 { typed = 20; } case _ { typed = 30; } } return (inferred, typed); }",
+  "function implicitAdd(fail: bool) returns (bool) { let x = 41; if (fail) { x = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; } let result = x + 1; return result == 42; }",
+  "function implicitSub(fail: bool) returns (bool) { let x = 1; if (fail) { x = 0; } let result = x - 1; return result == 0; }",
+  "function implicitMul(fail: bool) returns (bool) { let x = 21; if (fail) { x = 0x8000000000000000000000000000000000000000000000000000000000000000; } let result = x * 2; return result == 42; }",
+  "function implicitDiv(fail: bool) returns (bool) { let divisor = 2; if (fail) { divisor = 0; } let result = 84 / divisor; return result == 42; }",
+  "function implicitMod(fail: bool) returns (bool) { let divisor = 5; if (fail) { divisor = 0; } let result = 42 % divisor; return result == 2; }",
+  "function implicitNeg(fail: bool) returns (bool) { let x = 0; if (fail) { x = 1; } let result = -x; return result == 0; }",
+  "function implicitCompound(failure: uint256) returns (bool) { let x = 6; if (failure == 1) { x = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; } x += 1; if (failure == 2) { x = 0; } x -= 1; if (failure == 3) { x = 0x8000000000000000000000000000000000000000000000000000000000000000; } x *= 7; let divisor = 1; if (failure == 4) { divisor = 0; } x /= divisor; if (failure == 5) { divisor = 0; } x %= divisor; return x == 0; }",
+  "function explicitWord(x: Word) returns (Word, Word, Word) { return (x + 1, x - 1, -x); }",
+  "function negUnsigned(x: uint256) returns (uint256) { return -x; }",
+  "function negI8(x: int8) returns (int8) { return -x; }",
+  "function negI16(x: int16) returns (int16) { return -x; }",
+  "function negI32(x: int32) returns (int32) { return -x; }",
+  "function negI64(x: int64) returns (int64) { return -x; }",
+  "function negI128(x: int128) returns (int128) { return -x; }",
+  "function negI256(x: int256) returns (int256) { return -x; }"]
+
+private def fixtureNames : List String := [
+  "addU256", "subU256", "mulU256", "divU256", "modU256", "addU8", "subU8", "mulU8", "divU8", "modU8",
+  "addI256", "subI256", "mulI256", "divI256", "modI256", "addI8", "subI8", "mulI8", "divI8", "modI8",
+  "checkedSum", "apply", "outside", "inside", "compoundInside", "afterBlock", "calledFunction", "lambdaBody",
+  "divisionByZero", "literalAmount", "narrowAmount", "wordShift", "compound", "neverReverts", "insideUnchecked",
+  "precedence", "comparisons", "negate8", "addI32", "mulNeg", "ltSigned", "divSigned", "implicitSuccess",
+  "negateSigned", "negateWord", "runtimePatterns", "implicitAdd", "implicitSub", "implicitMul", "implicitDiv",
+  "implicitMod", "implicitNeg", "implicitCompound", "explicitWord", "negUnsigned", "negI8", "negI16", "negI32",
+  "negI64", "negI128", "negI256"]
+
+/-- Step 8e, the upstream fixtures' cases through the public API: each value
+and each panic code is the fixture's. -/
+def runUpstreamFixtures : IO Unit := do
+  let program ← get "upstream fixture check" (checkProgram fixtureWorkspace)
+  let seeds ← fixtureNames.mapM (seed program)
+  let compiled ← get "upstream fixture compilation"
+    (compile fixtureWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match fixtureNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"upstream fixture root {name} missing")
+    | none => throw (IO.userError s!"upstream fixture {name} unknown")
+  let max := modulus - 1
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × List Value × Value) := [
+    -- checked-arith, in range.
+    ("addU256", [word max, word 0], word max), ("subU256", [word 5, word 3], word 2),
+    ("mulU256", [word max, word 1], word max), ("divU256", [word 7, word 2], word 3),
+    ("modU256", [word 7, word 3], word 1),
+    ("addU8", [word 255, word 0], word 255), ("subU8", [word 10, word 3], word 7),
+    ("mulU8", [word 15, word 17], word 255), ("divU8", [word 255, word 2], word 127),
+    ("modU8", [word 255, word 16], word 15),
+    ("addI256", [word (2 ^ 255 - 1), word 0], word (2 ^ 255 - 1)), ("subI256", [word (2 ^ 255), word 0], word (2 ^ 255)),
+    ("mulI256", [word (2 ^ 255 - 1), word 1], word (2 ^ 255 - 1)),
+    ("divI256", [word (modulus - 20), word 3], word (modulus - 6)),
+    ("modI256", [word (modulus - 20), word 3], word (modulus - 2)),
+    ("addI8", [word 127, word 0], word 127), ("subI8", [word (modulus - 128), word 0], word (modulus - 128)),
+    ("mulI8", [word (modulus - 128), word 1], word (modulus - 128)),
+    ("divI8", [word (modulus - 20), word 3], word (modulus - 6)),
+    ("modI8", [word (modulus - 20), word 3], word (modulus - 2)),
+    -- unchecked-scope: only operators written in the block wrap.
+    ("inside", [word max, word 1], word 0), ("inside", [word 2, word 3], word 5),
+    ("compoundInside", [word 0, word 1], word max),
+    -- shift-operators.
+    ("literalAmount", [word 5], word 40), ("narrowAmount", [word 0x100, word 4], word 0x10),
+    ("narrowAmount", [word 0x100, word 255], word 0), ("wordShift", [word 1, word 255], word (2 ^ 255)),
+    ("wordShift", [word 1, word 256], word 0), ("compound", [word 1, word 8], word 128),
+    ("neverReverts", [word max], word (2 ^ 255)), ("insideUnchecked", [word 3, word 1], word 6),
+    ("precedence", [word 1, word 2], word 12), ("precedence", [word 0x40, word 0], word 0),
+    ("comparisons", [word 2, word 1], boolean true), ("comparisons", [word 1, word 2], boolean false),
+    -- int-ops, as two's-complement words.
+    ("mulNeg", [], word (modulus - 25)), ("ltSigned", [], word 1), ("divSigned", [], word (modulus - 6)),
+    ("negate8", [word (modulus - 8)], word 8), ("addI32", [word 1000000000, word 1000000000], word 2000000000),
+    -- issue92-checked-defaults: open literals default to `uint256`, checked.
+    ("implicitSuccess", [], boolean true), ("negateSigned", [word (modulus - 42)], word 42),
+    ("negateWord", [word 1], word max),
+    ("runtimePatterns", [word 0], .product (word 10) (word 10)),
+    ("runtimePatterns", [word 1], .product (word 20) (word 20)),
+    ("runtimePatterns", [word 2], .product (word 30) (word 30)),
+    ("implicitAdd", [boolean false], boolean true), ("implicitSub", [boolean false], boolean true),
+    ("implicitMul", [boolean false], boolean true), ("implicitDiv", [boolean false], boolean true),
+    ("implicitMod", [boolean false], boolean true), ("implicitNeg", [boolean false], boolean true),
+    ("implicitCompound", [word 0], boolean true),
+    ("explicitWord", [word 0], .product (word 1) (.product (word max) (word 0))),
+    ("explicitWord", [word 1], .product (word 2) (.product (word 0) (word max))),
+    ("explicitWord", [word max], .product (word 0) (.product (word (max - 1)) (word 1))),
+    ("negUnsigned", [word 0], word 0),
+    ("negI8", [word 0], word 0), ("negI8", [word max], word 1), ("negI8", [word 127], word (modulus - 127)),
+    ("negI16", [word 0], word 0), ("negI16", [word max], word 1), ("negI16", [word 32767], word (modulus - 32767)),
+    ("negI32", [word 0], word 0), ("negI32", [word max], word 1),
+    ("negI32", [word 2147483647], word (modulus - 2147483647)),
+    ("negI64", [word 0], word 0), ("negI64", [word max], word 1),
+    ("negI64", [word 9223372036854775807], word (modulus - 9223372036854775807)),
+    ("negI128", [word 0], word 0), ("negI128", [word max], word 1),
+    ("negI128", [word (2 ^ 127 - 1)], word (modulus - (2 ^ 127 - 1))),
+    ("negI256", [word 0], word 0), ("negI256", [word max], word 1),
+    ("negI256", [word (2 ^ 255 - 1)], word (2 ^ 255 + 1))]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) arguments
+    require (completed.value == expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  -- `Panic(0x11)`: checked overflow, underflow and `MIN / -1`, after an `unchecked` block, in a
+  -- called function and in a lambda body written in a block, and checked negation.
+  let arithmetic : List (String × List Value) := [
+    ("addU256", [word max, word 1]), ("subU256", [word 0, word 1]), ("mulU256", [word (2 ^ 255), word 2]),
+    ("addU8", [word 200, word 100]), ("subU8", [word 0, word 1]), ("mulU8", [word 16, word 16]),
+    ("addI256", [word (2 ^ 255 - 1), word 1]), ("subI256", [word (2 ^ 255), word 1]),
+    ("mulI256", [word (2 ^ 255 - 1), word 2]), ("divI256", [word (2 ^ 255), word max]),
+    ("addI8", [word 127, word 1]), ("subI8", [word (modulus - 128), word 1]), ("mulI8", [word 64, word 2]),
+    ("divI8", [word (modulus - 128), word max]),
+    ("outside", [word max, word 1]), ("afterBlock", [word max, word 1]), ("calledFunction", [word max, word 1]),
+    ("lambdaBody", [word max, word 1]),
+    ("implicitAdd", [boolean true]), ("implicitSub", [boolean true]), ("implicitMul", [boolean true]),
+    ("implicitNeg", [boolean true]),
+    ("implicitCompound", [word 1]), ("implicitCompound", [word 2]), ("implicitCompound", [word 3]),
+    ("negUnsigned", [word 1]),
+    ("negI8", [word (modulus - 128)]), ("negI16", [word (modulus - 32768)]), ("negI32", [word (modulus - 2 ^ 31)]),
+    ("negI64", [word (modulus - 2 ^ 63)]), ("negI128", [word (modulus - 2 ^ 127)]), ("negI256", [word (2 ^ 255)])]
+  for (name, arguments) in arithmetic do
+    session ← panics session (← key name) arguments SourceCorePanics.arithmetic s!"{name} on {reprStr arguments}"
+  -- `Panic(0x12)`: a zero divisor, inside an `unchecked` block too.
+  let zero : List (String × List Value) := [
+    ("divU256", [word 7, word 0]), ("modU256", [word 7, word 0]), ("divU8", [word 5, word 0]),
+    ("modU8", [word 5, word 0]), ("divI256", [word 5, word 0]), ("modI256", [word 5, word 0]),
+    ("divI8", [word 5, word 0]), ("modI8", [word 5, word 0]), ("divisionByZero", [word 7, word 0]),
+    ("implicitDiv", [boolean true]), ("implicitMod", [boolean true]),
+    ("implicitCompound", [word 4]), ("implicitCompound", [word 5])]
+  for (name, arguments) in zero do
+    session ← panics session (← key name) arguments SourceCorePanics.divisionByZero s!"{name} on {reprStr arguments}"
+  IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no conversion and no contract storage, and of their conversion-only functions adapted with the meaning kept, give the fixtures' values and panic codes"
+
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)
   let seeds ← names.mapM (seed program)
@@ -5062,6 +5244,7 @@ def run : IO Unit := do
   runUnchecked
   runShifts
   runCompoundShifts
+  runUpstreamFixtures
 
 end Tests.SourceCoreFixedIntegerOperators
 end

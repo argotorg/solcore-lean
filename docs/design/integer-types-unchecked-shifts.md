@@ -1004,7 +1004,10 @@ Made on 2026-11-11, during step 7.
     the literal `uint256` too.
   - Patterns are admitted on `word`, `integer` and `uint256`
     (`Ty.IntegerPatternCarrier`, `Detail.supportedIntegerPatternTarget`). The
-    other eleven types keep rejecting them (`Error.nonNumericPatternType`).
+    other eleven types keep rejecting them (`Error.nonNumericPatternType`), as
+    upstream does: its `numeric_literal_pattern_expected` admits only `word`,
+    `integer`, `uint256` and an open type, and `infer_lit_pat` reports a
+    mismatch otherwise (`crates/hir-ty/src/infer/pattern.rs` at the pin).
   - At `uint256` a pattern compares the scrutinee's word with the literal's.
     Both pattern compilers validate it with `validateFixedIntegerLiteral`,
     and the meaning proofs cover it (`LiteralCode.uint256`).
@@ -1345,4 +1348,10 @@ first planned after the literals and moved before them for this reason
      shifts](#row-1s-shifts-on-the-twelve-types-the-amount-takes-its-own-type)).
      The step is committed in two parts: the binary shifts, then the compound
      forms.
-   - 8e. Ports of the upstream fixtures.
+   - 8e. **Ports of the upstream fixtures.** The functions of `checked-arith`,
+     `unchecked-scope`, `shift-operators`, `int-ops` and
+     `issue92-checked-defaults` that need no conversion and no contract
+     storage, and the ones that convert only to reach a type, adapted where
+     the meaning is kept, run through the public API with the fixtures' values
+     and panic codes (`runUpstreamFixtures` in
+     `Tests.SourceCoreFixedIntegerOperators`).
