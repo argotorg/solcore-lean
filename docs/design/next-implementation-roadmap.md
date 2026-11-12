@@ -11099,8 +11099,9 @@ Both findings are recorded in `questions.md`, without investigation:
     Hull and Yul.
   - p16 reduced to its step alone. The other four share its fingerprint
     within the fixture, and are recorded as its duplicates.
-  - Each key is the mutant's program, so the class is not registered, and
-    each new mutant of it is a new signature.
+  - Each key is the mutant's program, so the class was not registered then.
+    Unit 18 (`c4d1cfb22`) registers the mutants whose words differ by whole
+    first allocations as a fixtures class; the others stay new.
 - **solc's Yul removes a store that Hull and Sonatina cannot make.**
   `asm-string-escapes` p8 and `revert` p2 move an inline Yul `mstore` to
   `2^256 - 1`.
@@ -11365,13 +11366,14 @@ tools refuse them.
 - **Changed:** Q012's layouts are refused with `SC0420` before emission.
   Q006's call is qualified by upstream's Yul emitter, while Hull keeps the
   plain name that Lean's importer diagnoses.
-- **Remaining:** Q013's usize overflow at O2 (24 of 24 archived) and in
-  inline Yul on O0, O2 and Yul (104 of 104), and its `sar` wrong code at O2
-  for counts of `2^16` and `2^32`; the O2 signextend overflow on
+- **Remaining:** Q013's usize overflow at O2 (24 of 24 archived) and in inline
+  Yul on O0, O2 and Yul (104 of 104), and its `sar` wrong code at O2 for
+  counts of `2^16` and `2^32`; the O2 signextend overflow on
   `stateful-adt-storage` (4 of 4); solc's `StackTooDeepError` (28 of 28);
-  `SC0401` through two superclass bounds (72 of 72); std's mapping slot
-  order; Hull memory's range on a store at `2^256 - 1` that solc removes;
-  and Sonatina's first allocation, at `0x200` on O0 and now at `0x140` on O2.
+  `SC0401` through two superclass bounds (72 of 72); std's mapping slot order;
+  Hull memory's range on a store at `2^256 - 1` that solc removes; and
+  Sonatina's first allocation, at `0x200` on O0 and now at `0x140` on O2, a
+  fixtures class of the fuzz driver since `c4d1cfb22`.
 - The fuzz driver's `has_inst` key and its O0 memory-values class no longer
   occur. Both stay registered.
 
@@ -11387,7 +11389,7 @@ wrapping are ordinary Core over Words.
 
 | Order | Upstream change | What the Lean side needs | Fixtures |
 | ---: | --- | --- | --- |
-| 1 | Checked integer types and literal defaulting (#95): `uint8` to `uint256` and `int8` to `int256` in `std.unsigned` and `std.signed`, checked `+ - * / %` that panic with `0x11` or `0x12`, unary negation, comptime range checks of literals, ABI validation of narrow integers, and an unconstrained literal defaulting to `uint256` instead of `word` | **Lean: done for the twelve types, with `==`, `!=`, `< > <= >=`, `& | ^`, `~`, checked `+ - * / %` and unary `-`, the compound `+= -= *= /= %=` and `&= |= ^=` on all twelve, unchecked `+ - * / %` and `+= -= *= /= %=` wrapping to the type's width, `<<`, `>>`, `<<=` and `>>=` by a `word` or unsigned amount, the orderings signed on `intN`, literals of either sign at all twelve, range-checked at compile time, an open literal defaulting to `uint256` where its uses, compound assignments among them, call for a type and rejected as ambiguous otherwise, and numeric patterns at `uint256`; conversions between `word` and the types, and in-place `~` at them, remain** ([row 1's steps](integer-types-unchecked-shifts.md#row-1-steps), [decisions on resuming](integer-types-unchecked-shifts.md#decisions-on-resuming), [panics as implemented](integer-types-unchecked-shifts.md#panics-as-implemented)). Typing: the default of an unconstrained integer literal, and the range check of a literal at its type. Source semantics: the integer types and their checked operations, a panic as revert data `Panic(code)`. Lowering: a checked operation converts its words to Core integers, computes the exact result, and fails with the panic outside the type's range or converts the result back; `/ %` first fail on a zero divisor, then divide the magnitudes with Core's Euclidean operations and restore the sign; a checked compound assignment computes Word's operation and makes the same tests in the place guard, after the setter. Importer: nothing; std's helpers lower through the existing `slt`, `sgt`, `sdiv`, `smod` and `signextend`. Generators: a profile of checked arithmetic over `uint256` and the narrow types, whose Core reference reverts with the panic, with boundary inputs at each type's extremes. | `checked-arith`, `int-ops`, `issue92-checked-defaults`, `shift-operators`, `mini-erc20`, `deposit` |
+| 1 | Checked integer types and literal defaulting (#95): `uint8` to `uint256` and `int8` to `int256` in `std.unsigned` and `std.signed`, checked `+ - * / %` that panic with `0x11` or `0x12`, unary negation, comptime range checks of literals, ABI validation of narrow integers, and an unconstrained literal defaulting to `uint256` instead of `word` | **Lean: done for the twelve types, with `==`, `!=`, `< > <= >=`, `& | ^`, `~` and in-place `~`, checked `+ - * / %` and unary `-`, the compound `+= -= *= /= %=` and `&= |= ^=` on all twelve, unchecked `+ - * / %` and `+= -= *= /= %=` wrapping to the type's width, `<<`, `>>`, `<<=` and `>>=` by a `word` or unsigned amount, the orderings signed on `intN`, literals of either sign at all twelve, range-checked at compile time, an open literal defaulting to `uint256` where its uses, compound assignments among them, call for a type and rejected as ambiguous otherwise, numeric patterns at `uint256`, and the constructors `uint256(w)`, `uintN(w)` and `intN(w)`, which check the word as upstream's ABI decoders do; `Typedef.abs`, `Typedef.rep` and `case uint256(w)` remain** ([row 1's steps](integer-types-unchecked-shifts.md#row-1-steps), [decisions on resuming](integer-types-unchecked-shifts.md#decisions-on-resuming), [panics as implemented](integer-types-unchecked-shifts.md#panics-as-implemented)). Typing: the default of an unconstrained integer literal, and the range check of a literal at its type. Source semantics: the integer types and their checked operations, a panic as revert data `Panic(code)`. Lowering: a checked operation converts its words to Core integers, computes the exact result, and fails with the panic outside the type's range or converts the result back; `/ %` first fail on a zero divisor, then divide the magnitudes with Core's Euclidean operations and restore the sign; a checked compound assignment computes Word's operation and makes the same tests in the place guard, after the setter. Importer: nothing; std's helpers lower through the existing `slt`, `sgt`, `sdiv`, `smod` and `signextend`. Generators: a profile of checked arithmetic over `uint256` and the narrow types, whose Core reference reverts with the panic, with boundary inputs at each type's extremes. | `checked-arith`, `int-ops`, `issue92-checked-defaults`, `shift-operators`, `mini-erc20`, `deposit` |
 | 2 | `unchecked` blocks (#119): `+ - * / %` inside a block resolve to `std.unchecked`'s wrapping instances, lexically | **Lean: done for `word`, and on the twelve types for `+ - * / %` and `+= -= *= /= %=`, which wrap to the type's width; `/ %` panic with `0x12` on a zero divisor** ([unchecked blocks as implemented](integer-types-unchecked-shifts.md#unchecked-blocks-as-implemented), [row 1's unchecked arithmetic](integer-types-unchecked-shifts.md#row-1s-unchecked-arithmetic-wrapped-to-the-types-width), [panics as implemented](integer-types-unchecked-shifts.md#panics-as-implemented)). Parser: the `unchecked { … }` statement. Typing: the five unchecked operators and their traits. Source semantics: wrapping arithmetic by lexical scope, `MIN / -1` wrapping. Lowering: the plain Core operations. Generators: the checked profile's operations inside and outside such blocks. | `unchecked-scope`, `shift-operators` |
 | 3 | Shift operators (#129): `<<` and `>>` with `Shl`, `Shr` and `ShiftAmount`, arithmetic `>>` for signed types, no revert, amounts of at least the width giving 0 or -1 | **Lean: done for `word`, and on the twelve types for `<<`, `>>`, `<<=` and `>>=` by a `word` or unsigned amount** ([shifts as implemented](integer-types-unchecked-shifts.md#shifts-as-implemented), [row 1's shifts](integer-types-unchecked-shifts.md#row-1s-shifts-on-the-twelve-types-the-amount-takes-its-own-type)). Parser: the two tokens and their precedence. Typing: the two-parameter traits, an unsigned amount. Source semantics and lowering: Core's `wordShl`, `wordShr` and `wordSar`. Generators: shifts in the scalar fragment; the scalar meaning already has `shl`, `shr` and `sar`. | `shift-operators` |
 | 4 | Memory arrays, slices and panic codes (#145): `T[]`, `new T[](n)` zeroed, `a.length` and methods on any receiver, `a[i]` reads and writes through a checked `memref`, read-only slices `a[s:e]` over memory, storage and calldata arrays, memory arrays in the public ABI, `Panic(0x32)` for indices and slice bounds, `Panic(0x31)` for an empty pop, `Panic(0x41)` for allocation overflow | Parser: the array type, `new`, slices and member calls. Typing: an array's location by context, `memref`, `arraySlice` and `assignRef`. Source semantics: memory arrays and slices with their panics. Lowering: std's layout. ABI: memory arrays as parameters and returns. Generators: the memory-value and memory-call profiles in `T[]` syntax, array returns through `T[]`, slices; their references already model `Panic(0x32)` (this unit). | `array-syntax`, `mem-array`, `array-slice`, `calldata-slice`, `memory-array-abi`, `user-collection-index`, `memory-allocation-bounds`, `allocator-bounds`, `abi-sum-padding`, `array-ops` |
@@ -11851,25 +11853,39 @@ does: the target waits for its own type and the amount for its own, so
 default to `uint256` otherwise. The functions of the `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures that need no conversion and no contract storage run as public-API tests
-with the fixtures' values and panic codes (step 8e). Two differences from
-upstream remain. A `where` clause cannot name the builtin `Int`, a gap older
-than row 1, so upstream's `poly_int_defaulting` stops at its signature in Lean,
-where upstream reports the literal as ambiguous. And Lean generalizes a local
-lambda at its `let`, where upstream keeps a closure monomorphic and types its
-parameters from its calls, so a compound assignment on a parameter that neither
-the lambda's body nor a literal types, as in
-`lam(acc, step) { acc += step; return acc; }`, is rejected in Lean, as
-`acc + step` already was, and since step 8d so is a shift of such a parameter,
-as in `lam(x) { return x << 1; }` or `lam(x) { x <<= 1; return x; }`, which were
-`word` before ([upstream's
+with the fixtures' values and panic codes (step 8e). In-place `~` keeps the
+target's type, as upstream's rewrite of `x ~=` to `x = ~x` gives it: an open
+target waits and defaults to `uint256`, the result is the type's `~`, the low
+`N` bits on the narrower unsigned types, an `integer` or `Bool` target is
+rejected, and at the twelve types it is compiled but, like the compound
+assignments, outside the meaning proofs ([row 1's in-place
+`~`](integer-types-unchecked-shifts.md#row-1s-in-place--the-target-keeps-its-type)).
+The constructors `uint256(w)`, `uintN(w)` and `intN(w)` convert a word that is
+canonical for the type and otherwise revert with `DirtyHigherBitsForInteger()`
+(`0x6cc54a63`), the check and error of upstream's ABI decoders; they are
+compiled but outside the meaning proofs, and three of step 8e's adapted
+functions now run as upstream wrote them ([row 1's
+conversions](integer-types-unchecked-shifts.md#row-1s-conversions-a-word-becomes-a-value-only-when-canonical)).
+Three differences from upstream remain. Lean's constructors revert on a word
+that is not canonical for the type, where upstream's keep the raw word. A
+`where` clause cannot name the builtin `Int`, a gap older than row 1, so
+upstream's `poly_int_defaulting` stops at its signature in Lean, where upstream
+reports the literal as ambiguous. And Lean generalizes a local lambda at its
+`let`, where upstream keeps a closure monomorphic and types its parameters from
+its calls, so a compound assignment on a parameter that neither the lambda's
+body nor a literal types, as in `lam(acc, step) { acc += step; return acc; }`,
+is rejected in Lean, as `acc + step` already was, and since step 8d so is a
+shift of such a parameter, as in `lam(x) { return x << 1; }` or
+`lam(x) { x <<= 1; return x; }`, and since step 9a an in-place `~` of one, as in
+`lam(x) { x ~=; return x; }`, all of which were `word` before ([upstream's
 semantics](integer-types-unchecked-shifts.md#upstreams-semantics-at-e2eef194)).
-In-place `~` at the types and the conversions between them and `word`
-(`uint256(0)`, `Typedef.abs`, `Typedef.rep`) are still rejected; numeric
-patterns at the other eleven types are rejected as upstream rejects them. The
-[decisions on resuming](integer-types-unchecked-shifts.md#decisions-on-resuming)
-choose one generalized fault-to-token law, carried as an instance argument, with
-one Core reason per panic code; and integer-typed values held as words, with
-typed operators.
+`Typedef.abs`, `Typedef.rep` and `case uint256(w)` are still rejected; `x.value`
+on the types and numeric patterns at the other eleven are rejected as upstream
+rejects them. The [decisions on
+resuming](integer-types-unchecked-shifts.md#decisions-on-resuming) choose one
+generalized fault-to-token law, carried as an instance argument, with one Core
+reason per panic code; and integer-typed values held as words, with typed
+operators.
 
 **Memory arrays, slices and their panics: probe and definitions.** Row 4 of
 the table above makes `T[]` a memory array in locals, parameters and returns,

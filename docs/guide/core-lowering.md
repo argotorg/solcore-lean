@@ -153,14 +153,17 @@ depends on the change.
     writes it: `execute` and `modified` take an optional last argument `wrap` (`none` by default),
     which `lower` sets to `placeWrap`, and `wrapLeaf` masks the leaf with `wordAnd` on an unsigned
     type or sign-extends it with `wordSignExtend` on a signed one. `<<=`'s leaf is wrapped too;
-    `>>=`'s needs no wrap. The profile leaves those targets out, so they are compiled but not
-    covered by the meaning proofs; inside it, `assignmentModifier_plain` gives back
-    `binaryOperator`'s modifier and `placeWrap_plain` no wrap. A `Word` target's `<<=` and `>>=`
-    stay inside it with an amount of its own type: the assignment head's `rightView` is an
-    `AssignedRhsView`, under which the right-hand side has the leaf's runtime type or is a
-    `ShiftAmountType` amount whose word the shift reads (`AssignedRhsView.rep`); the statement trees
-    take the right-hand side through `AssignedOperandTyped`, and the statement checkers decide the
-    view (`AssignedRhsView.decide?`). The [design
+    `>>=`'s needs no wrap. In-place `~` takes `placeWrap` too: at the narrower unsigned types it is
+    the type (`bitNotWrap`), and `modified`'s `~` branch masks Word's `~` with `wrapLeaf`. The
+    profile leaves those targets out, so they are compiled but not covered by the meaning proofs;
+    inside it, `assignmentModifier_plain` gives back `binaryOperator`'s modifier and
+    `placeWrap_plain` no wrap for a value assignment, and the bit-not heads' `targetPlain` gives
+    none for `~=` (`bitNotWrap_of_runtime`). A `Word` target's `<<=` and `>>=` stay inside it with
+    an amount of its own type: the assignment head's `rightView` is an `AssignedRhsView`, under
+    which the right-hand side has the leaf's runtime type or is a `ShiftAmountType` amount whose
+    word the shift reads (`AssignedRhsView.rep`); the statement trees take the right-hand side
+    through `AssignedOperandTyped`, and the statement checkers decide the view
+    (`AssignedRhsView.decide?`). The [design
     note](../design/integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs)
     says what bringing the fixed-width targets in takes, and [why the wrap belongs to the
     leaf](../design/integer-types-unchecked-shifts.md#row-1s-unchecked-compound-assignments-the-wrap-belongs-to-the-leaf).
@@ -179,6 +182,13 @@ depends on the change.
   one as a Core word test after `validateFixedIntegerLiteral`, and both pattern-leaf codes gain
   `LiteralCode.uint256` with its construction (`constructs_uint256` in `DataPatternLeaves`,
   `constructs_uint256_with_requirement` in `CompatiblePatternLeaves`).
+- **A new builtin function** (c8738e7ef, the conversions `uint256(w)`, `uintN(w)` and `intN(w)`). A
+  builtin that is not a closure stays out of `BuiltinFunctionId.all`, so no program's globals,
+  callable table or closure identities change, and the builtin-call branch of
+  `lowerExpressionWithPolicy` lowers it inline (`SourceCoreInteger.conversion`). The conversions
+  stay outside the proved subset: `BuiltinCalls.call_of_accepted` takes
+  `function.conversion? = none`, which its callers get from `builtinForm`, the supported syntax or a
+  receipt's catalog index (`conversion?_of_inventory`).
 - **A changed rule** (7ac75aea3, closures by value). Theorems whose statements mention the old
   premise are restated over the new one. Most changes were in `Owned/`, `CellAware/`, `OwnedStaged/`,
   `OwnedPrepared/`, `Callable/`, `Statements/`, `Generalized/`, `Selected/` and `Foundations/`.

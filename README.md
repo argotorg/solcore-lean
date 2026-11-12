@@ -109,10 +109,12 @@ of all 168 fixtures the frontend refused 8 of 1,057 such mutants, and 8,135 of
 the others' 8,889 compared steps agree. Five disagree because Sonatina O0's
 first allocation lies at `0x200` and Hull's and solc's at `0x80`, and two fail
 on Hull, whose memory range a store at `2^256 - 1` exceeds while solc's Yul
-removes the store; both are recorded findings. At the current pin, Sonatina O2
-also places its first allocation away from `0x80`, at `0x140`, and a
-fuzz-driver iteration over eight fixtures matched all 603 steps of its 147
-input, 27 sequence and 12 source mutants.
+removes the store; both are recorded findings. The fuzz driver counts both as
+known: the store by its symptom, and a mutant whose returned words differ by
+whole first allocations as a class. At the current pin, Sonatina O2 also places
+its first allocation away from `0x80`, at `0x140`, and a fuzz-driver iteration
+over eight fixtures matched all 603 steps of its 147 input, 27 sequence and 12
+source mutants.
 Generated differential comparisons use the separate runners below.
 
 Importing Rust Hull does not prove the Rust compiler correct or extend the
@@ -215,7 +217,9 @@ suites with advancing seeds and counts their findings in a signature registry.
 Upstream findings already recorded whose signatures are stable symptoms, such
 as known compiler crashes and rejections, count as known rather than new. So do
 the mismatches of a recorded semantic defect that fall in its mismatch class,
-such as Sonatina O0's other Words for loops that write std memory values.
+such as Sonatina O0's other Words for loops that write std memory values, or a
+fixture source mutant whose returned words differ by the paths' first
+allocations.
 An opt-in run kind also runs the pinned fixture comparison in mutation mode,
 a slice of the fixtures per iteration within per-fixture and per-run budgets.
 

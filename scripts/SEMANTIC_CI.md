@@ -306,15 +306,23 @@ state reports only what `questions.md` does not record. The same panic at
 another call site is new. A mismatch's signature is its reduced program, so a
 recorded semantic defect is listed as a class instead. A class names its
 backend, profile and stage, which paths disagree with which and their shapes,
-and a structural property of the final plan that the recorded reductions
-share. The first is Sonatina O0's on `runtime-memory-values`: the EVM path
+and a structural property that the recorded reductions share: of the final
+plan for a suite profile, of the paths' recorded observations for the
+fixtures. The first is Sonatina O0's on `runtime-memory-values`: the EVM path
 returns another Word than original Core and Hull, which agree, and the final
 plan has a single loop that observes a bytes value or slice and later slices
 or writes one. Its occurrences count under the class and are shown as known.
 At `e2eef194` neither this class nor the fixtures' O2 crash occurs any more;
-both stay registered.
-Every other mismatch keeps its program signature and is new, including the
-same pattern on O2 or Yul.
+both stay registered. The second is the fixtures'
+`offset-by-first-allocations`: a source mutant whose paths differ only in
+returned words, and disagree exactly where their first allocations differ
+(Hull and solc at `0x80`, Sonatina O2 at `0x140`, O0 at `0x200`). Each
+differing word is one multiple `k` of the path's first allocation,
+`0 < |k| ≤ 4`, plus one constant on every path. A finding counts under the
+class by its own observations, a duplicate's included. Every other mismatch
+keeps its program signature and is new, including the same pattern on O2 or
+Yul, and a source mutant whose words depend on the first allocations
+otherwise, such as a read of the pointer's slot one byte early.
 
 The driver exits with status 2 when the tools are not ready or another driver
 holds the state, 3 on an epoch change, 4 when the state reaches
@@ -355,17 +363,20 @@ with upstream's recorded expectations, never with original Core.
   steps compared in sequence and source mutants, and `sequences` and
   `sources` count those mutants.
 - Findings register with the backend `fixtures`. A compiler crash or a path
-  failure registers by its symptom, a path mismatch or an unmet expectation
-  by its fixture and reduced input, and a sequence finding by its fixture,
+  failure registers by its symptom, a path mismatch or an unmet expectation by
+  its fixture and reduced input, and a sequence finding by its fixture,
   operator and reduced sequence, or, unreduced, by its operator, step, change
   and committed mutant. A source mutant's `compile-mismatch` registers by its
   stage, paths and symptom, as a crash does, and its step finding by its
-  fixture, edit and reduced steps. The first examples keep the
-  fixture's result record and the command that replays that fixture alone.
-- The Sonatina O2 crash on `ignored-builtin-effects` and Hull's memory-range
-  failure on a source mutant's store at `2^256 - 1` that solc's Yul removes
-  are listed as known: they are counted but never new. The O2 crash no longer
-  occurs at `e2eef194`.
+  fixture, edit and reduced steps. A step finding in the first-allocation
+  class registers under the class instead. A duplicate outside the class of
+  the finding it repeats registers by its own edit and step. The first
+  examples keep the fixture's result record and the command that replays that
+  fixture alone.
+- The Sonatina O2 crash on `ignored-builtin-effects`, Hull's memory-range
+  failure on a source mutant's store at `2^256 - 1` that solc's Yul removes,
+  and the first-allocation class are listed as known: they are counted but
+  never new. The O2 crash no longer occurs at `e2eef194`.
 - Readiness also runs `semantic-fixtures.py --check`. The epoch adds the
   digest of what that check reports: the scripts, the compilers, the
   directive tools, the declaration and site extractors, the Lean runner,

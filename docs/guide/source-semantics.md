@@ -52,10 +52,10 @@ not the complement of success.
 | [Heap](../../Solcore/SourceSemantics/Dynamic/Heap.lean) | `Dynamic.Heap`, `Dynamic.Heap.Reads`, `Dynamic.Heap.Allocates`, `Dynamic.Heap.AllocatesCopy`, `Dynamic.EnvironmentCopies` |
 | [GeneralizedClosure](../../Solcore/SourceSemantics/Dynamic/GeneralizedClosure.lean), [Evidence](../../Solcore/SourceSemantics/Dynamic/Evidence.lean) | Generalized local closures (`Dynamic.GeneralizedClosure.instantiate`), evidence closure (`Dynamic.EvidenceCloses`) |
 | [Typing](../../Solcore/SourceSemantics/Dynamic/Typing.lean) | `Dynamic.ValueHasType`, `Dynamic.HeapWellTyped`, `Dynamic.EnvironmentAgrees`, with their allocation and copy lemmas |
-| [Primitive](../../Solcore/SourceSemantics/Dynamic/Primitive.lean) | `Dynamic.BinaryPrimitiveApplies`, `Dynamic.StrictBinaryOperator`, coercions, `Dynamic.PatternMatches`, literal values (`Dynamic.ResolvedIntegerLiteralConstructs`, where a literal at a fixed-width integer type needs the type's range, so its word is canonical, and a negative literal wraps at `word` and is exact at `integer`); `Dynamic.BinaryValueApplies` and `Dynamic.UnaryValueApplies`, which choose between the primitive meaning and `Dynamic.FixedBinaryApplies` or `Dynamic.FixedUnaryApplies` by the operand's static type; `Dynamic.BinaryValuePanics`, the primitive panics with the fixed-width overflow and zero divisor (`Dynamic.FixedBinaryPanics`). A new primitive operation goes here |
+| [Primitive](../../Solcore/SourceSemantics/Dynamic/Primitive.lean) | `Dynamic.BinaryPrimitiveApplies`, `Dynamic.StrictBinaryOperator`, coercions, `Dynamic.PatternMatches`, literal values (`Dynamic.ResolvedIntegerLiteralConstructs`, where a literal at a fixed-width integer type needs the type's range, so its word is canonical, and a negative literal wraps at `word` and is exact at `integer`); `Dynamic.BinaryValueApplies` and `Dynamic.UnaryValueApplies`, which choose between the primitive meaning and `Dynamic.FixedBinaryApplies` or `Dynamic.FixedUnaryApplies` by the operand's static type; `Dynamic.BinaryValuePanics`, the primitive panics with the fixed-width overflow and zero divisor (`Dynamic.FixedBinaryPanics`); `Dynamic.BuiltinApplies`, the builtin functions' meaning, under which a conversion keeps a word that is canonical for its type, and `Dynamic.BuiltinFaults`, a conversion's fault on any other word (`SemanticFault.dirtyHigherBitsForInteger`). A new primitive operation goes here |
 | [Place](../../Solcore/SourceSemantics/Dynamic/Place.lean) | `Dynamic.PlaceResolves`, `Dynamic.ProjectionsUpdate`, `Dynamic.PlaceAssignment` |
-| [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean) | Success: `Dynamic.ExpressionFormEvaluates`, `Dynamic.StatementExecutes`, `Dynamic.CallableApplies`, `Dynamic.AssignmentValueApplies`, which `Dynamic.CompoundAssignmentApplies` applies at the target's static type |
-| [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean) | Faults: `Dynamic.ExpressionFormFaults`, `Dynamic.StatementFaults`, `Dynamic.CallableFaults`, and the invalid-operand relations (`Dynamic.WordBinaryOperator`, `Dynamic.AssignmentOperatorBinary`) |
+| [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean) | Success: `Dynamic.ExpressionFormEvaluates`, `Dynamic.StatementExecutes`, `Dynamic.CallableApplies`, `Dynamic.AssignmentValueApplies`, which `Dynamic.CompoundAssignmentApplies` applies at the target's static type, and `Dynamic.BitNotAssignmentApplies`, in-place `~` at the target's static type |
+| [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean) | Faults: `Dynamic.ExpressionFormFaults`, `Dynamic.StatementFaults`, `Dynamic.CallableFaults` (`builtinFaults` for a conversion of a word that is not canonical), and the invalid-operand relations (`Dynamic.WordBinaryOperator`, `Dynamic.AssignmentOperatorBinary`) |
 | [Control](../../Solcore/SourceSemantics/Dynamic/Control.lean), [Preservation](../../Solcore/SourceSemantics/Dynamic/Preservation.lean) | Control outcomes against static summaries (`TypingControlShape`); the statement `Dynamic.WholeLanguagePreservation`, `Dynamic.SourceRuntimeValid`, and the cases that need no recursion, such as `Dynamic.BinaryPrimitiveApplies.preserves` |
 | [WholeLanguagePreservation](../../Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean) | One mutual block of private cases (`preserveFormRec`, `preserveBinaryRec`, `preserveStatementRec`, …) and `ProgramWellFormed.wholeLanguagePreservation` |
 | [Program](../../Solcore/SourceSemantics/Dynamic/Program.lean) | `Dynamic.ProgramEvaluates`, `Dynamic.ProgramOutcome`, `Dynamic.ProgramEvaluates.preserves` |
@@ -203,7 +203,9 @@ may, needs no new statement either. A compound form whose operand has its own ty
    `CompoundAssignmentApplies` takes `FixedBinaryApplies` at a fixed-width target for the operators
    of `FixedCheckedCompound` (`+= -= *= /= %=`, checked or unchecked, and `<<=` and `>>=`) and
    `AssignmentValueApplies` elsewhere, and `AssignmentOperandsPanic` applies `BinaryValuePanics` at
-   that type.
+   that type. In-place `~` reads the target's static type too: `BitNotAssignmentApplies` takes
+   `FixedUnaryApplies` at the narrower unsigned types and `BitNotSnapshot`, Word's or Integer's `~`,
+   elsewhere, and `eq_of_plain` gives back `BitNotSnapshot` away from those types.
 3. **Preservation**: `PrimitiveBinaryHasType` and its cases in
    `PrimitiveBinaryHasType.sourceTyping`, `BinaryPrimitiveApplies.preserves` and
    `AssignmentValueApplies.wordCompoundPreserves`, which `CompoundAssignmentApplies.preserves`
@@ -213,8 +215,9 @@ may, needs no new statement either. A compound form whose operand has its own ty
    fixed-width type's range, as for checked and unchecked `+ - * / %`, for the shifts on the twelve
    types and for `~` on the narrower unsigned types, the proof needs the looked-up type to be the
    operand's typed type (`BinaryValueApplies.preserves_checked`, `preserves_division`,
-   `preserves_unchecked` and `preserves_shift`, `UnaryValueApplies.preserves_narrow`);
-   `Dynamic.operandType?_of_typing` gives it from the source's unique node occurrences.
+   `preserves_unchecked` and `preserves_shift`, `UnaryValueApplies.preserves_narrow`, and
+   `BitNotAssignmentApplies.preserves_target` for in-place `~`); `Dynamic.operandType?_of_typing`
+   gives it from the source's unique node occurrences.
 4. **Substitution and staging**: `StructuralSubstitution.BinaryOperatorHasType.applyParameters`,
    `BinaryOperatorHasType.result_type_admissible_of_left`, which gives `result_type_admissible`, and
    `FlexibleSubstitution.BinaryOperatorHasType.applySubstitution` in `StructuralLaws`; the

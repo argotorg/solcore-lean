@@ -175,9 +175,10 @@ The public API in [`Frontend/SourceCompiler.lean`](../../Solcore/Frontend/Source
 which re-exports `SourceCoreExecution`, did not change for shifts, nor did the checker
 `checkProgram` ([`Frontend/ProgramChecking.lean`](../../Solcore/Frontend/ProgramChecking.lean)).
 They change when callers see new values, errors or behaviour: `unchecked` blocks added the load
-error `ProgramLoadError.uncheckedBlock`, panics the diagnostic `RuntimeError.panic`, and the twelve
-integer types the error `nonCanonicalSourceValue`, which every public encoder raises for an argument
-that is not canonical for its type.
+error `ProgramLoadError.uncheckedBlock`, panics the diagnostic `RuntimeError.panic`, the conversions
+the diagnostic `RuntimeError.dirtyHigherBitsForInteger` with upstream's revert data `0x6cc54a63`,
+and the twelve integer types the error `nonCanonicalSourceValue`, which every public encoder raises
+for an argument that is not canonical for its type.
 
 ### Tests
 
