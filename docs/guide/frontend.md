@@ -285,11 +285,12 @@ Worked examples: 7aa1d539d (the re-pin to `e2eef194`) and 32b38d908 (larger nest
 - **Inference proofs number their cases.** They do functional induction on `inferExprFuel` and name
   its cases by number, in `SourceInference/Internal` and `SourceSemantics/Internal`. A new arm in
   `inferExprFuel`, or a new syntax constructor it matches on, shifts them (a constructor that only
-  reaches the last arm, as `new T[](n)` does, shifts nothing). This is why `unchecked` is a pass
-  around the parser. Pattern proofs do the same with `inferMatchPatternFlatFuel.induct`:
-  the arm of `case uint256(p)` (8708ef657) shifted its later cases in `ExpressionProperties`,
-  `Privacy/Active`, `Privacy/ProtectedFrames`, `Privacy/SelectedCalls`,
-  `Inference/ExpressionLedgers`, `Formation/NormalizedMatches` and `Selected/PatternMonomorphism`.
+  reaches the last arm, as `new T[](n)` and the slices do, shifts nothing). This is why
+  `unchecked` is a pass around the parser. Pattern proofs do the same with
+  `inferMatchPatternFlatFuel.induct`: the arm of `case uint256(p)` (8708ef657) shifted its later
+  cases in `ExpressionProperties`, `Privacy/Active`, `Privacy/ProtectedFrames`,
+  `Privacy/SelectedCalls`, `Inference/ExpressionLedgers`, `Formation/NormalizedMatches` and
+  `Selected/PatternMonomorphism`.
 - **The compiler imports the inference proofs.** `ProgramChecking` imports the `SourceInference`
   umbrella, which imports five proof files, so a broken inference proof stops the compiler build.
 - **Files kept apart on purpose.** The layout refactor kept these apart, for these reasons:

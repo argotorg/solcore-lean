@@ -182,11 +182,11 @@ These rest on three contracts, which a new construct extends:
 ## Making changes
 
 Four language changes have reached Syntax since the parser was built: shifts and row 4's array
-syntax (`T[]` and `new T[](n)`) went through the grammar and its proofs, `unchecked` blocks went
-around the parser, and unary minus took both routes. The commits for shifts and `unchecked` blocks
-name the paths from before the layout refactor; [Conventions](conventions.md#following-older-notes)
-says how to map them. [Adding a language feature](adding-a-feature.md) follows a change through
-every layer.
+syntax (`T[]`, `new T[](n)` and the slices) went through the grammar and its proofs, `unchecked`
+blocks went around the parser, and unary minus took both routes. The commits for shifts and
+`unchecked` blocks name the paths from before the layout refactor;
+[Conventions](conventions.md#following-older-notes) says how to map them.
+[Adding a language feature](adding-a-feature.md) follows a change through every layer.
 
 ### An operator, or a spelling made of existing tokens
 
@@ -241,13 +241,16 @@ Row 1's unary minus (53bb5d5a8) took both routes:
 
 ### A new expression, statement or declaration form
 
-Two commits since the parser was built have added a form, both for row 4's arrays: 7a76a1fb8 the
-type form `T[]` (`TypeExprValue.array`) and df10f3f11 the expression form `new T[](n)`
-(`ExprValue.newArray`, with the contextual keyword `new`). Each came after a commit that prepared
-its grammar and proofs without accepting new syntax: 8e2507095 split the type grammar into a base
-form and its suffixes, and 1f3f02fa7 added the head `new T[](` with its lemmas before any atom
-reached it. Their parser proofs are the type and atom layers' own, in `Parser/Internal`, in place
-of a declaration's lemma family. No statement or declaration form has been added, so for those this
+Three commits since the parser was built have added a form, all for row 4's arrays: 7a76a1fb8 the
+type form `T[]` (`TypeExprValue.array`), df10f3f11 the expression form `new T[](n)`
+(`ExprValue.newArray`, with the contextual keyword `new`) and fd61c0fdc the slices `a[s:e]`,
+`a[s:]`, `a[:e]` and `a[:]` (`ExprValue.slice`, with `a[]` rejected). Each came after commits that
+prepared its grammar and proofs without accepting new syntax: 8e2507095 split the type grammar
+into a base form and its suffixes, 1f3f02fa7 added the head `new T[](` with its lemmas before any
+atom reached it, and 4d6437fe7 gave what a `[` after an expression holds its own layer
+(`BracketContents`), whose optional bound 709281679 added before any bracket read it. Their parser
+proofs are the type, atom and bracket layers' own, in `Parser/Internal`, in place of a
+declaration's lemma family. No statement or declaration form has been added, so for those this
 order follows the structure of the code.
 
 1. **Tokens**, only if no spelling from existing tokens works: a `Symbol`, `HardKeyword` or
