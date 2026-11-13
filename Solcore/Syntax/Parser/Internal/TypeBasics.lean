@@ -1381,12 +1381,533 @@ end Solcore.Syntax.Parser
 end
 
 section
+/-! The array suffix parser's contracts: a run never rejects, changes only the
+cursor and the diagnostics, keeps source validity, and starts where its element
+starts. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.Parser
+
+namespace TypeArrayInternals
+
+/-- A found `]` is the first from `index` on, inside the window. -/
+theorem closingBracket?_eq_some {tokens : Array Token} {endIndex : Nat} :
+    ∀ {fuel index closing : Nat} {token : Token},
+      closingBracket? tokens endIndex fuel index = some (closing, token) →
+      index ≤ closing ∧ closing < endIndex ∧ tokens[closing]? = some token ∧
+        token.value = .symbol .rightBracket ∧
+        ∀ position, index ≤ position → position < closing →
+          DeclarativeGrammar.TokenKindAbsentAt tokens endIndex position
+            (.symbol .rightBracket) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro index closing token found
+      simp [closingBracket?] at found
+  | succ fuel ih =>
+      intro index closing token found
+      unfold closingBracket? at found
+      split at found
+      next inside =>
+        split at found
+        next current currentFound =>
+          split at found
+          next isClosing =>
+            cases found
+            exact ⟨Nat.le_refl _, inside, currentFound, isClosing,
+              fun position atLeast before => absurd before (Nat.not_lt.mpr atLeast)⟩
+          next notClosing =>
+            rcases ih found with ⟨after, bound, closingFound, closingKind, absent⟩
+            refine ⟨by omega, bound, closingFound, closingKind, ?_⟩
+            intro position atLeast before
+            rcases Nat.eq_or_lt_of_le atLeast with same | later
+            · subst same
+              rintro ⟨span, _, positionFound⟩
+              rw [currentFound] at positionFound
+              cases positionFound
+              exact notClosing rfl
+            · exact absent position later before
+        next => cases found
+      next => cases found
+
+/-- With fuel for the rest of the window, no `]` is found only where none is. -/
+theorem closingBracket?_eq_none {tokens : Array Token} {endIndex : Nat} :
+    ∀ {fuel index : Nat}, endIndex ≤ index + fuel →
+      closingBracket? tokens endIndex fuel index = none →
+      ∀ position, index ≤ position → position < endIndex →
+        DeclarativeGrammar.TokenKindAbsentAt tokens endIndex position
+          (.symbol .rightBracket) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro index adequate _ position atLeast before
+      exact absurd before (by omega)
+  | succ fuel ih =>
+      intro index adequate missing position atLeast before
+      unfold closingBracket? at missing
+      split at missing
+      next inside =>
+        split at missing
+        next current currentFound =>
+          split at missing
+          next => cases missing
+          next notClosing =>
+            rcases Nat.eq_or_lt_of_le atLeast with same | later
+            · subst same
+              rintro ⟨span, _, positionFound⟩
+              rw [currentFound] at positionFound
+              cases positionFound
+              exact notClosing rfl
+            · exact ih (by omega) missing position later before
+        next currentMissing =>
+          rintro ⟨span, _, positionFound⟩
+          have sizeLe := Array.getElem?_eq_none_iff.mp currentMissing
+          have positionMissing : tokens[position]? = none :=
+            Array.getElem?_eq_none (by omega)
+          rw [positionMissing] at positionFound
+          cases positionFound
+      next => exact absurd before (by omega)
+
+/-- A suffix at the cursor: its `[` there, and the first `]` after it. -/
+theorem suffixAt?_eq_some {input : State} {opening closingToken : Token}
+    {closing : Nat} (found : suffixAt? input = some (opening, closing, closingToken)) :
+    input.peek? = some opening ∧ opening.value = .symbol .leftBracket ∧
+      input.cursor + 1 ≤ closing ∧ closing < input.window.endIndex ∧
+      input.tokens[closing]? = some closingToken ∧
+      closingToken.value = .symbol .rightBracket ∧
+      ∀ position, input.cursor + 1 ≤ position → position < closing →
+        DeclarativeGrammar.TokenKindAbsentAt input.tokens input.window.endIndex
+          position (.symbol .rightBracket) := by
+  unfold suffixAt? at found
+  split at found
+  next current currentFound =>
+    split at found
+    next isOpening =>
+      cases closingResult : closingBracket? input.tokens input.window.endIndex
+          input.remainingCount (input.cursor + 1) with
+      | none =>
+          rw [closingResult] at found
+          cases found
+      | some pair =>
+          obtain ⟨closingIndex, token⟩ := pair
+          rw [closingResult] at found
+          simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at found
+          rcases found with ⟨rfl, rfl, rfl⟩
+          rcases closingBracket?_eq_some closingResult with
+            ⟨after, bound, closingFound, closingKind, absent⟩
+          exact ⟨currentFound, isOpening, after, bound, closingFound, closingKind, absent⟩
+    next => cases found
+  next => cases found
+
+/-- The state after a suffix moves past its `]` and may add one diagnostic. -/
+theorem afterSuffix_frame (state : State) (opening : Token) (closing : Nat)
+    (closingToken : Token) :
+    ∃ extra, afterSuffix state opening closing closingToken =
+      { state with cursor := closing + 1, diagnosticsRev := extra ++ state.diagnosticsRev } := by
+  unfold afterSuffix
+  split
+  · exact ⟨[], rfl⟩
+  · exact ⟨[_], rfl⟩
+
+/-- The end of a run adds at most one diagnostic. -/
+theorem finishArraySuffixes_frame (count : Nat) (result : TypeExpr) (state : State) :
+    ∃ extra, finishArraySuffixes count result state =
+      .ok result { state with diagnosticsRev := extra ++ state.diagnosticsRev } := by
+  simp only [finishArraySuffixes]
+  split
+  · exact ⟨[_], rfl⟩
+  · exact ⟨[], rfl⟩
+
+end TypeArrayInternals
+
+open TypeArrayInternals
+
+/-- A successful run changes only the cursor, forwards, and adds diagnostics. -/
+theorem arraySuffixes_ok_frame : ∀ fuel count element {input : State}
+    {value : TypeExpr} {next : State},
+    arraySuffixes fuel count element input = .ok value next →
+    ∃ cursor extra, next =
+      { input with cursor := cursor, diagnosticsRev := extra ++ input.diagnosticsRev } ∧
+      input.cursor ≤ cursor := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro count element input value next result
+      simp [arraySuffixes] at result
+  | succ fuel ih =>
+      intro count element input value next result
+      simp only [arraySuffixes] at result
+      split at result
+      next opening closing closingToken found =>
+        rcases suffixAt?_eq_some found with ⟨_, _, after, _⟩
+        rcases afterSuffix_frame input opening closing closingToken with ⟨first, afterEq⟩
+        rw [afterEq] at result
+        rcases ih (count + 1) _ result with ⟨cursor, extra, nextEq, moved⟩
+        subst nextEq
+        refine ⟨cursor, extra ++ first, ?_, ?_⟩
+        · rw [List.append_assoc]
+        · change closing + 1 ≤ cursor at moved
+          omega
+      next =>
+        rcases finishArraySuffixes_frame count element input with ⟨extra, finishEq⟩
+        rw [finishEq] at result
+        cases result
+        exact ⟨input.cursor, extra, rfl, Nat.le_refl _⟩
+
+/-- With fuel for every token left, a run of suffixes succeeds. -/
+theorem arraySuffixes_ok_of_remainingCount_lt : ∀ fuel count element (input : State),
+    input.remainingCount < fuel →
+      ∃ value next, arraySuffixes fuel count element input = .ok value next := by
+  intro fuel
+  induction fuel with
+  | zero => intro _ _ _ adequate; omega
+  | succ fuel ih =>
+      intro count element input adequate
+      simp only [arraySuffixes]
+      split
+      next opening closing closingToken found =>
+        rcases suffixAt?_eq_some found with ⟨_, _, after, bound, _⟩
+        rcases afterSuffix_frame input opening closing closingToken with ⟨extra, afterEq⟩
+        apply ih
+        rw [afterEq]
+        simp only [State.remainingCount] at adequate ⊢
+        omega
+      next =>
+        rcases finishArraySuffixes_frame count element input with ⟨extra, finishEq⟩
+        exact ⟨_, _, finishEq⟩
+
+/-- A run of suffixes starts where its element starts. -/
+theorem arraySuffixes_ok_start : ∀ fuel count element {input : State}
+    {value : TypeExpr} {next : State},
+    arraySuffixes fuel count element input = .ok value next →
+    value.span.startByte = element.span.startByte := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro count element input value next result
+      simp [arraySuffixes] at result
+  | succ fuel ih =>
+      intro count element input value next result
+      simp only [arraySuffixes] at result
+      split at result
+      next => exact (ih _ _ result :)
+      next =>
+        rcases finishArraySuffixes_frame count element input with ⟨extra, finishEq⟩
+        rw [finishEq] at result
+        cases result
+        rfl
+
+/-- A run of suffixes keeps validity, given a valid element that starts at or
+before the cursor. -/
+theorem arraySuffixes_validFor : ∀ fuel count element (input : State),
+    input.ValidFor → TypeExpr.ValidFor input.file element →
+    (∃ index token, index ≤ input.cursor ∧ input.tokens[index]? = some token ∧
+      token.span.startByte = element.span.startByte) →
+    (arraySuffixes fuel count element input).ValidFor input TypeExpr.ValidFor := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro count element input _ _ _
+      simp [arraySuffixes, Reply.ValidFor]
+  | succ fuel ih =>
+      intro count element input inputValid elementValid elementStart
+      rcases elementStart with ⟨index, startToken, indexLe, startFound, startEq⟩
+      simp only [arraySuffixes]
+      split
+      next opening closing closingToken found =>
+        rcases suffixAt?_eq_some found with
+          ⟨openingFound, _, after, bound, closingFound, _, _⟩
+        have openingAt := State.getElem?_eq_some_of_peek?_eq_some openingFound
+        have openingValid := inputValid.peek?_span_validFor openingFound
+        have closingValid :=
+          inputValid.token_span_validFor_of_getElem?_eq_some closingFound
+        have openingBefore := inputValid.token_end_le_token_start_of_getElem?_lt
+          openingAt closingFound (by omega)
+        have openingNonempty :=
+          inputValid.token_span_nonempty_of_getElem?_eq_some openingAt
+        have closingNonempty :=
+          inputValid.token_span_nonempty_of_getElem?_eq_some closingFound
+        have bracketsValid :
+            (SourceSpan.cover opening.span closingToken.span).ValidFor input.file :=
+          SourceSpan.cover_validFor openingValid closingValid (by omega)
+        have elementBefore : element.span.startByte ≤ closingToken.span.endByte := by
+          have startBefore := inputValid.token_end_le_token_start_of_getElem?_lt
+            startFound closingFound (by omega)
+          have startNonempty :=
+            inputValid.token_span_nonempty_of_getElem?_eq_some startFound
+          omega
+        have arrayValid : TypeExpr.ValidFor input.file
+            (TypeExpr.arrayOf element opening.span closingToken.span) :=
+          .array (SourceSpan.cover_validFor elementValid.span_valid closingValid
+            elementBefore) bracketsValid elementValid
+        have movedValid : ({ input with cursor := closing + 1 } : State).ValidFor :=
+          { inputValid with cursor_le_endIndex := bound }
+        have nextValid : (afterSuffix input opening closing closingToken).ValidFor := by
+          unfold afterSuffix
+          split
+          · exact movedValid
+          · exact movedValid.emit_validFor _ bracketsValid
+        rcases afterSuffix_frame input opening closing closingToken with ⟨extra, afterEq⟩
+        have rest := ih (count + 1) (TypeExpr.arrayOf element opening.span closingToken.span)
+          (afterSuffix input opening closing closingToken)
+          nextValid (by rw [afterEq]; exact arrayValid)
+          ⟨index, startToken, by rw [afterEq]; show index ≤ closing + 1; omega,
+            by rw [afterEq]; exact startFound, startEq⟩
+        exact rest.of_file_eq (by rw [afterEq])
+      next =>
+        simp only [finishArraySuffixes]
+        split
+        · exact ⟨elementValid, inputValid.emit_validFor _ elementValid.span_valid, rfl⟩
+        · exact ⟨elementValid, inputValid, rfl⟩
+
+/-- A bind runs its first parser, then the continuation on success. -/
+theorem bind_apply_cases {α β : Type} (first : Parser α) (next : α → Parser β)
+    (input : State) :
+    (first >>= next) input =
+      match first input with
+      | .ok value after => next value after
+      | .reject failure rejected => .reject failure rejected
+      | .invariant error => .invariant error := rfl
+
+/-- One positive-fuel layer: a base form, then its suffixes. -/
+theorem typeExprWithFuel_succ_eq (fuel : Nat) :
+    typeExprWithFuel (fuel + 1) =
+      typeExprBase (typeExprWithFuel fuel) >>= typeArraySuffixes := rfl
+
+/-- The suffixes after a base type always succeed. -/
+theorem typeArraySuffixes_ok (element : TypeExpr) (input : State) :
+    ∃ value next, typeArraySuffixes element input = .ok value next :=
+  arraySuffixes_ok_of_remainingCount_lt _ 0 element input (Nat.lt_succ_self _)
+
+/-- A successful type is a successful base form, then its suffixes. -/
+theorem typeExprWithFuel_succ_ok {fuel : Nat} {input next : State} {value : TypeExpr}
+    (result : typeExprWithFuel (fuel + 1) input = .ok value next) :
+    ∃ base afterBase, typeExprBase (typeExprWithFuel fuel) input = .ok base afterBase ∧
+      typeArraySuffixes base afterBase = .ok value next := by
+  rw [typeExprWithFuel_succ_eq, bind_apply_cases] at result
+  split at result
+  next base afterBase baseResult => exact ⟨base, afterBase, baseResult, result⟩
+  next => cases result
+  next => cases result
+
+/-- A type rejects exactly where its base form rejects: suffixes never reject. -/
+theorem typeExprWithFuel_succ_reject {fuel : Nat} {input rejected : State}
+    {failure : Failure}
+    (result : typeExprWithFuel (fuel + 1) input = .reject failure rejected) :
+    typeExprBase (typeExprWithFuel fuel) input = .reject failure rejected := by
+  rw [typeExprWithFuel_succ_eq, bind_apply_cases] at result
+  split at result
+  next base afterBase _ =>
+    rcases typeArraySuffixes_ok base afterBase with ⟨value, next, suffixesResult⟩
+    rw [suffixesResult] at result
+    cases result
+  next baseFailure baseRejected baseResult =>
+    rw [baseResult]
+    exact result
+  next => cases result
+
+/-- A base form's rejection is its layer's. -/
+theorem typeExprWithFuel_succ_reject_of_base {fuel : Nat} {input rejected : State}
+    {failure : Failure}
+    (result : typeExprBase (typeExprWithFuel fuel) input = .reject failure rejected) :
+    typeExprWithFuel (fuel + 1) input = .reject failure rejected := by
+  rw [typeExprWithFuel_succ_eq, bind_apply_cases, result]
+
+/-- A type's layer has an ordinary reply wherever its base form has one. -/
+theorem typeExprWithFuel_succ_ordinary_of_base {fuel : Nat} {input : State}
+    (base : (∃ value next, typeExprBase (typeExprWithFuel fuel) input = .ok value next) ∨
+      (∃ failure next, typeExprBase (typeExprWithFuel fuel) input = .reject failure next)) :
+    (∃ value next, typeExprWithFuel (fuel + 1) input = .ok value next) ∨
+      (∃ failure next, typeExprWithFuel (fuel + 1) input = .reject failure next) := by
+  rw [typeExprWithFuel_succ_eq, bind_apply_cases]
+  rcases base with ⟨value, next, baseResult⟩ | ⟨failure, next, baseResult⟩
+  · rw [baseResult]
+    exact .inl (typeArraySuffixes_ok value next)
+  · rw [baseResult]
+    exact .inr ⟨failure, next, rfl⟩
+
+/-- Where no `[` is at the cursor, the suffixes add nothing. -/
+theorem typeArraySuffixes_eq_of_absent {element : TypeExpr} {input : State}
+    (bracketAbsent : DeclarativeGrammar.TokenKindAbsentAt input.tokens
+      input.window.endIndex input.cursor (.symbol .leftBracket)) :
+    typeArraySuffixes element input = .ok element input := by
+  have missing : suffixAt? input = none := by
+    unfold suffixAt?
+    cases found : input.peek? with
+    | none => rfl
+    | some opening =>
+        have notOpening : ¬ opening.value = .symbol .leftBracket := by
+          intro isOpening
+          apply bracketAbsent
+          refine ⟨opening.span, ?_⟩
+          rw [← isOpening]
+          exact tokenAt_of_peek?_eq_some found
+        simp only [notOpening, ↓reduceIte]
+  unfold typeArraySuffixes
+  simp only [arraySuffixes, missing, finishArraySuffixes, Nat.not_lt_zero, ↓reduceIte]
+
+/-- A base form with no `[` after it is the whole type. -/
+theorem typeExprWithFuel_succ_eq_of_base {fuel : Nat} {input next : State}
+    {value : TypeExpr}
+    (base : typeExprBase (typeExprWithFuel fuel) input = .ok value next)
+    (bracketAbsent : DeclarativeGrammar.TokenKindAbsentAt next.tokens
+      next.window.endIndex next.cursor (.symbol .leftBracket)) :
+    typeExprWithFuel (fuel + 1) input = .ok value next := by
+  rw [typeExprWithFuel_succ_eq, bind_apply_cases, base]
+  exact typeArraySuffixes_eq_of_absent bracketAbsent
+
+/-- The suffixes after a base type keep the token window. -/
+theorem typeArraySuffixes_preservesTokenWindow (element : TypeExpr) :
+    Parser.PreservesTokenWindow (typeArraySuffixes element) := by
+  intro input
+  rcases typeArraySuffixes_ok element input with ⟨value, next, result⟩
+  rcases arraySuffixes_ok_frame _ _ _ result with ⟨cursor, extra, nextEq, _⟩
+  rw [result]
+  subst nextEq
+  exact ⟨rfl, rfl⟩
+
+/-- The suffixes after a base type never move the cursor back. -/
+theorem typeArraySuffixes_cursorMonotoneOnSuccess (element : TypeExpr) :
+    Parser.CursorMonotoneOnSuccess (typeArraySuffixes element) := by
+  intro input value next result
+  rcases arraySuffixes_ok_frame _ _ _ result with ⟨cursor, extra, nextEq, moved⟩
+  subst nextEq
+  exact moved
+
+end Solcore.Syntax.Parser
+end
+
+section
 -- leanmerge: from Solcore.Syntax.Parser.TypeRecursiveProperties
 /-! Fuel-inductive contracts for the complete recursive type parser. -/
 
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
+
+/-- The base dispatch keeps the contracts its nested parser keeps. -/
+private theorem typeExprBase_contracts (nested : Parser TypeExpr)
+    (nestedValid : nested.ValidFor TypeExpr.ValidFor)
+    (nestedWindow : Parser.PreservesTokenWindow nested)
+    (nestedTokens : Parser.PreservesTokensOnSuccess nested)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
+    (nestedStarts : Parser.StartsAtCurrentTokenOnSuccess nested (·.span)) :
+    (typeExprBase nested).ValidFor TypeExpr.ValidFor ∧
+    Parser.PreservesTokenWindow (typeExprBase nested) ∧
+    Parser.PreservesTokensOnSuccess (typeExprBase nested) ∧
+    Parser.CursorMonotoneOnSuccess (typeExprBase nested) ∧
+    Parser.StartsAtCurrentTokenOnSuccess (typeExprBase nested) (·.span) := by
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · intro input inputValid
+    simp only [typeExprBase]
+    split
+    · exact parseFunctionType_validFor nested
+        nestedValid nestedTokens input inputValid
+    · split
+      · exact parseComptimeType_validFor nested
+          nestedValid nestedStarts nestedTokens nestedCursor input inputValid
+      · split
+        · exact parseMappingType_validFor nested
+            nestedValid nestedStarts nestedTokens nestedCursor input inputValid
+        · split
+          · exact parseProxyType_validFor nested
+              nestedValid nestedStarts input inputValid
+          · split
+            · exact parseTupleType_validFor nested
+                nestedValid nestedTokens input inputValid
+            · split
+              · exact parseNamedType_validFor nested
+                  nestedValid nestedTokens input inputValid
+              · unfold rejectAt Reply.ValidFor
+                exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+  · intro input
+    simp only [typeExprBase]
+    split
+    · exact parseFunctionType_preservesTokenWindow
+        nested nestedWindow input
+    · split
+      · exact parseComptimeType_preservesTokenWindow
+          nested nestedWindow input
+      · split
+        · exact parseMappingType_preservesTokenWindow
+            nested nestedWindow input
+        · split
+          · exact parseProxyType_preservesTokenWindow
+              nested nestedWindow input
+          · split
+            · exact parseTupleType_preservesTokenWindow
+                nested nestedWindow input
+            · split
+              · exact parseNamedType_preservesTokenWindow
+                  nested nestedWindow input
+              · exact rejectAt_preservesTokenWindow input _ _
+  · intro input value next result
+    simp only [typeExprBase] at result
+    split at result
+    · exact parseFunctionType_preservesTokensOnSuccess
+        nested nestedTokens input value next result
+    · split at result
+      · exact parseComptimeType_preservesTokensOnSuccess
+          nested nestedTokens input value next result
+      · split at result
+        · exact parseMappingType_preservesTokensOnSuccess
+            nested nestedTokens input value next result
+        · split at result
+          · exact parseProxyType_preservesTokensOnSuccess
+              nested nestedTokens input value next result
+          · split at result
+            · exact parseTupleType_preservesTokensOnSuccess
+                nested nestedTokens input value next result
+            · split at result
+              · exact parseNamedType_preservesTokensOnSuccess
+                  nested nestedTokens input value next result
+              · unfold rejectAt at result
+                contradiction
+  · intro input value next result
+    simp only [typeExprBase] at result
+    split at result
+    · exact parseFunctionType_cursorMonotoneOnSuccess
+        nested input value next result
+    · split at result
+      · exact parseComptimeType_cursorMonotoneOnSuccess
+          nested nestedCursor input value next result
+      · split at result
+        · exact parseMappingType_cursorMonotoneOnSuccess
+            nested nestedCursor input value next result
+        · split at result
+          · exact parseProxyType_cursorMonotoneOnSuccess
+              nested nestedCursor input value next result
+          · split at result
+            · exact parseTupleType_cursorMonotoneOnSuccess
+                nested input value next result
+            · split at result
+              · exact parseNamedType_cursorMonotoneOnSuccess
+                  nested input value next result
+              · unfold rejectAt at result
+                contradiction
+  · intro input value next result
+    simp only [typeExprBase] at result
+    split at result
+    · exact parseFunctionType_startsAtCurrentTokenOnSuccess
+        nested input value next result
+    · split at result
+      · exact parseComptimeType_startsAtCurrentTokenOnSuccess
+          nested input value next result
+      · split at result
+        · exact parseMappingType_startsAtCurrentTokenOnSuccess
+            nested input value next result
+        · split at result
+          · exact parseProxyType_startsAtCurrentTokenOnSuccess
+              nested input value next result
+          · split at result
+            · exact parseTupleType_startsAtCurrentTokenOnSuccess
+                nested input value next result
+            · split at result
+              · exact parseNamedType_startsAtCurrentTokenOnSuccess
+                  nested input value next result
+              · unfold rejectAt at result
+                contradiction
 
 private theorem typeExprWithFuel_contracts : ∀ fuel,
     (typeExprWithFuel fuel).ValidFor TypeExpr.ValidFor ∧
@@ -1412,116 +1933,39 @@ private theorem typeExprWithFuel_contracts : ∀ fuel,
   | succ fuel inductionHypothesis =>
       rcases inductionHypothesis with
         ⟨nestedValid, nestedWindow, nestedTokens, nestedCursor, nestedStarts⟩
+      rcases typeExprBase_contracts (typeExprWithFuel fuel) nestedValid nestedWindow
+          nestedTokens nestedCursor nestedStarts with
+        ⟨baseValid, baseWindow, baseTokens, baseCursor, baseStarts⟩
       refine ⟨?_, ?_, ?_, ?_, ?_⟩
       · intro input inputValid
-        simp only [typeExprWithFuel]
-        split
-        · exact parseFunctionType_validFor (typeExprWithFuel fuel)
-            nestedValid nestedTokens input inputValid
-        · split
-          · exact parseComptimeType_validFor (typeExprWithFuel fuel)
-              nestedValid nestedStarts nestedTokens nestedCursor input inputValid
-          · split
-            · exact parseMappingType_validFor (typeExprWithFuel fuel)
-                nestedValid nestedStarts nestedTokens nestedCursor input inputValid
-            · split
-              · exact parseProxyType_validFor (typeExprWithFuel fuel)
-                  nestedValid nestedStarts input inputValid
-              · split
-                · exact parseTupleType_validFor (typeExprWithFuel fuel)
-                    nestedValid nestedTokens input inputValid
-                · split
-                  · exact parseNamedType_validFor (typeExprWithFuel fuel)
-                      nestedValid nestedTokens input inputValid
-                  · unfold rejectAt Reply.ValidFor
-                    exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
-      · intro input
-        simp only [typeExprWithFuel]
-        split
-        · exact parseFunctionType_preservesTokenWindow
-            (typeExprWithFuel fuel) nestedWindow input
-        · split
-          · exact parseComptimeType_preservesTokenWindow
-              (typeExprWithFuel fuel) nestedWindow input
-          · split
-            · exact parseMappingType_preservesTokenWindow
-                (typeExprWithFuel fuel) nestedWindow input
-            · split
-              · exact parseProxyType_preservesTokenWindow
-                  (typeExprWithFuel fuel) nestedWindow input
-              · split
-                · exact parseTupleType_preservesTokenWindow
-                    (typeExprWithFuel fuel) nestedWindow input
-                · split
-                  · exact parseNamedType_preservesTokenWindow
-                      (typeExprWithFuel fuel) nestedWindow input
-                  · exact rejectAt_preservesTokenWindow input _ _
-      · intro input value next result
-        simp only [typeExprWithFuel] at result
-        split at result
-        · exact parseFunctionType_preservesTokensOnSuccess
-            (typeExprWithFuel fuel) nestedTokens input value next result
-        · split at result
-          · exact parseComptimeType_preservesTokensOnSuccess
-              (typeExprWithFuel fuel) nestedTokens input value next result
-          · split at result
-            · exact parseMappingType_preservesTokensOnSuccess
-                (typeExprWithFuel fuel) nestedTokens input value next result
-            · split at result
-              · exact parseProxyType_preservesTokensOnSuccess
-                  (typeExprWithFuel fuel) nestedTokens input value next result
-              · split at result
-                · exact parseTupleType_preservesTokensOnSuccess
-                    (typeExprWithFuel fuel) nestedTokens input value next result
-                · split at result
-                  · exact parseNamedType_preservesTokensOnSuccess
-                      (typeExprWithFuel fuel) nestedTokens input value next result
-                  · unfold rejectAt at result
-                    contradiction
-      · intro input value next result
-        simp only [typeExprWithFuel] at result
-        split at result
-        · exact parseFunctionType_cursorMonotoneOnSuccess
-            (typeExprWithFuel fuel) input value next result
-        · split at result
-          · exact parseComptimeType_cursorMonotoneOnSuccess
-              (typeExprWithFuel fuel) nestedCursor input value next result
-          · split at result
-            · exact parseMappingType_cursorMonotoneOnSuccess
-                (typeExprWithFuel fuel) nestedCursor input value next result
-            · split at result
-              · exact parseProxyType_cursorMonotoneOnSuccess
-                  (typeExprWithFuel fuel) nestedCursor input value next result
-              · split at result
-                · exact parseTupleType_cursorMonotoneOnSuccess
-                    (typeExprWithFuel fuel) input value next result
-                · split at result
-                  · exact parseNamedType_cursorMonotoneOnSuccess
-                      (typeExprWithFuel fuel) input value next result
-                  · unfold rejectAt at result
-                    contradiction
-      · intro input value next result
-        simp only [typeExprWithFuel] at result
-        split at result
-        · exact parseFunctionType_startsAtCurrentTokenOnSuccess
-            (typeExprWithFuel fuel) input value next result
-        · split at result
-          · exact parseComptimeType_startsAtCurrentTokenOnSuccess
-              (typeExprWithFuel fuel) input value next result
-          · split at result
-            · exact parseMappingType_startsAtCurrentTokenOnSuccess
-                (typeExprWithFuel fuel) input value next result
-            · split at result
-              · exact parseProxyType_startsAtCurrentTokenOnSuccess
-                  (typeExprWithFuel fuel) input value next result
-              · split at result
-                · exact parseTupleType_startsAtCurrentTokenOnSuccess
-                    (typeExprWithFuel fuel) input value next result
-                · split at result
-                  · exact parseNamedType_startsAtCurrentTokenOnSuccess
-                      (typeExprWithFuel fuel) input value next result
-                  · unfold rejectAt at result
-                    contradiction
+        rw [typeExprWithFuel_succ_eq, bind_apply_cases]
+        have baseReply := baseValid input inputValid
+        cases baseResult : typeExprBase (typeExprWithFuel fuel) input with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [baseResult] at baseReply
+            exact baseReply
+        | ok base afterBase =>
+            rw [baseResult] at baseReply
+            rcases baseReply with ⟨baseValueValid, afterValid, afterFile⟩
+            rcases baseStarts input base afterBase baseResult with ⟨token, found, startEq⟩
+            have cursorLe := baseCursor input base afterBase baseResult
+            have tokensEq := baseTokens input base afterBase baseResult
+            have suffixesValid := arraySuffixes_validFor (afterBase.remainingCount + 1) 0
+              base afterBase afterValid
+              (by rw [afterFile]; exact baseValueValid)
+              ⟨input.cursor, token, cursorLe,
+                by rw [tokensEq]; exact State.getElem?_eq_some_of_peek?_eq_some found,
+                startEq⟩
+            exact suffixesValid.of_file_eq afterFile
+      · exact Parser.bind_preservesTokenWindow baseWindow
+          typeArraySuffixes_preservesTokenWindow
+      · exact Parser.bind_preservesTokensOnSuccess baseTokens
+          (fun element => (typeArraySuffixes_preservesTokenWindow element).preservesTokensOnSuccess)
+      · exact Parser.bind_cursorMonotoneOnSuccess baseCursor
+          typeArraySuffixes_cursorMonotoneOnSuccess
+      · exact Parser.bind_startsAtCurrentTokenOnSuccess_of_first baseStarts
+          (fun _ _ _ _ parsed => (arraySuffixes_ok_start _ _ _ parsed).symm)
 
 /-- Every fuel-bounded recursive type parse retains source provenance. -/
 theorem typeExprWithFuel_validFor (fuel : Nat) :

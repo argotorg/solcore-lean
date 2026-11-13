@@ -87,9 +87,19 @@ theorem TypeArraySuffixesParses.value_unique {element left right : Syntax.TypeEx
     (leftParsed : TypeArraySuffixesParses element input left afterLeft)
     (rightParsed : TypeArraySuffixesParses element input right afterRight) :
     left = right := by
-  cases leftParsed
-  cases rightParsed
-  rfl
+  induction leftParsed generalizing right afterRight with
+  | done absent =>
+      cases rightParsed with
+      | done => rfl
+      | suffix brackets => exact absurd absent brackets.not_absent
+  | suffix brackets _ restIH =>
+      cases rightParsed with
+      | done absent => exact absurd absent brackets.not_absent
+      | suffix rightBrackets rightRest =>
+          rcases brackets.unique rightBrackets with
+            ⟨closingEq, openingEq, closingSpanEq⟩
+          subst closingEq openingEq closingSpanEq
+          exact restIH rightRest
 
 /-- A base type form constructs one exact type-expression AST. -/
 theorem TypeExprBaseParses.value_unique {input : Remainder}

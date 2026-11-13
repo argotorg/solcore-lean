@@ -596,10 +596,11 @@ private def rejectedTokens : List Token := [marker, sym 7 8 .leftParen, nameToke
 private theorem checked_child (content : String) (tokens : List Token) (prior : List ParseDiagnostic)
     (token : TokenAt tokens.toArray tokens.length 2 nameToken)
     (noDot : TokenKindAbsentAt tokens.toArray tokens.length 3 (.symbol .dot))
-    (noArgs : TokenKindAbsentAt tokens.toArray tokens.length 3 (.symbol .less)) :
+    (noArgs : TokenKindAbsentAt tokens.toArray tokens.length 3 (.symbol .less))
+    (noBracket : TokenKindAbsentAt tokens.toArray tokens.length 3 (.symbol .leftBracket)) :
     typeExpr (state content tokens prior 2 []) = .ok ty (state content tokens prior 3 [event]) :=
   checked_name_type token (.hyphen (by unfold IdentifierHyphenSpelling name; decide))
-    noDot noArgs (by decide) (by decide)
+    noDot noArgs noBracket (by decide) (by decide)
 
 private theorem empty_exec (nested : Parser TypeExpr) (prior : List ParseDiagnostic) :
     parseFunctionReturns nested (state emptyText emptyTokens prior 0 []) =
@@ -628,6 +629,7 @@ private theorem success_exec (prior : List ParseDiagnostic) :
     (input := s 0 []) (after := (s 1 []).declarativeRemainder) (span := span 0 7)
     ⟨⟨by change 0 < 6; decide, rfl⟩, rfl⟩
   have child := checked_child successText successTokens prior ⟨by decide, rfl⟩
+    (by simp [TokenKindAbsentAt, TokenAt, successTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, successTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, successTokens, sym])
   have opening := symbol_eq_ok_of_exactTokenParses .leftParen .typeExpr
@@ -665,6 +667,7 @@ private theorem rejected_exec (prior : List ParseDiagnostic) :
     (input := s 0 []) (after := (s 1 []).declarativeRemainder) (span := span 0 7)
     ⟨⟨by change 0 < 6; decide, rfl⟩, rfl⟩
   have child := checked_child rejectedText rejectedTokens prior ⟨by decide, rfl⟩
+    (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
   have opening := symbol_eq_ok_of_exactTokenParses .leftParen .typeExpr
@@ -914,7 +917,8 @@ private theorem child_pair (content : String) (tokens : List Token) (prior : Lis
     (arrowToken : TokenAt tokens.toArray tokens.length 3 (sym 12 14 .fatArrow))
     (valueToken : TokenAt tokens.toArray tokens.length 4 (nameToken valueName))
     (noDot : TokenKindAbsentAt tokens.toArray tokens.length 5 (.symbol .dot))
-    (noArguments : TokenKindAbsentAt tokens.toArray tokens.length 5 (.symbol .less)) :
+    (noArguments : TokenKindAbsentAt tokens.toArray tokens.length 5 (.symbol .less))
+    (noBracket : TokenKindAbsentAt tokens.toArray tokens.length 5 (.symbol .leftBracket)) :
     typeExpr (state content tokens prior 2 []) = .ok (ty keyName) (state content tokens prior 3 [event keyName]) ∧
     typeExpr (state content tokens prior 4 [event keyName]) =
       .ok (ty valueName) (state content tokens prior 5 [event keyName, event valueName]) := by
@@ -927,9 +931,11 @@ private theorem child_pair (content : String) (tokens : List Token) (prior : Lis
   constructor
   · exact checked_name_type (input := state content tokens prior 2 []) keyToken
       (.hyphen (by unfold IdentifierHyphenSpelling keyName; decide))
-      (afterKeyAbsent .dot (by decide)) (afterKeyAbsent .less (by decide)) (by decide) (by decide)
+      (afterKeyAbsent .dot (by decide)) (afterKeyAbsent .less (by decide))
+      (afterKeyAbsent .leftBracket (by decide)) (by decide) (by decide)
   · exact checked_name_type (input := state content tokens prior 4 [event keyName]) valueToken
-      (.hyphen (by unfold IdentifierHyphenSpelling valueName; decide)) noDot noArguments (by decide) (by decide)
+      (.hyphen (by unfold IdentifierHyphenSpelling valueName; decide)) noDot noArguments noBracket
+      (by decide) (by decide)
 
 private def successText : String := "mapping(a-b => c-d) tail"
 private def successTokens : List Token := prefixTokens ++ [sym 18 19 .rightParen,
@@ -943,6 +949,7 @@ private theorem success_exec (prior : List ParseDiagnostic) :
   let s := state successText successTokens prior
   have children := child_pair successText successTokens prior
     ⟨by decide, rfl⟩ ⟨by decide, rfl⟩ ⟨by decide, rfl⟩
+    (by simp [TokenKindAbsentAt, TokenAt, successTokens, prefixTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, successTokens, prefixTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, successTokens, prefixTokens, sym])
   have markerResult := contextual_eq_ok_of_exactTokenParses .mapping .typeExpr
@@ -990,6 +997,7 @@ private theorem rejection_exec (prior : List ParseDiagnostic) :
   let s := state rejectedText rejectedTokens prior
   have children := child_pair rejectedText rejectedTokens prior
     ⟨by decide, rfl⟩ ⟨by decide, rfl⟩ ⟨by decide, rfl⟩
+    (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, prefixTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, prefixTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, prefixTokens, sym])
   have markerResult := contextual_eq_ok_of_exactTokenParses .mapping .typeExpr
@@ -1060,7 +1068,8 @@ private def checkedState (input : State) : State := {
 private theorem checked_type_exec (input : State)
     (found : input.peek? = some (nameToken nameA))
     (noDot : isSymbol (checkedState input) .dot = false)
-    (noArgs : isSymbol (checkedState input) .less = false) :
+    (noArgs : isSymbol (checkedState input) .less = false)
+    (noBracket : isSymbol (checkedState input) .leftBracket = false) :
     typeExpr input = .ok named (checkedState input) := by
   have checked : identifier .typeExpr input = .ok nameA (checkedState input) := by
     simp only [identifier, rawIdentifier, found]
@@ -1069,12 +1078,15 @@ private theorem checked_type_exec (input : State)
     simp only [qualifiedName, checked, QualifiedNameInternals.qualifiedNameTail, noDot,
       Bool.false_eq_true, if_false, QualifiedNameInternals.finishQualifiedName]
     rfl
-  have selected (fuel : Nat) : typeExprWithFuel (fuel + 1) input =
+  have selected (fuel : Nat) : typeExprBase (typeExprWithFuel fuel) input =
       parseNamedType (typeExprWithFuel fuel) input := by
-    simp only [typeExprWithFuel, isKeyword, isContextual, isSymbol, isIdentifier,
+    simp only [typeExprBase, isKeyword, isContextual, isSymbol, isIdentifier,
       State.peekKind?, found, Option.map_some]
     rfl
-  rw [typeExpr, selected]
+  rw [typeExpr]
+  apply typeExprWithFuel_succ_eq_of_base _
+    (symbolAbsentAt_of_isSymbol_eq_false .leftBracket noBracket)
+  rw [selected]
   simp only [parseNamedType, bind, path, parseNamedTypeArguments, getState, noArgs,
     Bool.false_eq_true, if_false, pure]
   rfl
@@ -1098,7 +1110,7 @@ private theorem success_exec (prior : List ParseDiagnostic) :
       (span 0 1) afterOpening.declarativeRemainder := ⟨⟨by change 0 < 5; decide, rfl⟩, rfl⟩
   have markerResult := symbol_eq_ok_of_exactTokenParses .less .typeExpr marker
   change symbol .less .typeExpr input = .ok (sym 0 1 .less) afterOpening at markerResult
-  have child := checked_type_exec afterOpening rfl rfl rfl
+  have child := checked_type_exec afterOpening rfl rfl rfl rfl
   have tail := SyntaxDelimitedTrailingSuccessTraceProperties.trailing_close_bypasses_any_child
     typeExpr (sym 0 1 .less) .greater .typeExpr .typeExpr afterOpening.remainingCount [named]
     (input := checkedState afterOpening) (afterComma := remainder successTokens 3)
@@ -1152,15 +1164,17 @@ private theorem rejection_exec (prior : List ParseDiagnostic) :
       (span 0 1) afterOpening.declarativeRemainder := ⟨⟨by change 0 < 6; decide, rfl⟩, rfl⟩
   have markerResult := symbol_eq_ok_of_exactTokenParses .less .typeExpr marker
   change symbol .less .typeExpr input = .ok (sym 0 1 .less) afterOpening at markerResult
-  have child := checked_type_exec afterOpening rfl rfl rfl
+  have child := checked_type_exec afterOpening rfl rfl rfl rfl
   have found : (rejectedOutput prior).peek? = some (sym 5 6 .plus) := rfl
-  have selected (fuel : Nat) : typeExprWithFuel (fuel + 1) (rejectedOutput prior) =
+  have selected (fuel : Nat) : typeExprBase (typeExprWithFuel fuel) (rejectedOutput prior) =
       rejectAt (rejectedOutput prior) { head := .typeExpr, tail := [] } .typeExpr := by
-    simp only [typeExprWithFuel, isKeyword, isContextual, isSymbol, isIdentifier,
+    simp only [typeExprBase, isKeyword, isContextual, isSymbol, isIdentifier,
       State.peekKind?, found, Option.map_some]
     rfl
   have rejected : typeExpr (rejectedOutput prior) = .reject failure (rejectedOutput prior) := by
-    rw [typeExpr, selected]
+    rw [typeExpr]
+    apply typeExprWithFuel_succ_reject_of_base
+    rw [selected]
     rfl
   have comma : ExactTokenParses (.symbol .comma) (checkedState afterOpening).declarativeRemainder
       (span 4 5) (rejectedOutput prior).declarativeRemainder := ⟨⟨by change 2 < 6; decide, rfl⟩, rfl⟩
@@ -1293,13 +1307,15 @@ private theorem rejected_exec (prior : List ParseDiagnostic) :
   change symbol .less .typeExpr afterName =
     .ok { span := span 7 8, value := .symbol .less } (rejectedOutput prior) at markerResult
   have found : (rejectedOutput prior).peek? = some { span := span 8 9, value := .symbol .plus } := rfl
-  have selected (fuel : Nat) : typeExprWithFuel (fuel + 1) (rejectedOutput prior) =
+  have selected (fuel : Nat) : typeExprBase (typeExprWithFuel fuel) (rejectedOutput prior) =
       rejectAt (rejectedOutput prior) { head := .typeExpr, tail := [] } .typeExpr := by
-    simp only [typeExprWithFuel, isKeyword, isContextual, isSymbol, isIdentifier,
+    simp only [typeExprBase, isKeyword, isContextual, isSymbol, isIdentifier,
       State.peekKind?, found, Option.map_some]
     rfl
   have child : typeExpr (rejectedOutput prior) = .reject failure (rejectedOutput prior) := by
-    rw [typeExpr, selected]
+    rw [typeExpr]
+    apply typeExprWithFuel_succ_reject_of_base
+    rw [selected]
     rfl
   have raw : delimited .less .greater false typeExpr .typeExpr .typeExpr afterName =
       .reject failure (rejectedOutput prior) := by
@@ -1672,16 +1688,20 @@ private theorem type_exec (prior : List ParseDiagnostic) :
     rfl
   have noDot : isSymbol (output prior) .dot = false := rfl
   have noArgs : isSymbol (output prior) .less = false := rfl
+  have noBracket : isSymbol (output prior) .leftBracket = false := rfl
   have path : qualifiedName .typeExpr .typeExpr (afterMarker prior) = .ok qualified (output prior) := by
     simp only [qualifiedName, checked, QualifiedNameInternals.qualifiedNameTail, noDot,
       Bool.false_eq_true, if_false, QualifiedNameInternals.finishQualifiedName]
     rfl
-  have selected (fuel : Nat) : typeExprWithFuel (fuel + 1) (afterMarker prior) =
+  have selected (fuel : Nat) : typeExprBase (typeExprWithFuel fuel) (afterMarker prior) =
       parseNamedType (typeExprWithFuel fuel) (afterMarker prior) := by
-    simp only [typeExprWithFuel, isKeyword, isContextual, isSymbol, isIdentifier,
+    simp only [typeExprBase, isKeyword, isContextual, isSymbol, isIdentifier,
       State.peekKind?, found, Option.map_some]
     rfl
-  rw [typeExpr, selected]
+  rw [typeExpr]
+  apply typeExprWithFuel_succ_eq_of_base _
+    (symbolAbsentAt_of_isSymbol_eq_false .leftBracket noBracket)
+  rw [selected]
   simp only [parseNamedType, bind, path, parseNamedTypeArguments, getState, noArgs,
     Bool.false_eq_true, if_false, pure]
   rfl
@@ -1729,12 +1749,14 @@ private def typeFailure : Failure := {
 private theorem type_rejection_exec (prior : List ParseDiagnostic) :
     typeExpr (rejectedOutput prior) = .reject typeFailure (rejectedOutput prior) := by
   have found : (rejectedOutput prior).peek? = some { span := span 1 2, value := .symbol .plus } := rfl
-  have selected (fuel : Nat) : typeExprWithFuel (fuel + 1) (rejectedOutput prior) =
+  have selected (fuel : Nat) : typeExprBase (typeExprWithFuel fuel) (rejectedOutput prior) =
       rejectAt (rejectedOutput prior) { head := .typeExpr, tail := [] } .typeExpr := by
-    simp only [typeExprWithFuel, isKeyword, isContextual, isSymbol, isIdentifier,
+    simp only [typeExprBase, isKeyword, isContextual, isSymbol, isIdentifier,
       State.peekKind?, found, Option.map_some]
     rfl
-  rw [typeExpr, selected]
+  rw [typeExpr]
+  apply typeExprWithFuel_succ_reject_of_base
+  rw [selected]
   rfl
 
 set_option maxRecDepth 16384 in
@@ -1818,6 +1840,7 @@ theorem canonical_proxy_type (prior : List ParseDiagnostic) :
     ⟨by change 1 < 3; decide, rfl⟩ (.hyphen (by unfold IdentifierHyphenSpelling name; decide))
     (by simp [TokenKindAbsentAt, TokenAt, afterMarker, input, initial, State.initial, carrier, successTokens])
     (by simp [TokenKindAbsentAt, TokenAt, afterMarker, input, initial, State.initial, carrier, successTokens])
+    (by simp [TokenKindAbsentAt, TokenAt, afterMarker, input, initial, State.initial, carrier, successTokens])
     (by decide) (by decide)
   have result := parseProxyType_success_iff_components.mpr
     ⟨_, afterMarker, inner, symbol_eq_ok_of_exactTokenParses .at .typeExpr marker, typed, rfl⟩
@@ -1851,12 +1874,14 @@ theorem canonical_proxy_type_failure (prior : List ParseDiagnostic) :
   have marker : ExactTokenParses (.symbol .at) input.declarativeRemainder
       (span 0 1) (rejectedOutput prior).declarativeRemainder := ⟨⟨by change 0 < 3; decide, rfl⟩, rfl⟩
   have found : (rejectedOutput prior).peek? = some { span := span 1 2, value := .symbol .plus } := rfl
-  have selected (fuel : Nat) : typeExprWithFuel (fuel + 1) (rejectedOutput prior) =
+  have selected (fuel : Nat) : typeExprBase (typeExprWithFuel fuel) (rejectedOutput prior) =
       rejectAt (rejectedOutput prior) { head := .typeExpr, tail := [] } .typeExpr := by
-    simp only [typeExprWithFuel, isKeyword, isContextual, isSymbol, isIdentifier, State.peekKind?, found, Option.map_some]
+    simp only [typeExprBase, isKeyword, isContextual, isSymbol, isIdentifier, State.peekKind?, found, Option.map_some]
     rfl
   have child : typeExpr (rejectedOutput prior) = .reject failure (rejectedOutput prior) := by
-    rw [typeExpr, selected]
+    rw [typeExpr]
+    apply typeExprWithFuel_succ_reject_of_base
+    rw [selected]
     rfl
   have result := parseProxyType_reject_iff_components.mpr (.inr
     ⟨_, rejectedOutput prior, symbol_eq_ok_of_exactTokenParses .at .typeExpr marker, child⟩)
@@ -2001,11 +2026,12 @@ private def rejectedTokens : List Token := [sym 0 1 .leftParen, nameToken nameA,
 private theorem first_child (content : String) (tokens : List Token) (prior : List ParseDiagnostic)
     (token : TokenAt tokens.toArray tokens.length 1 (nameToken nameA))
     (noDot : TokenKindAbsentAt tokens.toArray tokens.length 2 (.symbol .dot))
-    (noArgs : TokenKindAbsentAt tokens.toArray tokens.length 2 (.symbol .less)) :
+    (noArgs : TokenKindAbsentAt tokens.toArray tokens.length 2 (.symbol .less))
+    (noBracket : TokenKindAbsentAt tokens.toArray tokens.length 2 (.symbol .leftBracket)) :
     typeExpr (state content tokens prior 1 []) =
       .ok (ty nameA) (state content tokens prior 2 [event nameA]) :=
   checked_name_type token (.hyphen (by unfold IdentifierHyphenSpelling nameA; decide))
-    noDot noArgs (by decide) (by decide)
+    noDot noArgs noBracket (by decide) (by decide)
 
 private theorem empty_exec (prior : List ParseDiagnostic) :
     parseTupleType typeExpr (state emptyText emptyTokens prior 0 []) =
@@ -2024,6 +2050,7 @@ private theorem single_exec (prior : List ParseDiagnostic) :
         (state singleText singleTokens prior 4 [event nameA]) := by
   let s := state singleText singleTokens prior
   have child := first_child singleText singleTokens prior ⟨by decide, rfl⟩
+    (by simp [TokenKindAbsentAt, TokenAt, singleTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, singleTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, singleTokens, sym])
   have marker := symbol_eq_ok_of_exactTokenParses .leftParen .typeExpr
@@ -2053,9 +2080,11 @@ private theorem pair_exec (prior : List ParseDiagnostic) :
   have first := first_child pairText pairTokens prior ⟨by decide, rfl⟩
     (by simp [TokenKindAbsentAt, TokenAt, pairTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, pairTokens, sym])
+    (by simp [TokenKindAbsentAt, TokenAt, pairTokens, sym])
   have second : typeExpr (s 3 [event nameA]) = .ok (ty nameC) (s 4 [event nameA, event nameC]) :=
     checked_name_type (name := nameC) ⟨by change 3 < 7; decide, rfl⟩
       (.hyphen (by unfold IdentifierHyphenSpelling nameC; decide))
+      (by simp [TokenKindAbsentAt, TokenAt, s, state, State.initial, carrier, pairTokens, sym])
       (by simp [TokenKindAbsentAt, TokenAt, s, state, State.initial, carrier, pairTokens, sym])
       (by simp [TokenKindAbsentAt, TokenAt, s, state, State.initial, carrier, pairTokens, sym])
       (by decide) (by decide)
@@ -2098,6 +2127,7 @@ private theorem rejected_exec (prior : List ParseDiagnostic) :
       .reject failure (state rejectedText rejectedTokens prior 2 [event nameA]) := by
   let s := state rejectedText rejectedTokens prior
   have child := first_child rejectedText rejectedTokens prior ⟨by decide, rfl⟩
+    (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
   have marker := symbol_eq_ok_of_exactTokenParses .leftParen .typeExpr
@@ -2446,10 +2476,12 @@ private def remainder (tokens : List Token) (cursor : Nat) : Remainder := {
 private theorem child_exec (content : String) (tokens : List Token) (prior : List ParseDiagnostic)
     (token : TokenAt tokens.toArray tokens.length 2 nameToken)
     (noDot : TokenKindAbsentAt tokens.toArray tokens.length 3 (.symbol .dot))
-    (noArguments : TokenKindAbsentAt tokens.toArray tokens.length 3 (.symbol .less)) :
+    (noArguments : TokenKindAbsentAt tokens.toArray tokens.length 3 (.symbol .less))
+    (noBracket : TokenKindAbsentAt tokens.toArray tokens.length 3 (.symbol .leftBracket)) :
     typeExpr (state content tokens prior 2 []) = .ok inner (state content tokens prior 3 [event]) :=
   checked_name_type (input := state content tokens prior 2 []) token
-    (.hyphen (by unfold IdentifierHyphenSpelling name; decide)) noDot noArguments (by decide) (by decide)
+    (.hyphen (by unfold IdentifierHyphenSpelling name; decide)) noDot noArguments noBracket
+    (by decide) (by decide)
 
 private def successText : String := "comptime<a-b> tail"
 private def successTokens : List Token := [marker, sym 8 9 .less, nameToken, sym 12 13 .greater,
@@ -2463,6 +2495,7 @@ private theorem success_exec (prior : List ParseDiagnostic) :
       .ok value (state successText successTokens prior 4 [event]) := by
   let s := state successText successTokens prior
   have child := child_exec successText successTokens prior ⟨by decide, rfl⟩
+    (by simp [TokenKindAbsentAt, TokenAt, successTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, successTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, successTokens, sym])
   have markerResult := contextual_eq_ok_of_exactTokenParses .comptime .typeExpr
@@ -2507,6 +2540,7 @@ private theorem rejection_exec (prior : List ParseDiagnostic) :
       .reject failure (state rejectedText rejectedTokens prior 3 [event]) := by
   let s := state rejectedText rejectedTokens prior
   have child := child_exec rejectedText rejectedTokens prior ⟨by decide, rfl⟩
+    (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
   have markerResult := contextual_eq_ok_of_exactTokenParses .comptime .typeExpr
@@ -2579,11 +2613,13 @@ private def remainder (tokens : List Token) (cursor : Nat) : Remainder := {
 private theorem child_exec (fuel : Nat) (content : String) (tokens : List Token) (prior : List ParseDiagnostic)
     (token : TokenAt tokens.toArray tokens.length 3 nameToken)
     (noDot : TokenKindAbsentAt tokens.toArray tokens.length 4 (.symbol .dot))
-    (noArguments : TokenKindAbsentAt tokens.toArray tokens.length 4 (.symbol .less)) :
+    (noArguments : TokenKindAbsentAt tokens.toArray tokens.length 4 (.symbol .less))
+    (noBracket : TokenKindAbsentAt tokens.toArray tokens.length 4 (.symbol .leftBracket)) :
     typeExprWithFuel (fuel + 1) (state content tokens prior 3 []) =
       .ok inner (state content tokens prior 4 [event]) :=
   checked_name_type_with_positive_fuel fuel (input := state content tokens prior 3 []) token
-    (.hyphen (by unfold IdentifierHyphenSpelling name; decide)) noDot noArguments (by decide) (by decide)
+    (.hyphen (by unfold IdentifierHyphenSpelling name; decide)) noDot noArguments noBracket
+    (by decide) (by decide)
 
 private def successText : String := "@comptime<a-b> tail"
 private def successTokens : List Token := [sym 0 1 .at, marker, sym 9 10 .less, nameToken,
@@ -2600,6 +2636,7 @@ private theorem success_with_fuel (fuel : Nat) (prior : List ParseDiagnostic) :
   have child := child_exec fuel successText successTokens prior ⟨by decide, rfl⟩
     (by simp [TokenKindAbsentAt, TokenAt, successTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, successTokens, sym])
+    (by simp [TokenKindAbsentAt, TokenAt, successTokens, sym])
   have proxyResult := symbol_eq_ok_of_exactTokenParses .at .typeExpr
     (input := s 0 []) (after := (s 1 []).declarativeRemainder) (span := span 0 1)
     ⟨⟨by change 0 < 6; decide, rfl⟩, rfl⟩
@@ -2612,13 +2649,18 @@ private theorem success_with_fuel (fuel : Nat) (prior : List ParseDiagnostic) :
   have closingResult := symbol_eq_ok_of_exactTokenParses .greater .typeExpr
     (input := s 4 [event]) (after := (s 5 [event]).declarativeRemainder) (span := span 13 14)
     ⟨⟨by change 4 < 6; decide, rfl⟩, rfl⟩
+  have noBracket : TokenKindAbsentAt (s 5 [event]).tokens (s 5 [event]).window.endIndex
+      (s 5 [event]).cursor (.symbol .leftBracket) := by
+    simp [TokenKindAbsentAt, TokenAt, s, state, State.initial, carrier, successTokens, sym]
   have comptimeResult : typeExprWithFuel (fuel + 2) (s 1 []) = .ok comptimeValue (s 5 [event]) := by
+    apply typeExprWithFuel_succ_eq_of_base _ noBracket
     rw [typeExprWithFuel_eq_raw_of_selection (fuel + 1)
       (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
         TypeDispatchTraceInternals.selectedBranch (s 1 []) = .comptime from rfl))]
     exact parseComptimeType_success_iff_components.mpr
       ⟨marker, s 2 [], sym 9 10 .less, s 3 [], inner, s 4 [event], sym 13 14 .greater,
         markerResult, openingResult, child, closingResult, rfl⟩
+  apply typeExprWithFuel_succ_eq_of_base _ noBracket
   rw [typeExprWithFuel_eq_raw_of_selection (fuel + 2)
     (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
       TypeDispatchTraceInternals.selectedBranch (s 0 []) = .proxy from rfl))]
@@ -2675,6 +2717,7 @@ private theorem rejection_with_fuel (fuel : Nat) (prior : List ParseDiagnostic) 
   have child := child_exec fuel rejectedText rejectedTokens prior ⟨by decide, rfl⟩
     (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
     (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
+    (by simp [TokenKindAbsentAt, TokenAt, rejectedTokens, sym])
   have proxyResult := symbol_eq_ok_of_exactTokenParses .at .typeExpr
     (input := s 0 []) (after := (s 1 []).declarativeRemainder) (span := span 0 1)
     ⟨⟨by change 0 < 7; decide, rfl⟩, rfl⟩
@@ -2691,11 +2734,13 @@ private theorem rejection_with_fuel (fuel : Nat) (prior : List ParseDiagnostic) 
       { head := .symbol .greater, tail := [] } .typeExpr (s 4 [event]).declarativeRemainder failure.toDiagnostic :=
     .reported (.token (current := sym 14 15 .plus) ⟨by change 4 < 7; decide, rfl⟩)
   have comptimeResult : typeExprWithFuel (fuel + 2) (s 1 []) = .reject failure (s 4 [event]) := by
+    apply typeExprWithFuel_succ_reject_of_base
     rw [typeExprWithFuel_eq_raw_of_selection (fuel + 1)
       (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
         TypeDispatchTraceInternals.selectedBranch (s 1 []) = .comptime from rfl))]
     exact missing_closing_keeps_complete_child_state (typeExprWithFuel (fuel + 1))
       markerResult openingResult child missing reported
+  apply typeExprWithFuel_succ_reject_of_base
   rw [typeExprWithFuel_eq_raw_of_selection (fuel + 2)
     (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
       TypeDispatchTraceInternals.selectedBranch (s 0 []) = .proxy from rfl))]
@@ -3422,15 +3467,15 @@ private def state (kinds : List TokenKind) (endIndex : Nat) (prior : List ParseD
 
 private theorem runs_selected (fuel : Nat) {input : State} {branch : TypeDispatchBranch}
     (selected : selectedBranch input = branch) :
-    typeExprWithFuel (fuel + 1) input = rawParser (typeExprWithFuel fuel) branch input :=
+    typeExprBase (typeExprWithFuel fuel) input = rawParser (typeExprWithFuel fuel) branch input :=
   typeExprWithFuel_eq_raw_of_selection fuel (selectedBranch_eq_iff.mp selected)
 
 theorem function_keyword_and_identifier_are_distinct (fuel : Nat) (prior : List ParseDiagnostic) :
     selectedBranch (state [.keyword .functionKw] 1 prior) = .function ∧
     selectedBranch (state [.identifier "function"] 1 prior) = .named ∧
-    typeExprWithFuel (fuel + 1) (state [.keyword .functionKw] 1 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.keyword .functionKw] 1 prior) =
       parseFunctionType (typeExprWithFuel fuel) (state [.keyword .functionKw] 1 prior) ∧
-    typeExprWithFuel (fuel + 1) (state [.identifier "function"] 1 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.identifier "function"] 1 prior) =
       parseNamedType (typeExprWithFuel fuel) (state [.identifier "function"] 1 prior) := by
   exact ⟨rfl, rfl, runs_selected fuel rfl, runs_selected fuel rfl⟩
 
@@ -3438,11 +3483,11 @@ theorem mapping_requires_its_left_parenthesis (fuel : Nat) (prior : List ParseDi
     selectedBranch (state [.identifier "mapping"] 1 prior) = .named ∧
     selectedBranch (state [.identifier "mapping", .symbol .less] 2 prior) = .named ∧
     selectedBranch (state [.identifier "mapping", .symbol .leftParen] 2 prior) = .mapping ∧
-    typeExprWithFuel (fuel + 1) (state [.identifier "mapping"] 1 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.identifier "mapping"] 1 prior) =
       parseNamedType (typeExprWithFuel fuel) (state [.identifier "mapping"] 1 prior) ∧
-    typeExprWithFuel (fuel + 1) (state [.identifier "mapping", .symbol .less] 2 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.identifier "mapping", .symbol .less] 2 prior) =
       parseNamedType (typeExprWithFuel fuel) (state [.identifier "mapping", .symbol .less] 2 prior) ∧
-    typeExprWithFuel (fuel + 1) (state [.identifier "mapping", .symbol .leftParen] 2 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.identifier "mapping", .symbol .leftParen] 2 prior) =
       parseMappingType (typeExprWithFuel fuel) (state [.identifier "mapping", .symbol .leftParen] 2 prior) := by
   exact ⟨rfl, rfl, rfl, runs_selected fuel rfl, runs_selected fuel rfl, runs_selected fuel rfl⟩
 
@@ -3450,20 +3495,20 @@ theorem comptime_requires_its_angle (fuel : Nat) (prior : List ParseDiagnostic) 
     selectedBranch (state [.identifier "comptime"] 1 prior) = .named ∧
     selectedBranch (state [.identifier "comptime", .symbol .leftParen] 2 prior) = .named ∧
     selectedBranch (state [.identifier "comptime", .symbol .less] 2 prior) = .comptime ∧
-    typeExprWithFuel (fuel + 1) (state [.identifier "comptime"] 1 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.identifier "comptime"] 1 prior) =
       parseNamedType (typeExprWithFuel fuel) (state [.identifier "comptime"] 1 prior) ∧
-    typeExprWithFuel (fuel + 1) (state [.identifier "comptime", .symbol .leftParen] 2 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.identifier "comptime", .symbol .leftParen] 2 prior) =
       parseNamedType (typeExprWithFuel fuel) (state [.identifier "comptime", .symbol .leftParen] 2 prior) ∧
-    typeExprWithFuel (fuel + 1) (state [.identifier "comptime", .symbol .less] 2 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.identifier "comptime", .symbol .less] 2 prior) =
       parseComptimeType (typeExprWithFuel fuel) (state [.identifier "comptime", .symbol .less] 2 prior) := by
   exact ⟨rfl, rfl, rfl, runs_selected fuel rfl, runs_selected fuel rfl, runs_selected fuel rfl⟩
 
 theorem proxy_and_tuple_have_their_own_branches (fuel : Nat) (prior : List ParseDiagnostic) :
     selectedBranch (state [.symbol .at] 1 prior) = .proxy ∧
     selectedBranch (state [.symbol .leftParen] 1 prior) = .tuple ∧
-    typeExprWithFuel (fuel + 1) (state [.symbol .at] 1 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.symbol .at] 1 prior) =
       parseProxyType (typeExprWithFuel fuel) (state [.symbol .at] 1 prior) ∧
-    typeExprWithFuel (fuel + 1) (state [.symbol .leftParen] 1 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.symbol .leftParen] 1 prior) =
       parseTupleType (typeExprWithFuel fuel) (state [.symbol .leftParen] 1 prior) := by
   exact ⟨rfl, rfl, runs_selected fuel rfl, runs_selected fuel rfl⟩
 
@@ -3474,9 +3519,9 @@ theorem hidden_second_tokens_do_not_select_pairs (fuel : Nat) (prior : List Pars
     (state [.identifier "comptime", .symbol .less] 1 prior).peekOffsetKind? 1 = none ∧
     selectedBranch (state [.identifier "mapping", .symbol .leftParen] 1 prior) = .named ∧
     selectedBranch (state [.identifier "comptime", .symbol .less] 1 prior) = .named ∧
-    typeExprWithFuel (fuel + 1) (state [.identifier "mapping", .symbol .leftParen] 1 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.identifier "mapping", .symbol .leftParen] 1 prior) =
       parseNamedType (typeExprWithFuel fuel) (state [.identifier "mapping", .symbol .leftParen] 1 prior) ∧
-    typeExprWithFuel (fuel + 1) (state [.identifier "comptime", .symbol .less] 1 prior) =
+    typeExprBase (typeExprWithFuel fuel) (state [.identifier "comptime", .symbol .less] 1 prior) =
       parseNamedType (typeExprWithFuel fuel) (state [.identifier "comptime", .symbol .less] 1 prior) := by
   exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, runs_selected fuel rfl, runs_selected fuel rfl⟩
 
@@ -3486,6 +3531,7 @@ theorem final_selection_keeps_complete_state (fuel : Nat) {input : State}
       span := input.currentSpan, found := input.peekKind?
       expected := { head := .typeExpr, tail := [] }, context := .typeExpr
     } input := by
+  apply typeExprWithFuel_succ_reject_of_base
   rw [typeExprWithFuel_eq_raw_of_selection fuel selection]
   rfl
 
@@ -3522,7 +3568,8 @@ set_option maxRecDepth 16384 in
 theorem canonical_mapping_prefix_lexes_and_selects (fuel : Nat) (prior : List ParseDiagnostic) :
     Lexer.lex canonicalFile = .ok canonicalLexed ∧
     selectedBranch { State.initial canonicalFile canonicalLexed with diagnosticsRev := prior.reverse } = .mapping ∧
-    typeExprWithFuel (fuel + 1) { State.initial canonicalFile canonicalLexed with diagnosticsRev := prior.reverse } =
+    typeExprBase (typeExprWithFuel fuel)
+        { State.initial canonicalFile canonicalLexed with diagnosticsRev := prior.reverse } =
       parseMappingType (typeExprWithFuel fuel)
         { State.initial canonicalFile canonicalLexed with diagnosticsRev := prior.reverse } := by
   refine ⟨?_, rfl, runs_selected fuel rfl⟩

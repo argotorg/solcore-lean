@@ -102,9 +102,10 @@ private theorem return_trace : OptionalLambdaReturnTypeTraceParses TypeExprTrace
       (.absent (by simp [TokenKindAbsentAt, TokenAt, remainder, tokens, token]))
       (.ordinary (by unfold UnqualifiedMappingSpelling tracedQualifiedName qualifiedNameFromSuffix name; decide))
   exact .present (span 7 9) ⟨⟨by change 4 < 9; decide, rfl⟩, rfl⟩
-    (TypeExprTraceParses.roll (.selected .named
+    (TypeExprTraceParses.roll_base (.selected .named
       (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
-        TypeDispatchTraceInternals.selectedBranch (state typedKind 5 [] []) = .named from rfl)) named))
+        TypeDispatchTraceInternals.selectedBranch (state typedKind 5 [] []) = .named from rfl)) named)
+      (.of_bracketAbsent (by simp [TokenKindAbsentAt, TokenAt, remainder, tokens, token])))
 
 private theorem optional_return_state {input : State} {value : Option TypeExpr} {after : Remainder}
     {trace : List ParseDiagnostic} (parsed : OptionalLambdaReturnTypeTraceParses TypeExprTraceParses
@@ -330,12 +331,13 @@ private theorem leaf_trace {before after : Remainder} {n : Identifier} {events :
     (head : IdentifierTraceParses before n after events)
     (noDot : TokenKindAbsentAt after.tokens after.endIndex after.cursor (.symbol .dot))
     (noArguments : TokenKindAbsentAt after.tokens after.endIndex after.cursor (.symbol .less))
+    (noBracket : TokenKindAbsentAt after.tokens after.endIndex after.cursor (.symbol .leftBracket))
     (ordinary : ¬ UnqualifiedMappingSpelling (tracedQualifiedName n []))
     (selection : TypeDispatchSelects before .named) :
     TypeExprTraceParses source 99 before (namedTypeTraceValue (tracedQualifiedName n []) none) after events := by
   have qualified : QualifiedNameTraceParses source 99 before (tracedQualifiedName n []) after events := by
     simpa only [List.append_nil] using QualifiedNameTraceParses.parsed head (.done noDot)
-  apply TypeExprTraceParses.roll
+  apply TypeExprTraceParses.roll_base _ (.of_bracketAbsent noBracket)
   apply TypeDispatchTraceParses.selected .named selection
   change NamedTypeTraceParses TypeExprTraceParses source 99 before
     (namedTypeTraceValue (tracedQualifiedName n []) none) after events
@@ -425,17 +427,19 @@ theorem typed_trace : OrdinaryLambdaParameterTraceParses source 99
         (.hyphen (by unfold IdentifierHyphenSpelling typeName name; decide))
     · simp [TokenKindAbsentAt, TokenAt, remainder, typedTokens, symbol]
     · simp [TokenKindAbsentAt, TokenAt, remainder, typedTokens, symbol]
+    · simp [TokenKindAbsentAt, TokenAt, remainder, typedTokens, symbol]
     · unfold UnqualifiedMappingSpelling tracedQualifiedName qualifiedNameFromSuffix typeName name; decide
     · exact TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
         TypeDispatchTraceInternals.selectedBranch { input typedTokens [] with cursor := 4 } = .named from rfl)
   have typed : TypeExprTraceParses source 99 (remainder typedTokens 2) outer
       (remainder typedTokens 6) [hyphen typeName] :=
-    TypeExprTraceParses.roll (.selected .comptime
+    TypeExprTraceParses.roll_base (.selected .comptime
       (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
         TypeDispatchTraceInternals.selectedBranch { input typedTokens [] with cursor := 2 } = .comptime from rfl))
       (.parsed (span 5 13) (span 13 14) (span 17 18)
         ⟨⟨by change 2 < 7; decide, rfl⟩, rfl⟩ ⟨⟨by change 3 < 7; decide, rfl⟩, rfl⟩
         child ⟨⟨by change 5 < 7; decide, rfl⟩, rfl⟩))
+      (.of_bracketAbsent (by simp [TokenKindAbsentAt, TokenAt, remainder, typedTokens, symbol]))
   have tail : NamedParameterTailTraceParses ordinaryName.span none ordinaryName ordinaryName.span
       source 99 (remainder typedTokens 1) (typedParameterTraceValue ordinaryName.span none ordinaryName outer) (remainder typedTokens 6)
       [hyphen typeName, constraint outer.span .comptimeTypeInParameter] :=
@@ -515,6 +519,7 @@ theorem marked_trace : ComptimeLambdaParameterTraceParses source 99
     apply leaf_trace
     · exact .parsed ⟨⟨by change 3 < 5; decide, rfl⟩, rfl, rfl, rfl⟩
         (.clean (by unfold IdentifierHyphenSpelling plainName name; decide))
+    · simp [TokenKindAbsentAt, TokenAt, remainder, markedTokens, symbol]
     · simp [TokenKindAbsentAt, TokenAt, remainder, markedTokens, symbol]
     · simp [TokenKindAbsentAt, TokenAt, remainder, markedTokens, symbol]
     · unfold UnqualifiedMappingSpelling tracedQualifiedName qualifiedNameFromSuffix plainName name; decide
@@ -1202,12 +1207,13 @@ private theorem leaf_trace {before after : Remainder} {n : Identifier} {events :
     (head : IdentifierTraceParses before n after events)
     (noDot : TokenKindAbsentAt after.tokens after.endIndex after.cursor (.symbol .dot))
     (noArguments : TokenKindAbsentAt after.tokens after.endIndex after.cursor (.symbol .less))
+    (noBracket : TokenKindAbsentAt after.tokens after.endIndex after.cursor (.symbol .leftBracket))
     (ordinary : ¬ UnqualifiedMappingSpelling (tracedQualifiedName n []))
     (selection : TypeDispatchSelects before .named) :
     TypeExprTraceParses source 99 before (namedTypeTraceValue (tracedQualifiedName n []) none) after events := by
   have qualified : QualifiedNameTraceParses source 99 before (tracedQualifiedName n []) after events := by
     simpa only [List.append_nil] using QualifiedNameTraceParses.parsed head (.done noDot)
-  apply TypeExprTraceParses.roll
+  apply TypeExprTraceParses.roll_base _ (.of_bracketAbsent noBracket)
   apply TypeDispatchTraceParses.selected .named selection
   change NamedTypeTraceParses TypeExprTraceParses source 99 before
     (namedTypeTraceValue (tracedQualifiedName n []) none) after events
@@ -1298,17 +1304,19 @@ private theorem typed_trace : OrdinaryNamedParameterTraceParses source 99
         (.hyphen (by unfold IdentifierHyphenSpelling typeName name; decide))
     · simp [TokenKindAbsentAt, TokenAt, remainder, typedTokens, symbol]
     · simp [TokenKindAbsentAt, TokenAt, remainder, typedTokens, symbol]
+    · simp [TokenKindAbsentAt, TokenAt, remainder, typedTokens, symbol]
     · unfold UnqualifiedMappingSpelling tracedQualifiedName qualifiedNameFromSuffix typeName name; decide
     · exact TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
         TypeDispatchTraceInternals.selectedBranch { input typedTokens [] with cursor := 4 } = .named from rfl)
   have typed : TypeExprTraceParses source 99 (remainder typedTokens 2) outer
       (remainder typedTokens 6) [hyphen typeName] :=
-    TypeExprTraceParses.roll (.selected .comptime
+    TypeExprTraceParses.roll_base (.selected .comptime
       (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
         TypeDispatchTraceInternals.selectedBranch { input typedTokens [] with cursor := 2 } = .comptime from rfl))
       (.parsed (span 5 13) (span 13 14) (span 17 18)
         ⟨⟨by change 2 < 7; decide, rfl⟩, rfl⟩ ⟨⟨by change 3 < 7; decide, rfl⟩, rfl⟩
         child ⟨⟨by change 5 < 7; decide, rfl⟩, rfl⟩))
+      (.of_bracketAbsent (by simp [TokenKindAbsentAt, TokenAt, remainder, typedTokens, symbol]))
   have tail : NamedParameterTailTraceParses ordinaryName.span none ordinaryName ordinaryName.span
       source 99 (remainder typedTokens 1) typedValue (remainder typedTokens 6)
       [hyphen typeName, constraint outer.span .comptimeTypeInParameter] :=
@@ -1380,6 +1388,7 @@ private theorem marked_trace : ComptimeNamedParameterTraceParses source 99
     apply leaf_trace
     · exact .parsed ⟨⟨by change 3 < 5; decide, rfl⟩, rfl, rfl, rfl⟩
         (.clean (by unfold IdentifierHyphenSpelling plainName name; decide))
+    · simp [TokenKindAbsentAt, TokenAt, remainder, markedTokens, symbol]
     · simp [TokenKindAbsentAt, TokenAt, remainder, markedTokens, symbol]
     · simp [TokenKindAbsentAt, TokenAt, remainder, markedTokens, symbol]
     · unfold UnqualifiedMappingSpelling tracedQualifiedName qualifiedNameFromSuffix plainName name; decide
@@ -1622,18 +1631,20 @@ private theorem success_trace :
         unfold UnqualifiedMappingSpelling tracedQualifiedName qualifiedNameFromSuffix successName
         decide))
   have nested : TypeExprTraceParses source 18 (r 4) inner (r 5) [typeEvent] :=
-    TypeExprTraceParses.roll (.selected .named
+    TypeExprTraceParses.roll_base (.selected .named
       (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
         TypeDispatchTraceInternals.selectedBranch (successState [] 4 []) = .named from rfl)) named)
+      (.of_bracketAbsent (by simp [TokenKindAbsentAt, TokenAt, r, remainder, successTokens, sym]))
   have comptime : ComptimeTypeTraceParses TypeExprTraceParses source 18 (r 2) type (r 6) [typeEvent] :=
     .parsed (span 4 12) (span 12 13) (span 16 17)
       ⟨⟨by change 2 < 7; decide, rfl⟩, rfl⟩
       ⟨⟨by change 3 < 7; decide, rfl⟩, rfl⟩ nested
       ⟨⟨by change 5 < 7; decide, rfl⟩, rfl⟩
   have typed : TypeExprTraceParses source 18 (r 2) type (r 6) [typeEvent] :=
-    TypeExprTraceParses.roll (.selected .comptime
+    TypeExprTraceParses.roll_base (.selected .comptime
       (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
         TypeDispatchTraceInternals.selectedBranch (successState [] 2 []) = .comptime from rfl)) comptime)
+      (.of_bracketAbsent (by simp [TokenKindAbsentAt, TokenAt, r, remainder, successTokens, sym]))
   have finished : TypedParameterFinishingTrace type [finishingEvent] :=
     .comptime (by simp [ParameterTypeAllowed, type, comptimeTypeTraceValue])
   exact NamedParameterTailTraceParses.typed (input := r 1) (span 3 4)

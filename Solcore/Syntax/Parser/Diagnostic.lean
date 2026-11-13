@@ -81,12 +81,20 @@ inductive ParseConstraint where
   | deriveOnlyEnum
   | implicitPublicModifier (declaration : HardKeyword)
   | fallbackRequiresNoParameters
+  /-- A size inside a type's brackets, `T[k]`: upstream's "fixed-size arrays
+  `T[k]` are not supported; use `T[]`". -/
+  | fixedSizeArray
   deriving Repr, BEq, DecidableEq
 
-/-- Bounded recursive syntax dimensions checked before recursive parsing. -/
+/-- Bounded recursive syntax dimensions. The preflight checks delimiters and
+conditionals before recursive parsing, and the type parser checks array suffixes. -/
 inductive NestingKind where
   | delimiter
   | conditional
+  /-- A run of `[]` suffixes longer than `arraySuffixRoom`, which upstream
+  counts against its type nesting limit. The parser checks it, not the
+  preflight. -/
+  | arraySuffix
   deriving Repr, BEq, DecidableEq
 
 /-- Stable semantic categories for ordinary canonical parse diagnostics. -/
@@ -106,6 +114,26 @@ structure ParseDiagnostic where
   span : SourceSpan
   kind : ParseDiagnosticKind
   deriving Repr, BEq, DecidableEq
+
+/-- The longest run of `[]` suffixes upstream accepts on a type outside any
+other type, 127: its nesting limit of 128 (`MAX_SYNTAX_NESTING`,
+`crates/parser/src/parse/mod.rs:36`) less the type's own depth
+(`crates/parser/src/parse/types.rs:205-214`). -/
+def arraySuffixRoom : Nat := 127
+
+/-- Upstream's "type nesting exceeds the compiler limit of 128", over a type
+with more than `arraySuffixRoom` suffixes. -/
+def arraySuffixNestingDiagnostic (span : SourceSpan) : ParseDiagnostic := {
+  span
+  kind := .nestingExceeded .arraySuffix (arraySuffixRoom + 1)
+}
+
+/-- Upstream's "fixed-size arrays `T[k]` are not supported; use `T[]`", over
+the brackets of `T[k]`. -/
+def fixedSizeArrayDiagnostic (span : SourceSpan) : ParseDiagnostic := {
+  span
+  kind := .constraintViolation .fixedSizeArray
+}
 
 /-- Executor phase named by an exceptional parser invariant. -/
 inductive ParserPhase where

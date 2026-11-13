@@ -196,6 +196,41 @@ private def typeReturnsOutputMotive (input : Remainder)
   ∀ {right afterRight}, OptionalFunctionTypeReturnsParses input right
     afterRight → output = afterRight
 
+/-- One remainder starts at most one suffix: its `]` is the first after the `[`. -/
+theorem ArraySuffixAt.unique {input : Remainder} {leftClosing rightClosing : Nat}
+    {leftOpening leftClosingSpan rightOpening rightClosingSpan : SourceSpan}
+    (left : ArraySuffixAt input leftClosing leftOpening leftClosingSpan)
+    (right : ArraySuffixAt input rightClosing rightOpening rightClosingSpan) :
+    leftClosing = rightClosing ∧ leftOpening = rightOpening ∧
+      leftClosingSpan = rightClosingSpan := by
+  have closingEq : leftClosing = rightClosing := by
+    rcases Nat.lt_trichotomy leftClosing rightClosing with lt | same | gt
+    · exact absurd ⟨leftClosingSpan, left.closingToken⟩
+        (right.first leftClosing left.after lt)
+    · exact same
+    · exact absurd ⟨rightClosingSpan, right.closingToken⟩
+        (left.first rightClosing right.after gt)
+  subst closingEq
+  have openingEq := left.opening.2.symm.trans right.opening.2
+  have closingSpanEq := left.closingToken.2.symm.trans right.closingToken.2
+  simp only [Option.some.injEq, Located.mk.injEq, and_true] at openingEq closingSpanEq
+  exact ⟨rfl, openingEq, closingSpanEq⟩
+
+/-- Where a suffix starts, one is not absent. -/
+theorem ArraySuffixAt.not_absent {input : Remainder} {closing : Nat}
+    {openingSpan closingSpan : SourceSpan}
+    (brackets : ArraySuffixAt input closing openingSpan closingSpan) :
+    ¬ ArraySuffixAbsentAt input := fun absent =>
+  absent openingSpan brackets.opening closing brackets.after
+    brackets.closingToken.1 ⟨closingSpan, brackets.closingToken⟩
+
+/-- No `[` at the cursor: no suffix starts there. -/
+theorem ArraySuffixAbsentAt.of_bracketAbsent {input : Remainder}
+    (bracketAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+      (.symbol .leftBracket)) :
+    ArraySuffixAbsentAt input := fun openingSpan opening =>
+  absurd ⟨openingSpan, opening⟩ bracketAbsent
+
 /-- Array suffixes end at one remainder, whatever their element. -/
 theorem TypeArraySuffixesParses.output_unique
     {leftElement rightElement left right : Syntax.TypeExpr}
@@ -203,9 +238,18 @@ theorem TypeArraySuffixesParses.output_unique
     (leftParsed : TypeArraySuffixesParses leftElement input left afterLeft)
     (rightParsed : TypeArraySuffixesParses rightElement input right afterRight) :
     afterLeft = afterRight := by
-  cases leftParsed
-  cases rightParsed
-  rfl
+  induction leftParsed generalizing rightElement right afterRight with
+  | done absent =>
+      cases rightParsed with
+      | done => rfl
+      | suffix brackets => exact absurd absent brackets.not_absent
+  | suffix brackets _ restIH =>
+      cases rightParsed with
+      | done absent => exact absurd absent brackets.not_absent
+      | suffix rightBrackets rightRest =>
+          rcases brackets.unique rightBrackets with ⟨closingEq, _, _⟩
+          subst closingEq
+          exact restIH rightRest
 
 /-- A base type form has a unique output remainder. -/
 theorem TypeExprBaseParses.output_unique {input : Remainder}

@@ -476,10 +476,12 @@ named in the [open decisions](#open-decisions) beyond the ones listed there.
   abi-fixed-yul, memory-random-o0, abi-random-o2 and fuzz-o0. RustParity's 31 cases contain no
   array, so they are unchanged too.
 - **The source-to-Rust harnesses** compare Core references with the Rust paths and are unchanged.
-- **Lean tests.** The only existing tests that change are the parser's expected-token lists after
-  a type, which gain `[` in step 1. Upstream's snapshot
-  `crates/uitest/tests/fixtures/parse/struct_field_missing_semicolon/diagnostics.snap` changed the
-  same way. Everything else is new tests.
+- **Lean tests.** The existing tests that change in step 1a are those that state the type parser's
+  exact result: a type followed by another token gains the premise that the token is not `[`, and a
+  dispatch test states the base form's dispatch. Upstream's snapshot
+  `crates/uitest/tests/fixtures/parse/struct_field_missing_semicolon/diagnostics.snap` gained `[`
+  in its expected tokens. Lean's expected tokens after a type do not change, since Lean reports
+  only the failing parser's own expectation. Everything else is new tests.
 
 ## Open decisions
 

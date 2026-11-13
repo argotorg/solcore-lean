@@ -304,7 +304,8 @@ theorem typeExprWithFuel_ordinary_of_remainingCount_lt :
         cursorLtOnSuccess := typeExprWithFuel_cursor_lt_onSuccess fuel
         ordinary := inductionHypothesis
       }
-      simp only [typeExprWithFuel]
+      apply typeExprWithFuel_succ_ordinary_of_base
+      simp only [typeExprBase]
       split
       · exact parseFunctionType_ordinary_of_elementFuel
           (typeExprWithFuel fuel) fuel nestedContract input inputValid

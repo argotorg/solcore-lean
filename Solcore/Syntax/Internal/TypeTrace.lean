@@ -3593,6 +3593,127 @@ end Solcore.Syntax.DeclarativeGrammar
 end
 
 section
+/-! Array suffix traces: upstream's fixed-size array error for each sized
+suffix in order, then its nesting error after a run longer than its room. A
+base form's trace comes first, as upstream emits the suffix errors after it. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.DeclarativeGrammar
+
+/-- The diagnostic of one suffix: none for `[]`, and upstream's fixed-size
+array error over the brackets of `[k]`. -/
+def arraySuffixTrace (input : Remainder) (closing : Nat)
+    (openingSpan closingSpan : SourceSpan) : List ParseDiagnostic :=
+  if closing = input.cursor + 1 then []
+  else [fixedSizeArrayDiagnostic (SourceSpan.cover openingSpan closingSpan)]
+
+/-- The diagnostic after a run of `count` suffixes that built `result`. -/
+def arraySuffixCountTrace (count : Nat) (result : Syntax.TypeExpr) :
+    List ParseDiagnostic :=
+  if arraySuffixRoom < count then [arraySuffixNestingDiagnostic result.span]
+  else []
+
+/-- Array suffixes and their diagnostics, after `count` suffixes before
+`input`. -/
+inductive TypeArraySuffixesTraceParses :
+    Nat → Syntax.TypeExpr → Remainder → Syntax.TypeExpr → Remainder →
+      List ParseDiagnostic → Prop where
+  | done {count : Nat} {element : Syntax.TypeExpr} {input : Remainder}
+      (absent : ArraySuffixAbsentAt input) :
+      TypeArraySuffixesTraceParses count element input element input
+        (arraySuffixCountTrace count element)
+  | suffix {count : Nat} {element result : Syntax.TypeExpr}
+      {input output : Remainder} {closing : Nat}
+      {openingSpan closingSpan : SourceSpan} {trace : List ParseDiagnostic}
+      (brackets : ArraySuffixAt input closing openingSpan closingSpan)
+      (rest : TypeArraySuffixesTraceParses (count + 1)
+        (Syntax.TypeExpr.arrayOf element openingSpan closingSpan)
+        { input with cursor := closing + 1 } result output trace) :
+      TypeArraySuffixesTraceParses count element input result output
+        (arraySuffixTrace input closing openingSpan closingSpan ++ trace)
+
+/-- A base form's trace, then its suffixes' trace. -/
+inductive TypeSuffixedTraceParses
+    (elementTrace : SourceId → Nat → Remainder → Syntax.TypeExpr → Remainder →
+      List ParseDiagnostic → Prop)
+    (source : SourceId) (endByte : Nat) :
+    Remainder → Syntax.TypeExpr → Remainder → List ParseDiagnostic → Prop where
+  | suffixed {input afterBase output : Remainder} {base value : Syntax.TypeExpr}
+      {baseTrace suffixTrace : List ParseDiagnostic}
+      (baseParsed : TypeDispatchTraceParses elementTrace source endByte input base
+        afterBase baseTrace)
+      (suffixesParsed : TypeArraySuffixesTraceParses 0 base afterBase value output
+        suffixTrace) :
+      TypeSuffixedTraceParses elementTrace source endByte input value output
+        (baseTrace ++ suffixTrace)
+
+theorem TypeArraySuffixesTraceParses.result_unique {count : Nat}
+    {element left right : Syntax.TypeExpr} {input afterLeft afterRight : Remainder}
+    {leftTrace rightTrace : List ParseDiagnostic}
+    (leftParsed : TypeArraySuffixesTraceParses count element input left afterLeft
+      leftTrace)
+    (rightParsed : TypeArraySuffixesTraceParses count element input right afterRight
+      rightTrace) :
+    left = right ∧ afterLeft = afterRight ∧ leftTrace = rightTrace := by
+  induction leftParsed generalizing right afterRight rightTrace with
+  | done absent =>
+      cases rightParsed with
+      | done => exact ⟨rfl, rfl, rfl⟩
+      | suffix brackets => exact absurd absent brackets.not_absent
+  | suffix brackets _ restIH =>
+      cases rightParsed with
+      | done absent => exact absurd absent brackets.not_absent
+      | suffix rightBrackets rightRest =>
+          rcases brackets.unique rightBrackets with
+            ⟨closingEq, openingEq, closingSpanEq⟩
+          subst closingEq openingEq closingSpanEq
+          rcases restIH rightRest with ⟨valueEq, outputEq, traceEq⟩
+          exact ⟨valueEq, outputEq, by rw [traceEq]⟩
+
+theorem TypeArraySuffixesTraceParses.ordinary {count : Nat}
+    {element result : Syntax.TypeExpr} {input output : Remainder}
+    {trace : List ParseDiagnostic}
+    (parsed : TypeArraySuffixesTraceParses count element input result output trace) :
+    TypeArraySuffixesParses element input result output := by
+  induction parsed with
+  | done absent => exact .done absent
+  | suffix brackets _ restIH => exact .suffix brackets restIH
+
+theorem TypeArraySuffixesTraceParses.output_window {count : Nat}
+    {element result : Syntax.TypeExpr} {input output : Remainder}
+    {trace : List ParseDiagnostic}
+    (parsed : TypeArraySuffixesTraceParses count element input result output trace) :
+    output.tokens = input.tokens ∧ output.endIndex = input.endIndex := by
+  induction parsed with
+  | done => exact ⟨rfl, rfl⟩
+  | suffix _ _ restIH => exact restIH
+
+theorem TypeArraySuffixesTraceParses.cascadeFilters {count : Nat}
+    {element result : Syntax.TypeExpr} {input output : Remainder}
+    {trace : List ParseDiagnostic}
+    (parsed : TypeArraySuffixesTraceParses count element input result output trace)
+    (text : String) (lexical : List SourceSpan) :
+    ParseDiagnosticCascadeFilters text lexical trace trace := by
+  induction parsed with
+  | done =>
+      unfold arraySuffixCountTrace
+      split
+      · exact parseDiagnosticCascadeFilters_protected_cons
+          (by simp [arraySuffixNestingDiagnostic, LexicalCascadeCandidate]) .nil
+      · exact .nil
+  | suffix _ _ restIH =>
+      apply ParseDiagnosticCascadeFilters.append _ restIH
+      unfold arraySuffixTrace
+      split
+      · exact .nil
+      · exact parseDiagnosticCascadeFilters_protected_cons
+          (by simp [fixedSizeArrayDiagnostic, LexicalCascadeCandidate]) .nil
+
+end Solcore.Syntax.DeclarativeGrammar
+end
+
+section
 -- leanmerge: from Solcore.Syntax.DeclarativeTypeExprTraceGrammar
 /-! Fuel-free recursive type traces are the least simultaneous fixed point of
 the independent selected layer. Success and rejection share one query domain;
@@ -3611,7 +3732,7 @@ inductive TypeTraceQuery where
 
 def TypeTraceLayer (candidate : TypeTraceQuery → Prop) : TypeTraceQuery → Prop
   | .success source endByte input value output trace =>
-      TypeDispatchTraceParses (fun source endByte input value output trace =>
+      TypeSuffixedTraceParses (fun source endByte input value output trace =>
         candidate (.success source endByte input value output trace))
         source endByte input value output trace
   | .rejection source endByte input rejected report trace =>
@@ -3864,6 +3985,21 @@ theorem TypeDispatchTraceParses.mono
   cases parsed with
   | selected branch selection raw => exact .selected branch selection (TypeDispatchRawTraceParses.mono childMap raw)
 
+theorem TypeSuffixedTraceParses.mono
+    {elementTrace otherTrace : SourceId → Nat → Remainder → Syntax.TypeExpr →
+      Remainder → List ParseDiagnostic → Prop}
+    {source : SourceId} {endByte : Nat}
+    (childMap : ∀ {input value output trace},
+      elementTrace source endByte input value output trace →
+        otherTrace source endByte input value output trace)
+    {input output : Remainder} {value : Syntax.TypeExpr} {trace : List ParseDiagnostic}
+    (parsed : TypeSuffixedTraceParses elementTrace source endByte input value output
+      trace) :
+    TypeSuffixedTraceParses otherTrace source endByte input value output trace := by
+  cases parsed with
+  | suffixed baseParsed suffixesParsed =>
+      exact .suffixed (baseParsed.mono childMap) suffixesParsed
+
 theorem TypeDispatchRawTraceRejects.mono
     (successMap : ∀ {input value output trace},
       elementTrace source endByte input value output trace → otherTrace source endByte input value output trace)
@@ -3911,7 +4047,7 @@ theorem TypeTraceLayer.mono {left right : TypeTraceQuery → Prop}
     (step : TypeTraceLayer left query) : TypeTraceLayer right query := by
   cases query with
   | success source endByte input value output trace =>
-      exact TypeDispatchTraceParses.mono
+      exact TypeSuffixedTraceParses.mono
         (fun {input value output trace} parsed =>
           childMap (.success source endByte input value output trace) parsed) step
   | rejection source endByte input rejected report trace =>
@@ -3951,7 +4087,7 @@ theorem TypeTraceLeast.strong_induction
 theorem TypeExprTraceParses.unroll_iff {source : SourceId} {endByte : Nat}
     {input output : Remainder} {value : Syntax.TypeExpr} {trace : List ParseDiagnostic} :
     TypeExprTraceParses source endByte input value output trace ↔
-      TypeDispatchTraceParses TypeExprTraceParses source endByte input value output trace := by
+      TypeSuffixedTraceParses TypeExprTraceParses source endByte input value output trace := by
   change TypeTraceLeast (.success source endByte input value output trace) ↔
     TypeTraceLayer TypeTraceLeast (.success source endByte input value output trace)
   exact ⟨TypeTraceLeast.unroll, TypeTraceLeast.roll⟩
@@ -3967,9 +4103,18 @@ theorem TypeExprTraceRejects.unroll_iff {source : SourceId} {endByte : Nat}
 
 theorem TypeExprTraceParses.roll {source : SourceId} {endByte : Nat}
     {input output : Remainder} {value : Syntax.TypeExpr} {trace : List ParseDiagnostic}
-    (step : TypeDispatchTraceParses TypeExprTraceParses source endByte input value output trace) :
+    (step : TypeSuffixedTraceParses TypeExprTraceParses source endByte input value output trace) :
     TypeExprTraceParses source endByte input value output trace :=
   TypeExprTraceParses.unroll_iff.mpr step
+
+/-- A base form with no suffix after it is a whole type. -/
+theorem TypeExprTraceParses.roll_base {source : SourceId} {endByte : Nat}
+    {input output : Remainder} {value : Syntax.TypeExpr} {trace : List ParseDiagnostic}
+    (step : TypeDispatchTraceParses TypeExprTraceParses source endByte input value output trace)
+    (absent : ArraySuffixAbsentAt output) :
+    TypeExprTraceParses source endByte input value output trace := by
+  have rolled := TypeExprTraceParses.roll (.suffixed step (.done absent))
+  simpa only [arraySuffixCountTrace, Nat.not_lt_zero, ↓reduceIte, List.append_nil] using rolled
 
 theorem TypeExprTraceRejects.roll {source : SourceId} {endByte : Nat}
     {input rejected : Remainder} {report : ParseDiagnostic} {trace : List ParseDiagnostic}
@@ -4025,18 +4170,27 @@ private theorem agreesWithLeast_closed (query : TypeTraceQuery)
   cases query with
   | success source endByte input value output trace =>
       have agreement := typeDispatchTraceOutcomeAgreement (knownChildren_agree source endByte)
+      obtain ⟨baseParsed, suffixesParsed⟩ := step
       constructor
       · intro other after events right
-        exact agreement.successResultAgree step (TypeExprTraceParses.unroll_iff.mp right)
+        obtain ⟨rightBase, rightSuffixes⟩ := TypeExprTraceParses.unroll_iff.mp right
+        rcases agreement.successResultAgree baseParsed rightBase with
+          ⟨baseEq, afterBaseEq, baseTraceEq⟩
+        subst baseEq afterBaseEq baseTraceEq
+        rcases suffixesParsed.result_unique rightSuffixes with
+          ⟨valueEq, outputEq, suffixTraceEq⟩
+        exact ⟨valueEq, outputEq, by rw [suffixTraceEq]⟩
       · intro rejected report events right
-        exact agreement.successRejectDisjoint step (TypeExprTraceRejects.unroll_iff.mp right)
+        exact agreement.successRejectDisjoint baseParsed
+          (TypeExprTraceRejects.unroll_iff.mp right)
   | rejection source endByte input rejected report trace =>
       have agreement := typeDispatchTraceOutcomeAgreement (knownChildren_agree source endByte)
       constructor
       · intro after diagnostic events right
         exact agreement.rejectResultAgree step (TypeExprTraceRejects.unroll_iff.mp right)
       · intro value output events right
-        exact agreement.rejectSuccessDisjoint step (TypeExprTraceParses.unroll_iff.mp right)
+        obtain ⟨rightBase, _⟩ := TypeExprTraceParses.unroll_iff.mp right
+        exact agreement.rejectSuccessDisjoint step rightBase
 
 theorem TypeExprTraceParses.result_unique
     {source : SourceId} {endByte : Nat} {input afterLeft afterRight : Remainder}
@@ -4099,9 +4253,12 @@ private theorem successStructure_closed (query : TypeTraceQuery)
     (step : TypeTraceLayer successStructure query) : successStructure query := by
   cases query with
   | success source endByte input value output trace =>
+      obtain ⟨baseParsed, suffixesParsed⟩ := step
+      have baseWindow := TypeDispatchTraceParses.output_window (fun child => child.2) baseParsed
+      have suffixesWindow := suffixesParsed.output_window
       exact ⟨.suffixed (TypeDispatchTraceParses.ordinary (fun child => child.1)
-        (fun child => child.2) step) .done,
-        TypeDispatchTraceParses.output_window (fun child => child.2) step⟩
+        (fun child => child.2) baseParsed) suffixesParsed.ordinary,
+        suffixesWindow.1.trans baseWindow.1, suffixesWindow.2.trans baseWindow.2⟩
   | rejection => trivial
 
 theorem TypeExprTraceParses.ordinary
@@ -4126,7 +4283,10 @@ private theorem protectedEvents_closed (text : String) (lexical : List SourceSpa
     (query : TypeTraceQuery) (step : TypeTraceLayer (protectedEvents text lexical) query) :
     protectedEvents text lexical query := by
   cases query with
-  | success => exact TypeDispatchTraceParses.cascadeFilters (fun child => child) step
+  | success =>
+      obtain ⟨baseParsed, suffixesParsed⟩ := step
+      exact (TypeDispatchTraceParses.cascadeFilters (fun child => child) baseParsed).append
+        (suffixesParsed.cascadeFilters text lexical)
   | rejection => exact TypeDispatchTraceRejects.cascadeFilters (fun child => child) (fun child => child) step
 
 theorem TypeExprTraceParses.cascadeFilters

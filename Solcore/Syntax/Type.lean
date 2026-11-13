@@ -31,11 +31,23 @@ inductive TypeExprValue where
       (argumentsSpan : SourceSpan)
       (inner : Located TypeExprValue)
   | tuple (elements : List (Located TypeExprValue))
+  /-- `T[]`, an array of `element`; `brackets` covers the `[` and the `]`. -/
+  | array
+      (element : Located TypeExprValue)
+      (brackets : SourceSpan)
   | error
   deriving Repr, BEq
 
 /-- A complete type expression paired with its outer source range. -/
 abbrev TypeExpr := Located TypeExprValue
+
+/-- `element[]`: its range runs from the element to the `]`, and its brackets
+from the `[` to the `]`. -/
+def TypeExpr.arrayOf (element : TypeExpr)
+    (openingSpan closingSpan : SourceSpan) : TypeExpr := {
+  span := SourceSpan.cover element.span closingSpan
+  value := .array element (SourceSpan.cover openingSpan closingSpan)
+}
 
 /-- One trait predicate written `subject: Trait<arguments...>`. -/
 structure Predicate where

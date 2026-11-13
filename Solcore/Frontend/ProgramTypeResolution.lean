@@ -55,6 +55,8 @@ inductive ProgramTypeResolutionError where
   | cyclicTypeAlias (cycle : List Resolved.DeclarationId)
   | aliasExpansionLimit
   | nestingLimit
+  /-- `T[]`, which has no meaning in Lean until memory arrays do. -/
+  | unsupportedArrayType
   deriving Repr, DecidableEq
 
 /-- Exact source spelling components, with all occurrence spans erased. -/
@@ -209,6 +211,7 @@ mutual
     | fuel + 1, ⟨_, .tuple elements⟩ => do
         let resolved ← resolveProgramTypeExprListFuel environment scope fuel elements
         pure (tupleProgramType resolved)
+    | _ + 1, ⟨_, .array _ _⟩ => .error .unsupportedArrayType
     | _ + 1, ⟨_, .error⟩ => pure .error
 
   private def resolveProgramTypeExprListFuel
@@ -818,6 +821,8 @@ private theorem resolveProgramTypeFuel_variablesBelow
                 subst resolved
                 exact tupleProgramType_variablesBelow
                   (listInduction _ _ elementsResult)
+        | array element brackets =>
+            simp [resolveProgramTypeExprFuel] at success
         | error =>
             simp [resolveProgramTypeExprFuel, pure, Pure.pure,
               Except.pure] at success

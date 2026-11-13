@@ -203,7 +203,8 @@ theorem typeExprWithFuel_reject_sound :
       simp [typeExprWithFuel] at result
   | succ fuel inductionHypothesis =>
       intro input rejected failure result
-      simp only [typeExprWithFuel] at result
+      have result := typeExprWithFuel_succ_reject result
+      simp only [typeExprBase] at result
       split at result
       next functionPresent =>
         exact .function (parseFunctionType_reject_type_sound

@@ -160,28 +160,98 @@ def startsTypeExpr (state : State) : Bool :=
   isKeyword state .functionKw || isSymbol state .at ||
     isSymbol state .leftParen || isIdentifier state
 
-/-- Recursive Core type parser, parameterized by remaining nesting depth. -/
+namespace TypeArrayInternals
+
+/-- The first `]` at or after `index` in the window, and its index, looking at
+no more than `fuel` tokens. -/
+def closingBracket? (tokens : Array Token) (endIndex : Nat) :
+    Nat → Nat → Option (Nat × Token)
+  | 0, _ => none
+  | fuel + 1, index =>
+      if index < endIndex then
+        match tokens[index]? with
+        | some token =>
+            if token.value = .symbol .rightBracket then some (index, token)
+            else closingBracket? tokens endIndex fuel (index + 1)
+        | none => none
+      else none
+
+/-- The suffix at the cursor: its `[`, and the index of the first `]` after it
+in the window with that token. -/
+def suffixAt? (state : State) : Option (Token × Nat × Token) :=
+  match state.peek? with
+  | some opening =>
+      if opening.value = .symbol .leftBracket then
+        (closingBracket? state.tokens state.window.endIndex state.remainingCount
+          (state.cursor + 1)).map fun found => (opening, found.1, found.2)
+      else none
+  | none => none
+
+/-- The state after one suffix: past its `]`, with upstream's fixed-size array
+error if it has a size. -/
+def afterSuffix (state : State) (opening : Token) (closing : Nat)
+    (closingToken : Token) : State :=
+  if closing = state.cursor + 1 then { state with cursor := closing + 1 }
+  else { state with cursor := closing + 1 }.emit
+    (fixedSizeArrayDiagnostic (SourceSpan.cover opening.span closingToken.span))
+
+/-- After a run of `count` suffixes on `result`: upstream's nesting error if the
+run is longer than its room. -/
+def finishArraySuffixes (count : Nat) (result : TypeExpr) : Parser TypeExpr :=
+  fun state =>
+    if arraySuffixRoom < count then
+      .ok result (state.emit (arraySuffixNestingDiagnostic result.span))
+    else .ok result state
+
+end TypeArrayInternals
+
+open TypeArrayInternals in
+/-- The array suffixes after `element`, `count` of them so far, folded left to
+right as upstream's `crates/parser/src/parse/types.rs:186-224` reads them. A
+suffix runs from a `[` to the first `]` after it. Tokens between are a size,
+which gets upstream's fixed-size array error. A `[` with no `]` after it in the
+window ends the run, as upstream's `repeated()` rewinds a suffix that fails. -/
+def arraySuffixes : Nat → Nat → TypeExpr → Parser TypeExpr
+  | 0, _, _ => fun state =>
+      .invariant (.fuelExhausted .typeExpr state.currentSpan)
+  | fuel + 1, count, element => fun state =>
+      match suffixAt? state with
+      | some (opening, closing, closingToken) =>
+          arraySuffixes fuel (count + 1)
+            (TypeExpr.arrayOf element opening.span closingToken.span)
+            (afterSuffix state opening closing closingToken)
+      | none => finishArraySuffixes count element state
+
+/-- The array suffixes after a complete base type, with fuel for every token
+left. -/
+def typeArraySuffixes (element : TypeExpr) : Parser TypeExpr := fun state =>
+  arraySuffixes (state.remainingCount + 1) 0 element state
+
+/-- The base form a type starts with, chosen by its first token. -/
+def typeExprBase (nested : Parser TypeExpr) : Parser TypeExpr := fun state =>
+  if isKeyword state .functionKw then
+    parseFunctionType nested state
+  else if isContextual state .comptime &&
+      hasFollowingSymbol state .less then
+    parseComptimeType nested state
+  else if isContextual state .mapping &&
+      hasFollowingSymbol state .leftParen then
+    parseMappingType nested state
+  else if isSymbol state .at then
+    parseProxyType nested state
+  else if isSymbol state .leftParen then
+    parseTupleType nested state
+  else if isIdentifier state then
+    parseNamedType nested state
+  else
+    rejectAt state { head := .typeExpr, tail := [] } .typeExpr
+
+/-- Recursive Core type parser, parameterized by remaining nesting depth: a base
+form, then its array suffixes. -/
 def typeExprWithFuel : Nat → Parser TypeExpr
   | 0 => fun state =>
       .invariant (.fuelExhausted .typeExpr state.currentSpan)
-  | fuel + 1 => fun state =>
-      let nested := typeExprWithFuel fuel
-      if isKeyword state .functionKw then
-        parseFunctionType nested state
-      else if isContextual state .comptime &&
-          hasFollowingSymbol state .less then
-        parseComptimeType nested state
-      else if isContextual state .mapping &&
-          hasFollowingSymbol state .leftParen then
-        parseMappingType nested state
-      else if isSymbol state .at then
-        parseProxyType nested state
-      else if isSymbol state .leftParen then
-        parseTupleType nested state
-      else if isIdentifier state then
-        parseNamedType nested state
-      else
-        rejectAt state { head := .typeExpr, tail := [] } .typeExpr
+  | fuel + 1 => typeExprBase (typeExprWithFuel fuel) >>= typeArraySuffixes
 
 /-- Parse one complete canonical Core type expression. -/
 def typeExpr : Parser TypeExpr := fun state =>

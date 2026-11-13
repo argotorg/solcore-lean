@@ -3468,7 +3468,8 @@ theorem selectedBranch_eq_iff {input : State} {branch : TypeDispatchBranch} :
   · exact (selectedBranch_selects input).branch_unique
 
 theorem typeExprWithFuel_eq_selected_raw (fuel : Nat) (input : State) :
-    typeExprWithFuel (fuel + 1) input = rawParser (typeExprWithFuel fuel) (selectedBranch input) input := by
+    typeExprBase (typeExprWithFuel fuel) input =
+      rawParser (typeExprWithFuel fuel) (selectedBranch input) input := by
   change (if isKeyword input .functionKw then parseFunctionType (typeExprWithFuel fuel) input
     else if isContextual input .comptime && (input.peekOffsetKind? 1 == some (.symbol .less)) then
       parseComptimeType (typeExprWithFuel fuel) input
@@ -3485,7 +3486,8 @@ end TypeDispatchTraceInternals
 
 theorem typeExprWithFuel_eq_raw_of_selection (fuel : Nat) {input : State} {branch : TypeDispatchBranch}
     (selection : TypeDispatchSelects input.declarativeRemainder branch) :
-    typeExprWithFuel (fuel + 1) input = TypeDispatchTraceInternals.rawParser (typeExprWithFuel fuel) branch input := by
+    typeExprBase (typeExprWithFuel fuel) input =
+      TypeDispatchTraceInternals.rawParser (typeExprWithFuel fuel) branch input := by
   rw [TypeDispatchTraceInternals.typeExprWithFuel_eq_selected_raw,
     TypeDispatchTraceInternals.selectedBranch_eq_iff.mpr selection]
 
@@ -3993,13 +3995,24 @@ theorem parseFunctionType_preservesFile (nested : Parser TypeExpr)
   intro returns
   exact Parser.pure_preservesFile _
 
+/-- The suffixes after a base type keep the source file. -/
+theorem typeArraySuffixes_preservesFile (element : TypeExpr) :
+    Parser.PreservesFile (typeArraySuffixes element) := by
+  intro input
+  rcases typeArraySuffixes_ok element input with ⟨value, next, result⟩
+  rw [result]
+  rcases arraySuffixes_ok_frame _ _ _ result with ⟨cursor, extra, nextEq, _⟩
+  subst nextEq
+  rfl
+
 theorem typeExprWithFuel_preservesFile (fuel : Nat) :
     Parser.PreservesFile (typeExprWithFuel fuel) := by
   induction fuel with
   | zero => intro input; trivial
   | succ fuel ih =>
+      refine Parser.bind_preservesFile ?_ typeArraySuffixes_preservesFile
       intro input
-      simp only [typeExprWithFuel]
+      simp only [typeExprBase]
       split
       · exact parseFunctionType_preservesFile _ ih input
       · split
@@ -4031,6 +4044,14 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser
 
+/-- The suffixes after a base type keep the file and the window. -/
+theorem typeArraySuffixes_success_context {element : TypeExpr} :
+    ParserSuccessContext (typeArraySuffixes element) := by
+  intro input output value result
+  rcases arraySuffixes_ok_frame _ _ _ result with ⟨cursor, extra, outputEq, _⟩
+  subst outputEq
+  exact ⟨rfl, rfl⟩
+
 theorem typeExprWithFuel_success_context (fuel : Nat) :
     ParserSuccessContext (typeExprWithFuel fuel) := by
   induction fuel with
@@ -4038,8 +4059,12 @@ theorem typeExprWithFuel_success_context (fuel : Nat) :
       intro input output value result
       simp [typeExprWithFuel] at result
   | succ fuel ih =>
-      intro input output value result
-      simp only [typeExprWithFuel] at result
+      intro input layerOutput layerValue layerResult
+      rcases typeExprWithFuel_succ_ok layerResult with ⟨value, output, result, suffixes⟩
+      have suffixesContext := typeArraySuffixes_success_context suffixes
+      suffices base : output.file = input.file ∧ output.window = input.window from
+        ⟨suffixesContext.1.trans base.1, suffixesContext.2.trans base.2⟩
+      simp only [typeExprBase] at result
       split at result
       · exact parseFunctionType_success_context ih result
       · split at result
@@ -4128,6 +4153,7 @@ theorem typeExprWithFuel_dispatch_reject_trace_sound (fuel : Nat)
     (rejectSound : ParserTraceRejectSound (typeExprWithFuel fuel) elementRejects) :
     ParserTraceRejectSound (typeExprWithFuel (fuel + 1)) (TypeDispatchTraceRejects elementTrace elementRejects) := by
   intro input rejected failure result
+  have result := typeExprWithFuel_succ_reject result
   rw [typeExprWithFuel_eq_selected_raw] at result
   rcases raw_reject_trace_sound successSound rejectSound (typeExprWithFuel_success_context fuel)
       (selectedBranch input) result with
@@ -4143,7 +4169,8 @@ theorem typeExprWithFuel_dispatch_trace_reject_complete (fuel : Nat)
   | selected branch selection raw =>
       rcases raw_trace_reject_complete successComplete rejectComplete (typeExprWithFuel_success_context fuel) branch raw with
         ⟨failure, rejected, result, afterEq, reportEq, events⟩
-      exact ⟨failure, rejected, (typeExprWithFuel_eq_raw_of_selection fuel selection).trans result,
+      exact ⟨failure, rejected, typeExprWithFuel_succ_reject_of_base
+        ((typeExprWithFuel_eq_raw_of_selection fuel selection).trans result),
         afterEq, reportEq, events⟩
 
 theorem typeExprWithFuel_dispatch_trace_reject_iff (fuel : Nat)
@@ -4246,7 +4273,8 @@ end TypeDispatchTraceInternals
 
 theorem typeExprWithFuel_dispatch_trace_success_sound (fuel : Nat)
     (successSound : ParserTraceSuccessSound (typeExprWithFuel fuel) elementTrace) :
-    ParserTraceSuccessSound (typeExprWithFuel (fuel + 1)) (TypeDispatchTraceParses elementTrace) := by
+    ParserTraceSuccessSound (typeExprBase (typeExprWithFuel fuel))
+      (TypeDispatchTraceParses elementTrace) := by
   intro input output value result
   rw [typeExprWithFuel_eq_selected_raw] at result
   rcases raw_trace_success_sound successSound (typeExprWithFuel_success_context fuel) (selectedBranch input) result with
@@ -4255,7 +4283,8 @@ theorem typeExprWithFuel_dispatch_trace_success_sound (fuel : Nat)
 
 theorem typeExprWithFuel_dispatch_trace_success_complete (fuel : Nat)
     (successComplete : ParserTraceSuccessComplete (typeExprWithFuel fuel) elementTrace) :
-    ParserTraceSuccessComplete (typeExprWithFuel (fuel + 1)) (TypeDispatchTraceParses elementTrace) := by
+    ParserTraceSuccessComplete (typeExprBase (typeExprWithFuel fuel))
+      (TypeDispatchTraceParses elementTrace) := by
   intro input value after trace parsed
   cases parsed with
   | selected branch selection raw =>
@@ -4273,7 +4302,7 @@ theorem typeExprWithFuel_dispatch_trace_success_iff (fuel : Nat)
     {input : State} {value : TypeExpr} {after : Remainder} {trace : List ParseDiagnostic} :
     TypeDispatchTraceParses elementTrace input.file.id input.window.endByte
       input.declarativeRemainder value after trace ↔
-    ∃ output, typeExprWithFuel (fuel + 1) input = .ok value output ∧
+    ∃ output, typeExprBase (typeExprWithFuel fuel) input = .ok value output ∧
       output.declarativeRemainder = after ∧ output.diagnostics = input.diagnostics ++ trace := by
   constructor
   · exact typeExprWithFuel_dispatch_trace_success_complete fuel successComplete
@@ -4299,6 +4328,58 @@ namespace Solcore.Syntax.Parser
 
 open DeclarativeGrammar
 
+namespace TypeArrayInternals
+
+/-- One suffix adds its own diagnostic, if any, to the state. -/
+theorem afterSuffix_diagnostics (input : State) (opening : Token) (closing : Nat)
+    (closingToken : Token) :
+    (afterSuffix input opening closing closingToken).diagnostics =
+      input.diagnostics ++ arraySuffixTrace input.declarativeRemainder closing
+        opening.span closingToken.span := by
+  by_cases sizeless : closing = input.cursor + 1 <;>
+    simp [afterSuffix, arraySuffixTrace, sizeless, State.emit, State.diagnostics,
+      State.declarativeRemainder]
+
+end TypeArrayInternals
+
+open TypeArrayInternals in
+/-- A successful run of suffixes emits exactly their trace. -/
+theorem arraySuffixes_trace_success_sound : ∀ fuel count element {input : State}
+    {value : TypeExpr} {next : State},
+    arraySuffixes fuel count element input = .ok value next →
+    ∃ trace, TypeArraySuffixesTraceParses count element input.declarativeRemainder value
+        next.declarativeRemainder trace ∧
+      next.diagnostics = input.diagnostics ++ trace := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro count element input value next result
+      simp [arraySuffixes] at result
+  | succ fuel ih =>
+      intro count element input value next result
+      simp only [arraySuffixes] at result
+      split at result
+      next opening closing closingToken found =>
+        rcases ih (count + 1) _ result with ⟨trace, rest, events⟩
+        have shape : (afterSuffix input opening closing closingToken).declarativeRemainder =
+            { input.declarativeRemainder with cursor := closing + 1 } := by
+          unfold afterSuffix
+          split <;> rfl
+        rw [shape] at rest
+        exact ⟨_, .suffix (arraySuffixAt_of_suffixAt? found) rest,
+          by rw [events, afterSuffix_diagnostics, List.append_assoc]⟩
+      next missing =>
+        simp only [finishArraySuffixes] at result
+        split at result
+        next over =>
+          cases result
+          exact ⟨_, .done (arraySuffixAbsentAt_of_suffixAt? missing),
+            by simp [arraySuffixCountTrace, over, State.emit, State.diagnostics]⟩
+        next within =>
+          cases result
+          exact ⟨_, .done (arraySuffixAbsentAt_of_suffixAt? missing),
+            by simp [arraySuffixCountTrace, within]⟩
+
 private theorem typeTraceSoundAtFuel (fuel : Nat) :
     ParserTraceSuccessSound (typeExprWithFuel fuel) TypeExprTraceParses ∧
     ParserTraceRejectSound (typeExprWithFuel fuel) TypeExprTraceRejects := by
@@ -4312,9 +4393,13 @@ private theorem typeTraceSoundAtFuel (fuel : Nat) :
   | succ fuel ih =>
       constructor
       · intro input output value result
-        rcases typeExprWithFuel_dispatch_trace_success_sound fuel ih.1 result with
-          ⟨trace, step, events⟩
-        exact ⟨trace, TypeExprTraceParses.roll step, events⟩
+        rcases typeExprWithFuel_succ_ok result with ⟨base, afterBase, baseResult, suffixes⟩
+        rcases typeExprWithFuel_dispatch_trace_success_sound fuel ih.1 baseResult with
+          ⟨baseTrace, step, baseEvents⟩
+        rcases arraySuffixes_trace_success_sound _ _ _ suffixes with
+          ⟨suffixTrace, suffixesStep, suffixEvents⟩
+        exact ⟨baseTrace ++ suffixTrace, TypeExprTraceParses.roll (.suffixed step suffixesStep),
+          by rw [suffixEvents, baseEvents, List.append_assoc]⟩
       · intro input rejected failure result
         rcases typeExprWithFuel_dispatch_reject_trace_sound fuel ih.1 ih.2 result with
           ⟨trace, step, events⟩
@@ -4476,7 +4561,8 @@ theorem typeExprWithFuel_ordinary_of_remainingCount_lt_unrestricted :
         cursorLtOnSuccess := typeExprWithFuel_cursor_lt_onSuccess fuel
         ordinary := ih
       }
-      simp only [typeExprWithFuel]
+      apply typeExprWithFuel_succ_ordinary_of_base
+      simp only [typeExprBase]
       split
       · exact parseFunctionType_ordinary_of_unrestrictedElementFuel
           (typeExprWithFuel fuel) fuel children input (by omega)

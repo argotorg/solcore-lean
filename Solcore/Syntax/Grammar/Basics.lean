@@ -698,12 +698,48 @@ inductive NoTrailingDelimitedListParses {α : Type}
 
 /-! Recursive grammar of canonical type-expression token shapes. -/
 
-/-- The suffixes after a complete base type. The layer has one rule so far:
-`done`, no suffix, so it accepts exactly the types it accepted before. -/
+/-- No array suffix starts at the cursor: no `[`, or no `]` after it in the
+window. -/
+def ArraySuffixAbsentAt (input : Remainder) : Prop :=
+  ∀ openingSpan, TokenAt input.tokens input.endIndex input.cursor {
+      span := openingSpan
+      value := .symbol .leftBracket
+    } →
+    ∀ index, input.cursor < index → index < input.endIndex →
+      TokenKindAbsentAt input.tokens input.endIndex index (.symbol .rightBracket)
+
+/-- The brackets of one array suffix: a `[` at the cursor and the first `]`
+after it, at `closing`. Tokens between them are a size. -/
+structure ArraySuffixAt (input : Remainder) (closing : Nat)
+    (openingSpan closingSpan : SourceSpan) : Prop where
+  opening : TokenAt input.tokens input.endIndex input.cursor {
+    span := openingSpan
+    value := .symbol .leftBracket
+  }
+  after : input.cursor < closing
+  first : ∀ index, input.cursor < index → index < closing →
+    TokenKindAbsentAt input.tokens input.endIndex index (.symbol .rightBracket)
+  closingToken : TokenAt input.tokens input.endIndex closing {
+    span := closingSpan
+    value := .symbol .rightBracket
+  }
+
+/-- The array suffixes after a complete base type, folded left to right, as
+upstream's `crates/parser/src/parse/types.rs:186-224` reads them. The run is
+maximal: it ends where no suffix starts, so a `[` with no `]` after it in the
+window ends it, as upstream's `repeated()` rewinds a suffix that fails. -/
 inductive TypeArraySuffixesParses :
     Syntax.TypeExpr → Remainder → Syntax.TypeExpr → Remainder → Prop where
-  | done {element : Syntax.TypeExpr} {input : Remainder} :
+  | done {element : Syntax.TypeExpr} {input : Remainder}
+      (absent : ArraySuffixAbsentAt input) :
       TypeArraySuffixesParses element input element input
+  | suffix {element result : Syntax.TypeExpr} {input output : Remainder}
+      {closing : Nat} {openingSpan closingSpan : SourceSpan}
+      (brackets : ArraySuffixAt input closing openingSpan closingSpan)
+      (rest : TypeArraySuffixesParses
+        (Syntax.TypeExpr.arrayOf element openingSpan closingSpan)
+        { input with cursor := closing + 1 } result output) :
+      TypeArraySuffixesParses element input result output
 
 /-
 Independent recursive grammar of every non-recovery type expression, together

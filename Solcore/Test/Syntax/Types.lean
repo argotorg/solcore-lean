@@ -42,6 +42,8 @@ theorem checked_name_type_with_positive_fuel
     (diagnostics : IdentifierDiagnosticTrace name trace)
     (dotAbsent : TokenKindAbsentAt input.tokens input.window.endIndex (input.cursor + 1) (.symbol .dot))
     (argumentsAbsent : TokenKindAbsentAt input.tokens input.window.endIndex (input.cursor + 1) (.symbol .less))
+    (bracketAbsent : TokenKindAbsentAt input.tokens input.window.endIndex (input.cursor + 1)
+      (.symbol .leftBracket))
     (notComptime : name.value ≠ ContextualKeyword.comptime.spelling)
     (notMapping : name.value ≠ ContextualKeyword.mapping.spelling) :
     typeExprWithFuel (fuel + 1) input =
@@ -87,7 +89,8 @@ theorem checked_name_type_with_positive_fuel
     simp only [isSymbol, State.peekKind?, current, Option.map_some]; rfl
   have named : isIdentifier input = true := by
     simp only [isIdentifier, State.peekKind?, current, Option.map_some]
-  simpa only [typeExprWithFuel, noFunction, noComptime, noMapping, noProxy, noTuple,
+  apply typeExprWithFuel_succ_eq_of_base _ bracketAbsent
+  simpa only [typeExprBase, noFunction, noComptime, noMapping, noProxy, noTuple,
     named, Bool.false_and, Bool.false_eq_true, if_false, if_true] using namedResult
 
 theorem checked_name_type
@@ -97,11 +100,14 @@ theorem checked_name_type
     (diagnostics : IdentifierDiagnosticTrace name trace)
     (dotAbsent : TokenKindAbsentAt input.tokens input.window.endIndex (input.cursor + 1) (.symbol .dot))
     (argumentsAbsent : TokenKindAbsentAt input.tokens input.window.endIndex (input.cursor + 1) (.symbol .less))
+    (bracketAbsent : TokenKindAbsentAt input.tokens input.window.endIndex (input.cursor + 1)
+      (.symbol .leftBracket))
     (notComptime : name.value ≠ ContextualKeyword.comptime.spelling)
     (notMapping : name.value ≠ ContextualKeyword.mapping.spelling) :
     typeExpr input = .ok (namedTypeTraceValue (tracedQualifiedName name []) none)
       { input with cursor := input.cursor + 1, diagnosticsRev := trace.reverse ++ input.diagnosticsRev } :=
-  checked_name_type_with_positive_fuel input.remainingCount token diagnostics dotAbsent argumentsAbsent notComptime notMapping
+  checked_name_type_with_positive_fuel input.remainingCount token diagnostics dotAbsent argumentsAbsent
+    bracketAbsent notComptime notMapping
 
 end Solcore.Test.SyntaxCheckedTypeLeafTraceSupport
 end
@@ -147,8 +153,13 @@ theorem singleton_trailing_checked_type_list
     rintro ⟨span, other⟩
     have impossible := congrArg (·.value) (comma.token_unique other)
     cases impossible
+  have noBracket : TokenKindAbsentAt input.tokens input.window.endIndex (input.cursor + 2)
+      (.symbol .leftBracket) := by
+    rintro ⟨span, other⟩
+    have impossible := congrArg (·.value) (comma.token_unique other)
+    cases impossible
   have child := checked_name_type (input := { input with cursor := input.cursor + 1 })
-    nameAt nameTrace noDot noArgs notComptime notMapping
+    nameAt nameTrace noDot noArgs noBracket notComptime notMapping
   have marker := symbol_eq_ok_of_exactTokenParses .leftParen .typeExpr
     (input := input) ⟨opening, rfl⟩
   have first : ({ input with cursor := input.cursor + 1 } : State).peek? =
@@ -195,8 +206,13 @@ theorem checked_type_list_missing_separator
     rintro ⟨span, other⟩
     have impossible := congrArg (·.value) (bad.token_unique other)
     cases impossible
+  have noBracket : TokenKindAbsentAt input.tokens input.window.endIndex (input.cursor + 2)
+      (.symbol .leftBracket) := by
+    rintro ⟨span, other⟩
+    have impossible := congrArg (·.value) (bad.token_unique other)
+    cases impossible
   have child := checked_name_type (input := { input with cursor := input.cursor + 1 })
-    nameAt nameTrace noDot noArgs notComptime notMapping
+    nameAt nameTrace noDot noArgs noBracket notComptime notMapping
   have marker := symbol_eq_ok_of_exactTokenParses .leftParen .typeExpr
     (input := input) ⟨opening, rfl⟩
   have first : ({ input with cursor := input.cursor + 1 } : State).peek? =
@@ -1389,6 +1405,7 @@ private inductive TypeShape where
       (returns : Option (List TypeShape))
   | comptime (inner : TypeShape)
   | tuple (elements : List TypeShape)
+  | array (element : TypeShape)
   | error
   deriving Repr, BEq, Inhabited
 
@@ -1420,6 +1437,7 @@ private partial def typeShape (type : TypeExpr) : TypeShape :=
         (returns.map fun values => values.elements.map typeShape)
   | .comptime _ _ inner => .comptime (typeShape inner)
   | .tuple elements => .tuple (elements.map typeShape)
+  | .array element _ => .array (typeShape element)
   | .error => .error
 
 private def asTypeAlias? (item : TopItem) : Option TypeAliasDecl :=
@@ -1590,6 +1608,95 @@ private def testHyphenDiagnostic : IO Unit := do
   assertEqual (byteRange declaration.value.name.span) (5, 13)
     "hyphen diagnostic span"
 
+private def diagnosticRanges (output : ParseOutput) :
+    List (ByteRange × ParseDiagnosticKind) :=
+  output.parseDiagnostics.map fun diagnostic =>
+    (byteRange diagnostic.span, diagnostic.kind)
+
+/-- `T[]` on every base form, folded left to right; a `[` with no `]` after it
+ends the type, as upstream's `repeated()` rewinds. -/
+private def testArrayTypes : IO Unit := do
+  let output ← checkedParse "array types" (String.intercalate "\n" [
+    "type Words = word[];",
+    "type Grid = uint256[][];",
+    "type Pairs = (A, B)[];",
+    "type Callables = function(A) returns (B)[];",
+    "type Proxies = @word[];",
+    "type Boxes = Box<word[]>[];",
+    "type Maps = mapping(K => V[])[];",
+    "type Spaced = word [ ] [ ];"
+  ])
+  assertEqual output.parseDiagnostics [] "array type diagnostics"
+  let declarations ← aliasDeclarations "array types" output
+  assertEqual (aliasShapes declarations) [
+      .array (named "word"),
+      .array (.array (named "uint256")),
+      .array (.tuple [named "A", named "B"]),
+      .array (.function [named "A"] (some [named "B"])),
+      .proxy (.array (named "word")),
+      .array (.named ["Box"] (some [.array (named "word")])),
+      .array (.mapping (named "K") (.array (named "V"))),
+      .array (.array (named "word"))
+    ] "array type shapes"
+  let grid ← declarationAt "array types" declarations 1
+  assertEqual (byteRange grid.value.value.span) (33, 44) "outer array span"
+  match grid.value.value.value with
+  | .array inner brackets =>
+      assertEqual (byteRange brackets) (42, 44) "outer array brackets"
+      assertEqual (byteRange inner.span) (33, 42) "inner array span"
+  | _ => throw (IO.userError "the outer array changed shape")
+  let unclosed ← checkedParse "unclosed array suffix" "type Open = word[;"
+  assertEqual ((diagnosticRanges unclosed).map (·.1.1)) [16]
+    "an unclosed suffix ends the type at its `[`"
+  -- `crates/parser/tests/formatting.rs:119`
+  let formatting ← checkedParse "array type formatting source" (String.intercalate "\n" [
+    "pragma solcore;",
+    "contract C{xs:uint256[];grid:mapping(address=>Pair<word,uint256>[][]);}",
+    "function f(xs:uint256 [ ],ys:calldata<word[]>)returns(memory<DynArray<word>>[]){return [];}"
+  ])
+  assertEqual formatting.parseDiagnostics [] "array types in fields, parameters and results"
+
+/-- `T[k]` keeps `T[]` with upstream's error over its brackets, as in
+`crates/uitest/tests/fixtures/parse/fixed_size_array_rejected`. -/
+private def testFixedSizeArrays : IO Unit := do
+  let fixture ← checkedParse "fixed_size_array_rejected" (String.intercalate "\n" [
+    "pragma solcore;",
+    "",
+    "import * from std;",
+    "",
+    "// Fixed-size arrays are not supported yet; use `T[]`.",
+    "function f(xs: uint256[3]) returns (uint256) {",
+    "    return 0;",
+    "}"
+  ])
+  assertEqual (diagnosticRanges fixture)
+    [((114, 117), .constraintViolation .fixedSizeArray)]
+    "upstream's fixed-size array fixture"
+  let output ← checkedParse "fixed-size arrays" (String.intercalate "\n" [
+    "type Fixed = word[3];",
+    "type Mixed = word[][k + 1][];"
+  ])
+  assertEqual (diagnosticRanges output) [
+      ((17, 20), .constraintViolation .fixedSizeArray),
+      ((41, 48), .constraintViolation .fixedSizeArray)
+    ] "fixed-size array diagnostics"
+  let declarations ← aliasDeclarations "fixed-size arrays" output
+  assertEqual (aliasShapes declarations) [
+      .array (named "word"),
+      .array (.array (.array (named "word")))
+    ] "fixed-size arrays keep their suffix"
+
+/-- More than 127 suffixes on a type get upstream's nesting error over the
+whole type. -/
+private def testArraySuffixNesting : IO Unit := do
+  let suffixes (count : Nat) : String := String.join (List.replicate count "[]")
+  let within ← checkedParse "127 array suffixes" s!"type Deep = word{suffixes 127};"
+  assertEqual within.parseDiagnostics [] "127 suffixes are within the room"
+  let over ← checkedParse "128 array suffixes" s!"type Deeper = word{suffixes 128};"
+  assertEqual (diagnosticRanges over)
+    [((14, 274), .nestingExceeded .arraySuffix 128)]
+    "128 suffixes exceed the room"
+
 /-- Run successful canonical type-alias parser and diagnostic regressions. -/
 def testSyntaxParserTypes : IO Unit := do
   testEveryTypeForm
@@ -1598,6 +1705,9 @@ def testSyntaxParserTypes : IO Unit := do
   testUtf8ByteSpans
   testMappingConstraint
   testHyphenDiagnostic
+  testArrayTypes
+  testFixedSizeArrays
+  testArraySuffixNesting
 
 end Tests
 end
@@ -1878,17 +1988,20 @@ private theorem success_trace :
       (NamedTypeFinishingTrace.ordinary (by
         unfold UnqualifiedMappingSpelling tracedQualifiedName qualifiedNameFromSuffix name
         decide))
-  have child := TypeExprTraceParses.roll (.selected .named
+  have noBracket : ArraySuffixAbsentAt (remainder successTokens 2) :=
+    .of_bracketAbsent (by simp [TokenKindAbsentAt, TokenAt, remainder, successTokens])
+  have child := TypeExprTraceParses.roll_base (.selected .named
     (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
       TypeDispatchTraceInternals.selectedBranch { input "@a-b;" successTokens [] with cursor := 1 } = .named from rfl)) named)
+    noBracket
   have proxy : ProxyTypeTraceParses TypeExprTraceParses source 5 (remainder successTokens 0)
       value (remainder successTokens 2) [event] := by
     unfold value
     exact .parsed (span 0 1) ⟨⟨by change 0 < 3; decide, rfl⟩, rfl⟩ child
-  exact TypeExprTraceParses.roll (.selected .proxy
+  exact TypeExprTraceParses.roll_base (.selected .proxy
     (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
       TypeDispatchTraceInternals.selectedBranch (input "@a-b;" successTokens []) = .proxy from rfl))
-    proxy)
+    proxy) noBracket
 
 private theorem rejection_trace :
     TypeExprTraceRejects source 6 (remainder rejectTokens 0) (remainder rejectTokens 3)
@@ -2070,9 +2183,10 @@ private theorem malformed_leaf_trace (prior : List ParseDiagnostic) :
       (NamedTypeFinishingTrace.ordinary (by
         unfold UnqualifiedMappingSpelling tracedQualifiedName qualifiedNameFromSuffix name
         decide))
-  exact TypeExprTraceParses.roll (.selected .named
+  exact TypeExprTraceParses.roll_base (.selected .named
     (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
       TypeDispatchTraceInternals.selectedBranch (state prior 0) = .named from rfl)) raw)
+    (.of_bracketAbsent (by simp [TokenKindAbsentAt, TokenAt, state, State.declarativeRemainder]))
 
 theorem malformed_leaf_reconstructed (prior : List ParseDiagnostic) :
     TypeExprTraceParses source 99 (state prior 0).declarativeRemainder value
@@ -2087,6 +2201,7 @@ theorem malformed_leaf_reconstructed (prior : List ParseDiagnostic) :
     checked_name_type (input := state prior 0) (name := name) (trace := [event])
       ⟨by change 0 < 3; decide, rfl⟩
       (.hyphen (by unfold IdentifierHyphenSpelling name; decide))
+      (by simp [TokenKindAbsentAt, TokenAt, state])
       (by simp [TokenKindAbsentAt, TokenAt, state])
       (by simp [TokenKindAbsentAt, TokenAt, state]) (by decide) (by decide)
   rw [componentResult] at result
@@ -2113,6 +2228,7 @@ theorem missing_carrier_reconstructed (prior : List ParseDiagnostic) :
     ⟨output, result, afterEq, events⟩
   have componentResult : typeExpr (state prior 1) = .reject failure (state prior 1) := by
     change typeExprWithFuel ((state prior 1).remainingCount + 1) (state prior 1) = _
+    apply typeExprWithFuel_succ_reject_of_base
     rw [typeExprWithFuel_eq_raw_of_selection (state prior 1).remainingCount
       (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
         TypeDispatchTraceInternals.selectedBranch (state prior 1) = .final from rfl))]
@@ -2141,6 +2257,7 @@ theorem past_window_reconstructed (prior : List ParseDiagnostic) :
     ⟨output, result, afterEq, events⟩
   have componentResult : typeExpr (state prior 7) = .reject failure (state prior 7) := by
     change typeExprWithFuel ((state prior 7).remainingCount + 1) (state prior 7) = _
+    apply typeExprWithFuel_succ_reject_of_base
     rw [typeExprWithFuel_eq_raw_of_selection (state prior 7).remainingCount
       (TypeDispatchTraceInternals.selectedBranch_eq_iff.mp (show
         TypeDispatchTraceInternals.selectedBranch (state prior 7) = .final from rfl))]
@@ -2202,6 +2319,7 @@ theorem noncanonical_window_keeps_source_and_window (prior : List ParseDiagnosti
     (output prior).diagnostics = prior ++ [event] := by
   have result := checked_name_type (input := input prior) (name := name) (trace := [event])
     ⟨by change 0 < 9; decide, rfl⟩ (.hyphen (by unfold IdentifierHyphenSpelling name; decide))
+    (by simp [TokenKindAbsentAt, TokenAt, input])
     (by simp [TokenKindAbsentAt, TokenAt, input])
     (by simp [TokenKindAbsentAt, TokenAt, input])
     (by decide) (by decide)

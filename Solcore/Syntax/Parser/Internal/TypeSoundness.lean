@@ -184,7 +184,10 @@ theorem typeExprWithFuel_cursor_lt_onSuccess (fuel : Nat)
   cases fuel with
   | zero => simp [typeExprWithFuel] at parsed
   | succ fuel =>
-      simp only [typeExprWithFuel] at parsed
+      rcases typeExprWithFuel_succ_ok parsed with ⟨base, afterBase, parsed, suffixes⟩
+      refine Nat.lt_of_lt_of_le ?_
+        (typeArraySuffixes_cursorMonotoneOnSuccess base afterBase value final suffixes)
+      simp only [typeExprBase] at parsed
       split at parsed
       · exact parseFunctionType_cursor_lt_onSuccess
           (typeExprWithFuel fuel) parsed
@@ -540,6 +543,14 @@ private theorem parseFunctionType_reflectsDiagnosticFreeOnSuccess
   intro returns
   exact Parser.pure_reflectsDiagnosticFreeOnSuccess _
 
+private theorem typeArraySuffixes_reflectsDiagnosticFreeOnSuccess
+    (element : TypeExpr) :
+    Parser.ReflectsDiagnosticFreeOnSuccess (typeArraySuffixes element) := by
+  intro input value next parsed diagnosticFree
+  rcases arraySuffixes_ok_frame _ _ _ parsed with ⟨cursor, extra, nextEq, _⟩
+  subst nextEq
+  exact (List.append_eq_nil_iff.mp diagnosticFree).2
+
 /-- A diagnostic-free successful bounded type parse had a diagnostic-free input. -/
 theorem typeExprWithFuel_reflectsDiagnosticFreeOnSuccess :
     ∀ fuel,
@@ -550,8 +561,11 @@ theorem typeExprWithFuel_reflectsDiagnosticFreeOnSuccess :
       intro input value next parsed diagnosticFree
       simp [typeExprWithFuel] at parsed
   | succ fuel inductionHypothesis =>
-      intro input value next parsed diagnosticFree
-      simp only [typeExprWithFuel] at parsed
+      intro input layerValue layerNext layerParsed layerFree
+      rcases typeExprWithFuel_succ_ok layerParsed with ⟨value, next, parsed, suffixes⟩
+      have diagnosticFree := typeArraySuffixes_reflectsDiagnosticFreeOnSuccess value next
+        layerValue layerNext suffixes layerFree
+      simp only [typeExprBase] at parsed
       split at parsed
       · exact parseFunctionType_reflectsDiagnosticFreeOnSuccess
           (typeExprWithFuel fuel) inductionHypothesis input value next parsed
@@ -1193,6 +1207,86 @@ private theorem contextualSymbolPairAbsentAt_of_composite_eq_false
   rw [keywordPresent, followingPresent] at absent
   contradiction
 
+namespace TypeArrayInternals
+
+/-- A found suffix has the grammar's brackets. -/
+theorem arraySuffixAt_of_suffixAt? {input : State} {opening closingToken : Token}
+    {closing : Nat} (found : suffixAt? input = some (opening, closing, closingToken)) :
+    DeclarativeGrammar.ArraySuffixAt input.declarativeRemainder closing opening.span
+      closingToken.span := by
+  rcases suffixAt?_eq_some found with
+    ⟨openingFound, isOpening, after, bound, closingFound, isClosing, absent⟩
+  exact {
+    opening := by
+      rw [← isOpening]
+      exact tokenAt_of_peek?_eq_some openingFound
+    after := after
+    first := fun position later before => absent position later before
+    closingToken := by
+      refine ⟨bound, ?_⟩
+      rw [← isClosing]
+      exact closingFound
+  }
+
+/-- Where no suffix is at the cursor, none starts there. -/
+theorem arraySuffixAbsentAt_of_suffixAt? {input : State}
+    (missing : suffixAt? input = none) :
+    DeclarativeGrammar.ArraySuffixAbsentAt input.declarativeRemainder := by
+  intro openingSpan openingToken index after before
+  have current : input.peek? = some { span := openingSpan, value := .symbol .leftBracket } := by
+    have inside : input.cursor < input.window.endIndex := openingToken.1
+    unfold State.peek?
+    rw [if_pos inside]
+    exact openingToken.2
+  unfold suffixAt? at missing
+  split at missing
+  next found peekEq =>
+    rw [current] at peekEq
+    cases peekEq
+    split at missing
+    next =>
+      cases closingResult : closingBracket? input.tokens input.window.endIndex
+          input.remainingCount (input.cursor + 1) with
+      | some pair =>
+          rw [closingResult] at missing
+          cases missing
+      | none =>
+          exact closingBracket?_eq_none (by simp only [State.remainingCount]; omega)
+            closingResult index after before
+    next notOpening => exact absurd rfl notOpening
+  next peekNone =>
+    rw [current] at peekNone
+    cases peekNone
+
+end TypeArrayInternals
+
+open TypeArrayInternals in
+/-- A successful run of suffixes follows the grammar. -/
+theorem arraySuffixes_success_sound : ∀ fuel count element {input : State}
+    {value : TypeExpr} {next : State},
+    arraySuffixes fuel count element input = .ok value next →
+    DeclarativeGrammar.TypeArraySuffixesParses element input.declarativeRemainder value
+      next.declarativeRemainder := by
+  intro fuel
+  induction fuel with
+  | zero =>
+      intro count element input value next result
+      simp [arraySuffixes] at result
+  | succ fuel ih =>
+      intro count element input value next result
+      simp only [arraySuffixes] at result
+      split at result
+      next opening closing closingToken found =>
+        have rest := ih (count + 1) _ result
+        rcases afterSuffix_frame input opening closing closingToken with ⟨extra, afterEq⟩
+        rw [afterEq] at rest
+        exact .suffix (arraySuffixAt_of_suffixAt? found) rest
+      next missing =>
+        rcases finishArraySuffixes_frame count element input with ⟨extra, finishEq⟩
+        rw [finishEq] at result
+        cases result
+        exact .done (arraySuffixAbsentAt_of_suffixAt? missing)
+
 /-- Every successful fuel-bounded type parse follows the recursive grammar. -/
 theorem typeExprWithFuel_success_sound :
     ∀ fuel {input next : State} {value : TypeExpr},
@@ -1206,33 +1300,35 @@ theorem typeExprWithFuel_success_sound :
       simp [typeExprWithFuel] at result
   | succ fuel inductionHypothesis =>
       intro input next value result
-      simp only [typeExprWithFuel] at result
+      rcases typeExprWithFuel_succ_ok result with ⟨base, afterBase, result, suffixes⟩
+      refine .suffixed ?_ (arraySuffixes_success_sound _ _ _ suffixes)
+      simp only [typeExprBase] at result
       split at result
       next functionPresent =>
-        exact .suffixed (parseFunctionType_success_sound (typeExprWithFuel fuel)
+        exact parseFunctionType_success_sound (typeExprWithFuel fuel)
           inductionHypothesis (typeExprWithFuel_preservesTokenWindow fuel)
-          result) .done
+          result
       next functionAbsent =>
         split at result
         next comptimePresent =>
-          exact .suffixed (parseComptimeType_success_sound (typeExprWithFuel fuel)
-            inductionHypothesis result) .done
+          exact parseComptimeType_success_sound (typeExprWithFuel fuel)
+            inductionHypothesis result
         next comptimeAbsent =>
           split at result
           next mappingPresent =>
-            exact .suffixed (parseMappingType_success_sound (typeExprWithFuel fuel)
-              inductionHypothesis result) .done
+            exact parseMappingType_success_sound (typeExprWithFuel fuel)
+              inductionHypothesis result
           next mappingAbsent =>
             split at result
             next proxyPresent =>
-              exact .suffixed (parseProxyType_success_sound (typeExprWithFuel fuel)
-                inductionHypothesis result) .done
+              exact parseProxyType_success_sound (typeExprWithFuel fuel)
+                inductionHypothesis result
             next proxyAbsent =>
               split at result
               next tuplePresent =>
-                exact .suffixed (parseTupleType_success_sound (typeExprWithFuel fuel)
+                exact parseTupleType_success_sound (typeExprWithFuel fuel)
                   inductionHypothesis
-                  (typeExprWithFuel_preservesTokenWindow fuel) result) .done
+                  (typeExprWithFuel_preservesTokenWindow fuel) result
               next tupleAbsent =>
                 split at result
                 next namedPresent =>
@@ -1254,14 +1350,14 @@ theorem typeExprWithFuel_success_sound :
                       (input.peekOffsetKind? 1 ==
                         some (.symbol .leftParen))) = true at mappingAbsent
                     exact mappingAbsent
-                  exact .suffixed (parseNamedType_success_sound (typeExprWithFuel fuel)
+                  exact parseNamedType_success_sound (typeExprWithFuel fuel)
                     inductionHypothesis
                     (typeExprWithFuel_preservesTokenWindow fuel)
                     (contextualSymbolPairAbsentAt_of_composite_eq_false
                       .comptime .less comptimeFalse)
                     (contextualSymbolPairAbsentAt_of_composite_eq_false
                       .mapping .leftParen mappingFalse)
-                    result) .done
+                    result
                 next namedAbsent =>
                   unfold rejectAt at result
                   contradiction

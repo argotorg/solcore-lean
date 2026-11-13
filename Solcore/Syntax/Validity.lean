@@ -187,6 +187,11 @@ inductive ValidFor (file : SourceFile) : TypeExpr → Prop where
       (spanValid : span.ValidFor file)
       (elementsValid : ∀ element ∈ elements, ValidFor file element) :
       ValidFor file { span, value := .tuple elements }
+  | array {span brackets : SourceSpan} {element : TypeExpr}
+      (spanValid : span.ValidFor file)
+      (bracketsValid : brackets.ValidFor file)
+      (elementValid : ValidFor file element) :
+      ValidFor file { span, value := .array element brackets }
   | error {span : SourceSpan} (spanValid : span.ValidFor file) :
       ValidFor file { span, value := .error }
 
