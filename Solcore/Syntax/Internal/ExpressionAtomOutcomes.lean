@@ -1431,6 +1431,42 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.DeclarativeGrammar
 
+/-- An index or a slice bound is unique, with its end. -/
+theorem OptionalBoundParses.result_unique
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : ExactDeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    {input afterLeft afterRight : Remainder} {left right : Option Syntax.Expr}
+    (leftParsed : OptionalBoundParses nestedOrdinary input left afterLeft)
+    (rightParsed : OptionalBoundParses nestedOrdinary input right afterRight) :
+    left = right ∧ afterLeft = afterRight := by
+  cases leftParsed with
+  | absent leftEnds =>
+      cases rightParsed with
+      | absent => exact ⟨rfl, rfl⟩
+      | present colonAbsent closingAbsent _ =>
+          exact (leftEnds ⟨colonAbsent, closingAbsent⟩).elim
+  | present colonAbsent closingAbsent leftBound =>
+      cases rightParsed with
+      | absent rightEnds => exact (rightEnds ⟨colonAbsent, closingAbsent⟩).elim
+      | present _ _ rightBound =>
+          rcases nestedOutcomes.successResultUnique leftBound rightBound with ⟨rfl, rfl⟩
+          exact ⟨rfl, rfl⟩
+
+/-- A started bound's rejection has one end. -/
+theorem OptionalBoundRejects.output_unique
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : ExactDeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    {input left right : Remainder}
+    (leftRejected : OptionalBoundRejects nestedRejects input left)
+    (rightRejected : OptionalBoundRejects nestedRejects input right) :
+    left = right := by
+  cases leftRejected with
+  | rejected _ _ leftBound =>
+      cases rightRejected with
+      | rejected _ _ rightBound => exact nestedOutcomes.rejectOutputUnique leftBound rightBound
+
 /-- What a `[` holds is unique, with its end. -/
 theorem BracketContentsParses.result_unique
     {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}

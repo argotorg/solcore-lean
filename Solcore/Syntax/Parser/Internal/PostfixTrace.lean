@@ -17,20 +17,117 @@ events of the trace grammar.
 -/
 
 section
-/-! What a `[` holds, on the parser's side: its traces both ways, its success
-and rejection frames, and its totality on arbitrary states. Each follows from
-the nested expression's own law. -/
+/-! What a `[` holds and the bounds it reads, on the parser's side: their traces
+both ways, their success and rejection frames, and their totality on arbitrary
+states. Each follows from the nested expression's own law. -/
 
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser.ExpressionAtomInternals
 
-open DeclarativeGrammar
+open DeclarativeGrammar DelimitedTraceInternals
 
 variable {nested : Parser Expr}
   {nestedTrace : SourceId → Nat → Remainder → Expr → Remainder → List ParseDiagnostic → Prop}
   {nestedRejects : SourceId → Nat → Remainder → Remainder → ParseDiagnostic →
     List ParseDiagnostic → Prop}
+
+/-- A bound's grammar reads the parser's own choice of whether one starts. -/
+theorem isBoundEnd_of_boundEndsAt {input : State}
+    (ends : BoundEndsAt input.declarativeRemainder) :
+    (isSymbol input .colon || isSymbol input .rightBracket) = true := by
+  cases found : (isSymbol input .colon || isSymbol input .rightBracket)
+  · simp only [Bool.or_eq_false_iff] at found
+    exact (ends ⟨symbolAbsentAt_of_isSymbol_eq_false .colon found.1,
+      symbolAbsentAt_of_isSymbol_eq_false .rightBracket found.2⟩).elim
+  · rfl
+
+theorem optionalBound_success_context (success : ParserSuccessContext nested) :
+    ParserSuccessContext (optionalBound nested) := by
+  intro input output bound result
+  cases bound with
+  | none =>
+      obtain ⟨rfl, -⟩ := optionalBound_eq_ok_none result
+      exact ⟨rfl, rfl⟩
+  | some value => exact success (optionalBound_eq_ok_some result).2
+
+theorem optionalBound_trace_success_sound
+    (successSound : ParserTraceSuccessSound nested nestedTrace) :
+    ParserTraceSuccessSound (optionalBound nested) (OptionalBoundTraceParses nestedTrace) := by
+  intro input output bound result
+  cases bound with
+  | none =>
+      obtain ⟨rfl, ends⟩ := optionalBound_eq_ok_none result
+      exact ⟨[], .absent (boundEndsAt_of_isSymbol ends), (List.append_nil _).symm⟩
+  | some value =>
+      obtain ⟨ends, nestedResult⟩ := optionalBound_eq_ok_some result
+      obtain ⟨colonAbsent, closingAbsent⟩ := boundAbsent_of_isSymbol ends
+      rcases successSound nestedResult with ⟨trace, parsed, events⟩
+      exact ⟨trace, .present colonAbsent closingAbsent parsed, events⟩
+
+theorem optionalBound_trace_success_complete
+    (successComplete : ParserTraceSuccessComplete nested nestedTrace) :
+    ParserTraceSuccessComplete (optionalBound nested) (OptionalBoundTraceParses nestedTrace) := by
+  intro input bound after trace parsed
+  cases parsed with
+  | absent ends =>
+      refine ⟨input, ?_, rfl, (List.append_nil _).symm⟩
+      unfold optionalBound
+      rw [if_pos (isBoundEnd_of_boundEndsAt ends)]
+  | present colonAbsent closingAbsent boundParsed =>
+      rcases successComplete boundParsed with ⟨output, result, afterEq, events⟩
+      refine ⟨output, ?_, afterEq, events⟩
+      unfold optionalBound
+      rw [if_neg (show ¬ (isSymbol input .colon || isSymbol input .rightBracket) = true by
+        simp [symbol_absent .colon colonAbsent, symbol_absent .rightBracket closingAbsent])]
+      simp only [result]
+
+theorem optionalBound_reject_trace_sound
+    (rejectSound : ParserTraceRejectSound nested nestedRejects) :
+    ParserTraceRejectSound (optionalBound nested) (OptionalBoundTraceRejects nestedRejects) := by
+  intro input rejected failure result
+  obtain ⟨ends, nestedResult⟩ := optionalBound_eq_reject result
+  obtain ⟨colonAbsent, closingAbsent⟩ := boundAbsent_of_isSymbol ends
+  rcases rejectSound nestedResult with ⟨trace, rejection, events⟩
+  exact ⟨trace, .rejected colonAbsent closingAbsent rejection, events⟩
+
+theorem optionalBound_trace_reject_complete
+    (rejectComplete : ParserTraceRejectComplete nested nestedRejects) :
+    ParserTraceRejectComplete (optionalBound nested) (OptionalBoundTraceRejects nestedRejects) := by
+  intro input after report trace rejection
+  cases rejection with
+  | rejected colonAbsent closingAbsent boundRejected =>
+      rcases rejectComplete boundRejected with
+        ⟨failure, rejected, result, afterEq, reportEq, events⟩
+      refine ⟨failure, rejected, ?_, afterEq, reportEq, events⟩
+      unfold optionalBound
+      rw [if_neg (show ¬ (isSymbol input .colon || isSymbol input .rightBracket) = true by
+        simp [symbol_absent .colon colonAbsent, symbol_absent .rightBracket closingAbsent])]
+      simp only [result]
+
+theorem optionalBound_ordinary_of_unrestrictedElementFuel (nested : Parser Expr)
+    (nestedFuel : Nat) (contract : UnrestrictedFuelElementContract nested nestedFuel)
+    (input : State) (adequate : input.remainingCount < nestedFuel) :
+    (∃ bound next, optionalBound nested input = .ok bound next) ∨
+    (∃ failure next, optionalBound nested input = .reject failure next) := by
+  unfold optionalBound
+  split
+  · exact .inl ⟨none, input, rfl⟩
+  · rcases contract.ordinary input adequate with
+      ⟨bound, next, result⟩ | ⟨failure, rejected, result⟩
+    · exact .inl ⟨some bound, next, by simp only [result]⟩
+    · exact .inr ⟨failure, rejected, by simp only [result]⟩
+
+theorem optionalBound_remainingCount_le_of_success {nestedFuel : Nat}
+    (contract : UnrestrictedFuelElementContract nested nestedFuel)
+    {input next : State} {bound : Option Expr}
+    (result : optionalBound nested input = .ok bound next) :
+    next.remainingCount ≤ input.remainingCount := by
+  cases bound with
+  | none =>
+      obtain ⟨rfl, -⟩ := optionalBound_eq_ok_none result
+      exact Nat.le_refl _
+  | some value => exact contract.remainingCount_le_of_success (optionalBound_eq_ok_some result).2
 
 theorem bracketContents_success_context (success : ParserSuccessContext nested) :
     ParserSuccessContext (bracketContents nested) := by

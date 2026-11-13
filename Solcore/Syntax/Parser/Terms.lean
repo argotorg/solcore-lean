@@ -299,6 +299,16 @@ def expressionAtom (nested : Parser Expr)
 
 namespace ExpressionAtomInternals
 
+/-- An index or a slice bound where one may start, after a `[` or a slice's
+`:`: none before a `:` or a `]`, and otherwise an expression. -/
+def optionalBound (nested : Parser Expr) : Parser (Option Expr) := fun state =>
+  if isSymbol state .colon || isSymbol state .rightBracket then .ok none state
+  else
+    match nested state with
+    | .ok bound next => .ok (some bound) next
+    | .reject failure failed => .reject failure failed
+    | .invariant error => .invariant error
+
 /-- What a `[` after an expression holds, read after the `[`: an index. -/
 def bracketContents (nested : Parser Expr) : Parser BracketContents := fun state =>
   match nested state with

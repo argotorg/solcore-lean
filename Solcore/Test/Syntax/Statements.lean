@@ -3689,6 +3689,23 @@ private def testNewArrays : IO Unit := do
   | .ok output =>
       assertEqual output.parseDiagnostics [] "formatting.rs:128 parse diagnostics"
 
+/-- The bound that step 1c-ii reads in brackets is none before a `:` or a `]`,
+where it leaves the cursor, and otherwise an expression. No bracket reads it
+yet. -/
+private def testOptionalBound : IO Unit := do
+  for source in [":", "]", ": x", "] x"] do
+    let state ← initialState s!"no bound before {source}" source
+    match Parser.ExpressionAtomInternals.optionalBound Parser.expression state with
+    | .ok none next => assertEqual next.cursor 0 s!"no bound before {source}"
+    | _ => throw (IO.userError s!"a bound started before {source}")
+  let state ← initialState "a bound" "x + 1]"
+  match Parser.ExpressionAtomInternals.optionalBound Parser.expression state with
+  | .ok (some bound) next =>
+      assertEqual (expressionShape bound) (bin (ident "x") .add (.literal (.decimal "1")))
+        "a bound reads its expression"
+      assertEqual next.cursor 3 "a bound ends before the `]`"
+  | _ => throw (IO.userError "no bound was read before a `]`")
+
 private def testSourcePreservingWitnesses : IO Unit := do
   let proxy ← runExpression "proxy expression" "@pkg.Box<word>"
   assertEqual proxy.state.diagnostics [] "proxy expression diagnostics"
@@ -3916,6 +3933,7 @@ private def testPatternRecovery : IO Unit := do
 def testSyntaxParserTerms : IO Unit := do
   testAtomsAndTuples
   testNewArrays
+  testOptionalBound
   testSourcePreservingWitnesses
   testTrailingCommaRejection
   testPostfixAndUnary

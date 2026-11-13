@@ -1041,6 +1041,19 @@ namespace Solcore.Syntax.Parser
 
 namespace ExpressionAtomInternals
 
+theorem optionalBound_preservesEndIndex (nested : Parser Expr)
+    (child : Parser.PreservesEndIndex nested) :
+    Parser.PreservesEndIndex (optionalBound nested) := by
+  intro input
+  have frame := child input
+  unfold optionalBound
+  split
+  · exact rfl
+  · cases result : nested input with
+    | invariant error => trivial
+    | reject failure rejected => rw [result] at frame; exact frame
+    | ok value next => rw [result] at frame; exact frame
+
 theorem bracketContents_preservesEndIndex (nested : Parser Expr)
     (child : Parser.PreservesEndIndex nested) :
     Parser.PreservesEndIndex (bracketContents nested) := by
@@ -1212,6 +1225,36 @@ section
 set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser.ExpressionAtomInternals
+
+/-- An optional bound keeps the source provenance of every ordinary reply. -/
+theorem optionalBound_weakValidFor (nested : Parser Expr)
+    (nestedValid : nested.ValidFor (fun _ _ => True)) :
+    (optionalBound nested).ValidFor (fun _ _ => True) := by
+  intro input inputValid
+  have reply := nestedValid input inputValid
+  unfold optionalBound
+  split
+  · exact ⟨trivial, inputValid, rfl⟩
+  · cases result : nested input with
+    | invariant error => trivial
+    | reject failure rejected => rw [result] at reply; exact reply
+    | ok bound next => rw [result] at reply; exact reply
+
+/-- An optional bound inherits the bounded totality of its expression. -/
+theorem optionalBound_ordinary_of_elementFuel
+    (nested : Parser Expr) (nestedFuel : Nat)
+    (contract : FuelElementTotalityContract nested nestedFuel)
+    (input : State) (inputValid : input.ValidFor)
+    (adequate : input.remainingCount < nestedFuel) :
+    (∃ bound next, optionalBound nested input = .ok bound next) ∨
+    (∃ failure next, optionalBound nested input = .reject failure next) := by
+  unfold optionalBound
+  split
+  · exact Or.inl ⟨none, input, rfl⟩
+  · rcases contract.ordinary input inputValid adequate with
+      ⟨bound, next, result⟩ | ⟨failure, rejected, result⟩
+    · exact Or.inl ⟨some bound, next, by simp only [result]⟩
+    · exact Or.inr ⟨failure, rejected, by simp only [result]⟩
 
 /-- What a `[` holds keeps the source provenance of every ordinary reply. -/
 theorem bracketContents_weakValidFor (nested : Parser Expr)

@@ -463,7 +463,8 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 1b-i | Syntax: the head `new T[](`, with its grammar and every lemma, and direct tests of its parser; no atom reaches it yet | 10–12 files, +700–900; measured at 10 files, +636/−0 | none |
 | 1b-ii | Syntax: `new T[](n)` in the name atom, falling back to the identifier `new` where no head starts; inference rejects it | 18–26 files, +900–1,100/−50–150; measured at 27 files, +1,412/−199 | `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
 | 1c-i | Syntax: the bracket contents layer, as a refactor that accepts no new syntax: what a `[` after an expression holds has its own parser, grammar and lemmas, and an index is its one form | 10–12 files, +650–750/−150–200; measured at 12 files, +696/−182 | none |
-| 1c-ii | Syntax: the slices, with `a[]` rejected, as the bracket contents' other forms; inference rejects the slices | 16–24 files, +900–1,400/−100–250 | parser tests from `crates/uitest/tests/fixtures/parse/empty_index_rejected`, `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
+| 1c-ii-a | Syntax: the optional bound that an index and a slice's start and stop read, with its grammar and every lemma, and direct tests of its parser; no bracket reads it yet | 10–12 files, +500–600; measured at 10 files, +560/−4 | none |
+| 1c-ii-b | Syntax: the slices, with `a[]` rejected, as the bracket contents' other forms; inference rejects the slices | 18–22 files, +1,200–1,400/−250–300 | parser tests from `crates/uitest/tests/fixtures/parse/empty_index_rejected`, `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
 | 2 | The array type and its element check, the heap's store, `new` and `0x41`, the lengths, preservation, the staged copies, the lowering's cells | 60–72 files, +1,300–1,700/−300–450, the riskiest | newLen(n), oversized(n) |
 | 3 | Element reads and `0x32` | 35–55 files, +800–1,200/−200–350, between 3c and 3a | defaultZero(n, i), nestedEmpty(n) |
 | 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
@@ -472,12 +473,13 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 37 functions above |
 
-In all, that is about 336 to 464 file changes, +10,500 to 14,400 and −1,850 to 3,200 lines over
-thirteen commits: about half to two thirds of row 1, whose 23 commits added about 21,700 lines,
+In all, that is about 348 to 474 file changes, +11,300 to 15,000 and −2,000 to 3,250 lines over
+fourteen commits: about half to two thirds of row 1, whose 23 commits added about 21,700 lines,
 much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600, until its
 first measure: it adds three AST forms through the proved parser, so it became 1a to 1c. 1b's
 first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
-forms: 1c-i's measure and 1c-ii's estimate together pass the cap.
+forms: 1c-i's measure and 1c-ii's estimate together pass the cap. 1c-ii's first measure, +1,854,
+split it again as 1b did, into 1c-ii-a and 1c-ii-b.
 
 Step 5 waits for decision 3.
 

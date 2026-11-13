@@ -51,6 +51,55 @@ theorem NoTrailingDelimitedListParses.opening_present {alpha : Type}
         elementsEq, spanEq⟩
       exact ⟨openingSpan, openingToken⟩
 
+/-- An index or a slice bound ends at one remainder. -/
+theorem OptionalBoundParses.output_unique
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : DeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    {input afterLeft afterRight : Remainder} {left right : Option Syntax.Expr}
+    (leftParsed : OptionalBoundParses nestedOrdinary input left afterLeft)
+    (rightParsed : OptionalBoundParses nestedOrdinary input right afterRight) :
+    afterLeft = afterRight := by
+  cases leftParsed with
+  | absent leftEnds =>
+      cases rightParsed with
+      | absent => rfl
+      | present colonAbsent closingAbsent _ =>
+          exact (leftEnds ⟨colonAbsent, closingAbsent⟩).elim
+  | present colonAbsent closingAbsent leftBound =>
+      cases rightParsed with
+      | absent rightEnds => exact (rightEnds ⟨colonAbsent, closingAbsent⟩).elim
+      | present _ _ rightBound => exact nestedOutcomes.successOutputUnique leftBound rightBound
+
+/-- A started bound's rejection excludes every bound there. -/
+theorem OptionalBoundRejects.disjointOrdinary
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : DeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    {input rejected : Remainder}
+    (rejection : OptionalBoundRejects nestedRejects input rejected) :
+    ¬ ∃ bound output, OptionalBoundParses nestedOrdinary input bound output := by
+  rintro ⟨bound, output, parsed⟩
+  cases rejection with
+  | rejected colonAbsent closingAbsent boundRejected =>
+      cases parsed with
+      | absent ends => exact ends ⟨colonAbsent, closingAbsent⟩
+      | present _ _ boundParsed =>
+          exact nestedOutcomes.successRejectDisjoint boundRejected ⟨_, _, boundParsed⟩
+
+/-- Pointwise nested inclusion lifts through a bound. -/
+theorem OptionalBoundParses.mapNestedRelation
+    {source target : Remainder → Syntax.Expr → Remainder → Prop}
+    (includeNested : ∀ {input expression output},
+      source input expression output → target input expression output)
+    {input output : Remainder} {bound : Option Syntax.Expr}
+    (parsed : OptionalBoundParses source input bound output) :
+    OptionalBoundParses target input bound output := by
+  cases parsed with
+  | absent ends => exact .absent ends
+  | present colonAbsent closingAbsent boundParsed =>
+      exact .present colonAbsent closingAbsent (includeNested boundParsed)
+
 /-- What a `[` holds ends at one remainder. -/
 theorem BracketContentsParses.output_unique
     {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}

@@ -1145,6 +1145,26 @@ def PostfixSuffixAbsentAt (input : Remainder) : Prop :=
       (.symbol .leftParen) ∧
     TokenKindAbsentAt input.tokens input.endIndex input.cursor (.symbol .dot)
 
+/-- The token at the cursor ends a bound: a `:` or a `]`. -/
+def BoundEndsAt (input : Remainder) : Prop :=
+  ¬ (TokenKindAbsentAt input.tokens input.endIndex input.cursor (.symbol .colon) ∧
+    TokenKindAbsentAt input.tokens input.endIndex input.cursor (.symbol .rightBracket))
+
+/-- An index or a slice bound where one may start, after a `[` or a slice's
+`:`: none before a `:` or a `]`, and otherwise an expression. -/
+inductive OptionalBoundParses
+    (nestedParses : Remainder → Syntax.Expr → Remainder → Prop) :
+    Remainder → Option Syntax.Expr → Remainder → Prop where
+  | absent {input : Remainder} (ends : BoundEndsAt input) :
+      OptionalBoundParses nestedParses input none input
+  | present {input output : Remainder} {bound : Syntax.Expr}
+      (colonAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .colon))
+      (closingAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .rightBracket))
+      (boundParsed : nestedParses input bound output) :
+      OptionalBoundParses nestedParses input (some bound) output
+
 /-- What a `[` holds, read after it: an index. -/
 inductive BracketContentsParses
     (nestedParses : Remainder → Syntax.Expr → Remainder → Prop) :
@@ -2280,6 +2300,18 @@ namespace Solcore.Syntax.DeclarativeGrammar
 
 /-- The existing postfix grammar admits ordinary nested outcomes as-is. -/
 abbrev PostfixTailOrdinaryParses := PostfixTailParses
+
+/-- An index or a slice bound that starts and is rejected. -/
+inductive OptionalBoundRejects
+    (nestedRejects : Remainder → Remainder → Prop) :
+    Remainder → Remainder → Prop where
+  | rejected {input rejected : Remainder}
+      (colonAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .colon))
+      (closingAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .rightBracket))
+      (boundRejected : nestedRejects input rejected) :
+      OptionalBoundRejects nestedRejects input rejected
 
 /-- Exact rejection inside a `[`: in its index. -/
 inductive BracketContentsRejects

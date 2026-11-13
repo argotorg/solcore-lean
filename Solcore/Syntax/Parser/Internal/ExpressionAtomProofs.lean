@@ -2497,6 +2497,134 @@ theorem expressionAtom_startsAtCurrentTokenOnSuccess
         unfold State.peek? at found ⊢
         simpa [rewound, State.emit, coreShape.1, coreShape.2] using found
 
+/-- An optional bound that finds none stays at its input, before a `:` or a `]`. -/
+theorem optionalBound_eq_ok_none {nested : Parser Expr} {input next : State}
+    (result : optionalBound nested input = .ok none next) :
+    next = input ∧ (isSymbol input .colon || isSymbol input .rightBracket) = true := by
+  unfold optionalBound at result
+  split at result
+  · rename_i ends
+    cases result
+    exact ⟨rfl, ends⟩
+  · cases nestedResult : nested input with
+    | invariant error => simp [nestedResult] at result
+    | reject failure rejected => simp [nestedResult] at result
+    | ok bound afterBound => simp [nestedResult] at result
+
+/-- An optional bound that finds one is its nested expression, where no `:` or
+`]` is next. -/
+theorem optionalBound_eq_ok_some {nested : Parser Expr} {input next : State} {bound : Expr}
+    (result : optionalBound nested input = .ok (some bound) next) :
+    (isSymbol input .colon || isSymbol input .rightBracket) = false ∧
+      nested input = .ok bound next := by
+  unfold optionalBound at result
+  split at result
+  · cases result
+  · rename_i ends
+    refine ⟨Bool.eq_false_iff.mpr ends, ?_⟩
+    cases nestedResult : nested input with
+    | invariant error => simp [nestedResult] at result
+    | reject failure rejected => simp [nestedResult] at result
+    | ok value afterBound =>
+        simp only [nestedResult, Reply.ok.injEq, Option.some.injEq] at result
+        rcases result with ⟨rfl, rfl⟩
+        rfl
+
+/-- An optional bound's rejection is its nested expression's, where no `:` or
+`]` is next. -/
+theorem optionalBound_eq_reject {nested : Parser Expr} {input rejected : State}
+    {failure : Failure} (result : optionalBound nested input = .reject failure rejected) :
+    (isSymbol input .colon || isSymbol input .rightBracket) = false ∧
+      nested input = .reject failure rejected := by
+  unfold optionalBound at result
+  split at result
+  · cases result
+  · rename_i ends
+    refine ⟨Bool.eq_false_iff.mpr ends, ?_⟩
+    cases nestedResult : nested input with
+    | invariant error => simp [nestedResult] at result
+    | ok value afterBound => simp [nestedResult] at result
+    | reject actual next =>
+        simp only [nestedResult, Reply.reject.injEq] at result
+        rcases result with ⟨rfl, rfl⟩
+        rfl
+
+/-- Where an optional bound finds none, a `:` or a `]` is next. -/
+theorem boundEndsAt_of_isSymbol {input : State}
+    (ends : (isSymbol input .colon || isSymbol input .rightBracket) = true) :
+    DeclarativeGrammar.BoundEndsAt input.declarativeRemainder := by
+  rintro ⟨colonAbsent, closingAbsent⟩
+  simp only [Bool.or_eq_true] at ends
+  rcases ends with colon | closing
+  · rcases symbol_eq_ok_of_isSymbol_eq_true .colon .expression colon with ⟨token, result⟩
+    exact colonAbsent ⟨token.span, (symbol_success_exactTokenParses .colon .expression result).1⟩
+  · rcases symbol_eq_ok_of_isSymbol_eq_true .rightBracket .expression closing with
+      ⟨token, result⟩
+    exact closingAbsent
+      ⟨token.span, (symbol_success_exactTokenParses .rightBracket .expression result).1⟩
+
+/-- Where an optional bound reads an expression, no `:` or `]` is next. -/
+theorem boundAbsent_of_isSymbol {input : State}
+    (ends : (isSymbol input .colon || isSymbol input .rightBracket) = false) :
+    DeclarativeGrammar.TokenKindAbsentAt input.tokens input.window.endIndex input.cursor
+        (.symbol .colon) ∧
+      DeclarativeGrammar.TokenKindAbsentAt input.tokens input.window.endIndex input.cursor
+        (.symbol .rightBracket) := by
+  simp only [Bool.or_eq_false_iff] at ends
+  exact ⟨symbolAbsentAt_of_isSymbol_eq_false .colon ends.1,
+    symbolAbsentAt_of_isSymbol_eq_false .rightBracket ends.2⟩
+
+theorem optionalBound_preservesTokenWindow (nested : Parser Expr)
+    (nestedWindow : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (optionalBound nested) := by
+  intro input
+  have shape := nestedWindow input
+  unfold optionalBound
+  split
+  · exact ⟨rfl, rfl⟩
+  · cases result : nested input with
+    | invariant error => trivial
+    | reject failure rejected => rw [result] at shape; exact shape
+    | ok bound next => rw [result] at shape; exact shape
+
+theorem optionalBound_preservesTokensOnSuccess (nested : Parser Expr)
+    (nestedTokens : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (optionalBound nested) := by
+  intro input bound next parsed
+  cases bound with
+  | none =>
+      obtain ⟨rfl, -⟩ := optionalBound_eq_ok_none parsed
+      rfl
+  | some value => exact nestedTokens input value next (optionalBound_eq_ok_some parsed).2
+
+theorem optionalBound_cursorMonotoneOnSuccess (nested : Parser Expr)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (optionalBound nested) := by
+  intro input bound next parsed
+  cases bound with
+  | none =>
+      obtain ⟨rfl, -⟩ := optionalBound_eq_ok_none parsed
+      exact Nat.le_refl _
+  | some value => exact nestedCursor input value next (optionalBound_eq_ok_some parsed).2
+
+/-- An optional bound keeps the provenance of its expression. -/
+theorem optionalBound_validFor (nested : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid)) :
+    (optionalBound nested).ValidFor
+      (fun file bound => ∀ value ∈ bound, Expr.ValidFor statementValid file value) := by
+  intro input inputValid
+  have reply := nestedValid input inputValid
+  unfold optionalBound
+  split
+  · exact ⟨by simp, inputValid, rfl⟩
+  · cases result : nested input with
+    | invariant error => trivial
+    | reject failure rejected => rw [result] at reply; exact reply
+    | ok bound next =>
+        rw [result] at reply
+        exact ⟨by simpa using reply.1, reply.2.1, reply.2.2⟩
+
 /-- What a `[` holds keeps every ordinary token window. -/
 theorem bracketContents_preservesTokenWindow (nested : Parser Expr)
     (nestedWindow : Parser.PreservesTokenWindow nested) :

@@ -1030,6 +1030,20 @@ def postfixFieldTraceValue (base : Syntax.Expr) (dotSpan : SourceSpan)
   value := .field base dotSpan name
 }
 
+/-- An index or a slice bound where one may start, with its events. -/
+inductive OptionalBoundTraceParses
+    (nestedTrace : SourceId → Nat → Remainder → Syntax.Expr → Remainder → List ParseDiagnostic → Prop)
+    (source : SourceId) (endByte : Nat) :
+    Remainder → Option Syntax.Expr → Remainder → List ParseDiagnostic → Prop where
+  | absent {input : Remainder} (ends : BoundEndsAt input) :
+      OptionalBoundTraceParses nestedTrace source endByte input none input []
+  | present {input output : Remainder} {bound : Syntax.Expr} {trace : List ParseDiagnostic}
+      (colonAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor (.symbol .colon))
+      (closingAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .rightBracket))
+      (boundParsed : nestedTrace source endByte input bound output trace) :
+      OptionalBoundTraceParses nestedTrace source endByte input (some bound) output trace
+
 /-- What a `[` holds, read after it, with its events: an index's. -/
 inductive BracketContentsTraceParses
     (nestedTrace : SourceId → Nat → Remainder → Syntax.Expr → Remainder → List ParseDiagnostic → Prop)
@@ -1090,6 +1104,18 @@ ordered, and the terminal report is never appended as an emitted event. -/
 set_option autoImplicit false
 
 namespace Solcore.Syntax.DeclarativeGrammar
+
+/-- An index or a slice bound that starts and is rejected, with its events. -/
+inductive OptionalBoundTraceRejects
+    (nestedRejects : SourceId → Nat → Remainder → Remainder → ParseDiagnostic → List ParseDiagnostic → Prop)
+    (source : SourceId) (endByte : Nat) :
+    Remainder → Remainder → ParseDiagnostic → List ParseDiagnostic → Prop where
+  | rejected {input rejected : Remainder} {report : ParseDiagnostic} {trace : List ParseDiagnostic}
+      (colonAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor (.symbol .colon))
+      (closingAbsent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+        (.symbol .rightBracket))
+      (boundRejected : nestedRejects source endByte input rejected report trace) :
+      OptionalBoundTraceRejects nestedRejects source endByte input rejected report trace
 
 /-- Exact rejection inside a `[`, with its events: in its index. -/
 inductive BracketContentsTraceRejects
@@ -1246,6 +1272,56 @@ private theorem absent_conflicts_token {kind : TokenKind} {input : Remainder} {s
     (absent : TokenKindAbsentAt input.tokens input.endIndex input.cursor kind)
     (present : TokenAt input.tokens input.endIndex input.cursor { span, value := kind }) : False :=
   absent ⟨span, present⟩
+
+theorem OptionalBoundTraceParses.result_unique
+    (nested : TraceExactOutcomeSpec nestedTrace nestedRejects source endByte)
+    {input afterLeft afterRight : Remainder} {left right : Option Syntax.Expr}
+    {leftEvents rightEvents : List ParseDiagnostic}
+    (leftParsed : OptionalBoundTraceParses nestedTrace source endByte input left afterLeft
+      leftEvents)
+    (rightParsed : OptionalBoundTraceParses nestedTrace source endByte input right afterRight
+      rightEvents) :
+    left = right ∧ afterLeft = afterRight ∧ leftEvents = rightEvents := by
+  cases leftParsed with
+  | absent leftEnds =>
+      cases rightParsed with
+      | absent => exact ⟨rfl, rfl, rfl⟩
+      | present colonAbsent closingAbsent _ => exact (leftEnds ⟨colonAbsent, closingAbsent⟩).elim
+  | present colonAbsent closingAbsent leftBound =>
+      cases rightParsed with
+      | absent rightEnds => exact (rightEnds ⟨colonAbsent, closingAbsent⟩).elim
+      | present _ _ rightBound =>
+          rcases nested.successResultUnique leftBound rightBound with ⟨rfl, rfl, rfl⟩
+          exact ⟨rfl, rfl, rfl⟩
+
+theorem OptionalBoundTraceRejects.result_unique
+    (nested : TraceExactOutcomeSpec nestedTrace nestedRejects source endByte)
+    {input afterLeft afterRight : Remainder} {leftReport rightReport : ParseDiagnostic}
+    {leftEvents rightEvents : List ParseDiagnostic}
+    (left : OptionalBoundTraceRejects nestedRejects source endByte input afterLeft leftReport
+      leftEvents)
+    (right : OptionalBoundTraceRejects nestedRejects source endByte input afterRight rightReport
+      rightEvents) :
+    afterLeft = afterRight ∧ leftReport = rightReport ∧ leftEvents = rightEvents := by
+  cases left with
+  | rejected _ _ leftBound =>
+      cases right with
+      | rejected _ _ rightBound => exact nested.rejectResultUnique leftBound rightBound
+
+theorem OptionalBoundTraceRejects.disjoint_success
+    (nested : TraceExactOutcomeSpec nestedTrace nestedRejects source endByte)
+    {input rejected : Remainder} {report : ParseDiagnostic} {events : List ParseDiagnostic}
+    (rejection : OptionalBoundTraceRejects nestedRejects source endByte input rejected report
+      events) :
+    ¬ ∃ bound after trace,
+      OptionalBoundTraceParses nestedTrace source endByte input bound after trace := by
+  rintro ⟨bound, after, trace, parsed⟩
+  cases rejection with
+  | rejected colonAbsent closingAbsent boundRejected =>
+      cases parsed with
+      | absent ends => exact ends ⟨colonAbsent, closingAbsent⟩
+      | present _ _ boundParsed =>
+          exact nested.successRejectDisjoint boundRejected ⟨_, _, _, boundParsed⟩
 
 theorem BracketContentsTraceParses.result_unique
     (nested : TraceExactOutcomeSpec nestedTrace nestedRejects source endByte)

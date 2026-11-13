@@ -1119,6 +1119,73 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser.ExpressionAtomInternals
 
+/-- Every successful bound follows its grammar. -/
+theorem optionalBound_success_ordinary_sound (nested : Parser Expr)
+    {nestedOrdinary : DeclarativeGrammar.Remainder → Expr →
+      DeclarativeGrammar.Remainder → Prop}
+    (nestedSuccessSound : ∀ {input output : State} {value : Expr},
+      nested input = .ok value output →
+        nestedOrdinary input.declarativeRemainder value output.declarativeRemainder)
+    {input output : State} {bound : Option Expr}
+    (result : optionalBound nested input = .ok bound output) :
+    DeclarativeGrammar.OptionalBoundParses nestedOrdinary input.declarativeRemainder
+      bound output.declarativeRemainder := by
+  cases bound with
+  | none =>
+      obtain ⟨rfl, ends⟩ := optionalBound_eq_ok_none result
+      exact .absent (boundEndsAt_of_isSymbol ends)
+  | some value =>
+      obtain ⟨ends, nestedResult⟩ := optionalBound_eq_ok_some result
+      obtain ⟨colonAbsent, closingAbsent⟩ := boundAbsent_of_isSymbol ends
+      exact .present colonAbsent closingAbsent (nestedSuccessSound nestedResult)
+
+/-- Every diagnostic-free bound follows its grammar. -/
+theorem optionalBound_success_sound (nested : Parser Expr)
+    {nestedParses : DeclarativeGrammar.Remainder → Expr →
+      DeclarativeGrammar.Remainder → Prop}
+    (nestedSound : ∀ {input next : State} {value : Expr},
+      next.diagnosticsRev = [] → nested input = .ok value next →
+      nestedParses input.declarativeRemainder value next.declarativeRemainder)
+    {input output : State} {bound : Option Expr}
+    (diagnosticFree : output.diagnosticsRev = [])
+    (result : optionalBound nested input = .ok bound output) :
+    DeclarativeGrammar.OptionalBoundParses nestedParses input.declarativeRemainder
+      bound output.declarativeRemainder := by
+  cases bound with
+  | none =>
+      obtain ⟨rfl, ends⟩ := optionalBound_eq_ok_none result
+      exact .absent (boundEndsAt_of_isSymbol ends)
+  | some value =>
+      obtain ⟨ends, nestedResult⟩ := optionalBound_eq_ok_some result
+      obtain ⟨colonAbsent, closingAbsent⟩ := boundAbsent_of_isSymbol ends
+      exact .present colonAbsent closingAbsent (nestedSound diagnosticFree nestedResult)
+
+/-- Every rejected bound follows its grammar. -/
+theorem optionalBound_reject_ordinary_sound (nested : Parser Expr)
+    {nestedRejects : DeclarativeGrammar.Remainder → DeclarativeGrammar.Remainder → Prop}
+    (nestedRejectSound : ∀ {input rejected : State} {failure : Failure},
+      nested input = .reject failure rejected →
+        nestedRejects input.declarativeRemainder rejected.declarativeRemainder)
+    {input rejected : State} {failure : Failure}
+    (result : optionalBound nested input = .reject failure rejected) :
+    DeclarativeGrammar.OptionalBoundRejects nestedRejects input.declarativeRemainder
+      rejected.declarativeRemainder := by
+  obtain ⟨ends, nestedResult⟩ := optionalBound_eq_reject result
+  obtain ⟨colonAbsent, closingAbsent⟩ := boundAbsent_of_isSymbol ends
+  exact .rejected colonAbsent closingAbsent (nestedRejectSound nestedResult)
+
+/-- A bound reflects diagnostic freedom when its expression does. -/
+theorem optionalBound_reflectsDiagnosticFreeOnSuccess (nested : Parser Expr)
+    (nestedReflects : Parser.ReflectsDiagnosticFreeOnSuccess nested) :
+    Parser.ReflectsDiagnosticFreeOnSuccess (optionalBound nested) := by
+  intro input bound next result diagnosticFree
+  cases bound with
+  | none =>
+      obtain ⟨rfl, -⟩ := optionalBound_eq_ok_none result
+      exact diagnosticFree
+  | some value =>
+      exact nestedReflects input value next (optionalBound_eq_ok_some result).2 diagnosticFree
+
 /-- Every successful `[` contents follows its grammar. -/
 theorem bracketContents_success_ordinary_sound (nested : Parser Expr)
     {nestedOrdinary : DeclarativeGrammar.Remainder → Expr →
