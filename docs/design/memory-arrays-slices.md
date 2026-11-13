@@ -18,7 +18,8 @@ It records:
 - the effect on the generators, the gate's corpus runs and the smoke;
 - the decisions still open.
 
-No code follows this note until the open decisions are settled.
+Decisions 1, 2, 4, 5 and 6 were made on 2026-11-13, each as recommended. Decision 3 is with the
+user, and step 5 waits for its answer ([open decisions](#open-decisions)).
 
 ## Upstream at `e2eef194`
 
@@ -303,7 +304,8 @@ importer needs nothing either.
 
 ## Design
 
-The design follows the recommended answers to the [open decisions](#open-decisions).
+The design follows the [decisions](#open-decisions): 1, 2, 4, 5 and 6 as decided, and decision 3's
+recommended answer, which is still with the user.
 
 Memory arrays become builtins, as the twelve integer types did in row 1. They take upstream's typing
 and std's checks. The source semantics holds arrays as objects in its heap, and an array value is a
@@ -403,9 +405,9 @@ functions over words, as row 1's fixture ports did.
 
 ## Differences from upstream that Lean would keep
 
-1. **One evaluation of an element place in a compound assignment** (decision 3). `m[next(c)] += 5`
-   runs `next` once, so the probe's 205 is 105 in Lean. This is row 1's choice for compound
-   assignments ([row 1's compound assignments](integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs)).
+1. **One evaluation of an element place in a compound assignment**, if decision 3 keeps its
+   recommendation. `m[next(c)] += 5` runs `next` once, so the probe's 205 is 105 in Lean. This is
+   row 1's choice for compound assignments ([row 1's compound assignments](integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs)).
 2. **`0x41` only from the length check** (decision 2).
    - For lengths just below 2^251 − 1, the pinned backends disagree with each other. Each panics
      where its own free pointer makes the end wrap, and halts otherwise. Lean allocates.
@@ -428,6 +430,8 @@ functions over words, as row 1's fixture ports did.
 8. **An unused `let m = [];` is ambiguous**, as any unconstrained type is in Lean. Upstream accepts
    it.
 
+Differences 2 and 4 to 8 were accepted with the decisions. Difference 1 follows decision 3.
+
 ## Steps
 
 The yardstick is row 1's step 3c, 36 files, +868/−224. Each step stays within twice 3c: 72 files,
@@ -448,6 +452,8 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 In all, that is about 290 to 410 file changes, +6,700 to 9,600 and −1,600 to 2,750 lines over
 eight commits: a third to a half of row 1, whose 23 commits added about 21,700 lines, much of them
 meaning proofs.
+
+Step 5 waits for decision 3.
 
 Step 2 is the least certain. The change to `Dynamic.Heap` and `Dynamic.HeapWellTyped` reaches the
 126 files that name heap typing and the 88 that name allocation. If its first hour shows more than
@@ -478,8 +484,13 @@ Each decision lists its options, the recommendation, upstream's code and the sta
 changes. The statements are README and its Proof status, the names the guides cite, and
 core-lowering's table of [definitions and theorems you build on](../guide/core-lowering.md#definitions-and-theorems-you-build-on).
 
+On 2026-11-13, decisions 1, 2, 4, 5 and 6 were made as recommended, under the delegation. Decision
+3 is with the user: it is the one choice that changes a result upstream gives for a program it
+accepts.
+
 ### 1. How the source semantics holds arrays
 
+- **Decided: (a)**, on 2026-11-13.
 - **(a) Recommended: objects in the heap.** Array objects live in `Dynamic.Heap` beside the
   cells. An array value is a reference that carries its element type, and `Dynamic.HeapWellTyped`
   covers the objects.
@@ -502,6 +513,7 @@ core-lowering's table of [definitions and theorems you build on](../guide/core-l
 
 ### 2. How the lowering stores arrays, and when `new` panics with `0x41`
 
+- **Decided: (a)**, on 2026-11-13. The roadmap's "Lowering: std's layout" changes with it.
 - **(a) Recommended: one Core cell per array.** The cell holds the length, the default element and
   an `OrderedMapping` of elements, and is referenced by `cellRef`. `0x41` comes exactly when
   `n ≥ 2^251 − 1`. There is no free pointer.
@@ -519,6 +531,12 @@ core-lowering's table of [definitions and theorems you build on](../guide/core-l
 
 ### 3. Compound assignment to an element
 
+- **Open, with the user.** Until the answer comes, step 5 does not start.
+  - Under either answer, the place is resolved and its current value read before the right side,
+    then the write, as Lean's places do today. Under (a), only the second evaluation of the base
+    and the index differs from upstream.
+  - The main checkout's `questions.md` records the double evaluation (2026-11-13). It cites the
+    comment in `crates/parser/src/parse/stmt.rs:49-80`, which says the rewrite is deliberate.
 - **(a) Recommended: one evaluation of the place**, as row 1's compound assignments do.
 - **(b) Upstream's rewrite** to `a[i] = a[i] op v`.
 - **Upstream.** `crates/parser/src/parse/stmt.rs:49-80`, and the probe's 205 against 107.
@@ -530,6 +548,8 @@ core-lowering's table of [definitions and theorems you build on](../guide/core-l
 
 ### 4. What row 4's Lean side covers
 
+- **Decided: (a)**, on 2026-11-13. Storage arrays, calldata arrays and `T[]` in the ABI wait for
+  the native contract storage and calldata ABI, which are not scheduled.
 - **(a) Recommended: memory arrays in functions.** The types, `new`, literals, reads, writes, the
   lengths, slices of arrays and slices, `toArray` and `memref`: steps 1 to 8.
 - **(b) Without `memref`.** Step 7 goes, and bump(r) and bumpElement(v) are not ported.
@@ -540,6 +560,7 @@ core-lowering's table of [definitions and theorems you build on](../guide/core-l
 
 ### 5. Arrays at the public API
 
+- **Decided: (a)**, on 2026-11-13.
 - **(a) Recommended.** A root whose signature mentions an array or a slice is rejected.
 - **(b) A new public value form**, a list of elements, for array arguments and results.
 - **Upstream.** The ABI of `T[]`, above.
@@ -549,6 +570,7 @@ core-lowering's table of [definitions and theorems you build on](../guide/core-l
 
 ### 6. Meaning proofs
 
+- **Decided: (a)**, on 2026-11-13. The proofs for arrays become a later unit.
 - **(a) Recommended: compiled, outside the meaning proofs in row 4**, as row 1's conversions were.
   A later unit relates array objects to their Core cells.
 - **(b) Prove the lowering of arrays in row 4.**
