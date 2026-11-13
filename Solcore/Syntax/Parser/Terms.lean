@@ -309,10 +309,28 @@ def optionalBound (nested : Parser Expr) : Parser (Option Expr) := fun state =>
     | .reject failure failed => .reject failure failed
     | .invariant error => .invariant error
 
-/-- What a `[` after an expression holds, read after the `[`: an index. -/
-def bracketContents (nested : Parser Expr) : Parser BracketContents := fun state =>
-  match nested state with
-  | .ok index next => .ok (.index index) next
+/-- What a `[` after an expression holds, read after the `[` at
+`openingSpan`, as upstream's `crates/parser/src/parse/expr_pat.rs:316-341`
+reads it: a start, then a slice if a `:` follows. A start alone is an index,
+and nothing at all, `a[]`, gets upstream's error over the brackets. -/
+def bracketContents (nested : Parser Expr) (openingSpan : SourceSpan) :
+    Parser BracketContents := fun state =>
+  match optionalBound nested state with
+  | .ok start afterStart =>
+      if isSymbol afterStart .colon then
+        match symbol .colon .expression afterStart with
+        | .ok colon afterColon =>
+            match optionalBound nested afterColon with
+            | .ok stop next => .ok (.slice start colon.span stop) next
+            | .reject failure failed => .reject failure failed
+            | .invariant error => .invariant error
+        | .reject failure failed => .reject failure failed
+        | .invariant error => .invariant error
+      else
+        match start with
+        | some index => .ok (.index index) afterStart
+        | none => .ok .empty (afterStart.emit
+            (emptyIndexDiagnostic (SourceSpan.cover openingSpan afterStart.currentSpan)))
   | .reject failure failed => .reject failure failed
   | .invariant error => .invariant error
 
@@ -324,7 +342,7 @@ def postfixTail (nested : Parser Expr) (block : Parser Block) :
       if isSymbol state .leftBracket then
         match symbol .leftBracket .expression state with
         | .ok opening afterOpening =>
-            match bracketContents nested afterOpening with
+            match bracketContents nested opening.span afterOpening with
             | .ok contents next =>
                 match symbol .rightBracket .expression next with
                 | .ok closing afterClosing =>

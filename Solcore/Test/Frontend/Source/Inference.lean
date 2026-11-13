@@ -1436,6 +1436,12 @@ private def testNewArrayRejected : IO Unit := do
     "function bad(n: Word) returns (Word) { let m = new Word[](n); return n; }" fun error =>
       error == .unsupportedExpression "new"
 
+/-- Inference rejects the slices until row 4 gives them a meaning. -/
+private def testSliceRejected : IO Unit := do
+  expectInferenceError "array slice"
+    "function bad(n: Word) returns (Word) { let m = n[1:2]; return n; }" fun error =>
+      error == .unsupportedExpression "slice"
+
 /-- Exercise every phase-7 source-inference form before runtime lowering. -/
 def testSourcePhase7Inference : IO Unit := do
   testConstructors
@@ -1445,6 +1451,7 @@ def testSourcePhase7Inference : IO Unit := do
   testLoopsAndControl
   testNonterminalMatch
   testNewArrayRejected
+  testSliceRejected
   IO.println "phase-7 source inference GREEN"
 
 end Tests.SourcePhase7Inference

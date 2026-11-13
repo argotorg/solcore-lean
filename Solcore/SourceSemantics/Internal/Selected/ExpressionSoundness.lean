@@ -1033,6 +1033,9 @@ theorem actualInferExprFuelRetainedSoundness_step {fuel : Nat}
   | newArray keyword type length =>
       simp only [Detail.inferExprFuel, expressionEq] at success
       cases success
+  | slice base brackets start colon stop =>
+      simp only [Detail.inferExprFuel, expressionEq] at success
+      cases success
   | error =>
       simp only [Detail.inferExprFuel, expressionEq] at success
       cases success

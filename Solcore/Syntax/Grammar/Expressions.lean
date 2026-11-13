@@ -1165,13 +1165,28 @@ inductive OptionalBoundParses
       (boundParsed : nestedParses input bound output) :
       OptionalBoundParses nestedParses input (some bound) output
 
-/-- What a `[` holds, read after it: an index. -/
+/-- What a `[` holds, read after it: a start, then a slice if a `:` follows. A
+start alone is an index, and nothing at all is `a[]`. -/
 inductive BracketContentsParses
     (nestedParses : Remainder → Syntax.Expr → Remainder → Prop) :
     Remainder → Syntax.BracketContents → Remainder → Prop where
   | index {input output : Remainder} {index : Syntax.Expr}
-      (indexParsed : nestedParses input index output) :
+      (indexParsed : OptionalBoundParses nestedParses input (some index) output)
+      (sliceAbsent : TokenKindAbsentAt output.tokens output.endIndex output.cursor
+        (.symbol .colon)) :
       BracketContentsParses nestedParses input (.index index) output
+  | slice {input afterStart afterColon output : Remainder}
+      {start stop : Option Syntax.Expr} (colonSpan : SourceSpan)
+      (startParsed : OptionalBoundParses nestedParses input start afterStart)
+      (colonToken : ExactTokenParses (.symbol .colon) afterStart colonSpan afterColon)
+      (stopParsed : OptionalBoundParses nestedParses afterColon stop output) :
+      BracketContentsParses nestedParses input (.slice start colonSpan stop) output
+  | empty {input : Remainder} (closingSpan : SourceSpan)
+      (closingToken : TokenAt input.tokens input.endIndex input.cursor {
+        span := closingSpan
+        value := .symbol .rightBracket
+      }) :
+      BracketContentsParses nestedParses input .empty input
 
 /-- Maximal sequence of index, call, and field suffixes. -/
 inductive PostfixTailParses
@@ -2313,13 +2328,19 @@ inductive OptionalBoundRejects
       (boundRejected : nestedRejects input rejected) :
       OptionalBoundRejects nestedRejects input rejected
 
-/-- Exact rejection inside a `[`: in its index. -/
+/-- Exact rejection inside a `[`: in its start, or in a slice's stop. -/
 inductive BracketContentsRejects
     (nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop)
     (nestedRejects : Remainder → Remainder → Prop) :
     Remainder → Remainder → Prop where
-  | indexRejected {input rejected : Remainder}
-      (nestedRejected : nestedRejects input rejected) :
+  | startRejected {input rejected : Remainder}
+      (rejection : OptionalBoundRejects nestedRejects input rejected) :
+      BracketContentsRejects nestedOrdinary nestedRejects input rejected
+  | stopRejected {input afterStart afterColon rejected : Remainder}
+      {start : Option Syntax.Expr} (colonSpan : SourceSpan)
+      (startParsed : OptionalBoundParses nestedOrdinary input start afterStart)
+      (colonToken : ExactTokenParses (.symbol .colon) afterStart colonSpan afterColon)
+      (rejection : OptionalBoundRejects nestedRejects afterColon rejected) :
       BracketContentsRejects nestedOrdinary nestedRejects input rejected
 
 /-- Exact rejection while extending an already parsed Core atom. -/

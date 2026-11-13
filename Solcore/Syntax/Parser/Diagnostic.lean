@@ -84,6 +84,9 @@ inductive ParseConstraint where
   /-- A size inside a type's brackets, `T[k]`: upstream's "fixed-size arrays
   `T[k]` are not supported; use `T[]`". -/
   | fixedSizeArray
+  /-- Nothing inside an expression's brackets, `a[]`: upstream's "expected an
+  index or a slice `start:end` inside `[...]`". -/
+  | emptyIndex
   deriving Repr, BEq, DecidableEq
 
 /-- Bounded recursive syntax dimensions. The preflight checks delimiters and
@@ -133,6 +136,13 @@ the brackets of `T[k]`. -/
 def fixedSizeArrayDiagnostic (span : SourceSpan) : ParseDiagnostic := {
   span
   kind := .constraintViolation .fixedSizeArray
+}
+
+/-- Upstream's "expected an index or a slice `start:end` inside `[...]`", over
+the brackets of `a[]`. -/
+def emptyIndexDiagnostic (span : SourceSpan) : ParseDiagnostic := {
+  span
+  kind := .constraintViolation .emptyIndex
 }
 
 /-- Executor phase named by an exceptional parser invariant. -/

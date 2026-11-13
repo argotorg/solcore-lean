@@ -1193,74 +1193,187 @@ theorem bracketContents_success_ordinary_sound (nested : Parser Expr)
     (nestedSuccessSound : ∀ {input output : State} {value : Expr},
       nested input = .ok value output →
         nestedOrdinary input.declarativeRemainder value output.declarativeRemainder)
-    {input output : State} {contents : BracketContents}
-    (result : bracketContents nested input = .ok contents output) :
+    {openingSpan : SourceSpan} {input output : State} {contents : BracketContents}
+    (result : bracketContents nested openingSpan input = .ok contents output) :
     DeclarativeGrammar.BracketContentsParses nestedOrdinary input.declarativeRemainder
       contents output.declarativeRemainder := by
   unfold bracketContents at result
-  cases indexResult : nested input with
-  | invariant error => simp [indexResult] at result
-  | reject failure rejected => simp [indexResult] at result
-  | ok index next =>
-      simp only [indexResult, Reply.ok.injEq] at result
-      rcases result with ⟨rfl, rfl⟩
-      exact .index (nestedSuccessSound indexResult)
+  cases startResult : optionalBound nested input with
+  | invariant error => simp [startResult] at result
+  | reject failure rejected => simp [startResult] at result
+  | ok start afterStart =>
+      have startParsed :=
+        optionalBound_success_ordinary_sound nested nestedSuccessSound startResult
+      simp only [startResult] at result
+      split at result
+      · cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => simp [colonResult] at result
+        | reject failure rejected => simp [colonResult] at result
+        | ok colon afterColon =>
+            simp only [colonResult] at result
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => simp [stopResult] at result
+            | reject failure rejected => simp [stopResult] at result
+            | ok stop next =>
+                simp only [stopResult, Reply.ok.injEq] at result
+                rcases result with ⟨rfl, rfl⟩
+                exact .slice colon.span startParsed
+                  (symbol_success_exactTokenParses .colon .expression colonResult)
+                  (optionalBound_success_ordinary_sound nested nestedSuccessSound stopResult)
+      · rename_i colonAbsent
+        cases start with
+        | some index =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            exact .index startParsed (symbolAbsentAt_of_isSymbol_eq_false .colon
+              (Bool.eq_false_iff.mpr colonAbsent))
+        | none =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            obtain ⟨afterEq, ends⟩ := optionalBound_eq_ok_none startResult
+            rw [afterEq] at colonAbsent ⊢
+            rcases symbol_eq_ok_of_isSymbol_eq_true .rightBracket .expression
+                (rightBracket_of_bound_end ends colonAbsent) with ⟨token, closingResult⟩
+            exact .empty token.span
+              (symbol_success_exactTokenParses .rightBracket .expression closingResult).1
 
 /-- Every diagnostic-free `[` contents follows its grammar. -/
 theorem bracketContents_success_sound (nested : Parser Expr)
     {nestedParses : DeclarativeGrammar.Remainder → Expr →
       DeclarativeGrammar.Remainder → Prop}
+    (nestedReflects : Parser.ReflectsDiagnosticFreeOnSuccess nested)
     (nestedSound : ∀ {input next : State} {value : Expr},
       next.diagnosticsRev = [] → nested input = .ok value next →
       nestedParses input.declarativeRemainder value next.declarativeRemainder)
-    {input output : State} {contents : BracketContents}
+    {openingSpan : SourceSpan} {input output : State} {contents : BracketContents}
     (diagnosticFree : output.diagnosticsRev = [])
-    (result : bracketContents nested input = .ok contents output) :
+    (result : bracketContents nested openingSpan input = .ok contents output) :
     DeclarativeGrammar.BracketContentsParses nestedParses input.declarativeRemainder
       contents output.declarativeRemainder := by
   unfold bracketContents at result
-  cases indexResult : nested input with
-  | invariant error => simp [indexResult] at result
-  | reject failure rejected => simp [indexResult] at result
-  | ok index next =>
-      simp only [indexResult, Reply.ok.injEq] at result
-      rcases result with ⟨rfl, rfl⟩
-      exact .index (nestedSound diagnosticFree indexResult)
+  cases startResult : optionalBound nested input with
+  | invariant error => simp [startResult] at result
+  | reject failure rejected => simp [startResult] at result
+  | ok start afterStart =>
+      simp only [startResult] at result
+      split at result
+      · cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => simp [colonResult] at result
+        | reject failure rejected => simp [colonResult] at result
+        | ok colon afterColon =>
+            simp only [colonResult] at result
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => simp [stopResult] at result
+            | reject failure rejected => simp [stopResult] at result
+            | ok stop next =>
+                simp only [stopResult, Reply.ok.injEq] at result
+                rcases result with ⟨rfl, rfl⟩
+                have afterColonFree := optionalBound_reflectsDiagnosticFreeOnSuccess nested
+                  nestedReflects afterColon stop next stopResult diagnosticFree
+                have afterStartFree := symbol_reflectsDiagnosticFreeOnSuccess .colon .expression
+                  afterStart colon afterColon colonResult afterColonFree
+                exact .slice colon.span
+                  (optionalBound_success_sound nested nestedSound afterStartFree startResult)
+                  (symbol_success_exactTokenParses .colon .expression colonResult)
+                  (optionalBound_success_sound nested nestedSound diagnosticFree stopResult)
+      · rename_i colonAbsent
+        cases start with
+        | some index =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            exact .index (optionalBound_success_sound nested nestedSound diagnosticFree startResult)
+              (symbolAbsentAt_of_isSymbol_eq_false .colon (Bool.eq_false_iff.mpr colonAbsent))
+        | none =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            simp [State.emit] at diagnosticFree
 
 /-- Every `[` contents rejection follows its grammar. -/
 theorem bracketContents_reject_ordinary_sound (nested : Parser Expr)
     {nestedOrdinary : DeclarativeGrammar.Remainder → Expr →
       DeclarativeGrammar.Remainder → Prop}
     {nestedRejects : DeclarativeGrammar.Remainder → DeclarativeGrammar.Remainder → Prop}
+    (nestedSuccessSound : ∀ {input output : State} {value : Expr},
+      nested input = .ok value output →
+        nestedOrdinary input.declarativeRemainder value output.declarativeRemainder)
     (nestedRejectSound : ∀ {input rejected : State} {failure : Failure},
       nested input = .reject failure rejected →
         nestedRejects input.declarativeRemainder rejected.declarativeRemainder)
-    {input rejected : State} {failure : Failure}
-    (result : bracketContents nested input = .reject failure rejected) :
+    {openingSpan : SourceSpan} {input rejected : State} {failure : Failure}
+    (result : bracketContents nested openingSpan input = .reject failure rejected) :
     DeclarativeGrammar.BracketContentsRejects nestedOrdinary nestedRejects
       input.declarativeRemainder rejected.declarativeRemainder := by
   unfold bracketContents at result
-  cases indexResult : nested input with
-  | invariant error => simp [indexResult] at result
-  | ok index next => simp [indexResult] at result
-  | reject indexFailure indexRejected =>
-      simp only [indexResult, Reply.reject.injEq] at result
+  cases startResult : optionalBound nested input with
+  | invariant error => simp [startResult] at result
+  | reject startFailure startRejected =>
+      simp only [startResult, Reply.reject.injEq] at result
       rcases result with ⟨rfl, rfl⟩
-      exact .indexRejected (nestedRejectSound indexResult)
+      exact .startRejected
+        (optionalBound_reject_ordinary_sound nested nestedRejectSound startResult)
+  | ok start afterStart =>
+      simp only [startResult] at result
+      split at result
+      · rename_i colonPresent
+        cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => simp [colonResult] at result
+        | reject colonFailure colonRejected =>
+            rcases symbol_eq_ok_of_isSymbol_eq_true .colon .expression colonPresent with
+              ⟨_, okResult⟩
+            rw [okResult] at colonResult
+            cases colonResult
+        | ok colon afterColon =>
+            simp only [colonResult] at result
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => simp [stopResult] at result
+            | ok stop next => simp [stopResult] at result
+            | reject stopFailure stopRejected =>
+                simp only [stopResult, Reply.reject.injEq] at result
+                rcases result with ⟨rfl, rfl⟩
+                exact .stopRejected colon.span
+                  (optionalBound_success_ordinary_sound nested nestedSuccessSound startResult)
+                  (symbol_success_exactTokenParses .colon .expression colonResult)
+                  (optionalBound_reject_ordinary_sound nested nestedRejectSound stopResult)
+      · cases start <;> simp at result
 
 /-- What a `[` holds reflects diagnostic freedom when its expressions do. -/
 theorem bracketContents_reflectsDiagnosticFreeOnSuccess (nested : Parser Expr)
-    (nestedReflects : Parser.ReflectsDiagnosticFreeOnSuccess nested) :
-    Parser.ReflectsDiagnosticFreeOnSuccess (bracketContents nested) := by
+    (nestedReflects : Parser.ReflectsDiagnosticFreeOnSuccess nested)
+    {openingSpan : SourceSpan} :
+    Parser.ReflectsDiagnosticFreeOnSuccess (bracketContents nested openingSpan) := by
   intro input contents next result diagnosticFree
+  have boundReflects := optionalBound_reflectsDiagnosticFreeOnSuccess nested nestedReflects
   unfold bracketContents at result
-  cases indexResult : nested input with
-  | invariant error => simp [indexResult] at result
-  | reject failure rejected => simp [indexResult] at result
-  | ok index afterIndex =>
-      simp only [indexResult, Reply.ok.injEq] at result
-      rcases result with ⟨rfl, rfl⟩
-      exact nestedReflects input index afterIndex indexResult diagnosticFree
+  cases startResult : optionalBound nested input with
+  | invariant error => simp [startResult] at result
+  | reject failure rejected => simp [startResult] at result
+  | ok start afterStart =>
+      simp only [startResult] at result
+      split at result
+      · cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => simp [colonResult] at result
+        | reject failure rejected => simp [colonResult] at result
+        | ok colon afterColon =>
+            simp only [colonResult] at result
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => simp [stopResult] at result
+            | reject failure rejected => simp [stopResult] at result
+            | ok stop afterStop =>
+                simp only [stopResult, Reply.ok.injEq] at result
+                rcases result with ⟨rfl, rfl⟩
+                exact boundReflects input start afterStart startResult
+                  (symbol_reflectsDiagnosticFreeOnSuccess .colon .expression afterStart colon
+                    afterColon colonResult
+                    (boundReflects afterColon stop afterStop stopResult diagnosticFree))
+      · cases start with
+        | some index =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            exact boundReflects input _ afterStart startResult diagnosticFree
+        | none =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            simp [State.emit] at diagnosticFree
 
 /-- Every executable postfix-tail rejection follows the exact selected suffix
 branch and subordinate ordinary outcome. -/
@@ -1302,13 +1415,14 @@ theorem postfixTail_reject_ordinary_sound
             simp only [openingResult] at result
             have openingParsed := symbol_success_exactTokenParses .leftBracket
               .expression openingResult
-            cases indexResult : bracketContents nested afterOpening with
+            cases indexResult : bracketContents nested opening.span afterOpening with
             | invariant error => simp [indexResult] at result
             | reject indexFailure indexRejected =>
                 simp only [indexResult] at result
                 cases result
                 exact .indexNestedRejected opening.span openingParsed
-                  (bracketContents_reject_ordinary_sound nested nestedRejectSound indexResult)
+                  (bracketContents_reject_ordinary_sound nested nestedSuccessSound nestedRejectSound
+                    indexResult)
             | ok contents afterIndex =>
                 simp only [indexResult] at result
                 have indexParsed := bracketContents_success_ordinary_sound nested
@@ -1485,7 +1599,7 @@ theorem postfixTail_reflectsDiagnosticFreeOnSuccess
         | reject failure rejected => simp [openingResult] at result
         | ok opening afterOpening =>
             simp only [openingResult] at result
-            cases indexResult : bracketContents nested afterOpening with
+            cases indexResult : bracketContents nested opening.span afterOpening with
             | invariant error => simp [indexResult] at result
             | reject failure rejected => simp [indexResult] at result
             | ok contents afterIndex =>
@@ -1623,7 +1737,7 @@ theorem postfixTail_success_sound
         | reject failure rejected => simp [openingResult] at result
         | ok opening afterOpening =>
             simp only [openingResult] at result
-            cases indexResult : bracketContents nested afterOpening with
+            cases indexResult : bracketContents nested opening.span afterOpening with
             | invariant error => simp [indexResult] at result
             | reject failure rejected => simp [indexResult] at result
             | ok contents afterIndex =>
@@ -1644,7 +1758,7 @@ theorem postfixTail_success_sound
                     exact .index opening.span closing.span
                       (symbol_success_exactTokenParses .leftBracket
                         .expression openingResult)
-                      (bracketContents_success_sound nested nestedSound afterIndexFree
+                      (bracketContents_success_sound nested nestedReflects nestedSound afterIndexFree
                         indexResult)
                       (symbol_success_exactTokenParses .rightBracket
                         .expression closingResult)
@@ -1796,7 +1910,7 @@ theorem postfixTail_success_ordinary_sound
         | reject failure rejected => simp [openingResult] at result
         | ok opening afterOpening =>
             simp only [openingResult] at result
-            cases indexResult : bracketContents nested afterOpening with
+            cases indexResult : bracketContents nested opening.span afterOpening with
             | invariant error => simp [indexResult] at result
             | reject failure rejected => simp [indexResult] at result
             | ok contents afterIndex =>

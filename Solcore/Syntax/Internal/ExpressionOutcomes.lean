@@ -100,6 +100,17 @@ theorem OptionalBoundParses.mapNestedRelation
   | present colonAbsent closingAbsent boundParsed =>
       exact .present colonAbsent closingAbsent (includeNested boundParsed)
 
+/-- A `:` and a `]` cannot both be the token at one place. -/
+theorem colonToken_closingToken_conflict {input : Remainder}
+    {colonSpan closingSpan : SourceSpan}
+    (colon : TokenAt input.tokens input.endIndex input.cursor
+      { span := colonSpan, value := .symbol .colon })
+    (closing : TokenAt input.tokens input.endIndex input.cursor
+      { span := closingSpan, value := .symbol .rightBracket }) : False := by
+  have kinds : TokenKind.symbol .colon = TokenKind.symbol .rightBracket :=
+    congrArg Located.value (Option.some.inj (colon.2.symm.trans closing.2))
+  cases kinds
+
 /-- What a `[` holds ends at one remainder. -/
 theorem BracketContentsParses.output_unique
     {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
@@ -110,9 +121,42 @@ theorem BracketContentsParses.output_unique
     (rightParsed : BracketContentsParses nestedOrdinary input right afterRight) :
     afterLeft = afterRight := by
   cases leftParsed with
-  | index leftIndex =>
+  | index leftIndex leftSliceAbsent =>
       cases rightParsed with
-      | index rightIndex => exact nestedOutcomes.successOutputUnique leftIndex rightIndex
+      | index rightIndex _ => exact leftIndex.output_unique nestedOutcomes rightIndex
+      | slice colonSpan rightStart rightColon _ =>
+          have afterEq := leftIndex.output_unique nestedOutcomes rightStart
+          subst afterEq
+          exact (leftSliceAbsent ⟨colonSpan, rightColon.1⟩).elim
+      | empty closingSpan closingToken =>
+          cases leftIndex with
+          | present _ closingAbsent _ => exact (closingAbsent ⟨closingSpan, closingToken⟩).elim
+  | slice colonSpan leftStart leftColon leftStop =>
+      cases rightParsed with
+      | index rightIndex rightSliceAbsent =>
+          have afterEq := leftStart.output_unique nestedOutcomes rightIndex
+          subst afterEq
+          exact (rightSliceAbsent ⟨colonSpan, leftColon.1⟩).elim
+      | slice _ rightStart rightColon rightStop =>
+          have startEq := leftStart.output_unique nestedOutcomes rightStart
+          subst startEq
+          have colonEq := exactToken_output_unique leftColon rightColon
+          subst colonEq
+          exact leftStop.output_unique nestedOutcomes rightStop
+      | empty closingSpan closingToken =>
+          cases leftStart with
+          | absent _ => exact (colonToken_closingToken_conflict leftColon.1 closingToken).elim
+          | present _ closingAbsent _ => exact (closingAbsent ⟨closingSpan, closingToken⟩).elim
+  | empty closingSpan closingToken =>
+      cases rightParsed with
+      | index rightIndex _ =>
+          cases rightIndex with
+          | present _ closingAbsent _ => exact (closingAbsent ⟨closingSpan, closingToken⟩).elim
+      | slice _ rightStart rightColon _ =>
+          cases rightStart with
+          | absent _ => exact (colonToken_closingToken_conflict rightColon.1 closingToken).elim
+          | present _ closingAbsent _ => exact (closingAbsent ⟨closingSpan, closingToken⟩).elim
+      | empty => rfl
 
 /-- A rejection inside a `[` excludes every success there. -/
 theorem BracketContentsRejects.disjointOrdinary
@@ -124,10 +168,30 @@ theorem BracketContentsRejects.disjointOrdinary
     ¬ ∃ contents output, BracketContentsParses nestedOrdinary input contents output := by
   rintro ⟨contents, output, parsed⟩
   cases rejection with
-  | indexRejected nestedRejected =>
+  | startRejected rejection =>
       cases parsed with
-      | index indexParsed =>
-          exact nestedOutcomes.successRejectDisjoint nestedRejected ⟨_, _, indexParsed⟩
+      | index indexParsed _ => exact rejection.disjointOrdinary nestedOutcomes ⟨_, _, indexParsed⟩
+      | slice _ startParsed _ _ =>
+          exact rejection.disjointOrdinary nestedOutcomes ⟨_, _, startParsed⟩
+      | empty closingSpan closingToken =>
+          cases rejection with
+          | rejected _ closingAbsent _ => exact closingAbsent ⟨closingSpan, closingToken⟩
+  | stopRejected colonSpan rejectedStart rejectedColon rejection =>
+      cases parsed with
+      | index indexParsed sliceAbsent =>
+          have afterEq := rejectedStart.output_unique nestedOutcomes indexParsed
+          subst afterEq
+          exact sliceAbsent ⟨colonSpan, rejectedColon.1⟩
+      | slice _ startParsed colonParsed stopParsed =>
+          have startEq := rejectedStart.output_unique nestedOutcomes startParsed
+          subst startEq
+          have colonEq := exactToken_output_unique rejectedColon colonParsed
+          subst colonEq
+          exact rejection.disjointOrdinary nestedOutcomes ⟨_, _, stopParsed⟩
+      | empty closingSpan closingToken =>
+          cases rejectedStart with
+          | absent _ => exact colonToken_closingToken_conflict rejectedColon.1 closingToken
+          | present _ closingAbsent _ => exact closingAbsent ⟨closingSpan, closingToken⟩
 
 /-- Pointwise nested inclusion lifts through what a `[` holds. -/
 theorem BracketContentsParses.mapNestedRelation
@@ -138,7 +202,12 @@ theorem BracketContentsParses.mapNestedRelation
     (parsed : BracketContentsParses source input contents output) :
     BracketContentsParses target input contents output := by
   cases parsed with
-  | index indexParsed => exact .index (includeNested indexParsed)
+  | index indexParsed sliceAbsent =>
+      exact .index (indexParsed.mapNestedRelation includeNested) sliceAbsent
+  | slice colonSpan startParsed colonToken stopParsed =>
+      exact .slice colonSpan (startParsed.mapNestedRelation includeNested) colonToken
+        (stopParsed.mapNestedRelation includeNested)
+  | empty closingSpan closingToken => exact .empty closingSpan closingToken
 
 /-- A maximal ordinary postfix tail has a unique output remainder. -/
 theorem PostfixTailParses.output_unique

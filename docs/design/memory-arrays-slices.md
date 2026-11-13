@@ -446,10 +446,18 @@ functions over words, as row 1's fixture ports did.
 12. **Lean commits after `new T[](`.** Once `new`, an array type and the `(` are read, the length
     and the `)` are required, and their errors are reported. Upstream backtracks its whole
     alternative, so for `new T[](<bad>` it reports a later error at `T`.
+13. **Lean parses on after `a[]`.** Its brackets hold an error node after upstream's error, as
+    `T[k]` keeps `T[]`. Upstream's index fails there, and its recovery skips the rest of the
+    statement. The reports agree where the rest of the statement parses and where only a later
+    statement fails. They differ where the same statement fails later: `return a[] + ;` gets
+    upstream's error over the `[]` at the pin, and in Lean the `;` and then the `]`, as
+    `return a[1] + ;` does, since Lean's recovery of a failed statement does not keep the `[]`'s
+    error (`.upstream/lane-d-unit3-memory-arrays/step1/1c-probe`).
 
 Differences 2 and 4 to 8 were accepted with the decisions, and 9 to 12 on 2026-11-13. Those four
 change only a diagnostic or the room of a resource limit, never what an accepted program means.
-Difference 1 follows decision 3.
+Difference 13, from step 1c-ii-b, changes only a diagnostic too and is not yet accepted. Difference
+1 follows decision 3.
 
 ## Steps
 
@@ -464,7 +472,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 1b-ii | Syntax: `new T[](n)` in the name atom, falling back to the identifier `new` where no head starts; inference rejects it | 18–26 files, +900–1,100/−50–150; measured at 27 files, +1,412/−199 | `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
 | 1c-i | Syntax: the bracket contents layer, as a refactor that accepts no new syntax: what a `[` after an expression holds has its own parser, grammar and lemmas, and an index is its one form | 10–12 files, +650–750/−150–200; measured at 12 files, +696/−182 | none |
 | 1c-ii-a | Syntax: the optional bound that an index and a slice's start and stop read, with its grammar and every lemma, and direct tests of its parser; no bracket reads it yet | 10–12 files, +500–600; measured at 10 files, +560/−4 | none |
-| 1c-ii-b | Syntax: the slices, with `a[]` rejected, as the bracket contents' other forms; inference rejects the slices | 18–22 files, +1,200–1,400/−250–300 | parser tests from `crates/uitest/tests/fixtures/parse/empty_index_rejected`, `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
+| 1c-ii-b | Syntax: the slices, with `a[]` rejected, as the bracket contents' other forms; inference rejects the slices | 18–22 files, +1,200–1,400/−250–300; measured at 21 files, +1,374/−283 | parser tests from `crates/uitest/tests/fixtures/parse/empty_index_rejected`, `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
 | 2 | The array type and its element check, the heap's store, `new` and `0x41`, the lengths, preservation, the staged copies, the lowering's cells | 60–72 files, +1,300–1,700/−300–450, the riskiest | newLen(n), oversized(n) |
 | 3 | Element reads and `0x32` | 35–55 files, +800–1,200/−200–350, between 3c and 3a | defaultZero(n, i), nestedEmpty(n) |
 | 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
@@ -511,7 +519,9 @@ change to a statement named in the [open decisions](#open-decisions) beyond the 
   branch leaves the branches that ignore both child parsers, since `new T[](n)` reads its length
   with the nested one, and two names' dispatch traces gain the proof that no head `new T[](`
   starts. In step 1c-i, three trace tests' proofs wrap their index in the bracket contents' index
-  form, and no test's statement changes. Everything else is new tests.
+  form, and no test's statement changes. In step 1c-ii-b, `[]` is `a[]` whatever an index child
+  would do, so three theorems about a child that does not advance state the empty index and its
+  error, and the other index traces gain the bound's premises. Everything else is new tests.
 
 ## Open decisions
 

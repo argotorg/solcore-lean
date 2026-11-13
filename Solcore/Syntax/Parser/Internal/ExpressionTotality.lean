@@ -1055,15 +1055,36 @@ theorem optionalBound_preservesEndIndex (nested : Parser Expr)
     | ok value next => rw [result] at frame; exact frame
 
 theorem bracketContents_preservesEndIndex (nested : Parser Expr)
-    (child : Parser.PreservesEndIndex nested) :
-    Parser.PreservesEndIndex (bracketContents nested) := by
+    (child : Parser.PreservesEndIndex nested) (openingSpan : SourceSpan) :
+    Parser.PreservesEndIndex (bracketContents nested openingSpan) := by
+  have bound := optionalBound_preservesEndIndex nested child
   intro input
-  have frame := child input
   unfold bracketContents
-  cases result : nested input with
+  cases startResult : optionalBound nested input with
   | invariant error => trivial
-  | reject failure rejected => rw [result] at frame; exact frame
-  | ok index next => rw [result] at frame; exact frame
+  | reject failure rejected => exact bound.endIndex_eq_of_reject startResult
+  | ok start afterStart =>
+      have startFrame := bound.endIndex_eq_of_ok startResult
+      simp only
+      split
+      · cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => trivial
+        | reject failure rejected =>
+            exact ((symbol_preservesTokenWindow .colon .expression).preservesEndIndex.endIndex_eq_of_reject
+              colonResult).trans startFrame
+        | ok colon afterColon =>
+            have colonFrame := (symbol_preservesTokenWindow .colon .expression).preservesEndIndex.endIndex_eq_of_ok
+              colonResult
+            simp only
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => trivial
+            | reject failure rejected =>
+                exact (bound.endIndex_eq_of_reject stopResult).trans (colonFrame.trans startFrame)
+            | ok stop next =>
+                exact (bound.endIndex_eq_of_ok stopResult).trans (colonFrame.trans startFrame)
+      · cases start with
+        | some index => exact startFrame
+        | none => exact startFrame
 
 theorem postfixTail_preservesEndIndex (nested : Parser Expr) (block : Parser Block)
     (child : Parser.PreservesEndIndex nested) :
@@ -1082,8 +1103,8 @@ theorem postfixTail_preservesEndIndex (nested : Parser Expr) (block : Parser Blo
         | ok opening afterOpening =>
             have openingFrame := (symbol_preservesTokenWindow .leftBracket .expression).preservesEndIndex.endIndex_eq_of_ok openingResult
             simp only
-            have contentsFrame := bracketContents_preservesEndIndex nested child
-            cases childResult : bracketContents nested afterOpening with
+            have contentsFrame := bracketContents_preservesEndIndex nested child opening.span
+            cases childResult : bracketContents nested opening.span afterOpening with
             | invariant error => trivial
             | reject failure rejected =>
                 exact (contentsFrame.endIndex_eq_of_reject childResult).trans openingFrame
@@ -1256,31 +1277,97 @@ theorem optionalBound_ordinary_of_elementFuel
     · exact Or.inl ⟨some bound, next, by simp only [result]⟩
     · exact Or.inr ⟨failure, rejected, by simp only [result]⟩
 
-/-- What a `[` holds keeps the source provenance of every ordinary reply. -/
+/-- What a `[` holds keeps the source provenance of every ordinary reply,
+`a[]`'s error included, over brackets that reach validly to any next token. -/
 theorem bracketContents_weakValidFor (nested : Parser Expr)
-    (nestedValid : nested.ValidFor (fun _ _ => True)) :
-    (bracketContents nested).ValidFor (fun _ _ => True) := by
-  intro input inputValid
-  have reply := nestedValid input inputValid
+    (nestedValid : nested.ValidFor (fun _ _ => True))
+    (openingSpan : SourceSpan) (input : State) (inputValid : input.ValidFor)
+    (bracketsValid : ∀ token, input.peek? = some token →
+      (SourceSpan.cover openingSpan token.span).ValidFor input.file) :
+    (bracketContents nested openingSpan input).ValidFor input (fun _ _ => True) := by
+  have startReply := optionalBound_weakValidFor nested nestedValid input inputValid
   unfold bracketContents
-  cases result : nested input with
+  cases startResult : optionalBound nested input with
   | invariant error => trivial
-  | reject failure rejected => rw [result] at reply; exact reply
-  | ok index next => rw [result] at reply; exact reply
+  | reject failure rejected => rw [startResult] at startReply; exact startReply
+  | ok start afterStart =>
+      rw [startResult] at startReply
+      simp only
+      split
+      · have colonReply := symbol_validFor .colon .expression afterStart startReply.2.1
+        cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [colonResult] at colonReply
+            exact colonReply.of_file_eq startReply.2.2
+        | ok colon afterColon =>
+            rw [colonResult] at colonReply
+            simp only
+            have stopReply := optionalBound_weakValidFor nested nestedValid afterColon
+              colonReply.2.1
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => trivial
+            | reject failure rejected =>
+                rw [stopResult] at stopReply
+                exact stopReply.of_file_eq (colonReply.2.2.trans startReply.2.2)
+            | ok stop next =>
+                rw [stopResult] at stopReply
+                exact ⟨trivial, stopReply.2.1,
+                  stopReply.2.2.trans (colonReply.2.2.trans startReply.2.2)⟩
+      · rename_i notColon
+        cases start with
+        | some index => exact startReply
+        | none =>
+            obtain ⟨afterEq, ends⟩ := optionalBound_eq_ok_none startResult
+            rw [afterEq] at notColon ⊢
+            rcases symbol_eq_ok_of_isSymbol_eq_true .rightBracket .expression
+                (rightBracket_of_bound_end ends notColon) with ⟨token, closingResult⟩
+            have peekEq := (symbol_ok_state_shape .rightBracket .expression closingResult).1
+            have spanEq : input.currentSpan = token.span := by
+              simp only [State.currentSpan, peekEq]
+            refine ⟨trivial, inputValid.emit_validFor _ ?_, rfl⟩
+            simpa only [emptyIndexDiagnostic, spanEq] using bracketsValid token peekEq
 
 /-- What a `[` holds inherits the bounded totality of its expressions. -/
 theorem bracketContents_ordinary_of_elementFuel
     (nested : Parser Expr) (nestedFuel : Nat)
     (contract : FuelElementTotalityContract nested nestedFuel)
-    (input : State) (inputValid : input.ValidFor)
+    (openingSpan : SourceSpan) (input : State) (inputValid : input.ValidFor)
     (adequate : input.remainingCount < nestedFuel) :
-    (∃ contents next, bracketContents nested input = .ok contents next) ∨
-    (∃ failure next, bracketContents nested input = .reject failure next) := by
+    (∃ contents next, bracketContents nested openingSpan input = .ok contents next) ∨
+    (∃ failure next, bracketContents nested openingSpan input = .reject failure next) := by
   unfold bracketContents
-  rcases contract.ordinary input inputValid adequate with
-    ⟨index, next, result⟩ | ⟨failure, rejected, result⟩
-  · exact Or.inl ⟨.index index, next, by simp only [result]⟩
-  · exact Or.inr ⟨failure, rejected, by simp only [result]⟩
+  rcases optionalBound_ordinary_of_elementFuel nested nestedFuel contract input inputValid
+      adequate with ⟨start, afterStart, startResult⟩ | ⟨failure, rejected, startResult⟩
+  · have startReply := optionalBound_weakValidFor nested contract.validFor input inputValid
+    rw [startResult] at startReply
+    have startWindow := optionalBound_preservesTokenWindow nested contract.preservesTokenWindow
+      input
+    rw [startResult] at startWindow
+    have startCursor := optionalBound_cursorMonotoneOnSuccess nested
+      (fun _ _ _ result => Nat.le_of_lt (contract.cursorLtOnSuccess result)) input start
+        afterStart startResult
+    simp only [startResult]
+    by_cases colonPresent : isSymbol afterStart .colon = true
+    · simp only [colonPresent, if_true]
+      rcases symbol_eq_ok_of_isSymbol_eq_true .colon .expression colonPresent with
+        ⟨colon, colonResult⟩
+      have colonReply := symbol_validFor .colon .expression afterStart startReply.2.1
+      rw [colonResult] at colonReply
+      have afterColonAdequate : ({ afterStart with cursor := afterStart.cursor + 1 } :
+          State).remainingCount < nestedFuel :=
+        remainingCount_lt_of_cursor_le startWindow.2 (Nat.le_trans startCursor
+          (Nat.le_succ _)) adequate
+      simp only [colonResult]
+      rcases optionalBound_ordinary_of_elementFuel nested nestedFuel contract _ colonReply.2.1
+          afterColonAdequate with ⟨stop, next, stopResult⟩ | ⟨failure, rejected, stopResult⟩
+      · exact Or.inl ⟨.slice start colon.span stop, next, by simp only [stopResult]⟩
+      · exact Or.inr ⟨failure, rejected, by simp only [stopResult]⟩
+    · simp only [colonPresent]
+      cases start with
+      | some index => exact Or.inl ⟨_, afterStart, rfl⟩
+      | none => exact Or.inl ⟨_, _, rfl⟩
+  · exact Or.inr ⟨failure, rejected, by simp only [startResult]⟩
 
 theorem postfixTail_ordinary_of_fuel
     (nested : Parser Expr) (block : Parser Block) (nestedFuel : Nat)
@@ -1317,15 +1404,16 @@ theorem postfixTail_ordinary_of_fuel
               (acceptToken_cursor_lt_onSuccess (.symbol .leftBracket)
                 .expression (· == .symbol .leftBracket) openingResult)
               nestedAdequate
-          have contentsCursor : Parser.CursorMonotoneOnSuccess (bracketContents nested) :=
+          have contentsCursor :
+              Parser.CursorMonotoneOnSuccess (bracketContents nested opening.span) :=
             bracketContents_cursorMonotoneOnSuccess nested
-              (fun _ _ _ result => Nat.le_of_lt (contract.cursorLtOnSuccess result))
-          rcases bracketContents_ordinary_of_elementFuel nested nestedFuel contract afterOpening
-              openingValid.2.1 afterOpeningNested with
+              (fun _ _ _ result => Nat.le_of_lt (contract.cursorLtOnSuccess result)) opening.span
+          rcases bracketContents_ordinary_of_elementFuel nested nestedFuel contract opening.span
+              afterOpening openingValid.2.1 afterOpeningNested with
             ⟨contents, afterIndex, indexResult⟩ |
             ⟨failure, rejected, indexResult⟩
-          · have indexValid := bracketContents_weakValidFor nested contract.validFor afterOpening
-              openingValid.2.1
+          · have indexValid := bracketContents_weakValidFor nested contract.validFor opening.span
+              afterOpening openingValid.2.1 (leftBracket_bracketsValid inputValid openingResult)
             rw [indexResult] at indexValid
             rcases (symbol_ordinary .rightBracket .expression) afterIndex with
               ⟨closing, afterClosing, closingResult⟩ |
@@ -1338,7 +1426,7 @@ theorem postfixTail_ordinary_of_fuel
                   afterIndex)
               rw [closingResult] at suffixWindow
               have indexWindow := bracketContents_preservesTokenWindow nested
-                contract.preservesTokenWindow afterOpening
+                contract.preservesTokenWindow opening.span afterOpening
               rw [indexResult] at indexWindow
               have afterClosingWindow : afterClosing.window = input.window :=
                 suffixWindow.2.trans (indexWindow.2.trans openingWindow.2)

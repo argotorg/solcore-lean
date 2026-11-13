@@ -909,6 +909,17 @@ inductive ValidFor (statementValid : SourceFile → Statement → Prop)
       (typeValid : TypeExpr.ValidFor file type)
       (lengthValid : ValidFor statementValid file length) :
       ValidFor statementValid file { span, value := .newArray keyword type length }
+  | slice {span brackets colon : SourceSpan} {base : Expr} {start stop : Option Expr}
+      (spanValid : span.ValidFor file)
+      (baseValid : ValidFor statementValid file base)
+      (bracketsValid : brackets.ValidFor file)
+      (startValid : ∀ bound ∈ start, ValidFor statementValid file bound)
+      (colonValid : colon.ValidFor file)
+      (stopValid : ∀ bound ∈ stop, ValidFor statementValid file bound) :
+      ValidFor statementValid file {
+        span
+        value := .slice base brackets start colon stop
+      }
   | error {span : SourceSpan} (spanValid : span.ValidFor file) :
       ValidFor statementValid file { span, value := .error }
 
@@ -1218,16 +1229,24 @@ theorem mono {old new : SourceFile → Statement → Prop}
       exact .array spanValid elementsSpanValid elementsInduction
   | newArray spanValid keywordValid typeValid _ lengthInduction =>
       exact .newArray spanValid keywordValid typeValid lengthInduction
+  | slice spanValid _ bracketsValid _ colonValid _ baseInduction startInduction
+      stopInduction =>
+      exact .slice spanValid baseInduction bracketsValid startInduction colonValid
+        stopInduction
   | error spanValid => exact .error spanValid
 
 end Expr.ValidFor
 
 namespace BracketContents
 
-/-- What a `[` holds keeps the provenance of the expressions in it. -/
+/-- What a `[` holds keeps the provenance of the expressions and the `:` in it. -/
 def ValidFor (statementValid : SourceFile → Statement → Prop) (file : SourceFile) :
     BracketContents → Prop
   | .index inner => Expr.ValidFor statementValid file inner
+  | .slice start colon stop =>
+      (∀ bound ∈ start, Expr.ValidFor statementValid file bound) ∧ colon.ValidFor file ∧
+        ∀ bound ∈ stop, Expr.ValidFor statementValid file bound
+  | .empty => True
 
 theorem apply_span (contents : BracketContents) (base : Expr)
     (openingSpan closingSpan : SourceSpan) :
@@ -1246,6 +1265,12 @@ theorem apply_validFor {statementValid : SourceFile → Statement → Prop}
     Expr.ValidFor statementValid file (contents.apply base openingSpan closingSpan) := by
   cases contents with
   | index inner => exact Expr.ValidFor.index spanValid baseValid bracketsValid contentsValid
+  | slice start colon stop =>
+      exact Expr.ValidFor.slice spanValid baseValid bracketsValid contentsValid.1
+        contentsValid.2.1 contentsValid.2.2
+  | empty =>
+      exact Expr.ValidFor.index spanValid baseValid bracketsValid
+        (Expr.ValidFor.error bracketsValid)
 
 end BracketContents
 

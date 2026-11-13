@@ -2146,6 +2146,8 @@ theorem inferPlaceFuel_success_sound
           simp [Detail.inferPlaceFuel, targetEq] at success
       | newArray keyword type length =>
           simp [Detail.inferPlaceFuel, targetEq] at success
+      | slice base brackets start colon stop =>
+          simp [Detail.inferPlaceFuel, targetEq] at success
       | error =>
           simp [Detail.inferPlaceFuel, targetEq] at success
 

@@ -57,6 +57,14 @@ inductive ExprValue where
   | array (elements : DelimitedList (Located ExprValue))
   /-- `new T[](n)`: `keyword` is `new`'s span and `type` an array type. -/
   | newArray (keyword : SourceSpan) (type : TypeExpr) (length : Located ExprValue)
+  /-- `a[start:stop]`, either bound absent: `brackets` spans the `[` to the
+  `]`, and `colon` is the slice's own `:`. -/
+  | slice
+      (base : Located ExprValue)
+      (brackets : SourceSpan)
+      (start : Option (Located ExprValue))
+      (colon : SourceSpan)
+      (stop : Option (Located ExprValue))
   | error
   deriving Repr, BEq
 
@@ -164,16 +172,32 @@ builds the expression from it once the `]` is read (`BracketContents.apply`). -/
 inductive BracketContents where
   /-- `a[i]`. -/
   | index (index : Expr)
+  /-- `a[start:stop]`, with the slice's `:`. -/
+  | slice (start : Option Expr) (colon : SourceSpan) (stop : Option Expr)
+  /-- `a[]`, which gets upstream's error. -/
+  | empty
   deriving Repr, BEq
 
 /-- `base` followed by brackets from `openingSpan` to `closingSpan` holding
-`contents`. -/
+`contents`. `a[]` keeps its base as an index whose index is an error node over
+the brackets. -/
 def BracketContents.apply (contents : BracketContents) (base : Expr)
     (openingSpan closingSpan : SourceSpan) : Expr :=
   match contents with
   | .index inner => {
       span := SourceSpan.cover base.span closingSpan
       value := .index base (SourceSpan.cover openingSpan closingSpan) inner
+    }
+  | .slice start colon stop => {
+      span := SourceSpan.cover base.span closingSpan
+      value := .slice base (SourceSpan.cover openingSpan closingSpan) start colon stop
+    }
+  | .empty => {
+      span := SourceSpan.cover base.span closingSpan
+      value := .index base (SourceSpan.cover openingSpan closingSpan) {
+        span := SourceSpan.cover openingSpan closingSpan
+        value := .error
+      }
     }
 
 end Solcore.Syntax

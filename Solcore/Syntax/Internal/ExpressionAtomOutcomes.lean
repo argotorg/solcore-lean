@@ -1476,12 +1476,44 @@ theorem BracketContentsParses.result_unique
     (leftParsed : BracketContentsParses nestedOrdinary input left afterLeft)
     (rightParsed : BracketContentsParses nestedOrdinary input right afterRight) :
     left = right ∧ afterLeft = afterRight := by
+  refine ⟨?_, leftParsed.output_unique nestedOutcomes.toDeterministicOutcomeSpec rightParsed⟩
   cases leftParsed with
-  | index leftIndex =>
+  | index leftIndex leftSliceAbsent =>
       cases rightParsed with
-      | index rightIndex =>
-          rcases nestedOutcomes.successResultUnique leftIndex rightIndex with ⟨rfl, rfl⟩
-          exact ⟨rfl, rfl⟩
+      | index rightIndex _ =>
+          rcases leftIndex.result_unique nestedOutcomes rightIndex with ⟨indexEq, -⟩
+          cases indexEq
+          rfl
+      | slice colonSpan rightStart rightColon _ =>
+          rcases leftIndex.result_unique nestedOutcomes rightStart with ⟨-, rfl⟩
+          exact (leftSliceAbsent ⟨colonSpan, rightColon.1⟩).elim
+      | empty closingSpan closingToken =>
+          cases leftIndex with
+          | present _ closingAbsent _ => exact (closingAbsent ⟨closingSpan, closingToken⟩).elim
+  | slice colonSpan leftStart leftColon leftStop =>
+      cases rightParsed with
+      | index rightIndex rightSliceAbsent =>
+          rcases leftStart.result_unique nestedOutcomes rightIndex with ⟨-, rfl⟩
+          exact (rightSliceAbsent ⟨colonSpan, leftColon.1⟩).elim
+      | slice _ rightStart rightColon rightStop =>
+          rcases leftStart.result_unique nestedOutcomes rightStart with ⟨rfl, rfl⟩
+          rcases ExactTokenParses.result_unique leftColon rightColon with ⟨rfl, rfl⟩
+          rcases leftStop.result_unique nestedOutcomes rightStop with ⟨rfl, -⟩
+          rfl
+      | empty closingSpan closingToken =>
+          cases leftStart with
+          | absent _ => exact (colonToken_closingToken_conflict leftColon.1 closingToken).elim
+          | present _ closingAbsent _ => exact (closingAbsent ⟨closingSpan, closingToken⟩).elim
+  | empty closingSpan closingToken =>
+      cases rightParsed with
+      | index rightIndex _ =>
+          cases rightIndex with
+          | present _ closingAbsent _ => exact (closingAbsent ⟨closingSpan, closingToken⟩).elim
+      | slice _ rightStart rightColon _ =>
+          cases rightStart with
+          | absent _ => exact (colonToken_closingToken_conflict rightColon.1 closingToken).elim
+          | present _ closingAbsent _ => exact (closingAbsent ⟨closingSpan, closingToken⟩).elim
+      | empty => rfl
 
 /-- A rejection inside a `[` has one end. -/
 theorem BracketContentsRejects.output_unique
@@ -1493,9 +1525,21 @@ theorem BracketContentsRejects.output_unique
     (rightRejected : BracketContentsRejects nestedOrdinary nestedRejects input right) :
     left = right := by
   cases leftRejected with
-  | indexRejected leftNested =>
+  | startRejected leftRejection =>
       cases rightRejected with
-      | indexRejected rightNested => exact nestedOutcomes.rejectOutputUnique leftNested rightNested
+      | startRejected rightRejection => exact leftRejection.output_unique nestedOutcomes rightRejection
+      | stopRejected _ rightStart _ _ =>
+          exact (leftRejection.disjointOrdinary nestedOutcomes.toDeterministicOutcomeSpec
+            ⟨_, _, rightStart⟩).elim
+  | stopRejected _ leftStart leftColon leftRejection =>
+      cases rightRejected with
+      | startRejected rightRejection =>
+          exact (rightRejection.disjointOrdinary nestedOutcomes.toDeterministicOutcomeSpec
+            ⟨_, _, leftStart⟩).elim
+      | stopRejected _ rightStart rightColon rightRejection =>
+          rcases leftStart.result_unique nestedOutcomes rightStart with ⟨rfl, rfl⟩
+          rcases ExactTokenParses.result_unique leftColon rightColon with ⟨rfl, rfl⟩
+          exact leftRejection.output_unique nestedOutcomes rightRejection
 
 /-- What a `[` holds has exact outcomes when its nested expressions do. -/
 theorem bracketContentsExactOutcomeSpec

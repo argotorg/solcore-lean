@@ -2625,56 +2625,205 @@ theorem optionalBound_validFor (nested : Parser Expr)
         rw [result] at reply
         exact ⟨by simpa using reply.1, reply.2.1, reply.2.2⟩
 
+/-- Where an optional bound finds none and no `:` follows, a `]` is next. -/
+theorem rightBracket_of_bound_end {input : State}
+    (ends : (isSymbol input .colon || isSymbol input .rightBracket) = true)
+    (notColon : ¬ isSymbol input .colon = true) : isSymbol input .rightBracket = true := by
+  simp only [Bool.or_eq_true] at ends
+  exact ends.resolve_left notColon
+
 /-- What a `[` holds keeps every ordinary token window. -/
 theorem bracketContents_preservesTokenWindow (nested : Parser Expr)
-    (nestedWindow : Parser.PreservesTokenWindow nested) :
-    Parser.PreservesTokenWindow (bracketContents nested) := by
+    (nestedWindow : Parser.PreservesTokenWindow nested) (openingSpan : SourceSpan) :
+    Parser.PreservesTokenWindow (bracketContents nested openingSpan) := by
   intro input
-  have shape := nestedWindow input
+  have startShape := optionalBound_preservesTokenWindow nested nestedWindow input
   unfold bracketContents
-  cases result : nested input with
+  cases startResult : optionalBound nested input with
   | invariant error => trivial
-  | reject failure rejected => rw [result] at shape; exact shape
-  | ok index next => rw [result] at shape; exact shape
+  | reject failure rejected => rw [startResult] at startShape; exact startShape
+  | ok start afterStart =>
+      rw [startResult] at startShape
+      simp only
+      split
+      · have colonShape := symbol_preservesTokenWindow .colon .expression afterStart
+        cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [colonResult] at colonShape
+            exact colonShape.trans startShape
+        | ok colon afterColon =>
+            rw [colonResult] at colonShape
+            simp only
+            have stopShape := optionalBound_preservesTokenWindow nested nestedWindow afterColon
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => trivial
+            | reject failure rejected =>
+                rw [stopResult] at stopShape
+                exact (stopShape.trans colonShape).trans startShape
+            | ok stop next =>
+                rw [stopResult] at stopShape
+                exact (stopShape.trans colonShape).trans startShape
+      · cases start with
+        | some index => exact startShape
+        | none => exact startShape
 
 theorem bracketContents_preservesTokensOnSuccess (nested : Parser Expr)
-    (nestedTokens : Parser.PreservesTokensOnSuccess nested) :
-    Parser.PreservesTokensOnSuccess (bracketContents nested) := by
+    (nestedTokens : Parser.PreservesTokensOnSuccess nested) (openingSpan : SourceSpan) :
+    Parser.PreservesTokensOnSuccess (bracketContents nested openingSpan) := by
   intro input contents next parsed
+  have boundTokens := optionalBound_preservesTokensOnSuccess nested nestedTokens
   unfold bracketContents at parsed
-  cases result : nested input with
-  | invariant error => simp [result] at parsed
-  | reject failure rejected => simp [result] at parsed
-  | ok index afterIndex =>
-      simp only [result, Reply.ok.injEq] at parsed
-      rcases parsed with ⟨rfl, rfl⟩
-      exact nestedTokens input index afterIndex result
+  cases startResult : optionalBound nested input with
+  | invariant error => simp [startResult] at parsed
+  | reject failure rejected => simp [startResult] at parsed
+  | ok start afterStart =>
+      have startTokens := boundTokens input start afterStart startResult
+      simp only [startResult] at parsed
+      split at parsed
+      · cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => simp [colonResult] at parsed
+        | reject failure rejected => simp [colonResult] at parsed
+        | ok colon afterColon =>
+            have colonTokens := symbol_preservesTokensOnSuccess .colon .expression afterStart
+              colon afterColon colonResult
+            simp only [colonResult] at parsed
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => simp [stopResult] at parsed
+            | reject failure rejected => simp [stopResult] at parsed
+            | ok stop afterStop =>
+                simp only [stopResult, Reply.ok.injEq] at parsed
+                rcases parsed with ⟨rfl, rfl⟩
+                exact ((boundTokens afterColon stop afterStop stopResult).trans
+                  colonTokens).trans startTokens
+      · cases start with
+        | some index =>
+            simp only [Reply.ok.injEq] at parsed
+            rcases parsed with ⟨rfl, rfl⟩
+            exact startTokens
+        | none =>
+            simp only [Reply.ok.injEq] at parsed
+            rcases parsed with ⟨rfl, rfl⟩
+            exact startTokens
 
 theorem bracketContents_cursorMonotoneOnSuccess (nested : Parser Expr)
-    (nestedCursor : Parser.CursorMonotoneOnSuccess nested) :
-    Parser.CursorMonotoneOnSuccess (bracketContents nested) := by
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested) (openingSpan : SourceSpan) :
+    Parser.CursorMonotoneOnSuccess (bracketContents nested openingSpan) := by
   intro input contents next parsed
+  have boundCursor := optionalBound_cursorMonotoneOnSuccess nested nestedCursor
   unfold bracketContents at parsed
-  cases result : nested input with
-  | invariant error => simp [result] at parsed
-  | reject failure rejected => simp [result] at parsed
-  | ok index afterIndex =>
-      simp only [result, Reply.ok.injEq] at parsed
-      rcases parsed with ⟨rfl, rfl⟩
-      exact nestedCursor input index afterIndex result
+  cases startResult : optionalBound nested input with
+  | invariant error => simp [startResult] at parsed
+  | reject failure rejected => simp [startResult] at parsed
+  | ok start afterStart =>
+      have startCursor := boundCursor input start afterStart startResult
+      simp only [startResult] at parsed
+      split at parsed
+      · cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => simp [colonResult] at parsed
+        | reject failure rejected => simp [colonResult] at parsed
+        | ok colon afterColon =>
+            have colonCursor := symbol_cursorMonotoneOnSuccess .colon .expression afterStart
+              colon afterColon colonResult
+            simp only [colonResult] at parsed
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => simp [stopResult] at parsed
+            | reject failure rejected => simp [stopResult] at parsed
+            | ok stop afterStop =>
+                simp only [stopResult, Reply.ok.injEq] at parsed
+                rcases parsed with ⟨rfl, rfl⟩
+                exact Nat.le_trans startCursor
+                  (Nat.le_trans colonCursor (boundCursor afterColon stop afterStop stopResult))
+      · cases start with
+        | some index =>
+            simp only [Reply.ok.injEq] at parsed
+            rcases parsed with ⟨rfl, rfl⟩
+            exact startCursor
+        | none =>
+            simp only [Reply.ok.injEq] at parsed
+            rcases parsed with ⟨rfl, rfl⟩
+            exact startCursor
 
-/-- What a `[` holds keeps the provenance of its expressions. -/
+/-- After a `[` read from a valid state, the brackets from it to the next token
+are valid. -/
+theorem leftBracket_bracketsValid {input afterOpening : State} {opening : Token}
+    (inputValid : input.ValidFor)
+    (openingResult : symbol .leftBracket .expression input = .ok opening afterOpening) :
+    ∀ token, afterOpening.peek? = some token →
+      (SourceSpan.cover opening.span token.span).ValidFor afterOpening.file := by
+  intro token found
+  obtain ⟨openingFound, afterEq⟩ := symbol_ok_state_shape .leftBracket .expression openingResult
+  subst afterEq
+  have openingAt := State.getElem?_eq_some_of_peek?_eq_some openingFound
+  have tokenAt : input.tokens[input.cursor + 1]? = some token :=
+    State.getElem?_eq_some_of_peek?_eq_some found
+  have separated := inputValid.token_end_le_token_start_of_getElem?_lt openingAt tokenAt
+    (Nat.lt_succ_self _)
+  have openingValid := inputValid.token_span_validFor_of_getElem?_eq_some openingAt
+  have tokenValid := inputValid.token_span_validFor_of_getElem?_eq_some tokenAt
+  exact SourceSpan.cover_validFor openingValid tokenValid
+    (Nat.le_trans openingValid.2.1 (Nat.le_trans separated tokenValid.2.1))
+
+/-- What a `[` holds keeps the provenance of its expressions. `a[]`'s error
+lies over brackets that open at `openingSpan`, which reach validly to any next
+token. -/
 theorem bracketContents_validFor (nested : Parser Expr)
     (statementValid : SourceFile → Statement → Prop)
-    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid)) :
-    (bracketContents nested).ValidFor (BracketContents.ValidFor statementValid) := by
-  intro input inputValid
-  have reply := nestedValid input inputValid
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (openingSpan : SourceSpan) (input : State) (inputValid : input.ValidFor)
+    (bracketsValid : ∀ token, input.peek? = some token →
+      (SourceSpan.cover openingSpan token.span).ValidFor input.file) :
+    (bracketContents nested openingSpan input).ValidFor input
+      (BracketContents.ValidFor statementValid) := by
+  have startReply := optionalBound_validFor nested statementValid nestedValid input inputValid
   unfold bracketContents
-  cases result : nested input with
+  cases startResult : optionalBound nested input with
   | invariant error => trivial
-  | reject failure rejected => rw [result] at reply; exact reply
-  | ok index next => rw [result] at reply; exact reply
+  | reject failure rejected => rw [startResult] at startReply; exact startReply
+  | ok start afterStart =>
+      rw [startResult] at startReply
+      simp only
+      split
+      · have colonReply := symbol_validFor .colon .expression afterStart startReply.2.1
+        cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => trivial
+        | reject failure rejected =>
+            rw [colonResult] at colonReply
+            exact colonReply.of_file_eq startReply.2.2
+        | ok colon afterColon =>
+            rw [colonResult] at colonReply
+            simp only
+            have stopReply := optionalBound_validFor nested statementValid nestedValid
+              afterColon colonReply.2.1
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => trivial
+            | reject failure rejected =>
+                rw [stopResult] at stopReply
+                exact stopReply.of_file_eq (colonReply.2.2.trans startReply.2.2)
+            | ok stop next =>
+                rw [stopResult] at stopReply
+                have colonValid : colon.span.ValidFor input.file := by
+                  simpa only [Located.ValidFor, startReply.2.2] using colonReply.1
+                have stopValid : ∀ value ∈ stop,
+                    Expr.ValidFor statementValid input.file value := by
+                  simpa only [colonReply.2.2, startReply.2.2] using stopReply.1
+                exact ⟨⟨startReply.1, colonValid, stopValid⟩, stopReply.2.1,
+                  stopReply.2.2.trans (colonReply.2.2.trans startReply.2.2)⟩
+      · rename_i notColon
+        cases start with
+        | some index =>
+            exact ⟨show Expr.ValidFor statementValid input.file index by simpa using startReply.1,
+              startReply.2.1, startReply.2.2⟩
+        | none =>
+            obtain ⟨afterEq, ends⟩ := optionalBound_eq_ok_none startResult
+            rw [afterEq] at notColon ⊢
+            rcases symbol_eq_ok_of_isSymbol_eq_true .rightBracket .expression
+                (rightBracket_of_bound_end ends notColon) with ⟨token, closingResult⟩
+            have peekEq := (symbol_ok_state_shape .rightBracket .expression closingResult).1
+            have spanEq : input.currentSpan = token.span := by
+              simp only [State.currentSpan, peekEq]
+            refine ⟨trivial, inputValid.emit_validFor _ ?_, rfl⟩
+            simpa only [emptyIndexDiagnostic, spanEq] using bracketsValid token peekEq
 
 /-- The postfix loop preserves every ordinary token window. -/
 theorem postfixTail_preservesTokenWindow
@@ -2701,8 +2850,8 @@ theorem postfixTail_preservesTokenWindow
             rw [openingResult] at openingShape
             simp only
             have indexShape := bracketContents_preservesTokenWindow nested nestedWindow
-              afterOpening
-            cases indexResult : bracketContents nested afterOpening with
+              opening.span afterOpening
+            cases indexResult : bracketContents nested opening.span afterOpening with
             | invariant error => trivial
             | reject failure rejected =>
                 rw [indexResult] at indexShape
@@ -2803,7 +2952,7 @@ theorem postfixTail_cursorMonotoneOnSuccess
         | reject failure rejected => simp [openingResult] at parsed
         | ok opening afterOpening =>
             simp only [openingResult] at parsed
-            cases indexResult : bracketContents nested afterOpening with
+            cases indexResult : bracketContents nested opening.span afterOpening with
             | invariant error => simp [indexResult] at parsed
             | reject failure rejected => simp [indexResult] at parsed
             | ok contents next =>
@@ -2818,7 +2967,7 @@ theorem postfixTail_cursorMonotoneOnSuccess
                         input opening afterOpening openingResult)
                       (Nat.le_trans
                         (bracketContents_cursorMonotoneOnSuccess nested nestedCursor
-                          afterOpening contents next indexResult)
+                          opening.span afterOpening contents next indexResult)
                         (Nat.le_trans
                           (symbol_cursorMonotoneOnSuccess .rightBracket
                             .expression next closing afterClosing closingResult)
@@ -2882,7 +3031,7 @@ theorem postfixTail_preservesBaseStartOnSuccess
         | reject failure rejected => simp [openingResult] at parsed
         | ok opening afterOpening =>
             simp only [openingResult] at parsed
-            cases indexResult : bracketContents nested afterOpening with
+            cases indexResult : bracketContents nested opening.span afterOpening with
             | invariant error => simp [indexResult] at parsed
             | reject failure rejected => simp [indexResult] at parsed
             | ok contents next =>
@@ -3056,16 +3205,18 @@ theorem postfixTail_validFor
               inputValid
             rw [openingResult] at openingReply
             simp only
-            cases indexResult : bracketContents nested afterOpening with
+            cases indexResult : bracketContents nested opening.span afterOpening with
             | invariant error => trivial
             | reject failure rejected =>
                 have reply := bracketContents_validFor nested statementValid nestedValid
-                  afterOpening openingReply.2.1
+                  opening.span afterOpening openingReply.2.1
+                  (leftBracket_bracketsValid inputValid openingResult)
                 rw [indexResult] at reply
                 exact reply.of_file_eq openingReply.2.2
             | ok contents next =>
                 have indexReply := bracketContents_validFor nested statementValid nestedValid
-                  afterOpening openingReply.2.1
+                  opening.span afterOpening openingReply.2.1
+                  (leftBracket_bracketsValid inputValid openingResult)
                 rw [indexResult] at indexReply
                 simp only
                 cases closingResult : symbol .rightBracket .expression next with
@@ -3092,7 +3243,7 @@ theorem postfixTail_validFor
                       .leftBracket .expression input opening afterOpening
                         openingResult
                     have indexTokens := bracketContents_preservesTokensOnSuccess nested
-                      nestedTokens afterOpening contents next indexResult
+                      nestedTokens opening.span afterOpening contents next indexResult
                     have closingAt : input.tokens[next.cursor]? = some closing := by
                       simpa [indexTokens, openingTokens] using closingAtNext
                     have separated :=
@@ -3103,7 +3254,7 @@ theorem postfixTail_validFor
                             (.symbol .leftBracket) .expression
                             (· == .symbol .leftBracket) openingResult)
                           (bracketContents_cursorMonotoneOnSuccess nested nestedCursor
-                            afterOpening contents next indexResult))
+                            opening.span afterOpening contents next indexResult))
                     have openingSpan : opening.span.ValidFor input.file := by
                       simpa only [Located.ValidFor] using openingReply.1
                     have closingSpan : closing.span.ValidFor input.file := by
@@ -3150,7 +3301,7 @@ theorem postfixTail_validFor
                               (· == .symbol .leftBracket) openingResult)
                             (Nat.le_trans
                               (bracketContents_cursorMonotoneOnSuccess nested nestedCursor
-                                afterOpening contents next indexResult)
+                                opening.span afterOpening contents next indexResult)
                               (symbol_cursorMonotoneOnSuccess .rightBracket
                                 .expression next closing afterClosing
                                   closingResult)))

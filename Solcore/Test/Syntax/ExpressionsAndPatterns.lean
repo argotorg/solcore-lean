@@ -1192,10 +1192,11 @@ end
 
 section
 -- leanmerge: from Solcore.Test.SyntaxPostfixTailProgressProperties
-/-! Index children need not advance: the closing bracket can finish the
-suffix. Call lists instead reject stationary success as noProgress. A child
-that preserves file/window but rewinds and replaces tokens gives a finite
-independent index trace exceeding the production remaining-count fuel. -/
+/-! Brackets read an index only where one starts, so `[]` holds nothing
+whatever the child would do, and gets upstream's error over the brackets. Call
+lists instead reject stationary success as noProgress. A child that preserves
+file/window but rewinds and replaces tokens gives a finite independent index
+trace exceeding the production remaining-count fuel. -/
 
 set_option autoImplicit false
 
@@ -1205,7 +1206,9 @@ open Solcore.Syntax Solcore.Syntax.Parser Solcore.Syntax.DeclarativeGrammar
 open ExpressionAtomInternals SyntaxPostfixTailProgressSupport
 
 private def indexBefore : Remainder := remainder #[sym 0 1 .leftBracket, sym 1 2 .rightBracket] 0 2
-private def indexValue : Expr := postfixIndexTraceValue fixed fixed (span 0 1) (span 1 2)
+private def indexValue : Expr := BracketContents.empty.apply fixed (span 0 1) (span 1 2)
+private def emptyEvent : ParseDiagnostic :=
+  emptyIndexDiagnostic (SourceSpan.cover (span 0 1) (span 1 2))
 
 private theorem index_opening : ExactTokenParses (.symbol .leftBracket) indexBefore
     (span 0 1) { indexBefore with cursor := 1 } :=
@@ -1216,9 +1219,9 @@ private theorem index_closing : ExactTokenParses (.symbol .rightBracket) { index
 
 theorem stationary_index_has_independent_trace :
     PostfixTailTraceParses (childTrace id) source 6 indexBefore fixed indexValue
-      { indexBefore with cursor := 2 } [] := by
-  apply PostfixTailTraceParses.index (indexEvents := []) (tailEvents := [])
-    (span 0 1) (span 1 2) index_opening ⟨rfl, rfl, rfl⟩ index_closing
+      { indexBefore with cursor := 2 } [emptyEvent] := by
+  apply PostfixTailTraceParses.index (indexEvents := [emptyEvent]) (tailEvents := [])
+    (span 0 1) (span 1 2) index_opening (.empty (span 1 2) ⟨by decide, rfl⟩) index_closing
   exact .done (by simp [PostfixSuffixAbsentAt, TokenKindAbsentAt, TokenAt, indexBefore, remainder])
 
 theorem stationary_index_child_does_not_advance (prior : List ParseDiagnostic) :
@@ -1228,14 +1231,14 @@ theorem stationary_index_child_does_not_advance (prior : List ParseDiagnostic) :
 /-- Whole Reply equality also retains arbitrary incoming diagnostic multiplicity. -/
 theorem stationary_index_executes (block : Parser Block) (prior : List ParseDiagnostic) :
     postfixTail (child id) block 2 fixed (state indexBefore prior) =
-      .ok indexValue { state indexBefore prior with cursor := 2 } := rfl
+      .ok indexValue { (state indexBefore prior).emit emptyEvent with cursor := 2 } := rfl
 
 /-- The grammar-to-execution theorem consumes the independent token derivation. -/
 theorem stationary_index_trace_executes_eventually (block : Parser Block) (prior : List ParseDiagnostic) :
     ∃ bound, ∀ fuel, bound ≤ fuel → ∃ output,
       postfixTail (child id) block fuel fixed (state indexBefore prior) = .ok indexValue output ∧
       output.declarativeRemainder = { indexBefore with cursor := 2 } ∧
-      output.diagnostics = (state indexBefore prior).diagnostics ++ [] :=
+      output.diagnostics = (state indexBefore prior).diagnostics ++ [emptyEvent] :=
   postfixTail_trace_success_complete_eventually (child_success_complete id)
     (child_success_context id (fun _ => rfl)) block stationary_index_has_independent_trace
 
@@ -1282,6 +1285,22 @@ private theorem second_child : childTrace rewind source 6 { afterFirst with curs
     fixed afterSecond [] := ⟨rfl, rfl, rfl⟩
 private theorem second_closing : ExactTokenParses (.symbol .rightBracket) afterSecond (span 4 5)
     { afterSecond with cursor := 1 } := ⟨⟨by decide, rfl⟩, rfl⟩
+private theorem first_bound_starts (kind : TokenKind) :
+    TokenKindAbsentAt ({ rewindBefore with cursor := 2 } : Remainder).tokens
+      ({ rewindBefore with cursor := 2 } : Remainder).endIndex
+      ({ rewindBefore with cursor := 2 } : Remainder).cursor kind :=
+  fun ⟨_, inside, _⟩ => absurd inside (by decide)
+private theorem second_bound_starts (kind : TokenKind) :
+    TokenKindAbsentAt ({ afterFirst with cursor := 2 } : Remainder).tokens
+      ({ afterFirst with cursor := 2 } : Remainder).endIndex
+      ({ afterFirst with cursor := 2 } : Remainder).cursor kind :=
+  fun ⟨_, inside, _⟩ => absurd inside (by decide)
+private theorem first_not_slice :
+    TokenKindAbsentAt afterFirst.tokens afterFirst.endIndex afterFirst.cursor (.symbol .colon) :=
+  absent_of_token (token := sym 2 3 .rightBracket) ⟨by decide, rfl⟩ (by decide)
+private theorem second_not_slice :
+    TokenKindAbsentAt afterSecond.tokens afterSecond.endIndex afterSecond.cursor (.symbol .colon) :=
+  absent_of_token (token := sym 4 5 .rightBracket) ⟨by decide, rfl⟩ (by decide)
 private theorem final_stops : PostfixSuffixAbsentAt { afterSecond with cursor := 1 } := by
   have found : TokenAt finalTokens 2 1 (name 5 6) := ⟨by decide, rfl⟩
   exact ⟨absent_of_token found (by decide), absent_of_token found (by decide), absent_of_token found (by decide)⟩
@@ -1301,8 +1320,12 @@ theorem rewinding_child_has_five_contracts_and_is_ordinary :
 theorem rewinding_has_finite_independent_trace :
     PostfixTailTraceParses (childTrace rewind) source 6 rewindBefore fixed finalValue
       { afterSecond with cursor := 1 } [] :=
-  .index (span 1 2) (span 2 3) first_opening (.index first_child) first_closing
-    (.index (span 3 4) (span 4 5) second_opening (.index second_child) second_closing (.done final_stops))
+  .index (span 1 2) (span 2 3) first_opening
+    (.index (.present (first_bound_starts _) (first_bound_starts _) first_child) first_not_slice)
+    first_closing
+    (.index (span 3 4) (span 4 5) second_opening
+      (.index (.present (second_bound_starts _) (second_bound_starts _) second_child)
+        second_not_slice) second_closing (.done final_stops))
 
 theorem rewinding_trace_executes_eventually (block : Parser Block) (prior : List ParseDiagnostic) :
     ∃ bound, ∀ fuel, bound ≤ fuel → ∃ output,
@@ -1404,7 +1427,9 @@ theorem prefix_success (suffix : List Token) {value : Expr} {after : Remainder} 
   · apply PostfixTailTraceParses.index (afterOpening := rem suffix 3) (afterIndex := rem suffix 4)
       (afterClosing := rem suffix 5) (indexEvents := []) (tailEvents := trace) (span 5 6) (span 7 8)
     · exact ⟨⟨by simp [rem, tokens], rfl⟩, rfl⟩
-    · exact .index (prefix_index suffix)
+    · exact .index (.present (by simp [TokenKindAbsentAt, TokenAt, rem, tokens])
+        (by simp [TokenKindAbsentAt, TokenAt, rem, tokens]) (prefix_index suffix))
+        (by simp [TokenKindAbsentAt, TokenAt, rem, tokens, sym])
     · exact ⟨⟨by simp [rem, tokens], rfl⟩, rfl⟩
     · exact .call (by simp [TokenKindAbsentAt, TokenAt, rem, tokens, sym]) (prefix_arguments suffix) tail
 
@@ -1422,7 +1447,9 @@ theorem prefix_rejected (suffix : List Token) {after : Remainder} {report : Pars
   · apply PostfixTailTraceRejects.indexLaterRejected (afterOpening := rem suffix 3) (afterIndex := rem suffix 4)
       (afterClosing := rem suffix 5) (indexEvents := []) (tailEvents := trace) (span 5 6) (span 7 8)
     · exact ⟨⟨by simp [rem, tokens], rfl⟩, rfl⟩
-    · exact .index (prefix_index suffix)
+    · exact .index (.present (by simp [TokenKindAbsentAt, TokenAt, rem, tokens])
+        (by simp [TokenKindAbsentAt, TokenAt, rem, tokens]) (prefix_index suffix))
+        (by simp [TokenKindAbsentAt, TokenAt, rem, tokens, sym])
     · exact ⟨⟨by simp [rem, tokens], rfl⟩, rfl⟩
     · exact .callLaterRejected (by simp [TokenKindAbsentAt, TokenAt, rem, tokens, sym]) (prefix_arguments suffix) tail
 

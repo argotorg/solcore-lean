@@ -129,113 +129,414 @@ theorem optionalBound_remainingCount_le_of_success {nestedFuel : Nat}
       exact Nat.le_refl _
   | some value => exact contract.remainingCount_le_of_success (optionalBound_eq_ok_some result).2
 
-theorem bracketContents_success_context (success : ParserSuccessContext nested) :
-    ParserSuccessContext (bracketContents nested) := by
+private theorem traceSuccessComplete_at {α : Type} {parser : Parser α}
+    {traceParses : SourceId → Nat → Remainder → α → Remainder → List ParseDiagnostic → Prop}
+    (complete : ParserTraceSuccessComplete parser traceParses)
+    {input : State} {source : SourceId} {endByte : Nat} {remainder after : Remainder}
+    {value : α} {trace : List ParseDiagnostic}
+    (sourceEq : input.file.id = source) (byteEq : input.window.endByte = endByte)
+    (remainderEq : input.declarativeRemainder = remainder)
+    (parsed : traceParses source endByte remainder value after trace) :
+    ∃ output, parser input = .ok value output ∧ output.declarativeRemainder = after ∧
+      output.diagnostics = input.diagnostics ++ trace := by
+  subst sourceEq
+  subst byteEq
+  subst remainderEq
+  exact complete parsed
+
+private theorem traceRejectComplete_at {α : Type} {parser : Parser α}
+    {traceRejects : SourceId → Nat → Remainder → Remainder → ParseDiagnostic →
+      List ParseDiagnostic → Prop}
+    (complete : ParserTraceRejectComplete parser traceRejects)
+    {input : State} {source : SourceId} {endByte : Nat} {remainder after : Remainder}
+    {report : ParseDiagnostic} {trace : List ParseDiagnostic}
+    (sourceEq : input.file.id = source) (byteEq : input.window.endByte = endByte)
+    (remainderEq : input.declarativeRemainder = remainder)
+    (rejection : traceRejects source endByte remainder after report trace) :
+    ∃ failure rejected, parser input = .reject failure rejected ∧
+      rejected.declarativeRemainder = after ∧ failure.toDiagnostic = report ∧
+      rejected.diagnostics = input.diagnostics ++ trace := by
+  subst sourceEq
+  subst byteEq
+  subst remainderEq
+  exact complete rejection
+
+theorem bracketContents_success_context {openingSpan : SourceSpan}
+    (success : ParserSuccessContext nested) :
+    ParserSuccessContext (bracketContents nested openingSpan) := by
   intro input output contents result
+  have bound := @optionalBound_success_context nested success
   unfold bracketContents at result
-  cases indexResult : nested input with
-  | invariant error => simp [indexResult] at result
-  | reject failure rejected => simp [indexResult] at result
-  | ok index next =>
-      simp only [indexResult, Reply.ok.injEq] at result
-      rcases result with ⟨rfl, rfl⟩
-      exact success indexResult
+  cases startResult : optionalBound nested input with
+  | invariant error => simp [startResult] at result
+  | reject failure rejected => simp [startResult] at result
+  | ok start afterStart =>
+      have startFrame := bound startResult
+      simp only [startResult] at result
+      split at result
+      · cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => simp [colonResult] at result
+        | reject failure rejected => simp [colonResult] at result
+        | ok colon afterColon =>
+            simp only [colonResult] at result
+            have colonShape := (symbol_ok_tokenAt .colon .expression colonResult).2
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => simp [stopResult] at result
+            | reject failure rejected => simp [stopResult] at result
+            | ok stop next =>
+                simp only [stopResult, Reply.ok.injEq] at result
+                rcases result with ⟨rfl, rfl⟩
+                have stopFrame := bound stopResult
+                subst colonShape
+                exact ⟨stopFrame.1.trans startFrame.1, stopFrame.2.trans startFrame.2⟩
+      · cases start with
+        | some index =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            exact startFrame
+        | none =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            exact startFrame
 
 theorem bracketContents_reject_context_of_windowProjection {β : Type} {view : TokenWindow → β}
+    {openingSpan : SourceSpan}
+    (success : ParserSuccessContext nested)
     (reject : ∀ {input rejected failure}, nested input = .reject failure rejected →
       rejected.file = input.file ∧ view rejected.window = view input.window)
     {input rejected : State} {failure : Failure}
-    (result : bracketContents nested input = .reject failure rejected) :
+    (result : bracketContents nested openingSpan input = .reject failure rejected) :
     rejected.file = input.file ∧ view rejected.window = view input.window := by
+  have boundSuccess := @optionalBound_success_context nested success
+  have boundReject : ∀ {input rejected failure},
+      optionalBound nested input = .reject failure rejected →
+        rejected.file = input.file ∧ view rejected.window = view input.window :=
+    fun boundResult => reject (optionalBound_eq_reject boundResult).2
   unfold bracketContents at result
-  cases indexResult : nested input with
-  | invariant error => simp [indexResult] at result
-  | ok index next => simp [indexResult] at result
+  cases startResult : optionalBound nested input with
+  | invariant error => simp [startResult] at result
   | reject actual next =>
-      simp only [indexResult, Reply.reject.injEq] at result
+      simp only [startResult, Reply.reject.injEq] at result
       rcases result with ⟨rfl, rfl⟩
-      exact reject indexResult
+      exact boundReject startResult
+  | ok start afterStart =>
+      have startFrame := boundSuccess startResult
+      simp only [startResult] at result
+      split at result
+      · cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => simp [colonResult] at result
+        | reject actual next =>
+            simp only [colonResult, Reply.reject.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            rw [symbol_reject_state_eq .colon .expression colonResult]
+            exact ⟨startFrame.1, congrArg view startFrame.2⟩
+        | ok colon afterColon =>
+            simp only [colonResult] at result
+            have colonShape := (symbol_ok_tokenAt .colon .expression colonResult).2
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => simp [stopResult] at result
+            | ok stop next => simp [stopResult] at result
+            | reject actual next =>
+                simp only [stopResult, Reply.reject.injEq] at result
+                rcases result with ⟨rfl, rfl⟩
+                have stopFrame := boundReject stopResult
+                subst colonShape
+                exact ⟨stopFrame.1.trans startFrame.1,
+                  stopFrame.2.trans (congrArg view startFrame.2)⟩
+      · cases start <;> simp at result
 
-theorem bracketContents_trace_success_sound
-    (successSound : ParserTraceSuccessSound nested nestedTrace) :
-    ParserTraceSuccessSound (bracketContents nested) (BracketContentsTraceParses nestedTrace) := by
+theorem bracketContents_trace_success_sound {openingSpan : SourceSpan}
+    (successSound : ParserTraceSuccessSound nested nestedTrace)
+    (contextFrame : ParserSuccessContext nested) :
+    ParserTraceSuccessSound (bracketContents nested openingSpan)
+      (BracketContentsTraceParses nestedTrace openingSpan) := by
   intro input output contents result
+  have boundSound := @optionalBound_trace_success_sound nested nestedTrace successSound
+  have boundContext := @optionalBound_success_context nested contextFrame
   unfold bracketContents at result
-  cases indexResult : nested input with
-  | invariant error => simp [indexResult] at result
-  | reject failure rejected => simp [indexResult] at result
-  | ok index next =>
-      simp only [indexResult, Reply.ok.injEq] at result
-      rcases result with ⟨rfl, rfl⟩
-      rcases successSound indexResult with ⟨trace, parsed, events⟩
-      exact ⟨trace, .index parsed, events⟩
+  cases startResult : optionalBound nested input with
+  | invariant error => simp [startResult] at result
+  | reject failure rejected => simp [startResult] at result
+  | ok start afterStart =>
+      rcases boundSound startResult with ⟨startEvents, startParsed, startEq⟩
+      have startFrame := boundContext startResult
+      simp only [startResult] at result
+      split at result
+      · cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => simp [colonResult] at result
+        | reject failure rejected => simp [colonResult] at result
+        | ok colon afterColon =>
+            simp only [colonResult] at result
+            have colonParsed := symbol_success_exactTokenParses .colon .expression colonResult
+            have colonShape := (symbol_ok_tokenAt .colon .expression colonResult).2
+            have sourceEq : afterColon.file.id = input.file.id := by
+              rw [colonShape]
+              exact congrArg SourceFile.id startFrame.1
+            have byteEq : afterColon.window.endByte = input.window.endByte := by
+              rw [colonShape]
+              exact congrArg TokenWindow.endByte startFrame.2
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => simp [stopResult] at result
+            | reject failure rejected => simp [stopResult] at result
+            | ok stop next =>
+                simp only [stopResult, Reply.ok.injEq] at result
+                rcases result with ⟨rfl, rfl⟩
+                rcases boundSound stopResult with ⟨stopEvents, stopParsed, stopEq⟩
+                rw [sourceEq, byteEq] at stopParsed
+                refine ⟨startEvents ++ stopEvents,
+                  .slice colon.span startParsed colonParsed stopParsed, ?_⟩
+                rw [stopEq, colonShape]
+                change afterStart.diagnostics ++ stopEvents = _
+                rw [startEq]
+                exact List.append_assoc _ _ _
+      · rename_i colonAbsent
+        cases start with
+        | some index =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            exact ⟨startEvents, .index startParsed (symbolAbsentAt_of_isSymbol_eq_false .colon
+              (Bool.eq_false_iff.mpr colonAbsent)), startEq⟩
+        | none =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            obtain ⟨afterEq, ends⟩ := optionalBound_eq_ok_none startResult
+            rw [afterEq] at colonAbsent ⊢
+            rcases symbol_eq_ok_of_isSymbol_eq_true .rightBracket .expression
+                (rightBracket_of_bound_end ends colonAbsent) with ⟨token, closingResult⟩
+            have closingAt := (symbol_ok_tokenAt .rightBracket .expression closingResult).1
+            have peekEq := (symbol_ok_state_shape .rightBracket .expression closingResult).1
+            have spanEq : input.currentSpan = token.span := by
+              simp only [State.currentSpan, peekEq]
+            refine ⟨[emptyIndexDiagnostic (SourceSpan.cover openingSpan token.span)],
+              .empty token.span closingAt, ?_⟩
+            simp only [State.diagnostics, State.emit, List.reverse_cons, spanEq]
 
-theorem bracketContents_trace_success_complete
-    (successComplete : ParserTraceSuccessComplete nested nestedTrace) :
-    ParserTraceSuccessComplete (bracketContents nested) (BracketContentsTraceParses nestedTrace) := by
+theorem bracketContents_trace_success_complete {openingSpan : SourceSpan}
+    (successComplete : ParserTraceSuccessComplete nested nestedTrace)
+    (contextFrame : ParserSuccessContext nested) :
+    ParserTraceSuccessComplete (bracketContents nested openingSpan)
+      (BracketContentsTraceParses nestedTrace openingSpan) := by
   intro input contents after trace parsed
+  have boundComplete := @optionalBound_trace_success_complete nested nestedTrace successComplete
+  have boundContext := @optionalBound_success_context nested contextFrame
   cases parsed with
-  | index indexParsed =>
-      rcases successComplete indexParsed with ⟨output, result, afterEq, events⟩
-      exact ⟨output, by simp only [bracketContents, result], afterEq, events⟩
+  | index indexParsed sliceAbsent =>
+      rcases boundComplete indexParsed with ⟨output, result, afterEq, events⟩
+      subst afterEq
+      refine ⟨output, ?_, rfl, events⟩
+      have colonFalse : isSymbol output .colon = false := symbol_absent .colon sliceAbsent
+      simp only [bracketContents, result, colonFalse, Bool.false_eq_true, if_false]
+  | slice colonSpan startParsed colonToken stopParsed =>
+      rcases boundComplete startParsed with ⟨afterStart, startResult, startAfter, startEvents⟩
+      have startFrame := boundContext startResult
+      subst startAfter
+      have colonResult := symbol_eq_ok_of_exactTokenParses .colon .expression colonToken
+      have colonPresent := symbol_present .colon colonToken
+      rcases colonToken with ⟨_, colonAfter⟩
+      subst colonAfter
+      rcases traceSuccessComplete_at boundComplete
+          (input := { afterStart with cursor := afterStart.cursor + 1 })
+          (by simp only [startFrame.1]) (by simp only [startFrame.2]) rfl stopParsed with
+        ⟨output, stopResult, stopAfter, stopEvents⟩
+      refine ⟨output, ?_, stopAfter, ?_⟩
+      · simp only [bracketContents, startResult, colonPresent, if_true, colonResult, stopResult]
+      · rw [stopEvents]
+        change afterStart.diagnostics ++ _ = _
+        rw [startEvents]
+        exact List.append_assoc _ _ _
+  | empty closingSpan closingToken =>
+      have closingPresent : isSymbol input .rightBracket = true :=
+        symbol_present .rightBracket ⟨closingToken, rfl⟩
+      have colonFalse : isSymbol input .colon = false :=
+        symbol_absent .colon fun ⟨_, colonAt⟩ =>
+          colonToken_closingToken_conflict (input := input.declarativeRemainder) colonAt
+            closingToken
+      have startResult : optionalBound nested input = .ok none input := by
+        unfold optionalBound
+        rw [if_pos (show (isSymbol input .colon || isSymbol input .rightBracket) = true by
+          simp [closingPresent])]
+      have peekEq : input.peek? = some { span := closingSpan, value := .symbol .rightBracket } := by
+        have inside : input.cursor < input.window.endIndex := closingToken.1
+        have found : input.tokens[input.cursor]? =
+            some { span := closingSpan, value := .symbol .rightBracket } := closingToken.2
+        simp only [State.peek?, inside, ↓reduceIte, found]
+      have spanEq : input.currentSpan = closingSpan := by
+        simp only [State.currentSpan, peekEq]
+      refine ⟨input.emit (emptyIndexDiagnostic (SourceSpan.cover openingSpan closingSpan)), ?_,
+        rfl, ?_⟩
+      · simp only [bracketContents, startResult, colonFalse, Bool.false_eq_true, if_false, spanEq]
+      · simp only [State.diagnostics, State.emit, List.reverse_cons]
 
-theorem bracketContents_reject_trace_sound
-    (rejectSound : ParserTraceRejectSound nested nestedRejects) :
-    ParserTraceRejectSound (bracketContents nested)
+theorem bracketContents_reject_trace_sound {openingSpan : SourceSpan}
+    (successSound : ParserTraceSuccessSound nested nestedTrace)
+    (rejectSound : ParserTraceRejectSound nested nestedRejects)
+    (contextFrame : ParserSuccessContext nested) :
+    ParserTraceRejectSound (bracketContents nested openingSpan)
       (BracketContentsTraceRejects nestedTrace nestedRejects) := by
   intro input rejected failure result
+  have boundSound := @optionalBound_trace_success_sound nested nestedTrace successSound
+  have boundRejectSound := @optionalBound_reject_trace_sound nested nestedRejects rejectSound
+  have boundContext := @optionalBound_success_context nested contextFrame
   unfold bracketContents at result
-  cases indexResult : nested input with
-  | invariant error => simp [indexResult] at result
-  | ok index next => simp [indexResult] at result
+  cases startResult : optionalBound nested input with
+  | invariant error => simp [startResult] at result
   | reject actual next =>
-      simp only [indexResult, Reply.reject.injEq] at result
+      simp only [startResult, Reply.reject.injEq] at result
       rcases result with ⟨rfl, rfl⟩
-      rcases rejectSound indexResult with ⟨trace, rejection, events⟩
-      exact ⟨trace, .indexRejected rejection, events⟩
+      rcases boundRejectSound startResult with ⟨trace, rejection, events⟩
+      exact ⟨trace, .startRejected rejection, events⟩
+  | ok start afterStart =>
+      rcases boundSound startResult with ⟨startEvents, startParsed, startEq⟩
+      have startFrame := boundContext startResult
+      simp only [startResult] at result
+      split at result
+      · rename_i colonPresent
+        cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => simp [colonResult] at result
+        | reject colonFailure colonRejected =>
+            rcases symbol_eq_ok_of_isSymbol_eq_true .colon .expression colonPresent with
+              ⟨_, okResult⟩
+            rw [okResult] at colonResult
+            cases colonResult
+        | ok colon afterColon =>
+            simp only [colonResult] at result
+            have colonParsed := symbol_success_exactTokenParses .colon .expression colonResult
+            have colonShape := (symbol_ok_tokenAt .colon .expression colonResult).2
+            have sourceEq : afterColon.file.id = input.file.id := by
+              rw [colonShape]
+              exact congrArg SourceFile.id startFrame.1
+            have byteEq : afterColon.window.endByte = input.window.endByte := by
+              rw [colonShape]
+              exact congrArg TokenWindow.endByte startFrame.2
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => simp [stopResult] at result
+            | ok stop next => simp [stopResult] at result
+            | reject actual next =>
+                simp only [stopResult, Reply.reject.injEq] at result
+                rcases result with ⟨rfl, rfl⟩
+                rcases boundRejectSound stopResult with ⟨stopEvents, rejection, stopEq⟩
+                rw [sourceEq, byteEq] at rejection
+                refine ⟨startEvents ++ stopEvents,
+                  .stopRejected colon.span startParsed colonParsed rejection, ?_⟩
+                rw [stopEq, colonShape]
+                change afterStart.diagnostics ++ stopEvents = _
+                rw [startEq]
+                exact List.append_assoc _ _ _
+      · cases start <;> simp at result
 
-theorem bracketContents_trace_reject_complete
-    (rejectComplete : ParserTraceRejectComplete nested nestedRejects) :
-    ParserTraceRejectComplete (bracketContents nested)
+theorem bracketContents_trace_reject_complete {openingSpan : SourceSpan}
+    (successComplete : ParserTraceSuccessComplete nested nestedTrace)
+    (rejectComplete : ParserTraceRejectComplete nested nestedRejects)
+    (contextFrame : ParserSuccessContext nested) :
+    ParserTraceRejectComplete (bracketContents nested openingSpan)
       (BracketContentsTraceRejects nestedTrace nestedRejects) := by
   intro input after report trace rejection
+  have boundComplete := @optionalBound_trace_success_complete nested nestedTrace successComplete
+  have boundRejectComplete := @optionalBound_trace_reject_complete nested nestedRejects rejectComplete
+  have boundContext := @optionalBound_success_context nested contextFrame
   cases rejection with
-  | indexRejected nestedRejected =>
-      rcases rejectComplete nestedRejected with ⟨failure, rejected, result, afterEq, reportEq, events⟩
-      exact ⟨failure, rejected, by simp only [bracketContents, result], afterEq, reportEq, events⟩
+  | startRejected rejection =>
+      rcases boundRejectComplete rejection with
+        ⟨failure, rejected, result, afterEq, reportEq, events⟩
+      exact ⟨failure, rejected, by simp only [bracketContents, result], afterEq, reportEq,
+        events⟩
+  | stopRejected colonSpan startParsed colonToken rejection =>
+      rcases boundComplete startParsed with ⟨afterStart, startResult, startAfter, startEvents⟩
+      have startFrame := boundContext startResult
+      subst startAfter
+      have colonResult := symbol_eq_ok_of_exactTokenParses .colon .expression colonToken
+      have colonPresent := symbol_present .colon colonToken
+      rcases colonToken with ⟨_, colonAfter⟩
+      subst colonAfter
+      rcases traceRejectComplete_at boundRejectComplete
+          (input := { afterStart with cursor := afterStart.cursor + 1 })
+          (by simp only [startFrame.1]) (by simp only [startFrame.2]) rfl rejection with
+        ⟨failure, rejected, stopResult, afterEq, reportEq, stopEvents⟩
+      refine ⟨failure, rejected, ?_, afterEq, reportEq, ?_⟩
+      · simp only [bracketContents, startResult, colonPresent, if_true, colonResult, stopResult]
+      · rw [stopEvents]
+        change afterStart.diagnostics ++ _ = _
+        rw [startEvents]
+        exact List.append_assoc _ _ _
 
-theorem bracketContents_ordinary_of_unrestrictedElementFuel (nested : Parser Expr)
-    (nestedFuel : Nat) (contract : UnrestrictedFuelElementContract nested nestedFuel)
+theorem bracketContents_ordinary_of_unrestrictedElementFuel {openingSpan : SourceSpan}
+    (nested : Parser Expr) (nestedFuel : Nat)
+    (contract : UnrestrictedFuelElementContract nested nestedFuel)
     (input : State) (adequate : input.remainingCount < nestedFuel) :
-    (∃ contents next, bracketContents nested input = .ok contents next) ∨
-    (∃ failure next, bracketContents nested input = .reject failure next) := by
+    (∃ contents next, bracketContents nested openingSpan input = .ok contents next) ∨
+    (∃ failure next, bracketContents nested openingSpan input = .reject failure next) := by
   unfold bracketContents
-  rcases contract.ordinary input adequate with
-    ⟨index, next, result⟩ | ⟨failure, rejected, result⟩
-  · exact .inl ⟨.index index, next, by simp only [result]⟩
-  · exact .inr ⟨failure, rejected, by simp only [result]⟩
+  rcases optionalBound_ordinary_of_unrestrictedElementFuel nested nestedFuel contract input
+      adequate with ⟨start, afterStart, startResult⟩ | ⟨failure, rejected, startResult⟩
+  · have startLe := optionalBound_remainingCount_le_of_success contract startResult
+    simp only [startResult]
+    by_cases colonPresent : isSymbol afterStart .colon = true
+    · simp only [colonPresent, if_true]
+      rcases symbol_eq_ok_of_isSymbol_eq_true .colon .expression colonPresent with
+        ⟨colon, colonResult⟩
+      have colonLe : ({ afterStart with cursor := afterStart.cursor + 1 } : State).remainingCount <
+          nestedFuel :=
+        symbol_remainingCount_lt_of_success .colon .expression colonResult (by omega)
+      simp only [colonResult]
+      rcases optionalBound_ordinary_of_unrestrictedElementFuel nested nestedFuel contract _
+          colonLe with ⟨stop, next, stopResult⟩ | ⟨failure, rejected, stopResult⟩
+      · exact .inl ⟨.slice start colon.span stop, next, by simp only [stopResult]⟩
+      · exact .inr ⟨failure, rejected, by simp only [stopResult]⟩
+    · simp only [colonPresent]
+      cases start with
+      | some index => exact .inl ⟨_, afterStart, rfl⟩
+      | none => exact .inl ⟨_, _, rfl⟩
+  · exact .inr ⟨failure, rejected, by simp only [startResult]⟩
 
-theorem bracketContents_ne_invariant_of_unrestrictedElementFuel (nested : Parser Expr)
-    (nestedFuel : Nat) (contract : UnrestrictedFuelElementContract nested nestedFuel)
-    (input : State) (adequate : input.remainingCount < nestedFuel) (error : ParserInvariantError) :
-    bracketContents nested input ≠ .invariant error := by
+theorem bracketContents_ne_invariant_of_unrestrictedElementFuel {openingSpan : SourceSpan}
+    (nested : Parser Expr) (nestedFuel : Nat)
+    (contract : UnrestrictedFuelElementContract nested nestedFuel)
+    (input : State) (adequate : input.remainingCount < nestedFuel)
+    (error : ParserInvariantError) :
+    bracketContents nested openingSpan input ≠ .invariant error := by
   intro failed
-  rcases bracketContents_ordinary_of_unrestrictedElementFuel nested nestedFuel contract input
-      adequate with ⟨_, _, result⟩ | ⟨_, _, result⟩ <;> rw [result] at failed <;> contradiction
+  rcases bracketContents_ordinary_of_unrestrictedElementFuel (openingSpan := openingSpan) nested
+      nestedFuel contract input adequate with ⟨_, _, result⟩ | ⟨_, _, result⟩ <;>
+    rw [result] at failed <;> contradiction
 
 theorem bracketContents_remainingCount_le_of_success {nestedFuel : Nat}
     (contract : UnrestrictedFuelElementContract nested nestedFuel)
-    {input next : State} {contents : BracketContents}
-    (result : bracketContents nested input = .ok contents next) :
+    {openingSpan : SourceSpan} {input next : State} {contents : BracketContents}
+    (result : bracketContents nested openingSpan input = .ok contents next) :
     next.remainingCount ≤ input.remainingCount := by
   unfold bracketContents at result
-  cases indexResult : nested input with
-  | invariant error => simp [indexResult] at result
-  | reject failure rejected => simp [indexResult] at result
-  | ok index afterIndex =>
-      simp only [indexResult, Reply.ok.injEq] at result
-      rcases result with ⟨rfl, rfl⟩
-      exact contract.remainingCount_le_of_success indexResult
+  cases startResult : optionalBound nested input with
+  | invariant error => simp [startResult] at result
+  | reject failure rejected => simp [startResult] at result
+  | ok start afterStart =>
+      have startLe := optionalBound_remainingCount_le_of_success contract startResult
+      simp only [startResult] at result
+      split at result
+      · cases colonResult : symbol .colon .expression afterStart with
+        | invariant error => simp [colonResult] at result
+        | reject failure rejected => simp [colonResult] at result
+        | ok colon afterColon =>
+            simp only [colonResult] at result
+            have colonLe : afterColon.remainingCount ≤ afterStart.remainingCount :=
+              Nat.le_of_lt (symbol_remainingCount_lt_of_success .colon .expression colonResult
+                (Nat.lt_succ_self _))
+            cases stopResult : optionalBound nested afterColon with
+            | invariant error => simp [stopResult] at result
+            | reject failure rejected => simp [stopResult] at result
+            | ok stop afterStop =>
+                simp only [stopResult, Reply.ok.injEq] at result
+                rcases result with ⟨rfl, rfl⟩
+                exact Nat.le_trans (optionalBound_remainingCount_le_of_success contract stopResult)
+                  (Nat.le_trans colonLe startLe)
+      · cases start with
+        | some index =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            exact startLe
+        | none =>
+            simp only [Reply.ok.injEq] at result
+            rcases result with ⟨rfl, rfl⟩
+            exact startLe
 
 end Solcore.Syntax.Parser.ExpressionAtomInternals
 end
@@ -273,7 +574,7 @@ theorem postfixTail_ordinary_of_unrestrictedElementFuel
             have openingLoop := symbol_remainingCount_lt_of_success .leftBracket .expression openingResult loopAdequate
             have openingNested := symbol_remainingCount_lt_of_success .leftBracket .expression openingResult nestedAdequate
             simp only
-            cases indexResult : bracketContents nested afterOpening with
+            cases indexResult : bracketContents nested opening.span afterOpening with
             | invariant error =>
                 exact False.elim (bracketContents_ne_invariant_of_unrestrictedElementFuel nested
                   nestedFuel contract afterOpening openingNested error indexResult)
@@ -484,7 +785,7 @@ theorem postfixTail_success_context (success : ParserSuccessContext nested)
             simp only [openingResult] at result
             have openingShape := (symbol_ok_tokenAt .leftBracket .expression openingResult).2
             subst afterOpening
-            cases childResult : bracketContents nested { input with cursor := input.cursor + 1 } with
+            cases childResult : bracketContents nested opening.span { input with cursor := input.cursor + 1 } with
             | invariant error => simp [childResult] at result
             | reject failure rejected => simp [childResult] at result
             | ok contents next =>
@@ -616,11 +917,11 @@ theorem postfixTail_reject_context_of_windowProjection (success : ParserSuccessC
             simp only [openingResult] at result
             have openingShape := (symbol_ok_tokenAt .leftBracket .expression openingResult).2
             subst afterOpening
-            cases childResult : bracketContents nested { input with cursor := input.cursor + 1 } with
+            cases childResult : bracketContents nested opening.span { input with cursor := input.cursor + 1 } with
             | invariant error => simp [childResult] at result
             | reject actual next =>
                 simp only [childResult] at result; cases result
-                exact bracketContents_reject_context_of_windowProjection reject
+                exact bracketContents_reject_context_of_windowProjection success reject
                   (input := { input with cursor := input.cursor + 1 }) childResult
             | ok contents next =>
                 simp only [childResult] at result
@@ -776,12 +1077,12 @@ theorem postfixTail_trace_success_sound
             have openingParsed := symbol_success_exactTokenParses .leftBracket .expression openingResult
             have openingShape := (symbol_ok_tokenAt .leftBracket .expression openingResult).2
             subst afterOpening
-            cases indexResult : bracketContents nested { input with cursor := input.cursor + 1 } with
+            cases indexResult : bracketContents nested opening.span { input with cursor := input.cursor + 1 } with
             | invariant error => simp [indexResult] at result
             | reject failure rejected => simp [indexResult] at result
             | ok contents afterIndex =>
                 simp only [indexResult] at result
-                rcases bracketContents_trace_success_sound successSound indexResult with
+                rcases bracketContents_trace_success_sound successSound contextFrame indexResult with
                   ⟨indexTrace, indexParsed, indexEvents⟩
                 have frame := bracketContents_success_context contextFrame indexResult
                 cases closingResult : symbol .rightBracket .expression afterIndex with
@@ -892,7 +1193,7 @@ private theorem complete_at
       have openingResult := symbol_eq_ok_of_exactTokenParses .leftBracket .expression opening
       have openingPresent := symbol_present .leftBracket opening
       rcases opening with ⟨_, rfl⟩
-      rcases bracketContents_trace_success_complete successComplete
+      rcases bracketContents_trace_success_complete successComplete contextFrame
           (input := { input with cursor := input.cursor + 1 }) child with
         ⟨next, childResult, nextAfter, childEvents⟩
       have frame := bracketContents_success_context contextFrame childResult
@@ -1012,17 +1313,17 @@ theorem postfixTail_reject_trace_sound
           ⟨opening, openingResult⟩
         have openingParsed := symbol_success_exactTokenParses .leftBracket .expression openingResult
         simp only [indexed, if_true, openingResult] at result
-        cases indexResult : bracketContents nested { input with cursor := input.cursor + 1 } with
+        cases indexResult : bracketContents nested opening.span { input with cursor := input.cursor + 1 } with
         | invariant error => simp [indexResult] at result
         | reject actual next =>
             simp only [indexResult] at result
             cases result
-            rcases bracketContents_reject_trace_sound rejectSound indexResult with
+            rcases bracketContents_reject_trace_sound successSound rejectSound contextFrame indexResult with
               ⟨trace, rejection, events⟩
             exact ⟨trace, .indexNestedRejected opening.span openingParsed rejection, events⟩
         | ok contents next =>
             simp only [indexResult] at result
-            rcases bracketContents_trace_success_sound successSound indexResult with
+            rcases bracketContents_trace_success_sound successSound contextFrame indexResult with
               ⟨indexEvents, indexParsed, indexEq⟩
             have frame := bracketContents_success_context contextFrame indexResult
             cases closingResult : symbol .rightBracket .expression next with
@@ -1765,7 +2066,8 @@ private theorem complete_at_variant
       have openingResult := symbol_eq_ok_of_exactTokenParses .leftBracket .expression opening
       have openingPresent := symbol_present .leftBracket opening
       rcases opening with ⟨_, rfl⟩
-      rcases bracketContents_trace_reject_complete rejectComplete
+      rcases bracketContents_trace_reject_complete (openingSpan := openingSpan) successComplete
+          rejectComplete contextFrame
           (input := { input with cursor := input.cursor + 1 }) child with
         ⟨failure, rejected, result, afterEq, reportEq, events⟩
       refine ⟨1, ?_⟩
@@ -1781,7 +2083,7 @@ private theorem complete_at_variant
       have openingResult := symbol_eq_ok_of_exactTokenParses .leftBracket .expression opening
       have openingPresent := symbol_present .leftBracket opening
       rcases opening with ⟨_, rfl⟩
-      rcases bracketContents_trace_success_complete successComplete
+      rcases bracketContents_trace_success_complete successComplete contextFrame
           (input := { input with cursor := input.cursor + 1 }) child with
         ⟨next, childResult, nextAfter, childEvents⟩
       have frame := bracketContents_success_context contextFrame childResult
@@ -1804,7 +2106,7 @@ private theorem complete_at_variant
       have openingResult := symbol_eq_ok_of_exactTokenParses .leftBracket .expression opening
       have openingPresent := symbol_present .leftBracket opening
       rcases opening with ⟨_, rfl⟩
-      rcases bracketContents_trace_success_complete successComplete
+      rcases bracketContents_trace_success_complete successComplete contextFrame
           (input := { input with cursor := input.cursor + 1 }) child with
         ⟨next, childResult, nextAfter, childEvents⟩
       have frame := bracketContents_success_context contextFrame childResult

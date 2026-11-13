@@ -3567,6 +3567,7 @@ private inductive ExpressionShape where
   | tuple (elements : List ExpressionShape)
   | array (elements : List ExpressionShape)
   | newArray (length : ExpressionShape)
+  | slice (base : ExpressionShape) (start stop : Option ExpressionShape)
   | error
   | other
   deriving Repr, BEq, Inhabited
@@ -3591,6 +3592,8 @@ private partial def expressionShape (expression : Expr) : ExpressionShape :=
   | .tuple values => .tuple (values.elements.map expressionShape)
   | .array values => .array (values.elements.map expressionShape)
   | .newArray _ _ length => .newArray (expressionShape length)
+  | .slice base _ start _ stop =>
+      .slice (expressionShape base) (start.map expressionShape) (stop.map expressionShape)
   | .error => .error
   | _ => .other
 
@@ -3705,6 +3708,71 @@ private def testOptionalBound : IO Unit := do
         "a bound reads its expression"
       assertEqual next.cursor 3 "a bound ends before the `]`"
   | _ => throw (IO.userError "no bound was read before a `]`")
+
+/-- A `:` in brackets makes a slice whose bounds are optional, a conditional
+bound keeps its own colon, and `a[]` gets upstream's error over its brackets,
+as in upstream's `brackets_with_a_colon_parse_as_slices_with_optional_bounds`
+(`crates/parser/src/parse/mod.rs:1622`),
+`formats_slices_without_spaces_around_the_colon`
+(`crates/parser/tests/formatting.rs:138`) and
+`crates/uitest/tests/fixtures/parse/empty_index_rejected`. -/
+private def testSlices : IO Unit := do
+  let one : ExpressionShape := .literal (.decimal "1")
+  for (source, start, stop) in [
+      ("a[i:j]", some (ident "i"), some (ident "j")),
+      ("a[i + 1:]", some (bin (ident "i") .add one), none),
+      ("a[:j]", none, some (ident "j")),
+      ("a[:]", none, none),
+      ("a[c ? x : y:z]", some (.conditional (ident "c") (ident "x") (ident "y")),
+        some (ident "z"))
+    ] do
+    let run ← runExpression s!"slice {source}" source
+    assertEqual (expressionShape run.value) (.slice (ident "a") start stop) s!"slice {source}"
+    assertEqual run.state.diagnostics [] s!"slice diagnostics {source}"
+    assertEqual (byteRange run.value.span) (0, source.utf8ByteSize) s!"slice span {source}"
+  let nested ← runExpression "slice of a slice" "a[1:3][:2]"
+  assertEqual (expressionShape nested.value)
+    (.slice (.slice (ident "a") (some one) (some (.literal (.decimal "3")))) none
+      (some (.literal (.decimal "2")))) "slice of a slice shape"
+  match nested.value.value with
+  | .slice base brackets _ colon _ =>
+      assertEqual (byteRange brackets) (6, 10) "outer slice brackets"
+      assertEqual (byteRange colon) (7, 8) "outer slice colon"
+      match base.value with
+      | .slice _ innerBrackets _ innerColon _ =>
+          assertEqual (byteRange innerBrackets) (1, 6) "inner slice brackets"
+          assertEqual (byteRange innerColon) (3, 4) "inner slice colon"
+      | _ => throw (IO.userError "the inner slice changed shape")
+  | _ => throw (IO.userError "the slice of a slice changed shape")
+  let empty ← runExpression "empty index" "a[] + 1"
+  assertEqual (expressionShape empty.value) (bin (.index (ident "a") .error) .add one)
+    "an empty index keeps its base"
+  assertEqual (empty.state.diagnostics.map fun item => (byteRange item.span, item.kind))
+    [((1, 3), .constraintViolation .emptyIndex)]
+    "an empty index gets upstream's error over its brackets"
+  let fixture : SourceFile := { id := termSource, content := String.intercalate "\n" [
+      "pragma solcore;",
+      "",
+      "function f(a: word) returns (word) {",
+      "    return a[];",
+      "}"
+    ] }
+  match Parser.parse fixture with
+  | .error error => throw (IO.userError
+      s!"empty_index_rejected: parser invariant failed: {reprStr error}")
+  | .ok output =>
+      assertEqual (output.parseDiagnostics.map fun item => (byteRange item.span, item.kind))
+        [((66, 68), .constraintViolation .emptyIndex)] "upstream's empty index fixture"
+  let formatting : SourceFile := { id := termSource, content := String.intercalate "\n" [
+      "pragma solcore;",
+      "function f(a:uint256[],c:bool)returns(uint256){return a[1 : 3][ : 2].length+" ++
+        "a[c?1:2 :][i+1: ].length;}"
+    ] }
+  match Parser.parse formatting with
+  | .error error => throw (IO.userError
+      s!"formatting.rs:138: parser invariant failed: {reprStr error}")
+  | .ok output =>
+      assertEqual output.parseDiagnostics [] "formatting.rs:138 parse diagnostics"
 
 private def testSourcePreservingWitnesses : IO Unit := do
   let proxy ← runExpression "proxy expression" "@pkg.Box<word>"
@@ -3933,6 +4001,7 @@ private def testPatternRecovery : IO Unit := do
 def testSyntaxParserTerms : IO Unit := do
   testAtomsAndTuples
   testNewArrays
+  testSlices
   testOptionalBound
   testSourcePreservingWitnesses
   testTrailingCommaRejection
