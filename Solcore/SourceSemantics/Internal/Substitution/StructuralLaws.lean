@@ -3924,7 +3924,7 @@ theorem PatternInstructionHasType.applyParameters
         (types.map substitution.apply) requirements
         (binders.map (applyBinder substitution))
         (rest.map (applyMatchPatternInstruction substitution)))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intro rest type
     exact .wildcard
   · intro rest source resolution valid
@@ -3949,6 +3949,10 @@ theorem PatternInstructionHasType.applyParameters
       (PatternInstructionHasType.tuple
         (context := applyContext substitution context)
         (by simp [arity]) elementsInduction)
+  · intro instructions rest requirements binders argument argumentInduction
+    simpa [applyMatchPatternInstruction] using
+      (PatternInstructionHasType.uint256Word
+        (context := applyContext substitution context) argumentInduction)
   · intro instructions
     exact .nil
   · intro instructions afterHead rest type types headRequirements
@@ -3983,7 +3987,7 @@ theorem PatternInstructionsHaveTypes.applyParameters
         (types.map substitution.apply) requirements
         (binders.map (applyBinder substitution))
         (rest.map (applyMatchPatternInstruction substitution)))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intro rest type
     exact .wildcard
   · intro rest source resolution valid
@@ -4008,6 +4012,10 @@ theorem PatternInstructionsHaveTypes.applyParameters
       (PatternInstructionHasType.tuple
         (context := applyContext substitution context)
         (by simp [arity]) elementsInduction)
+  · intro instructions rest requirements binders argument argumentInduction
+    simpa [applyMatchPatternInstruction] using
+      (PatternInstructionHasType.uint256Word
+        (context := applyContext substitution context) argumentInduction)
   · intro instructions
     exact .nil
   · intro instructions afterHead rest type types headRequirements
@@ -4055,6 +4063,7 @@ theorem MatchPatternSourceRepresents.applyParameters
         (StructuralSubstitution.ConstructorPatternSpellingValid.applyParameters
           spelling)
   | tuple => exact .tuple
+  | uint256Word => exact .uint256Word
   | group inner induction => exact .group induction
 
 theorem PatternInstructionIrrefutable.applyParameters
@@ -4073,13 +4082,15 @@ theorem PatternInstructionIrrefutable.applyParameters
       PatternInstructionsIrrefutable
         (instructions.map (applyMatchPatternInstruction substitution)) count
         (rest.map (applyMatchPatternInstruction substitution)))
-    ?_ ?_ ?_ ?_ ?_ irrefutable
+    ?_ ?_ ?_ ?_ ?_ ?_ irrefutable
   · intro rest
     exact .wildcard
   · intro rest binder
     exact .binder
   · intro instructions rest elementCount elements elementsInduction
     exact .tuple elementsInduction
+  · intro instructions rest argument argumentInduction
+    exact .uint256Word argumentInduction
   · intro instructions
     exact .zero
   · intro instructions afterHead rest count head tail headInduction
@@ -4102,13 +4113,15 @@ theorem PatternInstructionsIrrefutable.applyParameters
       PatternInstructionsIrrefutable
         (instructions.map (applyMatchPatternInstruction substitution)) count
         (rest.map (applyMatchPatternInstruction substitution)))
-    ?_ ?_ ?_ ?_ ?_ irrefutable
+    ?_ ?_ ?_ ?_ ?_ ?_ irrefutable
   · intro rest
     exact .wildcard
   · intro rest binder
     exact .binder
   · intro instructions rest elementCount elements elementsInduction
     exact .tuple elementsInduction
+  · intro instructions rest argument argumentInduction
+    exact .uint256Word argumentInduction
   · intro instructions
     exact .zero
   · intro instructions afterHead rest count head tail headInduction
@@ -11810,7 +11823,7 @@ theorem PatternInstructionHasType.applySubstitution
         (types.map substitution.apply) requirements
         (binders.map (TypedBinder.applySubstitution substitution))
         (rest.map (MatchPatternInstruction.applySubstitution substitution)))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intro rest type
     exact .wildcard
   · intro rest literal resolution valid
@@ -11831,6 +11844,9 @@ theorem PatternInstructionHasType.applySubstitution
     simpa [apply_productMany, MatchPatternInstruction.applySubstitution] using
       (PatternInstructionHasType.tuple (context := target)
         (by simp [arity]) elementsInduction)
+  · intro instructions rest requirements binders argument argumentInduction
+    simpa [MatchPatternInstruction.applySubstitution] using
+      (PatternInstructionHasType.uint256Word (context := target) argumentInduction)
   · intro instructions
     exact .nil
   · intro instructions afterHead rest type types headRequirements
@@ -11871,7 +11887,7 @@ theorem PatternInstructionsHaveTypes.applySubstitution
         (types.map substitution.apply) requirements
         (binders.map (TypedBinder.applySubstitution substitution))
         (rest.map (MatchPatternInstruction.applySubstitution substitution)))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intro rest type
     exact .wildcard
   · intro rest literal resolution valid
@@ -11892,6 +11908,9 @@ theorem PatternInstructionsHaveTypes.applySubstitution
     simpa [apply_productMany, MatchPatternInstruction.applySubstitution] using
       (PatternInstructionHasType.tuple (context := target)
         (by simp [arity]) elementsInduction)
+  · intro instructions rest requirements binders argument argumentInduction
+    simpa [MatchPatternInstruction.applySubstitution] using
+      (PatternInstructionHasType.uint256Word (context := target) argumentInduction)
   · intro instructions
     exact .nil
   · intro instructions afterHead rest type types headRequirements
@@ -11954,6 +11973,7 @@ theorem MatchPatternSourceRepresents.applySubstitution
       exact .constructor
         (ConstructorPatternSpellingValid.applySubstitution closes spelling)
   | tuple => exact .tuple
+  | uint256Word => exact .uint256Word
   | group inner induction => exact .group induction
 
 /-- Flexible substitution preserves declarative irrefutability of one prefix
@@ -11976,13 +11996,15 @@ theorem PatternInstructionIrrefutable.applySubstitution
         (instructions.map
           (MatchPatternInstruction.applySubstitution substitution)) count
         (rest.map (MatchPatternInstruction.applySubstitution substitution)))
-    ?_ ?_ ?_ ?_ ?_ irrefutable
+    ?_ ?_ ?_ ?_ ?_ ?_ irrefutable
   · intro rest
     exact .wildcard
   · intro rest binder
     exact .binder
   · intro instructions rest elementCount elements elementsInduction
     exact .tuple elementsInduction
+  · intro instructions rest argument argumentInduction
+    exact .uint256Word argumentInduction
   · intro instructions
     exact .zero
   · intro instructions afterHead rest count head tail headInduction
@@ -12010,13 +12032,15 @@ theorem PatternInstructionsIrrefutable.applySubstitution
         (instructions.map
           (MatchPatternInstruction.applySubstitution substitution)) count
         (rest.map (MatchPatternInstruction.applySubstitution substitution)))
-    ?_ ?_ ?_ ?_ ?_ irrefutable
+    ?_ ?_ ?_ ?_ ?_ ?_ irrefutable
   · intro rest
     exact .wildcard
   · intro rest binder
     exact .binder
   · intro instructions rest elementCount elements elementsInduction
     exact .tuple elementsInduction
+  · intro instructions rest argument argumentInduction
+    exact .uint256Word argumentInduction
   · intro instructions
     exact .zero
   · intro instructions afterHead rest count head tail headInduction

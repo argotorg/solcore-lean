@@ -194,6 +194,41 @@ theorem ValueHasType.unit_value
       cases type_eq
   | comptime => cases type_eq
 
+/-- A value of a fixed-width integer type is a word. -/
+theorem ValueHasType.fixed_value
+    {context : Context} {heap : Heap} {value : Value} {fixed : TypeSystem.FixedInteger}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (typed : ValueHasType context heap value (.fixed fixed)) :
+    ∃ word, value = .word word := by
+  generalize type_eq : Ty.fixed fixed = type at typed
+  cases typed with
+  | unit => simp [Ty.unit, Ty.fixed] at type_eq
+  | bool => simp [Ty.bool, Ty.fixed] at type_eq
+  | word value => exact ⟨value, rfl⟩
+  | fixed value => exact ⟨value, rfl⟩
+  | integer => simp [Ty.integer, Ty.fixed] at type_eq
+  | product => cases type_eq
+  | proxy => cases type_eq
+  | constructed valid arguments_typed =>
+      cases valid with
+      | intro dataType signature dataType_mem signature_mem signature_owner
+          constructor_eq substitution_exact substitution_range payloadTypes_eq
+          resultType_eq =>
+          rw [resultType_eq] at type_eq
+          exact (nominal_ne_of_head _ _ _
+            (by simp [Ty.fixed, applicationHead]) type_eq.symm).elim
+  | mapping => cases type_eq
+  | closure => cases type_eq
+  | global valid evidence_covers =>
+      rcases global_type_eq_function catalog valid with
+        ⟨parameter, result, function_eq⟩
+      rw [function_eq] at type_eq
+      cases type_eq
+  | builtin function =>
+      rw [BuiltinFunctionId.type] at type_eq
+      cases type_eq
+  | comptime => cases type_eq
+
 theorem ValueHasType.product_value
     {context : Context} {heap : Heap} {value : Value}
     {leftType rightType : Ty}
@@ -419,7 +454,7 @@ private theorem patternInstruction_typedRest_length_lt
       rest.length < instructions.length)
     (motive_2 := fun instructions _ _ _ rest _ =>
       rest.length ≤ instructions.length)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   all_goals intros
   all_goals try simp_all only [List.length_cons]
   all_goals omega
@@ -438,6 +473,7 @@ private theorem matchPattern_rootArity_eq
   | binder => cases right_represents; rfl
   | constructor => cases right_represents; rfl
   | tuple => cases right_represents; rfl
+  | uint256Word => cases right_represents; rfl
   | group _ induction =>
       cases right_represents with
       | group inner => exact induction inner
@@ -492,6 +528,11 @@ mutual
             have same_length := dynamic_arity.trans arity
             exact PatternInstructionsMatch.preservesTyping elements_type
               (packing.unpack_types value_typed same_length) children
+    | uint256Word argument_type =>
+        cases matched with
+        | uint256Word argument_matched =>
+            exact PatternInstructionsMatch.preservesTyping argument_type (.cons (.word _) .nil)
+              argument_matched
     termination_by instructions.length * 2
     decreasing_by
       all_goals simp_all
@@ -582,6 +623,8 @@ mutual
         exact PatternInstructionsHaveTypes.patternBinders_monomorphic arguments
     | tuple arity elements =>
         exact PatternInstructionsHaveTypes.patternBinders_monomorphic elements
+    | uint256Word argument =>
+        exact PatternInstructionsHaveTypes.patternBinders_monomorphic argument
     termination_by instructions.length * 2
     decreasing_by all_goals simp_all; all_goals omega
 
@@ -656,6 +699,14 @@ mutual
               ⟨bindings, children, rest_eq⟩
             exact ⟨bindings, .tuple packed
               (values_typed.length_eq.trans arity.symm) children, rest_eq⟩
+    | uint256Word argument_type =>
+        cases irrefutable with
+        | uint256Word argument_irrefutable =>
+            obtain ⟨word, rfl⟩ := ValueHasType.fixed_value catalog value_typed
+            rcases PatternInstructionsIrrefutable.matchesTyped (heap := heap) catalog
+                argument_type (.cons (.word word) .nil) argument_irrefutable with
+              ⟨bindings, argument_matched, rest_eq⟩
+            exact ⟨bindings, .uint256Word argument_matched, rest_eq⟩
     termination_by instructions.length * 2
     decreasing_by
       all_goals simp_all
@@ -721,6 +772,7 @@ theorem rootArity_eq
   | binder => cases right_represents; rfl
   | constructor => cases right_represents; rfl
   | tuple => cases right_represents; rfl
+  | uint256Word => cases right_represents; rfl
   | group _ induction =>
       cases right_represents with
       | group inner => exact induction inner

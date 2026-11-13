@@ -734,6 +734,10 @@ private theorem instruction_binders {context : Context}
     intro value bindings sourceRest matched
     cases matched with
     | tuple packed length children => exact ih (length.trans arity) children
+  | uint256Word typed ih =>
+    intro value bindings sourceRest matched
+    cases matched with
+    | uint256Word children => exact ih rfl children
   | nil =>
     rename_i values bindings sourceRest length matched
     have empty : values = [] := by simpa using length

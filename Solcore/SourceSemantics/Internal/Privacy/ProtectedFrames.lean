@@ -1353,6 +1353,31 @@ private theorem integer_prefix_private {protectedVars : List TypeVarId} {state r
     unify_fixes_protected ((fixed.of_substitution_eq (after := state.fresh.2) rfl).of_substitution_eq (congrArg InferState.substitution inference))
       targetSafe normalizedSafe unified⟩
 
+/-- `uint256(p)`'s prefix: the matched type is unified with `uint256`, and `p`
+is checked at `word`, a closed type. -/
+private theorem uint256_prefix_private {protectedVars : List TypeVarId}
+    {state final : State} {expected : Ty}
+    (ready : state.InferenceReady) (expectedBelow : expected.VariablesBelow state.inference.next)
+    (safe : Safe protectedVars state expected) (live : LiveBindersSafe protectedVars state)
+    (fixed : FixesProtected protectedVars state)
+    (unified : Detail.unify state expected (Ty.fixed .uint256) = .ok final) :
+    PatternFixedProgress protectedVars state final ∧ state.InferenceProgress final ∧ final.InferenceReady ∧
+      (∀ type ∈ [Ty.word], type.VariablesBelow final.inference.next ∧ Safe protectedVars final type) := by
+  have fixedSafe : Safe protectedVars state (Ty.fixed .uint256) :=
+    ProtectedVariables.safe_closed protectedVars state (Ty.variablesBelow_constructor _ _)
+  have progress := Detail.unify_inferenceProgress ready.solved expectedBelow
+    (Ty.variablesBelow_constructor _ _) unified
+  have finalReady := Detail.unify_preserves_inferenceReady ready expectedBelow
+    (Ty.variablesBelow_constructor _ _) unified
+  have transport := ProtectedVariables.unify safe fixedSafe unified
+  refine ⟨PatternFixedProgress.of_unchanged transport (live.unify safe fixedSafe unified)
+      (unify_fixes_protected fixed safe fixedSafe unified), progress, finalReady, ?_⟩
+  intro type member
+  simp only [List.mem_singleton] at member
+  subst type
+  exact ⟨Ty.variablesBelow_constructor _ _,
+    ProtectedVariables.safe_closed protectedVars final (Ty.variablesBelow_constructor _ _)⟩
+
 private theorem contextual_prefix_private {protectedVars : List TypeVarId}
     {context : SourceInference.Context} {state final : State} {expected : Ty} {name : String}
     {dataType : ProgramDataSignature} {constructor : ProgramDataConstructorSignature} {arguments : List Ty}
@@ -1505,7 +1530,7 @@ private theorem pattern_call_private (protectedVars : List TypeVarId) (fuel : Na
   case case10 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments contextualBranch childrenIH
+      flatArguments notUint256 contextualBranch childrenIH
     unfold PatternCallFixedness at *
     intro result ready expectedBelow formation bound expectedSafe live fixed success
     unfold Detail.inferMatchPatternFlatFuel at success
@@ -1532,7 +1557,7 @@ private theorem pattern_call_private (protectedVars : List TypeVarId) (fuel : Na
   case case11 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments explicitBranch childrenIH
+      flatArguments notUint256 explicitBranch childrenIH
     unfold PatternCallFixedness at *
     intro result ready expectedBelow formation bound expectedSafe live fixed success
     unfold Detail.inferMatchPatternFlatFuel at success
@@ -1556,7 +1581,27 @@ private theorem pattern_call_private (protectedVars : List TypeVarId) (fuel : Na
           (fun metavariable member => Nat.lt_of_lt_of_le (bound metavariable member) beforeChildren.2.1.next_le)
           (fun type member => (beforeChildren.2.2.2 type member).2) beforeChildren.1.2.1 beforeChildren.1.2.2 (by assumption)
         exact beforeChildren.1.trans child
-  case case13 =>
+  case case12 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq argument
+      selectedEq childrenIH
+    unfold PatternCallFixedness at *
+    intro result ready expectedBelow formation bound expectedSafe live fixed success
+    unfold Detail.inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all
+    all_goals try subst_vars
+    have beforeChildren := uint256_prefix_private ready expectedBelow expectedSafe live fixed
+      (by assumption)
+    have child := childrenIH _ _ beforeChildren.2.2.1
+      (fun type member => (beforeChildren.2.2.2 type member).1) formation
+      (fun metavariable member => Nat.lt_of_lt_of_le (bound metavariable member) beforeChildren.2.1.next_le)
+      (fun type member => (beforeChildren.2.2.2 type member).2) beforeChildren.1.2.1 beforeChildren.1.2.2
+      (by assumption)
+    exact beforeChildren.1.trans child
+  case case14 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold PatternCallFixedness at *
@@ -1581,7 +1626,7 @@ private theorem pattern_call_private (protectedVars : List TypeVarId) (fuel : Na
         rw [← argumentTypesEq]
         simpa only [sources] using (by assumption))
     exact beforeChildren.1.trans child
-  case case17 =>
+  case case18 =>
     intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
     unfold PatternsCallFixedness
     unfold PatternCallFixedness at ihHead

@@ -5229,6 +5229,23 @@ theorem explicitConstructorPrefix_inferenceProperties
     fun payload member =>
       (allocatedProperties.2.2.2.1 payload member).weaken progress.next_le⟩
 
+/-- `uint256(p)` is spelled `uint256`, with no qualifier, no leading dot and
+one pattern. -/
+theorem uint256PatternArgument?_some {leadingDot : Option Syntax.SourceSpan}
+    {qualifiers : List Syntax.Identifier} {name : String} {arguments : List Syntax.Pattern}
+    {expected : Ty} {argument : Syntax.Pattern}
+    (selected : uint256PatternArgument? leadingDot qualifiers name arguments expected =
+      some argument) :
+    leadingDot = none ∧ qualifiers = [] ∧ name = "uint256" ∧ arguments = [argument] := by
+  unfold uint256PatternArgument? at selected
+  split at selected <;> try contradiction
+  all_goals
+    split at selected
+    · rename_i same
+      cases selected
+      exact ⟨rfl, rfl, same, rfl⟩
+    · contradiction
+
 private theorem tuplePatternPrefix_inferenceProperties
     {state allocated next : State} {expected : Ty} {count : Nat}
     {elementTypes : List Ty}
@@ -5376,7 +5393,7 @@ private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
   case case10 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments contextualBranch childrenIH
+      flatArguments notUint256 contextualBranch childrenIH
     unfold MatchPatternFlatInferenceProperties at *
     intro result ready expectedBelow validated success
     unfold inferMatchPatternFlatFuel at success
@@ -5402,7 +5419,7 @@ private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
   case case11 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments explicitBranch childrenIH
+      flatArguments notUint256 explicitBranch childrenIH
     unfold MatchPatternFlatInferenceProperties at *
     intro result ready expectedBelow validated success
     unfold inferMatchPatternFlatFuel at success
@@ -5424,7 +5441,31 @@ private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
         have children := childrenIH _ _ _ constructorPrefix.2.1
           constructorPrefix.2.2 validated (by assumption)
         exact ⟨constructorPrefix.1.trans children.1, children.2⟩
-  case case13 =>
+  case case12 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq argument
+      selectedEq childrenIH
+    unfold MatchPatternFlatInferenceProperties at *
+    intro result ready expectedBelow validated success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    have fixedBelow : (Ty.fixed .uint256).VariablesBelow inputState.inference.next :=
+      Ty.variablesBelow_constructor _ _
+    have unifiedProgress := unify_inferenceProgress ready.solved expectedBelow fixedBelow
+      (by assumption)
+    have unifiedReady := unify_preserves_inferenceReady ready expectedBelow fixedBelow
+      (by assumption)
+    have children := childrenIH _ _ unifiedReady (by
+        intro type member
+        simp only [List.mem_singleton] at member
+        subst type
+        exact Ty.variablesBelow_constructor _ _) validated (by assumption)
+    exact ⟨unifiedProgress.trans children.1, children.2⟩
+  case case14 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold MatchPatternFlatInferenceProperties at *
@@ -5450,7 +5491,7 @@ private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
         rw [← argumentTypesEq]
         simpa only [sources] using (by assumption))
     exact ⟨tuplePrefix.1.trans children.1, children.2⟩
-  case case17 =>
+  case case18 =>
     intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
     unfold MatchPatternsFlatInferenceProperties
     unfold MatchPatternFlatInferenceProperties at ihHead
@@ -5587,7 +5628,7 @@ private theorem inferMatchPatternFlatFuel_advances_nextLocal
   case case10 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments contextualBranch childrenIH
+      flatArguments notUint256 contextualBranch childrenIH
     unfold AdvancesNextLocal at *
     intro result success
     unfold inferMatchPatternFlatFuel at success
@@ -5606,7 +5647,7 @@ private theorem inferMatchPatternFlatFuel_advances_nextLocal
   case case11 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments explicitBranch childrenIH
+      flatArguments notUint256 explicitBranch childrenIH
     unfold AdvancesNextLocal at *
     intro result success
     unfold inferMatchPatternFlatFuel at success
@@ -5622,7 +5663,22 @@ private theorem inferMatchPatternFlatFuel_advances_nextLocal
       | have childrenNext := childrenIH _ _ _ (by assumption)
         have unifiedNext := unify_preserves_nextLocal (by assumption)
         simp_all <;> omega
-  case case13 =>
+  case case12 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq argument
+      selectedEq childrenIH
+    unfold AdvancesNextLocal at *
+    intro result success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    have childrenNext := childrenIH _ _ (by assumption)
+    have unifiedNext := unify_preserves_nextLocal (by assumption)
+    simp_all <;> omega
+  case case14 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold AdvancesNextLocal at *
@@ -5653,7 +5709,7 @@ private theorem inferMatchPatternFlatFuel_advances_nextLocal
               inputState.nextLocal = allocatedState.nextLocal := allocatedNext
               _ = unifiedState.nextLocal := unifiedNext.symm
               _ ≤ children.state.nextLocal := childrenNext
-  case case17 =>
+  case case18 =>
     intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
     unfold AdvancesNextLocal at *
     intro result success
@@ -5732,7 +5788,7 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
   case case10 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments contextualBranch childrenIH
+      flatArguments notUint256 contextualBranch childrenIH
     unfold PatternPreservesBinderBound
     intro result below success
     unfold inferMatchPatternFlatFuel at success
@@ -5754,7 +5810,7 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
   case case11 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments explicitBranch childrenIH
+      flatArguments notUint256 explicitBranch childrenIH
     unfold PatternPreservesBinderBound
     intro result below success
     unfold inferMatchPatternFlatFuel at success
@@ -5773,7 +5829,22 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
               _ _ inputState below)
             (by assumption))
           (by assumption)
-  case case13 =>
+  case case12 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq argument
+      selectedEq childrenIH
+    unfold PatternPreservesBinderBound
+    intro result below success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    exact childrenIH _ _
+      (unify_preserves_localBindersBelowNextLocal below (by assumption))
+      (by assumption)
+  case case14 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold PatternPreservesBinderBound
@@ -5806,7 +5877,7 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
               (unify_preserves_localBindersBelowNextLocal allocatedBelow
                 unifiedResult)
               (by simpa only [sources] using childrenResult)
-  case case17 =>
+  case case18 =>
     intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
     unfold PatternsPreserveBinderBound at *
     unfold PatternPreservesBinderBound at ihHead
@@ -5869,7 +5940,7 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
     all_goals
       apply State.allocateBinder_preserves_localBindersBelowNextLocal
       exact below
-  case case12 =>
+  case case13 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel inner
       patternEq induction
     unfold PatternPreservesBinderBound at *
@@ -5893,7 +5964,7 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
     simp_all [bind, Except.bind, pure, Pure.pure, Except.pure]
     subst result
     exact below
-  case case16 =>
+  case case17 =>
     intros
     unfold PatternsPreserveBinderBound
     intro result below success
@@ -13462,6 +13533,7 @@ theorem exhaustsNominalConstructors_eq_true_facts
                 simp [covered, resolutionEq] at selected
             | binder binder => simp [covered, resolutionEq] at selected
             | tuple instructions => simp [covered, resolutionEq] at selected
+            | uint256Word instructions => simp [covered, resolutionEq] at selected
             | constructor instantiation instructions =>
                 cases irrefutableEq :
                     constructorArgumentsIrrefutable instantiation instructions <;>

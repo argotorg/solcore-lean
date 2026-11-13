@@ -30,7 +30,7 @@ def instructionBinders (instructions : List MatchPatternInstruction) : List Type
 def patternBinders (pattern : TypedMatchPattern) : List TypedBinder :=
   match pattern.resolution with
   | .binder binder => [binder]
-  | .constructor _ children | .tuple children => instructionBinders children
+  | .constructor _ children | .tuple children | .uint256Word children => instructionBinders children
   | _ => []
 
 /-- The `let` binders of a `for` header. -/

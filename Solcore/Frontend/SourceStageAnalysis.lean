@@ -288,7 +288,8 @@ def bindersInPatternResolution :
     MatchPatternResolution → List TypedBinder
   | .binder binder => [binder]
   | .constructor _ instructions
-  | .tuple instructions => instructions.flatMap bindersInPatternInstruction
+  | .tuple instructions
+  | .uint256Word instructions => instructions.flatMap bindersInPatternInstruction
   | _ => []
 
 def registerPatternBinders (owner : Resolved.DeclarationId)

@@ -307,7 +307,8 @@ private def expressionBinders : ExpressionForm → List TypedBinder
 
 private def instructionTypes : MatchPatternInstruction → List Ty
   | .wildcard
-  | .tuple _ => []
+  | .tuple _
+  | .uint256Word => []
   | .integerLiteral _ resolution => [resolution.targetType]
   | .binder binder => [binder.scheme.body]
   | .constructor instantiation _ => constructorTypes instantiation
@@ -318,7 +319,7 @@ private def patternTypes : MatchPatternResolution → List Ty
   | .binder binder => [binder.scheme.body]
   | .constructor instantiation instructions =>
       constructorTypes instantiation ++ instructions.flatMap instructionTypes
-  | .tuple instructions => instructions.flatMap instructionTypes
+  | .tuple instructions | .uint256Word instructions => instructions.flatMap instructionTypes
 
 private def instructionBinders (instructions : List MatchPatternInstruction) : List TypedBinder :=
   instructions.filterMap fun
@@ -327,7 +328,8 @@ private def instructionBinders (instructions : List MatchPatternInstruction) : L
 
 private def patternBinders : MatchPatternResolution → List TypedBinder
   | .binder binder => [binder]
-  | .constructor _ instructions | .tuple instructions => instructionBinders instructions
+  | .constructor _ instructions | .tuple instructions | .uint256Word instructions =>
+      instructionBinders instructions
   | _ => []
 
 private def forTypes : ForItemForm → List Ty
@@ -500,7 +502,7 @@ private theorem instruction_congr {left right : Substitution} {instruction : Mat
       binder.applySubstitution left = binder.applySubstitution right) :
     instruction.applySubstitution left = instruction.applySubstitution right := by
   cases instruction with
-  | wildcard | tuple => rfl
+  | wildcard | tuple | uint256Word => rfl
   | integerLiteral source resolution => exact congrArg _ (integer_congr same.head)
   | binder binder =>
     exact congrArg MatchPatternInstruction.binder
@@ -541,6 +543,8 @@ private theorem pattern_congr {left right : Substitution} {pattern : MatchPatter
     simp only [MatchPatternResolution.applySubstitution, constructor, instructions]
   | tuple instructions =>
     exact congrArg MatchPatternResolution.tuple (instructions_congr same binders)
+  | uint256Word instructions =>
+    exact congrArg MatchPatternResolution.uint256Word (instructions_congr same binders)
 
 private theorem assignment_congr {left right : Substitution} {assignment : AssignmentResolution}
     (same : left.apply assignment.target.type = right.apply assignment.target.type) :

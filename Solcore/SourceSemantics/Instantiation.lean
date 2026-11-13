@@ -690,6 +690,7 @@ def applyMatchPatternInstruction (substitution : ParameterSubstitution) :
       .constructor (applyDataConstructorInstantiation substitution instantiation)
         argumentCount
   | .tuple elementCount => .tuple elementCount
+  | .uint256Word => .uint256Word
 
 def applyMatchPatternResolution (substitution : ParameterSubstitution) :
     MatchPatternResolution → MatchPatternResolution
@@ -703,6 +704,8 @@ def applyMatchPatternResolution (substitution : ParameterSubstitution) :
         (arguments.map (applyMatchPatternInstruction substitution))
   | .tuple elements =>
       .tuple (elements.map (applyMatchPatternInstruction substitution))
+  | .uint256Word argument =>
+      .uint256Word (argument.map (applyMatchPatternInstruction substitution))
 
 def applyTypedMatchPattern (substitution : ParameterSubstitution)
     (pattern : TypedMatchPattern) : TypedMatchPattern := {

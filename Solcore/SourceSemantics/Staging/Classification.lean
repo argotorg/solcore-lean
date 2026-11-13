@@ -180,14 +180,16 @@ def instructionBinders : MatchPatternInstruction → List TypedBinder
   | .wildcard
   | .integerLiteral _ _
   | .constructor _ _
-  | .tuple _ => []
+  | .tuple _
+  | .uint256Word => []
 
 /-- Every binder retained by a pattern resolution, including nested prefix
 instructions, in source order. -/
 def patternBinders : MatchPatternResolution → List TypedBinder
   | .binder binder => [binder]
   | .constructor _ instructions
-  | .tuple instructions => instructions.flatMap instructionBinders
+  | .tuple instructions
+  | .uint256Word instructions => instructions.flatMap instructionBinders
   | .wildcard
   | .integerLiteral _ _ => []
 

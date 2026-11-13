@@ -504,6 +504,9 @@ private theorem pattern_tree {compilation : SourceCoreCompatibleDataMatches.Cont
     exact .constructor (by simpa only [SourceCoreCompatibleDataMatches.projected, edited.metadata.owner] using projected)
       result count resolved coreType raw ih
       (by simpa only [projectedSame] using projectedChildren) registered
+  | uint256Word projected _ coreType ih =>
+    exact .uint256Word
+      (by simpa only [SourceCoreCompatibleDataMatches.projected, edited.metadata.owner] using projected) ih coreType
   | nil => exact .nil
   | cons _ _ head tail => exact .cons head tail
 

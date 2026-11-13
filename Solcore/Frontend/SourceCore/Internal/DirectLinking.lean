@@ -378,7 +378,8 @@ private def localIdsInMatchPatternResolution :
     MatchPatternResolution → List Resolved.LocalId
   | .binder binder => [binder.id]
   | .constructor _ arguments
-  | .tuple arguments => arguments.flatMap localIdsInMatchPatternInstruction
+  | .tuple arguments
+  | .uint256Word arguments => arguments.flatMap localIdsInMatchPatternInstruction
   | _ => []
 
 private def localIdsInAssignment

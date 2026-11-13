@@ -1346,6 +1346,19 @@ structure InferredPatterns where
   names : List String
   state : State
 
+/-- The one pattern of `case uint256(p)`, which a `uint256` value's word is
+matched with: spelled `uint256` with no qualifier and no leading dot, at a type
+that is `uint256` or still open. Upstream rejects a constructor pattern at the
+other eleven types (`SC0107`), and `uint256` at any other type. -/
+def uint256PatternArgument? (leadingDot : Option Syntax.SourceSpan)
+    (qualifiers : List Syntax.Identifier) (name : String) (arguments : List Syntax.Pattern)
+    (expected : Ty) : Option Syntax.Pattern :=
+  match leadingDot, qualifiers, arguments, expected with
+  | none, [], [argument], .variable _ => if name = "uint256" then some argument else none
+  | none, [], [argument], .constructor (.builtin (.fixed ⟨false, .w256⟩)) =>
+      if name = "uint256" then some argument else none
+  | _, _, _, _ => none
+
 def freshTypes : Nat → State → List Ty × State
   | 0, state => ([], state)
   | count + 1, state =>
@@ -1431,41 +1444,56 @@ mutual
       | .constructor leadingDot qualifiers name arguments => do
           let qualifierNames := qualifiers.map (·.value)
           let sourceArguments := arguments.map (·.elements.toList) |>.getD []
-          let (constructor, instantiation, state) ←
-            if leadingDot.isSome || qualifierNames.isEmpty then
-              let (dataType, constructor, typeArguments) ←
-                contextualConstructorCandidate context state (some expected)
-                  name.value
-              pure (constructor,
-                instantiateDataConstructor dataType constructor typeArguments,
-                state)
-            else
-              let (dataType, constructor) ←
-                explicitConstructorCandidate context qualifierNames name.value
-              let (instantiation, state) :=
-                freshDataConstructorInstantiation dataType constructor state
-              pure (constructor, instantiation, state)
-          unless sourceArguments.length = instantiation.payloadTypes.length do
-            throw (.constructorArityMismatch constructor.id
-              instantiation.payloadTypes.length sourceArguments.length)
-          let state ← unify state instantiation.resultType expected
-          let children ← inferMatchPatternsFlatFuel fuel context sourceArguments
-            instantiation.payloadTypes seen state
-          let instantiation := {
-            instantiation with
-            payloadTypes := instantiation.payloadTypes.map children.state.resolve
-            resultType := children.state.resolve instantiation.resultType
-          }
-          pure {
-            source := .constructor pattern.span leadingDot qualifierNames
-              name.value sourceArguments.length
-            resolution := .constructor instantiation children.instructions
-            instructions := .constructor instantiation sourceArguments.length ::
-              children.instructions
-            requirements := children.requirements
-            names := children.names
-            state := children.state
-          }
+          match uint256PatternArgument? leadingDot qualifiers name.value
+              (arguments.map (·.elements.toList) |>.getD []) (state.resolve expected) with
+          | none =>
+              let (constructor, instantiation, state) ←
+                if leadingDot.isSome || qualifierNames.isEmpty then
+                  let (dataType, constructor, typeArguments) ←
+                    contextualConstructorCandidate context state (some expected)
+                      name.value
+                  pure (constructor,
+                    instantiateDataConstructor dataType constructor typeArguments,
+                    state)
+                else
+                  let (dataType, constructor) ←
+                    explicitConstructorCandidate context qualifierNames name.value
+                  let (instantiation, state) :=
+                    freshDataConstructorInstantiation dataType constructor state
+                  pure (constructor, instantiation, state)
+              unless sourceArguments.length = instantiation.payloadTypes.length do
+                throw (.constructorArityMismatch constructor.id
+                  instantiation.payloadTypes.length sourceArguments.length)
+              let state ← unify state instantiation.resultType expected
+              let children ← inferMatchPatternsFlatFuel fuel context sourceArguments
+                instantiation.payloadTypes seen state
+              let instantiation := {
+                instantiation with
+                payloadTypes := instantiation.payloadTypes.map children.state.resolve
+                resultType := children.state.resolve instantiation.resultType
+              }
+              pure {
+                source := .constructor pattern.span leadingDot qualifierNames
+                  name.value sourceArguments.length
+                resolution := .constructor instantiation children.instructions
+                instructions := .constructor instantiation sourceArguments.length ::
+                  children.instructions
+                requirements := children.requirements
+                names := children.names
+                state := children.state
+              }
+          | some argument =>
+              let state ← unify state expected (.fixed .uint256)
+              let children ← inferMatchPatternsFlatFuel fuel context [argument] [.word] seen
+                state
+              pure {
+                source := .constructor pattern.span leadingDot qualifierNames name.value 1
+                resolution := .uint256Word children.instructions
+                instructions := .uint256Word :: children.instructions
+                requirements := children.requirements
+                names := children.names
+                state := children.state
+              }
       | .group inner => do
           let result ← inferMatchPatternFlatFuel fuel context inner expected seen
             state
@@ -1541,6 +1569,7 @@ mutual
                 let (_, rest) ← consumeIrrefutableInstructions fuel count rest
                 pure (false, rest)
             | .tuple count => consumeIrrefutableInstructions fuel count rest
+            | .uint256Word => consumeIrrefutableInstructions fuel 1 rest
 
   def consumeIrrefutableInstructions (fuel : Nat) :
       Nat → List MatchPatternInstruction →
@@ -1573,6 +1602,10 @@ def typedPatternIsCatchall (pattern : TypedMatchPattern) : Bool :=
               instructions with
           | some (true, []) => true
           | _ => false
+      | _ => false
+  | .uint256Word instructions =>
+      match consumeIrrefutableInstructions (instructions.length + 1) 1 instructions with
+      | some (true, []) => true
       | _ => false
   | .integerLiteral .. | .constructor .. => false
 

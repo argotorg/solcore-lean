@@ -1695,7 +1695,8 @@ private def instructionBinders : MatchPatternInstruction → List TypedBinder
 
 private def patternBinders : MatchPatternResolution → List TypedBinder
   | .binder binder => [binder]
-  | .constructor _ instructions | .tuple instructions => instructions.flatMap instructionBinders
+  | .constructor _ instructions | .tuple instructions | .uint256Word instructions =>
+      instructions.flatMap instructionBinders
   | _ => []
 
 private def allowed (source : TypedSource) (binder : TypedBinder)

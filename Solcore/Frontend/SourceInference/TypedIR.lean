@@ -176,6 +176,9 @@ inductive MatchPatternInstruction where
       (instantiation : DataConstructorInstantiation)
       (argumentCount : Nat)
   | tuple (elementCount : Nat)
+  /-- `uint256(p)`: a `uint256` value, whose word the one pattern that follows
+  matches at `word`. A `uint256` value is its word. -/
+  | uint256Word
   deriving Repr, BEq, DecidableEq
 
 /-- The supported semantic classification of one source match pattern. -/
@@ -189,6 +192,8 @@ inductive MatchPatternResolution where
       (instantiation : DataConstructorInstantiation)
       (arguments : List MatchPatternInstruction)
   | tuple (elements : List MatchPatternInstruction)
+  /-- `uint256(p)`, with the instructions of `p`. -/
+  | uint256Word (argument : List MatchPatternInstruction)
   deriving Repr, BEq, DecidableEq
 
 /-- A source-preserving pattern carrier for the initial executable match
@@ -747,6 +752,7 @@ def applySubstitution (substitution : Substitution) :
   | .constructor instantiation argumentCount =>
       .constructor (instantiation.applySubstitution substitution) argumentCount
   | .tuple elementCount => .tuple elementCount
+  | .uint256Word => .uint256Word
 
 end MatchPatternInstruction
 
@@ -764,6 +770,8 @@ def applySubstitution (substitution : Substitution) :
         (arguments.map (MatchPatternInstruction.applySubstitution substitution))
   | .tuple elements =>
       .tuple (elements.map (MatchPatternInstruction.applySubstitution substitution))
+  | .uint256Word argument =>
+      .uint256Word (argument.map (MatchPatternInstruction.applySubstitution substitution))
 
 end MatchPatternResolution
 
@@ -876,7 +884,7 @@ def binderIds (instructions : List MatchPatternInstruction) :
   instructions.filterMap fun instruction =>
     match instruction with
     | .binder selectedBinder => some selectedBinder.id
-    | .wildcard | .integerLiteral .. | .constructor .. | .tuple .. => none
+    | .wildcard | .integerLiteral .. | .constructor .. | .tuple .. | .uint256Word => none
 
 end MatchPatternInstruction
 
@@ -888,7 +896,7 @@ def binderIds (pattern : TypedMatchPattern) : List Resolved.LocalId :=
   match pattern.resolution with
   | .wildcard | .integerLiteral .. => []
   | .binder selectedBinder => [selectedBinder.id]
-  | .constructor _ arguments | .tuple arguments =>
+  | .constructor _ arguments | .tuple arguments | .uint256Word arguments =>
       MatchPatternInstruction.binderIds arguments
 
 end TypedMatchPattern

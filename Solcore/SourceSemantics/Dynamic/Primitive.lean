@@ -1607,6 +1607,9 @@ mutual
     | tuple {instructions rest elementCount}
         (children : PatternInstructionsSkip instructions elementCount rest) :
         PatternInstructionSkips (.tuple elementCount :: instructions) rest
+    | uint256Word {instructions rest}
+        (argument : PatternInstructionsSkip instructions 1 rest) :
+        PatternInstructionSkips (.uint256Word :: instructions) rest
 
   /-- Consume exactly `count` consecutive self-delimiting instructions. -/
   inductive PatternInstructionsSkip :
@@ -1659,6 +1662,14 @@ mutual
           bindings rest) :
         PatternInstructionMatches context value
           (.tuple elementCount :: instructions) bindings rest
+    /-- A `uint256` value is its word, which `p` matches. -/
+    | uint256Word
+        {word : Core.Word} {instructions rest : List MatchPatternInstruction}
+        {bindings : List (TypedBinder × Value)}
+        (argument : PatternInstructionsMatch context [.word word] instructions
+          bindings rest) :
+        PatternInstructionMatches context (.word word) (.uint256Word :: instructions)
+          bindings rest
 
   /-- Match a source-ordered value vector against the same number of prefix
   pattern trees.  Appending head bindings before tail bindings fixes binding

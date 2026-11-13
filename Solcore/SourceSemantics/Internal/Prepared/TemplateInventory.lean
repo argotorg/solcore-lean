@@ -38,9 +38,10 @@ private def formBinders : StatementForm → List TypedBinder
   | .matchWith resolution => resolution.cases.flatMap fun arm =>
       match arm.pattern.resolution with
       | .binder binder => [binder]
-      | .constructor _ instructions | .tuple instructions => instructions.filterMap fun
-          | .binder binder => some binder
-          | _ => none
+      | .constructor _ instructions | .tuple instructions | .uint256Word instructions =>
+          instructions.filterMap fun
+            | .binder binder => some binder
+            | _ => none
       | _ => []
   | _ => []
 

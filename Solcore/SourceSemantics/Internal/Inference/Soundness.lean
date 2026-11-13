@@ -7602,6 +7602,10 @@ private theorem consumeIrrefutable_true_sound :
     apply PatternInstructionIrrefutable.tuple
     apply induction final
     simpa [Detail.consumeIrrefutableInstruction] using success
+  · intro rest fuel induction final success
+    apply PatternInstructionIrrefutable.uint256Word
+    apply induction final
+    simpa [Detail.consumeIrrefutableInstruction] using success
   · intro fuel instructions rest success
     simp [Detail.consumeIrrefutableInstructions] at success
     subst rest
@@ -7749,6 +7753,31 @@ theorem typedPatternIsCatchall_true_sound
                         MatchPatternResolution.applySubstitution,
                         matchPatternResolutionInstructions] using
                         (PatternInstructionIrrefutable.tuple substituted)
+  | uint256Word instructions =>
+      cases consumed : Detail.consumeIrrefutableInstructions
+          (instructions.length + 1) 1 instructions with
+      | none =>
+          simp [Detail.typedPatternIsCatchall, resolutionEq, consumed] at accepted
+      | some pair =>
+          rcases pair with ⟨irrefutable, rest⟩
+          cases irrefutable with
+          | false =>
+              simp [Detail.typedPatternIsCatchall, resolutionEq, consumed] at accepted
+          | true =>
+              cases rest with
+              | cons head tail =>
+                  simp [Detail.typedPatternIsCatchall, resolutionEq, consumed] at accepted
+              | nil =>
+                  have argumentIrrefutable :
+                      PatternInstructionsIrrefutable instructions 1 [] :=
+                    consumeIrrefutableInstructions_true_sound consumed
+                  have substituted :=
+                    FlexibleSubstitution.PatternInstructionsIrrefutable.applySubstitution
+                      (substitution := outer) argumentIrrefutable
+                  simpa [TypedMatchPattern.applySubstitution, resolutionEq,
+                    MatchPatternResolution.applySubstitution,
+                    matchPatternResolutionInstructions] using
+                    (PatternInstructionIrrefutable.uint256Word substituted)
 
 /-- A positive nominal coverage check constructs the declarative constructor
 coverage witness after closing the scrutinee and every retained case. -/
@@ -12809,6 +12838,155 @@ private theorem inferMatchPatternFlatFuel_success_binder_sound
         exact nameAbsent (candidateEq ▸ candidateMem)
     }⟩
 
+/-- `uint256(p)` unifies the matched type with `uint256` and checks `p` at
+`word`, as a tuple pattern checks its elements. -/
+private theorem inferMatchPatternFlatFuel_success_uint256_sound
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext activeContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {fuel : Nat}
+    {resultPremise : Frontend.SourceInference.State →
+      List RequirementId → Prop}
+    {pattern : Syntax.Pattern} {leadingDot : Option Syntax.SourceSpan}
+    {qualifiers : List Syntax.Identifier} {name : Syntax.Identifier}
+    {arguments : Option
+      (Syntax.NonemptyDelimitedList (Syntax.Located Syntax.PatternValue))}
+    {argument : Syntax.Pattern}
+    {expected : TypeSystem.Ty} {seen : List String}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPattern}
+    (pattern_eq : pattern.value =
+      .constructor leadingDot qualifiers name arguments)
+    (selected : Detail.uint256PatternArgument? leadingDot qualifiers name.value
+      ((arguments.map (fun retained => retained.elements.toList)).getD [])
+      (initial.resolve expected) = some argument)
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
+    (recursivePatterns : MatchPatternsFlatSoundAtWith resultPremise source
+      inferenceContext semanticContext outer fuel)
+    (rootPremise : resultPremise result.state result.requirements)
+    (ready : initial.InferenceReady)
+    (expectedBelow : expected.VariablesBelow initial.inference.next)
+    (below : initial.LocalBindersBelowNextLocal)
+    (owner_eq : source.owner = initial.owner)
+    (seen_nodup : seen.Nodup)
+    (semanticAdmissible :
+      TypeAdmissible semanticContext (outer.apply expected))
+    (activeAdmissible :
+      TypeAdmissible activeContext (outer.apply expected))
+    (activeSignaturesEq :
+      activeContext.signatures = semanticContext.signatures)
+    (invariant : ActiveLocalContextInvariant initial outer activeContext)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (success : Detail.inferMatchPatternFlatFuel (fuel + 1) inferenceContext
+      pattern expected seen initial = .ok result) :
+    Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result) := by
+  have properties := stateCallbacks.pattern ready expectedBelow validated below
+    success
+  obtain ⟨dotEq, qualifiersEq, nameEq, _⟩ := Detail.uint256PatternArgument?_some selected
+  unfold Detail.inferMatchPatternFlatFuel at success
+  simp only [pattern_eq, selected, bind, Except.bind] at success
+  have fixedBelow : (TypeSystem.Ty.fixed .uint256).VariablesBelow
+      initial.inference.next :=
+    TypeSystem.Ty.variablesBelow_constructor _ _
+  cases unifyResult : Detail.unify initial expected
+      (TypeSystem.Ty.fixed .uint256) with
+  | error error => simp [unifyResult] at success
+  | ok unified =>
+      simp only [unifyResult] at success
+      cases childrenResult : Detail.inferMatchPatternsFlatFuel fuel
+          inferenceContext [argument] [TypeSystem.Ty.word] seen unified with
+      | error error => simp [childrenResult] at success
+      | ok children =>
+          simp only [childrenResult, pure, Pure.pure, Except.pure] at success
+          injection success with resultEq
+          subst result
+          have unifiedProgress := Detail.unify_inferenceProgress
+            ready.solved expectedBelow fixedBelow unifyResult
+          have unifiedReady := Detail.unify_preserves_inferenceReady
+            ready expectedBelow fixedBelow unifyResult
+          have unifiedBelow : unified.LocalBindersBelowNextLocal :=
+            Detail.unify_preserves_localBindersBelowNextLocal below unifyResult
+          have wordBelow : ∀ type ∈ [TypeSystem.Ty.word],
+              type.VariablesBelow unified.inference.next := by
+            intro type member
+            simp only [List.mem_singleton] at member
+            subst type
+            exact TypeSystem.Ty.variablesBelow_constructor _ _
+          have childrenProperties := stateCallbacks.patterns unifiedReady
+            wordBelow validated unifiedBelow childrenResult
+          have outerUnified : outer.SemanticallyExtends
+              unified.inference.substitution :=
+            TypeSystem.Substitution.SemanticallyExtends.trans outerExtension
+              childrenProperties.1.substitution_extends
+          have fixedEq : outer.apply expected = TypeSystem.Ty.fixed .uint256 := by
+            calc
+              outer.apply expected =
+                  outer.apply (unified.resolve expected) :=
+                (outerUnified expected).symm
+              _ = outer.apply (unified.resolve (TypeSystem.Ty.fixed .uint256)) :=
+                congrArg outer.apply (Detail.unify_resolve_eq unifyResult)
+              _ = outer.apply (TypeSystem.Ty.fixed .uint256) :=
+                outerUnified (TypeSystem.Ty.fixed .uint256)
+              _ = TypeSystem.Ty.fixed .uint256 := by
+                simp [TypeSystem.Ty.fixed]
+          have wordApply : outer.apply TypeSystem.Ty.word = TypeSystem.Ty.word := by
+            simp [TypeSystem.Ty.word]
+          have eachSemantic : ∀ type ∈ [TypeSystem.Ty.word],
+              TypeAdmissible semanticContext (outer.apply type) := by
+            intro type member
+            simp only [List.mem_singleton] at member
+            subst type
+            rw [wordApply]
+            exact TypeAdmissible.word semanticAdmissible.binders
+          have eachActive : ∀ type ∈ [TypeSystem.Ty.word],
+              TypeAdmissible activeContext (outer.apply type) := by
+            intro type member
+            simp only [List.mem_singleton] at member
+            subst type
+            rw [wordApply]
+            exact TypeAdmissible.word activeAdmissible.binders
+          have unifiedInvariant : ActiveLocalContextInvariant unified outer
+              activeContext :=
+            invariant.unify unifyResult
+          have unifiedOwner : unified.owner = initial.owner := by
+            have headerEq := Detail.unify_state_header unifyResult
+            simpa [Frontend.SourceInference.State.header] using
+              congrArg Frontend.SourceInference.State.Header.owner headerEq
+          obtain ⟨childrenCertificate⟩ := recursivePatterns
+            unifiedReady wordBelow unifiedBelow (owner_eq.trans unifiedOwner.symm)
+            seen_nodup eachSemantic eachActive
+            activeSignaturesEq unifiedInvariant outerExtension rootPremise
+            childrenResult
+          exact ⟨{
+            binders := childrenCertificate.binders
+            rootArity := 1
+            finalContext := childrenCertificate.finalContext
+            source_represents := by
+              have spelled : name.value = "uint256" := nameEq
+              subst dotEq qualifiersEq
+              rw [List.map_nil, spelled]
+              exact .uint256Word
+            instructions_eq := rfl
+            instruction_type := fun suffix => by
+              have typed := PatternInstructionHasType.uint256Word
+                (context := semanticContext)
+                (childrenCertificate.instructions_type suffix)
+              rw [fixedEq]
+              simpa [MatchPatternInstruction.applySubstitution, wordApply] using typed
+            binders_extend := childrenCertificate.binders_extend
+            invariant := childrenCertificate.invariant
+            progress := properties.1
+            ready := properties.2.1
+            below := properties.2.2.1
+            owner_eq := properties.2.2.2
+            names_eq := childrenCertificate.names_eq
+            names_nodup := childrenCertificate.names_nodup
+          }⟩
+
 /-- Common semantic assembly for both contextual and explicitly qualified
 constructor selection.  The branch-specific wrapper below supplies candidate
 provenance and the state facts for either the unchanged or freshly allocated
@@ -13034,6 +13212,9 @@ private theorem inferMatchPatternFlatFuel_success_constructor_sound
     {result : Detail.InferredPattern}
     (pattern_eq : pattern.value =
       .constructor leadingDot qualifiers name arguments)
+    (notUint256 : Detail.uint256PatternArgument? leadingDot qualifiers name.value
+      ((arguments.map (fun retained => retained.elements.toList)).getD [])
+      (initial.resolve expected) = none)
     (catalog : SignatureCatalogWellFormed semanticContext.signatures)
     (semanticSignaturesEq :
       semanticContext.signatures = inferenceContext.signatures)
@@ -13065,6 +13246,7 @@ private theorem inferMatchPatternFlatFuel_success_constructor_sound
     success
   unfold Detail.inferMatchPatternFlatFuel at success
   simp only [pattern_eq, bind, Except.bind] at success
+  simp only [notUint256] at success
   let qualifierNames := qualifiers.map (fun qualifier => qualifier.value)
   let sourceArguments :=
     (arguments.map (fun retained => retained.elements.toList)).getD []
@@ -13530,12 +13712,22 @@ private theorem inferMatchPatternFlatFuel_success_sound_step
         semanticOwner seen_nodup semanticAdmissible activeAdmissible
         invariant outerExtension success
   | constructor leadingDot qualifiers name arguments =>
-      exact inferMatchPatternFlatFuel_success_constructor_sound valueEq
-        (resultPremise := fun _ _ => True)
-        catalog semanticSignaturesEq activeSignaturesEq validated
-        stateCallbacks recursivePatternsWith trivial ready expectedBelow below owner_eq
-        seen_nodup semanticAdmissible activeAdmissible invariant
-        outerExtension success
+      cases selected : Detail.uint256PatternArgument? leadingDot qualifiers name.value
+          ((arguments.map (fun retained => retained.elements.toList)).getD [])
+          (initial.resolve expected) with
+      | some argument =>
+          exact inferMatchPatternFlatFuel_success_uint256_sound valueEq selected
+            (resultPremise := (fun _ _ => True))
+            validated stateCallbacks recursivePatternsWith trivial ready expectedBelow
+            below owner_eq seen_nodup semanticAdmissible activeAdmissible
+            activeSignaturesEq invariant outerExtension success
+      | none =>
+          exact inferMatchPatternFlatFuel_success_constructor_sound valueEq selected
+            (resultPremise := fun _ _ => True)
+            catalog semanticSignaturesEq activeSignaturesEq validated
+            stateCallbacks recursivePatternsWith trivial ready expectedBelow below owner_eq
+            seen_nodup semanticAdmissible activeAdmissible invariant
+            outerExtension success
   | comptime keyword expression =>
       simp [Detail.inferMatchPatternFlatFuel, valueEq] at success
   | group inner =>
@@ -13654,13 +13846,23 @@ private theorem inferMatchPatternFlatFuel_success_sound_step_at
         semanticOwner seen_nodup semanticAdmissible activeAdmissible
         invariant outerExtension success
   | constructor leadingDot qualifiers name arguments =>
-      exact inferMatchPatternFlatFuel_success_constructor_sound valueEq
-        (resultPremise :=
-          MatchPatternMetadataAt source evidenceState occurrence)
-        catalog semanticSignaturesEq activeSignaturesEq validated
-        stateCallbacks recursivePatternsWith metadata ready expectedBelow below
-        owner_eq seen_nodup semanticAdmissible activeAdmissible invariant
-        outerExtension success
+      cases selected : Detail.uint256PatternArgument? leadingDot qualifiers name.value
+          ((arguments.map (fun retained => retained.elements.toList)).getD [])
+          (initial.resolve expected) with
+      | some argument =>
+          exact inferMatchPatternFlatFuel_success_uint256_sound valueEq selected
+            (resultPremise := (MatchPatternMetadataAt source evidenceState occurrence))
+            validated stateCallbacks recursivePatternsWith metadata ready expectedBelow
+            below owner_eq seen_nodup semanticAdmissible activeAdmissible
+            activeSignaturesEq invariant outerExtension success
+      | none =>
+          exact inferMatchPatternFlatFuel_success_constructor_sound valueEq selected
+            (resultPremise :=
+              MatchPatternMetadataAt source evidenceState occurrence)
+            catalog semanticSignaturesEq activeSignaturesEq validated
+            stateCallbacks recursivePatternsWith metadata ready expectedBelow below
+            owner_eq seen_nodup semanticAdmissible activeAdmissible invariant
+            outerExtension success
   | comptime keyword expression =>
       simp [Detail.inferMatchPatternFlatFuel, valueEq] at success
   | group inner =>

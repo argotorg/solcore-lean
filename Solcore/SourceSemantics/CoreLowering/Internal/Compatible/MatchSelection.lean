@@ -2145,7 +2145,7 @@ private theorem compile_same (fuel : Nat) (compilation : Compilation) (native : 
       | nil => rfl
       | cons instruction rest =>
         cases instruction <;>
-          simp only [compileOne, ih.2]
+          simp only [compileOne, ih.1, ih.2]
           <;> rfl
     · intro types instructions
       cases types with
@@ -2360,6 +2360,12 @@ private theorem Tree.numeric_typed
       intro context sourceType requirements binders sourceRest typed
       cases typed with
       | constructor valid arity arguments => exact ih arguments rfl
+  | uint256Word child ih =>
+      intro context sourceType requirements binders sourceRest typed
+      cases typed with
+      | uint256Word argument =>
+          cases argument with
+          | cons head tail => exact ih head
   | @head type types instructions afterHead rest head tail resolution first remaining child ih =>
       rename_i context sourceTypes requirements binders sourceRest typed length
       cases sourceTypes with

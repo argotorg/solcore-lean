@@ -748,6 +748,13 @@ mutual
         PatternInstructionHasType context
           (.tuple elementCount :: instructions)
           (TypeSystem.Ty.productMany elementTypes) requirements binders rest
+    /-- `uint256(p)` at `uint256`, with `p` at `word`. -/
+    | uint256Word
+        {instructions rest requirements binders}
+        (argument : PatternInstructionsHaveTypes context instructions
+          [TypeSystem.Ty.word] requirements binders rest) :
+        PatternInstructionHasType context (.uint256Word :: instructions)
+          (TypeSystem.Ty.fixed .uint256) requirements binders rest
 
   /-- Consume a source-ordered sequence of pattern trees at the corresponding
   source types.  Requirements and binders are concatenated in that same order. -/
@@ -780,6 +787,7 @@ def matchPatternResolutionInstructions :
   | .constructor instantiation arguments, rootArity =>
       .constructor instantiation rootArity :: arguments
   | .tuple elements, rootArity => .tuple rootArity :: elements
+  | .uint256Word argument, _ => .uint256Word :: argument
 
 /-- The root resolution is a complete, exactly consumed pattern program. -/
 def MatchPatternResolutionHasType (context : Context)
@@ -826,6 +834,11 @@ inductive MatchPatternSourceRepresents (context : Context) :
   | tuple {span elementCount elements} :
       MatchPatternSourceRepresents context (.tuple span elementCount)
         (.tuple elements) elementCount
+  /-- `uint256(p)`: the one-argument spelling `uint256`, with no qualifier and
+  no leading dot. -/
+  | uint256Word {span argument} :
+      MatchPatternSourceRepresents context (.constructor span none [] "uint256" 1)
+        (.uint256Word argument) 1
   | group {span inner resolution rootArity}
       (inner_represents :
         MatchPatternSourceRepresents context inner resolution rootArity) :
@@ -863,6 +876,9 @@ mutual
         (elements : PatternInstructionsIrrefutable instructions elementCount rest) :
         PatternInstructionIrrefutable
           (.tuple elementCount :: instructions) rest
+    | uint256Word {instructions rest}
+        (argument : PatternInstructionsIrrefutable instructions 1 rest) :
+        PatternInstructionIrrefutable (.uint256Word :: instructions) rest
 
   /-- Every pattern in a fixed-length prefix sequence is irrefutable. -/
   inductive PatternInstructionsIrrefutable :
@@ -917,7 +933,7 @@ theorem requirements_valid
       RequirementIdsValid context requirements)
     (motive_2 := fun _ _ requirements _ _ _ =>
       RequirementIdsValid context requirements)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intros
     simp [RequirementIdsValid]
   · intros
@@ -927,6 +943,8 @@ theorem requirements_valid
     exact IntegerLiteralValid.requirement_valid (by assumption)
   · intros
     simp [RequirementIdsValid]
+  · intros
+    assumption
   · intros
     assumption
   · intros
@@ -953,7 +971,7 @@ theorem requirements_valid
       RequirementIdsValid context requirements)
     (motive_2 := fun _ _ requirements _ _ _ =>
       RequirementIdsValid context requirements)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intros
     simp [RequirementIdsValid]
   · intros
@@ -963,6 +981,8 @@ theorem requirements_valid
     exact IntegerLiteralValid.requirement_valid (by assumption)
   · intros
     simp [RequirementIdsValid]
+  · intros
+    assumption
   · intros
     assumption
   · intros

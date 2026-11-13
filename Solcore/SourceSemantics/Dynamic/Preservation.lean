@@ -1698,6 +1698,7 @@ theorem rootArity_unique
   | binder => cases right_represents; rfl
   | constructor => cases right_represents; rfl
   | tuple => cases right_represents; rfl
+  | uint256Word => cases right_represents; rfl
   | group _ inductionHypothesis =>
       cases right_represents with
       | group inner => exact inductionHypothesis inner
@@ -1718,7 +1719,7 @@ theorem rest_length_lt
       rest.length < instructions.length)
     (motive_2 := fun instructions _ _ _ rest _ =>
       rest.length ≤ instructions.length)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   all_goals intros
   all_goals try simp_all only [List.length_cons]
   all_goals omega
@@ -1739,7 +1740,7 @@ theorem rest_length_le
       rest.length < instructions.length)
     (motive_2 := fun instructions _ _ _ rest _ =>
       rest.length ≤ instructions.length)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   all_goals intros
   all_goals try simp_all only [List.length_cons]
   all_goals omega
@@ -1786,6 +1787,11 @@ mutual
             have same_length := dynamic_arity.trans arity
             exact PatternInstructionsMatch.preserves elements_typing
               (packing.unpackTypes value_typed same_length) children
+    | uint256Word argument_typing =>
+        cases matched with
+        | uint256Word argument_matched =>
+            exact PatternInstructionsMatch.preserves argument_typing (.cons (.word _) .nil)
+              argument_matched
     termination_by instructions.length * 2
     decreasing_by
       all_goals simp_all
@@ -1883,6 +1889,10 @@ mutual
         exact
           Solcore.SourceSemantics.Dynamic.PatternInstructionsHaveTypes.binders_monomorphic
             elements
+    | uint256Word argument =>
+        exact
+          Solcore.SourceSemantics.Dynamic.PatternInstructionsHaveTypes.binders_monomorphic
+            argument
   termination_by instructions.length * 2
   decreasing_by all_goals simp_all; all_goals omega
 

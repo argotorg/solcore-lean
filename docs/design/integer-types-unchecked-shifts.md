@@ -1428,6 +1428,25 @@ option B, decided the same day.
     (`SourceCoreInteger.builtinConversion`): `conversion` at a fixed-width type, and the word
     itself at `word`. Neither is a function value: `Typedef.abs` as a value is no expression Lean
     types.
+- **`case uint256(p)` (part 3).**
+  - **Upstream.** `case uint256(w)` is `uint256`'s enum constructor pattern (`std/std.sol:1010-1012`), and
+    `rep` uses it (`std/std.sol:1018-1024`). A probe of the pinned driver on 2026-11-13 accepted it outside std
+    with a binder, a literal (`case uint256(0)`), a wildcard, inside a tuple, and at an open scrutinee, which
+    takes `uint256`. It rejected `case uint256(w)` at `word` (`SC0201`, "type mismatch: expected word, found
+    uint256"), and `case uint8(w)`, `case int8(w)`, `case uint128(w)` and `case int256(w)` (`SC0107`,
+    "invalid pattern syntax"): the other eleven are structs.
+  - **Lean.** `uint256(p)`, spelled with no qualifier and no leading dot, at a type that is `uint256` or still
+    open (`uint256PatternArgument?`), unifies the type with `uint256` and matches `p` against the value's word
+    at `word` (`MatchPatternInstruction.uint256Word`, `MatchPatternResolution.uint256Word`). A `uint256` value
+    is its word, so every value matches `uint256(w)`, which binds that word, and `uint256(p)` is irrefutable
+    exactly when `p` is.
+  - The static rule is `PatternInstructionHasType.uint256Word` (`p` at `word`), the dynamic one
+    `PatternInstructionMatches.uint256Word` (`p` against the same value), and the source rule
+    `MatchPatternSourceRepresents.uint256Word`.
+  - Both pattern compilers lower it as `p`'s matcher, since a `uint256` value's Core value is its word.
+  - At any other type `uint256(p)` is an ordinary constructor pattern, so it is rejected as upstream rejects
+    it. So are `uint8(p)` … `int256(p)` at the other eleven types.
+  - `x.value` is not implemented. Upstream rejects it outside std (part 1's probe), so this is no difference.
 - **The revert.**
   - `SourceCorePanics.dirtyReason` is the word just below the panic range, `2^256 − 2^8 − 1`.
   - The fault-site tables allocate below it (`tableBound`). `Table.PanicFree` and preparation's
@@ -1450,6 +1469,10 @@ option B, decided the same day.
   - The inference proofs follow a `Typedef` call as a builtin call (`recordBuiltinFunctionCall`).
     `IndirectCalleeAt` excludes it, so the callee is never inferred.
   - A builtin profile with the dirty reason's token would bring the conversions in.
+  - `case uint256(p)` needs no exclusion. The pattern proofs take it as `p` at the value's word:
+    inference soundness (`inferMatchPatternFlatFuel_success_uint256_sound`), irrefutability and
+    completeness (`PatternInstructionIrrefutable.matchesTyped`), and both pattern certificates'
+    success and decision (`Tree.uint256Word`).
 
 ### Row 1: steps
 
@@ -1548,6 +1571,7 @@ first planned after the literals and moved before them for this reason
      planned in three parts:
      - first `uint256(w)`, `uintN(w)` and `intN(w)` with the dirty-integer revert (done);
      - then `Typedef.abs` and `Typedef.rep`, chosen by the type known at the call (done);
-     - then `case uint256(w)`; `x.value` is rejected outside std upstream too.
+     - then `case uint256(p)`, which matches the value's word with `p` (done); `x.value` is rejected
+       outside std upstream too.
 
      Each part ports again the 8e functions it makes possible, as upstream wrote them.

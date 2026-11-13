@@ -173,6 +173,12 @@ mutual
           pure (⟨type, bindings, children.flatMap (·.requirements),
             .lambda type (.sum .unit outputType)
               (matchChildren outputType children (childValues types) [])⟩, rest)
+      | .uint256Word =>
+          -- A `uint256` value is its word: `p`'s matcher takes it as it is.
+          unless expected = TypeSystem.Ty.fixed .uint256 do throw invalid
+          let (argument, rest) ← compileOne context source site span scope fuel TypeSystem.Ty.word rest
+          SourceCoreBasic.ensureType (.occurrence site.occurrence) type argument.type
+          pure (argument, rest)
       | .constructor instantiation arity =>
           unless instantiation.resultType = expected && arity = instantiation.payloadTypes.length do throw invalid
           let constructor ← (context.checked.resolveConstructor instantiation)
@@ -227,6 +233,9 @@ def rootInstructions (context : Context) : MatchPatternSource → MatchPatternRe
       unless constructor.name = name do throw invalid
       pure (.constructor instantiation count :: instructions)
   | .tuple _ count, .tuple instructions => pure (.tuple count :: instructions)
+  | .constructor _ dot qualifiers name count, .uint256Word instructions => do
+      unless dot.isNone && qualifiers.isEmpty && name = "uint256" && count = 1 do throw invalid
+      pure (.uint256Word :: instructions)
   | .group _ inner, resolution => rootInstructions context inner resolution
   | _, _ => throw invalid
 

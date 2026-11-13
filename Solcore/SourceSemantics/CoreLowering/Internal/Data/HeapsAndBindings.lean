@@ -998,6 +998,15 @@ theorem Tree.binding_types {compilation : Compilation} {context : SourceSemantic
       cases represented with
       | constructed nominal actualResult authenticated payloads =>
         exact ih _ _ _ _ (agreement.payload_types_eq ▸ payloads) matchedChildren
+  | uint256Word projection argumentTree coreType ih =>
+    intro sourceValue value bindings sourceRest represented matched
+    cases matched with
+    | uint256Word argumentMatched =>
+      cases argumentMatched with
+      | cons head tail =>
+        cases tail
+        cases represented with
+        | fixed => simpa using ih _ _ _ _ (.word _) head
   | nil =>
     intro sources values bindings sourceRest represented matched
     cases represented

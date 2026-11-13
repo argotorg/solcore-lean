@@ -94,6 +94,13 @@ mutual
         (registered : compilation.checked.catalog.definitions[constructor.owner.index]? = some definition) :
         Tree compilation source site span scope expected (.constructor instantiation arity :: instructions)
           (constructorPattern type constructor definition metadata children coreTypes) rest
+    /-- `uint256(p)` compiles to `p`'s matcher: a `uint256` value's Core value is its word. -/
+    | uint256Word {type instructions rest argument}
+        (projection : projected compilation source (TypeSystem.Ty.fixed .uint256) = .ok type)
+        (argumentTyped : Tree compilation source site span scope TypeSystem.Ty.word instructions argument rest)
+        (coreType : type = argument.type) :
+        Tree compilation source site span scope (TypeSystem.Ty.fixed .uint256) (.uint256Word :: instructions)
+          argument rest
 
   inductive Forest (compilation : Compilation) (source : TypedSource) (site : StatementId)
       (span : Syntax.SourceSpan) (scope : Scope) : List TypeSystem.Ty → List MatchPatternInstruction →
@@ -204,6 +211,21 @@ theorem trees_of_compile (fuel : Nat) (compilation : Compilation) (source : Type
                   · simp [compileOne, projection, result, count, resolved, Except.mapError, SourceCoreBasic.ensureType, same, bind, Except.bind] at accepted
               · simp [compileOne, projection, result, count, bind, Except.bind] at accepted
             · simp [compileOne, projection, result, bind, Except.bind] at accepted
+          | uint256Word =>
+            by_cases fixed : expected = TypeSystem.Ty.fixed .uint256
+            · subst fixed
+              cases compiled : compileOne compilation source site span scope fuel TypeSystem.Ty.word instructions with
+              | error error => simp [compileOne, projection, compiled, bind, Except.bind] at accepted
+              | ok compiledPair =>
+                obtain ⟨argument, after⟩ := compiledPair
+                by_cases same : type = argument.type
+                · simp [compileOne, projection, compiled, SourceCoreBasic.ensureType, same, bind, Except.bind,
+                    pure, Except.pure] at accepted
+                  rcases accepted with ⟨rfl, rfl⟩
+                  exact .uint256Word projection (ih.1 _ _ _ _ compiled) same
+                · simp [compileOne, projection, compiled, SourceCoreBasic.ensureType, same, bind,
+                    Except.bind] at accepted
+            · simp [compileOne, projection, fixed, bind, Except.bind] at accepted
     · intro types instructions patterns rest accepted
       cases types with
       | nil =>
@@ -314,6 +336,7 @@ theorem Tree.skips {compilation : Compilation} {source : TypedSource} {site : St
     exact .tuple ((unpackTypes_length unpacked) ▸ ih)
   | constructor projection result count resolved coreType raw children projectedChildren registered ih =>
     exact .constructor (count.symm ▸ ih)
+  | uint256Word projection argument coreType ih => exact .uint256Word (.succ ih .zero)
   | nil => exact .zero
   | cons head tail headIH tailIH => exact .succ headIH tailIH
 
@@ -331,6 +354,7 @@ theorem Forest.skips {compilation : Compilation} {source : TypedSource} {site : 
     exact .tuple ((unpackTypes_length unpacked) ▸ ih)
   | constructor projection result count resolved coreType raw children projectedChildren registered ih =>
     exact .constructor (count.symm ▸ ih)
+  | uint256Word projection argument coreType ih => exact .uint256Word (.succ ih .zero)
   | nil => exact .zero
   | cons head tail headIH tailIH => exact .succ headIH tailIH
 
@@ -378,6 +402,16 @@ theorem rootInstructions_sound (compilation : Compilation) (context : Context)
   | constructor span dot qualifiers name count =>
     cases resolution <;> simp only [rootInstructions] at accepted
     all_goals try contradiction
+    case uint256Word argument =>
+      split at accepted
+      · rename_i plain
+        simp only [pure, Except.pure, Except.ok.injEq] at accepted
+        subst instructions
+        simp only [Bool.and_eq_true, Option.isNone_iff_eq_none, List.isEmpty_iff,
+          decide_eq_true_eq] at plain
+        obtain ⟨⟨⟨rfl, rfl⟩, rfl⟩, rfl⟩ := plain
+        exact ⟨1, rfl, .uint256Word⟩
+      · simp [Functor.map, Except.map] at accepted
     rename_i instantiation arguments
     generalize selectedEq : compilation.signatures.dataTypes.filter
       (fun signature => decide (signature.id = instantiation.constructor.dataType)) = selected at accepted
@@ -1816,7 +1850,11 @@ theorem Tree.projected {source : TypedSource} {site : StatementId} {span : Synta
     {type : TypeSystem.Ty} {instructions rest : List MatchPatternInstruction} {pattern : Pattern}
     (tree : Tree compilation source site span scope type instructions pattern rest) :
     compilation.checked.catalog.project type = .ok pattern.type := by
-  cases tree <;> apply CompatibleExpressionReads.projectType_of_accepted <;> assumption
+  cases tree with
+  | uint256Word projection _ coreType =>
+    rw [← coreType]
+    exact CompatibleExpressionReads.projectType_of_accepted projection
+  | _ => apply CompatibleExpressionReads.projectType_of_accepted <;> assumption
 
 private theorem literal_success {context : Context} {literal : Syntax.CoreLiteralValue}
     {resolution : IntegerLiteralResolution} {expected : TypeSystem.Ty} {matcher : Expr}
@@ -1978,6 +2016,22 @@ theorem Tree.success {context : Context} {source : TypedSource} {site : Statemen
         (environment := .pair (.word metadata) (packValues values) :: .constructed constructor (.pair (.word metadata) (packValues values)) :: environment)
         (expression := .second (.var 0)) (Selects.second (.var rfl)) (lengths.2.2.symm.trans lengths.2.1)
       simpa [constructorPattern, Pattern.bindingTypes] using childrenRun _ store _ [] [] _ paths .nil
+  | @uint256Word type instructions rest argument projection argumentTree coreType ih =>
+    intro sourceValue value bindings sourceRest represented matched
+    obtain ⟨word, sourceEq, valueEq, typeEq, _⟩ :=
+      CompatibleExpressionPrimitives.fixed_fields represented rfl
+    subst sourceEq
+    subst valueEq
+    cases matched with
+    | uint256Word argumentMatched =>
+      cases argumentMatched with
+      | cons head tail =>
+        cases tail
+        have wordRep : CompatiblePayload.ValueRep compilation.checked registry functions mapping world
+            TypeSystem.Ty.word (.word word) (.word word) argument.type := by
+          rw [typeEq]
+          exact .word word
+        simpa using ih _ _ _ _ wordRep head
   | nil =>
     intro sources values coreTypes bindings sourceRest represented matched
     cases represented
@@ -2094,6 +2148,12 @@ mutual
         {registered : compilation.checked.catalog.definitions[constructor.owner.index]? = some definition}
         (child : Forest.NumericAt tree resolution) :
         Tree.NumericAt (Tree.constructor projection result count resolved coreType raw tree projectedChildren registered) resolution
+    | uint256Word {type instructions rest argument resolution}
+        {projection : projected compilation source (TypeSystem.Ty.fixed .uint256) = .ok type}
+        {argumentTree : Tree compilation source site span scope TypeSystem.Ty.word instructions argument rest}
+        {coreType : type = argument.type}
+        (child : Tree.NumericAt argumentTree resolution) :
+        Tree.NumericAt (Tree.uint256Word projection argumentTree coreType) resolution
   inductive Forest.NumericAt {source : TypedSource} {site : StatementId} {span : Syntax.SourceSpan}
       {scope : Scope} : {types : List TypeSystem.Ty} → {instructions : List MatchPatternInstruction} →
       {patterns : List Pattern} → {rest : List MatchPatternInstruction} →
@@ -2130,7 +2190,7 @@ theorem Tree.literalSites {source site span scope type instructions pattern rest
   induction occurrence using Tree.NumericAt.rec
     (motive_2 := fun _ resolution _ => literals resolution) with
   | @literal type native literal resolution matcher rest projection validated => exact leaf _ _ _ _ validated
-  | tuple _ ih | constructor _ ih | head _ ih | tail _ ih => exact ih
+  | tuple _ ih | constructor _ ih | uint256Word _ ih | head _ ih | tail _ ih => exact ih
 
 private theorem ordinary_requirement {context : Context} (valid : ContextValid compilation context)
     {site span expected literal resolution matcher}
@@ -2317,6 +2377,23 @@ theorem Tree.decides_with_literals {context : Context} {source : TypedSource} {s
         simp [List.getElem?_map, List.getElem?_zipIdx, lookup, indexDifferent]
       exact .inr (fun _ store _ selected => .apply .lambda (selected.evaluates store)
         (.matchData (.var rfl) ownerEq branchLookup (.inLeft .unit)))
+  | @uint256Word type instructions rest argument projection argumentTree coreType ih =>
+    intro sites sourceValue value represented
+    obtain ⟨word, sourceEq, valueEq, typeEq, _⟩ :=
+      CompatibleExpressionPrimitives.fixed_fields represented rfl
+    subst sourceEq
+    subst valueEq
+    have wordRep : CompatiblePayload.ValueRep compilation.checked registry functions mapping world
+        TypeSystem.Ty.word (.word word) (.word word) argument.type := by
+      rw [typeEq]
+      exact .word word
+    cases ih (fun resolution occurrence => sites resolution (.uint256Word (projection := projection) (argumentTree := argumentTree)
+        (coreType := coreType) occurrence)) _ _ wordRep with
+    | inl success =>
+      obtain ⟨bindings, values, matched, bindingRep, run⟩ := success
+      refine .inl ⟨bindings, values, .uint256Word ?_, bindingRep, run⟩
+      simpa using Dynamic.PatternInstructionsMatch.cons matched .nil
+    | inr failed => exact .inr failed
   | nil sites =>
     intro sources values coreTypes represented
     cases represented
@@ -2664,6 +2741,25 @@ theorem Tree.reflects_with_literals {context : Context} {source : TypedSource} {
       | inLeft unit =>
         cases unit
         exact ⟨.inr rfl, rfl⟩
+  | @uint256Word type instructions rest argument projection argumentTree coreType ih =>
+    intro sites sourceValue value represented environment store expression selected outcome after completed
+    obtain ⟨word, sourceEq, valueEq, typeEq, _⟩ :=
+      CompatibleExpressionPrimitives.fixed_fields represented rfl
+    subst sourceEq
+    subst valueEq
+    have wordRep : CompatiblePayload.ValueRep compilation.checked registry functions mapping world
+        TypeSystem.Ty.word (.word word) (.word word) argument.type := by
+      rw [typeEq]
+      exact .word word
+    obtain ⟨observed, sameStore⟩ := ih
+      (fun resolution occurrence => sites resolution (.uint256Word (projection := projection) (argumentTree := argumentTree)
+        (coreType := coreType) occurrence))
+      _ _ wordRep environment store expression selected outcome after completed
+    refine ⟨?_, sameStore⟩
+    rcases observed with ⟨bindings, values, matched, bindingRep, outcomeEq⟩ | failed
+    · refine .inl ⟨bindings, values, .uint256Word ?_, bindingRep, outcomeEq⟩
+      simpa using Dynamic.PatternInstructionsMatch.cons matched .nil
+    · exact .inr failed
   | nil sites =>
     intro sources values coreTypes represented environment store expressions accumulated accumulatedValues outputType selected previous outcome after completed
     cases represented
@@ -3665,6 +3761,14 @@ theorem Tree.source_binders
     intro context sourceType requirements binders sourceRest typed
     cases typed with
     | constructor valid arity arguments => exact ih arguments rfl
+  | uint256Word projection argument coreType ih =>
+    intro context sourceType requirements binders sourceRest typed
+    cases typed with
+    | uint256Word argumentTyped =>
+      cases argumentTyped with
+      | cons head tail =>
+        cases tail
+        simpa using ih head
   | nil =>
     rename_i context sourceTypes requirements binders sourceRest typed length
     have empty : sourceTypes = [] := List.length_eq_zero_iff.mp length
@@ -3693,6 +3797,7 @@ theorem source_arity_unique
   | binder => cases right; rfl
   | constructor => cases right; rfl
   | tuple => cases right; rfl
+  | uint256Word => cases right; rfl
   | group inner ih => cases right with | group other => exact ih other
 
 theorem instruction_binders
@@ -3710,6 +3815,7 @@ theorem instruction_binders
   | binder => rfl
   | constructor valid arity arguments ih => exact ih
   | tuple arity elements ih => exact ih
+  | uint256Word argument ih => exact ih
   | nil => rfl
   | cons head tail headIH tailIH => rw [headIH, tailIH, List.append_assoc]
 

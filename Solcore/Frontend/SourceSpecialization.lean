@@ -180,6 +180,7 @@ def applyMatchPatternInstruction (substitution : ParameterSubstitution) :
       .constructor (applyDataConstructorInstantiation substitution instantiation)
         argumentCount
   | .tuple elementCount => .tuple elementCount
+  | .uint256Word => .uint256Word
 
 def applyMatchPatternResolution (substitution : ParameterSubstitution) :
     MatchPatternResolution → MatchPatternResolution
@@ -193,6 +194,8 @@ def applyMatchPatternResolution (substitution : ParameterSubstitution) :
         (arguments.map (applyMatchPatternInstruction substitution))
   | .tuple elements =>
       .tuple (elements.map (applyMatchPatternInstruction substitution))
+  | .uint256Word argument =>
+      .uint256Word (argument.map (applyMatchPatternInstruction substitution))
 
 def applyTypedMatchPattern (substitution : ParameterSubstitution)
     (pattern : TypedMatchPattern) : TypedMatchPattern := {
@@ -434,7 +437,8 @@ private def dataInstantiationTypes
 
 private def matchInstructionTypes : MatchPatternInstruction → List Ty
   | .wildcard
-  | .tuple _ => []
+  | .tuple _
+  | .uint256Word => []
   | .integerLiteral _ resolution => [resolution.targetType]
   | .binder selectedBinder => [selectedBinder.scheme.body]
   | .constructor instantiation _ => dataInstantiationTypes instantiation
@@ -446,7 +450,7 @@ private def matchResolutionTypes : MatchPatternResolution → List Ty
   | .constructor instantiation arguments =>
       dataInstantiationTypes instantiation ++
         arguments.flatMap matchInstructionTypes
-  | .tuple elements => elements.flatMap matchInstructionTypes
+  | .tuple elements | .uint256Word elements => elements.flatMap matchInstructionTypes
 
 private def expressionFormTypes : ExpressionForm → List Ty
   | .reference _ resolution => referenceTypes resolution
@@ -515,7 +519,8 @@ private def statementFormBinders : StatementForm → List TypedBinder
         match arm.pattern.resolution with
         | .binder selectedBinder => [selectedBinder]
         | .constructor _ instructions
-        | .tuple instructions => instructionBinders instructions
+        | .tuple instructions
+        | .uint256Word instructions => instructionBinders instructions
         | _ => []
   | _ => []
 
@@ -706,7 +711,8 @@ private def patternResolutionBinders :
     MatchPatternResolution → List TypedBinder
   | .binder binder => [binder]
   | .constructor _ instructions
-  | .tuple instructions => instructions.flatMap patternInstructionBinders
+  | .tuple instructions
+  | .uint256Word instructions => instructions.flatMap patternInstructionBinders
   | _ => []
 
 private def unsupportedPolymorphicBindersInNode

@@ -5186,6 +5186,60 @@ def runTypedef : IO Unit := do
     ["function bad() returns (Word) { let f = Typedef.abs; return 0; }"]
   IO.println "SOURCE_CORE_TYPEDEF_PASS: Typedef.abs and Typedef.rep through the public API, chosen by the type known at the call, abs at the twelve types checking the word as uintN(w) and intN(w) do and at Word the word itself, rep giving a value's word, an abs or rep whose type is open at the call rejected naming Typedef, as are Bool and integer, a non-Word abs argument, two arguments, another name and Typedef.abs as a value"
 
+/-- Step 9b's third part: `case uint256(p)`, which a `uint256` value's word is
+matched with, as upstream's `enum uint256 { uint256(word) }` gives it. -/
+private def uint256PatternWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function unwrap(x: uint256) returns (Word) { match (x) { case uint256(w) { return w; } } }",
+  "function plusOne(x: uint256) returns (uint256) { match (x) { case uint256(w) { return uint256(w + 1); } } }",
+  "function isZero(x: uint256) returns (Bool) { match (x) { case uint256(0) { return true; } case _ { return false; } } }",
+  "function ignored(x: uint256) returns (Word) { match (x) { case uint256(_) { return 7; } } }",
+  "function grouped(x: uint256) returns (Word) { match (x) { case uint256((w)) { return w; } } }",
+  "function pair(x: uint256, y: uint256) returns (Word) { match (x, y) { case (uint256(a), uint256(b)) { return a + b; } } }",
+  "function opened() returns (Word) { let x = 5; match (x) { case uint256(w) { return w; } } }"]
+
+private def uint256PatternNames : List String :=
+  ["unwrap", "plusOne", "isZero", "ignored", "grouped", "pair", "opened"]
+
+/-- Step 9b's third part through the public API: every `uint256` value matches
+`uint256(w)`, which binds its word; a literal inside matches that word; and the
+pattern at another type, or another type's spelling, is rejected as upstream
+rejects it. -/
+def runUint256Patterns : IO Unit := do
+  let program ← get "uint256 pattern check" (checkProgram uint256PatternWorkspace)
+  let seeds ← uint256PatternNames.mapM (seed program)
+  let compiled ← get "uint256 pattern compilation"
+    (compile uint256PatternWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match uint256PatternNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"uint256 pattern root {name} missing")
+    | none => throw (IO.userError s!"uint256 pattern {name} unknown")
+  let max := modulus - 1
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × List Value × Value) := [
+    ("unwrap", [word 0], word 0), ("unwrap", [word max], word max),
+    ("plusOne", [word 41], word 42), ("plusOne", [word max], word 0),
+    ("isZero", [word 0], boolean true), ("isZero", [word 1], boolean false),
+    ("ignored", [word 3], word 7), ("grouped", [word 9], word 9),
+    ("pair", [word 2, word 3], word 5), ("opened", [], word 5)]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) arguments
+    require (completed.value == expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  let _ := session
+  -- Upstream rejects a constructor pattern at the other eleven types and `uint256(w)` at another type.
+  rejectedByInference "uint8(w) at uint8"
+    ["function bad(x: uint8) returns (Word) { match (x) { case uint8(w) { return w; } } }"]
+  rejectedByInference "int256(w) at int256"
+    ["function bad(x: int256) returns (Word) { match (x) { case int256(w) { return w; } } }"]
+  rejectedByInference "uint256(w) at Word"
+    ["function bad(x: Word) returns (Word) { match (x) { case uint256(w) { return w; } } }"]
+  rejectedByInference "uint256(w) at uint8"
+    ["function bad(x: uint8) returns (Word) { match (x) { case uint256(w) { return w; } } }"]
+  rejectedByInference "uint256 with two patterns"
+    ["function bad(x: uint256) returns (Word) { match (x) { case uint256(a, b) { return a; } } }"]
+  IO.println "SOURCE_CORE_UINT256_PATTERNS_PASS: case uint256(p) through the public API, every uint256 value matching uint256(w) with w its word, a literal, a wildcard and a group inside, two inside a tuple, an open scrutinee taking uint256, and uint8(w) and int256(w), uint256(w) at Word and uint8, and two patterns inside rejected"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -5587,6 +5641,7 @@ def run : IO Unit := do
   runBitNotAssignments
   runConversions
   runTypedef
+  runUint256Patterns
   runUpstreamFixtures
 
 end Tests.SourceCoreFixedIntegerOperators

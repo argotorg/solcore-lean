@@ -1839,7 +1839,8 @@ private def patternLiterals (pattern : TypedMatchPattern) :
   match pattern.resolution with
   | .integerLiteral source resolution => [(source, resolution)]
   | .constructor _ instructions
-  | .tuple instructions => patternLiteralResolutions instructions
+  | .tuple instructions
+  | .uint256Word instructions => patternLiteralResolutions instructions
   | .wildcard | .binder _ => []
 
 private def validatePatternMetadata (function : CheckedFunction)
