@@ -485,6 +485,9 @@ def lowerType (site : ErrorSite) : Ty → Except Error Core.Ty
   -- The fixed-width integer types are lowered by the catalog projections only.
   | type@(.constructor (.builtin (.fixed _))) =>
       fail site (.unsupportedType type)
+  -- A memory array is an application; its bare constructor is no type.
+  | type@(.constructor (.builtin .memoryArray)) =>
+      fail site (.unsupportedType type)
   | .constructor (.declaration id) => fail site (.nominalType id)
   | .product left right => do
       pure (.product (← lowerType site left) (← lowerType site right))

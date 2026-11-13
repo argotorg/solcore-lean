@@ -119,6 +119,14 @@ mutual
           SignatureTypeFormationValidated signatures owner parameters inner) :
         SignatureTypeFormationValidated signatures owner parameters
           (.comptime inner)
+    /-- `T[]`, a memory array of a formed element. Type resolution has already
+    checked the element (`TypeSystem.Ty.arraysWellFormed`). -/
+    | array
+        {element : TypeSystem.Ty}
+        (elementValidated :
+          SignatureTypeFormationValidated signatures owner parameters element) :
+        SignatureTypeFormationValidated signatures owner parameters
+          (TypeSystem.Ty.array element)
 
   /-- Source-order companion for a row of validated signature types. -/
   inductive SignatureTypesFormationValidated
@@ -227,6 +235,14 @@ mutual
             flexibleVariables inner) :
         InferenceTypeFormationValidated signatures owner parameters
           flexibleVariables (.comptime inner)
+    /-- `T[]`, a memory array of a formed element. -/
+    | array
+        {element : TypeSystem.Ty}
+        (elementValidated :
+          InferenceTypeFormationValidated signatures owner parameters
+            flexibleVariables element) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (TypeSystem.Ty.array element)
 
   /-- Source-order companion for a row of open inference types. -/
   inductive InferenceTypesFormationValidated
@@ -410,6 +426,8 @@ private def validateSignatureTypeFuel
               validateSignatureNominalWith
                 (validateSignatureTypeFuel signatures owner parameters fuel)
                 signatures owner nominal arguments
+          | (.constructor (.builtin .memoryArray), [element]) =>
+              validateSignatureTypeFuel signatures owner parameters fuel element
           | _ => .error (.invalidApplication owner type)
       | .function parameter result =>
           match validateSignatureTypeFuel signatures owner parameters fuel
@@ -464,6 +482,9 @@ private def validateInferenceTypeFuel
                 (validateInferenceTypeFuel signatures owner parameters
                   flexibleVariables fuel)
                 signatures owner nominal arguments
+          | (.constructor (.builtin .memoryArray), [element]) =>
+              validateInferenceTypeFuel signatures owner parameters
+                flexibleVariables fuel element
           | _ => .error (.invalidApplication owner type)
       | .function parameter result =>
           match validateInferenceTypeFuel signatures owner parameters
@@ -901,7 +922,17 @@ private theorem validateSignatureTypeFuel_success
                         exact .contractNominal contract arguments cataloged arity
                           argumentsValidated
                   | builtin builtin =>
-                      simp [validateSignatureTypeFuel, spine] at success
+                      cases builtin with
+                      | memoryArray =>
+                          rcases arguments with _ | ⟨element, _ | ⟨next, rest⟩⟩
+                          · simp [validateSignatureTypeFuel, spine] at success
+                          · have elementSuccess : validateSignatureTypeFuel
+                                signatures owner parameters fuel element = .ok () := by
+                              simpa [validateSignatureTypeFuel, spine] using success
+                            rw [← signatureTypeApplicationSpine_reconstruct spine]
+                            exact .array (induction elementSuccess)
+                          · simp [validateSignatureTypeFuel, spine] at success
+                      | _ => simp [validateSignatureTypeFuel, spine] at success
               | «variable» metavariable =>
                   simp [validateSignatureTypeFuel, spine] at success
               | parameter parameter =>
@@ -1140,7 +1171,18 @@ private theorem validateInferenceTypeFuel_success
                         exact .contractNominal contract arguments cataloged arity
                           argumentsValidated
                   | builtin builtin =>
-                      simp [validateInferenceTypeFuel, spine] at success
+                      cases builtin with
+                      | memoryArray =>
+                          rcases arguments with _ | ⟨element, _ | ⟨next, rest⟩⟩
+                          · simp [validateInferenceTypeFuel, spine] at success
+                          · have elementSuccess : validateInferenceTypeFuel
+                                signatures owner parameters flexibleVariables fuel
+                                element = .ok () := by
+                              simpa [validateInferenceTypeFuel, spine] using success
+                            rw [← signatureTypeApplicationSpine_reconstruct spine]
+                            exact .array (induction elementSuccess)
+                          · simp [validateInferenceTypeFuel, spine] at success
+                      | _ => simp [validateInferenceTypeFuel, spine] at success
               | «variable» metavariable =>
                   simp [validateInferenceTypeFuel, spine] at success
               | parameter parameter =>

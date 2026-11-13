@@ -1922,6 +1922,34 @@ private def testIntegerFallbackPriority : IO Unit := do
   assertTrue (decide (isolatedUse = TypeSystem.Ty.integer))
     "an unimported integer declaration incorrectly hid the intrinsic"
 
+/-- `T[]` resolves to a memory array once aliases are expanded, of `word`, one
+of the twelve types or a memory array. Any other element, a generic element and
+a mapping over arrays are rejected. -/
+private def testArrayTypes : IO Unit := do
+  let module ← parsed .main "arrays.solc" (String.intercalate "\n" [
+    "type W = word;",
+    "type Words = W[];",
+    "type Grid = uint8[][];",
+    "type Bools = bool[];",
+    "type Generic(t) = t[];",
+    "type Stored = mapping(word => uint256[]);",
+    "type Deep = mapping(word => mapping(word => int8[]));"
+  ])
+  let environment ← build [module]
+  let words ← resolvedAlias environment "arrays" "Words"
+  assertTrue (decide (words = TypeSystem.Ty.array .word))
+    "an alias of `word` did not form an array of words"
+  let grid ← resolvedAlias environment "arrays" "Grid"
+  assertTrue (decide (grid = .array (.array (.fixed ⟨false, .w8⟩))))
+    "`uint8[][]` did not form an array of arrays"
+  for name in ["Bools", "Generic", "Stored", "Deep"] do
+    let declaration ← declaration environment "arrays" name
+    let source ← aliasValue declaration
+    match resolveProgramTypeExpr environment (.ofDeclaration declaration) source with
+    | .error (.unsupportedArrayType _) => pure ()
+    | result => throw (IO.userError
+        s!"{name} was not rejected as an array type: {reprStr result}")
+
 private def testStrictImportVisibility : IO Unit := do
   let provider ← parsed .main "provider.solc"
     "export {*}; enum Hidden { Only }"
@@ -1993,6 +2021,7 @@ def testProgramEnvironmentAndTypeResolution : IO Unit := do
   ProgramEnvironmentAndTypeResolution.expectResolutionFailures
   ProgramEnvironmentAndTypeResolution.testIntegerFallbackPriority
   ProgramEnvironmentAndTypeResolution.testStrictImportVisibility
+  ProgramEnvironmentAndTypeResolution.testArrayTypes
   ProgramEnvironmentAndTypeResolution.expectEnvironmentFailures
 
 end Tests

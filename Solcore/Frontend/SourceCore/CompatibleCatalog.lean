@@ -59,6 +59,9 @@ def Catalog.project (catalog : Catalog) : Ty → Except Error Core.Ty
   | .constructor (.builtin .word) => pure .word
   | .constructor (.builtin (.fixed _)) => pure .word
   | .constructor (.builtin .integer) => pure .integer
+  -- A memory array has no Core representation yet.
+  | type@(.constructor (.builtin .memoryArray)) =>
+      throw (.catalog (.missingRepresentation (SourceCoreRawMetadata.runtimeType type)))
   | .product left right => do pure (.product (← catalog.project left) (← catalog.project right))
   | .function parameter result => do
       pure (catalog.functionType (← catalog.project parameter) (← catalog.project result))

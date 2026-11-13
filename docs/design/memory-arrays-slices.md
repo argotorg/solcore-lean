@@ -472,7 +472,11 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 1c-i | Syntax: the bracket contents layer, as a refactor that accepts no new syntax: what a `[` after an expression holds has its own parser, grammar and lemmas, and an index is its one form | 10–12 files, +650–750/−150–200; measured at 12 files, +696/−182 | none |
 | 1c-ii-a | Syntax: the optional bound that an index and a slice's start and stop read, with its grammar and every lemma, and direct tests of its parser; no bracket reads it yet | 10–12 files, +500–600; measured at 10 files, +560/−4 | none |
 | 1c-ii-b | Syntax: the slices, with `a[]` rejected, as the bracket contents' other forms; inference rejects the slices | 18–22 files, +1,200–1,400/−250–300; measured at 21 files, +1,374/−283 | parser tests from `crates/uitest/tests/fixtures/parse/empty_index_rejected`, `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
-| 2 | The array type and its element check, the heap's store, `new` and `0x41`, the lengths, preservation, the staged copies, the lowering's cells | 60–72 files, +1,300–1,700/−300–450, the riskiest | newLen(n), oversized(n) |
+| 2a-i | The array type: `T[]` resolves to a memory array once aliases are expanded, type resolution checks its element and rejects a mapping that holds an array, and type formation admits it; no value has an array type yet, and elaboration rejects every array type | 25–35 files, +300–500/−20–60; measured at 27 files, +458/−75 | none |
+| 2a-ii | The store: an array object, a reference to it and their typing, with the typing's laws; no expression makes one yet | 20–40 files, +400–800/−50–150 | none |
+| 2b-i | `new T[](n)` and `0x41`: inference, evaluation and its fault, the sized and staged copies and preservation | 35–60 files, +900–1,500/−100–300 | none |
+| 2b-ii | The lengths: `a.length`, `a.length()` and `Length.length(a)` | 30–50 files, +600–1,000/−100–200 | none |
+| 2b-iii | The lowering: the Core cells of `new` and the lengths | 15–30 files, +400–800/−50–150 | newLen(n), oversized(n) |
 | 3 | Element reads and `0x32` | 35–55 files, +800–1,200/−200–350, between 3c and 3a | defaultZero(n, i), nestedEmpty(n) |
 | 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
 | 5 | Element writes and compound assignments, with the place checked before the right side | 55–72 files, +1,200–1,700/−300–450 | setGet(n, i, v), fillAndSum(n), compound(v), nestedReplace(n, v), alias(v); ret(n), sum(xs), echo(xs), grid(n) adapted |
@@ -480,22 +484,25 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 37 functions above |
 
-In all, that is about 348 to 474 file changes, +11,300 to 15,000 and −2,000 to 3,250 lines over
-fourteen commits: about half to two thirds of row 1, whose 23 commits added about 21,700 lines,
-much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600, until its
-first measure: it adds three AST forms through the proved parser, so it became 1a to 1c. 1b's
+In all, that is about 413 to 617 file changes, +12,600 to 17,900 and −2,000 to 3,650 lines over
+eighteen commits: about three fifths to four fifths of row 1, whose 23 commits added about 21,700
+lines, much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600, until
+its first measure: it adds three AST forms through the proved parser, so it became 1a to 1c. 1b's
 first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
 forms: 1c-i's measure and 1c-ii's estimate together pass the cap. 1c-ii's first measure, +1,854,
 split it again as 1b did, into 1c-ii-a and 1c-ii-b.
 
 Step 5 waits for decision 3.
 
-Step 2 is the least certain. The change to `Dynamic.Heap` and `Dynamic.HeapWellTyped` reaches the
-126 files that name heap typing and the 88 that name allocation. Its arm for `new` in inference
-also renumbers the cases of the proofs by functional induction on `inferExprFuel`. If its first
-hour shows more than twice 3c, it splits: 2a for the type, the store and its typing, then 2b for
-`new`, the lengths and the lowering. Each later step stops on the same size condition, and on any
-change to a statement named in the [open decisions](#open-decisions) beyond the ones listed there.
+Step 2 was one row of 60–72 files, +1,300–1,700/−300–450, until its first measure: about 110 to
+150 files, +3,000 to 4,500/−400 to 800. `new` and the lengths each take a typed form with its
+evaluation, fault, sized and staged rules, as row 1's 3c did, and every induction over types takes
+the array's case. So it split into 2a, the type and the store, then 2b, `new`, the lengths and the
+lowering, and each again by what one part prepares for the next. `new` takes its own arm in
+inference only where the proofs by functional induction on `inferExprFuel` keep their numbered
+cases, or after a commit that only renumbers them and still rejects `new`. Each later step stops on
+the same size condition, and on any change to a statement named in the
+[open decisions](#open-decisions) beyond the ones listed there.
 
 ## Generators, corpora and the smoke
 

@@ -41,7 +41,7 @@ private theorem parameter_occurs_mem {context : Context} {variables : List TypeV
       parameter ∈ context.typeParameters)
     (motive_2 := fun types _ => ∀ type ∈ types, ∀ parameter,
       TypeParameterOccurs parameter type → parameter ∈ context.typeParameters)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ formed
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ formed
   · intro metavariable _ parameter occurs; cases occurs
   · intro actual bound _ parameter occurs; cases occurs; exact bound
   · intro builtin parameter occurs; cases occurs
@@ -59,6 +59,10 @@ private theorem parameter_occurs_mem {context : Context} {variables : List TypeV
     exact occurs.elim (leftIH parameter) (rightIH parameter)
   · intro inner _ ih parameter occurs; exact ih parameter occurs
   · intro inner _ ih parameter occurs; exact ih parameter occurs
+  · intro element _ ih parameter occurs
+    rcases occurs with occurs | occurs
+    · cases occurs
+    · exact ih parameter occurs
   · intro type member; cases member
   · intro head tail _ _ headIH tailIH type member
     rcases List.mem_cons.mp member with rfl | member

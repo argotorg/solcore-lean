@@ -55,8 +55,10 @@ inductive ProgramTypeResolutionError where
   | cyclicTypeAlias (cycle : List Resolved.DeclarationId)
   | aliasExpansionLimit
   | nestingLimit
-  /-- `T[]`, which has no meaning in Lean until memory arrays do. -/
-  | unsupportedArrayType
+  /-- A memory array whose element is not `word`, one of the twelve types or a
+  memory array, as `TypeSystem.Ty.arrayElementAllowed` admits, or a mapping
+  that holds a memory array. -/
+  | unsupportedArrayType (type : TypeSystem.Ty)
   deriving Repr, DecidableEq
 
 /-- Exact source spelling components, with all occurrence spans erased. -/
@@ -211,7 +213,9 @@ mutual
     | fuel + 1, ⟨_, .tuple elements⟩ => do
         let resolved ← resolveProgramTypeExprListFuel environment scope fuel elements
         pure (tupleProgramType resolved)
-    | _ + 1, ⟨_, .array _ _⟩ => .error .unsupportedArrayType
+    | fuel + 1, ⟨_, .array element _⟩ => do
+        let resolved ← resolveProgramTypeExprFuel environment scope fuel element
+        pure (TypeSystem.Ty.array resolved)
     | _ + 1, ⟨_, .error⟩ => pure .error
 
   private def resolveProgramTypeExprListFuel
@@ -391,6 +395,19 @@ private def runProgramTypeAliasNormalization
   let result ← computation.run nodeBudget
   pure result.1
 
+/-- The memory arrays of a normalized type are well formed, as
+`TypeSystem.Ty.arraysWellFormed` checks once every alias is expanded. -/
+private def checkProgramTypeArrays (type : TypeSystem.Ty) :
+    Except ProgramTypeResolutionError TypeSystem.Ty :=
+  if type.arraysWellFormed then pure type else .error (.unsupportedArrayType type)
+
+/-- The memory arrays of every normalized type in a list are well formed. -/
+private def checkProgramTypeArrayList (types : List TypeSystem.Ty) :
+    Except ProgramTypeResolutionError (List TypeSystem.Ty) :=
+  match types.find? (fun type => !type.arraysWellFormed) with
+  | some type => .error (.unsupportedArrayType type)
+  | none => pure types
+
 /-- Default structural-resolution budget; extreme generated trees can opt in
 to a larger explicit budget through `resolveProgramTypeExprWithFuel`. -/
 def defaultProgramTypeResolutionFuel : Nat := 4096
@@ -407,9 +424,10 @@ def resolveProgramTypeExprWithBudgets
     Except ProgramTypeResolutionError TypeSystem.Ty := do
   validateProgramTypeScope scope
   let raw ← resolveProgramTypeExprFuel environment scope structuralFuel source
-  runProgramTypeAliasNormalization aliasExpansionFuel
+  let normalized ← runProgramTypeAliasNormalization aliasExpansionFuel
     (normalizeProgramTypeAliasesFuel environment structuralFuel
       aliasExpansionFuel [] raw)
+  checkProgramTypeArrays normalized
 
 /-- Resolve and transparently expand a source-ordered list with independent
 structural and alias-expansion budgets. -/
@@ -419,9 +437,10 @@ def resolveProgramTypeExprListWithBudgets
     Except ProgramTypeResolutionError (List TypeSystem.Ty) := do
   validateProgramTypeScope scope
   let raw ← resolveProgramTypeExprListFuel environment scope structuralFuel sources
-  runProgramTypeAliasNormalization aliasExpansionFuel
+  let normalized ← runProgramTypeAliasNormalization aliasExpansionFuel
     (normalizeProgramTypeAliasListFuel environment structuralFuel
       aliasExpansionFuel [] raw)
+  checkProgramTypeArrayList normalized
 
 /-- Resolve and normalize one alias declaration body while treating the
 declaration itself as the root of cycle diagnostics. -/
@@ -432,9 +451,10 @@ def resolveProgramTypeAliasBodyWithBudgets
   let scope := ProgramTypeScope.ofDeclaration declaration
   validateProgramTypeScope scope
   let raw ← resolveProgramTypeExprFuel environment scope structuralFuel source
-  runProgramTypeAliasNormalization aliasExpansionFuel
+  let normalized ← runProgramTypeAliasNormalization aliasExpansionFuel
     (normalizeProgramTypeAliasesFuel environment structuralFuel
       aliasExpansionFuel [declaration.id] raw)
+  checkProgramTypeArrays normalized
 
 /-- Resolve every name occurrence with an explicit structural budget. -/
 def resolveProgramTypeExprWithFuel
@@ -822,7 +842,15 @@ private theorem resolveProgramTypeFuel_variablesBelow
                 exact tupleProgramType_variablesBelow
                   (listInduction _ _ elementsResult)
         | array element brackets =>
-            simp [resolveProgramTypeExprFuel] at success
+            cases elementResult : resolveProgramTypeExprFuel environment scope fuel element with
+            | error error =>
+                simp [resolveProgramTypeExprFuel, elementResult, bind,
+                  Except.bind] at success
+            | ok resolvedElement =>
+                simp [resolveProgramTypeExprFuel, elementResult, bind,
+                  Except.bind, pure, Pure.pure, Except.pure] at success
+                subst resolved
+                simpa [TypeSystem.Ty.array] using resolveInduction _ _ elementResult
         | error =>
             simp [resolveProgramTypeExprFuel, pure, Pure.pure,
               Except.pure] at success
@@ -1284,6 +1312,20 @@ private theorem runProgramTypeAliasNormalization_success
       refine ⟨remaining, ?_⟩
       rw [← success]
 
+private theorem checkProgramTypeArrays_ok {type resolved : TypeSystem.Ty}
+    (checked : checkProgramTypeArrays type = .ok resolved) : type = resolved := by
+  unfold checkProgramTypeArrays at checked
+  split at checked
+  · simpa only [pure, Except.pure, Except.ok.injEq] using checked
+  · cases checked
+
+private theorem checkProgramTypeArrayList_ok {types resolved : List TypeSystem.Ty}
+    (checked : checkProgramTypeArrayList types = .ok resolved) : types = resolved := by
+  unfold checkProgramTypeArrayList at checked
+  split at checked
+  · cases checked
+  · simpa only [pure, Except.pure, Except.ok.injEq] using checked
+
 /-- Successful resolution of one source type never manufactures a flexible
 inference metavariable.  The arbitrary `next` bound makes this stronger than
 mere closedness (`next = 0`) and suitable for later source-semantics bridges. -/
@@ -1305,14 +1347,22 @@ theorem resolveProgramTypeExprWithBudgets_success_variablesBelow
           simp [validationResult, rawResult, bind, Except.bind] at success
       | ok raw =>
           simp only [validationResult, rawResult, bind, Except.bind] at success
-          obtain ⟨remaining, normalizedResult⟩ :=
-            runProgramTypeAliasNormalization_success success
-          exact normalizeProgramTypeAliasesFuel_variablesBelow next environment
-            structuralFuel aliasExpansionFuel [] raw aliasExpansionFuel resolved
-            remaining
-            ((resolveProgramTypeFuel_variablesBelow next environment scope
-              structuralFuel).1 source raw rawResult)
-            normalizedResult
+          cases checkedResult : runProgramTypeAliasNormalization aliasExpansionFuel
+              (normalizeProgramTypeAliasesFuel environment structuralFuel
+                aliasExpansionFuel [] raw) with
+          | error error => simp [checkedResult] at success
+          | ok normalized =>
+              simp only [checkedResult] at success
+              have normalizedEq := checkProgramTypeArrays_ok success
+              subst normalized
+              obtain ⟨remaining, normalizedResult⟩ :=
+                runProgramTypeAliasNormalization_success checkedResult
+              exact normalizeProgramTypeAliasesFuel_variablesBelow next environment
+                structuralFuel aliasExpansionFuel [] raw aliasExpansionFuel resolved
+                remaining
+                ((resolveProgramTypeFuel_variablesBelow next environment scope
+                  structuralFuel).1 source raw rawResult)
+                normalizedResult
 
 /-- Successful list resolution preserves the source-order list while proving
 that every resolved element is free of flexible inference metavariables. -/
@@ -1334,14 +1384,22 @@ theorem resolveProgramTypeExprListWithBudgets_success_variablesBelow
           simp [validationResult, rawResult, bind, Except.bind] at success
       | ok raw =>
           simp only [validationResult, rawResult, bind, Except.bind] at success
-          obtain ⟨remaining, normalizedResult⟩ :=
-            runProgramTypeAliasNormalization_success success
-          exact normalizeProgramTypeAliasListFuel_variablesBelow next environment
-            structuralFuel aliasExpansionFuel [] raw aliasExpansionFuel resolved
-            remaining
-            ((resolveProgramTypeFuel_variablesBelow next environment scope
-              structuralFuel).2 sources raw rawResult)
-            normalizedResult
+          cases checkedResult : runProgramTypeAliasNormalization aliasExpansionFuel
+              (normalizeProgramTypeAliasListFuel environment structuralFuel
+                aliasExpansionFuel [] raw) with
+          | error error => simp [checkedResult] at success
+          | ok normalized =>
+              simp only [checkedResult] at success
+              have normalizedEq := checkProgramTypeArrayList_ok success
+              subst normalized
+              obtain ⟨remaining, normalizedResult⟩ :=
+                runProgramTypeAliasNormalization_success checkedResult
+              exact normalizeProgramTypeAliasListFuel_variablesBelow next environment
+                structuralFuel aliasExpansionFuel [] raw aliasExpansionFuel resolved
+                remaining
+                ((resolveProgramTypeFuel_variablesBelow next environment scope
+                  structuralFuel).2 sources raw rawResult)
+                normalizedResult
 
 /-- Alias-body resolution, including declaration-rooted cycle tracking and
 transparent expansion, cannot introduce a flexible inference metavariable. -/
@@ -1365,13 +1423,21 @@ theorem resolveProgramTypeAliasBodyWithBudgets_success_variablesBelow
           simp [scope, validationResult, rawResult, bind, Except.bind] at success
       | ok raw =>
           simp only [scope, validationResult, rawResult, bind, Except.bind] at success
-          obtain ⟨remaining, normalizedResult⟩ :=
-            runProgramTypeAliasNormalization_success success
-          exact normalizeProgramTypeAliasesFuel_variablesBelow next environment
-            structuralFuel aliasExpansionFuel [declaration.id] raw
-            aliasExpansionFuel resolved remaining
-            ((resolveProgramTypeFuel_variablesBelow next environment scope
-              structuralFuel).1 source raw rawResult)
-            normalizedResult
+          cases checkedResult : runProgramTypeAliasNormalization aliasExpansionFuel
+              (normalizeProgramTypeAliasesFuel environment structuralFuel
+                aliasExpansionFuel [declaration.id] raw) with
+          | error error => simp [checkedResult] at success
+          | ok normalized =>
+              simp only [checkedResult] at success
+              have normalizedEq := checkProgramTypeArrays_ok success
+              subst normalized
+              obtain ⟨remaining, normalizedResult⟩ :=
+                runProgramTypeAliasNormalization_success checkedResult
+              exact normalizeProgramTypeAliasesFuel_variablesBelow next environment
+                structuralFuel aliasExpansionFuel [declaration.id] raw
+                aliasExpansionFuel resolved remaining
+                ((resolveProgramTypeFuel_variablesBelow next environment scope
+                  structuralFuel).1 source raw rawResult)
+                normalizedResult
 
 end Solcore.Frontend

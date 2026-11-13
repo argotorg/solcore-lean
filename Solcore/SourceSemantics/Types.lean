@@ -90,6 +90,11 @@ inductive TypeWellScoped (context : Context)
       {inner : TypeSystem.Ty}
       (innerWellScoped : TypeWellScoped context flexibleVariables inner) :
       TypeWellScoped context flexibleVariables (.comptime inner)
+  /-- `T[]`, a memory array of a well-scoped element. -/
+  | array
+      {element : TypeSystem.Ty}
+      (elementWellScoped : TypeWellScoped context flexibleVariables element) :
+      TypeWellScoped context flexibleVariables (TypeSystem.Ty.array element)
 
 /-- Pointwise well-scopedness for nominal type arguments. -/
 inductive TypesWellScoped (context : Context)
@@ -325,7 +330,7 @@ theorem weakenTo
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped context larger type)
     (motive_2 := fun types _ => TypesWellScoped context larger types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable (included metavariable bound)
   · intro parameter bound owned
@@ -346,6 +351,8 @@ theorem weakenTo
     exact .proxy innerInduction
   · intro inner _ innerInduction
     exact .comptime innerInduction
+  · intro element _ elementInduction
+    exact .array elementInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -364,7 +371,7 @@ theorem withLocal
       (context.withLocal id scheme requirements) flexibleVariables type)
     (motive_2 := fun types _ => TypesWellScoped
       (context.withLocal id scheme requirements) flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -388,6 +395,8 @@ theorem withLocal
     exact .proxy innerInduction
   · intro inner _ innerInduction
     exact .comptime innerInduction
+  · intro element _ elementInduction
+    exact .array elementInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -477,6 +486,15 @@ private theorem nominal_ne_mapping
   rw [applicationHead_nominal] at heads
   cases heads
 
+private theorem nominal_ne_array
+    (declaration : Resolved.DeclarationId)
+    (arguments : List TypeSystem.Ty) (element : TypeSystem.Ty) :
+    TypeSystem.Ty.nominal declaration arguments ≠ TypeSystem.Ty.array element := by
+  intro equal
+  have heads := congrArg applicationHead equal
+  rw [applicationHead_nominal] at heads
+  cases heads
+
 /-- Inversion for flexible variables: every occurrence is explicitly bound by
 the flexible-variable list of the judgment. -/
 theorem variable_mem {context : Context}
@@ -504,6 +522,7 @@ theorem variable_mem {context : Context}
   | .mapping _ _ => by intro _ equal; cases equal
   | .proxy _ => by intro _ equal; cases equal
   | .comptime _ => by intro _ equal; cases equal
+  | .array _ => by intro _ equal; cases equal
 
 /-- Inversion for rigid parameters records both binder membership and
 declaration ownership. -/
@@ -533,6 +552,7 @@ theorem parameter_scope {context : Context}
   | .mapping _ _ => by intro _ equal; cases equal
   | .proxy _ => by intro _ equal; cases equal
   | .comptime _ => by intro _ equal; cases equal
+  | .array _ => by intro _ equal; cases equal
 
 /-- Recovery types never occur in a well-scoped source type. -/
 theorem ne_error {context : Context}
@@ -553,6 +573,7 @@ theorem ne_error {context : Context}
   | .mapping _ _ => by intro equal; cases equal
   | .proxy _ => by intro equal; cases equal
   | .comptime _ => by intro equal; cases equal
+  | .array _ => by intro equal; cases equal
 
 /-- Inversion for function types exposes both structurally scoped
 components. -/
@@ -583,6 +604,7 @@ theorem function_components
   | .mapping _ _ => by intro _ _ equal; cases equal
   | .proxy _ => by intro _ _ equal; cases equal
   | .comptime _ => by intro _ _ equal; cases equal
+  | .array _ => by intro _ _ equal; cases equal
 
 /-- Inversion for product types exposes both structurally scoped
 components. -/
@@ -613,6 +635,7 @@ theorem product_components
   | .mapping _ _ => by intro _ _ equal; cases equal
   | .proxy _ => by intro _ _ equal; cases equal
   | .comptime _ => by intro _ _ equal; cases equal
+  | .array _ => by intro _ _ equal; cases equal
 
 /-- Inversion for mapping types exposes both structurally scoped
 components. -/
@@ -643,6 +666,34 @@ theorem mapping_components
       exact ⟨keyScoped, valueScoped⟩
   | .proxy _ => by intro _ _ equal; cases equal
   | .comptime _ => by intro _ _ equal; cases equal
+  | .array _ => by intro _ _ equal; cases equal
+
+/-- Inversion for memory array types exposes the scoped element. -/
+theorem array_element
+    {context : Context} {flexibleVariables : List TypeSystem.TypeVarId}
+    {type : TypeSystem.Ty}
+    (wellScoped : TypeWellScoped context flexibleVariables type) :
+    ∀ element, type = TypeSystem.Ty.array element →
+      TypeWellScoped context flexibleVariables element :=
+  match wellScoped with
+  | .variable _ => by intro _ equal; cases equal
+  | .parameter _ _ => by intro _ equal; cases equal
+  | .builtin _ => by intro _ equal; cases equal
+  | .nominal dataType arguments _ _ _ => by
+      intro element equal
+      exact False.elim (nominal_ne_array dataType.id arguments element equal)
+  | .contractNominal contract arguments _ _ _ => by
+      intro element equal
+      exact False.elim (nominal_ne_array contract.id arguments element equal)
+  | .function _ _ => by intro _ equal; cases equal
+  | .product _ _ => by intro _ equal; cases equal
+  | .mapping _ _ => by intro _ equal; cases equal
+  | .proxy _ => by intro _ equal; cases equal
+  | .comptime _ => by intro _ equal; cases equal
+  | .array elementScoped => by
+      intro _ equal
+      cases equal
+      exact elementScoped
 
 theorem variable_iff {context : Context}
     {flexibleVariables : List TypeSystem.TypeVarId}
@@ -839,6 +890,17 @@ theorem comptime
   binders := innerAdmissible.binders
   typeWellScoped := .comptime
     (innerAdmissible.typeWellScopedWithin fun _ member => member)
+}
+
+/-- Admissibility is compositional for memory arrays. -/
+theorem array
+    {context : Context} {element : TypeSystem.Ty}
+    (elementAdmissible : TypeAdmissible context element) :
+    TypeAdmissible context (TypeSystem.Ty.array element) := {
+  binders := elementAdmissible.binders
+  typeWellScoped := .array
+    (elementAdmissible.typeWellScopedWithin fun metavariable member =>
+      (TypeSystem.Ty.mem_freeVariables_array_iff metavariable element).mpr member)
 }
 
 /-- A source-ordered row of admissible element types has an admissible

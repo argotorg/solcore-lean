@@ -923,7 +923,7 @@ theorem TypeWellScoped.weakenFlexible
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped context larger type)
     (motive_2 := fun types _ => TypesWellScoped context larger types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable (included metavariable bound)
   · intro parameter bound owned
@@ -944,6 +944,8 @@ theorem TypeWellScoped.weakenFlexible
     exact .proxy innerInduction
   · intro inner _ innerInduction
     exact .comptime innerInduction
+  · intro element _ elementInduction
+    exact .array elementInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -957,7 +959,7 @@ theorem TypesWellScoped.weakenFlexible
   refine TypesWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped context larger type)
     (motive_2 := fun types _ => TypesWellScoped context larger types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable (included metavariable bound)
   · intro parameter bound owned
@@ -978,6 +980,8 @@ theorem TypesWellScoped.weakenFlexible
     exact .proxy innerInduction
   · intro inner _ innerInduction
     exact .comptime innerInduction
+  · intro element _ elementInduction
+    exact .array elementInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -1031,7 +1035,7 @@ theorem TypeWellScoped.freeVariable_mem
       ∀ type, type ∈ types → ∀ metavariable,
         metavariable ∈ type.freeVariables →
           metavariable ∈ flexibleVariables)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound candidate member
     simp [Ty.freeVariables] at member
     subst candidate
@@ -1068,6 +1072,9 @@ theorem TypeWellScoped.freeVariable_mem
     exact innerInduction metavariable member
   · intro inner _ innerInduction metavariable member
     exact innerInduction metavariable member
+  · intro element _ elementInduction metavariable member
+    exact elementInduction metavariable
+      ((TypeSystem.Ty.mem_freeVariables_array_iff _ _).mp member)
   · intro type member
     simp at member
   · intro head tail _ _ headInduction tailInduction type member
@@ -1100,7 +1107,7 @@ theorem TypeWellScoped.ofSignatures_transport
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
     (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound
@@ -1125,6 +1132,8 @@ theorem TypeWellScoped.ofSignatures_transport
     exact .proxy innerInduction
   · intro inner _ innerInduction
     exact .comptime innerInduction
+  · intro element _ elementInduction
+    exact .array elementInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -1139,7 +1148,7 @@ theorem TypesWellScoped.ofSignatures_transport
   refine TypesWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
     (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound
@@ -1164,6 +1173,8 @@ theorem TypesWellScoped.ofSignatures_transport
     exact .proxy innerInduction
   · intro inner _ innerInduction
     exact .comptime innerInduction
+  · intro element _ elementInduction
+    exact .array elementInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -1190,7 +1201,7 @@ theorem TypeWellScoped.transportContext
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
     (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -1214,6 +1225,8 @@ theorem TypeWellScoped.transportContext
     exact .proxy innerInduction
   · intro inner _ innerInduction
     exact .comptime innerInduction
+  · intro element _ elementInduction
+    exact .array elementInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -1229,7 +1242,7 @@ theorem TypesWellScoped.transportContext
   refine TypesWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexibleVariables type)
     (motive_2 := fun types _ => TypesWellScoped target flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -1253,6 +1266,8 @@ theorem TypesWellScoped.transportContext
     exact .proxy innerInduction
   · intro inner _ innerInduction
     exact .comptime innerInduction
+  · intro element _ elementInduction
+    exact .array elementInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -1502,7 +1517,7 @@ theorem TypeWellScoped.applyParametersTo
       TypeWellScoped target flexibleVariables (substitution.apply type))
     (motive_2 := fun types _ =>
       TypesWellScoped target flexibleVariables (types.map substitution.apply))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound _
@@ -1535,6 +1550,8 @@ theorem TypeWellScoped.applyParametersTo
     exact .proxy innerInduction
   · intro inner _ innerInduction
     exact .comptime innerInduction
+  · intro element _ elementInduction
+    exact .array elementInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -1598,7 +1615,7 @@ theorem TypeWellScoped.toAdmissibleOfResidual
     (motive_1 := fun current _ => TypeAdmissible context current)
     (motive_2 := fun types _ => ∀ current, current ∈ types →
       TypeAdmissible context current)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable _
     exact TypeAdmissible.variableOfResidual binders residual metavariable
   · intro parameter bound owned
@@ -1636,6 +1653,8 @@ theorem TypeWellScoped.toAdmissibleOfResidual
     exact TypeAdmissible.proxy innerInduction
   · intro inner _ innerInduction
     exact TypeAdmissible.comptime innerInduction
+  · intro element _ elementInduction
+    exact TypeAdmissible.array elementInduction
   · intro current member
     simp at member
   · intro head tail _ _ headInduction tailInduction current member
@@ -1663,7 +1682,7 @@ theorem TypeWellScoped.applyParametersAdmissibleTo
       TypeAdmissible target (substitution.apply type))
     (motive_2 := fun types _ => ∀ type, type ∈ types →
       TypeAdmissible target (substitution.apply type))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     simp at bound
   · intro parameter bound _
@@ -1715,6 +1734,8 @@ theorem TypeWellScoped.applyParametersAdmissibleTo
     exact TypeAdmissible.proxy innerInduction
   · intro inner _ innerInduction
     exact TypeAdmissible.comptime innerInduction
+  · intro element _ elementInduction
+    exact TypeAdmissible.array elementInduction
   · intro type member
     simp at member
   · intro head tail _ _ headInduction tailInduction type member
@@ -1966,7 +1987,7 @@ theorem TypeWellScoped.applySubstitution_eq_self
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => substitution.apply type = type)
     (motive_2 := fun types _ => types.map substitution.apply = types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     simp at bound
   · intro parameter _ _
@@ -1992,6 +2013,9 @@ theorem TypeWellScoped.applySubstitution_eq_self
   · intro inner _ innerInduction
     simp only [TypeSystem.Substitution.apply]
     rw [innerInduction]
+  · intro element _ elementInduction
+    simp only [TypeSystem.Ty.array, TypeSystem.Substitution.apply]
+    rw [elementInduction]
   · rfl
   · intro head tail _ _ headInduction tailInduction
     simp only [List.map_cons]
@@ -2005,7 +2029,7 @@ theorem TypesWellScoped.applySubstitution_eq_self
   refine TypesWellScoped.rec
     (motive_1 := fun type _ => substitution.apply type = type)
     (motive_2 := fun types _ => types.map substitution.apply = types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     simp at bound
   · intro parameter _ _
@@ -2031,6 +2055,9 @@ theorem TypesWellScoped.applySubstitution_eq_self
   · intro inner _ innerInduction
     simp only [TypeSystem.Substitution.apply]
     rw [innerInduction]
+  · intro element _ elementInduction
+    simp only [TypeSystem.Ty.array, TypeSystem.Substitution.apply]
+    rw [elementInduction]
   · rfl
   · intro head tail _ _ headInduction tailInduction
     simp only [List.map_cons]
@@ -2056,7 +2083,7 @@ theorem TypeWellScoped.applyMixed_compose
       (types.map inner.apply).map outer.apply =
         (types.map outer.apply).map
           (Substitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable _
     by_cases substituted : metavariable ∈ substitutedVariables
     · obtain ⟨replacement, member, innerLookup⟩ :=
@@ -2128,6 +2155,10 @@ theorem TypeWellScoped.applyMixed_compose
     simp only [TypeSystem.Substitution.apply,
       TypeSystem.ParameterSubstitution.apply]
     rw [innerInduction]
+  · intro element _ elementInduction
+    simp only [TypeSystem.Ty.array, TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [elementInduction]
   · rfl
   · intro head tail _ _ headInduction tailInduction
     simp only [List.map_cons]
@@ -2180,7 +2211,7 @@ theorem TypeWellScoped.applyParameters_compose
     (motive_2 := fun types _ =>
       (types.map inner.apply).map outer.apply =
         types.map (ParameterSubstitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable _
     rfl
   · intro parameter bound _
@@ -2220,6 +2251,9 @@ theorem TypeWellScoped.applyParameters_compose
   · intro innerType _ innerInduction
     simp only [TypeSystem.ParameterSubstitution.apply]
     rw [innerInduction]
+  · intro element _ elementInduction
+    simp only [TypeSystem.Ty.array, TypeSystem.ParameterSubstitution.apply]
+    rw [elementInduction]
   · rfl
   · intro head tail _ _ headInduction tailInduction
     simp only [List.map_cons]
@@ -2241,7 +2275,7 @@ theorem TypesWellScoped.applyParameters_compose
     (motive_2 := fun types _ =>
       (types.map inner.apply).map outer.apply =
         types.map (ParameterSubstitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable _
     rfl
   · intro parameter bound _
@@ -2281,6 +2315,9 @@ theorem TypesWellScoped.applyParameters_compose
   · intro innerType _ innerInduction
     simp only [TypeSystem.ParameterSubstitution.apply]
     rw [innerInduction]
+  · intro element _ elementInduction
+    simp only [TypeSystem.Ty.array, TypeSystem.ParameterSubstitution.apply]
+    rw [elementInduction]
   · rfl
   · intro head tail _ _ headInduction tailInduction
     simp only [List.map_cons]
@@ -3676,7 +3713,7 @@ theorem TypeWellScoped.applyParameters_eq_of_orderedArguments_eq
     (motive_1 := fun type _ => left.apply type = right.apply type)
     (motive_2 := fun types _ =>
       types.map left.apply = types.map right.apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     rfl
   · intro parameter bound owned
@@ -3712,6 +3749,9 @@ theorem TypeWellScoped.applyParameters_eq_of_orderedArguments_eq
     rw [induction]
   · intro inner wellScoped induction
     simp only [TypeSystem.ParameterSubstitution.apply]
+    rw [induction]
+  · intro element wellScoped induction
+    simp only [TypeSystem.Ty.array, TypeSystem.ParameterSubstitution.apply]
     rw [induction]
   · rfl
   · intro head tail headWellScoped tailWellScoped headInduction tailInduction
@@ -5949,7 +5989,7 @@ theorem nominal_data_arguments
               (admissibleTypeVariables context
                 (Ty.nominal dataType.id arguments)) arguments)
       (motive_2 := fun _ _ => True)
-      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
       admissible.typeWellScoped rfl
     · intro _ _ equal
       have head := applicationHead_eq_of_eq_nominal equal
@@ -5981,6 +6021,9 @@ theorem nominal_data_arguments
       have head := applicationHead_eq_of_eq_nominal equal
       cases head
     · intro _ _ _ _ _ _ equal
+      have head := applicationHead_eq_of_eq_nominal equal
+      cases head
+    · intro _ _ _ equal
       have head := applicationHead_eq_of_eq_nominal equal
       cases head
     · intro _ _ _ equal
@@ -6522,7 +6565,7 @@ theorem TypeWellScoped.applyExactAdmissible
       TypeAdmissible context (substitution.apply current))
     (motive_2 := fun types _ => ∀ current, current ∈ types →
       TypeAdmissible context (substitution.apply current))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     by_cases substituted : metavariable ∈ substitution.domain
     · rcases List.mem_map.mp substituted with
@@ -6594,6 +6637,8 @@ theorem TypeWellScoped.applyExactAdmissible
     exact TypeAdmissible.proxy innerInduction
   · intro inner _ innerInduction
     exact TypeAdmissible.comptime innerInduction
+  · intro element _ elementInduction
+    exact TypeAdmissible.array elementInduction
   · intro current member
     simp at member
   · intro head tail _ _ headInduction tailInduction current member
@@ -7590,7 +7635,7 @@ theorem TypeWellScoped.applyFlexible_composeParameters
     (motive_2 := fun types _ =>
       (types.map inner.apply).map outer.apply =
         types.map (ParameterSubstitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     simp at bound
   · intro parameter bound _
@@ -7640,6 +7685,10 @@ theorem TypeWellScoped.applyFlexible_composeParameters
     simp only [TypeSystem.Substitution.apply,
       TypeSystem.ParameterSubstitution.apply]
     rw [innerInduction]
+  · intro element _ elementInduction
+    simp only [TypeSystem.Ty.array, TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [elementInduction]
   · rfl
   · intro head tail _ _ headInduction tailInduction
     simp only [List.map_cons]
@@ -7660,7 +7709,7 @@ theorem TypesWellScoped.applyFlexible_composeParameters
     (motive_2 := fun types _ =>
       (types.map inner.apply).map outer.apply =
         types.map (ParameterSubstitution.mapRange outer inner).apply)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     simp at bound
   · intro parameter bound _
@@ -7710,6 +7759,10 @@ theorem TypesWellScoped.applyFlexible_composeParameters
     simp only [TypeSystem.Substitution.apply,
       TypeSystem.ParameterSubstitution.apply]
     rw [innerInduction]
+  · intro element _ elementInduction
+    simp only [TypeSystem.Ty.array, TypeSystem.Substitution.apply,
+      TypeSystem.ParameterSubstitution.apply]
+    rw [elementInduction]
   · rfl
   · intro head tail _ _ headInduction tailInduction
     simp only [List.map_cons]
@@ -8151,7 +8204,7 @@ theorem TypeWellScoped.applySubstitution
     (motive_2 := fun types _ =>
       TypesWellScoped target targetVariables
         (types.map substitution.apply))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     by_cases member : metavariable ∈ substitution.domain
     · rcases List.mem_map.mp member with ⟨entry, entryMember, keyEq⟩
@@ -8195,6 +8248,8 @@ theorem TypeWellScoped.applySubstitution
     exact .proxy innerInduction
   · intro inner _ innerInduction
     exact .comptime innerInduction
+  · intro element _ elementInduction
+    exact .array elementInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction

@@ -2520,6 +2520,14 @@ private def testStageErrors : IO Unit := do
       reason := .unsupportedType (.function .word .word), .. })) => pure ()
   | result => throw (IO.userError
       s!"indirect call did not retain its direct-linking rejection: {reprStr result}")
+  let arrayLocal := rawWorkspace "main.solc" [("main.solc",
+    "function count() returns (Word) { let m: uint256[]; return 0; }")]
+  match prepare arrayLocal (Seed.named moduleId "count") generousLimits with
+  | .error (.linking (.sourceCore { reason := .unsupportedType type, .. })) =>
+      assertTrue (decide (type = .array (.fixed ⟨false, .w256⟩)))
+        "an array local's rejection lost its type"
+  | result => throw (IO.userError
+      s!"an array local reached a Core representation: {reprStr result}")
   let recursive := rawWorkspace "main.solc" [("main.solc",
     "function loop(value: Word) returns (Word) { return loop(value); }")]
   match prepare recursive (Seed.named moduleId "loop") generousLimits with

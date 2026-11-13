@@ -147,6 +147,8 @@ inductive BuiltinType where
   | integer
   /-- `uint8` … `uint256` and `int8` … `int256`. -/
   | fixed (type : FixedInteger)
+  /-- `T[]`, a memory array, applied to its element type. -/
+  | memoryArray
   deriving Repr, DecidableEq
 
 /-- The stable identity at the head of a type application. -/
@@ -218,6 +220,56 @@ def IntegerPatternCarrier (type : Ty) : Prop :=
 def fixedInteger? : Ty → Option FixedInteger
   | .constructor (.builtin (.fixed type)) => some type
   | _ => none
+
+/-- `T[]`, a memory array of `element`. -/
+def array (element : Ty) : Ty := .application (.constructor (.builtin .memoryArray)) element
+
+/-- The element type of a memory array type. -/
+def arrayElement? : Ty → Option Ty
+  | .application (.constructor (.builtin .memoryArray)) element => some element
+  | _ => none
+
+/-- Whether a memory array may hold `element`: `word`, one of the twelve types
+or a memory array, the element types with `Typedef<word>` upstream that Lean
+has. -/
+def arrayElementAllowed : Ty → Bool
+  | .constructor (.builtin .word)
+  | .constructor (.builtin (.fixed _))
+  | .application (.constructor (.builtin .memoryArray)) _ => true
+  | _ => false
+
+/-- Whether a memory array occurs anywhere in a type. -/
+def containsArray : Ty → Bool
+  | .application (.constructor (.builtin .memoryArray)) _ => true
+  | .application leftPart rightPart
+  | .function leftPart rightPart
+  | .product leftPart rightPart
+  | .mapping leftPart rightPart => leftPart.containsArray || rightPart.containsArray
+  | .proxy inner
+  | .comptime inner => inner.containsArray
+  | .variable _
+  | .parameter _
+  | .constructor _
+  | .error => false
+
+/-- Every memory array in a type holds an element `arrayElementAllowed`
+admits, and no mapping holds a memory array, whose meaning upstream is a
+storage array. -/
+def arraysWellFormed : Ty → Bool
+  | .application (.constructor (.builtin .memoryArray)) element =>
+      element.arrayElementAllowed && element.arraysWellFormed
+  | .mapping key value =>
+      !key.containsArray && !value.containsArray &&
+        key.arraysWellFormed && value.arraysWellFormed
+  | .application leftPart rightPart
+  | .function leftPart rightPart
+  | .product leftPart rightPart => leftPart.arraysWellFormed && rightPart.arraysWellFormed
+  | .proxy inner
+  | .comptime inner => inner.arraysWellFormed
+  | .variable _
+  | .parameter _
+  | .constructor _
+  | .error => true
 
 /-- Left-associated type application. -/
 def applyMany (head : Ty) (arguments : List Ty) : Ty :=
@@ -335,6 +387,13 @@ private theorem mem_unionVariables_iff (metavariable : TypeVarId)
       metavariable ∈ function.freeVariables ∨
         metavariable ∈ argument.freeVariables := by
   exact mem_unionVariables_iff metavariable _ _
+
+@[simp] theorem mem_freeVariables_array_iff
+    (metavariable : TypeVarId) (element : Ty) :
+    metavariable ∈ (Ty.array element).freeVariables ↔
+      metavariable ∈ element.freeVariables := by
+  rw [array, mem_freeVariables_application_iff]
+  simp [freeVariables]
 
 @[simp] theorem mem_freeVariables_function_iff
     (metavariable : TypeVarId) (parameter result : Ty) :
