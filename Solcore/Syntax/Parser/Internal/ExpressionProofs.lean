@@ -850,6 +850,33 @@ theorem newArrayHead_reflectsDiagnosticFreeOnSuccess :
   intro _
   exact Parser.pure_reflectsDiagnosticFreeOnSuccess _
 
+/-- A name atom reflects diagnostic freedom when its length does. -/
+theorem nameAtom_reflectsDiagnosticFreeOnSuccess (nested : Parser Expr)
+    (nestedReflects : Parser.ReflectsDiagnosticFreeOnSuccess nested) :
+    Parser.ReflectsDiagnosticFreeOnSuccess (nameAtom nested) := by
+  intro input value next result diagnosticFree
+  unfold nameAtom at result
+  cases headResult : newArrayHead input with
+  | invariant error => simp only [headResult] at result <;> cases result
+  | reject failure rejected =>
+      simp only [headResult] at result
+      exact identifierExpression_reflectsDiagnosticFreeOnSuccess input value next result
+        diagnosticFree
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      simp only [headResult] at result
+      have tailReflects :
+          Parser.ReflectsDiagnosticFreeOnSuccess (newArrayTail nested keyword type) := by
+        unfold newArrayTail
+        apply Parser.bind_reflectsDiagnosticFreeOnSuccess nestedReflects
+        intro length
+        apply Parser.bind_reflectsDiagnosticFreeOnSuccess
+          (symbol_reflectsDiagnosticFreeOnSuccess .rightParen .expression)
+        intro closing
+        exact Parser.pure_reflectsDiagnosticFreeOnSuccess _
+      exact newArrayHead_reflectsDiagnosticFreeOnSuccess input (keyword, type) afterOpening
+        headResult (tailReflects afterOpening value next result diagnosticFree)
+
 /-- Every successful head of `new T[](n)` follows its grammar. -/
 theorem newArrayHead_success_sound
     {typeOrdinary : DeclarativeGrammar.Remainder → TypeExpr →
@@ -910,6 +937,50 @@ theorem newArrayHead_reject_absent
           simp only [bind_apply_cases, keywordResult, typeResult, guardResult,
             openingResult] at result
           cases result
+
+/-- Every successful name atom follows its grammar: `new T[](n)` after a head,
+or the identifier where the head rejects. The length's soundness is asked only
+of runs that end with the atom's diagnostics. -/
+theorem nameAtom_success_sound (nested : Parser Expr)
+    {nestedParses : DeclarativeGrammar.Remainder → Expr →
+      DeclarativeGrammar.Remainder → Prop}
+    {typeOrdinary : DeclarativeGrammar.Remainder → TypeExpr →
+      DeclarativeGrammar.Remainder → Prop}
+    {typeRejects : DeclarativeGrammar.Remainder → DeclarativeGrammar.Remainder → Prop}
+    (typeOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec typeOrdinary typeRejects)
+    (typeSuccessSound : ∀ {input next : State} {value : TypeExpr},
+      typeExpr input = .ok value next →
+        typeOrdinary input.declarativeRemainder value next.declarativeRemainder)
+    (typeRejectSound : ∀ {input rejected : State} {failure : Failure},
+      typeExpr input = .reject failure rejected →
+        typeRejects input.declarativeRemainder rejected.declarativeRemainder)
+    {input next : State} {expression : Expr}
+    (lengthSound : ∀ {lengthInput lengthNext : State} {length : Expr},
+      lengthNext.diagnosticsRev = next.diagnosticsRev →
+      nested lengthInput = .ok length lengthNext →
+        nestedParses lengthInput.declarativeRemainder length lengthNext.declarativeRemainder)
+    (result : nameAtom nested input = .ok expression next) :
+    DeclarativeGrammar.NameAtomParses nestedParses typeOrdinary input.declarativeRemainder
+      expression next.declarativeRemainder := by
+  unfold nameAtom at result
+  cases headResult : newArrayHead input with
+  | invariant error => simp only [headResult] at result <;> cases result
+  | reject failure rejected =>
+      simp only [headResult] at result
+      exact .identifier (newArrayHead_reject_absent typeOutcomes typeSuccessSound
+        typeRejectSound headResult) (identifierExpression_success_sound result)
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      simp only [headResult] at result
+      have headParsed := newArrayHead_success_sound typeSuccessSound headResult
+      unfold newArrayTail at result
+      rcases bind_ok_components result with ⟨length, afterLength, lengthResult, rest⟩
+      rcases bind_ok_components rest with ⟨closing, afterClosing, closingResult, finished⟩
+      cases finished
+      have closingState := (symbol_ok_tokenAt .rightParen .expression closingResult).2
+      exact .newArray (.parsed _ _ headParsed
+        (lengthSound (by rw [closingState]) lengthResult)
+        (symbol_success_exactTokenParses .rightParen .expression closingResult))
 
 /-- Proxy leaf soundness composes with source provenance. -/
 theorem proxyExpression_success_sound_and_validFor
@@ -3289,7 +3360,7 @@ theorem atom
     ExpressionContract statementValid (expressionAtom nested block) := {
   validFor := ExpressionAtomInternals.expressionAtom_validFor nested block
     statementValid nestedContract.validFor nestedContract.preservesTokenWindow
-      blockValid blockStarts blockWindow
+      nestedContract.cursorMonotoneOnSuccess blockValid blockStarts blockWindow
   preservesTokenWindow :=
     ExpressionAtomInternals.expressionAtom_preservesTokenWindow nested block
       nestedContract.preservesTokenWindow blockWindow

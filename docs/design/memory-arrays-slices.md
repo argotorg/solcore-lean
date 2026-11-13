@@ -323,7 +323,11 @@ wait for the native pipeline's contracts and ABI.
   `a[]` is rejected.
 - `e.length` and `e.length()` parse already, as a field and a call of a field.
 - The grammar and the parser's correctness proofs take the new forms. Inference and type
-  resolution reject them until the step that gives them a meaning.
+  resolution reject them until the step that gives them a meaning. Inference rejects the new
+  expression forms in its last arm, a catch-all, because the proofs by functional induction on
+  `inferExprFuel` name its cases by number, and an arm of their own would shift every later
+  case. The step that gives a form its meaning gives it its own arm and renumbers those cases:
+  at 1b-ii, up to 285 case names in 14 files.
 
 ### Typing
 
@@ -457,7 +461,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | --- | --- | --- | --- |
 | 1a | Syntax: `T[]`, with `T[k]` rejected and the suffixes counted against the nesting limit, the grammar and its proofs; type resolution rejects array types. Two commits: 1a-i, the suffix layer as a refactor that accepts no new syntax, then 1a-ii, the suffix | 25–32 files, +1,600–2,000/−350–450; 1a-i measured at 6 files, +156/−57 | parser tests from upstream's `crates/uitest/tests/fixtures/parse/fixed_size_array_rejected` and `crates/parser/tests/formatting.rs` cases |
 | 1b-i | Syntax: the head `new T[](`, with its grammar and every lemma, and direct tests of its parser; no atom reaches it yet | 10–12 files, +700–900; measured at 10 files, +636/−0 | none |
-| 1b-ii | Syntax: `new T[](n)` in the name atom, falling back to the identifier `new` where no head starts; inference rejects it | 18–26 files, +900–1,100/−50–150 | `crates/parser/tests/formatting.rs` cases |
+| 1b-ii | Syntax: `new T[](n)` in the name atom, falling back to the identifier `new` where no head starts; inference rejects it | 18–26 files, +900–1,100/−50–150; measured at 27 files, +1,412/−199 | `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
 | 1c | Syntax: the slices, with `a[]` rejected; inference rejects the slices | 12–18 files, +800–1,200/−150–350 | parser tests from `crates/uitest/tests/fixtures/parse/empty_index_rejected` and `crates/parser/tests/formatting.rs` cases |
 | 2 | The array type and its element check, the heap's store, `new` and `0x41`, the lengths, preservation, the staged copies, the lowering's cells | 60–72 files, +1,300–1,700/−300–450, the riskiest | newLen(n), oversized(n) |
 | 3 | Element reads and `0x32` | 35–55 files, +800–1,200/−200–350, between 3c and 3a | defaultZero(n, i), nestedEmpty(n) |
@@ -476,10 +480,11 @@ first measure, about +1,800, split it again into 1b-i and 1b-ii.
 Step 5 waits for decision 3.
 
 Step 2 is the least certain. The change to `Dynamic.Heap` and `Dynamic.HeapWellTyped` reaches the
-126 files that name heap typing and the 88 that name allocation. If its first hour shows more than
-twice 3c, it splits: 2a for the type, the store and its typing, then 2b for `new`, the lengths and
-the lowering. Each later step stops on the same size condition, and on any change to a statement
-named in the [open decisions](#open-decisions) beyond the ones listed there.
+126 files that name heap typing and the 88 that name allocation. Its arm for `new` in inference
+also renumbers the cases of the proofs by functional induction on `inferExprFuel`. If its first
+hour shows more than twice 3c, it splits: 2a for the type, the store and its typing, then 2b for
+`new`, the lengths and the lowering. Each later step stops on the same size condition, and on any
+change to a statement named in the [open decisions](#open-decisions) beyond the ones listed there.
 
 ## Generators, corpora and the smoke
 
@@ -498,7 +503,10 @@ named in the [open decisions](#open-decisions) beyond the ones listed there.
   dispatch test states the base form's dispatch. Upstream's snapshot
   `crates/uitest/tests/fixtures/parse/struct_field_missing_semicolon/diagnostics.snap` gained `[`
   in its expected tokens. Lean's expected tokens after a type do not change, since Lean reports
-  only the failing parser's own expectation. Everything else is new tests.
+  only the failing parser's own expectation. In step 1b-ii, three atom tests change: the name
+  branch leaves the branches that ignore both child parsers, since `new T[](n)` reads its length
+  with the nested one, and two names' dispatch traces gain the proof that no head `new T[](`
+  starts. Everything else is new tests.
 
 ## Open decisions
 

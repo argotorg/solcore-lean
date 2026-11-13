@@ -434,6 +434,22 @@ theorem newArrayHead_reject_trace_absent {input rejected : State} {failure : Fai
   rw [success] at result
   cases result
 
+/-- A successful head consumes its `new`, paying one unit of fuel. -/
+theorem newArrayHead_remainingCount_lt_of_success {input next : State}
+    {head : Token × TypeExpr} {fuel : Nat} (result : newArrayHead input = .ok head next)
+    (adequate : input.remainingCount < fuel + 1) : next.remainingCount < fuel := by
+  rcases newArrayHead_success_iff_components.mp result with
+    ⟨afterKeyword, afterType, opening, keywordResult, typeResult, _, openingResult⟩
+  have keywordAdequate := acceptToken_remainingCount_lt_of_success (.contextual .new)
+    .expression (·.isContextual .new) keywordResult adequate
+  have keywordState := (contextual_ok_tokenAt .new .expression keywordResult).2
+  have window := newArrayHead_preservesTokenWindow input
+  rw [result] at window
+  subst keywordState
+  exact remainingCount_lt_of_endIndex_eq (input := { input with cursor := input.cursor + 1 })
+    (congrArg TokenWindow.endIndex window.2) (newArrayHead_cursor_lt_onSuccess result)
+    keywordAdequate
+
 /-- Where the trace grammar has no head, the head rejects. -/
 theorem newArrayHead_reject_of_trace_absent {input : State}
     (absent : NewArrayHeadTraceAbsent TypeExprTraceParses input.file.id input.window.endByte
@@ -1467,6 +1483,31 @@ private theorem proxy_ordinary : Parser.Ordinary proxyExpression := by
   intro type input
   exact .inl ⟨_, input, rfl⟩
 
+private theorem nameAtom_ordinary_of_unrestrictedElementFuel (nested : Parser Expr)
+    (nestedFuel : Nat) (contract : UnrestrictedFuelElementContract nested nestedFuel)
+    (input : State) (adequate : input.remainingCount < nestedFuel + 1) :
+    (∃ value next, nameAtom nested input = .ok value next) ∨
+    (∃ failure next, nameAtom nested input = .reject failure next) := by
+  unfold nameAtom
+  rcases newArrayHead_ordinary input with
+    ⟨head, afterOpening, headResult⟩ | ⟨failure, rejected, headResult⟩
+  · rcases head with ⟨keyword, type⟩
+    simp only [headResult]
+    rcases contract.ordinary afterOpening
+        (newArrayHead_remainingCount_lt_of_success headResult adequate) with
+      ⟨length, afterLength, lengthResult⟩ | ⟨failure, rejected, lengthResult⟩
+    · rcases symbol_ordinary .rightParen .expression afterLength with
+        ⟨closing, afterClosing, closingResult⟩ | ⟨failure, rejected, closingResult⟩
+      · exact .inl ⟨{
+            span := SourceSpan.cover keyword.span closing.span
+            value := .newArray keyword.span type length
+          }, afterClosing, by simp only [newArrayTail, bind, lengthResult, closingResult, pure]⟩
+      · exact .inr ⟨failure, rejected, by
+          simp only [newArrayTail, bind, lengthResult, closingResult]⟩
+    · exact .inr ⟨failure, rejected, by simp only [newArrayTail, bind, lengthResult]⟩
+  · simp only [headResult]
+    exact name_ordinary input
+
 private theorem raw_ordinary (nested : Parser Expr) (block : Parser Block) (nestedFuel : Nat)
     (contract : UnrestrictedFuelElementContract nested nestedFuel)
     (blockOrdinary : Parser.Ordinary block) (branch : ExpressionAtomDispatchBranch)
@@ -1475,7 +1516,8 @@ private theorem raw_ordinary (nested : Parser Expr) (block : Parser Block) (nest
     (∃ failure next, rawParser nested block branch input = .reject failure next) := by
   cases branch with
   | literal => exact literal_ordinary input
-  | name => exact name_ordinary input
+  | name =>
+      exact nameAtom_ordinary_of_unrestrictedElementFuel nested nestedFuel contract input adequate
   | dotConstructor => exact dotConstructor_ordinary_of_unrestrictedElementFuel nested nestedFuel contract input adequate
   | proxy => exact proxy_ordinary input
   | parenthesized => exact parenthesized_ordinary_of_unrestrictedElementFuel nested nestedFuel contract input adequate

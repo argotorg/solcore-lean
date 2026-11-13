@@ -272,7 +272,7 @@ def rawParser (nested : Parser Expr) (block : Parser Block)
     (branch : ExpressionAtomDispatchBranch) : Parser Expr :=
   match branch with
   | .literal => literalExpression
-  | .name => identifierExpression
+  | .name => nameAtom nested
   | .dotConstructor => dotConstructor nested
   | .proxy => proxyExpression
   | .parenthesized => parenthesized nested

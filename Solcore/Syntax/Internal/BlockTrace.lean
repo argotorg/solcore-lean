@@ -2067,7 +2067,7 @@ theorem expressionAtomDispatchRawTraceExactOutcomeSpec
       (ExpressionAtomDispatchRawTraceRejects nestedTrace nestedRejects blockRejects branch) source endByte := by
   cases branch with
   | literal => exact (literalExpressionTraceExactOutcomeSpec source endByte).toTraceExactOutcomeSpec
-  | name => exact (identifierExpressionTrace_exactOutcomeSpec source endByte).toTraceExactOutcomeSpec
+  | name => exact (nameAtomTraceExactOutcomeSpec nested.toExpressionTraceExactOutcomeSpec).toTraceExactOutcomeSpec
   | dotConstructor => exact (dotConstructorTraceExactOutcomeSpec nested.toExpressionTraceExactOutcomeSpec).toTraceExactOutcomeSpec
   | proxy => exact (proxyExpressionTraceExactOutcomeSpec typeExprTraceExactOutcomeSpec).toTraceExactOutcomeSpec
   | parenthesized => exact (parenthesizedTraceExactOutcomeSpec nested.toExpressionTraceExactOutcomeSpec).toTraceExactOutcomeSpec

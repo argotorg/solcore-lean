@@ -416,6 +416,144 @@ theorem LiteralExpressionOrdinaryParses.coreLiteralStartsAt
       | hexadecimal token => exact Or.inr (Or.inl ⟨_, _, token⟩)
       | string token => exact Or.inr (Or.inr ⟨_, _, token⟩)
 
+/-- One remainder ends at most one head `new T[](`. -/
+theorem NewArrayHeadParses.output_unique
+    {typeParses : Remainder → Syntax.TypeExpr → Remainder → Prop}
+    {typeRejects : Remainder → Remainder → Prop}
+    (typeOutcomes : DeterministicOutcomeSpec typeParses typeRejects)
+    {input afterLeft afterRight : Remainder} {leftSpan rightSpan : SourceSpan}
+    {left right : Syntax.TypeExpr}
+    (leftParsed : NewArrayHeadParses typeParses input leftSpan left afterLeft)
+    (rightParsed : NewArrayHeadParses typeParses input rightSpan right afterRight) :
+    leftSpan = rightSpan ∧ afterLeft = afterRight := by
+  cases leftParsed with
+  | parsed _ keyword typed _ opening =>
+      cases rightParsed with
+      | parsed _ otherKeyword otherTyped _ otherOpening =>
+          rcases keyword.result_unique otherKeyword with ⟨rfl, rfl⟩
+          have afterTypeEq := typeOutcomes.successOutputUnique typed otherTyped
+          subst afterTypeEq
+          rcases opening.result_unique otherOpening with ⟨_, rfl⟩
+          exact ⟨rfl, rfl⟩
+
+/-- A name atom ends at one remainder. -/
+theorem NameAtomParses.output_unique
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    {typeOrdinary : Remainder → Syntax.TypeExpr → Remainder → Prop}
+    {typeRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : DeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    (typeOutcomes : DeterministicOutcomeSpec typeOrdinary typeRejects)
+    {input afterLeft afterRight : Remainder} {left right : Syntax.Expr}
+    (leftParsed : NameAtomParses nestedOrdinary typeOrdinary input left afterLeft)
+    (rightParsed : NameAtomParses nestedOrdinary typeOrdinary input right afterRight) :
+    afterLeft = afterRight := by
+  cases leftParsed with
+  | newArray leftParsed =>
+      cases leftParsed with
+      | parsed _ _ leftHead leftLength leftClosing =>
+          cases rightParsed with
+          | newArray rightParsed =>
+              cases rightParsed with
+              | parsed _ _ rightHead rightLength rightClosing =>
+                  rcases leftHead.output_unique typeOutcomes rightHead with ⟨_, rfl⟩
+                  have afterLengthEq :=
+                    nestedOutcomes.successOutputUnique leftLength rightLength
+                  subst afterLengthEq
+                  exact (leftClosing.result_unique rightClosing).2
+          | identifier headAbsent _ => exact absurd ⟨_, _, _, leftHead⟩ headAbsent
+  | identifier headAbsent leftParsed =>
+      cases rightParsed with
+      | newArray rightParsed =>
+          cases rightParsed with
+          | parsed _ _ rightHead => exact absurd ⟨_, _, _, rightHead⟩ headAbsent
+      | identifier _ rightParsed =>
+          exact identifierExpressionDeterministicOutcomeSpec.successOutputUnique
+            leftParsed rightParsed
+
+/-- A name atom builds one expression. -/
+theorem NameAtomParses.value_unique
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    {typeOrdinary : Remainder → Syntax.TypeExpr → Remainder → Prop}
+    {typeRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : ExactDeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    (typeOutcomes : ExactDeterministicOutcomeSpec typeOrdinary typeRejects)
+    {input afterLeft afterRight : Remainder} {left right : Syntax.Expr}
+    (leftParsed : NameAtomParses nestedOrdinary typeOrdinary input left afterLeft)
+    (rightParsed : NameAtomParses nestedOrdinary typeOrdinary input right afterRight) :
+    left = right := by
+  cases leftParsed with
+  | newArray leftParsed =>
+      cases leftParsed with
+      | parsed _ _ leftHead leftLength leftClosing =>
+          cases rightParsed with
+          | newArray rightParsed =>
+              cases rightParsed with
+              | parsed _ _ rightHead rightLength rightClosing =>
+                  rcases leftHead.result_unique typeOutcomes rightHead with ⟨rfl, rfl, rfl⟩
+                  rcases nestedOutcomes.successResultUnique leftLength rightLength with
+                    ⟨rfl, rfl⟩
+                  rcases leftClosing.result_unique rightClosing with ⟨rfl, _⟩
+                  rfl
+          | identifier headAbsent _ => exact absurd ⟨_, _, _, leftHead⟩ headAbsent
+  | identifier headAbsent leftParsed =>
+      cases rightParsed with
+      | newArray rightParsed =>
+          cases rightParsed with
+          | parsed _ _ rightHead => exact absurd ⟨_, _, _, rightHead⟩ headAbsent
+      | identifier _ rightParsed =>
+          exact IdentifierExpressionOrdinaryParses.value_unique leftParsed rightParsed
+
+/-- After its head, `new T[](n)`'s rejection excludes every name atom. -/
+theorem NewArrayExpressionRejects.disjointOrdinary
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    {typeOrdinary : Remainder → Syntax.TypeExpr → Remainder → Prop}
+    {typeRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : DeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    (typeOutcomes : DeterministicOutcomeSpec typeOrdinary typeRejects)
+    {input rejected : Remainder}
+    (rejection : NewArrayExpressionRejects nestedOrdinary nestedRejects typeOrdinary
+      input rejected) :
+    ¬ ∃ value output, NameAtomParses nestedOrdinary typeOrdinary input value output := by
+  rintro ⟨value, output, parsed⟩
+  cases rejection with
+  | lengthRejected head lengthRejected =>
+      cases parsed with
+      | identifier headAbsent _ => exact headAbsent ⟨_, _, _, head⟩
+      | newArray parsed =>
+          cases parsed with
+          | parsed _ _ otherHead lengthParsed _ =>
+              rcases head.output_unique typeOutcomes otherHead with ⟨_, rfl⟩
+              exact nestedOutcomes.successRejectDisjoint lengthRejected
+                ⟨_, _, lengthParsed⟩
+  | closingMissing head lengthParsed closingAbsent =>
+      cases parsed with
+      | identifier headAbsent _ => exact headAbsent ⟨_, _, _, head⟩
+      | newArray parsed =>
+          cases parsed with
+          | parsed _ closingSpan otherHead otherLength closing =>
+              rcases head.output_unique typeOutcomes otherHead with ⟨_, rfl⟩
+              have afterLengthEq :=
+                nestedOutcomes.successOutputUnique lengthParsed otherLength
+              subst afterLengthEq
+              exact closingAbsent ⟨closingSpan, closing.1⟩
+
+/-- Name atoms have deterministic ordinary outcomes. -/
+theorem nameAtomDeterministicOutcomeSpec
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    {typeOrdinary : Remainder → Syntax.TypeExpr → Remainder → Prop}
+    {typeRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : DeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    (typeOutcomes : DeterministicOutcomeSpec typeOrdinary typeRejects) :
+    DeterministicOutcomeSpec (NameAtomParses nestedOrdinary typeOrdinary)
+      (NewArrayExpressionRejects nestedOrdinary nestedRejects typeOrdinary) where
+  successOutputUnique := NameAtomParses.output_unique nestedOutcomes typeOutcomes
+  successRejectDisjoint := NewArrayExpressionRejects.disjointOrdinary nestedOutcomes
+    typeOutcomes
+
 /-- Ordinary identifier leaves expose the Boolean-or-identifier guard. -/
 theorem IdentifierExpressionOrdinaryParses.expressionNameStartsAt
     {input output : Remainder} {expression : Syntax.Expr}
@@ -882,7 +1020,7 @@ theorem ExpressionAtomCoreOrdinaryParses.output_unique
           exact False.elim
             (leftLiteralAbsent rightBranch.coreLiteralStartsAt)
       | identifier _ rightBranch =>
-          exact identifierExpressionDeterministicOutcomeSpec
+          exact (nameAtomDeterministicOutcomeSpec nestedOutcomes typeOutcomes)
             |>.successOutputUnique leftBranch rightBranch
       | dotConstructor _ nameAbsent _ =>
           exact False.elim
@@ -1062,6 +1200,19 @@ theorem ExpressionAtomCoreRejects.disjointOrdinary
         typeOrdinary blockOrdinary input expression output := by
   rintro ⟨expression, output, successful⟩
   cases rejection with
+  | name rejectedLiteralAbsent rejectedBranch =>
+      have rejectedName := rejectedBranch.expressionNameStartsAt
+      cases successful with
+      | literal successfulBranch =>
+          exact rejectedLiteralAbsent successfulBranch.coreLiteralStartsAt
+      | identifier _ successfulBranch =>
+          exact (nameAtomDeterministicOutcomeSpec nestedOutcomes typeOutcomes)
+            |>.successRejectDisjoint rejectedBranch ⟨_, _, successfulBranch⟩
+      | dotConstructor _ nameAbsent _ => exact nameAbsent rejectedName
+      | proxy _ nameAbsent _ _ => exact nameAbsent rejectedName
+      | parenthesized _ nameAbsent _ _ _ => exact nameAbsent rejectedName
+      | array _ nameAbsent _ _ _ _ => exact nameAbsent rejectedName
+      | lambda _ nameAbsent _ _ _ _ _ => exact nameAbsent rejectedName
   | dotConstructor rejectedLiteralAbsent rejectedNameAbsent rejectedBranch =>
       rcases rejectedBranch.marker_present with
         ⟨rejectedSpan, rejectedMarker⟩
@@ -1694,14 +1845,14 @@ theorem ExpressionAtomCoreOrdinaryParses.value_unique
       typeOrdinary blockOrdinary input right afterRight) : left = right := by
   cases leftParsed <;> cases rightParsed <;>
     grind (ematch := 12) [LiteralExpressionOrdinaryParses.value_unique,
-      IdentifierExpressionOrdinaryParses.value_unique,
+      NameAtomParses.value_unique nestedOutcomes typeOutcomes,
       DotConstructorOrdinaryParses.value_unique nestedOutcomes,
       ProxyExpressionOrdinaryParses.value_unique typeOutcomes,
       ParenthesizedExpressionOrdinaryParses.value_unique nestedOutcomes,
       ArrayLiteralExpressionOrdinaryParses.value_unique nestedOutcomes,
       LambdaExpressionOrdinaryParses.value_unique parameterOutcomes typeOutcomes blockOutcomes,
       LiteralExpressionOrdinaryParses.coreLiteralStartsAt,
-      IdentifierExpressionOrdinaryParses.expressionNameStartsAt,
+      NameAtomParses.expressionNameStartsAt,
       DotConstructorOrdinaryParses.marker_present,
       ProxyExpressionOrdinaryParses.marker_present,
       ParenthesizedExpressionOrdinaryParses.marker_present,

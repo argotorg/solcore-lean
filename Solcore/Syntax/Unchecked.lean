@@ -155,6 +155,8 @@ def expression : Nat → Bool → Located ExprValue → M (Located ExprValue)
         | .group inner => pure (.group (← expression fuel inside inner))
         | .tuple elements => pure (.tuple (← delimited fuel inside elements))
         | .array elements => pure (.array (← delimited fuel inside elements))
+        | .newArray keyword type length =>
+            pure (.newArray keyword type (← expression fuel inside length))
         | value => pure value
       pure { written with value }
 

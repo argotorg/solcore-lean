@@ -825,7 +825,7 @@ theorem lambda_selection_ignores_nested (left right : Parser Expr) (block : Pars
 theorem leaf_selection_ignores_both_children (nestedLeft nestedRight : Parser Expr)
     (blockLeft blockRight : Parser Block) {input : State} {branch : ExpressionAtomDispatchBranch}
     (selected : ExpressionAtomDispatchSelects input.declarativeRemainder branch)
-    (leaf : branch ∈ [.literal, .name, .proxy, .final]) :
+    (leaf : branch ∈ [.literal, .proxy, .final]) :
     expressionAtomCore nestedLeft blockLeft input = expressionAtomCore nestedRight blockRight input := by
   rw [expressionAtomCore_eq_raw_of_selection nestedLeft blockLeft selected,
     expressionAtomCore_eq_raw_of_selection nestedRight blockRight selected]
@@ -1982,7 +1982,10 @@ theorem successful_name_bypasses_recovery (prior : List ParseDiagnostic) :
       (.inr (.inr ⟨name.span, name.value, ⟨by change 1 < 6; decide, rfl⟩⟩))
   have parsed : ExpressionAtomTraceParses coreParses coreRejects source 99 (remainder 1)
       { span := name.span, value := .identifier name } (remainder 2) [nameEvent] :=
-    .core (.selected .name selection (.parsed name_trace))
+    .core (.selected .name selection (.identifier
+      (.of_keyword_absent (by
+        simp [TokenKindAbsentAt, TokenAt, remainder, tokens, name, ContextualKeyword.spelling]))
+      (.parsed name_trace)))
   exact ⟨public_success_of_trace (input := input 1 prior) parsed, rfl⟩
 
 private def boundaryFailure : Failure := {

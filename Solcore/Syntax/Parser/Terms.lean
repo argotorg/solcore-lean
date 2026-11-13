@@ -68,6 +68,24 @@ def newArrayHead : Parser (Token × TypeExpr) := do
   let _ ← symbol .leftParen .expression
   pure (keyword, type)
 
+/-- `new T[](n)` after its head: the length and the `)`, committed. -/
+def newArrayTail (nested : Parser Expr) (keyword : Token) (type : TypeExpr) :
+    Parser Expr := do
+  let length ← nested
+  let closing ← symbol .rightParen .expression
+  pure {
+    span := SourceSpan.cover keyword.span closing.span
+    value := .newArray keyword.span type length
+  }
+
+/-- A name atom: `new T[](n)`, or the identifier or Boolean name. The head
+`new T[](` is transactional; after it the length and the `)` are committed. -/
+def nameAtom (nested : Parser Expr) : Parser Expr := fun state =>
+  match newArrayHead state with
+  | .ok (keyword, type) afterOpening => newArrayTail nested keyword type afterOpening
+  | .reject _ _ => identifierExpression state
+  | .invariant error => .invariant error
+
 /-- Parse a proxy expression whose outer range begins at its `@` marker. -/
 def proxyExpression : Parser Expr := do
   let marker ← symbol .at .expression
@@ -219,7 +237,7 @@ def expressionAtomCore (nested : Parser Expr)
   if isCoreLiteral state then
     ExpressionAtomInternals.literalExpression state
   else if isBooleanValue state || isIdentifier state then
-    ExpressionAtomInternals.identifierExpression state
+    ExpressionAtomInternals.nameAtom nested state
   else if isSymbol state .dot then
     ExpressionAtomInternals.dotConstructor nested state
   else if isSymbol state .at then

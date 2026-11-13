@@ -61,7 +61,7 @@ private theorem expressionSuccessorOutcome
     previous.expression.1 previous.expression.2
     (coreExpressionWithFuel_ordinary_preservesTokenWindow fuel)
     parameterOutcome.1 parameterOutcome.2 typeExpr_ordinaryOutcome_sound.1
-    typeExpr_ordinaryOutcome_sound.2 blockOutcome.1 blockOutcome.2
+    typeExpr_ordinaryOutcome_sound.2 typeExpr_exactOutcomeSpec blockOutcome.1 blockOutcome.2
     (isolatedBlockWindow fuel)
   constructor
   · intro input output value result

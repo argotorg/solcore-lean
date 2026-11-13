@@ -3353,6 +3353,10 @@ theorem expressionRetained_step_for {callProvenance : CallIndex → Prop}
       have success := boundary.accepted
       simp only [Detail.inferExprFuel, form] at success
       cases success
+  | newArray keyword type length =>
+      have success := boundary.accepted
+      simp only [Detail.inferExprFuel, form] at success
+      cases success
   | error =>
       have success := boundary.accepted
       simp only [Detail.inferExprFuel, form] at success

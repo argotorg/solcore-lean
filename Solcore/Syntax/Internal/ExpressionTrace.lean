@@ -384,6 +384,15 @@ theorem NewArrayHeadTraceParses.result_unique
           rcases opening.result_unique otherOpening with ⟨_, rfl⟩
           exact ⟨rfl, rfl, rfl, rfl⟩
 
+/-- No head starts where the current token is not `new`. -/
+theorem NewArrayHeadTraceAbsent.of_keyword_absent {input : Remainder}
+    (absent : TokenKindAbsentAt input.tokens input.endIndex input.cursor
+      (.identifier ContextualKeyword.new.spelling)) :
+    NewArrayHeadTraceAbsent typeTrace source endByte input := by
+  rintro ⟨keywordSpan, _, _, _, head⟩
+  cases head with
+  | parsed _ keyword => exact absent ⟨keywordSpan, keyword.1⟩
+
 theorem NewArrayHeadTraceParses.cascadeFilters
     {text : String} {lexical : List SourceSpan}
     (childProtected : ∀ {input value output trace},

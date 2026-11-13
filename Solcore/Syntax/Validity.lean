@@ -904,6 +904,11 @@ inductive ValidFor (statementValid : SourceFile → Statement → Prop)
       (elementsValid : ∀ element ∈ elements.elements,
         ValidFor statementValid file element) :
       ValidFor statementValid file { span, value := .array elements }
+  | newArray {span keyword : SourceSpan} {type : TypeExpr} {length : Expr}
+      (spanValid : span.ValidFor file) (keywordValid : keyword.ValidFor file)
+      (typeValid : TypeExpr.ValidFor file type)
+      (lengthValid : ValidFor statementValid file length) :
+      ValidFor statementValid file { span, value := .newArray keyword type length }
   | error {span : SourceSpan} (spanValid : span.ValidFor file) :
       ValidFor statementValid file { span, value := .error }
 
@@ -1211,6 +1216,8 @@ theorem mono {old new : SourceFile → Statement → Prop}
       exact .tuple spanValid elementsSpanValid elementsInduction
   | array spanValid elementsSpanValid _ elementsInduction =>
       exact .array spanValid elementsSpanValid elementsInduction
+  | newArray spanValid keywordValid typeValid _ lengthInduction =>
+      exact .newArray spanValid keywordValid typeValid lengthInduction
   | error spanValid => exact .error spanValid
 
 end Expr.ValidFor

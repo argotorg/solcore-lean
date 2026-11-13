@@ -3566,6 +3566,7 @@ private inductive ExpressionShape where
   | group (inner : ExpressionShape)
   | tuple (elements : List ExpressionShape)
   | array (elements : List ExpressionShape)
+  | newArray (length : ExpressionShape)
   | error
   | other
   deriving Repr, BEq, Inhabited
@@ -3589,6 +3590,7 @@ private partial def expressionShape (expression : Expr) : ExpressionShape :=
   | .group inner => .group (expressionShape inner)
   | .tuple values => .tuple (values.elements.map expressionShape)
   | .array values => .array (values.elements.map expressionShape)
+  | .newArray _ _ length => .newArray (expressionShape length)
   | .error => .error
   | _ => .other
 
@@ -3635,6 +3637,57 @@ private def testAtomsAndTuples : IO Unit := do
     assertEqual (expressionShape run.value) expected s!"atom shape {source}"
     assertEqual (byteRange run.value.span) (0, source.utf8ByteSize)
       s!"atom span {source}"
+
+/-- `new T[](n)` allocates and `new` elsewhere stays a name, as in upstream's
+`new_allocates_arrays_and_otherwise_stays_an_identifier`
+(`crates/parser/src/parse/mod.rs:1591`) and
+`formats_new_array_allocations_and_keeps_new_as_an_identifier`
+(`crates/parser/tests/formatting.rs:128`). After `new T[](` the length and the
+`)` are required. -/
+private def testNewArrays : IO Unit := do
+  let nested ← runExpression "new array" "new uint256[][](n + 1)"
+  assertEqual (expressionShape nested.value)
+    (.newArray (bin (ident "n") .add (.literal (.decimal "1")))) "new array shape"
+  assertEqual (byteRange nested.value.span) (0, 22) "new array span"
+  match nested.value.value with
+  | .newArray keyword type _ =>
+      assertEqual (byteRange keyword) (0, 3) "new keyword span"
+      assertEqual (byteRange type.span) (4, 15) "new array type span"
+      match type.value with
+      | .array element _ =>
+          unless TypeExpr.isArray element do
+            throw (IO.userError "the new array's element changed shape")
+      | _ => throw (IO.userError "the new array's type changed shape")
+  | _ => throw (IO.userError "the new array changed shape")
+  for (source, expected) in [
+      ("new(m)", .call (ident "new") [ident "m"]),
+      ("new + 1", bin (ident "new") .add (.literal (.decimal "1"))),
+      ("new", ident "new")
+    ] do
+    let run ← runExpression s!"new as a name {source}" source
+    assertEqual (expressionShape run.value) expected s!"new as a name {source}"
+  let notArray ← runExpression "new before a non-array type" "new uint256(3)" false
+  assertEqual (expressionShape notArray.value) (ident "new") "new before a non-array type"
+  assertEqual notArray.state.cursor 1 "new before a non-array type ends at the type"
+  let committed ← runExpression "new commits after its head" "new uint256[](;" false
+  assertEqual (expressionShape committed.value) .error "a committed new recovers"
+  assertEqual (committed.state.diagnostics.map fun item =>
+      (byteRange item.span, item.kind)) [
+    ((14, 15), .unexpected (some (.symbol .semicolon))
+      { head := .expression, tail := [] } .expression),
+    ((0, 12), .recovered .expressionAtom)
+  ] "a committed new reports its length, then recovers up to the `]`"
+  let file : SourceFile := { id := termSource, content := String.intercalate "\n" [
+      "pragma solcore;",
+      "function new(x:word)returns(word){return x;}",
+      "function f(n:uint256)returns(word){let m=new uint256[ ]( n );" ++
+        "let r=new uint256[][](n+1);return new(1);}"
+    ] }
+  match Parser.parse file with
+  | .error error => throw (IO.userError
+      s!"formatting.rs:128: parser invariant failed: {reprStr error}")
+  | .ok output =>
+      assertEqual output.parseDiagnostics [] "formatting.rs:128 parse diagnostics"
 
 private def testSourcePreservingWitnesses : IO Unit := do
   let proxy ← runExpression "proxy expression" "@pkg.Box<word>"
@@ -3862,6 +3915,7 @@ private def testPatternRecovery : IO Unit := do
 /-- Run direct expression and pattern parser regressions. -/
 def testSyntaxParserTerms : IO Unit := do
   testAtomsAndTuples
+  testNewArrays
   testSourcePreservingWitnesses
   testTrailingCommaRejection
   testPostfixAndUnary

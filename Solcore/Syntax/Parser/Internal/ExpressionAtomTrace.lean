@@ -1302,6 +1302,195 @@ end Solcore.Syntax.Parser.ExpressionAtomInternals
 end
 
 section
+/-! The name atom's traces: the head's events and then the length's, or the
+identifier's where the head rejects. Only the length's success frame is
+assumed; the head, its type and the identifier are concrete. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.Parser.ExpressionAtomInternals
+
+open DeclarativeGrammar
+
+variable {nested : Parser Expr}
+  {elementTrace : SourceId → Nat → Remainder → Expr → Remainder → List ParseDiagnostic → Prop}
+  {elementRejects : SourceId → Nat → Remainder → Remainder → ParseDiagnostic →
+    List ParseDiagnostic → Prop}
+
+theorem nameAtom_trace_success_sound
+    (successSound : ParserTraceSuccessSound nested elementTrace) :
+    ParserTraceSuccessSound (nameAtom nested) (NameAtomTraceParses elementTrace TypeExprTraceParses) := by
+  intro input output value result
+  unfold nameAtom at result
+  cases headResult : newArrayHead input with
+  | invariant error => simp only [headResult] at result <;> cases result
+  | reject failure rejected =>
+      simp only [headResult] at result
+      rcases identifierExpression_trace_success_sound result with ⟨trace, parsed, events⟩
+      exact ⟨trace, .identifier (newArrayHead_reject_trace_absent headResult) parsed, events⟩
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      simp only [headResult] at result
+      rcases newArrayHead_trace_success_sound headResult with ⟨headTrace, headParsed, headEvents⟩
+      have headFrame := newArrayHead_success_context headResult
+      unfold newArrayTail at result
+      rcases bind_ok_parts result with ⟨length, afterLength, lengthResult, rest⟩
+      rcases bind_ok_parts rest with ⟨closing, afterClosing, closingResult, finished⟩
+      cases finished
+      rcases successSound lengthResult with ⟨lengthTrace, lengthParsed, lengthEvents⟩
+      rw [headFrame.1, headFrame.2] at lengthParsed
+      have closingParsed := symbol_success_exactTokenParses .rightParen .expression closingResult
+      have closingState := (symbol_ok_tokenAt .rightParen .expression closingResult).2
+      refine ⟨headTrace ++ lengthTrace, .newArray (.parsed _ _ headParsed lengthParsed
+        closingParsed), ?_⟩
+      rw [closingState]
+      change afterLength.diagnostics = input.diagnostics ++ (headTrace ++ lengthTrace)
+      rw [lengthEvents, headEvents, List.append_assoc]
+
+theorem nameAtom_trace_success_complete
+    (successComplete : ParserTraceSuccessComplete nested elementTrace) :
+    ParserTraceSuccessComplete (nameAtom nested)
+      (NameAtomTraceParses elementTrace TypeExprTraceParses) := by
+  intro input value after trace parsed
+  cases parsed with
+  | identifier headAbsent parsed =>
+      rcases newArrayHead_reject_of_trace_absent headAbsent with ⟨failure, rejected, headResult⟩
+      rcases identifierExpression_trace_success_complete parsed with
+        ⟨output, result, afterEq, events⟩
+      exact ⟨output, by simp only [nameAtom, headResult]; exact result, afterEq, events⟩
+  | newArray parsed =>
+      cases parsed with
+      | parsed _ _ head lengthParsed closingParsed =>
+          rcases newArrayHead_trace_success_complete head with
+            ⟨afterOpening, headResult, rfl, headEvents⟩
+          have headFrame := newArrayHead_success_context headResult
+          rw [← headFrame.1, ← headFrame.2] at lengthParsed
+          rcases successComplete (input := afterOpening) lengthParsed with
+            ⟨afterLength, lengthResult, rfl, lengthEvents⟩
+          have closingResult := symbol_eq_ok_of_exactTokenParses .rightParen .expression
+            closingParsed
+          rcases closingParsed with ⟨_, rfl⟩
+          refine ⟨{ afterLength with cursor := afterLength.cursor + 1 }, ?_, rfl, ?_⟩
+          · simp only [nameAtom, headResult, newArrayTail, bind, lengthResult, closingResult,
+              pure]
+          · change afterLength.diagnostics = _
+            rw [lengthEvents, headEvents, List.append_assoc]
+
+theorem nameAtom_success_context (contextFrame : ParserSuccessContext nested) :
+    ParserSuccessContext (nameAtom nested) := by
+  intro input output value result
+  unfold nameAtom at result
+  cases headResult : newArrayHead input with
+  | invariant error => simp only [headResult] at result <;> cases result
+  | reject failure rejected =>
+      simp only [headResult] at result
+      exact identifierExpression_success_context result
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      simp only [headResult] at result
+      have headFrame := newArrayHead_success_context headResult
+      unfold newArrayTail at result
+      rcases bind_ok_parts result with ⟨length, afterLength, lengthResult, rest⟩
+      rcases bind_ok_parts rest with ⟨closing, afterClosing, closingResult, finished⟩
+      cases finished
+      have lengthFrame := contextFrame lengthResult
+      rw [(symbol_ok_tokenAt .rightParen .expression closingResult).2]
+      exact ⟨lengthFrame.1.trans headFrame.1, lengthFrame.2.trans headFrame.2⟩
+
+theorem nameAtom_reject_trace_sound
+    (successSound : ParserTraceSuccessSound nested elementTrace)
+    (rejectSound : ParserTraceRejectSound nested elementRejects)
+    (contextFrame : ParserSuccessContext nested) :
+    ParserTraceRejectSound (nameAtom nested)
+      (NameAtomTraceRejects elementTrace elementRejects TypeExprTraceParses) := by
+  intro input rejected failure result
+  unfold nameAtom at result
+  cases headResult : newArrayHead input with
+  | invariant error => simp only [headResult] at result <;> cases result
+  | reject headFailure headRejected =>
+      simp only [headResult] at result
+      rcases identifierExpression_trace_reject_sound result with ⟨trace, rejection, events⟩
+      exact ⟨trace, .identifier (newArrayHead_reject_trace_absent headResult) rejection, events⟩
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      simp only [headResult] at result
+      rcases newArrayHead_trace_success_sound headResult with ⟨headTrace, headParsed, headEvents⟩
+      have headFrame := newArrayHead_success_context headResult
+      unfold newArrayTail at result
+      cases lengthResult : nested afterOpening with
+      | invariant error => simp only [bind, lengthResult] at result <;> cases result
+      | reject lengthFailure lengthRejected =>
+          simp only [bind, lengthResult] at result
+          cases result
+          rcases rejectSound lengthResult with ⟨lengthTrace, lengthRejection, lengthEvents⟩
+          rw [headFrame.1, headFrame.2] at lengthRejection
+          exact ⟨headTrace ++ lengthTrace, .lengthRejected headParsed lengthRejection,
+            by rw [lengthEvents, headEvents, List.append_assoc]⟩
+      | ok length afterLength =>
+          simp only [bind, lengthResult] at result
+          cases closingResult : symbol .rightParen .expression afterLength with
+          | invariant error => simp only [closingResult] at result <;> cases result
+          | ok closing afterClosing => simp only [closingResult, pure] at result <;> cases result
+          | reject closingFailure closingRejected =>
+              simp only [closingResult] at result
+              cases result
+              rcases successSound lengthResult with ⟨lengthTrace, lengthParsed, lengthEvents⟩
+              rw [headFrame.1, headFrame.2] at lengthParsed
+              have same := symbol_reject_state_eq .rightParen .expression closingResult
+              subst same
+              have reported := (symbol_reject_reports_iff .rightParen .expression).mpr
+                ⟨_, closingResult, rfl⟩
+              have lengthFrame := contextFrame lengthResult
+              have report := reported.2
+              rw [lengthFrame.1, lengthFrame.2, headFrame.1, headFrame.2] at report
+              exact ⟨headTrace ++ lengthTrace,
+                .closingMissing headParsed lengthParsed reported.1 report,
+                by rw [lengthEvents, headEvents, List.append_assoc]⟩
+
+theorem nameAtom_trace_reject_complete
+    (successComplete : ParserTraceSuccessComplete nested elementTrace)
+    (rejectComplete : ParserTraceRejectComplete nested elementRejects)
+    (contextFrame : ParserSuccessContext nested) :
+    ParserTraceRejectComplete (nameAtom nested)
+      (NameAtomTraceRejects elementTrace elementRejects TypeExprTraceParses) := by
+  intro input after report trace rejection
+  cases rejection with
+  | identifier headAbsent rejection =>
+      rcases newArrayHead_reject_of_trace_absent headAbsent with
+        ⟨headFailure, headRejected, headResult⟩
+      rcases identifierExpression_trace_reject_complete rejection with
+        ⟨failure, rejected, result, afterEq, reportEq, events⟩
+      exact ⟨failure, rejected, by simp only [nameAtom, headResult]; exact result, afterEq,
+        reportEq, events⟩
+  | lengthRejected head lengthRejection =>
+      rcases newArrayHead_trace_success_complete head with
+        ⟨afterOpening, headResult, rfl, headEvents⟩
+      have headFrame := newArrayHead_success_context headResult
+      rw [← headFrame.1, ← headFrame.2] at lengthRejection
+      rcases rejectComplete (input := afterOpening) lengthRejection with
+        ⟨failure, rejected, lengthResult, afterEq, reportEq, lengthEvents⟩
+      exact ⟨failure, rejected,
+        by simp only [nameAtom, headResult, newArrayTail, bind, lengthResult],
+        afterEq, reportEq, by rw [lengthEvents, headEvents, List.append_assoc]⟩
+  | closingMissing head lengthParsed closingAbsent reported =>
+      rcases newArrayHead_trace_success_complete head with
+        ⟨afterOpening, headResult, rfl, headEvents⟩
+      have headFrame := newArrayHead_success_context headResult
+      rw [← headFrame.1, ← headFrame.2] at lengthParsed
+      rcases successComplete (input := afterOpening) lengthParsed with
+        ⟨afterLength, lengthResult, rfl, lengthEvents⟩
+      have lengthFrame := contextFrame lengthResult
+      rw [← headFrame.1, ← headFrame.2, ← lengthFrame.1, ← lengthFrame.2] at reported
+      rcases (symbol_reject_reports_iff .rightParen .expression).mp ⟨closingAbsent, reported⟩ with
+        ⟨failure, closingResult, reportEq⟩
+      exact ⟨failure, afterLength,
+        by simp only [nameAtom, headResult, newArrayTail, bind, lengthResult, closingResult],
+        rfl, reportEq, by rw [lengthEvents, headEvents, List.append_assoc]⟩
+
+end Solcore.Syntax.Parser.ExpressionAtomInternals
+end
+
+section
 -- leanmerge: from Solcore.Syntax.Parser.ExpressionAtomDispatchSuccessTraceProperties
 /-! One atom-core layer composes exact raw successes. Nested-expression
 success frames remain explicit; the final lambda body needs only its own
@@ -1327,7 +1516,7 @@ theorem raw_trace_success_sound
       (ExpressionAtomDispatchRawTraceParses elementTrace blockTrace branch) := by
   cases branch with
   | literal => exact literalExpression_trace_success_sound
-  | name => exact identifierExpression_trace_success_sound
+  | name => exact nameAtom_trace_success_sound successSound
   | dotConstructor => exact dotConstructor_trace_success_sound successSound contextFrame
   | proxy => exact proxyExpression_concrete_trace_success_sound
   | parenthesized => exact parenthesized_trace_success_sound successSound contextFrame
@@ -1343,7 +1532,7 @@ theorem raw_trace_success_complete
       (ExpressionAtomDispatchRawTraceParses elementTrace blockTrace branch) := by
   cases branch with
   | literal => exact literalExpression_trace_success_complete
-  | name => exact identifierExpression_trace_success_complete
+  | name => exact nameAtom_trace_success_complete successComplete
   | dotConstructor => exact dotConstructor_trace_success_complete successComplete contextFrame
   | proxy => exact proxyExpression_concrete_trace_success_complete
   | parenthesized => exact parenthesized_trace_success_complete successComplete contextFrame
@@ -1356,7 +1545,7 @@ theorem raw_success_context (contextFrame : ParserSuccessContext nested)
     ParserSuccessContext (rawParser nested block branch) := by
   cases branch with
   | literal => exact literalExpression_success_context
-  | name => exact identifierExpression_success_context
+  | name => exact nameAtom_success_context contextFrame
   | dotConstructor => exact dotConstructor_success_context contextFrame
   | proxy => exact proxyExpression_concrete_success_context
   | parenthesized => exact parenthesized_success_context contextFrame
@@ -1429,7 +1618,7 @@ theorem raw_reject_trace_sound
       (ExpressionAtomDispatchRawTraceRejects elementTrace elementRejects blockRejects branch) := by
   cases branch with
   | literal => exact literalExpression_trace_reject_sound
-  | name => exact identifierExpression_trace_reject_sound
+  | name => exact nameAtom_reject_trace_sound successSound rejectSound contextFrame
   | dotConstructor => exact dotConstructor_reject_trace_sound successSound rejectSound contextFrame
   | proxy => exact proxyExpression_concrete_reject_trace_sound
   | parenthesized => exact parenthesized_reject_trace_sound successSound rejectSound contextFrame
@@ -1451,7 +1640,7 @@ theorem raw_trace_reject_complete
       (ExpressionAtomDispatchRawTraceRejects elementTrace elementRejects blockRejects branch) := by
   cases branch with
   | literal => exact literalExpression_trace_reject_complete
-  | name => exact identifierExpression_trace_reject_complete
+  | name => exact nameAtom_trace_reject_complete successComplete rejectComplete contextFrame
   | dotConstructor => exact dotConstructor_trace_reject_complete successComplete rejectComplete contextFrame
   | proxy => exact proxyExpression_concrete_trace_reject_complete
   | parenthesized => exact parenthesized_trace_reject_complete successComplete rejectComplete contextFrame
@@ -1755,6 +1944,46 @@ theorem lambdaExpression_reject_context_of_windowProjection {β : Type} {view : 
                   exact ⟨frame.1.trans (returnFrame.1.trans parameterFrame.1),
                     frame.2.trans (congrArg view (returnFrame.2.trans parameterFrame.2))⟩
 
+theorem nameAtom_reject_context_of_windowProjection {β : Type} {view : TokenWindow → β}
+    {nested : Parser Expr}
+    (nestedSuccess : ExpressionSuccessContext nested)
+    (nestedReject : ∀ {input rejected failure}, nested input = .reject failure rejected →
+      rejected.file = input.file ∧ view rejected.window = view input.window)
+    {input rejected : State} {failure : Failure}
+    (result : nameAtom nested input = .reject failure rejected) :
+    rejected.file = input.file ∧ view rejected.window = view input.window := by
+  unfold nameAtom at result
+  cases headResult : newArrayHead input with
+  | invariant error => simp only [headResult] at result <;> cases result
+  | reject headFailure headRejected =>
+      simp only [headResult] at result
+      have frame := identifierExpression_reject_context result
+      exact ⟨frame.1, congrArg view frame.2⟩
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      simp only [headResult] at result
+      have headFrame := newArrayHead_success_context headResult
+      unfold newArrayTail at result
+      cases lengthResult : nested afterOpening with
+      | invariant error => simp only [bind, lengthResult] at result <;> cases result
+      | reject lengthFailure lengthRejected =>
+          simp only [bind, lengthResult] at result
+          cases result
+          have frame := nestedReject lengthResult
+          exact ⟨frame.1.trans headFrame.1, frame.2.trans (congrArg view headFrame.2)⟩
+      | ok length afterLength =>
+          simp only [bind, lengthResult] at result
+          have lengthFrame := nestedSuccess lengthResult
+          cases closingResult : symbol .rightParen .expression afterLength with
+          | invariant error => simp only [closingResult] at result <;> cases result
+          | ok closing afterClosing => simp only [closingResult, pure] at result <;> cases result
+          | reject closingFailure closingRejected =>
+              simp only [closingResult] at result
+              cases result
+              rw [symbol_reject_state_eq .rightParen .expression closingResult]
+              exact ⟨lengthFrame.1.trans headFrame.1,
+                congrArg view (lengthFrame.2.trans headFrame.2)⟩
+
 theorem expressionAtomCore_reject_context_of_windowProjection
     {β : Type} {view : TokenWindow → β} {nested : Parser Expr} {block : Parser Block}
     (nestedSuccess : ExpressionSuccessContext nested)
@@ -1771,9 +2000,7 @@ theorem expressionAtomCore_reject_context_of_windowProjection
   | literal =>
       have frame := literalExpression_reject_context result
       exact ⟨frame.1, congrArg view frame.2⟩
-  | name =>
-      have frame := identifierExpression_reject_context result
-      exact ⟨frame.1, congrArg view frame.2⟩
+  | name => exact nameAtom_reject_context_of_windowProjection nestedSuccess nestedReject result
   | dotConstructor => exact dotConstructor_reject_context_of_windowProjection nestedSuccess nestedReject result
   | proxy =>
       have frame := proxyExpression_reject_context result

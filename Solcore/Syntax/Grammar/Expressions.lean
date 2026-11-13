@@ -1366,6 +1366,57 @@ def NewArrayHeadAbsent
     (input : Remainder) : Prop :=
   ¬ ∃ keywordSpan type output, NewArrayHeadParses typeParses input keywordSpan type output
 
+/-- `new T[](n)`: its head, then the length and the `)`. -/
+inductive NewArrayExpressionParses
+    (nestedParses : Remainder → Syntax.Expr → Remainder → Prop)
+    (typeParses : Remainder → Syntax.TypeExpr → Remainder → Prop) :
+    Remainder → Syntax.Expr → Remainder → Prop where
+  | parsed {input afterOpening afterLength output : Remainder}
+      {type : Syntax.TypeExpr} {length : Syntax.Expr}
+      (keywordSpan closingSpan : SourceSpan)
+      (head : NewArrayHeadParses typeParses input keywordSpan type afterOpening)
+      (lengthParsed : nestedParses afterOpening length afterLength)
+      (closingParsed : ExactTokenParses (.symbol .rightParen) afterLength
+        closingSpan output) :
+      NewArrayExpressionParses nestedParses typeParses input {
+        span := SourceSpan.cover keywordSpan closingSpan
+        value := .newArray keywordSpan type length
+      } output
+
+/-- A name atom: `new T[](n)`, or the identifier or Boolean name where no head
+`new T[](` starts, as upstream's `.or(new_array_expr).or(ident_parser())` falls
+back (`crates/parser/src/parse/expr_pat.rs:304-305`). -/
+inductive NameAtomParses
+    (nestedParses : Remainder → Syntax.Expr → Remainder → Prop)
+    (typeParses : Remainder → Syntax.TypeExpr → Remainder → Prop) :
+    Remainder → Syntax.Expr → Remainder → Prop where
+  | newArray {input output : Remainder} {value : Syntax.Expr}
+      (parsed : NewArrayExpressionParses nestedParses typeParses input value output) :
+      NameAtomParses nestedParses typeParses input value output
+  | identifier {input output : Remainder} {value : Syntax.Expr}
+      (headAbsent : NewArrayHeadAbsent typeParses input)
+      (parsed : IdentifierExpressionParses input value output) :
+      NameAtomParses nestedParses typeParses input value output
+
+/-- `new T[](n)` rejects only after its head: in its length or at its `)`. -/
+inductive NewArrayExpressionRejects
+    (nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop)
+    (nestedRejects : Remainder → Remainder → Prop)
+    (typeOrdinary : Remainder → Syntax.TypeExpr → Remainder → Prop) :
+    Remainder → Remainder → Prop where
+  | lengthRejected {input afterOpening rejected : Remainder}
+      {keywordSpan : SourceSpan} {type : Syntax.TypeExpr}
+      (head : NewArrayHeadParses typeOrdinary input keywordSpan type afterOpening)
+      (lengthRejected : nestedRejects afterOpening rejected) :
+      NewArrayExpressionRejects nestedOrdinary nestedRejects typeOrdinary input rejected
+  | closingMissing {input afterOpening afterLength : Remainder}
+      {keywordSpan : SourceSpan} {type : Syntax.TypeExpr} {length : Syntax.Expr}
+      (head : NewArrayHeadParses typeOrdinary input keywordSpan type afterOpening)
+      (lengthParsed : nestedOrdinary afterOpening length afterLength)
+      (closingAbsent : TokenKindAbsentAt afterLength.tokens afterLength.endIndex
+        afterLength.cursor (.symbol .rightParen)) :
+      NewArrayExpressionRejects nestedOrdinary nestedRejects typeOrdinary input afterLength
+
 /-- Exact grammar of an `@`-prefixed proxy expression leaf. -/
 inductive ProxyExpressionParses :
     Remainder → Syntax.Expr → Remainder → Prop where
@@ -1480,7 +1531,7 @@ inductive ExpressionAtomCoreParses
       ExpressionAtomCoreParses nestedParses blockParses input value output
   | identifier {input output : Remainder} {value : Syntax.Expr}
       (literalAbsent : ¬ CoreLiteralStartsAt input)
-      (parsed : IdentifierExpressionParses input value output) :
+      (parsed : NameAtomParses nestedParses TypeExprParses input value output) :
       ExpressionAtomCoreParses nestedParses blockParses input value output
   | dotConstructor {input output : Remainder} {value : Syntax.Expr}
       (literalAbsent : ¬ CoreLiteralStartsAt input)
@@ -1872,7 +1923,7 @@ inductive ExpressionAtomCoreOrdinaryParses
         typeOrdinary blockOrdinary input expression output
   | identifier {input output : Remainder} {expression : Syntax.Expr}
       (literalAbsent : ¬ CoreLiteralStartsAt input)
-      (parsed : IdentifierExpressionOrdinaryParses input expression output) :
+      (parsed : NameAtomParses nestedOrdinary typeOrdinary input expression output) :
       ExpressionAtomCoreOrdinaryParses nestedOrdinary parameterOrdinary
         typeOrdinary blockOrdinary input expression output
   | dotConstructor {input output : Remainder} {expression : Syntax.Expr}
@@ -1931,7 +1982,7 @@ inductive ExpressionAtomCoreOrdinaryParses
       ExpressionAtomCoreOrdinaryParses nestedOrdinary parameterOrdinary
         typeOrdinary blockOrdinary input expression output
 
-/-- Exact ordinary rejection of the five fallible selected branches or the
+/-- Exact ordinary rejection of the six fallible selected branches or the
 final non-consuming branch. -/
 inductive ExpressionAtomCoreRejects
     (nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop)
@@ -1943,6 +1994,13 @@ inductive ExpressionAtomCoreRejects
     (typeRejects : Remainder → Remainder → Prop)
     (blockRejects : Remainder → Remainder → Prop) :
     Remainder → Remainder → Prop where
+  | name {input rejected : Remainder}
+      (literalAbsent : ¬ CoreLiteralStartsAt input)
+      (branchRejected : NewArrayExpressionRejects nestedOrdinary nestedRejects
+        typeOrdinary input rejected) :
+      ExpressionAtomCoreRejects nestedOrdinary nestedRejects
+        parameterOrdinary parameterRejects typeOrdinary typeRejects
+          blockRejects input rejected
   | dotConstructor {input rejected : Remainder}
       (literalAbsent : ¬ CoreLiteralStartsAt input)
       (nameAbsent : ¬ ExpressionNameStartsAt input)

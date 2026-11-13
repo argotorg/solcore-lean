@@ -1,4 +1,5 @@
 import Solcore.Syntax.Internal.ExpressionAtomOutcomes
+import Solcore.Syntax.Internal.TypeExactness
 import Solcore.Syntax.Parser.Internal.DelimitedSoundness
 import Solcore.Syntax.Parser.Internal.ExpressionAtomProofs
 import Solcore.Syntax.Parser.Internal.ParameterBasics
@@ -443,6 +444,11 @@ theorem expressionAtomCore_success_ordinary_sound
     (blockSuccessSound : ∀ {input output : State} {body : Block},
       block input = .ok body output → blockOrdinary
         input.declarativeRemainder body output.declarativeRemainder)
+    {typeRejects : DeclarativeGrammar.Remainder → DeclarativeGrammar.Remainder → Prop}
+    (typeOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec typeOrdinary typeRejects)
+    (typeRejectSound : ∀ {input rejected : State} {failure : Failure},
+      typeExpr input = .reject failure rejected → typeRejects
+        input.declarativeRemainder rejected.declarativeRemainder)
     {input output : State} {expression : Expr}
     (result : expressionAtomCore nested block input = .ok expression output) :
     DeclarativeGrammar.ExpressionAtomCoreOrdinaryParses nestedOrdinary
@@ -459,7 +465,9 @@ theorem expressionAtomCore_success_ordinary_sound
       not_coreLiteralStartsAt_of_isCoreLiteral_eq_false literalAbsentEq
     split at result
     next namePresent =>
-      exact .identifier noLiteral (identifierExpression_success_sound result)
+      exact .identifier noLiteral (nameAtom_success_sound nested typeOutcomes
+        typeSuccessSound typeRejectSound (fun _ lengthResult => nestedSuccessSound lengthResult)
+        result)
     next nameAbsent =>
       have nameAbsentEq :
           (isBooleanValue input || isIdentifier input) = false :=
@@ -597,6 +605,57 @@ private theorem identifierExpression_ne_reject_of_name_guard_eq_true
     exact ⟨_, output, .parsed
       (.identifier trueAbsent falseAbsent identifierParsed)⟩
 
+/-- Under the name guard a name atom rejects only after its head, since the
+identifier cannot reject there. -/
+private theorem nameAtom_reject_ordinary_sound (nested : Parser Expr)
+    {nestedOrdinary : DeclarativeGrammar.Remainder → Expr →
+      DeclarativeGrammar.Remainder → Prop}
+    {nestedRejects : DeclarativeGrammar.Remainder → DeclarativeGrammar.Remainder → Prop}
+    {typeOrdinary : DeclarativeGrammar.Remainder → TypeExpr →
+      DeclarativeGrammar.Remainder → Prop}
+    (nestedSuccessSound : ∀ {input output : State} {expression : Expr},
+      nested input = .ok expression output → nestedOrdinary
+        input.declarativeRemainder expression output.declarativeRemainder)
+    (nestedRejectSound : ∀ {input rejected : State} {failure : Failure},
+      nested input = .reject failure rejected → nestedRejects
+        input.declarativeRemainder rejected.declarativeRemainder)
+    (typeSuccessSound : ∀ {input output : State} {type : TypeExpr},
+      typeExpr input = .ok type output → typeOrdinary
+        input.declarativeRemainder type output.declarativeRemainder)
+    {input rejected : State} {failure : Failure}
+    (present : (isBooleanValue input || isIdentifier input) = true)
+    (result : nameAtom nested input = .reject failure rejected) :
+    DeclarativeGrammar.NewArrayExpressionRejects nestedOrdinary nestedRejects typeOrdinary
+      input.declarativeRemainder rejected.declarativeRemainder := by
+  unfold nameAtom at result
+  cases headResult : newArrayHead input with
+  | invariant error => simp only [headResult] at result <;> cases result
+  | reject headFailure headRejected =>
+      simp only [headResult] at result
+      exact False.elim (identifierExpression_ne_reject_of_name_guard_eq_true present result)
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      simp only [headResult] at result
+      have headParsed := newArrayHead_success_sound typeSuccessSound headResult
+      unfold newArrayTail at result
+      cases lengthResult : nested afterOpening with
+      | invariant error => simp only [bind, lengthResult] at result <;> cases result
+      | reject lengthFailure lengthRejected =>
+          simp only [bind, lengthResult] at result
+          cases result
+          exact .lengthRejected headParsed (nestedRejectSound lengthResult)
+      | ok length afterLength =>
+          simp only [bind, lengthResult] at result
+          cases closingResult : symbol .rightParen .expression afterLength with
+          | invariant error => simp only [closingResult] at result <;> cases result
+          | ok closing afterClosing => simp only [closingResult, pure] at result <;> cases result
+          | reject closingFailure closingRejected =>
+              simp only [closingResult] at result
+              cases result
+              rw [symbol_reject_state_eq .rightParen .expression closingResult]
+              exact .closingMissing headParsed (nestedSuccessSound lengthResult)
+                (symbol_reject_tokenKindAbsentAt .rightParen .expression closingResult)
+
 /-- Every executable Core-atom rejection follows the exact selected branch;
 positive literal and name guards are proved unable to reject. -/
 theorem expressionAtomCore_reject_ordinary_sound
@@ -660,9 +719,8 @@ theorem expressionAtomCore_reject_ordinary_sound
       not_coreLiteralStartsAt_of_isCoreLiteral_eq_false literalAbsentEq
     split at result
     next namePresent =>
-      exact False.elim
-        (identifierExpression_ne_reject_of_name_guard_eq_true namePresent
-          result)
+      exact .name noLiteral (nameAtom_reject_ordinary_sound nested nestedSuccessSound
+        nestedRejectSound typeSuccessSound namePresent result)
     next nameAbsent =>
       have nameAbsentEq :
           (isBooleanValue input || isIdentifier input) = false :=
@@ -791,7 +849,8 @@ theorem expressionAtomCore_ordinaryOutcome_sound
         input.declarativeRemainder body output.declarativeRemainder)
     (blockRejectSound : ∀ {input rejected : State} {failure : Failure},
       block input = .reject failure rejected → blockRejects
-        input.declarativeRemainder rejected.declarativeRemainder) :
+        input.declarativeRemainder rejected.declarativeRemainder)
+    (typeOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec typeOrdinary typeRejects) :
     (∀ {input output : State} {expression : Expr},
       expressionAtomCore nested block input = .ok expression output →
         DeclarativeGrammar.ExpressionAtomCoreOrdinaryParses nestedOrdinary
@@ -807,7 +866,7 @@ theorem expressionAtomCore_ordinaryOutcome_sound
   ⟨expressionAtomCore_success_ordinary_sound nested block nestedOrdinary
       parameterOrdinary typeOrdinary blockOrdinary nestedSuccessSound
         nestedShape parameterSuccessSound parameterShape typeSuccessSound
-          blockSuccessSound,
+          blockSuccessSound typeOutcomes typeRejectSound,
     expressionAtomCore_reject_ordinary_sound nested block nestedOrdinary
       nestedRejects parameterOrdinary parameterRejects typeOrdinary
         typeRejects blockRejects nestedSuccessSound nestedRejectSound
@@ -1195,6 +1254,8 @@ theorem coreExpressionStep_ordinaryOutcome_sound
     (typeRejectSound : ∀ {input rejected : State} {failure : Failure},
       typeExpr input = .reject failure rejected → relations.typeRejects
         input.declarativeRemainder rejected.declarativeRemainder)
+    (typeOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec
+      relations.typeOrdinary relations.typeRejects)
     (blockSuccessSound : ∀ {input output : State} {body : Block},
       block input = .ok body output → relations.blockOrdinary
         input.declarativeRemainder body output.declarativeRemainder)
@@ -1219,7 +1280,7 @@ theorem coreExpressionStep_ordinaryOutcome_sound
               nestedRejectSound nestedWindow parameterSuccessSound
                 parameterRejectSound lambdaParameter_preservesTokenWindow
                   typeSuccessSound typeRejectSound blockSuccessSound
-                    blockRejectSound
+                    blockRejectSound typeOutcomes
   have coreWindow :=
     ExpressionAtomInternals.expressionAtomCore_preservesTokenWindow nested
       block nestedWindow blockWindow
@@ -1416,7 +1477,7 @@ theorem expressionAtomCore_reflectsDiagnosticFreeOnSuccess
   · exact literalExpression_reflectsDiagnosticFreeOnSuccess input value next
       result diagnosticFree
   split at result
-  · exact identifierExpression_reflectsDiagnosticFreeOnSuccess input value
+  · exact nameAtom_reflectsDiagnosticFreeOnSuccess nested nestedReflects input value
       next result diagnosticFree
   split at result
   · exact dotConstructor_reflectsDiagnosticFreeOnSuccess nested
@@ -1472,6 +1533,10 @@ theorem expressionAtomCore_success_sound
       block blockInput = .ok blockValue blockNext →
       blockParses blockInput.declarativeRemainder blockValue
         blockNext.declarativeRemainder)
+    (typeRejectSound : ∀ {typeInput typeRejected : State} {failure : Failure},
+      typeExpr typeInput = .reject failure typeRejected →
+        DeclarativeGrammar.TypeExprRejects typeInput.declarativeRemainder
+          typeRejected.declarativeRemainder)
     {input next : State} {value : Expr}
     (diagnosticFree : next.diagnosticsRev = [])
     (result : expressionAtomCore nested block input = .ok value next) :
@@ -1488,8 +1553,10 @@ theorem expressionAtomCore_success_sound
       not_coreLiteralStartsAt_of_isCoreLiteral_eq_false literalAbsentEq
     split at result
     next namePresent =>
-      exact .identifier noLiteral
-        (identifierExpression_success_sound result)
+      exact .identifier noLiteral (nameAtom_success_sound nested
+        DeclarativeGrammar.typeExprExactOutcomeSpec typeExpr_success_sound typeRejectSound
+        (fun same lengthResult => nestedSound (same.trans diagnosticFree) lengthResult)
+        result)
     next nameAbsent =>
       have nameAbsentEq :
           (isBooleanValue input || isIdentifier input) = false :=
@@ -1586,6 +1653,10 @@ theorem expressionAtom_success_sound
     (blockSound : ∀ {input next : State} {value : Block},
       next.diagnosticsRev = [] → block input = .ok value next →
       blockParses input.declarativeRemainder value next.declarativeRemainder)
+    (typeRejectSound : ∀ {typeInput typeRejected : State} {failure : Failure},
+      typeExpr typeInput = .reject failure typeRejected →
+        DeclarativeGrammar.TypeExprRejects typeInput.declarativeRemainder
+          typeRejected.declarativeRemainder)
     {input next : State} {value : Expr}
     (diagnosticFree : next.diagnosticsRev = [])
     (result : expressionAtom nested block input = .ok value next) :
@@ -1593,7 +1664,7 @@ theorem expressionAtom_success_sound
       input.declarativeRemainder value next.declarativeRemainder := by
   exact ExpressionAtomInternals.expressionAtomCore_success_sound nested block
     nestedParses blockParses nestedReflects nestedSound nestedShape
-      blockReflects blockSound diagnosticFree
+      blockReflects blockSound typeRejectSound diagnosticFree
         (expressionAtomCore_of_diagnosticFree_success nested block result
           diagnosticFree)
 
@@ -1640,6 +1711,10 @@ theorem coreExpressionStep_success_sound
     (blockSound : ∀ {input next : State} {value : Block},
       next.diagnosticsRev = [] → block input = .ok value next →
       blockParses input.declarativeRemainder value next.declarativeRemainder)
+    (typeRejectSound : ∀ {typeInput typeRejected : State} {failure : Failure},
+      typeExpr typeInput = .reject failure typeRejected →
+        DeclarativeGrammar.TypeExprRejects typeInput.declarativeRemainder
+          typeRejected.declarativeRemainder)
     {input next : State} {value : Expr}
     (diagnosticFree : next.diagnosticsRev = [])
     (result : expressionLayer nested block input = .ok value next) :
@@ -1654,7 +1729,7 @@ theorem coreExpressionStep_success_sound
     (fun atomFree atomResult =>
       expressionAtom_success_sound nested block nestedParses blockParses
         nestedReflects nestedSound nestedShape blockReflects blockSound
-          atomFree atomResult)
+          typeRejectSound atomFree atomResult)
     nestedReflects nestedSound nestedShape diagnosticFree result
 
 end Solcore.Syntax.Parser

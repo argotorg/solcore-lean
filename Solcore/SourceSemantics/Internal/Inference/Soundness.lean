@@ -2144,6 +2144,8 @@ theorem inferPlaceFuel_success_sound
           simp [Detail.inferPlaceFuel, targetEq] at success
       | array elements =>
           simp [Detail.inferPlaceFuel, targetEq] at success
+      | newArray keyword type length =>
+          simp [Detail.inferPlaceFuel, targetEq] at success
       | error =>
           simp [Detail.inferPlaceFuel, targetEq] at success
 

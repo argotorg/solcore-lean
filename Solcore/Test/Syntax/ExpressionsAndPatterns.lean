@@ -185,9 +185,12 @@ private theorem atom_name (suffix : List Token) :
   apply ExpressionAtomDispatchTraceParses.selected .name
   · exact .name (by simp [CoreLiteralStartsAt, TokenAt, rem, tokens])
       (.inr (.inr ⟨name.span, name.value, ⟨by simp [rem, tokens], rfl⟩⟩))
-  · exact .parsed (.identifier (by simp [BooleanPatternAbsentAt, TokenKindAbsentAt, TokenAt, rem, tokens])
-      (.parsed ⟨⟨by simp [rem, tokens], rfl⟩, rfl, rfl, rfl⟩
-        (.hyphen (by unfold IdentifierHyphenSpelling name; decide))))
+  · exact .identifier
+      (.of_keyword_absent (by
+        simp [TokenKindAbsentAt, TokenAt, rem, tokens, name, ContextualKeyword.spelling]))
+      (.parsed (.identifier (by simp [BooleanPatternAbsentAt, TokenKindAbsentAt, TokenAt, rem, tokens])
+        (.parsed ⟨⟨by simp [rem, tokens], rfl⟩, rfl, rfl, rfl⟩
+          (.hyphen (by unfold IdentifierHyphenSpelling name; decide)))))
 
 private theorem arguments_trace (suffix : List Token) :
     NoTrailingDelimitedListTraceParses .leftParen .rightParen true LiteralExpressionTraceParses source 99

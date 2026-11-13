@@ -55,6 +55,8 @@ inductive ExprValue where
   | group (inner : Located ExprValue)
   | tuple (elements : DelimitedList (Located ExprValue))
   | array (elements : DelimitedList (Located ExprValue))
+  /-- `new T[](n)`: `keyword` is `new`'s span and `type` an array type. -/
+  | newArray (keyword : SourceSpan) (type : TypeExpr) (length : Located ExprValue)
   | error
   deriving Repr, BEq
 

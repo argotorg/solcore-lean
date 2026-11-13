@@ -1430,6 +1430,12 @@ private def testNonterminalMatch : IO Unit := do
   assertTrue (functions.length == 1)
     "a nonterminal exhaustive match did not check"
 
+/-- Inference rejects `new T[](n)` until row 4 gives it a meaning. -/
+private def testNewArrayRejected : IO Unit := do
+  expectInferenceError "new array allocation"
+    "function bad(n: Word) returns (Word) { let m = new Word[](n); return n; }" fun error =>
+      error == .unsupportedExpression "new"
+
 /-- Exercise every phase-7 source-inference form before runtime lowering. -/
 def testSourcePhase7Inference : IO Unit := do
   testConstructors
@@ -1438,6 +1444,7 @@ def testSourcePhase7Inference : IO Unit := do
   testAssignments
   testLoopsAndControl
   testNonterminalMatch
+  testNewArrayRejected
   IO.println "phase-7 source inference GREEN"
 
 end Tests.SourcePhase7Inference

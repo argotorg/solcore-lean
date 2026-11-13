@@ -1698,12 +1698,319 @@ theorem lambdaExpression_cursor_lt_onSuccess (block : Parser Block)
         afterParameters returnType afterReturnType returnTypeResult)
         (blockCursor afterReturnType body next bodyResult)))
 
+/-- The array guard keeps its state, or rejects in place. -/
+theorem arrayTypeGuard_ok {type : TypeExpr} {input next : State} {value : Unit}
+    (result : arrayTypeGuard type input = .ok value next) :
+    type.isArray = true ∧ next = input := by
+  unfold arrayTypeGuard at result
+  split at result
+  next isArray =>
+    cases result
+    exact ⟨isArray, rfl⟩
+  next =>
+    unfold rejectAt at result
+    contradiction
+
+theorem arrayTypeGuard_validFor (type : TypeExpr) :
+    (arrayTypeGuard type).ValidFor (fun _ _ => True) := by
+  intro input inputValid
+  unfold arrayTypeGuard
+  split
+  · exact ⟨trivial, inputValid, rfl⟩
+  · unfold rejectAt Reply.ValidFor
+    exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+
+theorem arrayTypeGuard_preservesTokenWindow (type : TypeExpr) :
+    Parser.PreservesTokenWindow (arrayTypeGuard type) := by
+  intro input
+  unfold arrayTypeGuard
+  split
+  · exact ⟨rfl, rfl⟩
+  · exact rejectAt_preservesTokenWindow input _ _
+
+theorem arrayTypeGuard_cursorMonotoneOnSuccess (type : TypeExpr) :
+    Parser.CursorMonotoneOnSuccess (arrayTypeGuard type) := by
+  intro input value next result
+  rw [(arrayTypeGuard_ok result).2]
+  exact Nat.le_refl _
+
+/-- The head of `new T[](n)` keeps the provenance of its `new` and its type. -/
+theorem newArrayHead_validFor :
+    newArrayHead.ValidFor (fun file head =>
+      head.1.span.ValidFor file ∧ TypeExpr.ValidFor file head.2) := by
+  have weak : newArrayHead.ValidFor (fun _ _ => True) := by
+    unfold newArrayHead
+    apply Parser.bind_validFor (contextual_validFor .new .expression)
+    intro keyword
+    apply Parser.bind_validFor typeExpr_validFor
+    intro type
+    apply Parser.bind_validFor (arrayTypeGuard_validFor type)
+    intro _
+    apply Parser.bind_validFor (symbol_validFor .leftParen .expression)
+    intro _
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : newArrayHead input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok head final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold newArrayHead at stages
+      rcases atomBind_ok_components stages with
+        ⟨keyword, afterKeyword, keywordResult, rest⟩
+      rcases atomBind_ok_components rest with ⟨type, afterType, typeResult, rest⟩
+      rcases atomBind_ok_components rest with ⟨_, afterGuard, _, rest⟩
+      rcases atomBind_ok_components rest with ⟨_, afterOpening, _, finished⟩
+      cases finished
+      have keywordContract := contextual_validFor .new .expression input inputValid
+      rw [keywordResult] at keywordContract
+      have typeContract := typeExpr_validFor afterKeyword keywordContract.2.1
+      rw [typeResult] at typeContract
+      refine ⟨⟨?_, ?_⟩, weakResult.2.1, weakResult.2.2⟩
+      · simpa only [Located.ValidFor] using keywordContract.1
+      · simpa [keywordContract.2.2] using typeContract.1
+
+theorem newArrayHead_preservesTokenWindow :
+    Parser.PreservesTokenWindow newArrayHead := by
+  unfold newArrayHead
+  apply Parser.bind_preservesTokenWindow (contextual_preservesTokenWindow .new .expression)
+  intro keyword
+  apply Parser.bind_preservesTokenWindow typeExpr_preservesTokenWindow
+  intro type
+  apply Parser.bind_preservesTokenWindow (arrayTypeGuard_preservesTokenWindow type)
+  intro _
+  apply Parser.bind_preservesTokenWindow (symbol_preservesTokenWindow .leftParen .expression)
+  intro _
+  exact Parser.pure_preservesTokenWindow _
+
+theorem newArrayHead_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess newArrayHead := by
+  unfold newArrayHead
+  apply Parser.bind_cursorMonotoneOnSuccess (contextual_cursorMonotoneOnSuccess .new .expression)
+  intro keyword
+  apply Parser.bind_cursorMonotoneOnSuccess typeExpr_cursorMonotoneOnSuccess
+  intro type
+  apply Parser.bind_cursorMonotoneOnSuccess (arrayTypeGuard_cursorMonotoneOnSuccess type)
+  intro _
+  apply Parser.bind_cursorMonotoneOnSuccess (symbol_cursorMonotoneOnSuccess .leftParen .expression)
+  intro _
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- The head starts at its current `new`. -/
+theorem newArrayHead_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess newArrayHead (·.1.span) := by
+  unfold newArrayHead
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (contextual_startsAtCurrentTokenOnSuccess .new .expression)
+  intro keyword input head final parsed
+  rcases atomBind_ok_components parsed with ⟨type, afterType, _, rest⟩
+  rcases atomBind_ok_components rest with ⟨_, afterGuard, _, rest⟩
+  rcases atomBind_ok_components rest with ⟨_, afterOpening, _, finished⟩
+  cases finished
+  rfl
+
+theorem newArrayHead_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess newArrayHead :=
+  newArrayHead_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- The head consumes its `new`, so it always advances. -/
+theorem newArrayHead_cursor_lt_onSuccess {input next : State} {head : Token × TypeExpr}
+    (parsed : newArrayHead input = .ok head next) :
+    input.cursor < next.cursor := by
+  unfold newArrayHead at parsed
+  rcases atomBind_ok_components parsed with ⟨keyword, afterKeyword, keywordResult, rest⟩
+  rcases atomBind_ok_components rest with ⟨type, afterType, typeResult, rest⟩
+  rcases atomBind_ok_components rest with ⟨_, afterGuard, guardResult, rest⟩
+  rcases atomBind_ok_components rest with ⟨_, afterOpening, openingResult, finished⟩
+  have keywordLt := acceptToken_cursor_lt_onSuccess (.contextual .new) .expression
+    (·.isContextual .new) keywordResult
+  have typeLe := typeExpr_cursorMonotoneOnSuccess _ _ _ typeResult
+  have openingLe := symbol_cursorMonotoneOnSuccess .leftParen .expression _ _ _ openingResult
+  rw [(arrayTypeGuard_ok guardResult).2] at openingLe
+  cases finished
+  omega
+
+/-- A successful head took the `new` at the current cursor. -/
+theorem newArrayHead_keywordAt {input next : State} {head : Token × TypeExpr}
+    (parsed : newArrayHead input = .ok head next) :
+    DeclarativeGrammar.TokenAt input.tokens input.window.endIndex input.cursor
+      { span := head.1.span, value := .identifier ContextualKeyword.new.spelling } := by
+  unfold newArrayHead at parsed
+  rcases atomBind_ok_components parsed with ⟨keyword, afterKeyword, keywordResult, rest⟩
+  rcases atomBind_ok_components rest with ⟨type, afterType, typeResult, rest⟩
+  rcases atomBind_ok_components rest with ⟨_, afterGuard, guardResult, rest⟩
+  rcases atomBind_ok_components rest with ⟨_, afterOpening, openingResult, finished⟩
+  cases finished
+  exact (contextual_ok_tokenAt .new .expression keywordResult).1
+
+theorem newArrayTail_preservesTokenWindow (nested : Parser Expr)
+    (nestedWindow : Parser.PreservesTokenWindow nested) (keyword : Token) (type : TypeExpr) :
+    Parser.PreservesTokenWindow (newArrayTail nested keyword type) := by
+  unfold newArrayTail
+  apply Parser.bind_preservesTokenWindow nestedWindow
+  intro length
+  apply Parser.bind_preservesTokenWindow (symbol_preservesTokenWindow .rightParen .expression)
+  intro closing
+  exact Parser.pure_preservesTokenWindow _
+
+theorem newArrayTail_cursorMonotoneOnSuccess (nested : Parser Expr)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested) (keyword : Token) (type : TypeExpr) :
+    Parser.CursorMonotoneOnSuccess (newArrayTail nested keyword type) := by
+  unfold newArrayTail
+  apply Parser.bind_cursorMonotoneOnSuccess nestedCursor
+  intro length
+  apply Parser.bind_cursorMonotoneOnSuccess (symbol_cursorMonotoneOnSuccess .rightParen .expression)
+  intro closing
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+private theorem newArrayTail_weakValidFor (nested : Parser Expr)
+    (nestedValid : nested.ValidFor (fun _ _ => True)) (keyword : Token) (type : TypeExpr) :
+    (newArrayTail nested keyword type).ValidFor (fun _ _ => True) := by
+  unfold newArrayTail
+  apply Parser.bind_validFor nestedValid
+  intro length
+  apply Parser.bind_validFor (symbol_validFor .rightParen .expression)
+  intro closing
+  exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+
+/-- A name atom keeps every ordinary token window. -/
+theorem nameAtom_preservesTokenWindow (nested : Parser Expr)
+    (nestedWindow : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (nameAtom nested) := by
+  intro input
+  have headWindow := newArrayHead_preservesTokenWindow input
+  unfold nameAtom
+  cases headResult : newArrayHead input with
+  | invariant error => trivial
+  | reject failure rejected => exact identifierExpression_preservesTokenWindow input
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      rw [headResult] at headWindow
+      exact (newArrayTail_preservesTokenWindow nested nestedWindow keyword type
+        afterOpening).trans headWindow
+
+theorem nameAtom_preservesTokensOnSuccess (nested : Parser Expr)
+    (nestedWindow : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokensOnSuccess (nameAtom nested) :=
+  (nameAtom_preservesTokenWindow nested nestedWindow).preservesTokensOnSuccess
+
+/-- A name atom consumes its first token. -/
+theorem nameAtom_cursor_lt_onSuccess (nested : Parser Expr)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
+    {input next : State} {value : Expr}
+    (parsed : nameAtom nested input = .ok value next) :
+    input.cursor < next.cursor := by
+  unfold nameAtom at parsed
+  cases headResult : newArrayHead input with
+  | invariant error => simp only [headResult] at parsed <;> cases parsed
+  | reject failure rejected =>
+      simp only [headResult] at parsed
+      exact identifierExpression_cursor_lt_onSuccess parsed
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      simp only [headResult] at parsed
+      exact Nat.lt_of_lt_of_le (newArrayHead_cursor_lt_onSuccess headResult)
+        (newArrayTail_cursorMonotoneOnSuccess nested nestedCursor keyword type _ _ _ parsed)
+
+theorem nameAtom_cursorMonotoneOnSuccess (nested : Parser Expr)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (nameAtom nested) :=
+  fun _ _ _ parsed => Nat.le_of_lt (nameAtom_cursor_lt_onSuccess nested nestedCursor parsed)
+
+/-- A name atom starts at its first token. -/
+theorem nameAtom_startsAtCurrentTokenOnSuccess (nested : Parser Expr) :
+    Parser.StartsAtCurrentTokenOnSuccess (nameAtom nested) (·.span) := by
+  intro input value next parsed
+  unfold nameAtom at parsed
+  cases headResult : newArrayHead input with
+  | invariant error => simp only [headResult] at parsed <;> cases parsed
+  | reject failure rejected =>
+      simp only [headResult] at parsed
+      exact identifierExpression_startsAtCurrentTokenOnSuccess input value next parsed
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      simp only [headResult] at parsed
+      unfold newArrayTail at parsed
+      rcases atomBind_ok_components parsed with ⟨length, afterLength, lengthResult, rest⟩
+      rcases atomBind_ok_components rest with ⟨closing, afterClosing, closingResult, finished⟩
+      cases finished
+      exact newArrayHead_startsAtCurrentTokenOnSuccess input (keyword, type) afterOpening
+        headResult
+
+/-- A name atom keeps the provenance of its `new`, type, length and cover, or
+of its identifier. -/
+theorem nameAtom_validFor (nested : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
+    (nestedTokens : Parser.PreservesTokensOnSuccess nested)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested) :
+    (nameAtom nested).ValidFor (Expr.ValidFor statementValid) := by
+  intro input inputValid
+  have headReply := newArrayHead_validFor input inputValid
+  unfold nameAtom
+  cases headResult : newArrayHead input with
+  | invariant error => trivial
+  | reject failure rejected => exact identifierExpression_validFor statementValid input inputValid
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      show (newArrayTail nested keyword type afterOpening).ValidFor input
+        (Expr.ValidFor statementValid)
+      rw [headResult] at headReply
+      rcases headReply with ⟨⟨keywordValid, typeValid⟩, openingValid, openingFile⟩
+      have weak := newArrayTail_weakValidFor nested
+        (fun state stateValid => (nestedValid state stateValid).mono fun _ _ _ => trivial)
+        keyword type afterOpening openingValid
+      cases tailResult : newArrayTail nested keyword type afterOpening with
+      | invariant error => trivial
+      | reject failure rejected =>
+          rw [tailResult] at weak
+          exact weak.of_file_eq openingFile
+      | ok expression final =>
+          rw [tailResult] at weak
+          have stages := tailResult
+          unfold newArrayTail at stages
+          rcases atomBind_ok_components stages with ⟨length, afterLength, lengthResult, rest⟩
+          rcases atomBind_ok_components rest with
+            ⟨closing, afterClosing, closingResult, finished⟩
+          cases finished
+          have lengthReply := nestedValid afterOpening openingValid
+          rw [lengthResult] at lengthReply
+          have closingReply := symbol_validFor .rightParen .expression afterLength
+            lengthReply.2.1
+          rw [closingResult] at closingReply
+          have closingSpanValid : closing.span.ValidFor input.file := by
+            simpa only [Located.ValidFor, lengthReply.2.2, openingFile] using closingReply.1
+          have lengthValidInput : Expr.ValidFor statementValid input.file length := by
+            simpa [openingFile] using lengthReply.1
+          have tokensEq : afterLength.tokens = input.tokens :=
+            (nestedTokens afterOpening length afterLength lengthResult).trans
+              (newArrayHead_preservesTokensOnSuccess input (keyword, type) afterOpening
+                headResult)
+          have closingAt := (symbol_ok_tokenAt .rightParen .expression closingResult).1.2
+          rw [tokensEq] at closingAt
+          have before : input.cursor < afterLength.cursor :=
+            Nat.lt_of_lt_of_le (newArrayHead_cursor_lt_onSuccess headResult)
+              (nestedCursor afterOpening length afterLength lengthResult)
+          have ordered := inputValid.token_end_le_token_start_of_getElem?_lt
+            (newArrayHead_keywordAt headResult).2 closingAt before
+          have outerValid :
+              (SourceSpan.cover keyword.span closing.span).ValidFor input.file :=
+            SourceSpan.cover_validFor keywordValid closingSpanValid
+              (Nat.le_trans keywordValid.2.1 (Nat.le_trans ordered closingSpanValid.2.1))
+          exact ⟨Expr.ValidFor.newArray outerValid keywordValid typeValid lengthValidInput,
+            weak.2.1, weak.2.2.trans openingFile⟩
+
 /-- Atom dispatch preserves recursive source provenance in every branch. -/
 theorem expressionAtomCore_validFor
     (nested : Parser Expr) (block : Parser Block)
     (statementValid : SourceFile → Statement → Prop)
     (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
     (nestedTokens : Parser.PreservesTokensOnSuccess nested)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
     (blockValid : block.ValidFor (Block.ValidFor statementValid))
     (blockStarts : Parser.StartsAtCurrentTokenOnSuccess block (·.span)) :
     (expressionAtomCore nested block).ValidFor
@@ -1713,7 +2020,8 @@ theorem expressionAtomCore_validFor
   split
   · exact literalExpression_validFor statementValid input inputValid
   · split
-    · exact identifierExpression_validFor statementValid input inputValid
+    · exact nameAtom_validFor nested statementValid nestedValid nestedTokens nestedCursor
+        input inputValid
     · split
       · exact dotConstructor_validFor nested statementValid nestedValid
           nestedTokens input inputValid
@@ -1742,7 +2050,7 @@ theorem expressionAtomCore_preservesTokenWindow
   split
   · exact literalExpression_preservesTokenWindow input
   · split
-    · exact identifierExpression_preservesTokenWindow input
+    · exact nameAtom_preservesTokenWindow nested nestedWindow input
     · split
       · exact dotConstructor_preservesTokenWindow nested nestedWindow input
       · split
@@ -1767,7 +2075,7 @@ theorem expressionAtomCore_cursorMonotoneOnSuccess
   split at result
   · exact literalExpression_cursorMonotoneOnSuccess input value next result
   · split at result
-    · exact identifierExpression_cursorMonotoneOnSuccess input value next result
+    · exact nameAtom_cursorMonotoneOnSuccess nested nestedCursor input value next result
     · split at result
       · exact dotConstructor_cursorMonotoneOnSuccess nested
           input value next result
@@ -1796,7 +2104,7 @@ theorem expressionAtomCore_cursor_lt_onSuccess
   split at parsed
   · exact literalExpression_cursor_lt_onSuccess parsed
   · split at parsed
-    · exact identifierExpression_cursor_lt_onSuccess parsed
+    · exact nameAtom_cursor_lt_onSuccess nested nestedMonotone parsed
     · split at parsed
       · exact dotConstructor_cursor_lt_onSuccess nested parsed
       · split at parsed
@@ -1820,8 +2128,7 @@ theorem expressionAtomCore_startsAtCurrentTokenOnSuccess
   split at result
   · exact literalExpression_startsAtCurrentTokenOnSuccess input value next result
   · split at result
-    · exact identifierExpression_startsAtCurrentTokenOnSuccess
-        input value next result
+    · exact nameAtom_startsAtCurrentTokenOnSuccess nested input value next result
     · split at result
       · exact dotConstructor_startsAtCurrentTokenOnSuccess nested
           input value next result
@@ -2058,6 +2365,7 @@ theorem expressionAtom_validFor
     (statementValid : SourceFile → Statement → Prop)
     (nestedValid : nested.ValidFor (Expr.ValidFor statementValid))
     (nestedWindow : Parser.PreservesTokenWindow nested)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested)
     (blockValid : block.ValidFor (Block.ValidFor statementValid))
     (blockStarts : Parser.StartsAtCurrentTokenOnSuccess block (·.span))
     (blockWindow : Parser.PreservesTokenWindow block) :
@@ -2065,7 +2373,7 @@ theorem expressionAtom_validFor
   intro input inputValid
   unfold expressionAtom
   have coreValid := expressionAtomCore_validFor nested block statementValid
-    nestedValid nestedWindow.preservesTokensOnSuccess blockValid blockStarts
+    nestedValid nestedWindow.preservesTokensOnSuccess nestedCursor blockValid blockStarts
       input inputValid
   cases coreResult : expressionAtomCore nested block input with
   | ok value next => rw [coreResult] at coreValid; exact coreValid
@@ -2962,42 +3270,6 @@ theorem proxyExpression_ne_invariant (input : State)
   proxyExpression_invariantFreeOnValid.ne_invariant
     input inputValid error
 
-/-- The array guard keeps its state, or rejects in place. -/
-theorem arrayTypeGuard_ok {type : TypeExpr} {input next : State} {value : Unit}
-    (result : arrayTypeGuard type input = .ok value next) :
-    type.isArray = true ∧ next = input := by
-  unfold arrayTypeGuard at result
-  split at result
-  next isArray =>
-    cases result
-    exact ⟨isArray, rfl⟩
-  next =>
-    unfold rejectAt at result
-    contradiction
-
-theorem arrayTypeGuard_validFor (type : TypeExpr) :
-    (arrayTypeGuard type).ValidFor (fun _ _ => True) := by
-  intro input inputValid
-  unfold arrayTypeGuard
-  split
-  · exact ⟨trivial, inputValid, rfl⟩
-  · unfold rejectAt Reply.ValidFor
-    exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
-
-theorem arrayTypeGuard_preservesTokenWindow (type : TypeExpr) :
-    Parser.PreservesTokenWindow (arrayTypeGuard type) := by
-  intro input
-  unfold arrayTypeGuard
-  split
-  · exact ⟨rfl, rfl⟩
-  · exact rejectAt_preservesTokenWindow input _ _
-
-theorem arrayTypeGuard_cursorMonotoneOnSuccess (type : TypeExpr) :
-    Parser.CursorMonotoneOnSuccess (arrayTypeGuard type) := by
-  intro input value next result
-  rw [(arrayTypeGuard_ok result).2]
-  exact Nat.le_refl _
-
 theorem arrayTypeGuard_invariantFreeOnValid (type : TypeExpr) :
     Parser.InvariantFreeOnValid (arrayTypeGuard type) := by
   intro input _
@@ -3005,85 +3277,6 @@ theorem arrayTypeGuard_invariantFreeOnValid (type : TypeExpr) :
   split
   · exact .inl ⟨_, _, rfl⟩
   · exact .inr ⟨_, _, rfl⟩
-
-/-- The head of `new T[](n)` keeps the provenance of its `new` and its type. -/
-theorem newArrayHead_validFor :
-    newArrayHead.ValidFor (fun file head =>
-      head.1.span.ValidFor file ∧ TypeExpr.ValidFor file head.2) := by
-  have weak : newArrayHead.ValidFor (fun _ _ => True) := by
-    unfold newArrayHead
-    apply Parser.bind_validFor (contextual_validFor .new .expression)
-    intro keyword
-    apply Parser.bind_validFor typeExpr_validFor
-    intro type
-    apply Parser.bind_validFor (arrayTypeGuard_validFor type)
-    intro _
-    apply Parser.bind_validFor (symbol_validFor .leftParen .expression)
-    intro _
-    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
-  intro input inputValid
-  have weakResult := weak input inputValid
-  cases parsed : newArrayHead input with
-  | invariant error => trivial
-  | reject failure rejected =>
-      rw [parsed] at weakResult
-      exact weakResult
-  | ok head final =>
-      rw [parsed] at weakResult
-      have stages := parsed
-      unfold newArrayHead at stages
-      rcases atomBind_ok_components stages with
-        ⟨keyword, afterKeyword, keywordResult, rest⟩
-      rcases atomBind_ok_components rest with ⟨type, afterType, typeResult, rest⟩
-      rcases atomBind_ok_components rest with ⟨_, afterGuard, _, rest⟩
-      rcases atomBind_ok_components rest with ⟨_, afterOpening, _, finished⟩
-      cases finished
-      have keywordContract := contextual_validFor .new .expression input inputValid
-      rw [keywordResult] at keywordContract
-      have typeContract := typeExpr_validFor afterKeyword keywordContract.2.1
-      rw [typeResult] at typeContract
-      refine ⟨⟨?_, ?_⟩, weakResult.2.1, weakResult.2.2⟩
-      · simpa only [Located.ValidFor] using keywordContract.1
-      · simpa [keywordContract.2.2] using typeContract.1
-
-theorem newArrayHead_preservesTokenWindow :
-    Parser.PreservesTokenWindow newArrayHead := by
-  unfold newArrayHead
-  apply Parser.bind_preservesTokenWindow (contextual_preservesTokenWindow .new .expression)
-  intro keyword
-  apply Parser.bind_preservesTokenWindow typeExpr_preservesTokenWindow
-  intro type
-  apply Parser.bind_preservesTokenWindow (arrayTypeGuard_preservesTokenWindow type)
-  intro _
-  apply Parser.bind_preservesTokenWindow (symbol_preservesTokenWindow .leftParen .expression)
-  intro _
-  exact Parser.pure_preservesTokenWindow _
-
-theorem newArrayHead_cursorMonotoneOnSuccess :
-    Parser.CursorMonotoneOnSuccess newArrayHead := by
-  unfold newArrayHead
-  apply Parser.bind_cursorMonotoneOnSuccess (contextual_cursorMonotoneOnSuccess .new .expression)
-  intro keyword
-  apply Parser.bind_cursorMonotoneOnSuccess typeExpr_cursorMonotoneOnSuccess
-  intro type
-  apply Parser.bind_cursorMonotoneOnSuccess (arrayTypeGuard_cursorMonotoneOnSuccess type)
-  intro _
-  apply Parser.bind_cursorMonotoneOnSuccess (symbol_cursorMonotoneOnSuccess .leftParen .expression)
-  intro _
-  exact Parser.pure_cursorMonotoneOnSuccess _
-
-/-- The head starts at its current `new`. -/
-theorem newArrayHead_startsAtCurrentTokenOnSuccess :
-    Parser.StartsAtCurrentTokenOnSuccess newArrayHead (·.1.span) := by
-  unfold newArrayHead
-  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
-    (contextual_startsAtCurrentTokenOnSuccess .new .expression)
-  intro keyword input head final parsed
-  rcases atomBind_ok_components parsed with ⟨type, afterType, _, rest⟩
-  rcases atomBind_ok_components rest with ⟨_, afterGuard, _, rest⟩
-  rcases atomBind_ok_components rest with ⟨_, afterOpening, _, finished⟩
-  cases finished
-  rfl
 
 theorem newArrayHead_invariantFreeOnValid :
     Parser.InvariantFreeOnValid newArrayHead := by
@@ -3105,27 +3298,6 @@ theorem newArrayHead_ne_invariant (input : State)
     (inputValid : input.ValidFor) (error : ParserInvariantError) :
     newArrayHead input ≠ .invariant error :=
   newArrayHead_invariantFreeOnValid.ne_invariant input inputValid error
-
-theorem newArrayHead_preservesTokensOnSuccess :
-    Parser.PreservesTokensOnSuccess newArrayHead :=
-  newArrayHead_preservesTokenWindow.preservesTokensOnSuccess
-
-/-- The head consumes its `new`, so it always advances. -/
-theorem newArrayHead_cursor_lt_onSuccess {input next : State} {head : Token × TypeExpr}
-    (parsed : newArrayHead input = .ok head next) :
-    input.cursor < next.cursor := by
-  unfold newArrayHead at parsed
-  rcases atomBind_ok_components parsed with ⟨keyword, afterKeyword, keywordResult, rest⟩
-  rcases atomBind_ok_components rest with ⟨type, afterType, typeResult, rest⟩
-  rcases atomBind_ok_components rest with ⟨_, afterGuard, guardResult, rest⟩
-  rcases atomBind_ok_components rest with ⟨_, afterOpening, openingResult, finished⟩
-  have keywordLt := acceptToken_cursor_lt_onSuccess (.contextual .new) .expression
-    (·.isContextual .new) keywordResult
-  have typeLe := typeExpr_cursorMonotoneOnSuccess _ _ _ typeResult
-  have openingLe := symbol_cursorMonotoneOnSuccess .leftParen .expression _ _ _ openingResult
-  rw [(arrayTypeGuard_ok guardResult).2] at openingLe
-  cases finished
-  omega
 
 theorem optionalLambdaReturnType_invariantFreeOnValid :
     Parser.InvariantFreeOnValid optionalLambdaReturnType := by
@@ -3286,6 +3458,41 @@ theorem arrayLiteral_ordinary_of_elementFuel
   · exact Or.inr ⟨failure, rejected, by
       unfold arrayLiteral
       simp only [delimitedNoTrailing, valuesResult, bind]⟩
+
+/-- A name atom inherits the bounded totality of its length. -/
+theorem nameAtom_ordinary_of_elementFuel
+    (nested : Parser Expr) (nestedFuel : Nat)
+    (contract : FuelElementTotalityContract nested nestedFuel)
+    (input : State) (inputValid : input.ValidFor)
+    (adequate : input.remainingCount < nestedFuel + 1) :
+    (∃ expression next, nameAtom nested input = .ok expression next) ∨
+    (∃ failure next, nameAtom nested input = .reject failure next) := by
+  unfold nameAtom
+  rcases newArrayHead_invariantFreeOnValid input inputValid with
+    ⟨head, afterOpening, headResult⟩ | ⟨failure, rejected, headResult⟩
+  · rcases head with ⟨keyword, type⟩
+    simp only [headResult]
+    have headValid := newArrayHead_validFor input inputValid
+    rw [headResult] at headValid
+    have headWindow := newArrayHead_preservesTokenWindow input
+    rw [headResult] at headWindow
+    have openingAdequate : afterOpening.remainingCount < nestedFuel :=
+      remainingCount_lt_after_strict_progress headValid.2.1 headWindow.2
+        (newArrayHead_cursor_lt_onSuccess headResult) adequate
+    rcases contract.ordinary afterOpening headValid.2.1 openingAdequate with
+      ⟨length, afterLength, lengthResult⟩ | ⟨failure, rejected, lengthResult⟩
+    · rcases symbol_ordinary .rightParen .expression afterLength with
+        ⟨closing, afterClosing, closingResult⟩ | ⟨failure, rejected, closingResult⟩
+      · exact Or.inl ⟨{
+            span := SourceSpan.cover keyword.span closing.span
+            value := .newArray keyword.span type length
+          }, afterClosing, by
+            simp only [newArrayTail, bind, lengthResult, closingResult, pure]⟩
+      · exact Or.inr ⟨failure, rejected, by
+          simp only [newArrayTail, bind, lengthResult, closingResult]⟩
+    · exact Or.inr ⟨failure, rejected, by simp only [newArrayTail, bind, lengthResult]⟩
+  · simp only [headResult]
+    exact identifierExpression_invariantFreeOnValid input inputValid
 
 theorem arrayLiteral_ne_invariant_of_elementFuel
     (nested : Parser Expr) (nestedFuel : Nat)
@@ -3638,7 +3845,8 @@ theorem expressionAtomCore_ordinary_of_elementFuel
   split
   · exact literalExpression_invariantFreeOnValid input inputValid
   · split
-    · exact identifierExpression_invariantFreeOnValid input inputValid
+    · exact nameAtom_ordinary_of_elementFuel nested nestedFuel nestedContract input
+        inputValid adequate
     · split
       · exact dotConstructor_ordinary_of_elementFuel nested nestedFuel
           nestedContract input inputValid adequate

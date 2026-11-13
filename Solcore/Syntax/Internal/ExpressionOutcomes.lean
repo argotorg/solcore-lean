@@ -1051,6 +1051,49 @@ theorem NewArrayHeadParses.result_unique
           rcases opening.result_unique otherOpening with ⟨_, rfl⟩
           exact ⟨rfl, rfl, rfl⟩
 
+/-- A head `new T[](` starts with a name, its `new`. -/
+theorem NewArrayHeadParses.expressionNameStartsAt
+    {typeParses : Remainder → Syntax.TypeExpr → Remainder → Prop}
+    {input output : Remainder} {keywordSpan : SourceSpan} {type : Syntax.TypeExpr}
+    (parsed : NewArrayHeadParses typeParses input keywordSpan type output) :
+    ExpressionNameStartsAt input :=
+  Or.inr (Or.inr ⟨_, _, parsed.keyword_present⟩)
+
+/-- A name atom starts with a name. -/
+theorem NameAtomParses.expressionNameStartsAt
+    {nestedParses : Remainder → Syntax.Expr → Remainder → Prop}
+    {typeParses : Remainder → Syntax.TypeExpr → Remainder → Prop}
+    {input output : Remainder} {value : Syntax.Expr}
+    (parsed : NameAtomParses nestedParses typeParses input value output) :
+    ExpressionNameStartsAt input := by
+  cases parsed with
+  | newArray parsed =>
+      cases parsed with
+      | parsed _ _ head => exact head.expressionNameStartsAt
+  | identifier _ parsed =>
+      cases parsed with
+      | parsed nameParsed =>
+          cases nameParsed with
+          | boolean booleanParsed =>
+              cases booleanParsed with
+              | trueKeyword token => exact Or.inl ⟨_, token⟩
+              | falseKeyword token => exact Or.inr (Or.inl ⟨_, token⟩)
+          | identifier _ _ identifierParsed =>
+              exact Or.inr (Or.inr ⟨_, _, identifierParsed.1⟩)
+
+/-- `new T[](n)` rejects only after its head, so after a name. -/
+theorem NewArrayExpressionRejects.expressionNameStartsAt
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    {typeOrdinary : Remainder → Syntax.TypeExpr → Remainder → Prop}
+    {input rejected : Remainder}
+    (rejection : NewArrayExpressionRejects nestedOrdinary nestedRejects typeOrdinary
+      input rejected) :
+    ExpressionNameStartsAt input := by
+  cases rejection with
+  | lengthRejected head => exact head.expressionNameStartsAt
+  | closingMissing head => exact head.expressionNameStartsAt
+
 /-- Final dispatcher rejection excludes every successful ordered Core atom
 branch, independently of the supplied recursive grammars. -/
 theorem ExpressionAtomCoreFinalRejects.disjointCore
@@ -1076,18 +1119,7 @@ theorem ExpressionAtomCoreFinalRejects.disjointCore
               | string token =>
                   exact literalAbsent (Or.inr (Or.inr ⟨_, _, token⟩))
       | identifier earlierLiteralAbsent parsed =>
-          cases parsed with
-          | parsed nameParsed =>
-              cases nameParsed with
-              | boolean booleanParsed =>
-                  cases booleanParsed with
-                  | trueKeyword token =>
-                      exact nameAbsent (Or.inl ⟨_, token⟩)
-                  | falseKeyword token =>
-                      exact nameAbsent (Or.inr (Or.inl ⟨_, token⟩))
-              | identifier trueAbsent falseAbsent identifierParsed =>
-                  exact nameAbsent
-                    (Or.inr (Or.inr ⟨_, _, identifierParsed.1⟩))
+          exact nameAbsent parsed.expressionNameStartsAt
       | dotConstructor earlierLiteralAbsent earlierNameAbsent parsed =>
           cases parsed with
           | parsed dotSpan dotParsed nameParsed argumentsParsed =>

@@ -931,6 +931,28 @@ theorem lambdaExpression_preservesEndIndex (block : Parser Block)
   intro body
   exact pure_preservesEndIndex _
 
+theorem nameAtom_preservesEndIndex (nested : Parser Expr)
+    (child : Parser.PreservesEndIndex nested) : Parser.PreservesEndIndex (nameAtom nested) := by
+  intro input
+  have headFrame := newArrayHead_preservesTokenWindow.preservesEndIndex input
+  unfold nameAtom
+  cases headResult : newArrayHead input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      exact identifierExpression_preservesTokenWindow.preservesEndIndex input
+  | ok head afterOpening =>
+      rcases head with ⟨keyword, type⟩
+      rw [headResult] at headFrame
+      have tailFrame : Parser.PreservesEndIndex (newArrayTail nested keyword type) := by
+        unfold newArrayTail
+        apply bind_preservesEndIndex child
+        intro length
+        apply bind_preservesEndIndex
+          (symbol_preservesTokenWindow .rightParen .expression).preservesEndIndex
+        intro closing
+        exact pure_preservesEndIndex _
+      exact (tailFrame afterOpening).trans headFrame
+
 theorem expressionAtomCore_preservesEndIndex (nested : Parser Expr) (block : Parser Block)
     (nestedFrame : Parser.PreservesEndIndex nested) (blockFrame : Parser.PreservesEndIndex block) :
     Parser.PreservesEndIndex (expressionAtomCore nested block) := by
@@ -939,7 +961,7 @@ theorem expressionAtomCore_preservesEndIndex (nested : Parser Expr) (block : Par
   split
   · exact literalExpression_preservesTokenWindow.preservesEndIndex input
   · split
-    · exact identifierExpression_preservesTokenWindow.preservesEndIndex input
+    · exact nameAtom_preservesEndIndex nested nestedFrame input
     · split
       · exact dotConstructor_preservesEndIndex nested nestedFrame input
       · split
@@ -1498,7 +1520,8 @@ private theorem expressionAtomCore_ordinary_of_fuels
   split
   · exact literalExpression_invariantFreeOnValid input inputValid
   · split
-    · exact identifierExpression_invariantFreeOnValid input inputValid
+    · exact nameAtom_ordinary_of_elementFuel nested nestedFuel nestedContract input
+        inputValid nestedAdequate
     · split
       · exact dotConstructor_ordinary_of_elementFuel nested nestedFuel
           nestedContract input inputValid nestedAdequate

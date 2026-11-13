@@ -501,6 +501,211 @@ end Solcore.Syntax.DeclarativeGrammar
 end
 
 section
+/-! The name atom's traces: `new T[](n)` with its type's events and then its
+length's, or the identifier where no head `new T[](` starts. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.DeclarativeGrammar
+
+/-- `new T[](n)` with its type's events and then its length's. -/
+inductive NewArrayExpressionTraceParses
+    (nestedTrace : SourceId → Nat → Remainder → Syntax.Expr → Remainder →
+      List ParseDiagnostic → Prop)
+    (typeTrace : SourceId → Nat → Remainder → Syntax.TypeExpr → Remainder →
+      List ParseDiagnostic → Prop)
+    (source : SourceId) (endByte : Nat) :
+    Remainder → Syntax.Expr → Remainder → List ParseDiagnostic → Prop where
+  | parsed {input afterOpening afterLength output : Remainder}
+      {type : Syntax.TypeExpr} {length : Syntax.Expr}
+      {headTrace lengthTrace : List ParseDiagnostic} (keywordSpan closingSpan : SourceSpan)
+      (head : NewArrayHeadTraceParses typeTrace source endByte input keywordSpan type
+        afterOpening headTrace)
+      (lengthParsed : nestedTrace source endByte afterOpening length afterLength lengthTrace)
+      (closingParsed : ExactTokenParses (.symbol .rightParen) afterLength closingSpan output) :
+      NewArrayExpressionTraceParses nestedTrace typeTrace source endByte input {
+        span := SourceSpan.cover keywordSpan closingSpan
+        value := .newArray keywordSpan type length
+      } output (headTrace ++ lengthTrace)
+
+/-- A name atom's trace: `new T[](n)`, or the identifier where no head starts. -/
+inductive NameAtomTraceParses
+    (nestedTrace : SourceId → Nat → Remainder → Syntax.Expr → Remainder →
+      List ParseDiagnostic → Prop)
+    (typeTrace : SourceId → Nat → Remainder → Syntax.TypeExpr → Remainder →
+      List ParseDiagnostic → Prop)
+    (source : SourceId) (endByte : Nat) :
+    Remainder → Syntax.Expr → Remainder → List ParseDiagnostic → Prop where
+  | newArray {input output : Remainder} {value : Syntax.Expr} {trace : List ParseDiagnostic}
+      (parsed : NewArrayExpressionTraceParses nestedTrace typeTrace source endByte input value
+        output trace) :
+      NameAtomTraceParses nestedTrace typeTrace source endByte input value output trace
+  | identifier {input output : Remainder} {value : Syntax.Expr} {trace : List ParseDiagnostic}
+      (headAbsent : NewArrayHeadTraceAbsent typeTrace source endByte input)
+      (parsed : IdentifierExpressionTraceParses source endByte input value output trace) :
+      NameAtomTraceParses nestedTrace typeTrace source endByte input value output trace
+
+/-- A name atom's rejection: after its head, in the length or at the `)`, or
+the identifier's where no head starts. -/
+inductive NameAtomTraceRejects
+    (nestedTrace : SourceId → Nat → Remainder → Syntax.Expr → Remainder →
+      List ParseDiagnostic → Prop)
+    (nestedRejects : SourceId → Nat → Remainder → Remainder → ParseDiagnostic →
+      List ParseDiagnostic → Prop)
+    (typeTrace : SourceId → Nat → Remainder → Syntax.TypeExpr → Remainder →
+      List ParseDiagnostic → Prop)
+    (source : SourceId) (endByte : Nat) :
+    Remainder → Remainder → ParseDiagnostic → List ParseDiagnostic → Prop where
+  | lengthRejected {input afterOpening rejected : Remainder} {report : ParseDiagnostic}
+      {keywordSpan : SourceSpan} {type : Syntax.TypeExpr}
+      {headTrace lengthTrace : List ParseDiagnostic}
+      (head : NewArrayHeadTraceParses typeTrace source endByte input keywordSpan type
+        afterOpening headTrace)
+      (lengthRejected : nestedRejects source endByte afterOpening rejected report lengthTrace) :
+      NameAtomTraceRejects nestedTrace nestedRejects typeTrace source endByte input rejected
+        report (headTrace ++ lengthTrace)
+  | closingMissing {input afterOpening afterLength : Remainder} {report : ParseDiagnostic}
+      {keywordSpan : SourceSpan} {type : Syntax.TypeExpr} {length : Syntax.Expr}
+      {headTrace lengthTrace : List ParseDiagnostic}
+      (head : NewArrayHeadTraceParses typeTrace source endByte input keywordSpan type
+        afterOpening headTrace)
+      (lengthParsed : nestedTrace source endByte afterOpening length afterLength lengthTrace)
+      (closingAbsent : TokenKindAbsentAt afterLength.tokens afterLength.endIndex
+        afterLength.cursor (.symbol .rightParen))
+      (reported : RejectAtReports source endByte { head := .symbol .rightParen, tail := [] }
+        .expression afterLength report) :
+      NameAtomTraceRejects nestedTrace nestedRejects typeTrace source endByte input afterLength
+        report (headTrace ++ lengthTrace)
+  | identifier {input rejected : Remainder} {report : ParseDiagnostic}
+      {trace : List ParseDiagnostic}
+      (headAbsent : NewArrayHeadTraceAbsent typeTrace source endByte input)
+      (identifierRejected : IdentifierExpressionTraceRejects source endByte input rejected
+        report trace) :
+      NameAtomTraceRejects nestedTrace nestedRejects typeTrace source endByte input rejected
+        report trace
+
+variable {nestedTrace : SourceId → Nat → Remainder → Syntax.Expr → Remainder →
+    List ParseDiagnostic → Prop}
+  {nestedRejects : SourceId → Nat → Remainder → Remainder → ParseDiagnostic →
+    List ParseDiagnostic → Prop}
+  {source : SourceId} {endByte : Nat}
+
+private theorem typeHeads_unique {input afterLeft afterRight : Remainder}
+    {leftSpan rightSpan : SourceSpan} {left right : Syntax.TypeExpr}
+    {leftTrace rightTrace : List ParseDiagnostic}
+    (leftHead : NewArrayHeadTraceParses TypeExprTraceParses source endByte input leftSpan left
+      afterLeft leftTrace)
+    (rightHead : NewArrayHeadTraceParses TypeExprTraceParses source endByte input rightSpan
+      right afterRight rightTrace) :
+    leftSpan = rightSpan ∧ left = right ∧ afterLeft = afterRight ∧ leftTrace = rightTrace :=
+  leftHead.result_unique typeExprTraceExactOutcomeSpec.successResultUnique rightHead
+
+theorem NameAtomTraceParses.result_unique
+    (nested : ExpressionTraceExactOutcomeSpec nestedTrace nestedRejects source endByte)
+    {input afterLeft afterRight : Remainder} {left right : Syntax.Expr}
+    {leftTrace rightTrace : List ParseDiagnostic}
+    (leftParsed : NameAtomTraceParses nestedTrace TypeExprTraceParses source endByte input left
+      afterLeft leftTrace)
+    (rightParsed : NameAtomTraceParses nestedTrace TypeExprTraceParses source endByte input right
+      afterRight rightTrace) :
+    left = right ∧ afterLeft = afterRight ∧ leftTrace = rightTrace := by
+  cases leftParsed with
+  | newArray leftParsed =>
+      cases leftParsed with
+      | parsed _ _ leftHead leftLength leftClosing =>
+          cases rightParsed with
+          | identifier headAbsent _ => exact absurd ⟨_, _, _, _, leftHead⟩ headAbsent
+          | newArray rightParsed =>
+              cases rightParsed with
+              | parsed _ _ rightHead rightLength rightClosing =>
+                  rcases typeHeads_unique leftHead rightHead with ⟨rfl, rfl, rfl, rfl⟩
+                  rcases nested.successResultUnique leftLength rightLength with ⟨rfl, rfl, rfl⟩
+                  rcases leftClosing.result_unique rightClosing with ⟨rfl, rfl⟩
+                  exact ⟨rfl, rfl, rfl⟩
+  | identifier headAbsent leftParsed =>
+      cases rightParsed with
+      | newArray rightParsed =>
+          cases rightParsed with
+          | parsed _ _ rightHead => exact absurd ⟨_, _, _, _, rightHead⟩ headAbsent
+      | identifier _ rightParsed => exact leftParsed.result_unique rightParsed
+
+theorem NameAtomTraceRejects.result_unique
+    (nested : ExpressionTraceExactOutcomeSpec nestedTrace nestedRejects source endByte)
+    {input afterLeft afterRight : Remainder} {leftReport rightReport : ParseDiagnostic}
+    {leftTrace rightTrace : List ParseDiagnostic}
+    (left : NameAtomTraceRejects nestedTrace nestedRejects TypeExprTraceParses source endByte
+      input afterLeft leftReport leftTrace)
+    (right : NameAtomTraceRejects nestedTrace nestedRejects TypeExprTraceParses source endByte
+      input afterRight rightReport rightTrace) :
+    afterLeft = afterRight ∧ leftReport = rightReport ∧ leftTrace = rightTrace := by
+  cases left with
+  | lengthRejected leftHead leftRejected =>
+      cases right with
+      | lengthRejected rightHead rightRejected =>
+          rcases typeHeads_unique leftHead rightHead with ⟨_, _, rfl, rfl⟩
+          rcases nested.rejectResultUnique leftRejected rightRejected with ⟨rfl, rfl, rfl⟩
+          exact ⟨rfl, rfl, rfl⟩
+      | closingMissing rightHead rightLength _ _ =>
+          rcases typeHeads_unique leftHead rightHead with ⟨_, _, rfl, rfl⟩
+          exact absurd ⟨_, _, _, rightLength⟩ (nested.successRejectDisjoint leftRejected)
+      | identifier headAbsent _ => exact absurd ⟨_, _, _, _, leftHead⟩ headAbsent
+  | closingMissing leftHead leftLength leftAbsent leftReported =>
+      cases right with
+      | lengthRejected rightHead rightRejected =>
+          rcases typeHeads_unique leftHead rightHead with ⟨_, _, rfl, rfl⟩
+          exact absurd ⟨_, _, _, leftLength⟩ (nested.successRejectDisjoint rightRejected)
+      | closingMissing rightHead rightLength _ rightReported =>
+          rcases typeHeads_unique leftHead rightHead with ⟨_, _, rfl, rfl⟩
+          rcases nested.successResultUnique leftLength rightLength with ⟨_, rfl, rfl⟩
+          exact ⟨rfl, leftReported.diagnostic_unique rightReported, rfl⟩
+      | identifier headAbsent _ => exact absurd ⟨_, _, _, _, leftHead⟩ headAbsent
+  | identifier headAbsent leftRejected =>
+      cases right with
+      | lengthRejected rightHead => exact absurd ⟨_, _, _, _, rightHead⟩ headAbsent
+      | closingMissing rightHead => exact absurd ⟨_, _, _, _, rightHead⟩ headAbsent
+      | identifier _ rightRejected => exact leftRejected.result_unique rightRejected
+
+theorem NameAtomTraceRejects.disjoint_success
+    (nested : ExpressionTraceExactOutcomeSpec nestedTrace nestedRejects source endByte)
+    {input rejected : Remainder} {report : ParseDiagnostic} {trace : List ParseDiagnostic}
+    (rejection : NameAtomTraceRejects nestedTrace nestedRejects TypeExprTraceParses source
+      endByte input rejected report trace) :
+    ¬ ∃ value output events, NameAtomTraceParses nestedTrace TypeExprTraceParses source endByte
+      input value output events := by
+  rintro ⟨_, _, _, success⟩
+  cases success with
+  | newArray success =>
+      cases success with
+      | parsed _ closingSpan head lengthParsed closingParsed =>
+          cases rejection with
+          | lengthRejected rejectedHead lengthRejected =>
+              rcases typeHeads_unique head rejectedHead with ⟨_, _, rfl, rfl⟩
+              exact nested.successRejectDisjoint lengthRejected ⟨_, _, _, lengthParsed⟩
+          | closingMissing rejectedHead rejectedLength closingAbsent _ =>
+              rcases typeHeads_unique head rejectedHead with ⟨_, _, rfl, rfl⟩
+              rcases nested.successResultUnique lengthParsed rejectedLength with ⟨_, rfl, rfl⟩
+              exact closingAbsent ⟨closingSpan, closingParsed.1⟩
+          | identifier headAbsent _ => exact headAbsent ⟨_, _, _, _, head⟩
+  | identifier headAbsent success =>
+      cases rejection with
+      | lengthRejected rejectedHead => exact headAbsent ⟨_, _, _, _, rejectedHead⟩
+      | closingMissing rejectedHead => exact headAbsent ⟨_, _, _, _, rejectedHead⟩
+      | identifier _ rejected =>
+          exact (identifierExpressionTrace_exactOutcomeSpec source endByte).successRejectDisjoint
+            rejected ⟨_, _, _, success⟩
+
+theorem nameAtomTraceExactOutcomeSpec
+    (nested : ExpressionTraceExactOutcomeSpec nestedTrace nestedRejects source endByte) :
+    ExpressionTraceExactOutcomeSpec (NameAtomTraceParses nestedTrace TypeExprTraceParses)
+      (NameAtomTraceRejects nestedTrace nestedRejects TypeExprTraceParses) source endByte where
+  successResultUnique := NameAtomTraceParses.result_unique nested
+  rejectResultUnique := NameAtomTraceRejects.result_unique nested
+  successRejectDisjoint := NameAtomTraceRejects.disjoint_success nested
+
+end Solcore.Syntax.DeclarativeGrammar
+end
+
+section
 -- leanmerge: from Solcore.Syntax.DeclarativeExpressionAtomDispatchTraceGrammar
 /-! One prioritized expression-atom layer over supplied expression and block
 trace relations. Literal/name leaves and proxy types are concrete; recovering
@@ -524,7 +729,7 @@ def ExpressionAtomDispatchRawTraceParses
     SourceId → Nat → Remainder → Syntax.Expr → Remainder → List ParseDiagnostic → Prop :=
   match branch with
   | .literal => LiteralExpressionTraceParses
-  | .name => IdentifierExpressionTraceParses
+  | .name => NameAtomTraceParses nestedTrace TypeExprTraceParses
   | .dotConstructor => DotConstructorTraceParses nestedTrace
   | .proxy => ProxyExpressionTraceParses TypeExprTraceParses
   | .parenthesized => ParenthesizedExpressionTraceParses nestedTrace
@@ -540,7 +745,7 @@ def ExpressionAtomDispatchRawTraceRejects
     SourceId → Nat → Remainder → Remainder → ParseDiagnostic → List ParseDiagnostic → Prop :=
   match branch with
   | .literal => LiteralExpressionTraceRejects
-  | .name => IdentifierExpressionTraceRejects
+  | .name => NameAtomTraceRejects nestedTrace nestedRejects TypeExprTraceParses
   | .dotConstructor => DotConstructorTraceRejects nestedTrace nestedRejects
   | .proxy => ProxyExpressionTraceRejects TypeExprTraceRejects
   | .parenthesized => ParenthesizedExpressionTraceRejects nestedTrace nestedRejects
