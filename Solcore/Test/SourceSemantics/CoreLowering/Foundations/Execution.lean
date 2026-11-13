@@ -5429,7 +5429,7 @@ def runUpstreamFixtures : IO Unit := do
     ("implicitCompound", [word 4]), ("implicitCompound", [word 5])]
   for (name, arguments) in zero do
     session ← panics session (← key name) arguments SourceCorePanics.divisionByZero s!"{name} on {reprStr arguments}"
-  IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no contract storage, with afterBlock, ltSigned, runtimePatterns, narrowAmount, wordShift, mulNeg, divSigned, explicitWord and negI8 … negI256 as upstream wrote them with uint256(w), Typedef.abs and Typedef.rep, the other conversion-only functions adapted with the meaning kept, and basic's bnoteq, give the fixtures' values and panic codes"
+  IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no contract storage, with afterBlock, ltSigned, runtimePatterns, narrowAmount, wordShift, mulNeg, divSigned, explicitWord and negI8 … negI256 as upstream wrote them with uint256(w), Typedef.abs and Typedef.rep, so none stays adapted, and basic's bnoteq, give the fixtures' values and panic codes"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)
