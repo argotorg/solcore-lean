@@ -126,7 +126,7 @@ theorem ComptimeTypeTraceParses.ordinary
       elementTrace source endByte input value output trace → TypeExprParses input value output)
     {input output : Remainder} {value : Syntax.TypeExpr} {trace : List ParseDiagnostic}
     (parsed : ComptimeTypeTraceParses elementTrace source endByte input value output trace) :
-    TypeExprParses input value output := by
+    TypeExprBaseParses input value output := by
   cases parsed with
   | parsed m o c marker opening typed closing => exact .comptime m o c marker opening closing rfl (erases typed)
 
@@ -825,10 +825,10 @@ theorem FunctionTypeTraceParses.ordinary
       output.tokens = input.tokens ∧ output.endIndex = input.endIndex)
     {input output : Remainder} {value : Syntax.TypeExpr} {trace : List ParseDiagnostic}
     (parsed : FunctionTypeTraceParses elementTrace source endByte input value output trace) :
-    TypeExprParses input value output := by
+    TypeExprBaseParses input value output := by
   cases parsed with
   | parsed span marker parameters returns =>
-      refine TypeExprParses.function span marker rfl ?_ (returns.ordinary childOrdinary childWindow)
+      refine TypeExprBaseParses.function span marker rfl ?_ (returns.ordinary childOrdinary childWindow)
       have frame := parameters.output_window childWindow
       cases parameters with
       | empty openingSpan closingSpan allowed opening closing =>
@@ -1879,7 +1879,7 @@ theorem ProxyTypeTraceParses.ordinary
       typeTrace source endByte input value output trace → TypeExprParses input value output)
     {input output : Remainder} {value : Syntax.TypeExpr} {trace : List ParseDiagnostic}
     (parsed : ProxyTypeTraceParses typeTrace source endByte input value output trace) :
-    TypeExprParses input value output := by
+    TypeExprBaseParses input value output := by
   cases parsed with
   | parsed span marker typed => exact .proxy span marker rfl (erases typed)
 
@@ -2996,10 +2996,10 @@ theorem TupleTypeTraceParses.ordinary
         output.tokens = input.tokens ∧ output.endIndex = input.endIndex)
     {input output : Remainder} {value : Syntax.TypeExpr} {trace : List ParseDiagnostic}
     (parsed : TupleTypeTraceParses typeTrace source endByte input value output trace) :
-    TypeExprParses input value output := by
+    TypeExprBaseParses input value output := by
   cases parsed with
   | parsed elements =>
-      apply TypeExprParses.tuple rfl
+      apply TypeExprBaseParses.tuple rfl
       have frame := elements.output_window childWindow
       cases elements with
       | empty openingSpan closingSpan allowed marker closing =>
@@ -3529,7 +3529,7 @@ theorem TypeDispatchTraceParses.ordinary
       output.tokens = input.tokens ∧ output.endIndex = input.endIndex)
     {input output : Remainder} {value : Syntax.TypeExpr} {trace : List ParseDiagnostic}
     (parsed : TypeDispatchTraceParses elementTrace source endByte input value output trace) :
-    TypeExprParses input value output := by
+    TypeExprBaseParses input value output := by
   cases parsed with
   | selected branch selection raw =>
       cases branch <;> simp only [TypeDispatchRawTraceParses] at raw
@@ -4099,8 +4099,8 @@ private theorem successStructure_closed (query : TypeTraceQuery)
     (step : TypeTraceLayer successStructure query) : successStructure query := by
   cases query with
   | success source endByte input value output trace =>
-      exact ⟨TypeDispatchTraceParses.ordinary (fun child => child.1)
-        (fun child => child.2) step,
+      exact ⟨.suffixed (TypeDispatchTraceParses.ordinary (fun child => child.1)
+        (fun child => child.2) step) .done,
         TypeDispatchTraceParses.output_window (fun child => child.2) step⟩
   | rejection => trivial
 

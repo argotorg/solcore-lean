@@ -698,6 +698,13 @@ inductive NoTrailingDelimitedListParses {α : Type}
 
 /-! Recursive grammar of canonical type-expression token shapes. -/
 
+/-- The suffixes after a complete base type. The layer has one rule so far:
+`done`, no suffix, so it accepts exactly the types it accepted before. -/
+inductive TypeArraySuffixesParses :
+    Syntax.TypeExpr → Remainder → Syntax.TypeExpr → Remainder → Prop where
+  | done {element : Syntax.TypeExpr} {input : Remainder} :
+      TypeArraySuffixesParses element input element input
+
 /-
 Independent recursive grammar of every non-recovery type expression, together
 with its concrete recursive delimiter and optional-suffix support judgments.
@@ -707,7 +714,18 @@ mutual because Lean's positivity checker cannot nest this recursive grammar
 through the generic relation's parser parameter.
 -/
 mutual
+  /-- A type expression: one base form, then its array suffixes. -/
   inductive TypeExprParses :
+      Remainder → Syntax.TypeExpr → Remainder → Prop where
+    | suffixed {input afterBase output : Remainder}
+        {base result : Syntax.TypeExpr}
+        (baseParsed : TypeExprBaseParses input base afterBase)
+        (suffixesParsed : TypeArraySuffixesParses base afterBase result
+          output) :
+        TypeExprParses input result output
+
+  /-- The forms a type starts with; each nested type is a whole type. -/
+  inductive TypeExprBaseParses :
       Remainder → Syntax.TypeExpr → Remainder → Prop where
     | function {input afterKeyword afterParameters output : Remainder}
         {result : Syntax.TypeExpr}
@@ -726,7 +744,7 @@ mutual
           .leftParen .rightParen afterKeyword parameters afterParameters)
         (returnsParsed : OptionalFunctionTypeReturnsParses
           afterParameters returns output) :
-        TypeExprParses input result output
+        TypeExprBaseParses input result output
     | comptime {input afterMarker afterOpening afterInner output : Remainder}
         {result : Syntax.TypeExpr}
         {inner : Syntax.TypeExpr}
@@ -744,7 +762,7 @@ mutual
             (SourceSpan.cover openingSpan closingSpan) inner
         })
         (innerParsed : TypeExprParses afterOpening inner afterInner) :
-        TypeExprParses input result output
+        TypeExprBaseParses input result output
     | mapping
         {input afterMarker afterOpening afterKey afterArrow afterValue output :
           Remainder}
@@ -767,7 +785,7 @@ mutual
         })
         (keyParsed : TypeExprParses afterOpening key afterKey)
         (valueParsed : TypeExprParses afterArrow value afterValue) :
-        TypeExprParses input result output
+        TypeExprBaseParses input result output
     | proxy {input afterMarker output : Remainder} {result inner : Syntax.TypeExpr}
         (markerSpan : SourceSpan)
         (markerToken : ExactTokenParses (.symbol .at)
@@ -777,7 +795,7 @@ mutual
           value := .proxy markerSpan inner
         })
         (innerParsed : TypeExprParses afterMarker inner output) :
-        TypeExprParses input result output
+        TypeExprBaseParses input result output
     | tuple {input output : Remainder}
         {result : Syntax.TypeExpr}
         {values : DelimitedList Syntax.TypeExpr}
@@ -787,7 +805,7 @@ mutual
         })
         (valuesParsed : TypeExprTrailingDelimitedListParses
           .leftParen .rightParen input values output) :
-        TypeExprParses input result output
+        TypeExprBaseParses input result output
     | named {input afterName output : Remainder}
         {result : Syntax.TypeExpr}
         {name : Syntax.QualifiedName}
@@ -805,7 +823,7 @@ mutual
         })
         (argumentsParsed : OptionalNamedTypeArgumentsParses
           afterName arguments output) :
-        TypeExprParses input result output
+        TypeExprBaseParses input result output
 
   /-- Forward-order tail of a recursive type-expression delimiter list. -/
   inductive TypeExprTrailingDelimitedTailParses :

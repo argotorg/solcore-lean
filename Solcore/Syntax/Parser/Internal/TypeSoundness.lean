@@ -255,7 +255,7 @@ theorem parseMappingType_success_sound
           next.declarativeRemainder)
     {input next : State} {resultValue : TypeExpr}
     (result : parseMappingType nested input = .ok resultValue next) :
-    DeclarativeGrammar.TypeExprParses input.declarativeRemainder resultValue
+    DeclarativeGrammar.TypeExprBaseParses input.declarativeRemainder resultValue
       next.declarativeRemainder := by
   unfold parseMappingType at result
   rcases mappingTypeBind_success_components result with
@@ -292,7 +292,7 @@ theorem parseMappingType_success_sound_and_validFor
     {input next : State} {resultValue : TypeExpr}
     (inputValid : input.ValidFor)
     (result : parseMappingType nested input = .ok resultValue next) :
-    DeclarativeGrammar.TypeExprParses input.declarativeRemainder resultValue
+    DeclarativeGrammar.TypeExprBaseParses input.declarativeRemainder resultValue
         next.declarativeRemainder ∧
       TypeExpr.ValidFor input.file resultValue := by
   refine ⟨parseMappingType_success_sound nested nestedSound result, ?_⟩
@@ -694,7 +694,7 @@ theorem parseComptimeType_success_sound (nested : Parser TypeExpr)
           next.declarativeRemainder)
     {input next : State} {value : TypeExpr}
     (result : parseComptimeType nested input = .ok value next) :
-    DeclarativeGrammar.TypeExprParses input.declarativeRemainder value
+    DeclarativeGrammar.TypeExprBaseParses input.declarativeRemainder value
       next.declarativeRemainder := by
   unfold parseComptimeType at result
   rcases bind_ok_components result with
@@ -720,7 +720,7 @@ theorem parseProxyType_success_sound (nested : Parser TypeExpr)
           next.declarativeRemainder)
     {input next : State} {value : TypeExpr}
     (result : parseProxyType nested input = .ok value next) :
-    DeclarativeGrammar.TypeExprParses input.declarativeRemainder value
+    DeclarativeGrammar.TypeExprBaseParses input.declarativeRemainder value
       next.declarativeRemainder := by
   unfold parseProxyType at result
   cases markerResult : symbol .at .typeExpr input with
@@ -747,7 +747,7 @@ theorem parseTupleType_success_sound (nested : Parser TypeExpr)
     (nestedShape : Parser.PreservesTokenWindow nested)
     {input next : State} {value : TypeExpr}
     (result : parseTupleType nested input = .ok value next) :
-    DeclarativeGrammar.TypeExprParses input.declarativeRemainder value
+    DeclarativeGrammar.TypeExprBaseParses input.declarativeRemainder value
       next.declarativeRemainder := by
   unfold parseTupleType at result
   rcases bind_ok_components result with
@@ -834,7 +834,7 @@ theorem parseFunctionType_success_sound
     (nestedShape : Parser.PreservesTokenWindow nested)
     {input next : State} {value : TypeExpr}
     (result : parseFunctionType nested input = .ok value next) :
-    DeclarativeGrammar.TypeExprParses input.declarativeRemainder value
+    DeclarativeGrammar.TypeExprBaseParses input.declarativeRemainder value
       next.declarativeRemainder := by
   unfold parseFunctionType at result
   rcases typeFunctionBind_success_components result with
@@ -1100,7 +1100,7 @@ theorem parseNamedType_success_sound
     (mappingAbsent : DeclarativeGrammar.ContextualSymbolPairAbsentAt
       input.declarativeRemainder .mapping .leftParen)
     (result : parseNamedType nested input = .ok value next) :
-    DeclarativeGrammar.TypeExprParses input.declarativeRemainder value
+    DeclarativeGrammar.TypeExprBaseParses input.declarativeRemainder value
       next.declarativeRemainder := by
   unfold parseNamedType at result
   rcases namedTypeBind_success_components result with
@@ -1112,7 +1112,7 @@ theorem parseNamedType_success_sound
   have argumentsGrammar := parseNamedTypeArguments_success_sound nested
     nestedSound nestedShape argumentsResult
   have finishShape := finishNamedType_success_shape finished
-  apply DeclarativeGrammar.TypeExprParses.named comptimeAbsent mappingAbsent
+  apply DeclarativeGrammar.TypeExprBaseParses.named comptimeAbsent mappingAbsent
     nameGrammar
   · rw [finishShape.1]
     unfold makeNamedType
@@ -1136,7 +1136,7 @@ theorem parseNamedType_success_sound_and_validFor
     (mappingAbsent : DeclarativeGrammar.ContextualSymbolPairAbsentAt
       input.declarativeRemainder .mapping .leftParen)
     (result : parseNamedType nested input = .ok value next) :
-    DeclarativeGrammar.TypeExprParses input.declarativeRemainder value
+    DeclarativeGrammar.TypeExprBaseParses input.declarativeRemainder value
         next.declarativeRemainder ∧
       TypeExpr.ValidFor input.file value := by
   refine ⟨parseNamedType_success_sound nested nestedSound nestedShape
@@ -1209,30 +1209,30 @@ theorem typeExprWithFuel_success_sound :
       simp only [typeExprWithFuel] at result
       split at result
       next functionPresent =>
-        exact parseFunctionType_success_sound (typeExprWithFuel fuel)
+        exact .suffixed (parseFunctionType_success_sound (typeExprWithFuel fuel)
           inductionHypothesis (typeExprWithFuel_preservesTokenWindow fuel)
-          result
+          result) .done
       next functionAbsent =>
         split at result
         next comptimePresent =>
-          exact parseComptimeType_success_sound (typeExprWithFuel fuel)
-            inductionHypothesis result
+          exact .suffixed (parseComptimeType_success_sound (typeExprWithFuel fuel)
+            inductionHypothesis result) .done
         next comptimeAbsent =>
           split at result
           next mappingPresent =>
-            exact parseMappingType_success_sound (typeExprWithFuel fuel)
-              inductionHypothesis result
+            exact .suffixed (parseMappingType_success_sound (typeExprWithFuel fuel)
+              inductionHypothesis result) .done
           next mappingAbsent =>
             split at result
             next proxyPresent =>
-              exact parseProxyType_success_sound (typeExprWithFuel fuel)
-                inductionHypothesis result
+              exact .suffixed (parseProxyType_success_sound (typeExprWithFuel fuel)
+                inductionHypothesis result) .done
             next proxyAbsent =>
               split at result
               next tuplePresent =>
-                exact parseTupleType_success_sound (typeExprWithFuel fuel)
+                exact .suffixed (parseTupleType_success_sound (typeExprWithFuel fuel)
                   inductionHypothesis
-                  (typeExprWithFuel_preservesTokenWindow fuel) result
+                  (typeExprWithFuel_preservesTokenWindow fuel) result) .done
               next tupleAbsent =>
                 split at result
                 next namedPresent =>
@@ -1254,14 +1254,14 @@ theorem typeExprWithFuel_success_sound :
                       (input.peekOffsetKind? 1 ==
                         some (.symbol .leftParen))) = true at mappingAbsent
                     exact mappingAbsent
-                  exact parseNamedType_success_sound (typeExprWithFuel fuel)
+                  exact .suffixed (parseNamedType_success_sound (typeExprWithFuel fuel)
                     inductionHypothesis
                     (typeExprWithFuel_preservesTokenWindow fuel)
                     (contextualSymbolPairAbsentAt_of_composite_eq_false
                       .comptime .less comptimeFalse)
                     (contextualSymbolPairAbsentAt_of_composite_eq_false
                       .mapping .leftParen mappingFalse)
-                    result
+                    result) .done
                 next namedAbsent =>
                   unfold rejectAt at result
                   contradiction

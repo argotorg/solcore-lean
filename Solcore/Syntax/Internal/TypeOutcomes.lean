@@ -161,6 +161,11 @@ private def typeExprOutputMotive (input : Remainder)
     (_ : TypeExprParses input value output) : Prop :=
   ∀ {right afterRight}, TypeExprParses input right afterRight →
       output = afterRight
+private def typeExprBaseOutputMotive (input : Remainder)
+    (value : Syntax.TypeExpr) (output : Remainder)
+    (_ : TypeExprBaseParses input value output) : Prop :=
+  ∀ {right afterRight}, TypeExprBaseParses input right afterRight →
+      output = afterRight
 private def typeTailOutputMotive (closing : Symbol) (input : Remainder)
     (values : List Syntax.TypeExpr) (closingSpan : SourceSpan)
     (output : Remainder)
@@ -191,19 +196,38 @@ private def typeReturnsOutputMotive (input : Remainder)
   ∀ {right afterRight}, OptionalFunctionTypeReturnsParses input right
     afterRight → output = afterRight
 
-/-- Recursive Core type parsing has a unique output remainder. -/
-theorem TypeExprParses.output_unique {input : Remainder}
-    {left right : Syntax.TypeExpr} {afterLeft afterRight : Remainder}
-    (leftParsed : TypeExprParses input left afterLeft)
-    (rightParsed : TypeExprParses input right afterRight) :
+/-- Array suffixes end at one remainder, whatever their element. -/
+theorem TypeArraySuffixesParses.output_unique
+    {leftElement rightElement left right : Syntax.TypeExpr}
+    {input afterLeft afterRight : Remainder}
+    (leftParsed : TypeArraySuffixesParses leftElement input left afterLeft)
+    (rightParsed : TypeArraySuffixesParses rightElement input right afterRight) :
     afterLeft = afterRight := by
-  refine TypeExprParses.rec
+  cases leftParsed
+  cases rightParsed
+  rfl
+
+/-- A base type form has a unique output remainder. -/
+theorem TypeExprBaseParses.output_unique {input : Remainder}
+    {left right : Syntax.TypeExpr} {afterLeft afterRight : Remainder}
+    (leftParsed : TypeExprBaseParses input left afterLeft)
+    (rightParsed : TypeExprBaseParses input right afterRight) :
+    afterLeft = afterRight := by
+  refine TypeExprBaseParses.rec
     (motive_1 := typeExprOutputMotive)
-    (motive_2 := typeTailOutputMotive)
-    (motive_3 := typeListOutputMotive)
-    (motive_4 := typeArgumentsOutputMotive)
-    (motive_5 := typeReturnsOutputMotive)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ leftParsed rightParsed
+    (motive_2 := typeExprBaseOutputMotive)
+    (motive_3 := typeTailOutputMotive)
+    (motive_4 := typeListOutputMotive)
+    (motive_5 := typeArgumentsOutputMotive)
+    (motive_6 := typeReturnsOutputMotive)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ leftParsed rightParsed
+  · intro input afterBase output base result baseParsed suffixesParsed baseIH
+      right afterRight rightParsed
+    cases rightParsed with
+    | suffixed rightBase rightSuffixes =>
+        have afterBaseEq := baseIH rightBase
+        subst afterBaseEq
+        exact TypeArraySuffixesParses.output_unique suffixesParsed rightSuffixes
   · intro input afterKeyword afterParameters output result parameters returns
       keywordSpan keywordToken resultEq parametersParsed returnsParsed
       parametersIH returnsIH right afterRight rightParsed
@@ -445,6 +469,20 @@ theorem TypeExprParses.output_unique {input : Remainder}
           rightMarker
         subst afterMarkerEq
         exact valuesIH rightValues
+
+/-- Recursive Core type parsing has a unique output remainder. -/
+theorem TypeExprParses.output_unique {input : Remainder}
+    {left right : Syntax.TypeExpr} {afterLeft afterRight : Remainder}
+    (leftParsed : TypeExprParses input left afterLeft)
+    (rightParsed : TypeExprParses input right afterRight) :
+    afterLeft = afterRight := by
+  cases leftParsed with
+  | suffixed leftBase leftSuffixes =>
+      cases rightParsed with
+      | suffixed rightBase rightSuffixes =>
+          have afterBaseEq := TypeExprBaseParses.output_unique leftBase rightBase
+          subst afterBaseEq
+          exact TypeArraySuffixesParses.output_unique leftSuffixes rightSuffixes
 
 end Solcore.Syntax.DeclarativeGrammar
 end
@@ -1024,7 +1062,7 @@ theorem TypeExprCoreRejects.disjointOrdinary
     {input rejected : Remainder}
     (rejection : TypeExprCoreRejects nestedRejects input rejected) :
     ¬ ∃ value output, TypeExprParses input value output := by
-  rintro ⟨value, output, successful⟩
+  rintro ⟨value, output, ⟨successful, _⟩⟩
   cases rejection with
   | function branchRejected =>
       rcases branchRejected.keyword_token with ⟨span, rejectedKeyword⟩

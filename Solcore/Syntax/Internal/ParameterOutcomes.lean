@@ -48,13 +48,15 @@ theorem TypeExprTrailingDelimitedTailParses.output_unique
       rightClosing afterRight) : afterLeft = afterRight := by
   refine TypeExprTrailingDelimitedTailParses.rec
     (motive_1 := fun _ _ _ _ => True)
-    (motive_2 := fun closing input _ _ output _ =>
+    (motive_2 := fun _ _ _ _ => True)
+    (motive_3 := fun closing input _ _ output _ =>
       ∀ {right rightClosing afterRight},
         TypeExprTrailingDelimitedTailParses closing input right rightClosing
           afterRight → output = afterRight)
-    (motive_3 := fun _ _ _ _ _ _ => True)
-    (motive_4 := fun _ _ _ _ => True)
+    (motive_4 := fun _ _ _ _ _ _ => True)
     (motive_5 := fun _ _ _ _ => True)
+    (motive_6 := fun _ _ _ _ => True)
+    (by intros; trivial)
     (by intros; trivial) (by intros; trivial) (by intros; trivial)
     (by intros; trivial) (by intros; trivial) (by intros; trivial)
     ?_ ?_ ?_ (by intros; trivial) (by intros; trivial)

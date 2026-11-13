@@ -440,7 +440,9 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 
 | Step | Content | Estimate | Ports |
 | --- | --- | --- | --- |
-| 1 | Syntax: `T[]`, `new T[](n)`, the slices, the rejections, the grammar and its proofs | 35–50 files, +900–1,300/−400–600, like row 3's syntax half | parser tests from upstream's `crates/uitest/tests/fixtures/parse/fixed_size_array_rejected`, `crates/uitest/tests/fixtures/parse/empty_index_rejected` and `crates/parser/tests/formatting.rs` cases |
+| 1a | Syntax: `T[]`, with `T[k]` rejected and the suffixes counted against the nesting limit, the grammar and its proofs; type resolution rejects array types. Two commits: 1a-i, the suffix layer as a refactor that accepts no new syntax, then 1a-ii, the suffix | 25–32 files, +1,600–2,000/−350–450; 1a-i measured at 6 files, +156/−57 | parser tests from upstream's `crates/uitest/tests/fixtures/parse/fixed_size_array_rejected` and `crates/parser/tests/formatting.rs` cases |
+| 1b | Syntax: `new T[](n)`, falling back to the identifier `new`; inference rejects it | 12–18 files, +700–1,000/−100–250 | `crates/parser/tests/formatting.rs` cases |
+| 1c | Syntax: the slices, with `a[]` rejected; inference rejects the slices | 12–18 files, +800–1,200/−150–350 | parser tests from `crates/uitest/tests/fixtures/parse/empty_index_rejected` and `crates/parser/tests/formatting.rs` cases |
 | 2 | The array type and its element check, the heap's store, `new` and `0x41`, the lengths, preservation, the staged copies, the lowering's cells | 60–72 files, +1,300–1,700/−300–450, the riskiest | newLen(n), oversized(n) |
 | 3 | Element reads and `0x32` | 35–55 files, +800–1,200/−200–350, between 3c and 3a | defaultZero(n, i), nestedEmpty(n) |
 | 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
@@ -449,9 +451,10 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 37 functions above |
 
-In all, that is about 290 to 410 file changes, +6,700 to 9,600 and −1,600 to 2,750 lines over
-eight commits: a third to a half of row 1, whose 23 commits added about 21,700 lines, much of them
-meaning proofs.
+In all, that is about 305 to 425 file changes, +8,900 to 12,500 and −1,800 to 3,200 lines over
+eleven commits: two fifths to three fifths of row 1, whose 23 commits added about 21,700 lines, much
+of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600, until its first
+measure: it adds three AST forms through the proved parser, so it became 1a to 1c.
 
 Step 5 waits for decision 3.
 

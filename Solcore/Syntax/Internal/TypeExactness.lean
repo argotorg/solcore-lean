@@ -33,6 +33,10 @@ def typeValueMotive (input : Remainder) (value : Syntax.TypeExpr)
     (output : Remainder) (_ : TypeExprParses input value output) : Prop :=
   ∀ {right afterRight}, TypeExprParses input right afterRight → value = right
 
+def typeBaseValueMotive (input : Remainder) (value : Syntax.TypeExpr)
+    (output : Remainder) (_ : TypeExprBaseParses input value output) : Prop :=
+  ∀ {right afterRight}, TypeExprBaseParses input right afterRight → value = right
+
 def tailValueMotive (closing : Symbol) (input : Remainder)
     (values : List Syntax.TypeExpr) (closingSpan : SourceSpan)
     (output : Remainder)
@@ -77,14 +81,36 @@ namespace Solcore.Syntax.DeclarativeGrammar
 
 open CoreTypeExactnessInternals
 
-/-- Recursive Core type parsing constructs one exact type-expression AST. -/
-theorem TypeExprParses.value_unique {input : Remainder}
+/-- Array suffixes on one element at one remainder build one type. -/
+theorem TypeArraySuffixesParses.value_unique {element left right : Syntax.TypeExpr}
+    {input afterLeft afterRight : Remainder}
+    (leftParsed : TypeArraySuffixesParses element input left afterLeft)
+    (rightParsed : TypeArraySuffixesParses element input right afterRight) :
+    left = right := by
+  cases leftParsed
+  cases rightParsed
+  rfl
+
+/-- A base type form constructs one exact type-expression AST. -/
+theorem TypeExprBaseParses.value_unique {input : Remainder}
     {left right : Syntax.TypeExpr} {afterLeft afterRight : Remainder}
-    (leftParsed : TypeExprParses input left afterLeft) (rightParsed : TypeExprParses input right afterRight) : left = right := by
-  refine TypeExprParses.rec
-    (motive_1 := typeValueMotive) (motive_2 := tailValueMotive)
-    (motive_3 := listValueMotive) (motive_4 := argumentsValueMotive)
-    (motive_5 := returnsValueMotive) ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ leftParsed rightParsed
+    (leftParsed : TypeExprBaseParses input left afterLeft)
+    (rightParsed : TypeExprBaseParses input right afterRight) : left = right := by
+  refine TypeExprBaseParses.rec
+    (motive_1 := typeValueMotive) (motive_2 := typeBaseValueMotive)
+    (motive_3 := tailValueMotive)
+    (motive_4 := listValueMotive) (motive_5 := argumentsValueMotive)
+    (motive_6 := returnsValueMotive) ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+    leftParsed rightParsed
+  · intro input afterBase output base result baseParsed suffixesParsed baseIH
+      right afterRight rightParsed
+    cases rightParsed with
+    | suffixed rightBase rightSuffixes =>
+        have baseEq := baseIH rightBase
+        subst baseEq
+        have afterBaseEq := TypeExprBaseParses.output_unique baseParsed rightBase
+        subst afterBaseEq
+        exact TypeArraySuffixesParses.value_unique suffixesParsed rightSuffixes
   · intro input afterKeyword afterParameters output result parameters returns
       keywordSpan keywordToken resultEq parametersParsed returnsParsed
       parametersIH returnsIH right afterRight rightParsed
@@ -340,6 +366,21 @@ theorem TypeExprParses.value_unique {input : Remainder}
         rcases valuesIH rightValues with ⟨valuesEq, valuesOutEq⟩
         subst valuesEq
         exact ⟨rfl, valuesOutEq⟩
+
+/-- Recursive Core type parsing constructs one exact type-expression AST. -/
+theorem TypeExprParses.value_unique {input : Remainder}
+    {left right : Syntax.TypeExpr} {afterLeft afterRight : Remainder}
+    (leftParsed : TypeExprParses input left afterLeft)
+    (rightParsed : TypeExprParses input right afterRight) : left = right := by
+  cases leftParsed with
+  | suffixed leftBase leftSuffixes =>
+      cases rightParsed with
+      | suffixed rightBase rightSuffixes =>
+          have baseEq := TypeExprBaseParses.value_unique leftBase rightBase
+          subst baseEq
+          have afterBaseEq := TypeExprBaseParses.output_unique leftBase rightBase
+          subst afterBaseEq
+          exact TypeArraySuffixesParses.value_unique leftSuffixes rightSuffixes
 end Solcore.Syntax.DeclarativeGrammar
 end
 
