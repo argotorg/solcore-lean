@@ -1,0 +1,571 @@
+# Memory arrays and slices
+
+Updated: 2026-11-13.
+
+Row 4 of the roadmap table "Following upstream's semantics: the next units" brings solcore-rs #145
+to Lean's source language: memory arrays `T[]`, `new T[](n)`, element reads and writes, `a.length`,
+read-only slices, and Solidity's panic codes `0x32`, `0x31` and `0x41`. #145 is the pin itself:
+`e2eef194` is its merge. Lane E's generator side already compares the compiled paths with Core
+references for this row (the `runtime-memory-arrays` and `runtime-array-abi` profiles, roadmap
+"Memory arrays, slices and their panics: probe and definitions"). This note covers the Lean side:
+the parser, typing, the source semantics and the lowering to Core.
+
+It records:
+
+- upstream's behaviour at the pin, with file and line, and a probe of the pinned Rust paths;
+- what Lean has and lacks in each layer;
+- a design, the differences from upstream it keeps, and the steps in order with their sizes;
+- the effect on the generators, the gate's corpus runs and the smoke;
+- the decisions still open.
+
+No code follows this note until the open decisions are settled.
+
+## Upstream at `e2eef194`
+
+Paths are relative to the pinned checkout, and `std.sol` is `std/std.sol`.
+
+### Syntax
+
+- **`T[]`.** A type takes any number of `[]` suffixes, folded left to right, so `T[][]` is an
+  array of `T[]` (`crates/parser/src/parse/types.rs:186-224`). A size inside the brackets is
+  rejected: "fixed-size arrays `T[k]` are not supported; use `T[]`" (`:196`).
+- **`new T[](n)`.** `new` is a contextual keyword (`crates/parser/src/parse/common.rs:112`). It
+  allocates only before an array type and a parenthesized length. Anything else backtracks, so a
+  function named `new` stays callable (`crates/parser/src/parse/expr_pat.rs:244-269`).
+- **Indices and slices.** `a[i]` indexes. With a colon, `a[s:e]`, `a[s:]`, `a[:e]` and `a[:]`
+  slice. A conditional bound keeps its own colon (`a[c ? x : y:]`), and `a[]` is rejected
+  (`crates/parser/src/parse/expr_pat.rs:316-341`).
+- **Members.** `a.length` and method calls take any receiver expression, so `f().length` and
+  `xs[i].push(v)` need no temporary (`crates/hir/src/nameres/body_resolver.rs:514-537`,
+  `crates/specialize/src/specialize/call_resolver.rs:602-640`).
+- **Compound assignment.** `lhs op= rhs` is parsed as `lhs = lhs op rhs`
+  (`crates/parser/src/parse/stmt.rs:49-80`), on an element as on a local.
+
+### Typing
+
+**Location by context** (`crates/hir-ty/src/lower.rs:103-113`, `:196-225`, `:245-251`,
+`:271-285`):
+
+| Where `T[]` is written | Meaning |
+| --- | --- |
+| a local, a parameter, a return type, a constructor payload, a struct field | the memory array `memory<DynArray<T>>` |
+| a contract field (`:409-412`) | the storage array `array<T>` |
+| inside `storage<…>`, `mapping(…)` or `calldata<…>` | `array<T>` |
+| inside `memory<…>` | `DynArray<T>` |
+
+The constructor payload and struct field rows come from the probe below.
+
+- **Elements.** Every memory array operation requires `t: Typedef<word>`: `new`
+  (`crates/hir-ty/src/infer/expr.rs:344-369`), reads and writes
+  (`crates/hir-ty/src/infer/storage.rs:359-370`, `:128-150`) and std's instances (`std.sol:3081`,
+  `:3115`). Among the types Lean has, these are `word`, the twelve integer types and memory arrays.
+  The probe rejects `bool`, tuples, `()`, enums and closures with SC0207. Generic code must state
+  the bound (`where t: Typedef<word>`).
+- **`new T[](n)`** has the type `T[]`. The comment at `crates/hir-ty/src/infer/expr.rs:344-345`
+  says its length is a `uint256`, but the probe found the checker does not enforce this. A `word`
+  length passes the checker, and a `let`-bound literal length is reported ambiguous.
+- **Literals** `[e1, …, en]` unify their elements (`crates/hir-ty/src/infer/expr.rs:329-342`).
+  Open literal elements take their type from their uses, and otherwise `uint256`. `[]` takes the
+  expected type.
+- **Reads** (`crates/hir-ty/src/infer/expr.rs:82-124`).
+  - A memory array or a slice takes an index of any word-sized type: `word` or one of the twelve.
+  - A calldata array takes its own instance.
+  - Any other user type is indexed through its own `RValueIdxAccess` instance
+    (`crates/hir-ty/src/infer/storage.rs:422-443`).
+- **Writes** `a[i] = v` give `v` the element type (`crates/hir-ty/src/infer/storage.rs:128-150`).
+  Slices and calldata arrays are read-only: "expected assignable index (array slices are
+  read-only)" (`:152-203`).
+- **Slices** take `uint256` bounds and a base with a `Length` instance. They have the type
+  `arraySlice<B>`, nested for a slice of a slice (`crates/hir-ty/src/infer/storage.rs:205-256`).
+- **`a.length`** is `Length.length(a)`, a `uint256`, unless the value has a field named `length`
+  (`crates/hir-ty/src/infer/storage.rs:384-420`, `crates/hir-ty/src/infer/expr.rs:160-174`).
+  `a.length()` works too.
+- **Rejected.**
+  - `push` and `pop` on a memory array, with the hint "memory arrays have a fixed length"
+    (`crates/hir-ty/src/infer/diagnostics.rs:662-667`).
+  - `==` on arrays, since they have no `Eq`.
+  - An assignment to `a.length`.
+
+### Specialization
+
+Each form becomes a call of a std function (`crates/specialize/src/specialize/body.rs`):
+
+| Form | Call | Lines |
+| --- | --- | --- |
+| `a[i]` on a memory array | `ridx(a, i)` | `:702-711`, `:2410-2422` |
+| `a[i] = v` | `assignRef(lidx(a, i), v)` | `:389-394`, `:2464-2498` |
+| `new T[](n)`, `new T[][](n)` | `newArray(n)`, `newNestedArray(n)` | `:2424-2439`, `:3203-3222` |
+| `a[s:e]`, `a[s:]`, `a[:e]`, `a[:]` | `sliceRange(a, s, e)`, `sliceFrom(a, s)`, `sliceTo(a, e)`, `sliceAll(a)` | `:2441-2462` |
+| `a.length` | `Length.length(a)` | `:2525-2536` |
+| `c[i]` on another user type | `ridx(c, i)` | `:702-711` |
+
+So `lidx(a, i)` checks the element place before the right side is evaluated. The parser has
+already rewritten `a[i] += v` to `a[i] = a[i] + v`, so a compound assignment takes the same path
+and evaluates `a` and `i` twice, once in `lidx(a, i)` and once in `ridx(a, i)`.
+
+### std's layout and helpers
+
+- **Pointers.** `memory<t>` is `enum memory<t> { memory(word) }` with a `Typedef<memory<t>, word>`
+  instance (`std.sol:1229-1244`). So `Typedef.rep(a)` is an array's address, and `Typedef.abs(w)`
+  makes an array of any word.
+- **Allocation.**
+  - The free memory pointer is at `0x40` (`std.sol:1316-1329`).
+  - `allocate_memory(size)` panics with `0x41` when the end wraps (`:1331-1340`).
+  - `allocate_zeroed_memory(size)` clears the region with `calldatacopy` (`:1342-1353`).
+- **Layout.** An array is its length word at its address, then one word per element: element `i`
+  is at `p + 32 + 32·i` (`std.sol:1371-1382`).
+- **`new T[](n)`** has two `0x41` checks (`newArray(n)` and the helper under it,
+  `std.sol:1412-1441`). It panics when `n ≥ ⌊(2^256 − 1)/32⌋ = 2^251 − 1`, then allocates
+  `(n + 1)·32` zeroed bytes through `allocate_zeroed_memory(size)`, which panics when the end
+  wraps. In `new T[][](n)`, every element points at the empty array at `0x60` (`:1419-1430`).
+- **Literals** allocate first, without zeroing, then write the elements one by one
+  (`arrayLitNew(n)`, `arrayLitInit(a, i, v)`, `allocateDynamicArray(prx, n)`, `std.sol:1384-1411`).
+- **Elements.**
+  - `memref<t>` is `enum memref<t> { memref(word) }`. Its constructor is not exported and it has no
+    `Typedef<word>`, so a reference cannot be forged, offset or stored (`std.sol:3073-3098`).
+  - The memory instance of `LValueIdxAccess<…>` checks `i < length` (`0x32`) and gives
+    `memref(p + 32 + 32·i)`. `RValueIdxAccess` loads through it (`:3100-3119`).
+  - `lidx(c, i)`, `ridx(c, i)` and `assignRef(r, v)` are at `:3143-3155`. `Assign<r, v>` comes
+    from `CanStore` (`:2716-2730`).
+  - `Length` of a memory array reads its length word (`:2635-2639`).
+- **Slices.**
+  - `arraySlice<coll>` is `enum arraySlice<coll> { arraySlice(coll, uint256, uint256) }`,
+    exported with its constructor (`std.sol:3163-3165`).
+  - Its `Length` is the stored length. A read checks `i < length`, then reads the base's element
+    `start + i`, which the base checks again (`:3167-3197`).
+  - `sliceRange(base, s, e)` checks `s ≤ e ≤ Length.length(base)` with `0x32`. The other three
+    forms fill in the missing bounds (`:3199-3222`).
+  - `toArray(s)` copies a slice into `newArray(n)` (`:3224-3232`).
+  - No `LValueIdxAccess<…>` instance exists for slices.
+
+### Panics
+
+`panic(code)` reverts with Solidity's `Panic(uint256)`: the selector `0x4e487b71`, then the code as
+a word (`std.sol:721-726`).
+
+| Code | Sites |
+| --- | --- |
+| `0x32` | `out_of_bounds()` (`std.sol:220-223`) from a memory array index (`:3107`), a slice index (`:3186`), a slice bound (`:3203`, `:3206`), a calldata array index (`:2321`) and a storage array index (`:3041`) |
+| `0x31` | `pop` of an empty storage array (`:2680`) |
+| `0x41` | an allocation that wraps (`:1336`), a literal's or `new`'s length (`:1404`, `:1435`), a storage array offset (`:2648`), `push` at the greatest length (`:2696`) |
+
+### ABI
+
+A memory array of word-sized elements may be a public parameter, decoded into memory, or a
+result, encoded from it. Both sign as `T[]` (`crates/hir-ty/src/contract/abi.rs:468-479`,
+`std/dispatch.sol:160-166`, `std.sol:1940`, `std.sol:2237`).
+
+### The ten fixtures
+
+The last column lists the functions that Lean's native pipeline could run as top-level functions,
+which needs no contract storage and no ABI (see [Lean today](#lean-today)).
+
+| Fixture | Lines | Uses | Functions Lean could run |
+| --- | ---: | --- | --- |
+| `array-syntax` | 91 | `T[]` parameters, results and locals, literals and nested literals, `.length` of a call's result and of `new`; storage `uint256[]` and `uint256[][]` fields with `push`, `setLength` and `.length`; `mapping(address => uint256[])`; a struct field named `length` | sumAll(xs), pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n): 6 of 11 |
+| `mem-array` | 100 | `new` with zeroed elements, writes and reads, `0x32`, `0x41`, loops, a compound element write, rows of `new T[][]`, aliasing, `memref` through `lidx` and `CanStore`, `Length.length(m)` | all 11, bump(r) and bumpElement(v) with `memref` |
+| `array-slice` | 122 | the four slice forms of a call's result, a slice's `.length` and reads, slices of slices, bound panics, `toArray`, aliasing through a view, a conditional bound, slices of a storage array | build() and 14 of the 16 public functions; not storageSlice(i) and storageSliceLength() |
+| `calldata-slice` | 34 | slices of `calldata<uint256[]>` parameters through the public ABI | none |
+| `memory-array-abi` | 60 | `T[]` public parameters and results, `address[]` with a dirty address, a `uint256[][]` result, `toArray(xs[1:3])` | the bodies of ret(n), sum(xs), echo(xs), grid(n) and slices(xs), adapted to word arguments and results |
+| `user-collection-index` | 38 | a program's own `RValueIdxAccess` instance, `Typedef.rep(j)` at a generic index, `out_of_bounds()` | none |
+| `memory-allocation-bounds` | 36 | `allocateDynamicArray(prx, n)`, `mload`, `get_free_memory()`, an address as a word, `0x41` | none |
+| `allocator-bounds` | 22 | `get_free_memory()`, `set_free_memory(p)`, `allocate_memory(size)`, `0x41` | none |
+| `abi-sum-padding` | 100 | `abi_encode(v)` of sums into dirty scratch memory, `mstore`, `mload`; #145 does not change it | none |
+| `array-ops` | 58 | a storage `array<uint256>` with `ArrayPush.push`, `Array.pop` (`0x31`), `Length.length` and `Array.setLength` | none |
+
+## Probe of the pinned Rust paths
+
+Lane D probed the pinned driver offline in two parts. Its inputs and outputs are kept with the
+lane's records under `.upstream/lane-d-unit3-memory-arrays/probe/`.
+
+- **Compile probe.** 48 sources went through the checked frontend alone.
+- **Runtime probe.** One contract of 42 calls was exported to Sonatina O0 and O2 and to Yul, then
+  run on Anvil. The Lean Hull runner was not run.
+
+The compile probe accepted 31 sources, among them:
+
+- `word` and `int8` elements.
+- `Typedef.rep` and `Typedef.abs` at `uint256[]`.
+- `arraySlice(m, 1, 5)`, built and matched by hand, and annotations `arraySlice<uint256[]>` and
+  `arraySlice<arraySlice<uint256[]>>`.
+- Indices of type `word`, `uint8` and `int8`, and an open literal index.
+- `[1, 2]` as `uint256`, or as `word` through a use, and `[]` with or without an expected type.
+- `T[]` in a constructor payload and in a struct field, as memory arrays.
+- Generic code with `where t: Typedef<word>`, and `memory<uint256[]>` as `uint256[]`.
+- A function named `new`, `m.length()`, and `.length` after `new` and after a literal.
+- Three sources the checker passes but specialization rejects:
+  - `[1, 300]` and `m[0] = 300` at `uint8`, with SC0411;
+  - `new uint256[](n)` with `n: word`, with SC0405.
+
+It rejected these 17:
+
+- `bool`, tuple, `()`, enum and closure elements (SC0207).
+- A `word` slice bound (SC0201).
+- A plain or compound write through a slice (SC0201).
+- `lidx` of a slice and a `bool` index (SC0207).
+- Mixed literal elements (SC0201).
+- `toArray` of an array (SC0201 and SC0299).
+- `let n = 3; new uint256[](n)` (SC0299).
+- `new uint256(3)` (SC0001, a parse error at `uint256`).
+- An assignment to `m.length` (SC0201).
+- `==` on arrays (SC0207).
+- Generic `t[]` code without the bound (SC0207).
+
+The runtime probe gave these outcomes. "Halt" is an exceptional halt, which Anvil reports as
+InvalidOperandOOG.
+
+| Call | O0 | O2 | Yul | What it shows |
+| --- | --- | --- | --- | --- |
+| `m[5] = boom(1)` on a two-element array, where `boom(1)` overflows | `0x32` | `0x32` | `0x32` | the element place is checked before the right side |
+| `m[next(c)] += 5`, where `next(c)` adds 1 to `c[0]` | 205 | 205 | 205 | `next` runs twice |
+| `m[next(c)] = 7` | 107 | 107 | 107 | `next` runs once |
+| a closure, an argument, a tuple and a constructor payload holding an array, then a write | 5, 2, 3, 11 | the same | the same | arrays are references |
+| `let m = [1, 2]; return m[1] + m[0];` | 3 | 3 | 3 | open elements default to `uint256` |
+| an index of `word` 1, then of `int8` −1 | 5, `0x32` | the same | the same | any word-sized index; −1 is the greatest word |
+| `get_free_memory()` at entry, and the first array's address | 896 | 352 | 128 | the free pointer depends on the backend |
+| `[[1], [2]]`: the second row's address minus the outer one's | 160 | 160 | 160 | the outer array is allocated before its elements |
+| both rows of `new uint256[][](2)`, summed as addresses | 192 | 192 | 192 | both rows are the empty array at `0x60` |
+| `new uint256[](n)` for n = 2^251 − 1, 2^251 − 2, 2^251 − 5 and 2^256 − 1 | `0x41` | `0x41` | `0x41` | |
+| n = 2^251 − 6 and 2^251 − 12 | `0x41` | `0x41` | halt | the end wraps only past Yul's free pointer |
+| n = 2^251 − 20 | `0x41` | halt | halt | |
+| n = 2^32 | out of gas | out of gas | out of gas | |
+| `new` over memory dirtied past the free pointer | 0 | 0 | 0 | new elements are zero |
+| an element write and a nested row replaced, read back | 7 | 7 | 7 | |
+| a write to an element of an empty row | `0x32` | `0x32` | `0x32` | |
+| `toArray(a[1:3])`, then a write to the copy | 29 | 29 | 29 | `toArray` copies |
+| `arraySlice(m, 1, 5)` over three elements: its length, then a read at 2 | 5, `0x32` | the same | the same | the base checks a hand-built view |
+
+The two forms of the `new` length are recorded in the main checkout's `questions.md` (2026-11-13),
+beside its 2026-11-04 observation of `new uint256[](uint256(2))`. No other upstream defect was met.
+
+## Lean today
+
+- **Parser** (`Solcore/Syntax`).
+  - Types have no array form (`Solcore/Syntax/Type.lean:13-34`).
+  - `a[i]` (`Solcore/Syntax/Term.lean:38-41`) and array literals (`:57`) parse.
+  - There is no `new`, which is an ordinary identifier, and no slice.
+  - The parser is proved against the grammar of `Solcore/Syntax/Grammar`, so a new form needs
+    grammar and proof work too. Row 3's shift syntax took 34 files of `Solcore/Syntax`
+    (+736/−504).
+- **Typing** (`Solcore/TypeSystem`, `Solcore/Frontend/SourceInference`).
+  - `a[i]` is typed only on mappings: the base is unified with `mapping(K => V)`
+    (`Solcore/Frontend/SourceInference/Expression.lean:1941-1949`, places `:2036-2046`).
+  - Array literals are rejected with `unsupportedExpression` (`:1965`).
+  - `e.name` is read only as a constructor (`:1950-1964`), and assembly is rejected (`:2445`).
+  - The builtin types are `unit`, `bool`, `word`, `integer` and the twelve (`BuiltinType`,
+    `Solcore/TypeSystem/Type.lean:143-150`).
+  - There is no std, so there is no `Length`, `CanStore` or `RValueIdxAccess`, and no `struct`.
+- **Source semantics** (`Solcore/SourceSemantics`).
+  - Values are mathematical and copied (`Dynamic.Value`,
+    `Solcore/SourceSemantics/Dynamic/Value.lean:87-103`). A mapping is a value holding its
+    entries.
+  - The heap holds one cell per local (`Dynamic.Heap`,
+    `Solcore/SourceSemantics/Dynamic/Heap.lean:30-39`). No value refers to a heap location, and
+    there is no byte memory.
+  - The index rules read mappings only (`Solcore/SourceSemantics/Dynamic/Evaluation.lean:749-771`,
+    places `:791-816`).
+  - Builtin functions are pure: `Dynamic.BuiltinApplies` relates arguments to a result without
+    the heap (`Solcore/SourceSemantics/Dynamic/Primitive.lean:1105`).
+  - Panics exist as `SemanticFault.panic`.
+- **Lowering** (`Solcore/Frontend/SourceCore`). Places compile to Core getter and updater
+  functions. A mapping is an `OrderedMapping` value in its local's cell
+  (`Solcore/Frontend/SourceCore/DataPlaces.lean:134-171`). There is no memory.
+- **Core.**
+  - It has no memory primitive and no host function for memory
+    (`Solcore/Core/Syntax.lean:129-143`).
+  - It has cells, cell references and data types (`:36-46`, `:712-727`).
+  - Byte memory is ordinary Core code over a cell holding a `WordMapping`
+    (`Solcore/Frontend/RustHull/Memory.lean:1-25`, `memoryType` at `:23`), shared by the Hull
+    importer and the generators.
+- **Hull importer.** Nothing is missing.
+  - The ten fixtures are in the pinned contract inventory: six in `scripts/rust-method-parity.json`
+    and four in `scripts/rust-scenario-parity.json`.
+  - All 1,699 constructor and call observations of that inventory match on Core
+    ([README](../../README.md#running-solcore-rs-output)).
+- **Contracts and the ABI in the native pipeline.**
+  - Contract declarations are catalogued, but their members are not typed
+    (`ProgramContractSignature`, `Solcore/Frontend/ProgramSignatures.lean:603-611`).
+  - Persistent storage and external calls are not connected, and the ABI wrapper takes static
+    words only ([README](../../README.md#proof-status)).
+  - So storage arrays, `calldata<T[]>`, `T[]` in public signatures and std's raw memory functions
+    have no native counterpart.
+- **Generators** (`Solcore/Synthesis`).
+  - `runtime-memory-arrays` and `runtime-array-abi` (`Solcore/Synthesis/Internal/Arrays.lean`)
+    print `T[]` sources for the pinned compiler. They compare its paths with Core references that
+    hold an array as a length cell and element cells.
+  - `allocationLimit` is 2^251 − 1 (`:208`). A drawn length is at most 7 or at least 2^255, so no
+    case falls in the window near 2^251 that the probe found.
+
+**Core itself needs nothing, for row 4 too.** Core already has the cells, cell references, data
+types and byte memory code that both lowerings in [Design](#design) use. The Hull path runs all ten
+fixtures on Core today. No Core primitive, host function or typing rule is needed. The Hull
+importer needs nothing either.
+
+## Design
+
+The design follows the recommended answers to the [open decisions](#open-decisions).
+
+Memory arrays become builtins, as the twelve integer types did in row 1. They take upstream's typing
+and std's checks. The source semantics holds arrays as objects in its heap, and an array value is a
+reference to one. The lowering gives each array a Core cell. Lean ports what its native pipeline can
+express: memory arrays inside functions. Storage arrays, calldata arrays, the ABI and raw memory
+wait for the native pipeline's contracts and ABI.
+
+### Syntax
+
+- `TypeExprValue` gains the array form: `T[]` suffixes on any type, folded left to right. A size is
+  rejected with upstream's message.
+- `ExprValue` gains `new T[](n)` and the four slice forms. `new` allocates only before an array
+  type and a parenthesized length. Otherwise it stays an identifier, as upstream's contextual
+  keyword does. `a[]` is rejected.
+- `e.length` and `e.length()` parse already, as a field and a call of a field.
+- The grammar and the parser's correctness proofs take the new forms. Inference and type
+  resolution reject them until the step that gives them a meaning.
+
+### Typing
+
+- **Types.** `BuiltinType` gains the memory array and the slice, applied to their argument, and
+  `memref` in step 7. They are spelled `T[]`, `arraySlice<B>` and `memref<T>`.
+- **Element types.** `T[]` is well formed when `T` is `word`, one of the twelve types or a memory
+  array: the types with `Typedef<word>` upstream that Lean has.
+- **`new T[](n)`** has the type `T[]`. Its length has the type `uint256`, and an open literal length
+  defaults to it.
+- **Literals.** The elements take one type `T`, and the literal has the type `T[]`. `[]` needs an
+  expected type. Open literal elements wait as row 1's literals do, then default to `uint256`.
+- **Reads.** `a[i]` on an array or a slice takes `i` at `word` or one of the twelve types. An open
+  literal index defaults to `uint256`, and the read has the element type. On a mapping, or on a base
+  whose type is still open, `a[i]` keeps today's mapping rule.
+- **Writes.** `a[i] = v`, the compound assignments, in-place `~` and the unchecked forms take the
+  element type, with row 1's rules for each type. A write through a slice is rejected.
+- **Slices** take `uint256` bounds and a base that is an array or a slice, and have the type
+  `arraySlice<B>`.
+- **Lengths.** `a.length`, `a.length()` and `Length.length(a)` on arrays and slices have the type
+  `uint256`. `Length.length` is a builtin qualified call when no namespace `Length` exists, as
+  `Typedef.abs` is (`typedefCall?`).
+- **Builtins.** `toArray(s)` is a builtin, and so are `lidx(a, i)`, `CanStore.load(r)` and
+  `CanStore.store(r, v)` from step 7.
+- **Rejected.** `Typedef` at an array type, `==` on arrays, `push` and `pop`, and assignment to a
+  length. A mapping key or value of an array type is rejected too: upstream's meaning there is a
+  storage array. A contract field of an array type parses and, like every contract member, is not
+  typed.
+
+### Source semantics
+
+- **Values.** `Dynamic.Value` gains three forms:
+  - an array reference, which carries its element type and the location of its object, as Core's
+    `cellRef` does, so that `Dynamic.ValueHasType` stays independent of the heap;
+  - a slice, which holds its base value, its start and its length;
+  - in step 7, a `memref`.
+- **Heap.** `Dynamic.Heap` gains a store of array objects beside its cells. An allocation appends
+  an object. Objects never move, grow or shrink, so a reference and a `memref` stay valid.
+- **Rules.** Each rule comes with its fault rules and its sized and staged copies, as row 1's
+  rules did.
+  - `new T[](n)` panics with `0x41` when `n ≥ 2^251 − 1`. Otherwise it allocates an object of `n`
+    zero elements. For an array element type, the elements are `n` references to one fresh empty
+    array, as std's `0x60` is.
+  - A literal allocates its object first, then evaluates and stores its elements from left to
+    right.
+  - A read panics with `0x32` when `i ≥ length`. A read through a slice checks the slice's length,
+    then the base's at `start + i`.
+  - An element place `a[i]` evaluates `a` and `i` once and checks `i < length` before the right
+    side, as `lidx(a, i)` does. The write replaces the element.
+  - A slice panics with `0x32` when `s > e` or when `e` exceeds the base's length.
+  - The length rules read the object or the slice, and `toArray(s)` allocates a copy.
+- **Preservation.** `Dynamic.HeapWellTyped` requires each object's elements to have the object's
+  element type. A reference is typed by the type it carries and the object it names.
+- **Panics** reuse `SemanticFault.panic`.
+
+### Lowering
+
+- An array is a Core cell. The cell holds the length, the default element (zero, or the shared
+  empty array for an array element type) and the present elements in an `OrderedMapping` from index
+  to element. A source array value is the cell's `cellRef`, and nested arrays hold `cellRef`s.
+- `new` allocates the cell with no entries, so an absent element reads as the default. Reads and
+  writes check the length, then look up or update the entry.
+- A slice is a Core product of its base, its start and its length.
+- Arrays stay outside `StaticProfile` and the proved subset, as row 1's conversions did. The
+  meaning proofs and their statements do not change.
+
+### Public API
+
+A root whose signature mentions an array or a slice is rejected. Tests reach arrays through
+functions over words, as row 1's fixture ports did.
+
+### Outside row 4's Lean side
+
+- Storage arrays, so no `0x31`; calldata arrays; and `T[]` in the ABI. These need the native
+  pipeline's contract storage and calldata ABI first.
+- User collections indexed through `RValueIdxAccess`. They need std's traits, and `Typedef` at a
+  type parameter, which is row 1's open gap.
+- Raw memory: `get_free_memory()`, `allocate_memory(size)`, `mload`, `mstore` and
+  `abi_encode(v)`.
+- The meaning proofs for arrays (decision 6).
+
+## Differences from upstream that Lean would keep
+
+1. **One evaluation of an element place in a compound assignment** (decision 3). `m[next(c)] += 5`
+   runs `next` once, so the probe's 205 is 105 in Lean. This is row 1's choice for compound
+   assignments ([row 1's compound assignments](integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs)).
+2. **`0x41` only from the length check** (decision 2).
+   - For lengths just below 2^251 − 1, the pinned backends disagree with each other. Each panics
+     where its own free pointer makes the end wrap, and halts otherwise. Lean allocates.
+   - Lengths that exhaust EVM memory run out of gas there and allocate in Lean, whose Core does not
+     meter gas.
+3. **No addresses.** `Typedef.rep` and `Typedef.abs` at an array type, `memory<…>` and
+   `DynArray<…>`, and std's allocation functions are rejected.
+4. **`arraySlice<B>` is a type only.** A program cannot build or match a slice by hand, while
+   upstream exports the constructor.
+5. **`T[]` only where the native pipeline has a meaning for it.** Storage and calldata arrays,
+   mappings of arrays and `T[]` in public signatures are rejected.
+6. **Element types are checked where the type is formed.**
+   - `bool[]` is rejected even where upstream accepts it, which is until an operation requires
+     `Typedef<word>`.
+   - Generic `t[]` is rejected, since Lean cannot write `where t: Typedef<word>`. This is row 1's
+     gap for generic code over std's instances.
+7. **`new`'s length is a `uint256`, an open literal included.** Upstream's checker passes a `word`
+   length on to specialization (SC0405) and finds a `let`-bound literal length ambiguous (SC0299).
+   Both are recorded in `questions.md`.
+8. **An unused `let m = [];` is ambiguous**, as any unconstrained type is in Lean. Upstream accepts
+   it.
+
+## Steps
+
+The yardstick is row 1's step 3c, 36 files, +868/−224. Each step stays within twice 3c: 72 files,
++1,736/−448. Every step adds tests through the public API and keeps every array form outside the
+meaning proofs. A program that mentions no array keeps all its proofs.
+
+| Step | Content | Estimate | Ports |
+| --- | --- | --- | --- |
+| 1 | Syntax: `T[]`, `new T[](n)`, the slices, the rejections, the grammar and its proofs | 35–50 files, +900–1,300/−400–600, like row 3's syntax half | parser tests from upstream's `crates/uitest/tests/fixtures/parse/fixed_size_array_rejected`, `crates/uitest/tests/fixtures/parse/empty_index_rejected` and `crates/parser/tests/formatting.rs` cases |
+| 2 | The array type and its element check, the heap's store, `new` and `0x41`, the lengths, preservation, the staged copies, the lowering's cells | 60–72 files, +1,300–1,700/−300–450, the riskiest | newLen(n), oversized(n) |
+| 3 | Element reads and `0x32` | 35–55 files, +800–1,200/−200–350, between 3c and 3a | defaultZero(n, i), nestedEmpty(n) |
+| 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
+| 5 | Element writes and compound assignments, with the place checked before the right side | 55–72 files, +1,200–1,700/−300–450 | setGet(n, i, v), fillAndSum(n), compound(v), nestedReplace(n, v), alias(v); ret(n), sum(xs), echo(xs), grid(n) adapted |
+| 6 | Slices and `toArray(s)` | 45–65 files, +1,000–1,400/−200–400 | array-slice's 15 functions; slices(xs) adapted |
+| 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
+| 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 37 functions above |
+
+In all, that is about 290 to 410 file changes, +6,700 to 9,600 and −1,600 to 2,750 lines over
+eight commits: a third to a half of row 1, whose 23 commits added about 21,700 lines, much of them
+meaning proofs.
+
+Step 2 is the least certain. The change to `Dynamic.Heap` and `Dynamic.HeapWellTyped` reaches the
+126 files that name heap typing and the 88 that name allocation. If its first hour shows more than
+twice 3c, it splits: 2a for the type, the store and its typing, then 2b for `new`, the lengths and
+the lowering. Each later step stops on the same size condition, and on any change to a statement
+named in the [open decisions](#open-decisions) beyond the ones listed there.
+
+## Generators, corpora and the smoke
+
+- **No generated case changes.** No step changes `Solcore/Synthesis`, a corpus, a fixture or a
+  generated case. The generators print sources for the pinned compiler and compare its paths with
+  original Core references, and Lean's native compiler takes part in neither.
+- **The gate's 31 corpus runs** re-emit the same sources and are unchanged. Four of them concern
+  memory: the memory-value, memory-call, memory-array and array ABI validators in
+  `Tests/scripts`.
+- **The smoke and RustParity.** The smoke's nine runs are unchanged, among them memory-fixed-o2,
+  abi-fixed-yul, memory-random-o0, abi-random-o2 and fuzz-o0. RustParity's 31 cases contain no
+  array, so they are unchanged too.
+- **The source-to-Rust harnesses** compare Core references with the Rust paths and are unchanged.
+- **Lean tests.** The only existing tests that change are the parser's expected-token lists after
+  a type, which gain `[` in step 1. Upstream's snapshot
+  `crates/uitest/tests/fixtures/parse/struct_field_missing_semicolon/diagnostics.snap` changed the
+  same way. Everything else is new tests.
+
+## Open decisions
+
+Each decision lists its options, the recommendation, upstream's code and the statements each option
+changes. The statements are README and its Proof status, the names the guides cite, and
+core-lowering's table of [definitions and theorems you build on](../guide/core-lowering.md#definitions-and-theorems-you-build-on).
+
+### 1. How the source semantics holds arrays
+
+- **(a) Recommended: objects in the heap.** Array objects live in `Dynamic.Heap` beside the
+  cells. An array value is a reference that carries its element type, and `Dynamic.HeapWellTyped`
+  covers the objects.
+- **(b) Byte memory.** The source state holds std's layout, and an array value is its address.
+- **Upstream.** `std.sol:1229-1244`, `:1371-1382`, `:3100-3119`.
+- **Statements under (a).**
+  - These named definitions gain forms or a field: `Dynamic.Value`, `Dynamic.ValueHasType`,
+    `Dynamic.Heap`, `Dynamic.HeapWellTyped`, `Dynamic.Heap.Allocates` and
+    `Dynamic.Heap.AllocatesCopy`, which keep the store. They are named in
+    [source-semantics.md](../guide/source-semantics.md#dynamic-semantics).
+  - These theorems keep their text and come to cover arrays: `Dynamic.WholeLanguagePreservation`,
+    `ProgramWellFormed.wholeLanguagePreservation`,
+    `Staging.Recursive.SelectedPreservation.expression` and
+    `Staging.Recursive.FaultPreservation.expression`.
+  - README's Proof status sentence on the source semantics' type preservation stays true.
+  - Nothing in the build-on table changes.
+- **Statements under (b).** `Dynamic.ValueHasType` and `Dynamic.HeapWellTyped` take the memory, so
+  every cited statement that uses them changes its text, and preservation needs typed regions of
+  memory.
+
+### 2. How the lowering stores arrays, and when `new` panics with `0x41`
+
+- **(a) Recommended: one Core cell per array.** The cell holds the length, the default element and
+  an `OrderedMapping` of elements, and is referenced by `cellRef`. `0x41` comes exactly when
+  `n ≥ 2^251 − 1`. There is no free pointer.
+- **(b) std's layout.** All arrays share one Core memory cell (`memoryType`), with a free pointer
+  that starts at `0x80`. Both of std's checks apply, so `0x41` matches Yul exactly.
+- **(c) Cells and a counter.** As (a), plus a free-pointer counter in the source state and in Core,
+  for both checks without the layout.
+- **Upstream.** `std.sol:1331-1340` and `:1400-1441`. In the probe, the free pointer at entry is
+  896 on O0, 352 on O2 and 128 on Yul.
+- **Statements under (a).** None of the cited ones. The cells are the ones Core already allocates.
+- **Statements under (b) and (c).** Every function that allocates needs a memory or counter cell,
+  as an administrative binder or a global. `DataHeap.EnvRepresents` and the slot arithmetic behind
+  `CellAwareInvocationAcceptedFlow.body_preserves` read those binders. If the cell were threaded
+  through every function, those build-on statements could change.
+
+### 3. Compound assignment to an element
+
+- **(a) Recommended: one evaluation of the place**, as row 1's compound assignments do.
+- **(b) Upstream's rewrite** to `a[i] = a[i] op v`.
+- **Upstream.** `crates/parser/src/parse/stmt.rs:49-80`, and the probe's 205 against 107.
+- **Statements under (a).** None beyond the step's own place rules.
+- **Statements under (b).** The compound rules of every place would change: locals and mappings
+  too, to stay consistent. That reaches the cited `Dynamic.CompoundAssignmentApplies`,
+  `CompatibleBareAssignment.of_lower` and `inferAssignedValueFuel_success_sound`, and reverses row
+  1's decision.
+
+### 4. What row 4's Lean side covers
+
+- **(a) Recommended: memory arrays in functions.** The types, `new`, literals, reads, writes, the
+  lengths, slices of arrays and slices, `toArray` and `memref`: steps 1 to 8.
+- **(b) Without `memref`.** Step 7 goes, and bump(r) and bumpElement(v) are not ported.
+- **(c) With storage arrays, calldata arrays and `T[]` in the ABI.** These need the native
+  pipeline's contract storage and calldata ABI, which are units of their own and come before any
+  array work.
+- **Statements.** None. The options differ in size only.
+
+### 5. Arrays at the public API
+
+- **(a) Recommended.** A root whose signature mentions an array or a slice is rejected.
+- **(b) A new public value form**, a list of elements, for array arguments and results.
+- **Upstream.** The ABI of `T[]`, above.
+- **Statements under (a).** None.
+- **Statements under (b).** The public values of `SourceCoreExecution`, described in README's
+  [Using the frontend](../../README.md#using-the-frontend) and in the runtime API overview.
+
+### 6. Meaning proofs
+
+- **(a) Recommended: compiled, outside the meaning proofs in row 4**, as row 1's conversions were.
+  A later unit relates array objects to their Core cells.
+- **(b) Prove the lowering of arrays in row 4.**
+- **Statements under (a).** Nothing in README, its Proof status or the build-on table changes.
+  [What remains](../guide/core-lowering.md#what-remains) in core-lowering.md gains arrays.
+- **Statements under (b).** These are build-on table changes:
+  - `GenericHeap.HeapRepresents` gains the array objects;
+  - the premises of `CellAwareInvocationAcceptedFlow.body_preserves` and `body_reflects`
+    (`Covered`, `Expressions`) gain the array forms.
+
+## Consequences for existing programs
+
+- **`new` stays an identifier** unless an array type and a parenthesized length follow it.
+- **No program changes its meaning.** No source that Lean's own tests compile writes a type
+  followed by `[`. The `T[]` sources in `Solcore/Test/Synthesis` are printed for the pinned driver,
+  and Lean's parser never reads them.
+- **Array literals**, rejected today, become accepted in step 4. No existing test expects their
+  rejection.
+- **`unsupportedExpression "field"`** stays the answer for other names after a dot. The tests that
+  expect it use `provider.hidden`, `WordBox.Wrap` and `provider.Box.Wrap`.
