@@ -157,6 +157,11 @@ theorem ValueHasType.nominal_value
   | builtin function =>
       exact (nominal_ne_of_head _ _ _
         (by simp [BuiltinFunctionId.type, applicationHead]) type_eq).elim
+  | arrayRef =>
+      exact (nominal_ne_of_head _ _ _ (by simp [Ty.array, applicationHead]) type_eq).elim
+  | arrayObject =>
+      exact (nominal_ne_of_head _ _ _
+        (by simp [Ty.arrayObject, applicationHead]) type_eq).elim
   | comptime inner_typed =>
       exact (nominal_ne_comptime declaration arguments _ type_eq).elim
 
@@ -192,6 +197,8 @@ theorem ValueHasType.unit_value
   | builtin function =>
       rw [BuiltinFunctionId.type] at type_eq
       cases type_eq
+  | arrayRef => simp [Ty.unit, Ty.array] at type_eq
+  | arrayObject => simp [Ty.unit, Ty.arrayObject] at type_eq
   | comptime => cases type_eq
 
 /-- A value of a fixed-width integer type is a word. -/
@@ -227,6 +234,8 @@ theorem ValueHasType.fixed_value
   | builtin function =>
       rw [BuiltinFunctionId.type] at type_eq
       cases type_eq
+  | arrayRef => simp [Ty.fixed, Ty.array] at type_eq
+  | arrayObject => simp [Ty.fixed, Ty.arrayObject] at type_eq
   | comptime => cases type_eq
 
 theorem ValueHasType.product_value
@@ -267,6 +276,8 @@ theorem ValueHasType.product_value
   | builtin function =>
       rw [BuiltinFunctionId.type] at type_eq
       cases type_eq
+  | arrayRef => simp [Ty.array] at type_eq
+  | arrayObject => simp [Ty.arrayObject] at type_eq
   | comptime => cases type_eq
 
 theorem ValuesPack.exists_typed

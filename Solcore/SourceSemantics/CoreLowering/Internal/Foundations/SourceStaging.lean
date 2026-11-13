@@ -37,8 +37,9 @@ open Solcore Solcore.Frontend Solcore.Frontend.SourceInference Solcore.SourceSem
 def EnvironmentBounded (bound : Nat) (environment : Dynamic.Environment) : Prop :=
   ∀ binding, binding ∈ environment → binding.2.index < bound
 
-/-- A location stored anywhere in a value's nested closure captures. Mapping
-keys and values, and every constructor payload, retain their original lists. -/
+/-- A location stored anywhere in a value: in its nested closure captures, or
+as a memory array's reference. Mapping keys and values, every constructor
+payload and every array element retain their original lists. -/
 inductive ValueCaptures : Value → Location → Prop where
   | closure {function : Closure} {id : Resolved.LocalId} {location : Location}
       (member : (id, location) ∈ function.captured) :
@@ -56,6 +57,11 @@ inductive ValueCaptures : Value → Location → Prop where
   | mappingValue {keyType valueType : Ty} {entries : List (Value × Value)}
       {key value : Value} {location : Location} (member : (key, value) ∈ entries)
       (inside : ValueCaptures value location) : ValueCaptures (.mapping keyType valueType entries) location
+  | arrayRef {element : Ty} {location : Location} :
+      ValueCaptures (.arrayRef element location) location
+  | arrayElement {element : Ty} {elements : List Value} {value : Value} {location : Location}
+      (member : value ∈ elements) (inside : ValueCaptures value location) :
+      ValueCaptures (.arrayObject element elements) location
 
 def ValueBounded (bound : Nat) (value : Value) : Prop :=
   ∀ location, ValueCaptures value location → location.index < bound
@@ -86,7 +92,7 @@ theorem value_bounded {context : SourceSemantics.Context} {heap : Heap} {value :
     (motive_1 := fun value _ _ => ValueBounded heap.cells.length value)
     (motive_2 := fun values _ _ => ValuesBounded heap.cells.length values)
     (motive_3 := fun entries _ _ _ => EntriesBounded heap.cells.length entries)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typed
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typed
   · intro location captured; cases captured
   · intro _ location captured; cases captured
   · intro _ location captured; cases captured
@@ -109,6 +115,12 @@ theorem value_bounded {context : SourceSemantics.Context} {heap : Heap} {value :
     | closure member => exact environment_bounded agrees _ member
   · intro function valid evidence location captured; cases captured
   · intro function location captured; cases captured
+  · intro element location cell read _ found captured
+    cases captured
+    exact read.location_valid
+  · intro element elements _ bounded location captured
+    cases captured with
+    | arrayElement member inside => exact bounded _ member location inside
   · intro value inner typedValue bounded; exact bounded
   · intro value member; cases member
   · intro value values type types typedHead typedTail headBound tailBound candidate member
@@ -297,6 +309,12 @@ mutual
       ValueRel mapping (.closure function) (.closure { function with captured := captured })
   | global (function : Dynamic.GlobalFunction) : ValueRel mapping (.global function) (.global function)
   | builtin (function : Dynamic.BuiltinFunction) : ValueRel mapping (.builtin function) (.builtin function)
+  | arrayRef {element : TypeSystem.Ty} {source target : Dynamic.Location}
+      (location : Maps mapping source target) :
+      ValueRel mapping (.arrayRef element source) (.arrayRef element target)
+  | arrayObject {element : TypeSystem.Ty} {left right : List Dynamic.Value}
+      (values : ValuesRel mapping left right) :
+      ValueRel mapping (.arrayObject element left) (.arrayObject element right)
  inductive ValuesRel (mapping : LocationMap) : List Dynamic.Value → List Dynamic.Value → Prop where
   | nil : ValuesRel mapping [] []
   | cons {a b : Dynamic.Value} {left right : List Dynamic.Value}
@@ -314,7 +332,7 @@ theorem ValueRel.mono {a b : LocationMap} (extension : Extends a b) {left right 
     (motive_1 := fun left right _ => ValueRel b left right)
     (motive_2 := fun left right _ => ValuesRel b left right)
     (motive_3 := fun left right _ => EntriesRel b left right)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ related
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ related
   · exact .unit
   · exact fun v => .bool v
   · exact fun v => .word v
@@ -326,6 +344,8 @@ theorem ValueRel.mono {a b : LocationMap} (extension : Extends a b) {left right 
   · intro function captured captures; exact .closure (captures.mono extension)
   · exact fun f => .global f
   · exact fun f => .builtin f
+  · intro element source target location; exact .arrayRef (extension _ _ location)
+  · intros; exact .arrayObject ‹ValuesRel b _ _›
   · exact .nil
   · intros; exact .cons ‹ValueRel b _ _› ‹ValuesRel b _ _›
   · exact .nil
@@ -341,7 +361,7 @@ theorem value_identity {length : Nat} (value : Dynamic.Value)
     (motive_3 := fun entries => Capture.EntriesBounded length entries → EntriesRel (identityMap length) entries entries)
     (motive_4 := fun pair => Capture.ValueBounded length pair.1 ∧ Capture.ValueBounded length pair.2 →
       ValueRel (identityMap length) pair.1 pair.1 ∧ ValueRel (identityMap length) pair.2 pair.2)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ value bounded
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ value bounded
   · intro _; exact .unit
   · intro v _; exact .bool v
   · intro v _; exact .word v
@@ -361,6 +381,11 @@ theorem value_identity {length : Nat} (value : Dynamic.Value)
     simpa only using ValueRel.closure captured
   · intro f _; exact .global f
   · intro f _; exact .builtin f
+  · intro element location bound
+    exact .arrayRef (identity_maps (bound location .arrayRef))
+  · intro element elements ih bound
+    exact .arrayObject (ih (fun value member location found =>
+      bound location (.arrayElement member found)))
   · intro _; exact .nil
   · intro head tail hi ti bound
     exact .cons (hi (bound head (by simp))) (ti (fun v member => bound v (by simp [member])))

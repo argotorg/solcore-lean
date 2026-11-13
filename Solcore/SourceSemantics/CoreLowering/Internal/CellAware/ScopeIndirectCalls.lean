@@ -485,7 +485,8 @@ private theorem value_is_function {context : SourceSemantics.Context} {heap : Dy
           (ParameterSubstitution.orderedArguments instantiation.parameterSubstitution dataType.parameters)
           parameter result) impossible.symm)
     · cases impossible
-  | unit | bool | word | integer | product | proxy | mapping => cases typed
+  | unit | bool | word | integer | product | proxy | mapping | arrayRef | arrayObject =>
+    cases typed
 
 include positive caller view originalUnique sourceEq found sourceParent tree unique parentTyped in
 /-- The actual callee payload comes from the positive receiving model. Its

@@ -238,6 +238,22 @@ mutual
         ValueHasType context heap (.global function) function.instantiation.type
     | builtin (function : BuiltinFunction) :
         ValueHasType context heap (.builtin function) function.id.type
+    /-- A memory array is typed by the heap cell it names, which holds its
+    elements at `arrayObject element`. A later heap keeps every cell's type, so
+    the reference keeps its type. -/
+    | arrayRef
+        {element : Ty} {location : Location} {cell : Cell}
+        (read : Heap.Reads heap location cell)
+        (cell_type : cell.type = Ty.arrayObject element) :
+        ValueHasType context heap (.arrayRef element location) (Ty.array element)
+    /-- Each element a memory array's cell holds has the array's element
+    type. -/
+    | arrayObject
+        {element : Ty} {elements : List Value}
+        (elements_typed : ValuesHaveTypes context heap elements
+          (List.replicate elements.length element)) :
+        ValueHasType context heap (.arrayObject element elements)
+          (Ty.arrayObject element)
     | comptime
         {value : Value} {inner : Ty}
         (inner_typed : ValueHasType context heap value inner) :
@@ -301,12 +317,14 @@ mutual
   the type metadata that a value-typing derivation may traverse. -/
   def valueWeight : Value → Nat
     | .unit | .bool _ | .word _ | .integer _ | .proxy _
-    | .closure _ | .global _ | .builtin _ => 1
+    | .closure _ | .global _ | .builtin _ | .arrayRef _ _ => 1
     | .product left right => valueWeight left + valueWeight right + 1
     | .constructed instantiation arguments =>
         valuesWeight arguments + typesWeight instantiation.payloadTypes + 1
     | .mapping keyType valueType entries =>
         mappingEntriesWeight entries + typeWeight keyType + typeWeight valueType + 1
+    | .arrayObject element elements =>
+        valuesWeight elements + typesWeight (List.replicate elements.length element) + 1
 
   def valuesWeight : List Value → Nat
     | [] => 0
@@ -838,6 +856,11 @@ mutual
           (captures.mono extension)
     | global valid evidence_covers => exact .global valid evidence_covers
     | builtin function => exact .builtin function
+    | arrayRef read cell_type =>
+        rcases extension _ _ read with ⟨updatedCell, updatedRead, updatedType, _⟩
+        exact .arrayRef updatedRead (updatedType.trans cell_type)
+    | arrayObject elements_typed =>
+        exact .arrayObject (ValuesHaveTypes.mono extension elements_typed)
     | comptime inner_typed =>
         exact .comptime (ValueHasType.mono extension inner_typed)
     termination_by valueWeight value + typeWeight type
@@ -916,6 +939,9 @@ mutual
           (DeclarationInstantiation.Valid.transportContext supports valid)
           (by simpa [supports.signatures] using evidence_covers)
     | builtin function => exact .builtin function
+    | arrayRef read cell_type => exact .arrayRef read cell_type
+    | arrayObject elements_typed =>
+        exact .arrayObject (ValuesHaveTypes.transportContext supports elements_typed)
     | comptime inner_typed =>
         exact .comptime (ValueHasType.transportContext supports inner_typed)
     termination_by valueWeight value + typeWeight type
@@ -1279,6 +1305,32 @@ theorem builtin_inv
         ValueHasType context heap (.builtin function) inner) := by
   cases typed with
   | builtin function => exact .inl rfl
+  | comptime inner_typed => exact .inr ⟨_, rfl, inner_typed⟩
+
+/-- A memory array names a heap cell that holds its elements. -/
+theorem arrayRef_inv
+    {context : Context} {heap : Heap}
+    {element : Ty} {location : Location} {type : Ty}
+    (typed : ValueHasType context heap (.arrayRef element location) type) :
+    (type = Ty.array element ∧
+      ∃ cell, Heap.Reads heap location cell ∧ cell.type = Ty.arrayObject element) ∨
+    (∃ inner, type = .comptime inner ∧
+      ValueHasType context heap (.arrayRef element location) inner) := by
+  cases typed with
+  | arrayRef read cell_type => exact .inl ⟨rfl, _, read, cell_type⟩
+  | comptime inner_typed => exact .inr ⟨_, rfl, inner_typed⟩
+
+/-- A memory array's elements each have its element type. -/
+theorem arrayObject_inv
+    {context : Context} {heap : Heap}
+    {element : Ty} {elements : List Value} {type : Ty}
+    (typed : ValueHasType context heap (.arrayObject element elements) type) :
+    (type = Ty.arrayObject element ∧
+      ValuesHaveTypes context heap elements (List.replicate elements.length element)) ∨
+    (∃ inner, type = .comptime inner ∧
+      ValueHasType context heap (.arrayObject element elements) inner) := by
+  cases typed with
+  | arrayObject elements_typed => exact .inl ⟨rfl, elements_typed⟩
   | comptime inner_typed => exact .inr ⟨_, rfl, inner_typed⟩
 
 end ValueHasType

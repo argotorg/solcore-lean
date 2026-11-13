@@ -1018,7 +1018,8 @@ theorem literalMatcher_sound (compilation : Compilation) (site : StatementId) (s
     | declaration => simp [literalMatcher, bind, Except.bind] at accepted
     | builtin builtin =>
       cases builtin with
-      | unit | bool | memoryArray => simp [literalMatcher, bind, Except.bind] at accepted
+      | unit | bool | memoryArray | arrayObject =>
+        simp [literalMatcher, bind, Except.bind] at accepted
       | fixed fixedType =>
         rcases fixedType with ⟨signed, width⟩
         cases signed <;> cases width <;>

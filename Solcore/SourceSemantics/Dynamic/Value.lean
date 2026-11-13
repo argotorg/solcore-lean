@@ -100,6 +100,12 @@ inductive Value where
   | closure (function : Closure)
   | global (function : GlobalFunction)
   | builtin (function : BuiltinFunction)
+  /-- A memory array of `element`: the location of the heap cell that holds
+  its elements, as Core's `cellRef` names a cell. -/
+  | arrayRef (element : Ty) (location : Location)
+  /-- The elements of a memory array of `element`, which only the array's heap
+  cell holds. -/
+  | arrayObject (element : Ty) (elements : List Value)
   deriving Repr
 
 /-- Semantic failures are observable stuck outcomes of source evaluation.
@@ -253,12 +259,17 @@ inductive ValueRuntimeType : Value → Ty → Prop where
       ValueRuntimeType (.global function) function.instantiation.type
   | builtin (function : BuiltinFunction) :
       ValueRuntimeType (.builtin function) function.id.type
+  | arrayRef (element : Ty) (location : Location) :
+      ValueRuntimeType (.arrayRef element location) (.array element)
+  | arrayObject (element : Ty) (elements : List Value) :
+      ValueRuntimeType (.arrayObject element elements) (.arrayObject element)
 
 /-- The retained shallow metadata of a mathematical value is unique. -/
 theorem ValueRuntimeType.functional {value : Value} {first second : Ty}
     (typed : ValueRuntimeType value first) (other : ValueRuntimeType value second) : first = second := by
   induction typed generalizing second with
-  | unit | bool | word | integer | proxy | constructed | mapping | closure | global | builtin => cases other; rfl
+  | unit | bool | word | integer | proxy | constructed | mapping | closure | global | builtin
+  | arrayRef | arrayObject => cases other; rfl
   | product left right first second =>
     cases other with
     | product a b => simp only [first a, second b]

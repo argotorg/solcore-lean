@@ -149,6 +149,9 @@ inductive BuiltinType where
   | fixed (type : FixedInteger)
   /-- `T[]`, a memory array, applied to its element type. -/
   | memoryArray
+  /-- The type of the source semantics' heap cell that holds a memory array's
+  elements, applied to the element type. No source type names it. -/
+  | arrayObject
   deriving Repr, DecidableEq
 
 /-- The stable identity at the head of a type application. -/
@@ -223,6 +226,11 @@ def fixedInteger? : Ty → Option FixedInteger
 
 /-- `T[]`, a memory array of `element`. -/
 def array (element : Ty) : Ty := .application (.constructor (.builtin .memoryArray)) element
+
+/-- The type of the heap cell that holds the elements of a memory array of
+`element` in the source semantics. -/
+def arrayObject (element : Ty) : Ty :=
+  .application (.constructor (.builtin .arrayObject)) element
 
 /-- The element type of a memory array type. -/
 def arrayElement? : Ty → Option Ty

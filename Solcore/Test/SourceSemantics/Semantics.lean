@@ -1001,6 +1001,84 @@ end Solcore.Test.SourceSemanticsGeneralizedClosure
 end
 
 section
+/-! Memory arrays in the source heap: an object is a cell of the type
+`arrayObject T`, and a reference is typed against the cell it names. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Test.SourceSemanticsArrayObjects
+
+open SourceSemantics
+open SourceSemantics.Dynamic
+open TypeSystem
+
+private def one : Core.Word := Core.Word.ofNatModulo 1
+private def two : Core.Word := Core.Word.ofNatModulo 2
+
+/-- One cell that holds a memory array of two words. -/
+private def arrayHeap : Heap := {
+  cells := [{
+    type := Ty.arrayObject .word
+    value := some (.arrayObject .word [.word one, .word two])
+  }]
+}
+
+/-- The object's cell is well typed: each element has the element type. -/
+example (context : Context) : HeapWellTyped context arrayHeap := by
+  intro cell member
+  simp only [arrayHeap, List.mem_singleton] at member
+  subst cell
+  exact ⟨.some (.arrayObject (.cons (.word one) (.cons (.word two) .nil))), .none _⟩
+
+/-- A reference to the object's cell has the array type. -/
+example (context : Context) :
+    ValueHasType context arrayHeap (.arrayRef .word ⟨0⟩) (Ty.array .word) :=
+  .arrayRef (.intro .head) rfl
+
+/-- An element of another type leaves the object untyped. -/
+example (context : Context) :
+    ¬ ValueHasType context ⟨[]⟩ (.arrayObject .word [.bool true])
+      (Ty.arrayObject .word) := by
+  intro typed
+  rcases typed.arrayObject_inv with ⟨_, elements⟩ | ⟨_, equal, _⟩
+  · cases elements with
+    | cons head _ => cases head
+  · simp [Ty.arrayObject] at equal
+
+/-- A reference to a cell of another type is not typed, so a reference
+always names an array object. -/
+example (context : Context) :
+    ¬ ValueHasType context ⟨[{ type := .bool, value := some (.bool false) }]⟩
+      (.arrayRef .bool ⟨0⟩) (Ty.array .bool) := by
+  intro typed
+  rcases typed.arrayRef_inv with ⟨_, cell, read, cellType⟩ | ⟨_, equal, _⟩
+  · cases read with
+    | intro selected =>
+        cases selected
+        simp [Ty.bool, Ty.arrayObject] at cellType
+  · simp [Ty.array] at equal
+
+/-- A later heap keeps every cell's type, so a reference keeps its type. -/
+example {context : Context} {before after : Heap} {element : Ty}
+    {location : Location}
+    (extension : HeapTypesExtend before after)
+    (typed : ValueHasType context before (.arrayRef element location)
+      (Ty.array element)) :
+    ValueHasType context after (.arrayRef element location) (Ty.array element) :=
+  typed.mono extension
+
+/-- Allocating the object's cell gives a typed reference to it. -/
+example {context : Context} {before after : Heap} {element : Ty}
+    {elements : List Value} {location : Location}
+    (allocation : Heap.Allocates before (Ty.arrayObject element)
+      (some (.arrayObject element elements)) location after) :
+    ValueHasType context after (.arrayRef element location) (Ty.array element) :=
+  .arrayRef allocation.reads_new rfl
+
+end Solcore.Test.SourceSemanticsArrayObjects
+end
+
+section
 -- leanmerge: from Solcore.Test.SourceSemanticsGeneralizedClosureTyping
 /-! Focused proof consumers for generalized-closure cell typing. -/
 

@@ -358,13 +358,16 @@ wait for the native pipeline's contracts and ABI.
 
 ### Source semantics
 
-- **Values.** `Dynamic.Value` gains three forms:
+- **Values.** `Dynamic.Value` gains four forms:
   - an array reference, which carries its element type and the location of its object, as Core's
-    `cellRef` does, so that `Dynamic.ValueHasType` stays independent of the heap;
+    `cellRef` does;
+  - an array object, which holds the elements and lives only in its heap cell;
   - a slice, which holds its base value, its start and its length;
   - in step 7, a `memref`.
-- **Heap.** `Dynamic.Heap` gains a store of array objects beside its cells. An allocation appends
-  an object. Objects never move, grow or shrink, so a reference and a `memref` stay valid.
+- **Heap.** An array object is a heap cell, whose type is `arrayObject T`, a builtin type that no
+  source type names. An allocation appends a cell, so `Dynamic.Heap`, `Dynamic.Heap.Allocates` and
+  `Dynamic.Heap.AllocatesCopy` keep their text. Objects never move, grow or shrink, so a reference
+  and a `memref` stay valid.
 - **Rules.** Each rule comes with its fault rules and its sized and staged copies, as row 1's
   rules did.
   - `new T[](n)` panics with `0x41` when `n ≥ 2^251 − 1`. Otherwise it allocates an object of `n`
@@ -378,8 +381,10 @@ wait for the native pipeline's contracts and ABI.
     side, as `lidx(a, i)` does. The write replaces the element.
   - A slice panics with `0x32` when `s > e` or when `e` exceeds the base's length.
   - The length rules read the object or the slice, and `toArray(s)` allocates a copy.
-- **Preservation.** `Dynamic.HeapWellTyped` requires each object's elements to have the object's
-  element type. A reference is typed by the type it carries and the object it names.
+- **Preservation.** A reference has the type `T[]` when the cell it names has the type
+  `arrayObject T`, as Core's runtime typing reads a `cellRef`'s cell in its world, and an object's
+  elements each have its element type. A later heap keeps every cell's type, so a reference keeps
+  its type, and `Dynamic.HeapWellTyped` keeps its text.
 - **Panics** reuse `SemanticFault.panic`.
 
 ### Lowering
@@ -473,7 +478,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 1c-ii-a | Syntax: the optional bound that an index and a slice's start and stop read, with its grammar and every lemma, and direct tests of its parser; no bracket reads it yet | 10–12 files, +500–600; measured at 10 files, +560/−4 | none |
 | 1c-ii-b | Syntax: the slices, with `a[]` rejected, as the bracket contents' other forms; inference rejects the slices | 18–22 files, +1,200–1,400/−250–300; measured at 21 files, +1,374/−283 | parser tests from `crates/uitest/tests/fixtures/parse/empty_index_rejected`, `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
 | 2a-i | The array type: `T[]` resolves to a memory array once aliases are expanded, type resolution checks its element and rejects a mapping that holds an array, and type formation admits it; no value has an array type yet, and elaboration rejects every array type | 25–35 files, +300–500/−20–60; measured at 27 files, +458/−75 | none |
-| 2a-ii | The store: an array object, a reference to it and their typing, with the typing's laws; no expression makes one yet | 20–40 files, +400–800/−50–150 | none |
+| 2a-ii | The store: an array object, a reference to it and their typing, with the typing's laws; no expression makes one yet | 20–40 files, +400–800/−50–150; measured at 17 files, +214/−18 | none |
 | 2b-i | `new T[](n)` and `0x41`: inference, evaluation and its fault, the sized and staged copies and preservation | 35–60 files, +900–1,500/−100–300 | none |
 | 2b-ii | The lengths: `a.length`, `a.length()` and `Length.length(a)` | 30–50 files, +600–1,000/−100–200 | none |
 | 2b-iii | The lowering: the Core cells of `new` and the lengths | 15–30 files, +400–800/−50–150 | newLen(n), oversized(n) |
@@ -552,6 +557,9 @@ accepts.
     `Dynamic.Heap`, `Dynamic.HeapWellTyped`, `Dynamic.Heap.Allocates` and
     `Dynamic.Heap.AllocatesCopy`, which keep the store. They are named in
     [source-semantics.md](../guide/source-semantics.md#dynamic-semantics).
+  - As built in step 2a-ii, the objects are heap cells, so only `Dynamic.Value` and
+    `Dynamic.ValueHasType` gain forms, and the other four keep their text
+    ([Source semantics](#source-semantics)).
   - These theorems keep their text and come to cover arrays: `Dynamic.WholeLanguagePreservation`,
     `ProgramWellFormed.wholeLanguagePreservation`,
     `Staging.Recursive.SelectedPreservation.expression` and
