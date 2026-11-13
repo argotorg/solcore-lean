@@ -1301,8 +1301,8 @@ theorem rewinding_child_has_five_contracts_and_is_ordinary :
 theorem rewinding_has_finite_independent_trace :
     PostfixTailTraceParses (childTrace rewind) source 6 rewindBefore fixed finalValue
       { afterSecond with cursor := 1 } [] :=
-  .index (span 1 2) (span 2 3) first_opening first_child first_closing
-    (.index (span 3 4) (span 4 5) second_opening second_child second_closing (.done final_stops))
+  .index (span 1 2) (span 2 3) first_opening (.index first_child) first_closing
+    (.index (span 3 4) (span 4 5) second_opening (.index second_child) second_closing (.done final_stops))
 
 theorem rewinding_trace_executes_eventually (block : Parser Block) (prior : List ParseDiagnostic) :
     ∃ bound, ∀ fuel, bound ≤ fuel → ∃ output,
@@ -1404,7 +1404,7 @@ theorem prefix_success (suffix : List Token) {value : Expr} {after : Remainder} 
   · apply PostfixTailTraceParses.index (afterOpening := rem suffix 3) (afterIndex := rem suffix 4)
       (afterClosing := rem suffix 5) (indexEvents := []) (tailEvents := trace) (span 5 6) (span 7 8)
     · exact ⟨⟨by simp [rem, tokens], rfl⟩, rfl⟩
-    · exact prefix_index suffix
+    · exact .index (prefix_index suffix)
     · exact ⟨⟨by simp [rem, tokens], rfl⟩, rfl⟩
     · exact .call (by simp [TokenKindAbsentAt, TokenAt, rem, tokens, sym]) (prefix_arguments suffix) tail
 
@@ -1422,7 +1422,7 @@ theorem prefix_rejected (suffix : List Token) {after : Remainder} {report : Pars
   · apply PostfixTailTraceRejects.indexLaterRejected (afterOpening := rem suffix 3) (afterIndex := rem suffix 4)
       (afterClosing := rem suffix 5) (indexEvents := []) (tailEvents := trace) (span 5 6) (span 7 8)
     · exact ⟨⟨by simp [rem, tokens], rfl⟩, rfl⟩
-    · exact prefix_index suffix
+    · exact .index (prefix_index suffix)
     · exact ⟨⟨by simp [rem, tokens], rfl⟩, rfl⟩
     · exact .callLaterRejected (by simp [TokenKindAbsentAt, TokenAt, rem, tokens, sym]) (prefix_arguments suffix) tail
 

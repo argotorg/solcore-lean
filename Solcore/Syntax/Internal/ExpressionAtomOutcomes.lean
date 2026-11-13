@@ -1431,6 +1431,51 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.DeclarativeGrammar
 
+/-- What a `[` holds is unique, with its end. -/
+theorem BracketContentsParses.result_unique
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : ExactDeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    {input afterLeft afterRight : Remainder} {left right : Syntax.BracketContents}
+    (leftParsed : BracketContentsParses nestedOrdinary input left afterLeft)
+    (rightParsed : BracketContentsParses nestedOrdinary input right afterRight) :
+    left = right ∧ afterLeft = afterRight := by
+  cases leftParsed with
+  | index leftIndex =>
+      cases rightParsed with
+      | index rightIndex =>
+          rcases nestedOutcomes.successResultUnique leftIndex rightIndex with ⟨rfl, rfl⟩
+          exact ⟨rfl, rfl⟩
+
+/-- A rejection inside a `[` has one end. -/
+theorem BracketContentsRejects.output_unique
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : ExactDeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    {input left right : Remainder}
+    (leftRejected : BracketContentsRejects nestedOrdinary nestedRejects input left)
+    (rightRejected : BracketContentsRejects nestedOrdinary nestedRejects input right) :
+    left = right := by
+  cases leftRejected with
+  | indexRejected leftNested =>
+      cases rightRejected with
+      | indexRejected rightNested => exact nestedOutcomes.rejectOutputUnique leftNested rightNested
+
+/-- What a `[` holds has exact outcomes when its nested expressions do. -/
+theorem bracketContentsExactOutcomeSpec
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : ExactDeterministicOutcomeSpec nestedOrdinary nestedRejects) :
+    ExactDeterministicOutcomeSpec (BracketContentsParses nestedOrdinary)
+      (BracketContentsRejects nestedOrdinary nestedRejects) where
+  successOutputUnique :=
+    BracketContentsParses.output_unique nestedOutcomes.toDeterministicOutcomeSpec
+  successRejectDisjoint :=
+    BracketContentsRejects.disjointOrdinary nestedOutcomes.toDeterministicOutcomeSpec
+  successValueUnique := fun left right =>
+    (BracketContentsParses.result_unique nestedOutcomes left right).1
+  rejectOutputUnique := BracketContentsRejects.output_unique nestedOutcomes
+
 /-- At one fixed base, exact nested expressions fix the complete postfix AST
 and remainder, including index delimiters, call arguments, and field spans. -/
 theorem PostfixTailParses.result_unique
@@ -1464,7 +1509,7 @@ theorem PostfixTailParses.result_unique
             ⟨openingEq, inputEq⟩
           subst openingEq
           subst inputEq
-          rcases nestedOutcomes.successResultUnique leftIndex rightIndex with
+          rcases leftIndex.result_unique nestedOutcomes rightIndex with
             ⟨indexEq, inputEq⟩
           subst indexEq
           subst inputEq
@@ -1601,12 +1646,13 @@ theorem PostfixTailRejects.output_unique
       rightBase right) : left = right := by
   have argumentsOutcomes := noTrailingDelimitedListExactOutcomeSpec
     .leftParen .rightParen nestedOutcomes
+  have contentsOutcomes := bracketContentsExactOutcomeSpec nestedOutcomes
   induction leftRejected generalizing rightBase right <;>
     cases rightRejected <;>
     grind (ematch := 20) [postfix_absent_conflicts_exact,
       postfix_absent_conflicts_token, ExactTokenParses.output_unique,
-      nestedOutcomes.successOutputUnique, nestedOutcomes.successRejectDisjoint,
-      nestedOutcomes.rejectOutputUnique,
+      contentsOutcomes.successOutputUnique, contentsOutcomes.successRejectDisjoint,
+      contentsOutcomes.rejectOutputUnique,
       NoTrailingDelimitedListParses.opening_present,
       argumentsOutcomes.successOutputUnique,
       argumentsOutcomes.successRejectDisjoint,

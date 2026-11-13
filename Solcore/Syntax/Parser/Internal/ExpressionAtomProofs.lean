@@ -2497,6 +2497,57 @@ theorem expressionAtom_startsAtCurrentTokenOnSuccess
         unfold State.peek? at found ⊢
         simpa [rewound, State.emit, coreShape.1, coreShape.2] using found
 
+/-- What a `[` holds keeps every ordinary token window. -/
+theorem bracketContents_preservesTokenWindow (nested : Parser Expr)
+    (nestedWindow : Parser.PreservesTokenWindow nested) :
+    Parser.PreservesTokenWindow (bracketContents nested) := by
+  intro input
+  have shape := nestedWindow input
+  unfold bracketContents
+  cases result : nested input with
+  | invariant error => trivial
+  | reject failure rejected => rw [result] at shape; exact shape
+  | ok index next => rw [result] at shape; exact shape
+
+theorem bracketContents_preservesTokensOnSuccess (nested : Parser Expr)
+    (nestedTokens : Parser.PreservesTokensOnSuccess nested) :
+    Parser.PreservesTokensOnSuccess (bracketContents nested) := by
+  intro input contents next parsed
+  unfold bracketContents at parsed
+  cases result : nested input with
+  | invariant error => simp [result] at parsed
+  | reject failure rejected => simp [result] at parsed
+  | ok index afterIndex =>
+      simp only [result, Reply.ok.injEq] at parsed
+      rcases parsed with ⟨rfl, rfl⟩
+      exact nestedTokens input index afterIndex result
+
+theorem bracketContents_cursorMonotoneOnSuccess (nested : Parser Expr)
+    (nestedCursor : Parser.CursorMonotoneOnSuccess nested) :
+    Parser.CursorMonotoneOnSuccess (bracketContents nested) := by
+  intro input contents next parsed
+  unfold bracketContents at parsed
+  cases result : nested input with
+  | invariant error => simp [result] at parsed
+  | reject failure rejected => simp [result] at parsed
+  | ok index afterIndex =>
+      simp only [result, Reply.ok.injEq] at parsed
+      rcases parsed with ⟨rfl, rfl⟩
+      exact nestedCursor input index afterIndex result
+
+/-- What a `[` holds keeps the provenance of its expressions. -/
+theorem bracketContents_validFor (nested : Parser Expr)
+    (statementValid : SourceFile → Statement → Prop)
+    (nestedValid : nested.ValidFor (Expr.ValidFor statementValid)) :
+    (bracketContents nested).ValidFor (BracketContents.ValidFor statementValid) := by
+  intro input inputValid
+  have reply := nestedValid input inputValid
+  unfold bracketContents
+  cases result : nested input with
+  | invariant error => trivial
+  | reject failure rejected => rw [result] at reply; exact reply
+  | ok index next => rw [result] at reply; exact reply
+
 /-- The postfix loop preserves every ordinary token window. -/
 theorem postfixTail_preservesTokenWindow
     (nested : Parser Expr) (block : Parser Block)
@@ -2521,13 +2572,14 @@ theorem postfixTail_preservesTokenWindow
         | ok opening afterOpening =>
             rw [openingResult] at openingShape
             simp only
-            have indexShape := nestedWindow afterOpening
-            cases indexResult : nested afterOpening with
+            have indexShape := bracketContents_preservesTokenWindow nested nestedWindow
+              afterOpening
+            cases indexResult : bracketContents nested afterOpening with
             | invariant error => trivial
             | reject failure rejected =>
                 rw [indexResult] at indexShape
                 exact indexShape.trans openingShape
-            | ok index next =>
+            | ok contents next =>
                 rw [indexResult] at indexShape
                 simp only
                 have closingShape :=
@@ -2539,11 +2591,9 @@ theorem postfixTail_preservesTokenWindow
                     exact (closingShape.trans indexShape).trans openingShape
                 | ok closing afterClosing =>
                     rw [closingResult] at closingShape
-                    exact (((inductionHypothesis {
-                        span := SourceSpan.cover base.span closing.span
-                        value := .index base
-                          (SourceSpan.cover opening.span closing.span) index
-                      } afterClosing).trans closingShape).trans
+                    exact (((inductionHypothesis
+                        (contents.apply base opening.span closing.span)
+                        afterClosing).trans closingShape).trans
                         indexShape).trans openingShape
       · simp only [indexed, Bool.false_eq_true, if_false]
         by_cases called : isSymbol input .leftParen
@@ -2625,10 +2675,10 @@ theorem postfixTail_cursorMonotoneOnSuccess
         | reject failure rejected => simp [openingResult] at parsed
         | ok opening afterOpening =>
             simp only [openingResult] at parsed
-            cases indexResult : nested afterOpening with
+            cases indexResult : bracketContents nested afterOpening with
             | invariant error => simp [indexResult] at parsed
             | reject failure rejected => simp [indexResult] at parsed
-            | ok index next =>
+            | ok contents next =>
                 simp only [indexResult] at parsed
                 cases closingResult : symbol .rightBracket .expression next with
                 | invariant error => simp [closingResult] at parsed
@@ -2639,7 +2689,8 @@ theorem postfixTail_cursorMonotoneOnSuccess
                       (symbol_cursorMonotoneOnSuccess .leftBracket .expression
                         input opening afterOpening openingResult)
                       (Nat.le_trans
-                        (nestedCursor afterOpening index next indexResult)
+                        (bracketContents_cursorMonotoneOnSuccess nested nestedCursor
+                          afterOpening contents next indexResult)
                         (Nat.le_trans
                           (symbol_cursorMonotoneOnSuccess .rightBracket
                             .expression next closing afterClosing closingResult)
@@ -2703,10 +2754,10 @@ theorem postfixTail_preservesBaseStartOnSuccess
         | reject failure rejected => simp [openingResult] at parsed
         | ok opening afterOpening =>
             simp only [openingResult] at parsed
-            cases indexResult : nested afterOpening with
+            cases indexResult : bracketContents nested afterOpening with
             | invariant error => simp [indexResult] at parsed
             | reject failure rejected => simp [indexResult] at parsed
-            | ok index next =>
+            | ok contents next =>
                 simp only [indexResult] at parsed
                 cases closingResult : symbol .rightBracket .expression next with
                 | invariant error => simp [closingResult] at parsed
@@ -2715,13 +2766,10 @@ theorem postfixTail_preservesBaseStartOnSuccess
                     simp only [closingResult] at parsed
                     calc
                       expression.span.startByte =
-                          (SourceSpan.cover base.span closing.span).startByte :=
-                        inductionHypothesis {
-                          span := SourceSpan.cover base.span closing.span
-                          value := .index base
-                            (SourceSpan.cover opening.span closing.span) index
-                        } afterClosing expression final parsed
-                      _ = base.span.startByte := rfl
+                          (contents.apply base opening.span closing.span).span.startByte :=
+                        inductionHypothesis (contents.apply base opening.span closing.span)
+                          afterClosing expression final parsed
+                      _ = base.span.startByte := by rw [BracketContents.apply_span]; rfl
       · simp only [indexed, Bool.false_eq_true, if_false] at parsed
         by_cases called : isSymbol input .leftParen
         · simp only [called, if_true] at parsed
@@ -2880,14 +2928,16 @@ theorem postfixTail_validFor
               inputValid
             rw [openingResult] at openingReply
             simp only
-            cases indexResult : nested afterOpening with
+            cases indexResult : bracketContents nested afterOpening with
             | invariant error => trivial
             | reject failure rejected =>
-                have reply := nestedValid afterOpening openingReply.2.1
+                have reply := bracketContents_validFor nested statementValid nestedValid
+                  afterOpening openingReply.2.1
                 rw [indexResult] at reply
                 exact reply.of_file_eq openingReply.2.2
-            | ok index next =>
-                have indexReply := nestedValid afterOpening openingReply.2.1
+            | ok contents next =>
+                have indexReply := bracketContents_validFor nested statementValid nestedValid
+                  afterOpening openingReply.2.1
                 rw [indexResult] at indexReply
                 simp only
                 cases closingResult : symbol .rightBracket .expression next with
@@ -2913,8 +2963,8 @@ theorem postfixTail_validFor
                     have openingTokens := symbol_preservesTokensOnSuccess
                       .leftBracket .expression input opening afterOpening
                         openingResult
-                    have indexTokens := nestedTokens afterOpening index next
-                      indexResult
+                    have indexTokens := bracketContents_preservesTokensOnSuccess nested
+                      nestedTokens afterOpening contents next indexResult
                     have closingAt : input.tokens[next.cursor]? = some closing := by
                       simpa [indexTokens, openingTokens] using closingAtNext
                     have separated :=
@@ -2924,14 +2974,14 @@ theorem postfixTail_validFor
                           (acceptToken_cursor_lt_onSuccess
                             (.symbol .leftBracket) .expression
                             (· == .symbol .leftBracket) openingResult)
-                          (nestedCursor afterOpening index next indexResult))
+                          (bracketContents_cursorMonotoneOnSuccess nested nestedCursor
+                            afterOpening contents next indexResult))
                     have openingSpan : opening.span.ValidFor input.file := by
                       simpa only [Located.ValidFor] using openingReply.1
                     have closingSpan : closing.span.ValidFor input.file := by
                       simpa only [Located.ValidFor, indexReply.2.2,
                         openingReply.2.2] using closingReply.1
-                    have indexValid : Expr.ValidFor statementValid input.file
-                        index := by
+                    have indexValid : contents.ValidFor statementValid input.file := by
                       simpa [openingReply.2.2] using indexReply.1
                     have bracketsValid := SourceSpan.cover_validFor openingSpan
                       closingSpan (Nat.le_trans openingSpan.2.1
@@ -2941,15 +2991,11 @@ theorem postfixTail_validFor
                       (baseBefore opening openingShape.1)
                       (Nat.le_trans openingSpan.2.1
                         (Nat.le_trans separated closingSpan.2.1))
-                    let combined : Expr := {
-                      span := SourceSpan.cover base.span closing.span
-                      value := .index base
-                        (SourceSpan.cover opening.span closing.span) index
-                    }
+                    let combined : Expr := contents.apply base opening.span closing.span
                     have combinedValid : Expr.ValidFor statementValid input.file
-                        combined := Expr.ValidFor.index
-                      (SourceSpan.cover_validFor baseValid.span_valid closingSpan
-                        baseToClosing) baseValid bracketsValid indexValid
+                        combined := BracketContents.apply_validFor indexValid baseValid
+                      bracketsValid (SourceSpan.cover_validFor baseValid.span_valid
+                        closingSpan baseToClosing)
                     have resultFileEq : afterClosing.file = input.file :=
                       closingReply.2.2.trans
                         (indexReply.2.2.trans openingReply.2.2)
@@ -2960,6 +3006,8 @@ theorem postfixTail_validFor
                         afterClosing.peek? = some future →
                         combined.span.startByte ≤ future.span.startByte := by
                       intro future futureFound
+                      show (contents.apply base opening.span closing.span).span.startByte ≤ _
+                      rw [BracketContents.apply_span]
                       have futureAtAfter :=
                         State.getElem?_eq_some_of_peek?_eq_some futureFound
                       have futureAt : input.tokens[afterClosing.cursor]? =
@@ -2973,7 +3021,8 @@ theorem postfixTail_validFor
                               (.symbol .leftBracket) .expression
                               (· == .symbol .leftBracket) openingResult)
                             (Nat.le_trans
-                              (nestedCursor afterOpening index next indexResult)
+                              (bracketContents_cursorMonotoneOnSuccess nested nestedCursor
+                                afterOpening contents next indexResult)
                               (symbol_cursorMonotoneOnSuccess .rightBracket
                                 .expression next closing afterClosing
                                   closingResult)))

@@ -1145,6 +1145,14 @@ def PostfixSuffixAbsentAt (input : Remainder) : Prop :=
       (.symbol .leftParen) ∧
     TokenKindAbsentAt input.tokens input.endIndex input.cursor (.symbol .dot)
 
+/-- What a `[` holds, read after it: an index. -/
+inductive BracketContentsParses
+    (nestedParses : Remainder → Syntax.Expr → Remainder → Prop) :
+    Remainder → Syntax.BracketContents → Remainder → Prop where
+  | index {input output : Remainder} {index : Syntax.Expr}
+      (indexParsed : nestedParses input index output) :
+      BracketContentsParses nestedParses input (.index index) output
+
 /-- Maximal sequence of index, call, and field suffixes. -/
 inductive PostfixTailParses
     (nestedParses : Remainder → Syntax.Expr → Remainder → Prop) :
@@ -1153,17 +1161,16 @@ inductive PostfixTailParses
       (absent : PostfixSuffixAbsentAt input) :
       PostfixTailParses nestedParses input base base input
   | index {input afterOpening afterIndex afterClosing output : Remainder}
-      {base index expression : Syntax.Expr}
+      {base expression : Syntax.Expr} {contents : Syntax.BracketContents}
       (openingSpan closingSpan : SourceSpan)
       (openingToken : ExactTokenParses (.symbol .leftBracket) input
         openingSpan afterOpening)
-      (indexParsed : nestedParses afterOpening index afterIndex)
+      (contentsParsed : BracketContentsParses nestedParses afterOpening contents
+        afterIndex)
       (closingToken : ExactTokenParses (.symbol .rightBracket) afterIndex
         closingSpan afterClosing)
-      (tail : PostfixTailParses nestedParses afterClosing {
-        span := SourceSpan.cover base.span closingSpan
-        value := .index base (SourceSpan.cover openingSpan closingSpan) index
-      } expression output) :
+      (tail : PostfixTailParses nestedParses afterClosing
+        (contents.apply base openingSpan closingSpan) expression output) :
       PostfixTailParses nestedParses input base expression output
   | call {input afterArguments output : Remainder}
       {base expression : Syntax.Expr}
@@ -2274,6 +2281,15 @@ namespace Solcore.Syntax.DeclarativeGrammar
 /-- The existing postfix grammar admits ordinary nested outcomes as-is. -/
 abbrev PostfixTailOrdinaryParses := PostfixTailParses
 
+/-- Exact rejection inside a `[`: in its index. -/
+inductive BracketContentsRejects
+    (nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop)
+    (nestedRejects : Remainder → Remainder → Prop) :
+    Remainder → Remainder → Prop where
+  | indexRejected {input rejected : Remainder}
+      (nestedRejected : nestedRejects input rejected) :
+      BracketContentsRejects nestedOrdinary nestedRejects input rejected
+
 /-- Exact rejection while extending an already parsed Core atom. -/
 inductive PostfixTailRejects
     (nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop)
@@ -2283,29 +2299,31 @@ inductive PostfixTailRejects
       {base : Syntax.Expr} (openingSpan : SourceSpan)
       (openingToken : ExactTokenParses (.symbol .leftBracket) input
         openingSpan afterOpening)
-      (nestedRejected : nestedRejects afterOpening rejected) :
+      (contentsRejected : BracketContentsRejects nestedOrdinary nestedRejects
+        afterOpening rejected) :
       PostfixTailRejects nestedOrdinary nestedRejects input base rejected
   | indexClosingMissing {input afterOpening afterIndex : Remainder}
-      {base index : Syntax.Expr} (openingSpan : SourceSpan)
+      {base : Syntax.Expr} {contents : Syntax.BracketContents}
+      (openingSpan : SourceSpan)
       (openingToken : ExactTokenParses (.symbol .leftBracket) input
         openingSpan afterOpening)
-      (indexParsed : nestedOrdinary afterOpening index afterIndex)
+      (contentsParsed : BracketContentsParses nestedOrdinary afterOpening contents
+        afterIndex)
       (closingAbsent : TokenKindAbsentAt afterIndex.tokens afterIndex.endIndex
         afterIndex.cursor (.symbol .rightBracket)) :
       PostfixTailRejects nestedOrdinary nestedRejects input base afterIndex
   | indexLaterRejected
       {input afterOpening afterIndex afterClosing rejected : Remainder}
-      {base index : Syntax.Expr} (openingSpan closingSpan : SourceSpan)
+      {base : Syntax.Expr} {contents : Syntax.BracketContents}
+      (openingSpan closingSpan : SourceSpan)
       (openingToken : ExactTokenParses (.symbol .leftBracket) input
         openingSpan afterOpening)
-      (indexParsed : nestedOrdinary afterOpening index afterIndex)
+      (contentsParsed : BracketContentsParses nestedOrdinary afterOpening contents
+        afterIndex)
       (closingToken : ExactTokenParses (.symbol .rightBracket) afterIndex
         closingSpan afterClosing)
       (tailRejected : PostfixTailRejects nestedOrdinary nestedRejects
-        afterClosing {
-          span := SourceSpan.cover base.span closingSpan
-          value := .index base (SourceSpan.cover openingSpan closingSpan) index
-        } rejected) :
+        afterClosing (contents.apply base openingSpan closingSpan) rejected) :
       PostfixTailRejects nestedOrdinary nestedRejects input base rejected
   | callArgumentsRejected {input rejected : Remainder}
       {base : Syntax.Expr} (openingSpan : SourceSpan)

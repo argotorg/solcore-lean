@@ -51,6 +51,46 @@ theorem NoTrailingDelimitedListParses.opening_present {alpha : Type}
         elementsEq, spanEq⟩
       exact ⟨openingSpan, openingToken⟩
 
+/-- What a `[` holds ends at one remainder. -/
+theorem BracketContentsParses.output_unique
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : DeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    {input afterLeft afterRight : Remainder} {left right : Syntax.BracketContents}
+    (leftParsed : BracketContentsParses nestedOrdinary input left afterLeft)
+    (rightParsed : BracketContentsParses nestedOrdinary input right afterRight) :
+    afterLeft = afterRight := by
+  cases leftParsed with
+  | index leftIndex =>
+      cases rightParsed with
+      | index rightIndex => exact nestedOutcomes.successOutputUnique leftIndex rightIndex
+
+/-- A rejection inside a `[` excludes every success there. -/
+theorem BracketContentsRejects.disjointOrdinary
+    {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
+    {nestedRejects : Remainder → Remainder → Prop}
+    (nestedOutcomes : DeterministicOutcomeSpec nestedOrdinary nestedRejects)
+    {input rejected : Remainder}
+    (rejection : BracketContentsRejects nestedOrdinary nestedRejects input rejected) :
+    ¬ ∃ contents output, BracketContentsParses nestedOrdinary input contents output := by
+  rintro ⟨contents, output, parsed⟩
+  cases rejection with
+  | indexRejected nestedRejected =>
+      cases parsed with
+      | index indexParsed =>
+          exact nestedOutcomes.successRejectDisjoint nestedRejected ⟨_, _, indexParsed⟩
+
+/-- Pointwise nested inclusion lifts through what a `[` holds. -/
+theorem BracketContentsParses.mapNestedRelation
+    {source target : Remainder → Syntax.Expr → Remainder → Prop}
+    (includeNested : ∀ {input expression output},
+      source input expression output → target input expression output)
+    {input output : Remainder} {contents : Syntax.BracketContents}
+    (parsed : BracketContentsParses source input contents output) :
+    BracketContentsParses target input contents output := by
+  cases parsed with
+  | index indexParsed => exact .index (includeNested indexParsed)
+
 /-- A maximal ordinary postfix tail has a unique output remainder. -/
 theorem PostfixTailParses.output_unique
     {nestedOrdinary : Remainder → Syntax.Expr → Remainder → Prop}
@@ -88,8 +128,7 @@ theorem PostfixTailParses.output_unique
           have afterOpeningEq := exactToken_output_unique leftOpening
             rightOpening
           subst afterOpeningEq
-          have afterIndexEq := nestedOutcomes.successOutputUnique leftIndex
-            rightIndex
+          have afterIndexEq := leftIndex.output_unique nestedOutcomes rightIndex
           subst afterIndexEq
           have afterClosingEq := exactToken_output_unique leftClosing
             rightClosing
@@ -178,7 +217,7 @@ theorem PostfixTailParses.mapNestedRelation
   | index openingSpan closingSpan openingToken indexParsed closingToken tail
         inductionHypothesis =>
       exact .index openingSpan closingSpan openingToken
-        (includeNested indexParsed) closingToken inductionHypothesis
+        (indexParsed.mapNestedRelation includeNested) closingToken inductionHypothesis
   | call indexAbsent argumentsParsed tail inductionHypothesis =>
       exact .call indexAbsent
         (argumentsParsed.mapElementRelation includeNested) inductionHypothesis
@@ -222,8 +261,7 @@ theorem PostfixTailRejects.disjointOrdinary
           have afterOpeningEq := exactToken_output_unique openingToken
             successfulOpening
           subst afterOpeningEq
-          exact nestedOutcomes.successRejectDisjoint nestedRejected
-            ⟨_, _, indexParsed⟩
+          exact nestedRejected.disjointOrdinary nestedOutcomes ⟨_, _, indexParsed⟩
       | call indexAbsent argumentsParsed tail =>
           exact absent_conflicts_token indexAbsent openingToken.1
       | field dotSpan indexAbsent callAbsent dotToken nameParsed tail =>
@@ -238,8 +276,7 @@ theorem PostfixTailRejects.disjointOrdinary
           have afterOpeningEq := exactToken_output_unique openingToken
             successfulOpening
           subst afterOpeningEq
-          have afterIndexEq := nestedOutcomes.successOutputUnique indexParsed
-            successfulIndex
+          have afterIndexEq := indexParsed.output_unique nestedOutcomes successfulIndex
           subst afterIndexEq
           exact absent_conflicts_token closingAbsent closingToken.1
       | call indexAbsent argumentsParsed tail =>
@@ -257,8 +294,7 @@ theorem PostfixTailRejects.disjointOrdinary
           have afterOpeningEq := exactToken_output_unique openingToken
             successfulOpening
           subst afterOpeningEq
-          have afterIndexEq := nestedOutcomes.successOutputUnique indexParsed
-            successfulIndex
+          have afterIndexEq := indexParsed.output_unique nestedOutcomes successfulIndex
           subst afterIndexEq
           have afterClosingEq := exactToken_output_unique closingToken
             successfulClosing

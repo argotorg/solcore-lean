@@ -1222,6 +1222,33 @@ theorem mono {old new : SourceFile → Statement → Prop}
 
 end Expr.ValidFor
 
+namespace BracketContents
+
+/-- What a `[` holds keeps the provenance of the expressions in it. -/
+def ValidFor (statementValid : SourceFile → Statement → Prop) (file : SourceFile) :
+    BracketContents → Prop
+  | .index inner => Expr.ValidFor statementValid file inner
+
+theorem apply_span (contents : BracketContents) (base : Expr)
+    (openingSpan closingSpan : SourceSpan) :
+    (contents.apply base openingSpan closingSpan).span =
+      SourceSpan.cover base.span closingSpan := by
+  cases contents <;> rfl
+
+/-- Brackets around valid contents after a valid base form a valid expression. -/
+theorem apply_validFor {statementValid : SourceFile → Statement → Prop}
+    {file : SourceFile} {contents : BracketContents} {base : Expr}
+    {openingSpan closingSpan : SourceSpan}
+    (contentsValid : contents.ValidFor statementValid file)
+    (baseValid : Expr.ValidFor statementValid file base)
+    (bracketsValid : (SourceSpan.cover openingSpan closingSpan).ValidFor file)
+    (spanValid : (SourceSpan.cover base.span closingSpan).ValidFor file) :
+    Expr.ValidFor statementValid file (contents.apply base openingSpan closingSpan) := by
+  cases contents with
+  | index inner => exact Expr.ValidFor.index spanValid baseValid bracketsValid contentsValid
+
+end BracketContents
+
 namespace Pattern.ValidFor
 
 /-- Pattern validity is monotone in its embedded-expression contract. -/

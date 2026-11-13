@@ -1030,6 +1030,15 @@ def postfixFieldTraceValue (base : Syntax.Expr) (dotSpan : SourceSpan)
   value := .field base dotSpan name
 }
 
+/-- What a `[` holds, read after it, with its events: an index's. -/
+inductive BracketContentsTraceParses
+    (nestedTrace : SourceId → Nat → Remainder → Syntax.Expr → Remainder → List ParseDiagnostic → Prop)
+    (source : SourceId) (endByte : Nat) :
+    Remainder → Syntax.BracketContents → Remainder → List ParseDiagnostic → Prop where
+  | index {input output : Remainder} {index : Syntax.Expr} {trace : List ParseDiagnostic}
+      (indexParsed : nestedTrace source endByte input index output trace) :
+      BracketContentsTraceParses nestedTrace source endByte input (.index index) output trace
+
 inductive PostfixTailTraceParses
     (nestedTrace : SourceId → Nat → Remainder → Syntax.Expr → Remainder → List ParseDiagnostic → Prop)
     (source : SourceId) (endByte : Nat) :
@@ -1038,13 +1047,15 @@ inductive PostfixTailTraceParses
       (absent : PostfixSuffixAbsentAt input) :
       PostfixTailTraceParses nestedTrace source endByte input base base input []
   | index {input afterOpening afterIndex afterClosing output : Remainder}
-      {base index expression : Syntax.Expr} {indexEvents tailEvents : List ParseDiagnostic}
+      {base expression : Syntax.Expr} {contents : Syntax.BracketContents}
+      {indexEvents tailEvents : List ParseDiagnostic}
       (openingSpan closingSpan : SourceSpan)
       (openingToken : ExactTokenParses (.symbol .leftBracket) input openingSpan afterOpening)
-      (indexParsed : nestedTrace source endByte afterOpening index afterIndex indexEvents)
+      (contentsParsed : BracketContentsTraceParses nestedTrace source endByte afterOpening contents
+        afterIndex indexEvents)
       (closingToken : ExactTokenParses (.symbol .rightBracket) afterIndex closingSpan afterClosing)
       (tail : PostfixTailTraceParses nestedTrace source endByte afterClosing
-        (postfixIndexTraceValue base index openingSpan closingSpan) expression output tailEvents) :
+        (contents.apply base openingSpan closingSpan) expression output tailEvents) :
       PostfixTailTraceParses nestedTrace source endByte input base expression output (indexEvents ++ tailEvents)
   | call {input afterArguments output : Remainder}
       {base expression : Syntax.Expr} {arguments : DelimitedList Syntax.Expr}
@@ -1080,6 +1091,17 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.DeclarativeGrammar
 
+/-- Exact rejection inside a `[`, with its events: in its index. -/
+inductive BracketContentsTraceRejects
+    (nestedTrace : SourceId → Nat → Remainder → Syntax.Expr → Remainder → List ParseDiagnostic → Prop)
+    (nestedRejects : SourceId → Nat → Remainder → Remainder → ParseDiagnostic → List ParseDiagnostic → Prop)
+    (source : SourceId) (endByte : Nat) :
+    Remainder → Remainder → ParseDiagnostic → List ParseDiagnostic → Prop where
+  | indexRejected {input rejected : Remainder} {report : ParseDiagnostic}
+      {trace : List ParseDiagnostic}
+      (nestedRejected : nestedRejects source endByte input rejected report trace) :
+      BracketContentsTraceRejects nestedTrace nestedRejects source endByte input rejected report trace
+
 inductive PostfixTailTraceRejects
     (nestedTrace : SourceId → Nat → Remainder → Syntax.Expr → Remainder → List ParseDiagnostic → Prop)
     (nestedRejects : SourceId → Nat → Remainder → Remainder → ParseDiagnostic → List ParseDiagnostic → Prop)
@@ -1089,25 +1111,28 @@ inductive PostfixTailTraceRejects
       {base : Syntax.Expr} {report : ParseDiagnostic} {trace : List ParseDiagnostic}
       (openingSpan : SourceSpan)
       (openingToken : ExactTokenParses (.symbol .leftBracket) input openingSpan afterOpening)
-      (nestedRejected : nestedRejects source endByte afterOpening rejected report trace) :
+      (contentsRejected : BracketContentsTraceRejects nestedTrace nestedRejects source endByte
+        afterOpening rejected report trace) :
       PostfixTailTraceRejects nestedTrace nestedRejects source endByte input base rejected report trace
   | indexClosingMissing {input afterOpening afterIndex : Remainder}
-      {base index : Syntax.Expr} {report : ParseDiagnostic} {indexEvents : List ParseDiagnostic}
-      (openingSpan : SourceSpan)
+      {base : Syntax.Expr} {contents : Syntax.BracketContents} {report : ParseDiagnostic}
+      {indexEvents : List ParseDiagnostic} (openingSpan : SourceSpan)
       (openingToken : ExactTokenParses (.symbol .leftBracket) input openingSpan afterOpening)
-      (indexParsed : nestedTrace source endByte afterOpening index afterIndex indexEvents)
+      (contentsParsed : BracketContentsTraceParses nestedTrace source endByte afterOpening contents
+        afterIndex indexEvents)
       (closingAbsent : TokenKindAbsentAt afterIndex.tokens afterIndex.endIndex afterIndex.cursor (.symbol .rightBracket))
       (reported : RejectAtReports source endByte { head := .symbol .rightBracket, tail := [] }
         .expression afterIndex report) :
       PostfixTailTraceRejects nestedTrace nestedRejects source endByte input base afterIndex report indexEvents
   | indexLaterRejected {input afterOpening afterIndex afterClosing rejected : Remainder}
-      {base index : Syntax.Expr} {report : ParseDiagnostic}
+      {base : Syntax.Expr} {contents : Syntax.BracketContents} {report : ParseDiagnostic}
       {indexEvents tailEvents : List ParseDiagnostic} (openingSpan closingSpan : SourceSpan)
       (openingToken : ExactTokenParses (.symbol .leftBracket) input openingSpan afterOpening)
-      (indexParsed : nestedTrace source endByte afterOpening index afterIndex indexEvents)
+      (contentsParsed : BracketContentsTraceParses nestedTrace source endByte afterOpening contents
+        afterIndex indexEvents)
       (closingToken : ExactTokenParses (.symbol .rightBracket) afterIndex closingSpan afterClosing)
       (tailRejected : PostfixTailTraceRejects nestedTrace nestedRejects source endByte afterClosing
-        (postfixIndexTraceValue base index openingSpan closingSpan) rejected report tailEvents) :
+        (contents.apply base openingSpan closingSpan) rejected report tailEvents) :
       PostfixTailTraceRejects nestedTrace nestedRejects source endByte input base rejected report (indexEvents ++ tailEvents)
   | callArgumentsRejected {input rejected : Remainder}
       {base : Syntax.Expr} {report : ParseDiagnostic} {trace : List ParseDiagnostic}
@@ -1222,6 +1247,59 @@ private theorem absent_conflicts_token {kind : TokenKind} {input : Remainder} {s
     (present : TokenAt input.tokens input.endIndex input.cursor { span, value := kind }) : False :=
   absent ⟨span, present⟩
 
+theorem BracketContentsTraceParses.result_unique
+    (nested : TraceExactOutcomeSpec nestedTrace nestedRejects source endByte)
+    {input afterLeft afterRight : Remainder} {left right : Syntax.BracketContents}
+    {leftEvents rightEvents : List ParseDiagnostic}
+    (leftParsed : BracketContentsTraceParses nestedTrace source endByte input left afterLeft
+      leftEvents)
+    (rightParsed : BracketContentsTraceParses nestedTrace source endByte input right afterRight
+      rightEvents) :
+    left = right ∧ afterLeft = afterRight ∧ leftEvents = rightEvents := by
+  cases leftParsed with
+  | index leftIndex =>
+      cases rightParsed with
+      | index rightIndex =>
+          rcases nested.successResultUnique leftIndex rightIndex with ⟨rfl, rfl, rfl⟩
+          exact ⟨rfl, rfl, rfl⟩
+
+theorem BracketContentsTraceRejects.result_unique
+    (nested : TraceExactOutcomeSpec nestedTrace nestedRejects source endByte)
+    {input afterLeft afterRight : Remainder} {leftReport rightReport : ParseDiagnostic}
+    {leftEvents rightEvents : List ParseDiagnostic}
+    (left : BracketContentsTraceRejects nestedTrace nestedRejects source endByte input afterLeft
+      leftReport leftEvents)
+    (right : BracketContentsTraceRejects nestedTrace nestedRejects source endByte input afterRight
+      rightReport rightEvents) :
+    afterLeft = afterRight ∧ leftReport = rightReport ∧ leftEvents = rightEvents := by
+  cases left with
+  | indexRejected leftNested =>
+      cases right with
+      | indexRejected rightNested => exact nested.rejectResultUnique leftNested rightNested
+
+theorem BracketContentsTraceRejects.disjoint_success
+    (nested : TraceExactOutcomeSpec nestedTrace nestedRejects source endByte)
+    {input rejected : Remainder} {report : ParseDiagnostic} {events : List ParseDiagnostic}
+    (rejection : BracketContentsTraceRejects nestedTrace nestedRejects source endByte input
+      rejected report events) :
+    ¬ ∃ contents after trace,
+      BracketContentsTraceParses nestedTrace source endByte input contents after trace := by
+  rintro ⟨contents, after, trace, parsed⟩
+  cases rejection with
+  | indexRejected nestedRejected =>
+      cases parsed with
+      | index indexParsed =>
+          exact nested.successRejectDisjoint nestedRejected ⟨_, _, _, indexParsed⟩
+
+/-- What a `[` holds has exact traces when its nested expressions do. -/
+theorem bracketContentsTraceExactOutcomeSpec
+    (nested : TraceExactOutcomeSpec nestedTrace nestedRejects source endByte) :
+    TraceExactOutcomeSpec (BracketContentsTraceParses nestedTrace)
+      (BracketContentsTraceRejects nestedTrace nestedRejects) source endByte where
+  successResultUnique := BracketContentsTraceParses.result_unique nested
+  rejectResultUnique := BracketContentsTraceRejects.result_unique nested
+  successRejectDisjoint := BracketContentsTraceRejects.disjoint_success nested
+
 theorem PostfixTailTraceParses.result_unique
     (nested : TraceExactOutcomeSpec nestedTrace nestedRejects source endByte)
     {input afterLeft afterRight : Remainder} {base left right : Syntax.Expr}
@@ -1230,9 +1308,10 @@ theorem PostfixTailTraceParses.result_unique
     (rightParsed : PostfixTailTraceParses nestedTrace source endByte input base right afterRight rightEvents) :
     left = right ∧ afterLeft = afterRight ∧ leftEvents = rightEvents := by
   have arguments := noTrailingDelimitedListTraceExactOutcomeSpec .leftParen .rightParen true .expression nested
+  have contents := bracketContentsTraceExactOutcomeSpec nested
   induction leftParsed generalizing right afterRight rightEvents <;> cases rightParsed <;>
     grind (ematch := 20) [PostfixSuffixAbsentAt, absent_conflicts_exact, absent_conflicts_token,
-      ExactTokenParses.result_unique, nested.successResultUnique,
+      ExactTokenParses.result_unique, contents.successResultUnique,
       NoTrailingDelimitedListTraceParses.opening_present,
       arguments.successResultUnique, IdentifierTraceParses.result_unique]
 
@@ -1271,10 +1350,11 @@ theorem PostfixTailTraceRejects.result_unique
       input rightBase afterRight rightReport rightEvents) :
     afterLeft = afterRight ∧ leftReport = rightReport ∧ leftEvents = rightEvents := by
   have arguments := noTrailingDelimitedListTraceExactOutcomeSpec .leftParen .rightParen true .expression nested
+  have contents := bracketContentsTraceExactOutcomeSpec nested
   induction left generalizing rightBase afterRight rightReport rightEvents <;> cases right <;>
     grind (ematch := 20) [absent_conflicts_exact, absent_conflicts_token,
       identifier_absent_conflicts_trace, ExactTokenParses.result_unique,
-      nested.successResultUnique, nested.rejectResultUnique, nested.successRejectDisjoint,
+      contents.successResultUnique, contents.rejectResultUnique, contents.successRejectDisjoint,
       NoTrailingDelimitedListTraceParses.opening_present, arguments.successResultUnique,
       arguments.rejectResultUnique, arguments.successRejectDisjoint,
       IdentifierTraceParses.result_unique, RejectAtReports.diagnostic_unique]
@@ -1287,10 +1367,11 @@ theorem PostfixTailTraceRejects.disjoint_success
     (rejection : PostfixTailTraceRejects nestedTrace nestedRejects source endByte input base rejected report events) :
     ¬ ∃ otherBase value after trace, PostfixTailTraceParses nestedTrace source endByte input otherBase value after trace := by
   have arguments := noTrailingDelimitedListTraceExactOutcomeSpec .leftParen .rightParen true .expression nested
+  have contents := bracketContentsTraceExactOutcomeSpec nested
   induction rejection <;> rintro ⟨otherBase, value, after, trace, parsed⟩ <;> cases parsed <;>
     grind (ematch := 20) [PostfixSuffixAbsentAt, absent_conflicts_exact, absent_conflicts_token,
       identifier_absent_conflicts_trace, ExactTokenParses.result_unique,
-      nested.successResultUnique, nested.successRejectDisjoint,
+      contents.successResultUnique, contents.successRejectDisjoint,
       NoTrailingDelimitedListTraceParses.opening_present, arguments.successResultUnique,
       arguments.successRejectDisjoint, IdentifierTraceParses.result_unique]
 

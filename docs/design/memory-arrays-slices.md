@@ -462,7 +462,8 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 1a | Syntax: `T[]`, with `T[k]` rejected and the suffixes counted against the nesting limit, the grammar and its proofs; type resolution rejects array types. Two commits: 1a-i, the suffix layer as a refactor that accepts no new syntax, then 1a-ii, the suffix | 25–32 files, +1,600–2,000/−350–450; 1a-i measured at 6 files, +156/−57 | parser tests from upstream's `crates/uitest/tests/fixtures/parse/fixed_size_array_rejected` and `crates/parser/tests/formatting.rs` cases |
 | 1b-i | Syntax: the head `new T[](`, with its grammar and every lemma, and direct tests of its parser; no atom reaches it yet | 10–12 files, +700–900; measured at 10 files, +636/−0 | none |
 | 1b-ii | Syntax: `new T[](n)` in the name atom, falling back to the identifier `new` where no head starts; inference rejects it | 18–26 files, +900–1,100/−50–150; measured at 27 files, +1,412/−199 | `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
-| 1c | Syntax: the slices, with `a[]` rejected; inference rejects the slices | 12–18 files, +800–1,200/−150–350 | parser tests from `crates/uitest/tests/fixtures/parse/empty_index_rejected` and `crates/parser/tests/formatting.rs` cases |
+| 1c-i | Syntax: the bracket contents layer, as a refactor that accepts no new syntax: what a `[` after an expression holds has its own parser, grammar and lemmas, and an index is its one form | 10–12 files, +650–750/−150–200; measured at 12 files, +696/−182 | none |
+| 1c-ii | Syntax: the slices, with `a[]` rejected, as the bracket contents' other forms; inference rejects the slices | 16–24 files, +900–1,400/−100–250 | parser tests from `crates/uitest/tests/fixtures/parse/empty_index_rejected`, `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
 | 2 | The array type and its element check, the heap's store, `new` and `0x41`, the lengths, preservation, the staged copies, the lowering's cells | 60–72 files, +1,300–1,700/−300–450, the riskiest | newLen(n), oversized(n) |
 | 3 | Element reads and `0x32` | 35–55 files, +800–1,200/−200–350, between 3c and 3a | defaultZero(n, i), nestedEmpty(n) |
 | 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
@@ -471,11 +472,12 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 37 functions above |
 
-In all, that is about 320 to 445 file changes, +9,800 to 13,500 and −1,750 to 3,100 lines over
-twelve commits: about half to three fifths of row 1, whose 23 commits added about 21,700 lines,
+In all, that is about 336 to 464 file changes, +10,500 to 14,400 and −1,850 to 3,200 lines over
+thirteen commits: about half to two thirds of row 1, whose 23 commits added about 21,700 lines,
 much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600, until its
 first measure: it adds three AST forms through the proved parser, so it became 1a to 1c. 1b's
-first measure, about +1,800, split it again into 1b-i and 1b-ii.
+first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
+forms: 1c-i's measure and 1c-ii's estimate together pass the cap.
 
 Step 5 waits for decision 3.
 
@@ -506,7 +508,8 @@ change to a statement named in the [open decisions](#open-decisions) beyond the 
   only the failing parser's own expectation. In step 1b-ii, three atom tests change: the name
   branch leaves the branches that ignore both child parsers, since `new T[](n)` reads its length
   with the nested one, and two names' dispatch traces gain the proof that no head `new T[](`
-  starts. Everything else is new tests.
+  starts. In step 1c-i, three trace tests' proofs wrap their index in the bracket contents' index
+  form, and no test's statement changes. Everything else is new tests.
 
 ## Open decisions
 

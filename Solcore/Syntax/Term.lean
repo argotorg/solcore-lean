@@ -159,4 +159,21 @@ abbrev ForItem := Located ForItemValue
 abbrev Statement := Located StatementValue
 abbrev Block := Located (List Statement)
 
+/-- What a pair of brackets after an expression holds. The postfix parser
+builds the expression from it once the `]` is read (`BracketContents.apply`). -/
+inductive BracketContents where
+  /-- `a[i]`. -/
+  | index (index : Expr)
+  deriving Repr, BEq
+
+/-- `base` followed by brackets from `openingSpan` to `closingSpan` holding
+`contents`. -/
+def BracketContents.apply (contents : BracketContents) (base : Expr)
+    (openingSpan closingSpan : SourceSpan) : Expr :=
+  match contents with
+  | .index inner => {
+      span := SourceSpan.cover base.span closingSpan
+      value := .index base (SourceSpan.cover openingSpan closingSpan) inner
+    }
+
 end Solcore.Syntax

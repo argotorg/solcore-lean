@@ -1041,6 +1041,17 @@ namespace Solcore.Syntax.Parser
 
 namespace ExpressionAtomInternals
 
+theorem bracketContents_preservesEndIndex (nested : Parser Expr)
+    (child : Parser.PreservesEndIndex nested) :
+    Parser.PreservesEndIndex (bracketContents nested) := by
+  intro input
+  have frame := child input
+  unfold bracketContents
+  cases result : nested input with
+  | invariant error => trivial
+  | reject failure rejected => rw [result] at frame; exact frame
+  | ok index next => rw [result] at frame; exact frame
+
 theorem postfixTail_preservesEndIndex (nested : Parser Expr) (block : Parser Block)
     (child : Parser.PreservesEndIndex nested) :
     ∀ fuel base, Parser.PreservesEndIndex (postfixTail nested block fuel base) := by
@@ -1058,11 +1069,13 @@ theorem postfixTail_preservesEndIndex (nested : Parser Expr) (block : Parser Blo
         | ok opening afterOpening =>
             have openingFrame := (symbol_preservesTokenWindow .leftBracket .expression).preservesEndIndex.endIndex_eq_of_ok openingResult
             simp only
-            cases childResult : nested afterOpening with
+            have contentsFrame := bracketContents_preservesEndIndex nested child
+            cases childResult : bracketContents nested afterOpening with
             | invariant error => trivial
-            | reject failure rejected => exact (child.endIndex_eq_of_reject childResult).trans openingFrame
-            | ok index afterIndex =>
-                have indexFrame := child.endIndex_eq_of_ok childResult
+            | reject failure rejected =>
+                exact (contentsFrame.endIndex_eq_of_reject childResult).trans openingFrame
+            | ok contents afterIndex =>
+                have indexFrame := contentsFrame.endIndex_eq_of_ok childResult
                 simp only
                 cases closingResult : symbol .rightBracket .expression afterIndex with
                 | invariant error => trivial
@@ -1200,6 +1213,32 @@ set_option autoImplicit false
 
 namespace Solcore.Syntax.Parser.ExpressionAtomInternals
 
+/-- What a `[` holds keeps the source provenance of every ordinary reply. -/
+theorem bracketContents_weakValidFor (nested : Parser Expr)
+    (nestedValid : nested.ValidFor (fun _ _ => True)) :
+    (bracketContents nested).ValidFor (fun _ _ => True) := by
+  intro input inputValid
+  have reply := nestedValid input inputValid
+  unfold bracketContents
+  cases result : nested input with
+  | invariant error => trivial
+  | reject failure rejected => rw [result] at reply; exact reply
+  | ok index next => rw [result] at reply; exact reply
+
+/-- What a `[` holds inherits the bounded totality of its expressions. -/
+theorem bracketContents_ordinary_of_elementFuel
+    (nested : Parser Expr) (nestedFuel : Nat)
+    (contract : FuelElementTotalityContract nested nestedFuel)
+    (input : State) (inputValid : input.ValidFor)
+    (adequate : input.remainingCount < nestedFuel) :
+    (∃ contents next, bracketContents nested input = .ok contents next) ∨
+    (∃ failure next, bracketContents nested input = .reject failure next) := by
+  unfold bracketContents
+  rcases contract.ordinary input inputValid adequate with
+    ⟨index, next, result⟩ | ⟨failure, rejected, result⟩
+  · exact Or.inl ⟨.index index, next, by simp only [result]⟩
+  · exact Or.inr ⟨failure, rejected, by simp only [result]⟩
+
 theorem postfixTail_ordinary_of_fuel
     (nested : Parser Expr) (block : Parser Block) (nestedFuel : Nat)
     (contract : FuelElementTotalityContract nested nestedFuel) :
@@ -1235,11 +1274,15 @@ theorem postfixTail_ordinary_of_fuel
               (acceptToken_cursor_lt_onSuccess (.symbol .leftBracket)
                 .expression (· == .symbol .leftBracket) openingResult)
               nestedAdequate
-          rcases contract.ordinary afterOpening openingValid.2.1
-              afterOpeningNested with
-            ⟨index, afterIndex, indexResult⟩ |
+          have contentsCursor : Parser.CursorMonotoneOnSuccess (bracketContents nested) :=
+            bracketContents_cursorMonotoneOnSuccess nested
+              (fun _ _ _ result => Nat.le_of_lt (contract.cursorLtOnSuccess result))
+          rcases bracketContents_ordinary_of_elementFuel nested nestedFuel contract afterOpening
+              openingValid.2.1 afterOpeningNested with
+            ⟨contents, afterIndex, indexResult⟩ |
             ⟨failure, rejected, indexResult⟩
-          · have indexValid := contract.validFor afterOpening openingValid.2.1
+          · have indexValid := bracketContents_weakValidFor nested contract.validFor afterOpening
+              openingValid.2.1
             rw [indexResult] at indexValid
             rcases (symbol_ordinary .rightBracket .expression) afterIndex with
               ⟨closing, afterClosing, closingResult⟩ |
@@ -1251,7 +1294,8 @@ theorem postfixTail_ordinary_of_fuel
                 (symbol_preservesTokenWindow .rightBracket .expression
                   afterIndex)
               rw [closingResult] at suffixWindow
-              have indexWindow := contract.preservesTokenWindow afterOpening
+              have indexWindow := bracketContents_preservesTokenWindow nested
+                contract.preservesTokenWindow afterOpening
               rw [indexResult] at indexWindow
               have afterClosingWindow : afterClosing.window = input.window :=
                 suffixWindow.2.trans (indexWindow.2.trans openingWindow.2)
@@ -1261,8 +1305,7 @@ theorem postfixTail_ordinary_of_fuel
                   (Nat.lt_of_lt_of_le
                     (acceptToken_cursor_lt_onSuccess (.symbol .leftBracket)
                       .expression (· == .symbol .leftBracket) openingResult)
-                    (Nat.le_trans (Nat.le_of_lt
-                      (contract.cursorLtOnSuccess indexResult))
+                    (Nat.le_trans (contentsCursor afterOpening contents afterIndex indexResult)
                       (symbol_cursorMonotoneOnSuccess .rightBracket .expression
                         afterIndex closing afterClosing closingResult)))
                   loopAdequate
@@ -1271,16 +1314,12 @@ theorem postfixTail_ordinary_of_fuel
                   (Nat.le_trans
                     (symbol_cursorMonotoneOnSuccess .leftBracket .expression
                       input opening afterOpening openingResult)
-                    (Nat.le_trans (Nat.le_of_lt
-                      (contract.cursorLtOnSuccess indexResult))
+                    (Nat.le_trans (contentsCursor afterOpening contents afterIndex indexResult)
                       (symbol_cursorMonotoneOnSuccess .rightBracket .expression
                         afterIndex closing afterClosing closingResult)))
                   nestedAdequate
-              rcases inductionHypothesis {
-                    span := SourceSpan.cover base.span closing.span
-                    value := .index base
-                      (SourceSpan.cover opening.span closing.span) index
-                  } afterClosing closingValid.2.1 loopNext nestedNext with
+              rcases inductionHypothesis (contents.apply base opening.span closing.span)
+                  afterClosing closingValid.2.1 loopNext nestedNext with
                 ⟨value, final, tailResult⟩ |
                 ⟨failure, final, tailResult⟩
               · exact Or.inl ⟨value, final, by

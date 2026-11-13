@@ -299,6 +299,13 @@ def expressionAtom (nested : Parser Expr)
 
 namespace ExpressionAtomInternals
 
+/-- What a `[` after an expression holds, read after the `[`: an index. -/
+def bracketContents (nested : Parser Expr) : Parser BracketContents := fun state =>
+  match nested state with
+  | .ok index next => .ok (.index index) next
+  | .reject failure failed => .reject failure failed
+  | .invariant error => .invariant error
+
 /-- Extend one atom through every following index, call, and field suffix. -/
 def postfixTail (nested : Parser Expr) (block : Parser Block) :
     Nat → Expr → State → Reply Expr
@@ -307,15 +314,12 @@ def postfixTail (nested : Parser Expr) (block : Parser Block) :
       if isSymbol state .leftBracket then
         match symbol .leftBracket .expression state with
         | .ok opening afterOpening =>
-            match nested afterOpening with
-            | .ok index next =>
+            match bracketContents nested afterOpening with
+            | .ok contents next =>
                 match symbol .rightBracket .expression next with
                 | .ok closing afterClosing =>
-                    let brackets := SourceSpan.cover opening.span closing.span
-                    ExpressionAtomInternals.postfixTail nested block fuel {
-                      span := SourceSpan.cover base.span closing.span
-                      value := .index base brackets index
-                    } afterClosing
+                    ExpressionAtomInternals.postfixTail nested block fuel
+                      (contents.apply base opening.span closing.span) afterClosing
                 | .reject failure failed => .reject failure failed
                 | .invariant error => .invariant error
             | .reject failure failed => .reject failure failed
