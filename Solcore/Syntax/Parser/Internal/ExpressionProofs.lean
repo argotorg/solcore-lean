@@ -791,6 +791,126 @@ theorem identifierExpression_success_sound_and_validFor
   rw [result] at valid
   exact valid.1
 
+/-- An exact grammar token is the one the token consumer accepts. -/
+private theorem head_acceptToken_eq_ok
+    (expected : ParseExpectation) (context : ParseContext)
+    (accepts : TokenKind → Bool) {kind : TokenKind}
+    (accepted : accepts kind = true) {input : State} {span : SourceSpan}
+    {after : DeclarativeGrammar.Remainder}
+    (parsed : DeclarativeGrammar.ExactTokenParses kind
+      input.declarativeRemainder span after) :
+    acceptToken expected context accepts input =
+      .ok { span, value := kind } { input with cursor := input.cursor + 1 } := by
+  have current := parsed.1
+  change input.cursor < input.window.endIndex ∧
+    input.tokens[input.cursor]? = some { span, value := kind } at current
+  have found : input.peek? = some { span, value := kind } := by
+    simp only [State.peek?, current.1, if_true, current.2]
+  simp only [acceptToken, found, accepted, if_true]
+
+private theorem head_contextual_eq_ok (value : ContextualKeyword) (context : ParseContext)
+    {input : State} {span : SourceSpan} {after : DeclarativeGrammar.Remainder}
+    (parsed : DeclarativeGrammar.ExactTokenParses (.identifier value.spelling)
+      input.declarativeRemainder span after) :
+    contextual value context input = .ok { span, value := .identifier value.spelling }
+      { input with cursor := input.cursor + 1 } :=
+  head_acceptToken_eq_ok (.contextual value) context (·.isContextual value)
+    (by simp [TokenKind.isContextual]) parsed
+
+private theorem head_symbol_eq_ok (value : Symbol) (context : ParseContext)
+    {input : State} {span : SourceSpan} {after : DeclarativeGrammar.Remainder}
+    (parsed : DeclarativeGrammar.ExactTokenParses (.symbol value)
+      input.declarativeRemainder span after) :
+    symbol value context input = .ok { span, value := .symbol value }
+      { input with cursor := input.cursor + 1 } :=
+  head_acceptToken_eq_ok (.symbol value) context (· == .symbol value)
+    (by change instBEqSymbol.beq value value = true; cases value <;> rfl) parsed
+
+/-- The array guard keeps its state, so it reflects diagnostic freedom. -/
+theorem arrayTypeGuard_reflectsDiagnosticFreeOnSuccess (type : TypeExpr) :
+    Parser.ReflectsDiagnosticFreeOnSuccess (arrayTypeGuard type) := by
+  intro input value next result diagnosticFree
+  rw [(arrayTypeGuard_ok result).2] at diagnosticFree
+  exact diagnosticFree
+
+/-- The head of `new T[](n)` reflects diagnostic freedom. -/
+theorem newArrayHead_reflectsDiagnosticFreeOnSuccess :
+    Parser.ReflectsDiagnosticFreeOnSuccess newArrayHead := by
+  unfold newArrayHead
+  apply Parser.bind_reflectsDiagnosticFreeOnSuccess
+    (contextual_reflectsDiagnosticFreeOnSuccess .new .expression)
+  intro keyword
+  apply Parser.bind_reflectsDiagnosticFreeOnSuccess typeExpr_reflectsDiagnosticFreeOnSuccess
+  intro type
+  apply Parser.bind_reflectsDiagnosticFreeOnSuccess
+    (arrayTypeGuard_reflectsDiagnosticFreeOnSuccess type)
+  intro _
+  apply Parser.bind_reflectsDiagnosticFreeOnSuccess
+    (symbol_reflectsDiagnosticFreeOnSuccess .leftParen .expression)
+  intro _
+  exact Parser.pure_reflectsDiagnosticFreeOnSuccess _
+
+/-- Every successful head of `new T[](n)` follows its grammar. -/
+theorem newArrayHead_success_sound
+    {typeOrdinary : DeclarativeGrammar.Remainder → TypeExpr →
+      DeclarativeGrammar.Remainder → Prop}
+    (typeSuccessSound : ∀ {input next : State} {value : TypeExpr},
+      typeExpr input = .ok value next →
+        typeOrdinary input.declarativeRemainder value next.declarativeRemainder)
+    {input next : State} {head : Token × TypeExpr}
+    (result : newArrayHead input = .ok head next) :
+    DeclarativeGrammar.NewArrayHeadParses typeOrdinary input.declarativeRemainder
+      head.1.span head.2 next.declarativeRemainder := by
+  unfold newArrayHead at result
+  rcases bind_ok_components result with ⟨keyword, afterKeyword, keywordResult, rest⟩
+  rcases bind_ok_components rest with ⟨type, afterType, typeResult, rest⟩
+  rcases bind_ok_components rest with ⟨_, afterGuard, guardResult, rest⟩
+  rcases bind_ok_components rest with ⟨_, afterOpening, openingResult, finished⟩
+  cases finished
+  rcases arrayTypeGuard_ok guardResult with ⟨isArray, rfl⟩
+  exact .parsed _ (contextual_success_exactTokenParses .new .expression keywordResult)
+    (typeSuccessSound typeResult) isArray
+    (symbol_success_exactTokenParses .leftParen .expression openingResult)
+
+/-- Where the head of `new T[](n)` rejects, no head starts in the grammar.
+This needs only exact outcomes and soundness of the type parser. -/
+theorem newArrayHead_reject_absent
+    {typeOrdinary : DeclarativeGrammar.Remainder → TypeExpr →
+      DeclarativeGrammar.Remainder → Prop}
+    {typeRejects : DeclarativeGrammar.Remainder → DeclarativeGrammar.Remainder → Prop}
+    (typeOutcomes : DeclarativeGrammar.ExactDeterministicOutcomeSpec typeOrdinary typeRejects)
+    (typeSuccessSound : ∀ {input next : State} {value : TypeExpr},
+      typeExpr input = .ok value next →
+        typeOrdinary input.declarativeRemainder value next.declarativeRemainder)
+    (typeRejectSound : ∀ {input rejected : State} {failure : Failure},
+      typeExpr input = .reject failure rejected →
+        typeRejects input.declarativeRemainder rejected.declarativeRemainder)
+    {input rejected : State} {failure : Failure}
+    (result : newArrayHead input = .reject failure rejected) :
+    DeclarativeGrammar.NewArrayHeadAbsent typeOrdinary input.declarativeRemainder := by
+  rintro ⟨keywordSpan, type, output, head⟩
+  cases head with
+  | parsed _ keywordParsed typeParsed isArray openingParsed =>
+      have keywordResult := head_contextual_eq_ok .new .expression keywordParsed
+      rcases keywordParsed with ⟨_, rfl⟩
+      unfold newArrayHead at result
+      cases typeResult : typeExpr { input with cursor := input.cursor + 1 } with
+      | invariant error =>
+          simp only [bind_apply_cases, keywordResult, typeResult] at result
+          cases result
+      | reject typeFailure typeRejected =>
+          exact typeOutcomes.successRejectDisjoint (typeRejectSound typeResult)
+            ⟨_, _, typeParsed⟩
+      | ok parsedType afterType =>
+          rcases typeOutcomes.successResultUnique (typeSuccessSound typeResult) typeParsed with
+            ⟨rfl, rfl⟩
+          have guardResult : arrayTypeGuard parsedType afterType = .ok () afterType := by
+            simp [arrayTypeGuard, isArray]
+          have openingResult := head_symbol_eq_ok .leftParen .expression openingParsed
+          simp only [bind_apply_cases, keywordResult, typeResult, guardResult,
+            openingResult] at result
+          cases result
+
 /-- Proxy leaf soundness composes with source provenance. -/
 theorem proxyExpression_success_sound_and_validFor
     (statementValid : SourceFile → Statement → Prop)

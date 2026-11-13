@@ -1345,6 +1345,27 @@ inductive IdentifierExpressionParses :
         value := .identifier name
       } output
 
+/-- The head of `new T[](n)` over a type relation: the contextual `new`, an
+array type and the `(`. -/
+inductive NewArrayHeadParses
+    (typeParses : Remainder → Syntax.TypeExpr → Remainder → Prop) :
+    Remainder → SourceSpan → Syntax.TypeExpr → Remainder → Prop where
+  | parsed {input afterKeyword afterType output : Remainder}
+      {type : Syntax.TypeExpr} {openingSpan : SourceSpan} (keywordSpan : SourceSpan)
+      (keywordParsed : ExactTokenParses (.identifier ContextualKeyword.new.spelling)
+        input keywordSpan afterKeyword)
+      (typeParsed : typeParses afterKeyword type afterType)
+      (isArray : type.isArray = true)
+      (openingParsed : ExactTokenParses (.symbol .leftParen) afterType
+        openingSpan output) :
+      NewArrayHeadParses typeParses input keywordSpan type output
+
+/-- No head `new T[](` starts here. -/
+def NewArrayHeadAbsent
+    (typeParses : Remainder → Syntax.TypeExpr → Remainder → Prop)
+    (input : Remainder) : Prop :=
+  ¬ ∃ keywordSpan type output, NewArrayHeadParses typeParses input keywordSpan type output
+
 /-- Exact grammar of an `@`-prefixed proxy expression leaf. -/
 inductive ProxyExpressionParses :
     Remainder → Syntax.Expr → Remainder → Prop where

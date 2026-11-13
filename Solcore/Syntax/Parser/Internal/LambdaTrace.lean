@@ -304,6 +304,150 @@ end Solcore.Syntax.Parser.ExpressionAtomInternals
 end
 
 section
+/-! The head `new T[](` of `new T[](n)` produces exactly its type's events: the
+`new` and the `(` are silent. The head never reports an invariant, and a
+rejected head is exactly a head absent from the trace grammar, which is the
+premise of the name fallback. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.Parser.ExpressionAtomInternals
+
+open DeclarativeGrammar
+
+private theorem head_bind_ordinary {α β : Type} {first : Parser α} {next : α → Parser β}
+    (firstOrdinary : Parser.Ordinary first)
+    (nextOrdinary : ∀ value, Parser.Ordinary (next value)) :
+    Parser.Ordinary (first >>= next) := by
+  intro input
+  rcases firstOrdinary input with ⟨value, after, result⟩ | ⟨failure, after, result⟩
+  · simp only [bind, result]
+    exact nextOrdinary value after
+  · exact .inr ⟨failure, after, by simp only [bind, result]⟩
+
+theorem newArrayHead_success_iff_components {input output : State}
+    {head : Token × TypeExpr} :
+    newArrayHead input = .ok head output ↔
+    ∃ afterKeyword afterType opening,
+      contextual .new .expression input = .ok head.1 afterKeyword ∧
+      typeExpr afterKeyword = .ok head.2 afterType ∧ head.2.isArray = true ∧
+      symbol .leftParen .expression afterType = .ok opening output := by
+  constructor
+  · intro result
+    unfold newArrayHead at result
+    cases keywordResult : contextual .new .expression input with
+    | reject => simp only [bind, keywordResult] at result; contradiction
+    | invariant => simp only [bind, keywordResult] at result; contradiction
+    | ok keyword afterKeyword =>
+        simp only [bind, keywordResult] at result
+        cases typeResult : typeExpr afterKeyword with
+        | reject => simp only [typeResult] at result; contradiction
+        | invariant => simp only [typeResult] at result; contradiction
+        | ok type afterType =>
+            simp only [typeResult] at result
+            cases guardResult : arrayTypeGuard type afterType with
+            | reject => simp only [guardResult] at result; contradiction
+            | invariant => simp only [guardResult] at result; contradiction
+            | ok _ afterGuard =>
+                rcases arrayTypeGuard_ok guardResult with ⟨isArray, rfl⟩
+                simp only [guardResult] at result
+                cases openingResult : symbol .leftParen .expression afterGuard with
+                | reject => simp only [openingResult] at result; contradiction
+                | invariant => simp only [openingResult] at result; contradiction
+                | ok opening afterOpening =>
+                    simp only [openingResult, pure] at result
+                    cases result
+                    exact ⟨afterKeyword, afterGuard, opening, rfl, typeResult, isArray,
+                      openingResult⟩
+  · rintro ⟨afterKeyword, afterType, opening, keywordResult, typeResult, isArray,
+      openingResult⟩
+    have guardResult : arrayTypeGuard head.2 afterType = .ok () afterType := by
+      simp [arrayTypeGuard, isArray]
+    simp only [newArrayHead, bind, keywordResult, typeResult, guardResult, openingResult,
+      pure]
+
+theorem newArrayHead_trace_success_sound {input output : State} {head : Token × TypeExpr}
+    (result : newArrayHead input = .ok head output) :
+    ∃ trace, NewArrayHeadTraceParses TypeExprTraceParses input.file.id input.window.endByte
+      input.declarativeRemainder head.1.span head.2 output.declarativeRemainder trace ∧
+      output.diagnostics = input.diagnostics ++ trace := by
+  rcases newArrayHead_success_iff_components.mp result with
+    ⟨afterKeyword, afterType, opening, keywordResult, typeResult, isArray, openingResult⟩
+  have keywordParsed := contextual_success_exactTokenParses .new .expression keywordResult
+  have keywordState := (contextual_ok_tokenAt .new .expression keywordResult).2
+  subst afterKeyword
+  have openingParsed := symbol_success_exactTokenParses .leftParen .expression openingResult
+  have openingState := (symbol_ok_tokenAt .leftParen .expression openingResult).2
+  subst output
+  rcases typeExpr_trace_success_sound typeResult with ⟨trace, typed, events⟩
+  exact ⟨trace, .parsed _ keywordParsed typed isArray openingParsed, events⟩
+
+theorem newArrayHead_trace_success_complete {input : State} {keywordSpan : SourceSpan}
+    {type : TypeExpr} {after : Remainder} {trace : List ParseDiagnostic}
+    (parsed : NewArrayHeadTraceParses TypeExprTraceParses input.file.id input.window.endByte
+      input.declarativeRemainder keywordSpan type after trace) :
+    ∃ output, newArrayHead input =
+        .ok ({ span := keywordSpan, value := .identifier ContextualKeyword.new.spelling }, type)
+          output ∧
+      output.declarativeRemainder = after ∧ output.diagnostics = input.diagnostics ++ trace := by
+  cases parsed with
+  | parsed _ keyword typed isArray opening =>
+      have keywordResult := contextual_eq_ok_of_exactTokenParses .new .expression keyword
+      rcases keyword with ⟨_, rfl⟩
+      rcases (typeExpr_trace_success_iff (input := { input with cursor := input.cursor + 1 })).mp
+        typed with ⟨afterType, typeResult, rfl, events⟩
+      have openingResult := symbol_eq_ok_of_exactTokenParses .leftParen .expression opening
+      rcases opening with ⟨_, rfl⟩
+      exact ⟨_, newArrayHead_success_iff_components.mpr
+        ⟨_, _, _, keywordResult, typeResult, isArray, openingResult⟩, rfl, events⟩
+
+theorem newArrayHead_success_context : ParserSuccessContext newArrayHead := by
+  intro input output head result
+  rcases newArrayHead_success_iff_components.mp result with
+    ⟨afterKeyword, afterType, opening, keywordResult, typeResult, _, openingResult⟩
+  have frame := typeExpr_success_context typeResult
+  rw [(contextual_ok_tokenAt .new .expression keywordResult).2] at frame
+  rw [(symbol_ok_tokenAt .leftParen .expression openingResult).2]
+  exact frame
+
+/-- The head never reports an invariant, on any state. -/
+theorem newArrayHead_ordinary : Parser.Ordinary newArrayHead := by
+  unfold newArrayHead
+  refine head_bind_ordinary (contextual_ordinary .new .expression) fun _ => ?_
+  refine head_bind_ordinary typeExpr_ordinary fun type => ?_
+  refine head_bind_ordinary (fun input => ?_) fun _ => ?_
+  · simp only [arrayTypeGuard]
+    split
+    · exact .inl ⟨_, _, rfl⟩
+    · exact .inr ⟨_, _, rfl⟩
+  · refine head_bind_ordinary (symbol_ordinary .leftParen .expression) fun _ => ?_
+    intro input
+    exact .inl ⟨_, _, rfl⟩
+
+/-- A rejected head leaves no head in the trace grammar. -/
+theorem newArrayHead_reject_trace_absent {input rejected : State} {failure : Failure}
+    (result : newArrayHead input = .reject failure rejected) :
+    NewArrayHeadTraceAbsent TypeExprTraceParses input.file.id input.window.endByte
+      input.declarativeRemainder := by
+  rintro ⟨keywordSpan, type, output, trace, parsed⟩
+  rcases newArrayHead_trace_success_complete parsed with ⟨_, success, _⟩
+  rw [success] at result
+  cases result
+
+/-- Where the trace grammar has no head, the head rejects. -/
+theorem newArrayHead_reject_of_trace_absent {input : State}
+    (absent : NewArrayHeadTraceAbsent TypeExprTraceParses input.file.id input.window.endByte
+      input.declarativeRemainder) :
+    ∃ failure rejected, newArrayHead input = .reject failure rejected := by
+  rcases newArrayHead_ordinary input with ⟨head, output, result⟩ | rejects
+  · rcases newArrayHead_trace_success_sound result with ⟨trace, parsed, _⟩
+    exact absurd ⟨_, _, _, _, parsed⟩ absent
+  · exact rejects
+
+end Solcore.Syntax.Parser.ExpressionAtomInternals
+end
+
+section
 -- leanmerge: from Solcore.Syntax.Parser.OptionalDotConstructorArgumentsTraceProperties
 /-! Exact optional-argument success. The absent branch never calls the child;
 the present branch is the actual no-trailing list, with explicit child laws. -/

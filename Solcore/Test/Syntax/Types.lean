@@ -1697,6 +1697,36 @@ private def testArraySuffixNesting : IO Unit := do
     [((14, 274), .nestingExceeded .arraySuffix 128)]
     "128 suffixes exceed the room"
 
+/-- The head `new T[](` of `new T[](n)`, run directly: `new`, an array type
+with its type's events, and the `(`; anything else rejects. -/
+private def testNewArrayHead : IO Unit := do
+  let run (content : String) : IO (Parser.Reply (Token × TypeExpr)) := do
+    let file : SourceFile := { id := parserSource, content }
+    match Lexer.lex file with
+    | .ok lexed =>
+        pure (Parser.ExpressionAtomInternals.newArrayHead (Parser.State.initial file lexed))
+    | .error error =>
+        throw (IO.userError s!"{content}: lexer invariant failed: {reprStr error}")
+  match ← run "new uint256[](n)" with
+  | .ok (keyword, type) next =>
+      assertEqual (byteRange keyword.span) (0, 3) "the head's keyword"
+      assertEqual (typeShape type) (.array (named "uint256")) "the head's type"
+      assertEqual next.cursor 5 "the head ends after its `(`"
+      assertEqual next.diagnostics [] "the head's events"
+  | _ => throw (IO.userError "`new uint256[](` is a head")
+  match ← run "new uint256[3](n)" with
+  | .ok (_, type) next =>
+      assertEqual (typeShape type) (.array (named "uint256")) "a sized head's type"
+      assertEqual next.cursor 6 "a sized head ends after its `(`"
+      assertEqual (next.diagnostics.map fun diagnostic =>
+          (byteRange diagnostic.span, diagnostic.kind))
+        [((11, 14), .constraintViolation .fixedSizeArray)] "a sized head keeps its type's event"
+  | _ => throw (IO.userError "`new uint256[3](` is a head")
+  for content in ["new(3)", "new uint256(3)", "new uint256[]", "new x", "renew uint256[](1)"] do
+    match ← run content with
+    | .reject _ _ => pure ()
+    | _ => throw (IO.userError s!"`{content}` has no head")
+
 /-- Run successful canonical type-alias parser and diagnostic regressions. -/
 def testSyntaxParserTypes : IO Unit := do
   testEveryTypeForm
@@ -1708,6 +1738,7 @@ def testSyntaxParserTypes : IO Unit := do
   testArrayTypes
   testFixedSizeArrays
   testArraySuffixNesting
+  testNewArrayHead
 
 end Tests
 end

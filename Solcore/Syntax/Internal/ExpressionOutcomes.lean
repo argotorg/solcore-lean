@@ -1022,6 +1022,35 @@ private theorem absent_conflicts_token_variant {tokens : Array Token}
     (present : TokenAt tokens endIndex cursor { span, value := kind }) : False :=
   absent ⟨span, present⟩
 
+/-- A head `new T[](` starts with its `new`. -/
+theorem NewArrayHeadParses.keyword_present
+    {typeParses : Remainder → Syntax.TypeExpr → Remainder → Prop}
+    {input output : Remainder} {keywordSpan : SourceSpan} {type : Syntax.TypeExpr}
+    (parsed : NewArrayHeadParses typeParses input keywordSpan type output) :
+    TokenAt input.tokens input.endIndex input.cursor
+      { span := keywordSpan, value := .identifier ContextualKeyword.new.spelling } := by
+  cases parsed with
+  | parsed _ keyword => exact keyword.1
+
+/-- One remainder starts at most one head `new T[](`. -/
+theorem NewArrayHeadParses.result_unique
+    {typeParses : Remainder → Syntax.TypeExpr → Remainder → Prop}
+    {typeRejects : Remainder → Remainder → Prop}
+    (typeOutcomes : ExactDeterministicOutcomeSpec typeParses typeRejects)
+    {input afterLeft afterRight : Remainder} {leftSpan rightSpan : SourceSpan}
+    {left right : Syntax.TypeExpr}
+    (leftParsed : NewArrayHeadParses typeParses input leftSpan left afterLeft)
+    (rightParsed : NewArrayHeadParses typeParses input rightSpan right afterRight) :
+    leftSpan = rightSpan ∧ left = right ∧ afterLeft = afterRight := by
+  cases leftParsed with
+  | parsed _ keyword typed _ opening =>
+      cases rightParsed with
+      | parsed _ otherKeyword otherTyped _ otherOpening =>
+          rcases keyword.result_unique otherKeyword with ⟨rfl, rfl⟩
+          rcases typeOutcomes.successResultUnique typed otherTyped with ⟨rfl, rfl⟩
+          rcases opening.result_unique otherOpening with ⟨_, rfl⟩
+          exact ⟨rfl, rfl, rfl⟩
+
 /-- Final dispatcher rejection excludes every successful ordered Core atom
 branch, independently of the supplied recursive grammars. -/
 theorem ExpressionAtomCoreFinalRejects.disjointCore

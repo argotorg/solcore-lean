@@ -52,6 +52,22 @@ def identifierExpression : Parser Expr := do
     value := .identifier name
   }
 
+/-- Whether the type after `new` is an array: `new` allocates only arrays. -/
+def arrayTypeGuard (type : TypeExpr) : Parser Unit := fun state =>
+  if type.isArray then .ok () state
+  else rejectAt state { head := .symbol .leftBracket, tail := [] } .expression
+
+/-- The head of `new T[](n)`: the contextual `new`, an array type and the `(`.
+The name atom falls back to the identifier `new` where it rejects, as upstream's
+`.or(new_array_expr).or(ident_parser())` does
+(`crates/parser/src/parse/expr_pat.rs:246-268, 304-305`). -/
+def newArrayHead : Parser (Token × TypeExpr) := do
+  let keyword ← contextual .new .expression
+  let type ← typeExpr
+  arrayTypeGuard type
+  let _ ← symbol .leftParen .expression
+  pure (keyword, type)
+
 /-- Parse a proxy expression whose outer range begins at its `@` marker. -/
 def proxyExpression : Parser Expr := do
   let marker ← symbol .at .expression

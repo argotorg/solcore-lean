@@ -301,6 +301,106 @@ end Solcore.Syntax.DeclarativeGrammar
 end
 
 section
+/-! The head of `new T[](n)` with its type's events. The `new` and the `(`
+contribute none. -/
+
+set_option autoImplicit false
+
+namespace Solcore.Syntax.DeclarativeGrammar
+
+/-- The head of `new T[](n)` and the diagnostics of its type. -/
+inductive NewArrayHeadTraceParses
+    (typeTrace : SourceId → Nat → Remainder → Syntax.TypeExpr →
+      Remainder → List ParseDiagnostic → Prop)
+    (source : SourceId) (endByte : Nat) :
+    Remainder → SourceSpan → Syntax.TypeExpr → Remainder → List ParseDiagnostic → Prop where
+  | parsed {input afterKeyword afterType output : Remainder}
+      {type : Syntax.TypeExpr} {openingSpan : SourceSpan} {trace : List ParseDiagnostic}
+      (keywordSpan : SourceSpan)
+      (keywordParsed : ExactTokenParses (.identifier ContextualKeyword.new.spelling)
+        input keywordSpan afterKeyword)
+      (typeParsed : typeTrace source endByte afterKeyword type afterType trace)
+      (isArray : type.isArray = true)
+      (openingParsed : ExactTokenParses (.symbol .leftParen) afterType
+        openingSpan output) :
+      NewArrayHeadTraceParses typeTrace source endByte input keywordSpan type output trace
+
+/-- No head `new T[](` starts here, with any events. -/
+def NewArrayHeadTraceAbsent
+    (typeTrace : SourceId → Nat → Remainder → Syntax.TypeExpr →
+      Remainder → List ParseDiagnostic → Prop)
+    (source : SourceId) (endByte : Nat) (input : Remainder) : Prop :=
+  ¬ ∃ keywordSpan type output trace,
+    NewArrayHeadTraceParses typeTrace source endByte input keywordSpan type output trace
+
+variable {typeTrace : SourceId → Nat → Remainder → Syntax.TypeExpr →
+    Remainder → List ParseDiagnostic → Prop}
+  {source : SourceId} {endByte : Nat}
+
+theorem NewArrayHeadTraceParses.ordinary
+    {typeOrdinary : Remainder → Syntax.TypeExpr → Remainder → Prop}
+    (erases : ∀ {input value output trace},
+      typeTrace source endByte input value output trace → typeOrdinary input value output)
+    {input output : Remainder} {keywordSpan : SourceSpan} {type : Syntax.TypeExpr}
+    {trace : List ParseDiagnostic}
+    (parsed : NewArrayHeadTraceParses typeTrace source endByte input keywordSpan type output
+      trace) :
+    NewArrayHeadParses typeOrdinary input keywordSpan type output := by
+  cases parsed with
+  | parsed _ keyword typed isArray opening =>
+      exact .parsed keywordSpan keyword (erases typed) isArray opening
+
+theorem NewArrayHeadTraceParses.output_window
+    (childWindow : ∀ {input value output trace},
+      typeTrace source endByte input value output trace →
+        output.tokens = input.tokens ∧ output.endIndex = input.endIndex)
+    {input output : Remainder} {keywordSpan : SourceSpan} {type : Syntax.TypeExpr}
+    {trace : List ParseDiagnostic}
+    (parsed : NewArrayHeadTraceParses typeTrace source endByte input keywordSpan type output
+      trace) :
+    output.tokens = input.tokens ∧ output.endIndex = input.endIndex := by
+  cases parsed with
+  | parsed _ keyword typed _ opening =>
+      simpa only [keyword.2, opening.2] using childWindow typed
+
+theorem NewArrayHeadTraceParses.result_unique
+    (unique : ∀ {input left right afterLeft afterRight leftTrace rightTrace},
+      typeTrace source endByte input left afterLeft leftTrace →
+      typeTrace source endByte input right afterRight rightTrace →
+        left = right ∧ afterLeft = afterRight ∧ leftTrace = rightTrace)
+    {input afterLeft afterRight : Remainder} {leftSpan rightSpan : SourceSpan}
+    {left right : Syntax.TypeExpr} {leftTrace rightTrace : List ParseDiagnostic}
+    (leftParsed : NewArrayHeadTraceParses typeTrace source endByte input leftSpan left
+      afterLeft leftTrace)
+    (rightParsed : NewArrayHeadTraceParses typeTrace source endByte input rightSpan right
+      afterRight rightTrace) :
+    leftSpan = rightSpan ∧ left = right ∧ afterLeft = afterRight ∧ leftTrace = rightTrace := by
+  cases leftParsed with
+  | parsed _ keyword typed _ opening =>
+      cases rightParsed with
+      | parsed _ otherKeyword otherTyped _ otherOpening =>
+          rcases keyword.result_unique otherKeyword with ⟨rfl, rfl⟩
+          rcases unique typed otherTyped with ⟨rfl, rfl, rfl⟩
+          rcases opening.result_unique otherOpening with ⟨_, rfl⟩
+          exact ⟨rfl, rfl, rfl, rfl⟩
+
+theorem NewArrayHeadTraceParses.cascadeFilters
+    {text : String} {lexical : List SourceSpan}
+    (childProtected : ∀ {input value output trace},
+      typeTrace source endByte input value output trace →
+        ParseDiagnosticCascadeFilters text lexical trace trace)
+    {input output : Remainder} {keywordSpan : SourceSpan} {type : Syntax.TypeExpr}
+    {trace : List ParseDiagnostic}
+    (parsed : NewArrayHeadTraceParses typeTrace source endByte input keywordSpan type output
+      trace) :
+    ParseDiagnosticCascadeFilters text lexical trace trace := by
+  cases parsed with
+  | parsed _ _ typed => exact childProtected typed
+
+end Solcore.Syntax.DeclarativeGrammar
+end
+
+section
 -- leanmerge: from Solcore.Syntax.DeclarativeProxyExpressionRejectionTraceGrammar
 /-! Raw proxy rejection distinguishes a missing marker from a nested type
 failure. The exact final report stays separate from the child's ordered events. -/

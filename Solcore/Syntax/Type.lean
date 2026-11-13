@@ -49,6 +49,12 @@ def TypeExpr.arrayOf (element : TypeExpr)
   value := .array element (SourceSpan.cover openingSpan closingSpan)
 }
 
+/-- Whether a type is an array, `T[]`. -/
+def TypeExpr.isArray (type : TypeExpr) : Bool :=
+  match type.value with
+  | .array _ _ => true
+  | _ => false
+
 /-- One trait predicate written `subject: Trait<arguments...>`. -/
 structure Predicate where
   span : SourceSpan

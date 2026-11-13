@@ -2962,6 +2962,171 @@ theorem proxyExpression_ne_invariant (input : State)
   proxyExpression_invariantFreeOnValid.ne_invariant
     input inputValid error
 
+/-- The array guard keeps its state, or rejects in place. -/
+theorem arrayTypeGuard_ok {type : TypeExpr} {input next : State} {value : Unit}
+    (result : arrayTypeGuard type input = .ok value next) :
+    type.isArray = true ∧ next = input := by
+  unfold arrayTypeGuard at result
+  split at result
+  next isArray =>
+    cases result
+    exact ⟨isArray, rfl⟩
+  next =>
+    unfold rejectAt at result
+    contradiction
+
+theorem arrayTypeGuard_validFor (type : TypeExpr) :
+    (arrayTypeGuard type).ValidFor (fun _ _ => True) := by
+  intro input inputValid
+  unfold arrayTypeGuard
+  split
+  · exact ⟨trivial, inputValid, rfl⟩
+  · unfold rejectAt Reply.ValidFor
+    exact ⟨inputValid.currentSpan_validFor, inputValid, rfl⟩
+
+theorem arrayTypeGuard_preservesTokenWindow (type : TypeExpr) :
+    Parser.PreservesTokenWindow (arrayTypeGuard type) := by
+  intro input
+  unfold arrayTypeGuard
+  split
+  · exact ⟨rfl, rfl⟩
+  · exact rejectAt_preservesTokenWindow input _ _
+
+theorem arrayTypeGuard_cursorMonotoneOnSuccess (type : TypeExpr) :
+    Parser.CursorMonotoneOnSuccess (arrayTypeGuard type) := by
+  intro input value next result
+  rw [(arrayTypeGuard_ok result).2]
+  exact Nat.le_refl _
+
+theorem arrayTypeGuard_invariantFreeOnValid (type : TypeExpr) :
+    Parser.InvariantFreeOnValid (arrayTypeGuard type) := by
+  intro input _
+  unfold arrayTypeGuard
+  split
+  · exact .inl ⟨_, _, rfl⟩
+  · exact .inr ⟨_, _, rfl⟩
+
+/-- The head of `new T[](n)` keeps the provenance of its `new` and its type. -/
+theorem newArrayHead_validFor :
+    newArrayHead.ValidFor (fun file head =>
+      head.1.span.ValidFor file ∧ TypeExpr.ValidFor file head.2) := by
+  have weak : newArrayHead.ValidFor (fun _ _ => True) := by
+    unfold newArrayHead
+    apply Parser.bind_validFor (contextual_validFor .new .expression)
+    intro keyword
+    apply Parser.bind_validFor typeExpr_validFor
+    intro type
+    apply Parser.bind_validFor (arrayTypeGuard_validFor type)
+    intro _
+    apply Parser.bind_validFor (symbol_validFor .leftParen .expression)
+    intro _
+    exact Parser.pure_validFor _ (fun _ _ => True) (fun _ => trivial)
+  intro input inputValid
+  have weakResult := weak input inputValid
+  cases parsed : newArrayHead input with
+  | invariant error => trivial
+  | reject failure rejected =>
+      rw [parsed] at weakResult
+      exact weakResult
+  | ok head final =>
+      rw [parsed] at weakResult
+      have stages := parsed
+      unfold newArrayHead at stages
+      rcases atomBind_ok_components stages with
+        ⟨keyword, afterKeyword, keywordResult, rest⟩
+      rcases atomBind_ok_components rest with ⟨type, afterType, typeResult, rest⟩
+      rcases atomBind_ok_components rest with ⟨_, afterGuard, _, rest⟩
+      rcases atomBind_ok_components rest with ⟨_, afterOpening, _, finished⟩
+      cases finished
+      have keywordContract := contextual_validFor .new .expression input inputValid
+      rw [keywordResult] at keywordContract
+      have typeContract := typeExpr_validFor afterKeyword keywordContract.2.1
+      rw [typeResult] at typeContract
+      refine ⟨⟨?_, ?_⟩, weakResult.2.1, weakResult.2.2⟩
+      · simpa only [Located.ValidFor] using keywordContract.1
+      · simpa [keywordContract.2.2] using typeContract.1
+
+theorem newArrayHead_preservesTokenWindow :
+    Parser.PreservesTokenWindow newArrayHead := by
+  unfold newArrayHead
+  apply Parser.bind_preservesTokenWindow (contextual_preservesTokenWindow .new .expression)
+  intro keyword
+  apply Parser.bind_preservesTokenWindow typeExpr_preservesTokenWindow
+  intro type
+  apply Parser.bind_preservesTokenWindow (arrayTypeGuard_preservesTokenWindow type)
+  intro _
+  apply Parser.bind_preservesTokenWindow (symbol_preservesTokenWindow .leftParen .expression)
+  intro _
+  exact Parser.pure_preservesTokenWindow _
+
+theorem newArrayHead_cursorMonotoneOnSuccess :
+    Parser.CursorMonotoneOnSuccess newArrayHead := by
+  unfold newArrayHead
+  apply Parser.bind_cursorMonotoneOnSuccess (contextual_cursorMonotoneOnSuccess .new .expression)
+  intro keyword
+  apply Parser.bind_cursorMonotoneOnSuccess typeExpr_cursorMonotoneOnSuccess
+  intro type
+  apply Parser.bind_cursorMonotoneOnSuccess (arrayTypeGuard_cursorMonotoneOnSuccess type)
+  intro _
+  apply Parser.bind_cursorMonotoneOnSuccess (symbol_cursorMonotoneOnSuccess .leftParen .expression)
+  intro _
+  exact Parser.pure_cursorMonotoneOnSuccess _
+
+/-- The head starts at its current `new`. -/
+theorem newArrayHead_startsAtCurrentTokenOnSuccess :
+    Parser.StartsAtCurrentTokenOnSuccess newArrayHead (·.1.span) := by
+  unfold newArrayHead
+  apply Parser.bind_startsAtCurrentTokenOnSuccess_of_first
+    (contextual_startsAtCurrentTokenOnSuccess .new .expression)
+  intro keyword input head final parsed
+  rcases atomBind_ok_components parsed with ⟨type, afterType, _, rest⟩
+  rcases atomBind_ok_components rest with ⟨_, afterGuard, _, rest⟩
+  rcases atomBind_ok_components rest with ⟨_, afterOpening, _, finished⟩
+  cases finished
+  rfl
+
+theorem newArrayHead_invariantFreeOnValid :
+    Parser.InvariantFreeOnValid newArrayHead := by
+  unfold newArrayHead
+  apply Parser.bind_invariantFreeOnValid (contextual_validFor .new .expression)
+    (contextual_ordinary .new .expression).invariantFreeOnValid
+  intro keyword
+  apply Parser.bind_invariantFreeOnValid typeExpr_validFor typeExpr_invariantFreeOnValid
+  intro type
+  apply Parser.bind_invariantFreeOnValid (arrayTypeGuard_validFor type)
+    (arrayTypeGuard_invariantFreeOnValid type)
+  intro _
+  apply Parser.bind_invariantFreeOnValid (symbol_validFor .leftParen .expression)
+    (symbol_ordinary .leftParen .expression).invariantFreeOnValid
+  intro _
+  exact Parser.pure_invariantFreeOnValid ((keyword, type) : Token × TypeExpr)
+
+theorem newArrayHead_ne_invariant (input : State)
+    (inputValid : input.ValidFor) (error : ParserInvariantError) :
+    newArrayHead input ≠ .invariant error :=
+  newArrayHead_invariantFreeOnValid.ne_invariant input inputValid error
+
+theorem newArrayHead_preservesTokensOnSuccess :
+    Parser.PreservesTokensOnSuccess newArrayHead :=
+  newArrayHead_preservesTokenWindow.preservesTokensOnSuccess
+
+/-- The head consumes its `new`, so it always advances. -/
+theorem newArrayHead_cursor_lt_onSuccess {input next : State} {head : Token × TypeExpr}
+    (parsed : newArrayHead input = .ok head next) :
+    input.cursor < next.cursor := by
+  unfold newArrayHead at parsed
+  rcases atomBind_ok_components parsed with ⟨keyword, afterKeyword, keywordResult, rest⟩
+  rcases atomBind_ok_components rest with ⟨type, afterType, typeResult, rest⟩
+  rcases atomBind_ok_components rest with ⟨_, afterGuard, guardResult, rest⟩
+  rcases atomBind_ok_components rest with ⟨_, afterOpening, openingResult, finished⟩
+  have keywordLt := acceptToken_cursor_lt_onSuccess (.contextual .new) .expression
+    (·.isContextual .new) keywordResult
+  have typeLe := typeExpr_cursorMonotoneOnSuccess _ _ _ typeResult
+  have openingLe := symbol_cursorMonotoneOnSuccess .leftParen .expression _ _ _ openingResult
+  rw [(arrayTypeGuard_ok guardResult).2] at openingLe
+  cases finished
+  omega
+
 theorem optionalLambdaReturnType_invariantFreeOnValid :
     Parser.InvariantFreeOnValid optionalLambdaReturnType := by
   unfold optionalLambdaReturnType

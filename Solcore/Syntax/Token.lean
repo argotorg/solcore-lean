@@ -142,6 +142,8 @@ inductive ContextualKeyword where
   | trait
   | where
   | while
+  /-- `new`, in `new T[](n)` (`crates/parser/src/parse/common.rs:112`). -/
+  | new
   deriving Repr, BEq, DecidableEq
 
 namespace ContextualKeyword
@@ -158,6 +160,7 @@ def spelling : ContextualKeyword → String
   | .trait => "trait"
   | .where => "where"
   | .while => "while"
+  | .new => "new"
 
 def ofString? : String → Option ContextualKeyword
   | "comptime" => some .comptime
@@ -171,6 +174,7 @@ def ofString? : String → Option ContextualKeyword
   | "trait" => some .trait
   | "where" => some .where
   | "while" => some .while
+  | "new" => some .new
   | _ => none
 
 @[simp] theorem ofString?_spelling (keyword : ContextualKeyword) :
