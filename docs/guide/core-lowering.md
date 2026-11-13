@@ -178,15 +178,18 @@ depends on the change.
   other files only add that case to their case splits over `Literal`. Negative literals (53bb5d5a8)
   added three cases in the same way (`resolvedNegativeWord`, `resolvedNegativeInteger` and
   `resolvedNegativeFixed`), and the numeric branch chooses among them by the literal's sign.
-  Numeric patterns at `uint256` (cd1907db3) took the pattern side: both literal matchers compile
-  one as a Core word test after `validateFixedIntegerLiteral`, and both pattern-leaf codes gain
+  Numeric patterns at `uint256` (cd1907db3) took the pattern side: both literal matchers compile one
+  as a Core word test after `validateFixedIntegerLiteral`, and both pattern-leaf codes gain
   `LiteralCode.uint256` with its construction (`constructs_uint256` in `DataPatternLeaves`,
-  `constructs_uint256_with_requirement` in `CompatiblePatternLeaves`).
-- **A new builtin function** (c8738e7ef, the conversions `uint256(w)`, `uintN(w)` and `intN(w)`). A
-  builtin that is not a closure stays out of `BuiltinFunctionId.all`, so no program's globals,
-  callable table or closure identities change, and the builtin-call branch of
-  `lowerExpressionWithPolicy` lowers it inline (`SourceCoreInteger.conversion`). The conversions
-  stay outside the proved subset: `BuiltinCalls.call_of_accepted` takes
+  `constructs_uint256_with_requirement` in `CompatiblePatternLeaves`). A `case uint256(p)` pattern
+  (8708ef657) needs no leaf: both pattern compilers compile it as `p`'s matcher, since a `uint256`
+  value's Core value is its word, and both certificate `Tree`s gain a `uint256Word` case.
+- **A new builtin function** (c8738e7ef, the conversions `uint256(w)`, `uintN(w)` and `intN(w)`, and
+  8c846c460, `Typedef.abs` and `Typedef.rep`). A builtin that is not a closure stays out of
+  `BuiltinFunctionId.all`, so no program's globals, callable table or closure identities change, and
+  the builtin-call branch of `lowerExpressionWithPolicy` lowers it inline
+  (`SourceCoreInteger.builtinConversion`: the checked word at a fixed-width type, the word itself at
+  `word`). The conversions stay outside the proved subset: `BuiltinCalls.call_of_accepted` takes
   `function.conversion? = none`, which its callers get from `builtinForm`, the supported syntax or a
   receipt's catalog index (`conversion?_of_inventory`).
 - **A changed rule** (7ac75aea3, closures by value). Theorems whose statements mention the old
