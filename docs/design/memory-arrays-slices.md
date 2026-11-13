@@ -454,10 +454,9 @@ functions over words, as row 1's fixture ports did.
     `return a[1] + ;` does, since Lean's recovery of a failed statement does not keep the `[]`'s
     error (`.upstream/lane-d-unit3-memory-arrays/step1/1c-probe`).
 
-Differences 2 and 4 to 8 were accepted with the decisions, and 9 to 12 on 2026-11-13. Those four
-change only a diagnostic or the room of a resource limit, never what an accepted program means.
-Difference 13, from step 1c-ii-b, changes only a diagnostic too and is not yet accepted. Difference
-1 follows decision 3.
+Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13 and 13 on
+2026-11-14. Those five change only a diagnostic or the room of a resource limit, never what an
+accepted program means. Difference 1 follows decision 3.
 
 ## Steps
 
