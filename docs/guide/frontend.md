@@ -200,7 +200,9 @@ the layout refactor; [Conventions](conventions.md#following-older-notes) says ho
    their own types (0e5e82583), and finalization checks them with `validateShiftOperands`. A
    compound shift's amount is inferred with no expected type, so it waits too (2f616db3a), and
    finalization checks it with `validateShiftAmount`.
-   A new form also needs its arm in `inferExprFuel` (`SourceInference/Expression`).
+   A new form also needs its arm in `inferExprFuel` (`SourceInference/Expression`), except a form
+   that inference only rejects: it shares the last arm, which names it with `rejectedFormName`
+   (df10f3f11), until the step that gives it a meaning adds its own arm.
 4. **Inference proofs**: the new branch's lemmas next to it (`inferBinaryOperator_shift_result` in
    `SourceInference/Expression`), then every case analysis in
    `SourceInference/Internal/ExpressionProperties`. `unchecked` also touched `RequirementProperties`,
@@ -282,8 +284,9 @@ Worked examples: 7aa1d539d (the re-pin to `e2eef194`) and 32b38d908 (larger nest
   the [core lowering](core-lowering.md) work.
 - **Inference proofs number their cases.** They do functional induction on `inferExprFuel` and name
   its cases by number, in `SourceInference/Internal` and `SourceSemantics/Internal`. A new arm in
-  `inferExprFuel`, or a new syntax constructor it matches on, shifts them. This is why `unchecked`
-  is a pass around the parser. Pattern proofs do the same with `inferMatchPatternFlatFuel.induct`:
+  `inferExprFuel`, or a new syntax constructor it matches on, shifts them (a constructor that only
+  reaches the last arm, as `new T[](n)` does, shifts nothing). This is why `unchecked` is a pass
+  around the parser. Pattern proofs do the same with `inferMatchPatternFlatFuel.induct`:
   the arm of `case uint256(p)` (8708ef657) shifted its later cases in `ExpressionProperties`,
   `Privacy/Active`, `Privacy/ProtectedFrames`, `Privacy/SelectedCalls`,
   `Inference/ExpressionLedgers`, `Formation/NormalizedMatches` and `Selected/PatternMonomorphism`.

@@ -181,10 +181,12 @@ These rest on three contracts, which a new construct extends:
 
 ## Making changes
 
-Three language changes have reached Syntax since the parser was built: shifts went through the
-grammar and its proofs, `unchecked` blocks went around the parser, and unary minus took both routes. Their commits name the paths from
-before the layout refactor; [Conventions](conventions.md#following-older-notes) says how to map
-them. [Adding a language feature](adding-a-feature.md) follows a change through every layer.
+Four language changes have reached Syntax since the parser was built: shifts and row 4's array
+syntax (`T[]` and `new T[](n)`) went through the grammar and its proofs, `unchecked` blocks went
+around the parser, and unary minus took both routes. The commits for shifts and `unchecked` blocks
+name the paths from before the layout refactor; [Conventions](conventions.md#following-older-notes)
+says how to map them. [Adding a language feature](adding-a-feature.md) follows a change through
+every layer.
 
 ### An operator, or a spelling made of existing tokens
 
@@ -239,7 +241,14 @@ Row 1's unary minus (53bb5d5a8) took both routes:
 
 ### A new expression, statement or declaration form
 
-No commit since the parser was built has added one, so this order follows the structure of the code.
+Two commits since the parser was built have added a form, both for row 4's arrays: 7a76a1fb8 the
+type form `T[]` (`TypeExprValue.array`) and df10f3f11 the expression form `new T[](n)`
+(`ExprValue.newArray`, with the contextual keyword `new`). Each came after a commit that prepared
+its grammar and proofs without accepting new syntax: 8e2507095 split the type grammar into a base
+form and its suffixes, and 1f3f02fa7 added the head `new T[](` with its lemmas before any atom
+reached it. Their parser proofs are the type and atom layers' own, in `Parser/Internal`, in place
+of a declaration's lemma family. No statement or declaration form has been added, so for those this
+order follows the structure of the code.
 
 1. **Tokens**, only if no spelling from existing tokens works: a `Symbol`, `HardKeyword` or
    `ContextualKeyword` in `Token` with its `spelling` (and `ofString?` for a keyword), and a symbol's
