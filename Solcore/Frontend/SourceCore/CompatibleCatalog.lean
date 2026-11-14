@@ -59,7 +59,22 @@ def Catalog.project (catalog : Catalog) : Ty → Except Error Core.Ty
   | .constructor (.builtin .word) => pure .word
   | .constructor (.builtin (.fixed _)) => pure .word
   | .constructor (.builtin .integer) => pure .integer
-  -- A memory array has no Core representation yet.
+  -- A memory array is a Core cell of its length, its default element and the mapping of
+  -- its present elements from index to element, which `registerType` registers. Any other
+  -- application is a nominal type's.
+  | .application function element =>
+      match SourceCoreRawMetadata.runtimeType function with
+      | .constructor (.builtin .memoryArray) => do
+          let elementType ← catalog.project element
+          match catalog.identity? (.mapping (.constructor (.builtin .word)) element) with
+          | some identity => pure (.cell (.product .word (.product elementType (.namedData identity))))
+          | none => throw (.catalog (.missingRepresentation
+              (SourceCoreRawMetadata.runtimeType (.application function element))))
+      | _ => match catalog.identity? (.application function element) with
+          | some identity => pure (.namedData identity)
+          | none => throw (.catalog (.missingRepresentation
+              (SourceCoreRawMetadata.runtimeType (.application function element))))
+  -- The bare constructors name no source type.
   | type@(.constructor (.builtin .memoryArray))
   | type@(.constructor (.builtin .arrayObject)) =>
       throw (.catalog (.missingRepresentation (SourceCoreRawMetadata.runtimeType type)))
@@ -128,6 +143,10 @@ mutual
           let (catalog, value) ← registerType signatures fuel catalog value
           let layout : Core.OrderedMapping.Layout := ⟨key, value, identity⟩
           pure (install catalog identity layout.definition.constructorPayloadTypes, SourceCoreMappingWithDefault.type layout)
+      | .application (.constructor (.builtin .memoryArray)) element => do
+          let (catalog, _) ← registerType signatures fuel catalog
+            (.mapping (.constructor (.builtin .word)) element)
+          pure (catalog, ← catalog.project type)
       | _ => do
           let (declaration, arguments) ← match SourceCoreDataCatalog.nominalParts type with
             | some parts => pure parts
@@ -177,6 +196,9 @@ mutual
       | .mapping key value => do
           let (seen, metadata) ← discoverMetadataList signatures fuel seen [key, value]
           pure (seen, .mapping key value :: metadata)
+      -- A memory array's own mapping takes no metadata: only its element can.
+      | .application (.constructor (.builtin .memoryArray)) element =>
+          discoverMetadata signatures fuel seen element
       | _ => do
           let (declaration, arguments) ← match SourceCoreDataCatalog.nominalParts type with
             | some parts => pure parts

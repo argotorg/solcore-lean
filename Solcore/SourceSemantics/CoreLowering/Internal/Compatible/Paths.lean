@@ -1845,7 +1845,18 @@ theorem project_closed {catalog : Catalog} (closed : ClosedSources catalog)
     cases found : catalog.identity? (.mapping key value) with
     | none => simp [found, bind, Except.bind, throw, throwThe, MonadExceptOf.throw] at accepted
     | some identity => exact identity_closed closed found
-  | «variable» id | parameter id | error | application left right _ _ | proxy inner _ =>
+  | application left right _ rightIH =>
+    unfold Catalog.project at accepted
+    split at accepted
+    · rename_i head
+      obtain ⟨elementType, elementAccepted, _⟩ := bind_ok accepted
+      change (SourceCoreDataCatalog.closed left && SourceCoreDataCatalog.closed right) = true
+      rw [← runtime_closed left, head, rightIH elementAccepted]
+      rfl
+    · split at accepted
+      · exact identity_closed closed (by assumption)
+      · cases accepted
+  | «variable» id | parameter id | error | proxy inner _ =>
     unfold Catalog.project at accepted
     split at accepted
     · exact identity_closed closed (by assumption)

@@ -721,6 +721,20 @@ theorem index_completed {environment : Core.Environment} {before middle selected
     Core.Evaluates environment before (index layout comparison base key missingBase) result after :=
   Core.LanguageResult.bind_success _ baseEvaluated (Core.LanguageResult.bind_success _ keyEvaluated lookedUp)
 
+/-- The default element of a new memory array of `element`, as the source semantics'
+`NewArrayDefault` gives it: zero for a word-sized element, else one fresh empty array, whose
+own default is built the same way. -/
+def arrayDefault (catalog : SourceCoreCompatibleCatalog.Catalog) : TypeSystem.Ty → Option Core.Expr
+  | .constructor (.builtin .word) | .constructor (.builtin (.fixed _)) => some (.word Core.Word.zero)
+  | .application (.constructor (.builtin .memoryArray)) inner => do
+      let innerType ← (catalog.project inner).toOption
+      let identity ← catalog.identity? (.mapping (.constructor (.builtin .word)) inner)
+      let layout : Core.OrderedMapping.Layout := ⟨.word, innerType, identity⟩
+      let innerDefault ← arrayDefault catalog inner
+      some (.newCell (.product .word (.product innerType layout.type))
+        (.pair (.word Core.Word.zero) (.pair innerDefault (Core.OrderedMapping.empty layout))))
+  | _ => none
+
 def lowerWithReasons (fuel : Nat) (context : Context) (lowerChild : ExpressionLowerer)
     (source : TypedSource) (scope : Scope) (id : ExpressionId) (reasonAt : ExpressionId → Core.Word) :
     Except Error LoweredExpr := do
@@ -772,13 +786,34 @@ def lowerWithReasons (fuel : Nat) (context : Context) (lowerChild : ExpressionLo
           let comparison ← (SourceCoreCompatibleDataEquality.prepare fuel context.checked keyType).mapError
             (fun _ => unsupported node)
           pure ⟨type, index layout comparison.expression base.expression key.expression (reasonAt id)⟩
+      | .newArray element length =>
+          let arrayType ← projectType context.checked site (TypeSystem.Ty.array element)
+          SourceCoreBasic.ensureType site arrayType type
+          let (elementType, identity) ← match arrayType with
+            | .cell (.product .word (.product elementType (.namedData identity))) =>
+                pure (elementType, identity)
+            | _ => throw (unsupported node)
+          let layout : Core.OrderedMapping.Layout := ⟨.word, elementType, identity⟩
+          let default ← match arrayDefault context.checked.catalog element with
+            | some default => pure default
+            | none => throw (unsupported node)
+          let length ← lowerChild fuel source scope length reasonAt
+          SourceCoreBasic.ensureType site .word length.type
+          pure ⟨type, SourceCoreDataExpressions.newArray layout default length.expression⟩
+      | .arrayLength base =>
+          SourceCoreBasic.ensureType site .word type
+          let base ← lowerChild fuel source scope base reasonAt
+          match base.type with
+          | .cell (.product .word _) =>
+              pure ⟨type, SourceCoreDataExpressions.arrayLength base.expression⟩
+          | _ => throw (unsupported node)
       | _ => throw (unsupported node)
 
 def leafLowerer (context : Context) : ExpressionLowerer → ExpressionLowerer :=
   fun child fuel source scope id reasonAt => do
     let (node, type) ← readExpression context.checked source id
     match node.form with
-    | .constructor .. | .member .. | .proxy .. | .index .. =>
+    | .constructor .. | .member .. | .proxy .. | .index .. | .newArray .. | .arrayLength .. =>
         lowerWithReasons fuel context child source scope id reasonAt
     | .tuple elements =>
         let children ← elements.mapM fun element => child fuel source scope element reasonAt

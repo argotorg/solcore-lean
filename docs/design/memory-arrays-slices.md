@@ -401,6 +401,13 @@ wait for the native pipeline's contracts and ABI.
   to element. A source array value is the cell's `cellRef`, and nested arrays hold `cellRef`s.
 - `new` allocates the cell with no entries, so an absent element reads as the default. Reads and
   writes check the length, then look up or update the entry.
+- As built in step 2b-iii, the public compiler lowers through the compatible profile, so its
+  catalog (`SourceCoreCompatibleCatalog`) registers `T[]`'s element mapping as `mapping(word => T)`
+  and projects `T[]` to the cell of a word, the element's Core type and that mapping, and its data
+  lowering (`SourceCoreCompatibleDataExpressions`) lowers `new` and the length. The projection tests
+  an application's runtime head, so that a type and its runtime type project alike. A nested
+  element's default is one fresh empty array per `new`. The strict representation's catalog and
+  direct linking still reject `T[]`.
 - A slice is a Core product of its base, its start and its length.
 - Arrays stay outside `StaticProfile` and the proved subset, as row 1's conversions did. The
   meaning proofs and their statements do not change.
@@ -488,7 +495,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 2a-ii | The store: an array object, a reference to it and their typing, with the typing's laws; no expression makes one yet | 20–40 files, +400–800/−50–150; measured at 17 files, +214/−18 | none |
 | 2b-i | `new T[](n)` and `0x41`: inference, evaluation and its fault, the sized and staged copies and preservation. Three commits: 2b-i-a, `new`'s own arm in inference, which still rejects it and renumbers the cases of the proofs by functional induction on `inferExprFuel`; 2b-i-b, the typed form `new` with its static rule, evaluation, faults, sized copies, stage and preservation, which no source produces yet; then 2b-i-c, inference's typing of `new` | 35–60 files, +900–1,500/−100–300; 2b-i-a measured at 15 files, +293/−286, 2b-i-b at 28 files, +338/−6, 2b-i-c at 25 files, +799/−19 | none |
 | 2b-ii | The lengths: `a.length`, `a.length()` and `Length.length(a)`. Four commits: 2b-ii-a, the typed form of a memory array's length with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet; 2b-ii-b, inference's typing of `Length.length(a)`, a compiler function's qualified name as `Typedef.abs` is; 2b-ii-c, inference's typing of `a.length`, a field that names no constructor, whose base is a new child of inference's call tree; then 2b-ii-d, `a.length()`, a call of that field with no arguments | 30–50 files, +600–1,000/−100–200; 2b-ii-a measured at 27 files, +160/−10, 2b-ii-b at 19 files, +484/−10, 2b-ii-c at 23 files, +602/−90, 2b-ii-d at 20 files, +593/−51 | none |
-| 2b-iii | The lowering: the Core cells of `new` and the lengths | 15–30 files, +400–800/−50–150 | newLen(n), oversized(n) |
+| 2b-iii | The lowering: the Core cells of `new` and the lengths | 15–30 files, +400–800/−50–150; measured at 10 files, +175/−6 | newLen(n), oversized(n) |
 | 3 | Element reads and `0x32` | 35–55 files, +800–1,200/−200–350, between 3c and 3a | defaultZero(n, i), nestedEmpty(n) |
 | 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
 | 5 | Element writes and compound assignments, with the place checked before the right side | 55–72 files, +1,200–1,700/−300–450 | setGet(n, i, v), fillAndSum(n), compound(v), nestedReplace(n, v), alias(v); ret(n), sum(xs), echo(xs), grid(n) adapted |

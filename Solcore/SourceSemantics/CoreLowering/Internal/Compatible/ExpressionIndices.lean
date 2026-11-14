@@ -1697,7 +1697,13 @@ theorem nominal_project {catalog : SourceCoreCompatibleCatalog.Catalog} {type : 
   cases type <;> try simp [SourceCoreDataCatalog.nominalParts] at nominal
   · rename_i constructor
     cases constructor <;> simp_all [SourceCoreDataCatalog.nominalParts, SourceCoreCompatibleCatalog.Catalog.project]
-  · simp [SourceCoreCompatibleCatalog.Catalog.project, found]
+  · rename_i function argument
+    unfold SourceCoreCompatibleCatalog.Catalog.project
+    split
+    · next head =>
+      exfalso
+      cases function <;> simp_all [SourceCoreDataCatalog.nominalParts, SourceCoreRawMetadata.runtimeType]
+    · simp [found]
 
 private theorem row_native {checked : SourceCoreCompatibleCatalog.Checked} {site : SourceCoreElaboration.ErrorSite}
     {root field : TypeSystem.Ty} {substitution : TypeSystem.ParameterSubstitution}

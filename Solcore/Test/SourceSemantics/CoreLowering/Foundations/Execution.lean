@@ -5431,6 +5431,46 @@ def runUpstreamFixtures : IO Unit := do
     session ← panics session (← key name) arguments SourceCorePanics.divisionByZero s!"{name} on {reprStr arguments}"
   IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no contract storage, with afterBlock, ltSigned, runtimePatterns, narrowAmount, wordShift, mulNeg, divSigned, explicitWord and negI8 … negI256 as upstream wrote them with uint256(w), Typedef.abs and Typedef.rep, so none stays adapted, and basic's bnoteq, give the fixtures' values and panic codes"
 
+/-- Row 4's step 2b-iii: upstream's mem-array fixture's `newLen` and `oversized`, as upstream
+wrote them, and a nested array and the other two spellings of a length. -/
+private def arrayFixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function newLen(n: uint256) returns (uint256) {",
+  "  let m: uint256[] = new uint256[](n);",
+  "  return Length.length(m);",
+  "}",
+  "function oversized(n: uint256) returns (uint256) {",
+  "  let m: uint256[] = new uint256[](n);",
+  "  return Length.length(m);",
+  "}",
+  "function nested(n: uint256) returns (uint256) {",
+  "  let grid = new int8[][](n);",
+  "  return grid.length + new uint8[](3).length();",
+  "}"]
+
+/-- The fixture's `#[(5) -> 5]` and `#[(2^251) -> Panic(0x41)]`: a new array keeps its length,
+and a length from 2^251 − 1 on panics with `0x41` while one below it allocates nothing more. -/
+def runUpstreamArrayFixtures : IO Unit := do
+  let program ← get "array fixture check" (checkProgram arrayFixtureWorkspace)
+  let names := ["newLen", "oversized", "nested"]
+  let seeds ← names.mapM (seed program)
+  let compiled ← get "array fixture compilation"
+    (compile arrayFixtureWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (index : Nat) : IO Key := match compiled.keys[index]? with
+    | some key => pure key
+    | none => throw (IO.userError "array fixture root missing")
+  let mut session ← boot (← compiled.open)
+  let cases : List (Nat × Nat × Nat) :=
+    [(0, 5, 5), (0, 0, 0), (1, 2 ^ 251 - 2, 2 ^ 251 - 2), (2, 4, 7)]
+  for (index, argument, expected) in cases do
+    let completed ← execute session (← key index) [word argument]
+    require (completed.value == word expected)
+      s!"{names[index]!}({argument}) gave {reprStr completed.value}"
+    session := completed.session
+  for argument in [2 ^ 251, 2 ^ 251 - 1, modulus - 1] do
+    session ← panics session (← key 1) [word argument] SourceCorePanics.allocation
+      s!"oversized({argument})"
+  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen and oversized as upstream wrote them give the fixture's length and Panic(0x41) from 2^251 − 1 on, and a nested new with a.length and a.length() gives its lengths"
+
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)
   let seeds ← names.mapM (seed program)
@@ -5643,6 +5683,7 @@ def run : IO Unit := do
   runTypedef
   runUint256Patterns
   runUpstreamFixtures
+  runUpstreamArrayFixtures
 
 end Tests.SourceCoreFixedIntegerOperators
 end

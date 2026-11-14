@@ -3583,6 +3583,15 @@ theorem registered_shapes (signatures : ProgramSignatures) (fuel : Nat) :
             have shaped := ih.1 _ _ _ _ (ih.1 _ _ _ _ reserved initial) final
             exact install_preserves _ ((registerType_entries initial).trans (registerType_entries final)) shaped
               (nonnominal absent)
+          · obtain ⟨registered, child, accepted⟩ := bind_ok accepted
+            have shaped := ih.1 _ _ _ _ previous child
+            cases projected : registered.fst.project (SourceCoreRawMetadata.runtimeType original) with
+            | error error => simp [projected] at accepted
+            | ok projectedType =>
+                simp only [projected, Except.ok.injEq, Prod.mk.injEq] at accepted
+                obtain ⟨afterEq, _⟩ := accepted
+                subst afterEq
+                exact shaped
           · split at accepted
             · obtain ⟨signature, selected, accepted⟩ := bind_ok accepted
               have selected := exact_signature selected

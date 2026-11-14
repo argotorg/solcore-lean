@@ -13,7 +13,8 @@ names. Main declarations: `SourceCorePanics.reason`, `SourceCorePanics.code?`,
 `SourceCorePanics.dirtyRevertData`.
 
 The codes that Lean's source language raises are `divisionByZero` (`0x12`, unchecked `/` and `%`
-by zero) and, with the integer types, `arithmetic` (`0x11`).
+by zero), with the integer types `arithmetic` (`0x11`), and with memory arrays `allocation`
+(`0x41`, a length from 2^251 − 1 on).
 -/
 
 set_option autoImplicit false
@@ -28,6 +29,9 @@ def divisionByZero : UInt8 := 0x12
 
 /-- An arithmetic result outside its type. -/
 def arithmetic : UInt8 := 0x11
+
+/-- A memory array too long to allocate. -/
+def allocation : UInt8 := 0x41
 
 theorem base_add_lt (code : UInt8) : base + code.toNat < Core.wordModulus := by
   have bound := code.toNat_lt

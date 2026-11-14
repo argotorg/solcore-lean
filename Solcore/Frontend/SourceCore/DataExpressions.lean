@@ -65,6 +65,25 @@ def index (layout : Core.OrderedMapping.Layout) (comparison default base key : C
             (Core.LanguageResult.success (.var 0)))
           (Core.LanguageResult.success (.var 0)))))
 
+/-- The first length that `new T[](n)` rejects with `Panic(0x41)` (decision 2), as the source
+semantics' `newArrayLengthLimit` is. -/
+def arrayLengthLimit : Nat := 2 ^ 251 - 1
+
+/-- `new T[](n)`: the length's effects, then `Panic(0x41)` from `arrayLengthLimit` on, else a
+fresh cell of the length, the default element and no present element. -/
+def newArray (layout : Core.OrderedMapping.Layout) (default length : Core.Expr) : Core.Expr :=
+  let contents := Core.Ty.product .word (.product layout.valueType layout.type)
+  Core.LanguageResult.bind (.cell contents) length
+    (.ifE (Core.Expr.wordLt (.var 0) (.word (Core.Word.ofNatModulo arrayLengthLimit)))
+      (Core.LanguageResult.success
+        (.newCell contents (.pair (.var 0) (.pair (default.weakenAt 0) (Core.OrderedMapping.empty layout)))))
+      (Core.LanguageResult.failure (.cell contents)
+        (.word (SourceCorePanics.reason SourceCorePanics.allocation))))
+
+/-- A memory array's length: the first component of its cell. -/
+def arrayLength (base : Core.Expr) : Core.Expr :=
+  Core.LanguageResult.bind .word base (Core.LanguageResult.success (.first (.loadCell (.var 0))))
+
 private def project (checked : Checked) (node : ExpressionNode) (type : TypeSystem.Ty) : Except Error Core.Ty :=
   (checked.project type).mapError (fun _ => .unsupportedExpression node.id node.form) |>.map (·.type)
 

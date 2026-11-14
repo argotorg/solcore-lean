@@ -2921,7 +2921,20 @@ theorem project_wellFormed {catalog : SourceCoreCompatibleCatalog.Catalog}
       cases found : catalog.identity? (.constructor (.declaration declaration)) <;> simp [found] at projected
       cases projected
       exact identity_wellFormed found
-  | «variable» variableId | «parameter» parameterId | application left right _ _ | proxy inner _ | error =>
+  | application left right _ second =>
+    simp only [SourceCoreCompatibleCatalog.Catalog.project] at projected
+    split at projected
+    · obtain ⟨elementType, elementEq, rest⟩ := CompatibleEncoding.bind_ok projected
+      cases found : catalog.identity? (.mapping (.constructor (.builtin .word)) right) with
+      | none => simp [found] at rest
+      | some identity =>
+        simp only [found, pure, Except.pure, Except.ok.injEq] at rest
+        subst rest
+        exact .cell (.product .word (.product (second elementEq) (identity_wellFormed found)))
+    · split at projected
+      · cases projected; exact identity_wellFormed (by assumption)
+      · cases projected
+  | «variable» variableId | «parameter» parameterId | proxy inner _ | error =>
     simp only [SourceCoreCompatibleCatalog.Catalog.project] at projected
     split at projected
     · cases projected; exact identity_wellFormed (by assumption)
