@@ -3915,6 +3915,7 @@ private theorem inference_occurrenceBoundExtends :
         Node.references, Node.id, Function.comp_def,
         recordExpression_fst, recordSelectedCall_fst, recordSelectedCallResult_fst, recordIndirectCall_fst]
       all_goals occurrence_split_state_pairs
+      all_goals try (obtain ⟨argumentsEq, _⟩ := arrayLengthArgument_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
       all_goals occurrence_split_conjunctions
       all_goals occurrence_singleton_inputs
       all_goals occurrence_state_facts [freshPair_graph]
@@ -5294,6 +5295,17 @@ private theorem inference_anchoredNodePrefixExtends :
                                         exact throughArguments.trans
                                           (recordBuiltinFunctionCall_anchoredNodePrefixExtends success)
                                     simp only [typedefEq] at success
+                                    cases lengthEq : lengthCall namespacePath name
+                                    case true =>
+                                      simp only [lengthEq, if_true] at success
+                                      cases argumentResult : arrayLengthArgument arguments
+                                          argumentState with
+                                      | error error => simp [argumentResult, bind, Except.bind] at success
+                                      | ok array =>
+                                        simp only [argumentResult, bind, Except.bind] at success
+                                        exact throughArguments.trans
+                                          (recordExpressionWithExpected_anchoredNodePrefixExtends success)
+                                    simp only [lengthEq, Bool.false_eq_true, if_false] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>

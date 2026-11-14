@@ -1464,6 +1464,28 @@ private def testNewArray : IO Unit := do
       | .unsupportedExpression _ => false
       | _ => true
 
+/-- `Length.length(a)` on a memory array is its length, a `uint256`, and on
+another type it is rejected. -/
+private def testArrayLength : IO Unit := do
+  let functions ← check "array length" (String.intercalate "\n" [
+    "function size(n: uint256) returns (uint256) {",
+    "  let m: uint256[] = new uint256[](n);",
+    "  return Length.length(m);",
+    "}"
+  ])
+  let function ← match functions with
+    | [function] => pure function
+    | _ => throw (IO.userError "array length fixture lost its checked function")
+  let lengths := function.typedBody.nodes.filterMap fun
+    | .expression { form := .arrayLength _, type, .. } => some type
+    | _ => none
+  let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
+  assertTrue (decide (lengths = [uint256]))
+    s!"Length.length did not type an array's length as uint256: {reprStr lengths}"
+  expectInferenceError "Length.length of a uint256"
+    "function bad(n: uint256) returns (uint256) { return Length.length(n); }" fun error =>
+      error == .operatorNotSupported "Length" uint256
+
 /-- Inference rejects the slices until row 4 gives them a meaning. -/
 private def testSliceRejected : IO Unit := do
   expectInferenceError "array slice"
@@ -1479,6 +1501,7 @@ def testSourcePhase7Inference : IO Unit := do
   testLoopsAndControl
   testNonterminalMatch
   testNewArray
+  testArrayLength
   testSliceRejected
   IO.println "phase-7 source inference GREEN"
 

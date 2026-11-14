@@ -135,7 +135,7 @@ def assignmentExpected (operator : Syntax.ValueAssignOp) (state : State) (type :
 
 /-- The actual dispatch tests selecting an indirect callee after its arguments:
 a qualified name that no source namespace has is indirect unless it is one of
-the `Typedef` compiler functions. -/
+the `Typedef` compiler functions or `Length.length`. -/
 def IndirectCalleeAt (context : SourceInference.Context) (callee : Syntax.Expr)
     (state : State) : Prop :=
   match calleeQualifiedIdentifier? callee with
@@ -143,7 +143,8 @@ def IndirectCalleeAt (context : SourceInference.Context) (callee : Syntax.Expr)
       state.lookupBinder? namespacePath.head! ≠ none ∨
         (state.lookupBinder? namespacePath.head! = none ∧
           qualifiedFunctionsNamed context namespacePath name = .ok none ∧
-          typedefCall? namespacePath name = none)
+          typedefCall? namespacePath name = none ∧
+          lengthCall namespacePath name = false)
   | none =>
       match calleeIdentifier? callee with
       | some name => state.lookupBinder? name ≠ none

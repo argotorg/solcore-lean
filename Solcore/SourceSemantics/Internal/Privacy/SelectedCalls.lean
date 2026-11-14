@@ -1655,6 +1655,24 @@ theorem inferExprFuel_call_private
                                 exact fun type typeMember => builtinPrivacy.1 _
                                   (argumentsPrivacy.2.2.2 row inArguments fresh type typeMember)
                             simp only [typedefEq] at success
+                            cases lengthEq : lengthCall namespacePath name
+                            case true =>
+                              simp only [lengthEq, if_true] at success
+                              cases argumentResult : arrayLengthArgument arguments argumentState with
+                              | error error => simp [argumentResult] at success
+                              | ok array =>
+                                simp only [argumentResult] at success
+                                have uint256Closed : (Ty.fixed FixedInteger.uint256).VariablesBelow 0 :=
+                                  Ty.variablesBelow_constructor _ _
+                                have recorded := recordExpressionWithExpected_private catalog
+                                  argumentsProperties.2.1 (uint256Closed.weaken (Nat.zero_le _))
+                                  expectedAtArguments (safe_closed _ _ uint256Closed)
+                                  expectedSafeAtArguments argumentsPrivacy.2.2.1 success
+                                refine ⟨prefixPrivacy.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+                                intro row member fresh
+                                exact new_requirements_trans argumentsPrivacy.2.2.2 recorded.2.2.2
+                                  recorded.1 row member fresh
+                            simp only [lengthEq, Bool.false_eq_true, if_false] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

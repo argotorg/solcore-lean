@@ -1004,6 +1004,17 @@ theorem inferExprFuel_call_fixes_protected
                                 exact recordBuiltinFunctionCall_fixes_protected
                                   argumentsPrivacy.2.1 expectedSafeAtArguments argumentsFixed success
                             simp only [typedefEq] at success
+                            cases lengthEq : lengthCall namespacePath name
+                            case true =>
+                              simp only [lengthEq, if_true] at success
+                              cases argumentResult : arrayLengthArgument arguments argumentState with
+                              | error error => simp [argumentResult] at success
+                              | ok array =>
+                                simp only [argumentResult] at success
+                                exact recordExpressionWithExpected_fixes_protected argumentsFixed
+                                  (safe_closed _ _ (Ty.variablesBelow_constructor 0 _))
+                                  expectedSafeAtArguments success
+                            simp only [lengthEq, Bool.false_eq_true, if_false] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

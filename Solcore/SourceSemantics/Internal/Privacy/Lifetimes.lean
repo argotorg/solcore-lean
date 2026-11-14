@@ -990,6 +990,15 @@ theorem call_arguments_suffix
       cases same
       have completed := lifetime.recordBuiltin properties.2.1 properties.2.2 expectedAfter argumentsSafe expectedSafe recorded
       exact completed.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
+  | arrayLength _ actualArguments _ recorded =>
+      have same := Except.ok.inj (actualArguments.symm.trans childAccepted)
+      cases same
+      have uint256Closed : (Ty.fixed FixedInteger.uint256).VariablesBelow 0 :=
+        Ty.variablesBelow_constructor _ _
+      have completed := lifetime.recordExpression catalog.catalog properties.2.1
+        (uint256Closed.weaken (Nat.zero_le _)) expectedAfter (safe_closed _ _ uint256Closed)
+        expectedSafe recorded
+      exact completed.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
   | @indirect inferredArguments argumentState calleeState inferredCallee application _ actualArguments _ calleeAccepted applicationAccepted recorded =>
       have same := Except.ok.inj (actualArguments.symm.trans childAccepted)
       cases same

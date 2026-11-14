@@ -382,6 +382,19 @@ inductive CallExpressionDispatchProvenanceFacts
         inferredArguments id expected argumentState = .ok result) :
       CallExpressionDispatchProvenanceFacts context source callee arguments id expected
         fuel allocated result
+  | arrayLength
+      {inferredArguments : List InferredExpression}
+      {argumentState : Frontend.SourceInference.State}
+      {array : InferredExpression}
+      (nonconstructor : Detail.constructorCalleeCandidates context allocated callee = .ok [])
+      (argumentsSuccess : Detail.inferExprsFuel fuel context arguments.elements
+        allocated = .ok (inferredArguments, argumentState))
+      (argument : Detail.arrayLengthArgument inferredArguments argumentState = .ok array)
+      (recording : Detail.recordExpressionWithExpected context source id
+        (.fixed .uint256) (.arrayLength array.id) [] expected argumentState =
+          .ok result) :
+      CallExpressionDispatchProvenanceFacts context source callee arguments id expected
+        fuel allocated result
   | indirect
       {inferredArguments : List InferredExpression}
       {argumentState calleeState : Frontend.SourceInference.State}
@@ -440,6 +453,7 @@ theorem inferExprFuel_success_call_dispatch_provenance_facts
               · assumption
               · assumption
             | apply CallExpressionDispatchProvenanceFacts.builtin <;> assumption
+            | apply CallExpressionDispatchProvenanceFacts.arrayLength <;> assumption
             | apply CallExpressionDispatchProvenanceFacts.selected
               · exact discovery
               · assumption

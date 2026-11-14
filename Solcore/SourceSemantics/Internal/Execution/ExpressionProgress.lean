@@ -305,6 +305,10 @@ theorem call_arguments_suffix_progress
   | builtin _ actualArguments recorded =>
       cases Except.ok.inj (actualArguments.symm.trans childAccepted)
       exact (recordBuiltinFunctionCall_inferenceProperties properties.2.1 properties.2.2 expectedAfter recorded).1
+  | arrayLength _ actualArguments _ recorded =>
+      cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+      exact (recordExpressionWithExpected_inferenceProperties properties.2.1
+        (Ty.variablesBelow_constructor _ _) expectedAfter recorded).1
   | @indirect inferredArguments argumentState calleeState inferredCallee application _ actualArguments _ calleeAccepted applicationAccepted recorded =>
       cases Except.ok.inj (actualArguments.symm.trans childAccepted)
       have calleeProperties := inferExprFuel_inferenceProperties properties.2.1

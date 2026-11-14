@@ -1318,6 +1318,46 @@ def typedefFunction (call : TypedefCall) (arguments : List InferredExpression)
   | some other => .error (.operatorNotSupported "Typedef" other)
   | none => .error (.operatorNotSupported "Typedef" state.fresh.1)
 
+/-- `Length.length`, the function of upstream's `Length` trait, which Lean has
+as a memory array's length rather than a trait: the qualified name of a
+compiler form, found only when no source namespace or local is named `Length`,
+as `Typedef`'s are. -/
+def lengthCall : List String → String → Bool
+  | ["Length"], "length" => true
+  | _, _ => false
+
+/-- The array of `Length.length(a)`: its one argument, once inference has made
+its type a memory array, as `typedefFunction` reads `Typedef.rep`'s argument.
+Another row of arguments, or a type still open, is rejected: the choice is made
+here and does not wait for later uses. -/
+def arrayLengthArgument (arguments : List InferredExpression) (state : State) :
+    Except Error InferredExpression :=
+  match arguments with
+  | [array] =>
+      match (state.resolve array.type).arrayElement? with
+      | some _ => .ok array
+      | none => .error (.operatorNotSupported "Length" (state.resolve array.type))
+  | arguments => .error (.operatorNotSupported "Length"
+      (state.resolve (Ty.productMany (arguments.map (·.type)))))
+
+/-- `Length.length(a)`'s argument row is its one array, whose type is a memory
+array once resolved. -/
+theorem arrayLengthArgument_ok {arguments : List InferredExpression} {state : State}
+    {array : InferredExpression}
+    (success : arrayLengthArgument arguments state = .ok array) :
+    arguments = [array] ∧ ∃ element, state.resolve array.type = Ty.array element := by
+  match arguments with
+  | [only] =>
+      unfold arrayLengthArgument at success
+      cases found : (state.resolve only.type).arrayElement? with
+      | none => simp [found] at success
+      | some element =>
+          simp only [found, Except.ok.injEq] at success
+          subst success
+          exact ⟨rfl, element, Ty.arrayElement?_eq_some found⟩
+  | [] => simp [arrayLengthArgument] at success
+  | _ :: _ :: _ => simp [arrayLengthArgument] at success
+
 /-- Result of checking every explicit case in source order. -/
 structure MatchCasesResult where
   cases : List TypedMatchCase
@@ -1906,12 +1946,18 @@ mutual
                                 function.spelling function arguments id expected
                                 state
                           | none =>
-                              let (calleeResult, state) ←
-                                inferExprFuel fuel context callee none state
-                              let result ← applyFunctionType context id
-                                calleeResult.type arguments expected state
-                              pure <| recordIndirectCall expression calleeResult
-                                arguments result
+                              if lengthCall namespacePath name then
+                                let array ← arrayLengthArgument arguments state
+                                recordExpressionWithExpected context expression id
+                                  (.fixed .uint256) (.arrayLength array.id) []
+                                  expected state
+                              else
+                                let (calleeResult, state) ←
+                                  inferExprFuel fuel context callee none state
+                                let result ← applyFunctionType context id
+                                  calleeResult.type arguments expected state
+                                pure <| recordIndirectCall expression calleeResult
+                                  arguments result
               | none =>
                   match calleeIdentifier? callee with
                   | some name =>

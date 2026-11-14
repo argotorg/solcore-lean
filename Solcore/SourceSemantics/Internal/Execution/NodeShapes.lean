@@ -152,6 +152,9 @@ theorem callArguments
   | builtin _ actualArguments recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     exact recordBuiltin recorded
+  | arrayLength _ actualArguments _ recorded =>
+    cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+    exact ActualExpressionNodeShapes.recordExpected recorded
   | @indirect inferredArguments argumentState calleeState inferredCallee application _ actualArguments _ calleeAccepted applicationAccepted recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     have after := recordIndirect source inferredCallee inferredArguments application

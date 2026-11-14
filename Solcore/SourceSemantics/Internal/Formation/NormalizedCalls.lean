@@ -223,6 +223,29 @@ theorem inferExprFuel_call_formation
                                   (arguments,argumentState) argumentsResult argumentContinuation argumentCapture
                                 exact recordBuiltinFunctionCall_normalized_formation formation argumentFormation.2 success
                             simp only [typedefEq] at success
+                            cases lengthEq : lengthCall namespacePath name
+                            case true =>
+                              simp only [lengthEq, if_true] at success
+                              cases argumentResult : arrayLengthArgument arguments argumentState with
+                              | error error => simp [argumentResult] at success
+                              | ok array =>
+                                simp only [argumentResult] at success
+                                have recording := recordExpressionWithExpected_inferenceProperties
+                                  argumentsProperties.2.1 (Ty.variablesBelow_constructor _ _)
+                                  expectedAtArguments success
+                                have argumentContinuation := continuation.trans recording.1.substitution_extends
+                                have argumentCapture : NoCaptureNodes outer argumentState.nodes := by
+                                  obtain ⟨_, fit, _, nodes⟩ := recordExpressionWithExpected_success_nodes success
+                                  rw [nodes, (withExpected_occurrenceState_eq fit).1] at capture
+                                  exact capture.of_prefix (List.prefix_append _ _)
+                                have argumentFormation := argumentsInduction allocatedReady allocatedNodes allocatedFormed formation
+                                  (arguments,argumentState) argumentsResult argumentContinuation argumentCapture
+                                have produced := recordExpressionWithExpected_normalized_formation
+                                  (type := Ty.fixed .uint256) formation.toFormationContext continuation
+                                  (TypeAdmissible.builtin formation.scope.binders (.fixed .uint256)) expectedFormed success
+                                exact ⟨produced.1, argumentFormation.2.of_new_rows (congrArg LexicalScope.binders
+                                  (localReadScope_recordExpressionWithExpected_lexicalScope success)) produced.2⟩
+                            simp only [lengthEq, Bool.false_eq_true, if_false] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

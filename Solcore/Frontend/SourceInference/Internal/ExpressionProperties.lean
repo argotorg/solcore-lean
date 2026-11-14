@@ -2943,6 +2943,19 @@ private theorem recordExpressionWithExpected_state_header
         (localSchemeInstantiationStart := localSchemeInstantiationStart)).trans
           (withExpected_state_header fittedResult)
 
+/-- Recording one expression keeps the declaration owner. -/
+theorem recordExpressionWithExpected_preserves_owner
+    {context : Context} {source : Syntax.Expr} {id : ExpressionId}
+    {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
+    {expected : Option Ty} {state : State}
+    {localSchemeInstantiationStart : Option Nat}
+    {result : InferredExpression × State}
+    (success : recordExpressionWithExpected context source id type form
+      requirements expected state localSchemeInstantiationStart = .ok result) :
+    result.2.owner = state.owner :=
+  congrArg (fun header : State.Header => header.owner)
+    (recordExpressionWithExpected_state_header success)
+
 private theorem recordExpressionWithExpected_lexicalScope
     {context : Context} {source : Syntax.Expr} {id : ExpressionId}
     {type : Ty} {form : ExpressionForm} {requirements : List RequirementId}
@@ -11877,6 +11890,22 @@ private theorem inferFuel_inferenceProperties_internal :
                                         exact ⟨prefixProgress.trans builtinProperties.1,
                                           builtinProperties.2⟩
                                     simp only [typedefEq] at success
+                                    cases lengthEq : lengthCall namespacePath name
+                                    case true =>
+                                      simp only [lengthEq, if_true] at success
+                                      cases argumentResult : arrayLengthArgument arguments
+                                          argumentState with
+                                      | error error => simp [argumentResult, bind, Except.bind] at success
+                                      | ok array =>
+                                        simp only [argumentResult, bind, Except.bind] at success
+                                        have recordedProperties :=
+                                          recordExpressionWithExpected_inferenceProperties
+                                            argumentsProperties.2.1
+                                            (Ty.variablesBelow_constructor _ _)
+                                            expectedAtArguments success
+                                        exact ⟨prefixProgress.trans recordedProperties.1,
+                                          recordedProperties.2⟩
+                                    simp only [lengthEq, Bool.false_eq_true, if_false] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>
@@ -14090,6 +14119,17 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                         exact (recordBuiltinFunctionCall_lexicalScope success).trans
                                           throughArguments
                                     simp only [typedefEq] at success
+                                    cases lengthEq : lengthCall namespacePath name
+                                    case true =>
+                                      simp only [lengthEq, if_true] at success
+                                      cases argumentResult : arrayLengthArgument arguments
+                                          argumentState with
+                                      | error error => simp [argumentResult, bind, Except.bind] at success
+                                      | ok array =>
+                                        simp only [argumentResult, bind, Except.bind] at success
+                                        exact (recordExpressionWithExpected_lexicalScope success).trans
+                                          throughArguments
+                                    simp only [lengthEq, Bool.false_eq_true, if_false] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>

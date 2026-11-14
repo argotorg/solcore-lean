@@ -2535,6 +2535,14 @@ private def testStageErrors : IO Unit := do
   | .error (.linking (.sourceCore { reason := .unsupportedType _, .. })) => pure ()
   | result => throw (IO.userError
       s!"new reached a Core representation or failed before linking: {reprStr result}")
+  let arrayLength := rawWorkspace "main.solc" [("main.solc",
+    "function size(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); return Length.length(m); }")]
+  match prepare arrayLength (Seed.named moduleId "size") generousLimits with
+  | .error (.linking (.sourceCore { reason := .unsupportedExpression .arrayLength, .. }))
+  | .error (.linking (.sourceCore { reason := .unsupportedExpression .newArray, .. }))
+  | .error (.linking (.sourceCore { reason := .unsupportedType _, .. })) => pure ()
+  | result => throw (IO.userError
+      s!"an array's length reached a Core representation or failed before linking: {reprStr result}")
   let recursive := rawWorkspace "main.solc" [("main.solc",
     "function loop(value: Word) returns (Word) { return loop(value); }")]
   match prepare recursive (Seed.named moduleId "loop") generousLimits with
