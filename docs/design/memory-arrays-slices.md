@@ -450,7 +450,11 @@ functions over words, as row 1's fixture ports did.
    - Lengths that exhaust EVM memory run out of gas there and allocate in Lean, whose Core does not
      meter gas.
 3. **No addresses.** `Typedef.rep` and `Typedef.abs` at an array type, `memory<…>` and
-   `DynArray<…>`, and std's allocation functions are rejected.
+   `DynArray<…>`, and std's allocation functions are rejected. So is an array used as an index, with
+   `operatorNotSupported "Typedef"`: upstream's read takes any `i: Typedef<word>` (`std.sol:3115`),
+   which `memory<t>` has (`std.sol:1229-1244`), so the pinned driver compiles `a[b]` with `b` an
+   array, whose read takes `b`'s address as the index
+   (`.upstream/lane-d-unit3-memory-arrays/probe/compile/index-array`).
 4. **`arraySlice<B>` is a type only.** A program cannot build or match a slice by hand, while
    upstream exports the constructor.
 5. **`T[]` only where the native pipeline has a meaning for it.** Storage and calldata arrays,
@@ -492,11 +496,16 @@ functions over words, as row 1's fixture ports did.
     `arrayElement?`, so an array whose element type is still open is accepted. Upstream's `Length`
     constraint waits for later uses to fix the type. As with the open `Typedef` call, deferring the
     choice to finalization could lift this, and nothing schedules it.
+15. **A read needs its array known where the read is.** `a[i]` on a base whose type is still open
+    there takes the mapping rule, as the Typing section says, so a base that later turns out to be a
+    memory array is rejected with a type mismatch. Upstream's `RValueIdxAccess` constraint waits for
+    later uses to fix the type. As with difference 14, deferring the choice to finalization could
+    lift this, and nothing schedules it.
 
-Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13, and 13 and 14 on
-2026-11-14. Differences 9 to 13 change only a diagnostic or the room of a resource limit, and 14
-only rejects some programs that upstream accepts. None of them changes what an accepted program
-means. Difference 1 follows decision 3.
+Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13, 13 and 14 on
+2026-11-14, and 15 on 2026-11-15. Differences 9 to 13 change only a diagnostic or the room of a
+resource limit, and 14 and 15 only reject some programs that upstream accepts. None of them changes
+what an accepted program means. Difference 1 follows decision 3.
 
 ## Steps
 
