@@ -2510,11 +2510,11 @@ private theorem inference_preserves_nextOccurrence :
     all_goals grind [State.fresh, unify_occurrenceState_eq,
       unify_success_nextOccurrence,
       bindLambdaParameters_occurrenceState_eq]
-  case case67 =>
+  case case68 =>
     simp only [PreservesNextOccurrence, StrictlyAdvancesNextOccurrence] at *
     intros
     simp_all only [inferPlaceFuel]
-  case case70 =>
+  case case71 =>
     intros fuel context target operator value state placeInduction
       valueInduction
     have valueInductionWeak := fun target state =>
@@ -3541,7 +3541,7 @@ private theorem inference_occurrenceBoundExtends :
         → NodeGraphProgress.trans, → NodeIdsPresent.transport,
         NodeIdsPresent.append, NodeIdsPresent.cons, NodeIdsPresent.nil]
 
-  case case70 =>
+  case case71 =>
     intros fuel context target operator value state placeInduction
       valueInduction
     unfold PreservesOccurrenceBound at *
@@ -3644,7 +3644,7 @@ private theorem inference_occurrenceBoundExtends :
         → NodeGraphProgress.trans, → NodeIdsPresent.transport,
         NodeIdsPresent.append, NodeIdsPresent.cons, NodeIdsPresent.nil]
 
-  case case67 =>
+  case case68 =>
     unfold PreservesOccurrenceBound at *
     intros
     simp_all only [inferPlaceFuel]
@@ -5454,7 +5454,7 @@ private theorem inference_anchoredNodePrefixExtends :
                     simpa only [freshResult] using success)
                 exact allocationExtends.trans
                   (freshExtends.trans constructorExtends)
-  case case70 =>
+  case case71 =>
     intros fuel context target operator value state placeInduction
       valueInduction
     unfold PreservesAnchoredNodePrefix at *
@@ -5475,7 +5475,7 @@ private theorem inference_anchoredNodePrefixExtends :
       unify_anchoredNodePrefixExtends (by assumption)
     all_goals simp_all [Prod.eta]
     all_goals grind [AnchoredNodePrefixExtends.trans]
-  case case67 =>
+  case case68 =>
     unfold PreservesAnchoredNodePrefix at *
     intros
     simp_all only [inferPlaceFuel]

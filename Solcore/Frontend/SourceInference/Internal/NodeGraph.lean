@@ -114,7 +114,7 @@ private theorem inference_stable :
       Stable (fun budget => inferExprsFuel budget context expressions state) fuel)
     (motive11 := fun fuel context scrutineeType expectedReturn outerScope cases state =>
       Stable (fun budget => inferMatchCasesFuel budget context scrutineeType expectedReturn outerScope cases state) fuel)
-  case case23 =>
+  case case24 =>
     intro fuel context source id instantiation arguments expected state arity children
     unfold Stable at *
     intro extra result accepted
@@ -124,7 +124,7 @@ private theorem inference_stable :
     repeat' first | split at accepted
     all_goals try contradiction
     all_goals grind
-  case case44 =>
+  case case45 =>
     intro context statement expectedReturn state fuel id allocated allocation
       scrutinees arms form sources many casesInduction defaultInduction expressionsInduction
     have casesByType := fun type state =>
@@ -139,7 +139,7 @@ private theorem inference_stable :
     all_goals try cases accepted
     all_goals try simp_all
     all_goals grind
-  case case70 =>
+  case case71 =>
     intro fuel context target operator value state placeInduction valueInduction
     unfold Stable at *
     intro extra result accepted

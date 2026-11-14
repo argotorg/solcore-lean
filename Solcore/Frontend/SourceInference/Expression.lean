@@ -1633,12 +1633,10 @@ private def statementIsMatch (statement : Syntax.Statement) : Bool :=
   | .matchWith .. => true
   | _ => false
 
-/-- What inference calls the forms its last arm rejects: `new T[](n)` and the
-slices, which row 4 gives no meaning yet, and the parser's recovery nodes. One
-arm keeps the numbered cases of the proofs by functional induction on
-`inferExprFuel`. -/
+/-- What inference calls the forms its last arm rejects: the slices, which row 4
+gives no meaning yet, and the parser's recovery nodes. One arm keeps the
+numbered cases of the proofs by functional induction on `inferExprFuel`. -/
 def rejectedFormName : Syntax.ExprValue → String
-  | .newArray .. => "new"
   | .slice .. => "slice"
   | _ => "parser recovery"
 
@@ -1972,6 +1970,7 @@ mutual
           | _ => throw (.ambiguousConstructor [] name.value
               (candidates.map fun candidate => candidate.2.id))
       | .array .. => .error (.unsupportedExpression "array")
+      | .newArray .. => .error (.unsupportedExpression "new")
       | value => .error (.unsupportedExpression (rejectedFormName value))
 
   def inferExprsFuel (fuel : Nat) (context : Context) :

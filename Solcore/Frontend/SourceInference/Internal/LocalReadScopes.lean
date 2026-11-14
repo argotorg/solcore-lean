@@ -1530,7 +1530,7 @@ private theorem inferFuel_scope_progress_internal :
       PreservesScope MatchCasesResult.state state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
           cases state))
-  case case44 =>
+  case case45 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources notSingleton
       casesInduction bodyInduction expressionsInduction
@@ -1584,7 +1584,7 @@ private theorem inferFuel_scope_progress_internal :
       exact Fields.trans statementIdSubset
         (Fields.trans expressionsSubset (Fields.trans tupleSubset (hidden_start restoredWhole)))
     all_goals try solve | grind [Fields.trans, Fields.restore, Fields.refl, hidden_start, restored_start, restored_then, restored_saved_then, binders_self]
-  case case70 =>
+  case case71 =>
     intros fuel context target operator value state placeInduction valueInduction
     unfold PreservesScope at *
     intro result success
@@ -1626,7 +1626,7 @@ private theorem inferFuel_scope_progress_internal :
           (by change ∀ _ _, (.constructor _ _ : ExpressionForm) = _ → _; intro _ _ impossible; cases impossible))
       | skip
     all_goals try solve | grind [Fields.trans, Fields.restore, Fields.refl, hidden_start, restored_start, binders_self]
-  case case67 =>
+  case case68 =>
     unfold PreservesScope at *
     intros
     simp_all only [inferPlaceFuel]

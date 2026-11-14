@@ -579,7 +579,7 @@ private theorem inferFuel_origins_progress_internal :
             (here.child (.expression_field_constructor original form allocation discovery fresh accepted))
           exact (allocateExpressionId_success_origins_progress allocation).trans
             ((freshDataConstructorInstantiation_success_origins_progress fresh).trans childProgress)
-  case case34 =>
+  case case35 =>
     intro context statement expected state fuel id allocated allocation name initializer form ih
     intro result accepted here
     have parentAccepted := here.accepted
@@ -598,7 +598,7 @@ private theorem inferFuel_origins_progress_internal :
     exact ih _ (by simpa only [allocationState, sameInitializer, sameExpected] using receipt.child) (by
       simpa only [allocationState, sameInitializer, sameExpected] using
         here.child (statement_initializer_child receipt accepted))
-  case case35 =>
+  case case36 =>
     intro context statement expected state fuel id allocated allocation name syntaxType initializer form ih
     intro result accepted here
     have parentAccepted := here.accepted
@@ -618,7 +618,7 @@ private theorem inferFuel_origins_progress_internal :
     exact ih type _ (by simpa only [allocationState, sameInitializer, sameExpected] using receipt.child) (by
       simpa only [allocationState, sameInitializer, sameExpected] using
         here.child (statement_initializer_child receipt accepted))
-  case case45 =>
+  case case46 =>
     intro context statement expected initial fuel id allocated allocation headerSpan initializers condition post body form initIH condIH bodyIH postIH
     intro result accepted here
     have parentAccepted := here.accepted
@@ -656,7 +656,7 @@ private theorem inferFuel_origins_progress_internal :
                 inferForItemsFuel_events postRun (by first | assumption | actual_descend here)⟩
             · intro base wf direct calls
               exact (history.calls wf direct calls).statement _
-  case case43 =>
+  case case44 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources source single
       casesInduction bodyInduction expressionInduction
@@ -710,7 +710,7 @@ private theorem inferFuel_origins_progress_internal :
           (by change LocalReadEvents.Nonlocal (.constructor _ _); intro _ _ impossible; cases impossible))
       | skip
     all_goals grind [RelativeReadProgressFields.trans]
-  case case44 =>
+  case case45 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources notSingleton
       casesInduction bodyInduction expressionsInduction
@@ -763,7 +763,7 @@ private theorem inferFuel_origins_progress_internal :
           (by change LocalReadEvents.Nonlocal (.constructor _ _); intro _ _ impossible; cases impossible))
       | skip
     all_goals grind [RelativeReadProgressFields.trans]
-  case case70 =>
+  case case71 =>
     intro fuel context target operator value initial placeInduction valueInduction
     intro result accepted here
     rcases result with ⟨assignment, inferred, final⟩
@@ -780,7 +780,7 @@ private theorem inferFuel_origins_progress_internal :
          cases fitting
          exact RelativeReadProgress.refl _)
     exact placeProgress.trans (fittingProgress.trans valueProgress)
-  case case67 =>
+  case case68 =>
     intro context target state fuel inner form ih
     intro result accepted here
     have child : inferPlaceFuel fuel context inner state = .ok result := by

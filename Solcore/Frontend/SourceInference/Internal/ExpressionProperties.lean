@@ -10518,6 +10518,8 @@ private theorem inferFuel_inferenceProperties_internal :
     simp_all [InferExprFuelInferenceProperties, inferExprFuel]
   case case22 =>
     simp_all [InferExprFuelInferenceProperties, inferExprFuel]
+  case case23 =>
+    simp_all [InferExprFuelInferenceProperties, inferExprFuel]
   case case17 =>
     intros context expression expected initial fuel id allocated allocationEq
       dot name arguments expressionEq constructorInduction
@@ -10635,7 +10637,7 @@ private theorem inferFuel_inferenceProperties_internal :
                 exact ⟨allocationProperties.1.trans
                     (freshProperties.1.trans constructorProperties.1),
                   constructorProperties.2⟩
-  case case23 =>
+  case case24 =>
     intros fuel context source id instantiation arguments expected initial
       arityEq argumentsInduction
     unfold InferConstructorApplicationFuelInferenceProperties
@@ -10730,10 +10732,10 @@ private theorem inferFuel_inferenceProperties_internal :
                     expectedAtArguments success
                 exact ⟨throughArguments.trans recordedProperties.1,
                   recordedProperties.2⟩
-  case case24 =>
+  case case25 =>
     simp_all [InferConstructorApplicationFuelInferenceProperties,
       inferConstructorApplicationFuel, bind, Except.bind]
-  case case25 =>
+  case case26 =>
     intros fuel context initial
     unfold InferConstructorArgumentsFuelInferenceProperties
     intro ready _ _ _ result success
@@ -10741,7 +10743,7 @@ private theorem inferFuel_inferenceProperties_internal :
     injection success with resultEq
     subst result
     exact ⟨State.InferenceProgress.refl ready.solved, ready, by simp⟩
-  case case26 =>
+  case case27 =>
     intros fuel context source sources expected expectedTypes initial
       sourceInduction tailInduction
     unfold InferConstructorArgumentsFuelInferenceProperties
@@ -10785,12 +10787,12 @@ private theorem inferFuel_inferenceProperties_internal :
             rcases List.mem_cons.mp member with rfl | tailMember
             · exact sourceProperties.2.2.weaken tailProperties.1.next_le
             · exact tailProperties.2.2 expression tailMember
-  case case27 =>
+  case case28 =>
     simp_all [InferConstructorArgumentsFuelInferenceProperties,
       inferConstructorArgumentsFuel]
-  case case28 =>
-    simp [InferStatementsFuelInferenceProperties, inferStatementsFuel]
   case case29 =>
+    simp [InferStatementsFuelInferenceProperties, inferStatementsFuel]
+  case case30 =>
     intros context expectedReturn initial fuel
     unfold InferStatementsFuelInferenceProperties
     intro ready _ _ _ result success
@@ -10799,7 +10801,7 @@ private theorem inferFuel_inferenceProperties_internal :
     subst result
     exact ⟨State.InferenceProgress.refl ready.solved, ready,
       Ty.variablesBelow_constructor _ _⟩
-  case case30 =>
+  case case31 =>
     intros context expectedReturn initial fuel statement rest
       statementInduction tailInduction
     unfold InferStatementsFuelInferenceProperties
@@ -10841,12 +10843,12 @@ private theorem inferFuel_inferenceProperties_internal :
                   · exact headProperties.2.2.weaken
                       tailProperties.1.next_le
                   · exact tailProperties.2.2
-  case case31 =>
-    simp [InferStatementFuelInferenceProperties, inferStatementFuel]
   case case32 =>
+    simp [InferStatementFuelInferenceProperties, inferStatementFuel]
+  case case33 =>
     simp_all [InferStatementFuelInferenceProperties, inferStatementFuel,
       bind, Except.bind]
-  case case33 =>
+  case case34 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq name sourceType statementEq
     unfold InferStatementFuelInferenceProperties
@@ -10886,7 +10888,7 @@ private theorem inferFuel_inferenceProperties_internal :
                 bindingProperties.2.solved)),
           State.InferenceReady.recordNode _ bindingProperties.2,
           Ty.variablesBelow_constructor _ _⟩
-  case case34 =>
+  case case35 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq name initializer statementEq initializerInduction
     unfold InferStatementFuelInferenceProperties
@@ -10933,7 +10935,7 @@ private theorem inferFuel_inferenceProperties_internal :
                   bindingProperties.2.solved))),
           State.InferenceReady.recordNode _ bindingProperties.2,
           Ty.variablesBelow_constructor _ _⟩
-  case case35 =>
+  case case36 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq name sourceType initializer statementEq
       initializerInduction
@@ -10996,7 +10998,7 @@ private theorem inferFuel_inferenceProperties_internal :
                       bindingProperties.2.solved))),
               State.InferenceReady.recordNode _ bindingProperties.2,
               Ty.variablesBelow_constructor _ _⟩
-  case case36 =>
+  case case37 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq statementEq
     unfold InferStatementFuelInferenceProperties
@@ -11027,7 +11029,7 @@ private theorem inferFuel_inferenceProperties_internal :
         refine ⟨throughUnify.trans
             (State.InferenceProgress.recordNode _ _ unifiedReady.solved),
           State.InferenceReady.recordNode _ unifiedReady, resultTypeBelow⟩
-  case case37 =>
+  case case38 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq value statementEq valueInduction
     unfold InferStatementFuelInferenceProperties
@@ -11066,7 +11068,7 @@ private theorem inferFuel_inferenceProperties_internal :
               valueProperties.2.1.solved),
           State.InferenceReady.recordNode _ valueProperties.2.1,
           resultTypeBelow⟩
-  case case38 =>
+  case case39 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq expression trailingSemicolon statementEq
       expressionInduction
@@ -11098,7 +11100,7 @@ private theorem inferFuel_inferenceProperties_internal :
         split
         · exact Ty.variablesBelow_constructor _ _
         · exact expressionProperties.2.2
-  case case39 =>
+  case case40 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq condition thenBody elseBody statementEq
       conditionInduction thenInduction elseInduction
@@ -11184,7 +11186,7 @@ private theorem inferFuel_inferenceProperties_internal :
                     split
                     · exact throughElse.resolve_variablesBelow returnBelow
                     · exact Ty.variablesBelow_constructor _ _
-  case case40 =>
+  case case41 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq body statementEq bodyInduction
     unfold InferStatementFuelInferenceProperties
@@ -11214,7 +11216,7 @@ private theorem inferFuel_inferenceProperties_internal :
                 restoredBody.2.solved)),
           State.InferenceReady.recordNode _ restoredBody.2,
           bodyProperties.2.2⟩
-  case case41 =>
+  case case42 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq target operator value statementEq assignmentInduction
     unfold InferStatementFuelInferenceProperties
@@ -11243,7 +11245,7 @@ private theorem inferFuel_inferenceProperties_internal :
                 assignmentProperties.2.1.solved)),
           State.InferenceReady.recordNode _ assignmentProperties.2.1,
           Ty.variablesBelow_constructor _ _⟩
-  case case42 =>
+  case case43 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq target operator statementEq placeInduction
     unfold InferStatementFuelInferenceProperties
@@ -11925,7 +11927,7 @@ private theorem inferFuel_inferenceProperties_internal :
                                               (functionsNamed_success_subset_catalog
                                                 functionsResult)
                                               attempt selectionResult resultEq
-  case case43 =>
+  case case44 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq scrutinees arms statementEq sources source sourcesEq
       casesInduction bodyInduction scrutineeInduction
@@ -12026,7 +12028,7 @@ private theorem inferFuel_inferenceProperties_internal :
                       split
                       · exact throughDefault.resolve_variablesBelow returnBelow
                       · exact Ty.variablesBelow_constructor _ _
-  case case44 =>
+  case case45 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq scrutinees arms statementEq sources notSingleton
       casesInduction bodyInduction expressionsInduction
@@ -12180,7 +12182,7 @@ private theorem inferFuel_inferenceProperties_internal :
                       split
                       · exact throughDefault.resolve_variablesBelow returnBelow
                       · exact Ty.variablesBelow_constructor _ _
-  case case45 =>
+  case case46 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq headerSpan initializer condition post body statementEq
       initializerInduction conditionInduction bodyInduction postInduction
@@ -12265,7 +12267,7 @@ private theorem inferFuel_inferenceProperties_internal :
                     restoredOuter.2.solved)),
               State.InferenceReady.recordNode _ restoredOuter.2,
               Ty.variablesBelow_constructor _ _⟩
-  case case46 =>
+  case case47 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq condition body statementEq conditionInduction bodyInduction
     unfold InferStatementFuelInferenceProperties
@@ -12322,12 +12324,12 @@ private theorem inferFuel_inferenceProperties_internal :
                 restoredBody.2.solved)),
           State.InferenceReady.recordNode _ restoredBody.2,
           Ty.variablesBelow_constructor _ _⟩
-  case case47 =>
-    simp_all [InferStatementFuelInferenceProperties, inferStatementFuel]
   case case48 =>
+    simp_all [InferStatementFuelInferenceProperties, inferStatementFuel]
+  case case49 =>
     simp_all [InferStatementFuelInferenceProperties, inferStatementFuel,
       bind, Except.bind]
-  case case49 =>
+  case case50 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq statementEq loopNonzero
     unfold InferStatementFuelInferenceProperties
@@ -12363,10 +12365,10 @@ private theorem inferFuel_inferenceProperties_internal :
     subst result
     exact ⟨allocationProperties.1.trans recordProgress, finalReady,
       Ty.variablesBelow_constructor _ _⟩
-  case case50 =>
+  case case51 =>
     simp_all [InferStatementFuelInferenceProperties, inferStatementFuel,
       bind, Except.bind]
-  case case51 =>
+  case case52 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq statementEq loopNonzero
     unfold InferStatementFuelInferenceProperties
@@ -12402,9 +12404,9 @@ private theorem inferFuel_inferenceProperties_internal :
     subst result
     exact ⟨allocationProperties.1.trans recordProgress, finalReady,
       Ty.variablesBelow_constructor _ _⟩
-  case case52 =>
-    simp_all [InferStatementFuelInferenceProperties, inferStatementFuel]
   case case53 =>
+    simp_all [InferStatementFuelInferenceProperties, inferStatementFuel]
+  case case54 =>
     intros fuel context initial
     unfold InferForItemsFuelInferenceProperties
     intro ready _ _ result success
@@ -12412,7 +12414,7 @@ private theorem inferFuel_inferenceProperties_internal :
     injection success with resultEq
     subst result
     exact ⟨State.InferenceProgress.refl ready.solved, ready⟩
-  case case54 =>
+  case case55 =>
     intros fuel context item items initial itemInduction tailInduction
     unfold InferForItemsFuelInferenceProperties
     intro ready validated canonical result success
@@ -12436,12 +12438,12 @@ private theorem inferFuel_inferenceProperties_internal :
               itemProperties.2 validated canonical tail tailResult
             exact ⟨itemProperties.1.trans tailProperties.1,
               tailProperties.2⟩
-  case case55 =>
-    simp [InferForItemFuelInferenceProperties, inferForItemFuel]
   case case56 =>
+    simp [InferForItemFuelInferenceProperties, inferForItemFuel]
+  case case57 =>
     simp_all [InferForItemFuelInferenceProperties, inferForItemFuel, bind,
       Except.bind]
-  case case57 =>
+  case case58 =>
     intros context item initial fuel name sourceType itemEq
     unfold InferForItemFuelInferenceProperties
     intro ready _ _ result success
@@ -12472,7 +12474,7 @@ private theorem inferFuel_inferenceProperties_internal :
         injection success with resultEq
         rw [← resultEq]
         exact bindingProperties
-  case case58 =>
+  case case59 =>
     intros context item initial fuel name initializer itemEq
       initializerInduction
     unfold InferForItemFuelInferenceProperties
@@ -12511,7 +12513,7 @@ private theorem inferFuel_inferenceProperties_internal :
         rw [← resultEq]
         exact ⟨initializerProperties.1.trans bindingProperties.1,
           bindingProperties.2⟩
-  case case59 =>
+  case case60 =>
     intros context item initial fuel name sourceType initializer itemEq
       initializerInduction
     unfold InferForItemFuelInferenceProperties
@@ -12566,7 +12568,7 @@ private theorem inferFuel_inferenceProperties_internal :
             rw [← resultEq]
             exact ⟨initializerProperties.1.trans bindingProperties.1,
               bindingProperties.2⟩
-  case case60 =>
+  case case61 =>
     intros context item initial fuel expression itemEq expressionInduction
     unfold InferForItemFuelInferenceProperties
     intro ready validated canonical result success
@@ -12584,7 +12586,7 @@ private theorem inferFuel_inferenceProperties_internal :
         have expressionProperties := expressionInduction ready validated
           canonical (by simp) (inferred, expressionState) expressionResult
         exact ⟨expressionProperties.1, expressionProperties.2.1⟩
-  case case61 =>
+  case case62 =>
     intros context item initial fuel target operator value itemEq
       assignmentInduction
     unfold InferForItemFuelInferenceProperties
@@ -12606,7 +12608,7 @@ private theorem inferFuel_inferenceProperties_internal :
           canonical (assignment, inferredValue, assignmentState)
           assignmentResult
         exact ⟨assignmentProperties.1, assignmentProperties.2.1⟩
-  case case62 =>
+  case case63 =>
     intros context item initial fuel target operator itemEq placeInduction
     unfold InferForItemFuelInferenceProperties
     intro ready validated canonical result success
@@ -12636,9 +12638,9 @@ private theorem inferFuel_inferenceProperties_internal :
             have unifiedReady := unify_preserves_inferenceReady
               placeProperties.2.1 placeProperties.2.2 targetBelow unifyResult
             exact ⟨placeProperties.1.trans unifyProgress, unifiedReady⟩
-  case case63 =>
-    simp [InferPlaceFuelInferenceProperties, inferPlaceFuel]
   case case64 =>
+    simp [InferPlaceFuelInferenceProperties, inferPlaceFuel]
+  case case65 =>
     intros context target initial fuel name targetEq binder lookupEq
       monomorphic
     unfold InferPlaceFuelInferenceProperties
@@ -12651,19 +12653,19 @@ private theorem inferFuel_inferenceProperties_internal :
       State.InferenceReady.lookupBinder?_body_variablesBelow ready lookupEq
     exact ⟨State.InferenceProgress.refl ready.solved, ready,
       ready.solved.variablesBelow_apply bodyBelow⟩
-  case case65 =>
-    simp_all [InferPlaceFuelInferenceProperties, inferPlaceFuel, bind,
-      Except.bind]
   case case66 =>
     simp_all [InferPlaceFuelInferenceProperties, inferPlaceFuel, bind,
       Except.bind]
   case case67 =>
+    simp_all [InferPlaceFuelInferenceProperties, inferPlaceFuel, bind,
+      Except.bind]
+  case case68 =>
     intros fuel context target initial inner targetEq induction
     unfold InferPlaceFuelInferenceProperties at *
     intro ready validated canonical result success
     apply induction ready validated canonical result
     simpa only [inferPlaceFuel, targetEq] using success
-  case case68 =>
+  case case69 =>
     intros context target initial fuel base brackets key targetEq
       baseInduction keyInduction
     unfold InferPlaceFuelInferenceProperties
@@ -12745,10 +12747,10 @@ private theorem inferFuel_inferenceProperties_internal :
                     (keyProperties.1.trans
                       (valueProperties.1.trans fromValueToKey)),
                   keyExpressionProperties.2.1, resolvedValueBelow⟩
-  case case69 =>
+  case case70 =>
     simp_all [InferPlaceFuelInferenceProperties, inferPlaceFuel, bind,
       Except.bind]
-  case case70 =>
+  case case71 =>
     intros fuel context target operator value initial placeInduction
       valueInduction
     unfold InferAssignedValueFuelInferenceProperties
@@ -12908,9 +12910,9 @@ private theorem inferFuel_inferenceProperties_internal :
       | uncheckedMultiply => exact finishNonEqual .uncheckedMultiply (valueInduction place) success
       | uncheckedDivide => exact finishNonEqual .uncheckedDivide (valueInduction place) success
       | uncheckedModulo => exact finishNonEqual .uncheckedModulo (valueInduction place) success
-  case case71 =>
-    simp [InferExprsFuelInferenceProperties, inferExprsFuel]
   case case72 =>
+    simp [InferExprsFuelInferenceProperties, inferExprsFuel]
+  case case73 =>
     intros context initial fuel
     unfold InferExprsFuelInferenceProperties
     intro ready _ _ result success
@@ -12918,7 +12920,7 @@ private theorem inferFuel_inferenceProperties_internal :
     injection success with resultEq
     subst result
     exact ⟨State.InferenceProgress.refl ready.solved, ready, by simp⟩
-  case case73 =>
+  case case74 =>
     intros context initial fuel expression rest expressionInduction
       tailInduction
     unfold InferExprsFuelInferenceProperties
@@ -12952,9 +12954,9 @@ private theorem inferFuel_inferenceProperties_internal :
             · exact expressionProperties.2.2.weaken
                 tailProperties.1.next_le
             · exact tailProperties.2.2 element tailMember
-  case case74 =>
+  case case75 =>
     simp [InferMatchCasesFuelInferenceProperties, inferMatchCasesFuel]
-  case case76 =>
+  case case77 =>
     intros context scrutineeType expectedReturn outerScope initial fuel arm rest
       bodyInduction tailInduction
     unfold InferMatchCasesFuelInferenceProperties
@@ -13005,7 +13007,7 @@ private theorem inferFuel_inferenceProperties_internal :
                   (by simp) tail tailResult
                 exact ⟨restoredProperties.1.trans tailProperties.1,
                   tailProperties.2⟩
-  case case75 =>
+  case case76 =>
     intros context scrutineeType expectedReturn outerScope initial fuel
     unfold InferMatchCasesFuelInferenceProperties
     intro ready _ _ _ _ scopeEq result success
@@ -14219,7 +14221,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                   ((freshDataConstructorInstantiation_preserves_lexicalScope
                     dataType constructor allocated).trans allocationScope)
   -- Assignment-value inference threads place and value inference.
-  case case70 =>
+  case case71 =>
     intros fuel context target operator value initial placeInduction
       valueInduction
     unfold PreservesLexicalScope at *
@@ -14323,7 +14325,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
       | uncheckedDivide => exact finishNonEqual .uncheckedDivide (valueInduction place) success
       | uncheckedModulo => exact finishNonEqual .uncheckedModulo (valueInduction place) success
   -- A grouped place delegates directly to its inner place.
-  case case67 =>
+  case case68 =>
     intros
     simp_all only [PreservesLexicalScope, inferPlaceFuel]
     exact fun _ _ => True.intro
@@ -14627,13 +14629,13 @@ private theorem inferFuel_advances_nextLocal_internal :
     all_goals try omega
     all_goals grind [State.fresh, unify_preserves_nextLocal]
   -- Generated case 67 is a grouped place and delegates directly.
-  case case67 =>
+  case case68 =>
     unfold AdvancesNextLocal at *
     intros
     simp_all only [inferPlaceFuel]
   -- Generated case 70 threads a place through optional operator unification
   -- and then through value inference.
-  case case70 =>
+  case case71 =>
     intros fuel context target operator value state placeInduction
       valueInduction
     unfold AdvancesNextLocal at *
@@ -15117,7 +15119,7 @@ private theorem inferStatementsFuel_preserves_header_internal :
       PreservesStateHeader MatchCasesResult.state state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
           cases state))
-  case case44 =>
+  case case45 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources notSingleton
       casesInduction bodyInduction expressionsInduction
@@ -15145,7 +15147,7 @@ private theorem inferStatementsFuel_preserves_header_internal :
       State.restoreLexicalScope_header, State.recordNode_header]
     all_goals try exact
       restored_pair_result_state_header bodyHeader (by assumption)
-  case case70 =>
+  case case71 =>
     intros fuel context target operator value state placeInduction valueInduction
     unfold PreservesStateHeader at *
     intro result success
@@ -15159,7 +15161,7 @@ private theorem inferStatementsFuel_preserves_header_internal :
       pair_except_property (valueInduction _ _) (by assumption)
     all_goals try have unifiedHeader := unify_state_header (by assumption)
     all_goals simp_all [Prod.eta]
-  case case67 =>
+  case case68 =>
     unfold PreservesStateHeader at *
     intros
     simp_all only [inferPlaceFuel]

@@ -479,7 +479,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 1c-ii-b | Syntax: the slices, with `a[]` rejected, as the bracket contents' other forms; inference rejects the slices | 18–22 files, +1,200–1,400/−250–300; measured at 21 files, +1,374/−283 | parser tests from `crates/uitest/tests/fixtures/parse/empty_index_rejected`, `crates/parser/tests/formatting.rs` and `crates/parser/src/parse/mod.rs` cases |
 | 2a-i | The array type: `T[]` resolves to a memory array once aliases are expanded, type resolution checks its element and rejects a mapping that holds an array, and type formation admits it; no value has an array type yet, and elaboration rejects every array type | 25–35 files, +300–500/−20–60; measured at 27 files, +458/−75 | none |
 | 2a-ii | The store: an array object, a reference to it and their typing, with the typing's laws; no expression makes one yet | 20–40 files, +400–800/−50–150; measured at 17 files, +214/−18 | none |
-| 2b-i | `new T[](n)` and `0x41`: inference, evaluation and its fault, the sized and staged copies and preservation | 35–60 files, +900–1,500/−100–300 | none |
+| 2b-i | `new T[](n)` and `0x41`: inference, evaluation and its fault, the sized and staged copies and preservation. Two commits: 2b-i-a, `new`'s own arm in inference, which still rejects it and renumbers the cases of the proofs by functional induction on `inferExprFuel`, then 2b-i-b, the rest | 35–60 files, +900–1,500/−100–300; 2b-i-a measured at 15 files, +293/−286 | none |
 | 2b-ii | The lengths: `a.length`, `a.length()` and `Length.length(a)` | 30–50 files, +600–1,000/−100–200 | none |
 | 2b-iii | The lowering: the Core cells of `new` and the lengths | 15–30 files, +400–800/−50–150 | newLen(n), oversized(n) |
 | 3 | Element reads and `0x32` | 35–55 files, +800–1,200/−200–350, between 3c and 3a | defaultZero(n, i), nestedEmpty(n) |
@@ -499,15 +499,15 @@ split it again as 1b did, into 1c-ii-a and 1c-ii-b.
 
 Step 5 waits for decision 3.
 
-Step 2 was one row of 60–72 files, +1,300–1,700/−300–450, until its first measure: about 110 to
-150 files, +3,000 to 4,500/−400 to 800. `new` and the lengths each take a typed form with its
+Step 2 was one row of 60–72 files, +1,300–1,700/−300–450, until its first measure: about 110 to 150
+files, +3,000 to 4,500/−400 to 800. `new` and the lengths each take a typed form with its
 evaluation, fault, sized and staged rules, as row 1's 3c did, and every induction over types takes
 the array's case. So it split into 2a, the type and the store, then 2b, `new`, the lengths and the
-lowering, and each again by what one part prepares for the next. `new` takes its own arm in
-inference only where the proofs by functional induction on `inferExprFuel` keep their numbered
-cases, or after a commit that only renumbers them and still rejects `new`. Each later step stops on
-the same size condition, and on any change to a statement named in the
-[open decisions](#open-decisions) beyond the ones listed there.
+lowering, and each again by what one part prepares for the next. `new` took its own arm in inference
+in a commit that only renumbers the cases of the proofs by functional induction on `inferExprFuel`
+and still rejects `new`: 285 lines in 14 files, as 1b-ii measured. Each later step stops on the same
+size condition, and on any change to a statement named in the [open decisions](#open-decisions)
+beyond the ones listed there.
 
 ## Generators, corpora and the smoke
 

@@ -1330,7 +1330,7 @@ private theorem inferFuel_origins_progress_internal :
       PreservesOrigins MatchCasesResult.state state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
           cases state))
-  case case34 =>
+  case case35 =>
     intro context statement expected state fuel id allocated allocation name initializer form ih
     intro result accepted
     obtain ⟨receipt⟩ := LocalLetRequirementTiming.of_accepted form accepted
@@ -1346,7 +1346,7 @@ private theorem inferFuel_origins_progress_internal :
     have allocationState : state.allocateStatementId.2 = allocated := congrArg Prod.snd allocation
     rw [allocationState]
     exact ih _ (by simpa only [allocationState, sameInitializer, sameExpected] using receipt.child)
-  case case35 =>
+  case case36 =>
     intro context statement expected state fuel id allocated allocation name syntaxType initializer form ih
     intro result accepted
     obtain ⟨receipt⟩ := LocalLetRequirementTiming.of_initialized_accepted form accepted
@@ -1363,7 +1363,7 @@ private theorem inferFuel_origins_progress_internal :
     have allocationState : state.allocateStatementId.2 = allocated := congrArg Prod.snd allocation
     rw [allocationState]
     exact ih type _ (by simpa only [allocationState, sameInitializer, sameExpected] using receipt.child)
-  case case45 =>
+  case case46 =>
     intro context statement expected initial fuel id allocated allocation headerSpan initializers condition post body form initIH condIH bodyIH postIH
     intro result accepted
     have original := accepted
@@ -1404,7 +1404,7 @@ private theorem inferFuel_origins_progress_internal :
             apply (history.events wf direct reads events).statement
             exact ⟨inferForItemsFuel_events initRun readyAlloc,
               inferForItemsFuel_events postRun readyBody⟩
-  case case44 =>
+  case case45 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources notSingleton
       casesInduction bodyInduction expressionsInduction
@@ -1452,7 +1452,7 @@ private theorem inferFuel_origins_progress_internal :
           (by change LocalReadEvents.Nonlocal (.constructor _ _); intro _ _ impossible; cases impossible))
       | skip
     all_goals grind [ProgressFields.trans]
-  case case70 =>
+  case case71 =>
     intros fuel context target operator value state placeInduction valueInduction
     unfold PreservesOrigins at *
     intro result success
@@ -1494,7 +1494,7 @@ private theorem inferFuel_origins_progress_internal :
           (by change LocalReadEvents.Nonlocal (.constructor _ _); intro _ _ impossible; cases impossible))
       | skip
     all_goals grind [ProgressFields.trans]
-  case case67 =>
+  case case68 =>
     unfold PreservesOrigins at *
     intros
     simp_all only [inferPlaceFuel]
