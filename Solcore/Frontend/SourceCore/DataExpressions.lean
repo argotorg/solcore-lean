@@ -84,6 +84,22 @@ def newArray (layout : Core.OrderedMapping.Layout) (default length : Core.Expr) 
 def arrayLength (base : Core.Expr) : Core.Expr :=
   Core.LanguageResult.bind .word base (Core.LanguageResult.success (.first (.loadCell (.var 0))))
 
+/-- `a[i]`: the array's, then the index's effects, then `Panic(0x32)` from the array's length
+on, else the element present at the index, or the array's default element. -/
+def arrayIndex (layout : Core.OrderedMapping.Layout) (comparison base index : Core.Expr) :
+    Core.Expr :=
+  Core.LanguageResult.bind layout.valueType base
+    (Core.LanguageResult.bind layout.valueType (index.weakenAt 0)
+      (.ifE (Core.Expr.wordLt (.var 0) (.first (.loadCell (.var 1))))
+        (Core.LanguageResult.bind layout.valueType
+          (Core.OrderedMapping.lookup layout (comparison.weakenAt 0 |>.weakenAt 0)
+            (.second (.second (.loadCell (.var 1)))) (.var 0))
+          (.caseE (.var 0)
+            (Core.LanguageResult.success (.first (.second (.loadCell (.var 3)))))
+            (Core.LanguageResult.success (.var 0))))
+        (Core.LanguageResult.failure layout.valueType
+          (.word (SourceCorePanics.reason SourceCorePanics.outOfBounds)))))
+
 private def project (checked : Checked) (node : ExpressionNode) (type : TypeSystem.Ty) : Except Error Core.Ty :=
   (checked.project type).mapError (fun _ => .unsupportedExpression node.id node.form) |>.map (·.type)
 

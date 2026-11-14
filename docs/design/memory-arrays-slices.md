@@ -415,6 +415,11 @@ wait for the native pipeline's contracts and ABI.
   an application's runtime head, so that a type and its runtime type project alike. A nested
   element's default is one fresh empty array per `new`. The strict representation's catalog and
   direct linking still reject `T[]`.
+- As built in step 3c, that data lowering lowers `a[i]` on a memory array: it evaluates the array,
+  then the index, panics with `0x32` from the cell's length on, and otherwise looks the index up in
+  the cell's mapping, an absent element reading as the cell's default element
+  (`SourceCoreDataExpressions.arrayIndex`). The index's Core value is its word, so a negative signed
+  index panics, as upstream's `Typedef.rep(j)` gives it a word from 2^255 on.
 - A slice is a Core product of its base, its start and its length.
 - Arrays stay outside `StaticProfile` and the proved subset, as row 1's conversions did. The
   meaning proofs and their statements do not change.
@@ -514,7 +519,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 2b-iii | The lowering: the Core cells of `new` and the lengths | 15–30 files, +400–800/−50–150; measured at 10 files, +175/−6 | newLen(n), oversized(n) |
 | 3a | Element reads: the typed form of `a[i]` on a memory array with its static rule, evaluation, faults with `0x32`, sized copies, stage and preservation, which no source produces yet | 28–32 files, +400–550/−5–15; measured at 27 files, +352/−10 | none |
 | 3b | Element reads: inference's typing of `a[i]` on a memory array, whose index waits for its type until finalization checks that it is `word` or one of the twelve types | 26–32 files, +800–1,000/−100–180; measured at 28 files, +1,156/−57 | none |
-| 3c | Element reads: the lowering, with `0x32` | 4–6 files, +120–200 | defaultZero(n, i), nestedEmpty(n) |
+| 3c | Element reads: the lowering, with `0x32` | 4–6 files, +120–200; measured at 4 files, +73/−13 | defaultZero(n, i), nestedEmpty(n) |
 | 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
 | 5 | Element writes and compound assignments, with the place checked before the right side | 55–72 files, +1,200–1,700/−300–450 | setGet(n, i, v), fillAndSum(n), compound(v), nestedReplace(n, v), alias(v); ret(n), sum(xs), echo(xs), grid(n) adapted |
 | 6 | Slices and `toArray(s)` | 45–65 files, +1,000–1,400/−200–400 | array-slice's 12 functions; slices(xs) adapted |

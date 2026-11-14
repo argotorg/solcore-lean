@@ -5431,8 +5431,9 @@ def runUpstreamFixtures : IO Unit := do
     session ← panics session (← key name) arguments SourceCorePanics.divisionByZero s!"{name} on {reprStr arguments}"
   IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no contract storage, with afterBlock, ltSigned, runtimePatterns, narrowAmount, wordShift, mulNeg, divSigned, explicitWord and negI8 … negI256 as upstream wrote them with uint256(w), Typedef.abs and Typedef.rep, so none stays adapted, and basic's bnoteq, give the fixtures' values and panic codes"
 
-/-- Row 4's step 2b-iii: upstream's mem-array fixture's `newLen` and `oversized`, as upstream
-wrote them, and a nested array and the other two spellings of a length. -/
+/-- Row 4's steps 2b-iii and 3c: upstream's mem-array fixture's `newLen`, `oversized`,
+`defaultZero` and `nestedEmpty`, as upstream wrote them, a nested array with the other two
+spellings of a length, and a read at a negative `int8` index. -/
 private def arrayFixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function newLen(n: uint256) returns (uint256) {",
   "  let m: uint256[] = new uint256[](n);",
@@ -5445,13 +5446,33 @@ private def arrayFixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function nested(n: uint256) returns (uint256) {",
   "  let grid = new int8[][](n);",
   "  return grid.length + new uint8[](3).length();",
+  "}",
+  "function defaultZero(n: uint256, i: uint256) returns (uint256) {",
+  "  let m: uint256[] = new uint256[](n);",
+  "  return m[i];",
+  "}",
+  "function nestedEmpty(n: uint256) returns (uint256) {",
+  "  let rows: uint256[][] = new uint256[][](n);",
+  "  return Length.length(rows[n - 1]);",
+  "}",
+  "function signedIndex(n: uint256) returns (uint256) {",
+  "  let m: uint256[] = new uint256[](n);",
+  "  let k: int8 = -1;",
+  "  return m[k];",
   "}"]
 
-/-- The fixture's `#[(5) -> 5]` and `#[(2^251) -> Panic(0x41)]`: a new array keeps its length,
-and a length from 2^251 − 1 on panics with `0x41` while one below it allocates nothing more. -/
+/-- The source semantics and the lowering reject the same first length with `Panic(0x41)`. -/
+example : Solcore.SourceSemantics.Dynamic.newArrayLengthLimit =
+    SourceCoreDataExpressions.arrayLengthLimit := rfl
+
+/-- The fixture's `#[(5) -> 5]`, `#[(2^251) -> Panic(0x41)]`, `#[(4, 2) -> 0]` and `#[(3) -> 0]`:
+a new array keeps its length, a length from 2^251 − 1 on panics with `0x41` while one below it
+allocates nothing more, an element nothing wrote reads as zero, a row of `new T[][]` is an empty
+array, and a read from the length on, a negative `int8` index's word included, panics with
+`0x32`. -/
 def runUpstreamArrayFixtures : IO Unit := do
   let program ← get "array fixture check" (checkProgram arrayFixtureWorkspace)
-  let names := ["newLen", "oversized", "nested"]
+  let names := ["newLen", "oversized", "nested", "defaultZero", "nestedEmpty", "signedIndex"]
   let seeds ← names.mapM (seed program)
   let compiled ← get "array fixture compilation"
     (compile arrayFixtureWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
@@ -5459,17 +5480,22 @@ def runUpstreamArrayFixtures : IO Unit := do
     | some key => pure key
     | none => throw (IO.userError "array fixture root missing")
   let mut session ← boot (← compiled.open)
-  let cases : List (Nat × Nat × Nat) :=
-    [(0, 5, 5), (0, 0, 0), (1, 2 ^ 251 - 2, 2 ^ 251 - 2), (2, 4, 7)]
-  for (index, argument, expected) in cases do
-    let completed ← execute session (← key index) [word argument]
+  let cases : List (Nat × List Nat × Nat) :=
+    [(0, [5], 5), (0, [0], 0), (1, [2 ^ 251 - 2], 2 ^ 251 - 2), (2, [4], 7),
+      (3, [4, 2], 0), (3, [4, 3], 0), (4, [3], 0), (4, [1], 0)]
+  for (index, arguments, expected) in cases do
+    let completed ← execute session (← key index) (arguments.map word)
     require (completed.value == word expected)
-      s!"{names[index]!}({argument}) gave {reprStr completed.value}"
+      s!"{names[index]!}({arguments}) gave {reprStr completed.value}"
     session := completed.session
   for argument in [2 ^ 251, 2 ^ 251 - 1, modulus - 1] do
     session ← panics session (← key 1) [word argument] SourceCorePanics.allocation
       s!"oversized({argument})"
-  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen and oversized as upstream wrote them give the fixture's length and Panic(0x41) from 2^251 − 1 on, and a nested new with a.length and a.length() gives its lengths"
+  for arguments in [[4, 4], [0, 0], [4, modulus - 1]] do
+    session ← panics session (← key 3) (arguments.map word) SourceCorePanics.outOfBounds
+      s!"defaultZero({arguments})"
+  let _ ← panics session (← key 5) [word 4] SourceCorePanics.outOfBounds "signedIndex(4)"
+  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)

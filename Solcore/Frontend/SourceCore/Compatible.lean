@@ -807,13 +807,28 @@ def lowerWithReasons (fuel : Nat) (context : Context) (lowerChild : ExpressionLo
           | .cell (.product .word _) =>
               pure ⟨type, SourceCoreDataExpressions.arrayLength base.expression⟩
           | _ => throw (unsupported node)
+      | .arrayIndex base index =>
+          let base ← lowerChild fuel source scope base reasonAt
+          let (elementType, identity) ← match base.type with
+            | .cell (.product .word (.product elementType (.namedData identity))) =>
+                pure (elementType, identity)
+            | _ => throw (unsupported node)
+          SourceCoreBasic.ensureType site elementType type
+          let layout : Core.OrderedMapping.Layout := ⟨.word, elementType, identity⟩
+          let index ← lowerChild fuel source scope index reasonAt
+          SourceCoreBasic.ensureType site .word index.type
+          let comparison ← (SourceCoreCompatibleDataEquality.prepare fuel context.checked
+            (.constructor (.builtin .word))).mapError (fun _ => unsupported node)
+          pure ⟨type, SourceCoreDataExpressions.arrayIndex layout comparison.expression
+            base.expression index.expression⟩
       | _ => throw (unsupported node)
 
 def leafLowerer (context : Context) : ExpressionLowerer → ExpressionLowerer :=
   fun child fuel source scope id reasonAt => do
     let (node, type) ← readExpression context.checked source id
     match node.form with
-    | .constructor .. | .member .. | .proxy .. | .index .. | .newArray .. | .arrayLength .. =>
+    | .constructor .. | .member .. | .proxy .. | .index .. | .newArray .. | .arrayLength ..
+    | .arrayIndex .. =>
         lowerWithReasons fuel context child source scope id reasonAt
     | .tuple elements =>
         let children ← elements.mapM fun element => child fuel source scope element reasonAt
