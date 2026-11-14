@@ -1590,6 +1590,39 @@ theorem mappingComponents
   cases typed with
   | mapping entries_typed => exact ⟨rfl, rfl, entries_typed⟩
 
+/-- An element that a memory array's cell holds has the array's element type in
+a well-typed heap: the reference names a cell of `arrayObject T`, whose object
+holds `T`s. -/
+theorem arrayElement
+    {context : Context} {heap : Heap}
+    {element expected : Ty} {location : Location} {cell : Cell}
+    {elements : List Value} {index : Nat} {value : Value}
+    (reference : ValueHasType context heap (.arrayRef element location)
+      (TypeSystem.Ty.array expected))
+    (heap_typed : HeapWellTyped context heap)
+    (read : Heap.Reads heap location cell)
+    (stored : cell.value = some (.arrayObject element elements))
+    (element_at : elements[index]? = some value) :
+    ValueHasType context heap value expected := by
+  rcases reference.arrayRef_inv with
+    ⟨type_eq, typedCell, typed_read, cell_type⟩ | ⟨_, impossible, _⟩
+  · have expected_eq : expected = element := by
+      simpa [TypeSystem.Ty.array] using type_eq
+    subst expected_eq
+    have cell_eq := read.functional typed_read
+    subst cell_eq
+    have cell_value := (heap_typed _ read.member).value
+    rw [stored, cell_type] at cell_value
+    cases cell_value with
+    | some object_typed =>
+        rcases object_typed.arrayObject_inv with
+          ⟨_, elements_typed⟩ | ⟨_, impossible, _⟩
+        · have bound : index < elements.length :=
+            (List.getElem?_eq_some_iff.mp element_at).1
+          exact elements_typed.member element_at (by simp [bound])
+        · simp [TypeSystem.Ty.arrayObject] at impossible
+  · simp [TypeSystem.Ty.array] at impossible
+
 /-- Catalog validity rules out confusing a nominal constructor result with a
 staging wrapper, so constructor payload typing can be recovered exactly. -/
 theorem constructedPayloads
@@ -3364,6 +3397,18 @@ theorem preservesWith
               environment_agrees before_typed base_type base_evaluates with
             ⟨_, after_typed, extension⟩
           exact ⟨.fixed _ (uint256_word_canonical _), after_typed, extension⟩
+  | arrayIndex base_type index_type _ =>
+      cases evaluation with
+      | arrayIndex layout base_evaluates index_evaluates read stored element_at =>
+          rcases expression_preserves _ _ _ _ _ evidence_covers
+              environment_agrees before_typed base_type base_evaluates with
+            ⟨base_typed, middle_typed, base_extension⟩
+          rcases expression_preserves _ _ _ _ _ evidence_covers
+              (environment_agrees.mono base_extension) middle_typed index_type
+              index_evaluates with
+            ⟨_, after_typed, index_extension⟩
+          exact ⟨(base_typed.mono index_extension).arrayElement after_typed read stored
+              element_at, after_typed, base_extension.trans index_extension⟩
 
 end ExpressionFormEvaluates
 

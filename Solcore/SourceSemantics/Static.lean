@@ -645,6 +645,16 @@ mutual
           (TypeSystem.Ty.array element)) :
         ExpressionFormHasRawType source context (.arrayLength base) (.fixed .uint256)
           (.ordinary [])
+    /-- `a[i]` on a memory array has its element type, and takes an index of
+    `word` or one of the twelve types. -/
+    | arrayIndex
+        {context : Context} {base index : ExpressionId} {element indexType : TypeSystem.Ty}
+        (base_type : ExpressionHasType source context base
+          (TypeSystem.Ty.array element))
+        (index_type : ExpressionHasType source context index indexType)
+        (index_kind : ArrayIndexType indexType) :
+        ExpressionFormHasRawType source context (.arrayIndex base index) element
+          (.ordinary [])
 
   /-- Pointwise expression typing in source order. -/
   inductive ExpressionsHaveTypes (source : TypedSource) :
@@ -1286,6 +1296,8 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
     (fun allowed elementWellFormed _ lengthInduction =>
       .newArray allowed elementWellFormed lengthInduction)
     (fun _ baseInduction => .arrayLength baseInduction)
+    (fun _ _ kind baseInduction indexInduction =>
+      .arrayIndex baseInduction indexInduction kind)
     (fun _ => .nil _)
     (fun head tail headInduction tailInduction =>
       .cons headInduction tailInduction)

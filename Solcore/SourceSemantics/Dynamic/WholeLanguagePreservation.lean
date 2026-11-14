@@ -805,6 +805,19 @@ mutual
                 base_evaluates with
               ⟨_, after_typed, extension⟩
             exact ⟨.fixed _ (uint256_word_canonical _), after_typed, extension⟩
+    | .arrayIndex layout base_evaluates index_evaluates read stored element_at => by
+        cases typing with
+        | arrayIndex base_type index_type _ =>
+            rcases preserveExpressionRec program_well_formed runtime
+                evidence_covers environment_agrees before_typed base_type
+                base_evaluates with
+              ⟨base_typed, middle_typed, base_extension⟩
+            rcases preserveExpressionRec program_well_formed runtime
+                evidence_covers (environment_agrees.mono base_extension)
+                middle_typed index_type index_evaluates with
+              ⟨_, after_typed, index_extension⟩
+            exact ⟨(base_typed.mono index_extension).arrayElement after_typed read stored
+                element_at, after_typed, base_extension.trans index_extension⟩
     termination_by structural evaluation
 
   private theorem preserveExpressionsRec

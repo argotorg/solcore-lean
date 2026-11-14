@@ -1401,6 +1401,32 @@ theorem analyzeExpressionFormWith_sound
           obtain ⟨finalValid, baseStages⟩ :=
             expressionSound state base baseStage nextState valid analyzed
           exact ⟨finalValid, .arrayLength contains form baseStages⟩
+  | arrayIndex base index =>
+      simp only [analyzeExpressionFormWith, form] at success
+      cases baseResult : analyzeExpression state base with
+      | error problem =>
+          rw [baseResult] at success
+          cases success
+      | ok pair =>
+          rcases pair with ⟨baseStage, middleState⟩
+          rw [baseResult] at success
+          obtain ⟨middleValid, baseStages⟩ :=
+            expressionSound state base baseStage middleState valid baseResult
+          change (analyzeExpression middleState index >>= fun pair =>
+              .ok (Frontend.SourceStageAnalysis.Stage.deferred, pair.2)) =
+            .ok (stage, finalState) at success
+          cases indexResult : analyzeExpression middleState index with
+          | error problem =>
+              rw [indexResult] at success
+              cases success
+          | ok pair =>
+              rcases pair with ⟨indexStage, nextState⟩
+              rw [indexResult] at success
+              obtain ⟨rfl, rfl⟩ := success
+              obtain ⟨finalValid, indexStages⟩ :=
+                expressionSound middleState index indexStage nextState
+                  middleValid indexResult
+              exact ⟨finalValid, .arrayIndex contains form baseStages indexStages⟩
 
 theorem analyzeStatementFormWith_sound
     (source : TypedSource) (id : StatementId) (node : StatementNode)

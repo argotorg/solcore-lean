@@ -1610,6 +1610,52 @@ mutual
           before base reason after) :
         ExpressionFormFaults program context evidence source environment before
           (.arrayLength base) requirements coercions reason after
+    | arrayIndexBase
+        {context evidence source environment before after base index requirements
+          coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionFaults program context evidence source environment
+          before base reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.arrayIndex base index) requirements coercions reason after
+    | arrayIndexIndex
+        {context evidence source environment before middle after base index
+          requirements coercions baseValue reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base baseValue middle)
+        (fault : ExpressionFaults program context evidence source environment
+          middle index reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.arrayIndex base index) requirements coercions reason after
+    | arrayIndexType
+        {context evidence source environment before middle after base index
+          requirements coercions baseValue value actual}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base baseValue middle)
+        (index_evaluates : ExpressionEvaluates program context evidence source
+          environment middle index value after)
+        (not_word : ¬ WordValue value)
+        (actual_type : ValueRuntimeType value actual) :
+        ExpressionFormFaults program context evidence source environment before
+          (.arrayIndex base index) requirements coercions
+          (.typeMismatch .word actual) after
+    /-- `a[i]` from the array's length on panics with `0x32`, as std's bounds
+    check does. -/
+    | arrayIndexOutOfBounds
+        {context evidence source environment before middle after base index
+          requirements coercions element location position cell elements}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base (.arrayRef element location) middle)
+        (index_evaluates : ExpressionEvaluates program context evidence source
+          environment middle index (.word position) after)
+        (read : Heap.Reads after location cell)
+        (stored : cell.value = some (.arrayObject element elements))
+        (out_of_bounds : elements.length ≤ position.val) :
+        ExpressionFormFaults program context evidence source environment before
+          (.arrayIndex base index) requirements coercions (.panic 0x32) after
 
   /-- First fault in a left-to-right expression vector. -/
   inductive ExpressionsFault (program : Program) :

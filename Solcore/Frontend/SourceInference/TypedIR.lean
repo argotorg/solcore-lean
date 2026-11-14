@@ -368,6 +368,9 @@ inductive ExpressionForm where
   /-- `a.length`, `a.length()` or `Length.length(a)` on a memory array: the
   number of its elements. -/
   | arrayLength (base : ExpressionId)
+  /-- `a[i]` on a memory array: its element `i`, once `i` is below its
+  length. -/
+  | arrayIndex (base index : ExpressionId)
   deriving Repr, BEq, DecidableEq
 
 /-- One typed expression occurrence.  `requirements` contains every obligation
@@ -492,6 +495,7 @@ def references : ExpressionForm → List NodeId
   | .index base key => [NodeId.expression base, NodeId.expression key]
   | .newArray _ length => [NodeId.expression length]
   | .arrayLength base => [NodeId.expression base]
+  | .arrayIndex base key => [NodeId.expression base, NodeId.expression key]
 
 end ExpressionForm
 
@@ -721,6 +725,7 @@ def applySubstitution (substitution : Substitution) : ExpressionForm → Express
     | .index base key => .index base key
     | .newArray element length => .newArray (substitution.apply element) length
     | .arrayLength base => .arrayLength base
+    | .arrayIndex base key => .arrayIndex base key
 
 end ExpressionForm
 
@@ -953,7 +958,7 @@ def definedLocalIds : ExpressionForm → List Resolved.LocalId
   | .lambda parameters _ _ => parameters.map (fun binder => binder.id)
   | .literal _ | .integerLiteral .. | .reference .. | .group _ | .tuple _ |
       .unary .. | .binary .. | .conditional .. | .call .. | .constructor .. |
-      .member .. | .proxy _ | .index .. | .newArray .. | .arrayLength _ => []
+      .member .. | .proxy _ | .index .. | .newArray .. | .arrayLength _ | .arrayIndex .. => []
 
 end ExpressionForm
 

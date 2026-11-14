@@ -812,6 +812,21 @@ mutual
         ExpressionFormEvaluates program context evidence source environment before
           (.arrayLength base) requirements coercions
           (.word (Core.Word.ofNatModulo elements.length)) after
+    /-- `a[i]` below the array's length is its element `i`. The index is a word,
+    as `word` and the twelve types are. -/
+    | arrayIndex
+        {context evidence source environment before middle after base index
+          requirements coercions element location position cell elements value}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base (.arrayRef element location) middle)
+        (index_evaluates : ExpressionEvaluates program context evidence source
+          environment middle index (.word position) after)
+        (read : Heap.Reads after location cell)
+        (stored : cell.value = some (.arrayObject element elements))
+        (element_at : elements[position.val]? = some value) :
+        ExpressionFormEvaluates program context evidence source environment before
+          (.arrayIndex base index) requirements coercions value after
 
   /-- Left-to-right evaluation of an expression vector. -/
   inductive ExpressionsEvaluate (program : Program) :
@@ -1769,6 +1784,8 @@ mutual
         ((length_evaluates.initialization_extends).trans default.initialization_extends).trans
           (HeapInitializationExtend.of_allocation allocates)
     | .arrayLength _ base_evaluates _ _ => base_evaluates.initialization_extends
+    | .arrayIndex _ base_evaluates index_evaluates _ _ _ =>
+        (base_evaluates.initialization_extends).trans index_evaluates.initialization_extends
 
   theorem ExpressionsEvaluate.initialization_extends {program : Program}
       {context : Context}

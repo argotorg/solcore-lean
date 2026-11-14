@@ -392,6 +392,7 @@ private theorem recover_expression_form (original : ExpressionForm)
         (recover_type leftClosed rightClosed element leftLocal rightLocal
           (ExpressionForm.newArray.inj same).1)
   | arrayLength base => rfl
+  | arrayIndex base index => rfl
 
 private theorem recover_place (original : PlaceResolution)
     (leftLocal rightLocal : Substitution)

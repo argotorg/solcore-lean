@@ -1106,6 +1106,16 @@ example (context : Context) (heap : Heap) (count : Nat) :
     ValueHasType context heap (.word (Core.Word.ofNatModulo count)) (.fixed .uint256) :=
   .fixed _ (uint256_word_canonical _)
 
+/-- A read takes the object's element at its index, which has the element
+type. -/
+example (context : Context) (heapTyped : HeapWellTyped context arrayHeap) :
+    ValueHasType context arrayHeap (.word two) .word :=
+  ValueHasType.arrayElement (index := 1) (.arrayRef (.intro .head) rfl) heapTyped
+    (.intro .head) rfl rfl
+
+/-- A read takes a signed index too: `int8` is one of the twelve types. -/
+example : ArrayIndexType (.fixed ⟨true, .w8⟩) := .fixed _
+
 end Solcore.Test.SourceSemanticsArrayObjects
 end
 

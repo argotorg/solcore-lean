@@ -1360,6 +1360,12 @@ inductive ShiftValueType : TypeSystem.Ty → Prop where
   | word : ShiftValueType .word
   | fixed (type : TypeSystem.FixedInteger) : ShiftValueType (.fixed type)
 
+/-- The index type of a memory array read: `word` or one of the twelve
+fixed-width integer types, which upstream's read takes as `Typedef<word>`. -/
+inductive ArrayIndexType : TypeSystem.Ty → Prop where
+  | word : ArrayIndexType .word
+  | fixed (type : TypeSystem.FixedInteger) : ArrayIndexType (.fixed type)
+
 /-- The operand type of a compound assignment: Word's operators at a Word
 target, or the fixed-width ones at a target of a fixed-width integer type. -/
 inductive CompoundAssignmentTyping : Syntax.ValueAssignOp → TypeSystem.Ty → Prop where

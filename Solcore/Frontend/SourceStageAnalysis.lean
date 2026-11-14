@@ -472,6 +472,10 @@ def analyzeExpressionFormWith (source : TypedSource) (expression : ExpressionId)
   | .arrayLength base => do
       let (_, state) ← analyzeExpression state base
       pure (.deferred, state)
+  | .arrayIndex base index => do
+      let (_, state) ← analyzeExpression state base
+      let (_, state) ← analyzeExpression state index
+      pure (.deferred, state)
 
 /-- The statement-form decision, separated from occurrence bookkeeping for
 the proof that successful lexical transitions satisfy declarative staging. -/

@@ -163,9 +163,9 @@ which needs no contract storage and no ABI (see [Lean today](#lean-today)).
 
 | Fixture | Lines | Uses | Functions Lean could run |
 | --- | ---: | --- | --- |
-| `array-syntax` | 91 | `T[]` parameters, results and locals, literals and nested literals, `.length` of a call's result and of `new`; storage `uint256[]` and `uint256[][]` fields with `push`, `setLength` and `.length`; `mapping(address => uint256[])`; a struct field named `length` | sumAll(xs), pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n): 6 of 11 |
+| `array-syntax` | 91 | `T[]` parameters, results and locals, literals and nested literals, `.length` of a call's result and of `new`; storage `uint256[]` and `uint256[][]` fields with `push`, `setLength` and `.length`; `mapping(address => uint256[])`; a struct field named `length` | sumAll(xs), pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n): 6 of 12 |
 | `mem-array` | 100 | `new` with zeroed elements, writes and reads, `0x32`, `0x41`, loops, a compound element write, rows of `new T[][]`, aliasing, `memref` through `lidx` and `CanStore`, `Length.length(m)` | all 11, bump(r) and bumpElement(v) with `memref` |
-| `array-slice` | 122 | the four slice forms of a call's result, a slice's `.length` and reads, slices of slices, bound panics, `toArray`, aliasing through a view, a conditional bound, slices of a storage array | build() and 14 of the 16 public functions; not storageSlice(i) and storageSliceLength() |
+| `array-slice` | 122 | the four slice forms of a call's result, a slice's `.length` and reads, slices of slices, bound panics, `toArray`, aliasing through a view, a conditional bound, slices of a storage array | build() and 11 of the 13 public functions; not storageSlice(i) and storageSliceLength() |
 | `calldata-slice` | 34 | slices of `calldata<uint256[]>` parameters through the public ABI | none |
 | `memory-array-abi` | 60 | `T[]` public parameters and results, `address[]` with a dirty address, a `uint256[][]` result, `toArray(xs[1:3])` | the bodies of ret(n), sum(xs), echo(xs), grid(n) and slices(xs), adapted to word arguments and results |
 | `user-collection-index` | 38 | a program's own `RValueIdxAccess` instance, `Typedef.rep(j)` at a generic index, `out_of_bounds()` | none |
@@ -383,7 +383,10 @@ wait for the native pipeline's contracts and ABI.
   - A literal allocates its object first, then evaluates and stores its elements from left to
     right.
   - A read panics with `0x32` when `i ≥ length`. A read through a slice checks the slice's length,
-    then the base's at `start + i`.
+    then the base's at `start + i`. As built in step 3a, the read is its own typed form
+    (`ExpressionForm.arrayIndex`), whose index is a word at `word` or one of the twelve types
+    (`ArrayIndexType`), and it faults with the base's fault, the index's, an index that is not a
+    word, or `0x32` (`arrayIndexOutOfBounds`).
   - An element place `a[i]` evaluates `a` and `i` once and checks `i < length` before the right
     side, as `lidx(a, i)` does. The write replaces the element.
   - A slice panics with `0x32` when `s > e` or when `e` exceeds the base's length.
@@ -505,15 +508,17 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 2b-i | `new T[](n)` and `0x41`: inference, evaluation and its fault, the sized and staged copies and preservation. Three commits: 2b-i-a, `new`'s own arm in inference, which still rejects it and renumbers the cases of the proofs by functional induction on `inferExprFuel`; 2b-i-b, the typed form `new` with its static rule, evaluation, faults, sized copies, stage and preservation, which no source produces yet; then 2b-i-c, inference's typing of `new` | 35–60 files, +900–1,500/−100–300; 2b-i-a measured at 15 files, +293/−286, 2b-i-b at 28 files, +338/−6, 2b-i-c at 25 files, +799/−19 | none |
 | 2b-ii | The lengths: `a.length`, `a.length()` and `Length.length(a)`. Four commits: 2b-ii-a, the typed form of a memory array's length with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet; 2b-ii-b, inference's typing of `Length.length(a)`, a compiler function's qualified name as `Typedef.abs` is; 2b-ii-c, inference's typing of `a.length`, a field that names no constructor, whose base is a new child of inference's call tree; then 2b-ii-d, `a.length()`, a call of that field with no arguments | 30–50 files, +600–1,000/−100–200; 2b-ii-a measured at 27 files, +160/−10, 2b-ii-b at 19 files, +484/−10, 2b-ii-c at 23 files, +602/−90, 2b-ii-d at 20 files, +593/−51 | none |
 | 2b-iii | The lowering: the Core cells of `new` and the lengths | 15–30 files, +400–800/−50–150; measured at 10 files, +175/−6 | newLen(n), oversized(n) |
-| 3 | Element reads and `0x32` | 35–55 files, +800–1,200/−200–350, between 3c and 3a | defaultZero(n, i), nestedEmpty(n) |
+| 3a | Element reads: the typed form of `a[i]` on a memory array with its static rule, evaluation, faults with `0x32`, sized copies, stage and preservation, which no source produces yet | 28–32 files, +400–550/−5–15; measured at 27 files, +352/−10 | none |
+| 3b | Element reads: inference's typing of `a[i]` on a memory array, whose index waits for its type until finalization checks that it is `word` or one of the twelve types | 26–32 files, +800–1,000/−100–180 | none |
+| 3c | Element reads: the lowering, with `0x32` | 4–6 files, +120–200 | defaultZero(n, i), nestedEmpty(n) |
 | 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
 | 5 | Element writes and compound assignments, with the place checked before the right side | 55–72 files, +1,200–1,700/−300–450 | setGet(n, i, v), fillAndSum(n), compound(v), nestedReplace(n, v), alias(v); ret(n), sum(xs), echo(xs), grid(n) adapted |
-| 6 | Slices and `toArray(s)` | 45–65 files, +1,000–1,400/−200–400 | array-slice's 15 functions; slices(xs) adapted |
+| 6 | Slices and `toArray(s)` | 45–65 files, +1,000–1,400/−200–400 | array-slice's 12 functions; slices(xs) adapted |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
-| 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 37 functions above |
+| 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
 
-In all, that is about 413 to 617 file changes, +12,600 to 17,900 and −2,000 to 3,650 lines over
-twenty-three commits: about three fifths to four fifths of row 1, whose 23 commits added about 21,700
+In all, that is about 436 to 632 file changes, +13,100 to 18,450 and −1,900 to 3,500 lines over
+twenty-five commits: about three fifths to four fifths of row 1, whose 23 commits added about 21,700
 lines, much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600, until
 its first measure: it adds three AST forms through the proved parser, so it became 1a to 1c. 1b's
 first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
@@ -531,6 +536,12 @@ in a commit that only renumbers the cases of the proofs by functional induction 
 and still rejects `new`: 281 lines in 14 files, within 1b-ii's estimate of 285. Each later step
 stops on the same size condition, and on any change to a statement named in the
 [open decisions](#open-decisions) beyond the ones listed there.
+
+Step 3 was one row of 35–55 files, +800–1,200/−200–350, until its first measure: about 58 to 70 file
+changes, +1,300 to 1,750/−100 to 200. The read takes a typed form with its evaluation, its four
+faults and their sized rules, as `new` did in 2b-i-b, and inference's index arm takes an array
+branch whose index waits for its type until finalization checks it, as row 1's shift amounts do. So
+it split into 3a, the typed form, 3b, inference's typing, and 3c, the lowering.
 
 ## Generators, corpora and the smoke
 

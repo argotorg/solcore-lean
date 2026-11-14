@@ -5130,6 +5130,10 @@ theorem StatementsHaveType.applyParameters
       (lengthInduction catalog contextValid)
   · intro context base element baseType baseInduction catalog contextValid
     exact .arrayLength (baseInduction catalog contextValid)
+  · intro context base index element indexType baseType indexTypeProof indexKind
+      baseInduction indexInduction catalog contextValid
+    exact .arrayIndex (baseInduction catalog contextValid)
+      (indexInduction catalog contextValid) (by cases indexKind <;> constructor)
   · intro context catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction
@@ -12465,6 +12469,10 @@ theorem StatementsHaveType.applySubstitution
       (lengthInduction targetContext catalog contextValid)
   · intro context base element baseType baseInduction targetContext catalog contextValid
     exact .arrayLength (baseInduction targetContext catalog contextValid)
+  · intro context base index element indexType baseType indexTypeProof indexKind
+      baseInduction indexInduction targetContext catalog contextValid
+    exact .arrayIndex (baseInduction targetContext catalog contextValid)
+      (indexInduction targetContext catalog contextValid) (by cases indexKind <;> constructor)
   · intro context targetContext catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction

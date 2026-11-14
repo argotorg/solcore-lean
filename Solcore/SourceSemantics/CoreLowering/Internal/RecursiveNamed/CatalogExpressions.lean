@@ -1206,7 +1206,8 @@ theorem tree_of_functions_at_runtime_with_children
           · rw [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
             simp only [owner, ne_eq, not_false_eq_true, ↓reduceIte] at accepted
             cases accepted
-      | literal | integerLiteral | reference | lambda | proxy | newArray | arrayLength =>
+      | literal | integerLiteral | reference | lambda | proxy | newArray | arrayLength
+      | arrayIndex =>
         simp [runtimeCompositionForm, compositionForm, form] at composition
 
 /-- The existing Tree is extracted by the actual compiler's fuel induction.

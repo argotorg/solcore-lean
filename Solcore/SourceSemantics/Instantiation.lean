@@ -752,6 +752,7 @@ def applyExpressionForm (substitution : ParameterSubstitution) :
   | .index base index => .index base index
   | .newArray element length => .newArray (substitution.apply element) length
   | .arrayLength base => .arrayLength base
+  | .arrayIndex base index => .arrayIndex base index
 
 def applyPlaceResolution (substitution : ParameterSubstitution)
     (place : PlaceResolution) : PlaceResolution := {
