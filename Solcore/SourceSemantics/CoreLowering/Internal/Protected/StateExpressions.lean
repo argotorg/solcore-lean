@@ -480,6 +480,7 @@ def actualOperandIds : ExpressionForm → List ExpressionId
   | .constructor _ arguments => arguments
   | .member base _ _ => [base]
   | .index base key => [base, key]
+  | .newArray _ length => [length]
   | .literal _ | .integerLiteral _ _ | .reference _ _ | .lambda _ _ _ | .proxy _ => []
 
 /-- One original typing inversion supplies every actual operand's Source row.
@@ -510,6 +511,7 @@ theorem operand_types {source : TypedSource} {context : Context}
     | constructor _ children => exact ⟨_, children⟩
     | member child _ => exact ⟨_, .cons child (.nil context)⟩
     | index base key => exact ⟨_, .cons base (.cons key (.nil context))⟩
+    | newArray _ _ length => exact ⟨_, .cons length (.nil context)⟩
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionOperandTyping
 end

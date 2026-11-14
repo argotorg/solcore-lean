@@ -2899,6 +2899,22 @@ def ExpressionFormExecutionPreserves
     ValueHasType context after raw rawType /\
       HeapWellTyped context after /\ HeapTypesExtend before after
 
+/-- The default element of a new array has the element type in the heap after
+it, which stays well typed and keeps every cell's type. -/
+theorem NewArrayDefault.preserves {context : Context} {before after : Heap}
+    {element : Ty} {zero : Value}
+    (default : NewArrayDefault before element zero after)
+    (before_typed : HeapWellTyped context before) :
+    ValueHasType context after zero element ∧ HeapWellTyped context after ∧
+      HeapTypesExtend before after := by
+  cases default with
+  | word => exact ⟨.word _, before_typed, .refl _⟩
+  | fixed type => exact ⟨.fixed _ (FixedInteger.canonical_zero type), before_typed, .refl _⟩
+  | array allocates =>
+      exact ⟨.arrayRef allocates.reads_new rfl,
+        before_typed.allocate (.some (.arrayObject .nil)) allocates,
+        HeapTypesExtend.of_allocation allocates⟩
+
 namespace ExpressionFormEvaluates
 
 theorem referencePreserves
@@ -3327,6 +3343,20 @@ theorem preservesWith
             ⟨rfl, rfl, entries_typed⟩
           exact ⟨defaulted.hasType, after_typed,
             base_extension.trans index_extension⟩
+  | newArray _ _ length_type =>
+      cases evaluation with
+      | @newArray _ _ _ _ _ _ _ _ _ _ _ _ count zero _ layout length_evaluates fits
+          default allocates =>
+          rcases expression_preserves _ _ _ _ _ evidence_covers
+              environment_agrees before_typed length_type length_evaluates with
+            ⟨_, middle_typed, length_extension⟩
+          rcases default.preserves middle_typed with
+            ⟨zero_typed, defaulted_typed, default_extension⟩
+          exact ⟨.arrayRef allocates.reads_new rfl,
+            defaulted_typed.allocate
+              (.some (ValueHasType.arrayObject_replicate zero_typed count.val)) allocates,
+            (length_extension.trans default_extension).trans
+              (HeapTypesExtend.of_allocation allocates)⟩
 
 end ExpressionFormEvaluates
 

@@ -1572,6 +1572,36 @@ mutual
         ExpressionFormFaults program context evidence source environment before
           (.index base index) requirements coercions
           (.missingMappingDefault valueType) after
+    | newArrayLength
+        {context evidence source environment before after element length
+          requirements coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionFaults program context evidence source environment
+          before length reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.newArray element length) requirements coercions reason after
+    | newArrayLengthType
+        {context evidence source environment before after element length
+          requirements coercions value actual}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (length_evaluates : ExpressionEvaluates program context evidence source
+          environment before length value after)
+        (not_word : ¬ WordValue value)
+        (actual_type : ValueRuntimeType value actual) :
+        ExpressionFormFaults program context evidence source environment before
+          (.newArray element length) requirements coercions
+          (.typeMismatch (.fixed .uint256) actual) after
+    /-- `new T[](n)` from the length limit on panics with `0x41`, as std's
+    allocation check does (decision 2). -/
+    | newArrayTooLong
+        {context evidence source environment before after element length
+          requirements coercions count}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (length_evaluates : ExpressionEvaluates program context evidence source
+          environment before length (.word count) after)
+        (too_long : newArrayLengthLimit ≤ count.val) :
+        ExpressionFormFaults program context evidence source environment before
+          (.newArray element length) requirements coercions (.panic 0x41) after
 
   /-- First fault in a left-to-right expression vector. -/
   inductive ExpressionsFault (program : Program) :

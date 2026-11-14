@@ -47,6 +47,8 @@ inductive UnsupportedExpression where
   | index
   /-- Unchecked `/` and `%`, which panic; this bridge has no failures. -/
   | panickingOperator
+  /-- `new T[](n)`, whose array has no Core representation yet. -/
+  | newArray
   deriving Repr, BEq, DecidableEq
 
 /-- Statement forms outside the tail-normal executable profile. -/
@@ -1888,6 +1890,8 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
               (.unsupportedExpression .proxy)
           | .index _ _ => failWith lift (.occurrence id.occurrence)
               (.unsupportedExpression .index)
+          | .newArray _ _ => failWith lift (.occurrence id.occurrence)
+              (.unsupportedExpression .newArray)
 
 /-- Decide whether a compile-time-classified expression is closed relative to
 the staged values currently known while building a reusable runtime draft.
@@ -3078,6 +3082,7 @@ private def evaluateStagedValueNodeWith {error : Type}
               failWith lift site (.unsupportedExpression .member)
           | .proxy _ => failWith lift site (.unsupportedExpression .proxy)
           | .index _ _ => failWith lift site (.unsupportedExpression .index)
+          | .newArray _ _ => failWith lift site (.unsupportedExpression .newArray)
           | .integerLiteral _ _ =>
               failWith lift site .stagedValueStatementNotClosed
 

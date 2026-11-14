@@ -783,6 +783,20 @@ mutual
               ⟨rfl, rfl, entries_typed⟩
             exact ⟨defaulted.hasType, after_typed,
               base_extension.trans index_extension⟩
+    | .newArray layout length_evaluates fits default allocates => by
+        cases typing with
+        | newArray _ _ length_type =>
+            rcases preserveExpressionRec program_well_formed runtime
+                evidence_covers environment_agrees before_typed length_type
+                length_evaluates with
+              ⟨_, middle_typed, length_extension⟩
+            rcases default.preserves middle_typed with
+              ⟨zero_typed, defaulted_typed, default_extension⟩
+            exact ⟨.arrayRef allocates.reads_new rfl,
+              defaulted_typed.allocate
+                (.some (ValueHasType.arrayObject_replicate zero_typed _)) allocates,
+              (length_extension.trans default_extension).trans
+                (HeapTypesExtend.of_allocation allocates)⟩
     termination_by structural evaluation
 
   private theorem preserveExpressionsRec

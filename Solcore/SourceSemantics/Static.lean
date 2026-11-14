@@ -629,6 +629,15 @@ mutual
         (key_type : ExpressionHasType source context key keyType) :
         ExpressionFormHasRawType source context (.index base key) valueType
           (.ordinary [])
+    /-- `new T[](n)`: an element `T[]` admits and a `uint256` length. -/
+    | newArray
+        {context : Context} {element : TypeSystem.Ty} {length : ExpressionId}
+        (element_allowed : element.arrayElementAllowed = true)
+        (element_well_formed : TypeAdmissible context element)
+        (length_type : ExpressionHasType source context length
+          (.fixed .uint256)) :
+        ExpressionFormHasRawType source context (.newArray element length)
+          (TypeSystem.Ty.array element) (.ordinary [])
 
   /-- Pointwise expression typing in source order. -/
   inductive ExpressionsHaveTypes (source : TypedSource) :
@@ -1267,6 +1276,8 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
     (fun innerWellFormed => .proxy innerWellFormed)
     (fun baseType keyTypeProof baseInduction keyInduction =>
       .index baseInduction keyInduction)
+    (fun allowed elementWellFormed _ lengthInduction =>
+      .newArray allowed elementWellFormed lengthInduction)
     (fun _ => .nil _)
     (fun head tail headInduction tailInduction =>
       .cons headInduction tailInduction)

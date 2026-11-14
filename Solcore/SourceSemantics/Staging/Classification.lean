@@ -381,6 +381,13 @@ mutual
         (baseStages : HasStage source scope base baseStage)
         (keyStages : HasStage source scope key keyStage) :
         HasStage source scope id .deferred
+    | newArray
+        {scope : StageScope} {id length : ExpressionId} {node : ExpressionNode}
+        {element : TypeSystem.Ty} {lengthStage : Stage}
+        (contains : SourceSemantics.ContainsExpression source id node)
+        (form_eq : node.form = .newArray element length)
+        (lengthStages : HasStage source scope length lengthStage) :
+        HasStage source scope id .deferred
 
   /-- Pointwise expression classification in source order. -/
   inductive ExpressionsHaveStages (source : TypedSource) :

@@ -1075,6 +1075,31 @@ example {context : Context} {before after : Heap} {element : Ty}
     ValueHasType context after (.arrayRef element location) (Ty.array element) :=
   .arrayRef allocation.reads_new rfl
 
+/-- `new T[](n)` panics with `0x41` from `2^251 − 1` elements on. -/
+example : Dynamic.newArrayLengthLimit = 2 ^ 251 - 1 := rfl
+
+/-- A new array of `word` holds zero words and allocates nothing for them. -/
+example (heap : Heap) :
+    NewArrayDefault heap .word (.word Core.Word.zero) heap := .word heap
+
+/-- A new array of arrays shares one fresh empty array as its default element,
+typed in the heap after it. -/
+example {context : Context} {before after : Heap} {location : Location}
+    (typed : HeapWellTyped context before)
+    (allocation : Heap.Allocates before (Ty.arrayObject .word)
+      (some (.arrayObject .word [])) location after) :
+    ValueHasType context after (.arrayRef .word location) (Ty.array .word) ∧
+      HeapWellTyped context after :=
+  let preserved := (NewArrayDefault.array allocation).preserves typed
+  ⟨preserved.1, preserved.2.1⟩
+
+/-- `n` copies of the default element form an object of the element type. -/
+example {context : Context} {heap : Heap} (count : Nat) :
+    ValueHasType context heap
+      (.arrayObject .word (List.replicate count (.word Core.Word.zero)))
+      (Ty.arrayObject .word) :=
+  ValueHasType.arrayObject_replicate (.word _) count
+
 end Solcore.Test.SourceSemanticsArrayObjects
 end
 

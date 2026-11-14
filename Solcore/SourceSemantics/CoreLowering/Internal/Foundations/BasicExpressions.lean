@@ -1007,7 +1007,8 @@ theorem tree_of_lowerExpression
                                       obtain ⟨rightDepth, rightBound, rightTree⟩ := ih rightResult
                                       exact ⟨max leftDepth rightDepth + 1, by omega,
                                         .pair metadata form leftTree rightTree⟩
-          | integerLiteral | unary | binary | conditional | lambda | call | constructor | member | proxy | index =>
+          | integerLiteral | unary | binary | conditional | lambda | call | constructor | member | proxy | index
+          | newArray =>
               simp [form] at accepted
 
 theorem lowerExpression_hasType
@@ -1579,7 +1580,8 @@ theorem tree_of_lowerExpression
                       rw [same]
                       exact ⟨max leftDepth rightDepth + 1, by omega,
                         .pair (same ▸ metadata) form leftTree rightTree⟩
-      | literal | reference | integerLiteral | unary | binary | lambda | call | constructor | member | proxy | index =>
+      | literal | reference | integerLiteral | unary | binary | lambda | call | constructor | member | proxy | index
+      | newArray =>
           simp only [form] at accepted
           exact tree_of_basicLeaf unique found
             (by intro inner impossible; rw [form] at impossible; cases impossible)

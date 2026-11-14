@@ -1121,6 +1121,14 @@ end CellWellTyped
 
 namespace ValuesHaveTypes
 
+/-- `n` copies of a value of one type have that type `n` times. -/
+theorem replicate {context : Context} {heap : Heap} {value : Value} {type : Ty}
+    (typed : ValueHasType context heap value type) :
+    ∀ count, ValuesHaveTypes context heap (List.replicate count value)
+      (List.replicate count type)
+  | 0 => .nil
+  | count + 1 => .cons typed (replicate typed count)
+
 theorem transportClosed
     {source target : Context} {heap : Heap}
     {values : List Value} {types : List Ty}
@@ -1166,6 +1174,15 @@ theorem member
           exact member tail value_at type_at
 
 end ValuesHaveTypes
+
+/-- An array object of `count` copies of one element value has its object
+type. -/
+theorem ValueHasType.arrayObject_replicate {context : Context} {heap : Heap}
+    {element : Ty} {zero : Value} (typed : ValueHasType context heap zero element)
+    (count : Nat) :
+    ValueHasType context heap (.arrayObject element (List.replicate count zero))
+      (Ty.arrayObject element) :=
+  .arrayObject (by rw [List.length_replicate]; exact ValuesHaveTypes.replicate typed count)
 
 namespace ValueHasType
 

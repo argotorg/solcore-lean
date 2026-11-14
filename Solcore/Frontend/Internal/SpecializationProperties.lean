@@ -387,6 +387,10 @@ private theorem recover_expression_form (original : ExpressionForm)
       exact congrArg ExpressionForm.proxy
         (recover_type leftClosed rightClosed type leftLocal rightLocal (ExpressionForm.proxy.inj same))
   | index base key => rfl
+  | newArray element length =>
+      exact congrArg (fun selected => ExpressionForm.newArray selected length)
+        (recover_type leftClosed rightClosed element leftLocal rightLocal
+          (ExpressionForm.newArray.inj same).1)
 
 private theorem recover_place (original : PlaceResolution)
     (leftLocal rightLocal : Substitution)

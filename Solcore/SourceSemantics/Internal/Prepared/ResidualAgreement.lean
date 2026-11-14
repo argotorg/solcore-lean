@@ -292,6 +292,7 @@ private def expressionTypes : ExpressionForm → List Ty
   | .call _ _ resolution => callTypes resolution
   | .constructor instantiation _ => constructorTypes instantiation
   | .proxy inner => [inner]
+  | .newArray element _ => [element]
   | .literal _
   | .group _
   | .tuple _
@@ -494,6 +495,8 @@ private theorem expression_congr {left right : Substitution} {form : ExpressionF
   | constructor instantiation arguments =>
     exact congrArg (fun value => ExpressionForm.constructor value arguments) (constructor_congr same)
   | proxy _ => exact congrArg _ same.head
+  | newArray _ length =>
+    exact congrArg (fun element => ExpressionForm.newArray element length) same.head
   | literal | group | tuple | unary | binary | conditional | member | index => rfl
 
 private theorem instruction_congr {left right : Substitution} {instruction : MatchPatternInstruction}

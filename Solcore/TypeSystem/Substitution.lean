@@ -91,4 +91,18 @@ def apply (substitution : ParameterSubstitution) : Ty → Ty
 
 end ParameterSubstitution
 
+/-- A flexible substitution keeps an element that a memory array admits. -/
+theorem Substitution.arrayElementAllowed_apply (substitution : Substitution) {element : Ty}
+    (allowed : element.arrayElementAllowed = true) :
+    (substitution.apply element).arrayElementAllowed = true := by
+  unfold Ty.arrayElementAllowed at allowed
+  split at allowed <;> first | rfl | cases allowed
+
+/-- A rigid substitution keeps an element that a memory array admits. -/
+theorem ParameterSubstitution.arrayElementAllowed_apply (substitution : ParameterSubstitution)
+    {element : Ty} (allowed : element.arrayElementAllowed = true) :
+    (substitution.apply element).arrayElementAllowed = true := by
+  unfold Ty.arrayElementAllowed at allowed
+  split at allowed <;> first | rfl | cases allowed
+
 end Solcore.TypeSystem

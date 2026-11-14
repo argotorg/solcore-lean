@@ -434,6 +434,22 @@ structure ClosureFrame (program : Program) (function : Closure) : Prop where
   requirements : RequirementIdsUnique function.context
   evidence_covers : function.evidence.Covers function.context
 
+/-- `new T[](n)` panics with `0x41` from this length on, where std's
+allocation check does (decision 2): `2^251 − 1`. -/
+def newArrayLengthLimit : Nat := 2 ^ 251 - 1
+
+/-- The element a new memory array of `element` holds at every index, and the
+heap after it: zero for `word` and the twelve types, and for an array element a
+reference to one fresh empty array, as std's `0x60` is. -/
+inductive NewArrayDefault : Heap → TypeSystem.Ty → Value → Heap → Prop where
+  | word (heap : Heap) : NewArrayDefault heap .word (.word Core.Word.zero) heap
+  | fixed (heap : Heap) (type : TypeSystem.FixedInteger) :
+      NewArrayDefault heap (.fixed type) (.word Core.Word.zero) heap
+  | array {heap after : Heap} {inner : TypeSystem.Ty} {location : Location}
+      (allocates : Heap.Allocates heap (TypeSystem.Ty.arrayObject inner)
+        (some (.arrayObject inner [])) location after) :
+      NewArrayDefault heap (TypeSystem.Ty.array inner) (.arrayRef inner location) after
+
 /-- A selected match branch after its pattern bindings have been allocated. -/
 inductive MatchBranchExecutes
     (ExecuteStatements : Environment → Heap →
@@ -769,6 +785,21 @@ mutual
         (defaulted : DefaultValue valueType value) :
         ExpressionFormEvaluates program context evidence source environment before
           (.index base index) requirements coercions value after
+    /-- `new T[](n)` below the length limit allocates the array's cell with `n`
+    copies of the default element. -/
+    | newArray
+        {context evidence source environment before middle defaulted after element
+          length requirements coercions count zero location}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (length_evaluates : ExpressionEvaluates program context evidence source
+          environment before length (.word count) middle)
+        (fits : count.val < newArrayLengthLimit)
+        (default : NewArrayDefault middle element zero defaulted)
+        (allocates : Heap.Allocates defaulted (TypeSystem.Ty.arrayObject element)
+          (some (.arrayObject element (List.replicate count.val zero))) location after) :
+        ExpressionFormEvaluates program context evidence source environment before
+          (.newArray element length) requirements coercions
+          (.arrayRef element location) after
 
   /-- Left-to-right evaluation of an expression vector. -/
   inductive ExpressionsEvaluate (program : Program) :
@@ -1633,6 +1664,14 @@ theorem EnvironmentCopies.initialization_extends
   intro location cell read initialized
   exact ⟨cell, copy.preserves_read read, initialized⟩
 
+theorem NewArrayDefault.initialization_extends
+    {before after : Heap} {element : Ty} {value : Value}
+    (default : NewArrayDefault before element value after) :
+    HeapInitializationExtend before after := by
+  cases default with
+  | word | fixed => exact .refl _
+  | array allocates => exact .of_allocation allocates
+
 theorem BindersAllocate.initialization_extends
     {environment finalEnvironment : Environment} {before after : Heap}
     {binders : List TypedBinder} {values : List Value}
@@ -1714,6 +1753,9 @@ mutual
         (base_evaluates.initialization_extends).trans index_evaluates.initialization_extends
     | .indexDefault _ base_evaluates index_evaluates _ _ =>
         (base_evaluates.initialization_extends).trans index_evaluates.initialization_extends
+    | .newArray _ length_evaluates _ default allocates =>
+        ((length_evaluates.initialization_extends).trans default.initialization_extends).trans
+          (HeapInitializationExtend.of_allocation allocates)
 
   theorem ExpressionsEvaluate.initialization_extends {program : Program}
       {context : Context}
