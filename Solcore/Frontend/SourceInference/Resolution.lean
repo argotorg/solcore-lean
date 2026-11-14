@@ -604,6 +604,14 @@ def shiftAmountFits : Ty → Bool
   | .constructor (.builtin (.fixed type)) => !type.signed
   | _ => false
 
+/-- Whether a type is a memory array read's index type: `word` or one of the
+twelve fixed-width integer types, which upstream's read takes as
+`Typedef<word>`. -/
+def arrayIndexFits : Ty → Bool
+  | .constructor (.builtin .word) => true
+  | .constructor (.builtin (.fixed _)) => true
+  | _ => false
+
 /-- The type an in-place `~` unifies its target with. Upstream reads `x ~=` as
 `x = ~x`, so the target keeps its own type: an open target keeps it and waits,
 as step 7b's compound targets do, and a fixed-width integer type is its own.

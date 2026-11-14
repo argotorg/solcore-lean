@@ -1965,6 +1965,10 @@ theorem inferExprFuel_success_index_expressionTypingBase_under_ambient_bounded
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
       expected initial = .ok result)
+    (notArray : ∀ {baseResult : InferredExpression} {baseState : Frontend.SourceInference.State},
+      Detail.inferExprFuel fuel inferenceContext baseExpression none allocated =
+          .ok (baseResult, baseState) →
+        (baseState.resolve baseResult.type).arrayElement? = none)
     (initialBelow : initial.NodesBelowNextOccurrence)
     (allocatedReady : allocated.InferenceReady)
     (signatureFormation :
@@ -2023,7 +2027,7 @@ theorem inferExprFuel_success_index_expressionTypingBase_under_ambient_bounded
   obtain ⟨baseResult, baseState, keyType, keyState, valueType, valueState,
       mappingState, indexResult, indexState, baseSuccess, keyFresh, valueFresh,
       mappingSuccess, indexSuccess, recorded⟩ :=
-    Detail.inferExprFuel_success_index_facts expressionEq allocationEq success
+    Detail.inferExprFuel_success_index_facts expressionEq allocationEq notArray success
   have allocatedBelow : allocated.NodesBelowNextOccurrence := by
     have nextBelow :=
       Frontend.SourceInference.State.allocateExpressionId_preserves_nodesBelowNextOccurrence

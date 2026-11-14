@@ -423,10 +423,11 @@ def forItemMentions (state : State) (typeVar : TypeVarId) : ForItemForm → Bool
   | _ => false
 
 /-- Whether a type variable occurs in an operand type of a unary or binary
-operator (a builtin operator deferred on an open literal, or a comparison), or
-in the target type of a compound assignment that takes its target's type or of
-an in-place `~`, a statement's or a `for` item's: upstream reads `x op= e` as
-`x = x op e` and `x ~=` as `x = ~x`. -/
+operator (a builtin operator deferred on an open literal, or a comparison), in
+the index type of a memory array read, or in the target type of a compound
+assignment that takes its target's type or of an in-place `~`, a statement's or
+a `for` item's: upstream reads `x op= e` as `x = x op e` and `x ~=` as
+`x = ~x`. -/
 def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
   let mentions (operand : ExpressionId) : Bool :=
     match expressionTypeAt? state operand with
@@ -438,6 +439,7 @@ def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
         match node.form with
         | .unary _ operand => mentions operand
         | .binary left _ right => mentions left || mentions right
+        | .arrayIndex _ index => mentions index
         | _ => false
     | .statement node =>
         match node.form with
@@ -685,11 +687,25 @@ def validateShiftOperands (state : State) (node : ExpressionNode) : Except Error
       else .ok ()
   | _ => .ok ()
 
+/-- A memory array read infers its index on its own and waits for its type
+(`inferExprFuel`): once the defaults are in, the index must have `word` or one
+of the twelve types, as upstream's read takes it as `Typedef<word>`. Another
+type, such as `bool` or `integer`, is rejected with `operatorNotSupported
+"Typedef"`, as upstream's `bool: Typedef<word>` fails. -/
+def validateArrayIndex (state : State) (node : ExpressionNode) : Except Error Unit :=
+  match node.form with
+  | .arrayIndex _ index =>
+      if state.nodes.any (operandMisfits state index arrayIndexFits) then
+        throw (.operatorNotSupported "Typedef" ((expressionTypeAt? state index).getD .word))
+      else .ok ()
+  | _ => .ok ()
+
 /-- The finalization checks of one expression node: an unchecked operator's
-operand type and a shift's operand types. -/
+operand type, a shift's operand types and a memory array read's index type. -/
 def validateExpressionNode (state : State) (node : ExpressionNode) : Except Error Unit := do
   validateUncheckedOperand state node
   validateShiftOperands state node
+  validateArrayIndex state node
 
 /-- The finalization checks of one node: an assignment statement's value
 assignment or in-place `~`, a `for` loop's header items, an unchecked operator's

@@ -477,13 +477,14 @@ theorem expression_index_key
       (form : source.value = .index base brackets key)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
+      (notArray : (baseState.resolve baseValue.type).arrayElement? = none)
       (keyFresh : baseState.fresh = (keyType, keyState))
       (valueFresh : keyState.fresh = (valueType, valueState))
       (fitting : unify valueState baseValue.type (.mapping keyType valueType) = .ok fitted)
       (child : (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal).Accepted)
       (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs)
       (backed : LiveTemplatesBacked initial) : LiveTemplatesBacked (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal).initial := by
-  have step : ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal) := .expression_index_key accepted form allocation baseAccepted keyFresh valueFresh fitting child
+  have step : ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal) := .expression_index_key accepted form allocation baseAccepted notArray keyFresh valueFresh fitting child
   have childInputs := step.inputs inputs
   have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
   subst allocated
@@ -495,6 +496,25 @@ theorem expression_index_key
   have sameValue : valueState = baseState.fresh.2.fresh.2 := (congrArg Prod.snd valueFresh).symm
   subst valueState
   exact baseBacked.fresh.fresh.unify baseReady.fresh.fresh.solved fitting
+
+theorem expression_index_array
+      {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
+      {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
+      {value : InferredExpression}
+      {base key : Syntax.Expr} {brackets : Syntax.SourceSpan} {baseValue keyValue : InferredExpression}
+      {baseState childFinal : State} {element : Ty}
+      (accepted : (CallIndex.expression (fuel + 1) context source expected initial value final).Accepted)
+      (form : source.value = .index base brackets key)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
+      (_array : (baseState.resolve baseValue.type).arrayElement? = some element)
+      (_child : inferExprFuel fuel context key none baseState = .ok (keyValue, childFinal))
+      (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs)
+      (backed : LiveTemplatesBacked initial) : LiveTemplatesBacked (CallIndex.expression fuel context key none baseState keyValue childFinal).initial := by
+  have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+  subst allocated
+  have before := ChildStep.inputs inputs (.expression_index_base accepted form allocation baseAccepted)
+  exact expression before backed.allocateExpressionId baseAccepted
 
 theorem expression_call_constructor
       {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
@@ -1473,6 +1493,7 @@ theorem ChildStep.liveTemplatesBacked {parent child : CallIndex}
   | solve | apply ActualTemplateBacking.expression_lambda_body <;> assumption
   | solve | apply ActualTemplateBacking.expression_index_base <;> assumption
   | solve | apply ActualTemplateBacking.expression_index_key <;> assumption
+  | solve | apply ActualTemplateBacking.expression_index_array <;> assumption
   | solve | apply ActualTemplateBacking.expression_call_constructor <;> assumption
   | solve | apply ActualTemplateBacking.expression_call_arguments <;> assumption
   | solve | apply ActualTemplateBacking.expression_call_callee <;> assumption

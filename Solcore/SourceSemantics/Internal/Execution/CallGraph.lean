@@ -645,11 +645,25 @@ inductive ChildStep : CallIndex → CallIndex → Prop where
       (form : source.value = .index base brackets key)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
+      (notArray : (baseState.resolve baseValue.type).arrayElement? = none)
       (keyFresh : baseState.fresh = (keyType, keyState))
       (valueFresh : keyState.fresh = (valueType, valueState))
       (fitting : unify valueState baseValue.type (.mapping keyType valueType) = .ok fitted)
       (child : (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal).Accepted) :
       ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal)
+  | expression_index_array
+      {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
+      {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
+      {value : InferredExpression}
+      {base key : Syntax.Expr} {brackets : Syntax.SourceSpan} {baseValue keyValue : InferredExpression}
+      {baseState childFinal : State} {element : Ty}
+      (accepted : (CallIndex.expression (fuel + 1) context source expected initial value final).Accepted)
+      (form : source.value = .index base brackets key)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
+      (array : (baseState.resolve baseValue.type).arrayElement? = some element)
+      (child : inferExprFuel fuel context key none baseState = .ok (keyValue, childFinal)) :
+      ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.expression fuel context key none baseState keyValue childFinal)
   | expression_newArray_length
       {fuel : Nat} {context : SourceInference.Context} {source length : Syntax.Expr}
       {keyword : Syntax.SourceSpan} {sourceType : Syntax.TypeExpr}

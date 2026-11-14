@@ -2170,6 +2170,16 @@ theorem shiftAmountType_of_fits {type : TypeSystem.Ty} (fits : Detail.shiftAmoun
   · exact .unsigned (by simpa using fits)
   · cases fits
 
+/-- A type that finalization admits as a memory array read's index is an index
+type. -/
+theorem arrayIndexType_of_fits {type : TypeSystem.Ty}
+    (fits : Detail.arrayIndexFits type = true) : ArrayIndexType type := by
+  unfold Detail.arrayIndexFits at fits
+  split at fits
+  · exact .word
+  · exact .fixed _
+  · cases fits
+
 /-- A compound assignment's operand type is Word's, or the target's
 fixed-width integer type for an operator of `FixedCompoundAssignmentOperator` or
 a shift, whose value is the target. -/
@@ -24378,6 +24388,10 @@ theorem inferExprFuel_success_index_expressionTypingBase_scoped_of_retained
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
       expected initial = .ok result)
+    (notArray : ∀ {baseResult : InferredExpression} {baseState : Frontend.SourceInference.State},
+      Detail.inferExprFuel fuel inferenceContext baseExpression none allocated =
+          .ok (baseResult, baseState) →
+        (baseState.resolve baseResult.type).arrayElement? = none)
     (allocatedReady : allocated.InferenceReady)
     (signatureFormation :
       ProgramSignatureFormationValidated inferenceContext.signatures)
@@ -24432,7 +24446,7 @@ theorem inferExprFuel_success_index_expressionTypingBase_scoped_of_retained
   obtain ⟨baseResult, baseState, keyType, keyState, valueType, valueState,
       mappingState, indexResult, indexState, baseSuccess, keyFresh, valueFresh,
       mappingSuccess, indexSuccess, recorded⟩ :=
-    Detail.inferExprFuel_success_index_facts expressionEq allocationEq success
+    Detail.inferExprFuel_success_index_facts expressionEq allocationEq notArray success
   have baseProperties := Detail.inferExprFuel_inferenceProperties
     allocatedReady signatureFormation functionsCanonical (by
       intro expectedType member
@@ -26583,18 +26597,23 @@ def SourceUncheckedOperandsFit (source : TypedSource) : Prop :=
     node.requirements = Detail.coercionRequirements node.coercions →
     ContainsExpression source left leftNode → leftNode.type ≠ .integer
 
-/-- A successful node check is both of its checks. -/
+/-- A successful node check is each of its checks. -/
 theorem validateExpressionNode_ok {state : Frontend.SourceInference.State}
     {node : ExpressionNode}
     (success : Detail.validateAssignmentTargetNode state (.expression node) = .ok ()) :
     Detail.validateUncheckedOperand state node = .ok () ∧
-      Detail.validateShiftOperands state node = .ok () := by
+      Detail.validateShiftOperands state node = .ok () ∧
+      Detail.validateArrayIndex state node = .ok () := by
   simp only [Detail.validateAssignmentTargetNode, Detail.validateExpressionNode] at success
   cases unchecked : Detail.validateUncheckedOperand state node with
   | error error => simp [unchecked, bind, Except.bind] at success
   | ok _ =>
     simp only [unchecked, bind, Except.bind] at success
-    exact ⟨rfl, success⟩
+    cases shift : Detail.validateShiftOperands state node with
+    | error error => simp [shift] at success
+    | ok _ =>
+      simp only [shift] at success
+      exact ⟨rfl, rfl, success⟩
 
 /-- One successful check of an unchecked operator gives its left operand's fit
 under the checked state's substitution. -/
@@ -26730,7 +26749,7 @@ theorem finalize_shiftOperandsFit
         simp only [Node.applySubstitution, Node.expression.injEq] at rawEq rawLeftEq rawRightEq
         subst rawEq rawLeftEq rawRightEq
         have check := (validateExpressionNode_ok
-          (validateAssignmentTargets_member witness.assignmentValidation rawMember)).2
+          (validateAssignmentTargets_member witness.assignmentValidation rawMember)).2.1
         have formRaw : rawNode.form = .binary left operator right := by
           cases rawForm : rawNode.form <;>
             simp_all [ExpressionNode.applySubstitution, ExpressionForm.applySubstitution]
@@ -26741,6 +26760,75 @@ theorem finalize_shiftOperandsFit
         simpa [ExpressionNode.applySubstitution] using
           shiftOperandFits_of_validate check formRaw shift rawLeftMember leftIdRaw
             rawRightMember rightIdRaw
+
+/-- A memory array read's index has a type that its static rule takes: `word`
+or one of the twelve types. Finalization establishes it for the finalized source
+(`FinalInferenceResources.array_indexes_fit`). -/
+def SourceArrayIndexesFit (source : TypedSource) : Prop :=
+  ∀ {id base index : ExpressionId} {node indexNode : ExpressionNode},
+    ContainsExpression source id node → node.form = .arrayIndex base index →
+    ContainsExpression source index indexNode →
+    Detail.arrayIndexFits indexNode.type = true
+
+/-- One successful read check gives its index's fit under the checked state's
+substitution. -/
+theorem arrayIndexFits_of_validate {state : Frontend.SourceInference.State}
+    {node indexNode : ExpressionNode} {base index : ExpressionId}
+    (success : Detail.validateArrayIndex state node = .ok ())
+    (form : node.form = .arrayIndex base index)
+    (indexMember : Node.expression indexNode ∈ state.nodes) (indexId : indexNode.id = index) :
+    Detail.arrayIndexFits (state.inference.substitution.apply indexNode.type) = true := by
+  simp only [Detail.validateArrayIndex, form] at success
+  split at success
+  · cases success
+  · rename_i fits
+    have indexOk : Detail.operandMisfits state index Detail.arrayIndexFits
+        (.expression indexNode) = false := by
+      cases misfit : Detail.operandMisfits state index Detail.arrayIndexFits
+          (.expression indexNode)
+      · rfl
+      · exact absurd (List.any_eq_true.mpr ⟨_, indexMember, misfit⟩) fits
+    simp only [Detail.operandMisfits, indexId, decide_true, Bool.true_and,
+      Bool.not_eq_eq_eq_not, Bool.not_false, Frontend.SourceInference.State.resolve,
+      TypeSystem.InferState.resolve] at indexOk
+    exact indexOk
+
+/-- Finalization checks every memory array read, so its index in the finalized
+source has a type that its static rule takes. -/
+theorem finalize_arrayIndexesFit
+    {inferenceContext : Frontend.SourceInference.Context}
+    {type : TypeSystem.Ty}
+    {state : Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {result : Frontend.SourceInference.Result}
+    (success : Detail.finalize inferenceContext type state roots = .ok result) :
+    SourceArrayIndexesFit result.typedSource := by
+  let witness := Detail.finalize_success_witness success
+  have sourceEq : result.typedSource =
+      (witness.finalState.toTypedSource roots).applySubstitution
+        witness.finalState.inference.substitution :=
+    congrArg Frontend.SourceInference.Result.typedSource witness.result_eq
+  intro id base index node indexNode contains form indexContains
+  rw [sourceEq] at contains indexContains
+  obtain ⟨raw, rawMember, rawEq⟩ := List.mem_map.mp contains.1
+  obtain ⟨rawIndex, rawIndexMember, rawIndexEq⟩ := List.mem_map.mp indexContains.1
+  cases raw with
+  | statement _ => cases rawEq
+  | expression rawNode =>
+    cases rawIndex with
+    | statement _ => cases rawIndexEq
+    | expression rawIndexNode =>
+      simp only [Node.applySubstitution, Node.expression.injEq] at rawEq rawIndexEq
+      subst rawEq rawIndexEq
+      have check := (validateExpressionNode_ok
+        (validateAssignmentTargets_member witness.assignmentValidation rawMember)).2.2
+      have formRaw : rawNode.form = .arrayIndex base index := by
+        cases rawForm : rawNode.form <;>
+          simp_all [ExpressionNode.applySubstitution, ExpressionForm.applySubstitution]
+      have indexIdRaw : rawIndexNode.id = index := by
+        simpa [ExpressionNode.applySubstitution] using indexContains.2
+      simpa [ExpressionNode.applySubstitution] using
+        arrayIndexFits_of_validate check formRaw rawIndexMember indexIdRaw
 
 /-- The reusable whole-body resources exposed by one successful finalization.
 
@@ -26803,6 +26891,8 @@ structure FinalInferenceResources
   shift_operands_fit : SourceShiftOperandsFit result.typedSource
   /-- Every compound shift's amount has an amount type, which finalization checks. -/
   shift_amounts_fit : SourceShiftAmountsFit result.typedSource
+  /-- Every memory array read's index has a type that its static rule takes. -/
+  array_indexes_fit : SourceArrayIndexesFit result.typedSource
 
 namespace FinalInferenceResources
 
@@ -26858,6 +26948,7 @@ def ofFinalize
     unchecked_operands_fit := finalize_uncheckedOperandsFit success
     shift_operands_fit := finalize_shiftOperandsFit success
     shift_amounts_fit := finalize_shiftAmountsFit success
+    array_indexes_fit := finalize_arrayIndexesFit success
   }
   · intro ready
     have originsBelow := Detail.finalize_numericOriginsBelowNext success

@@ -274,10 +274,18 @@ theorem ChildStep.expression_shapes
     subst restoredState
     exact (ActualExpressionNodeShapes.unify unified).trans
       (ActualExpressionNodeShapes.recordExpected recorded)
-  | expression_index_base accepted form allocation childAccepted =>
+  | @expression_index_base _ _ _ _ _ _ _ _ _ _ _ _ inferred childFinal accepted form allocation
+      childAccepted =>
+    cases arrayEq : (childFinal.resolve inferred.type).arrayElement?
+    case some _ =>
+      obtain ⟨indexResult, indexState, keyRun, recorded⟩ :=
+        inferExprFuel_success_arrayIndex_facts form allocation childAccepted arrayEq accepted
+      simpa only [CallIndex.final] using (inferExprFuel_occurrenceGraph keyRun).graph.shapes.trans
+        (ActualExpressionNodeShapes.recordExpected recorded)
     obtain ⟨baseResult, baseState, keyType, keyState, valueType, valueState, mappingState,
       indexResult, indexState, baseRun, keyFresh, valueFresh, fitted, keyRun, recorded⟩ :=
-      inferExprFuel_success_index_facts form allocation accepted
+      inferExprFuel_success_index_facts form allocation (index_notArray_of_run childAccepted arrayEq)
+        accepted
     have keyNodes : keyState.nodes = baseState.nodes :=
       (congrArg (fun output : Ty × State => output.2.nodes) keyFresh).symm
     have valueNodes : valueState.nodes = keyState.nodes :=
@@ -287,14 +295,20 @@ theorem ChildStep.expression_shapes
       ((inferExprFuel_occurrenceGraph keyRun).graph.shapes.trans
         (ActualExpressionNodeShapes.recordExpected recorded))
     simpa only [CallIndex.final, valueNodes, keyNodes] using kept
-  | expression_index_key accepted form allocation baseAccepted keyFresh valueFresh fitted childAccepted =>
+  | expression_index_key accepted form allocation baseAccepted notArray keyFresh valueFresh fitted childAccepted =>
     obtain ⟨baseResult, baseState, keyType, keyState, valueType, valueState, mappingState,
       indexResult, indexState, baseRun, actualKeyFresh, actualValueFresh, actualFitted, keyRun, recorded⟩ :=
-      inferExprFuel_success_index_facts form allocation accepted
+      inferExprFuel_success_index_facts form allocation (index_notArray_of_run baseAccepted notArray)
+        accepted
     cases Except.ok.inj (baseRun.symm.trans baseAccepted)
     cases actualKeyFresh.symm.trans keyFresh
     cases actualValueFresh.symm.trans valueFresh
     cases Except.ok.inj (actualFitted.symm.trans fitted)
+    cases Except.ok.inj (keyRun.symm.trans childAccepted)
+    exact ActualExpressionNodeShapes.recordExpected recorded
+  | expression_index_array accepted form allocation baseAccepted array childAccepted =>
+    obtain ⟨indexResult, indexState, keyRun, recorded⟩ :=
+      inferExprFuel_success_arrayIndex_facts form allocation baseAccepted array accepted
     cases Except.ok.inj (keyRun.symm.trans childAccepted)
     exact ActualExpressionNodeShapes.recordExpected recorded
   | expression_call_arguments accepted form allocation nonconstructor childAccepted =>
@@ -1358,7 +1372,9 @@ theorem ChildStep.nonexpression_shapes {parent child : CallIndex}
       exact False.elim nonexpression
   | expression_index_base accepted form allocation child =>
       exact False.elim nonexpression
-  | expression_index_key accepted form allocation baseAccepted keyFresh valueFresh fitting child =>
+  | expression_index_key accepted form allocation baseAccepted notArray keyFresh valueFresh fitting child =>
+      exact False.elim nonexpression
+  | expression_index_array accepted form allocation baseAccepted array child =>
       exact False.elim nonexpression
   | expression_call_constructor accepted form allocation selected fresh child =>
       exact False.elim nonexpression

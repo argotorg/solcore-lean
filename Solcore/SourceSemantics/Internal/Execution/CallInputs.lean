@@ -273,6 +273,28 @@ theorem expression_index_base
   subst allocated
   exact ⟨inputs.ready.allocateExpressionId, inputs.wellFormed, inputs.catalog, (by intro type member; cases member)⟩
 
+theorem expression_index_array
+      {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
+      {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
+      {value : InferredExpression}
+      {base key : Syntax.Expr} {brackets : Syntax.SourceSpan} {baseValue keyValue : InferredExpression}
+      {baseState childFinal : State} {element : Ty}
+      (_accepted : (CallIndex.expression (fuel + 1) context source expected initial value final).Accepted)
+      (_form : source.value = .index base brackets key)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
+      (_array : (baseState.resolve baseValue.type).arrayElement? = some element)
+      (_child : inferExprFuel fuel context key none baseState = .ok (keyValue, childFinal))
+      (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs) : (CallIndex.expression fuel context key none baseState keyValue childFinal).Inputs := by
+  have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+  subst allocated
+  have baseProperties := inferExprFuel_inferenceProperties inputs.ready.allocateExpressionId
+    inputs.catalog.formation inputs.catalog.canonical (by intro type member; cases member) baseAccepted
+  exact ⟨baseProperties.2.1, (inferExprFuel_direct_progress baseAccepted).wellFormed inputs.wellFormed,
+    inputs.catalog, by
+      intro _ member
+      cases member⟩
+
 theorem expression_newArray_length
       {fuel : Nat} {context : SourceInference.Context} {source length : Syntax.Expr}
       {keyword : Syntax.SourceSpan} {sourceType : Syntax.TypeExpr}
@@ -434,6 +456,7 @@ theorem expression_index_key
       (_form : source.value = .index base brackets key)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
+      (_notArray : (baseState.resolve baseValue.type).arrayElement? = none)
       (keyFresh : baseState.fresh = (keyType, keyState))
       (valueFresh : keyState.fresh = (valueType, valueState))
       (fitting : unify valueState baseValue.type (.mapping keyType valueType) = .ok fitted)
@@ -884,6 +907,7 @@ theorem ChildStep.inputs {parent child : CallIndex}
       | solve | apply ActualExpressionInputs.expression_conditional_then <;> assumption
       | solve | apply ActualExpressionInputs.expression_conditional_else <;> assumption
       | solve | apply ActualExpressionInputs.expression_index_key <;> assumption
+      | solve | apply ActualExpressionInputs.expression_index_array <;> assumption
       | solve | apply ActualExpressionInputs.expression_lambda_body <;> assumption
       | solve | apply ActualExpressionInputs.expression_contextual_constructor <;> assumption
       | solve | apply ActualExpressionInputs.expression_call_constructor <;> assumption
@@ -1761,7 +1785,7 @@ theorem child_bound {parent child : CallIndex} (inputs : parent.Inputs)
     | none => cases Except.ok.inj fitting; exact below
     | some type => exact unifyRun fitting below
   case expression_index_key fuel context source expected initial allocated final id value base key brackets baseValue keyValue
-      baseState keyState valueState fitted childFinal keyType valueType accepted form allocation baseAccepted keyFresh valueFresh fitting child =>
+      baseState keyState valueState fitted childFinal keyType valueType accepted form allocation baseAccepted notArray keyFresh valueFresh fitting child =>
     exact unifyRun fitting (freshAllocation valueFresh (freshAllocation keyFresh
       (expressionRun baseAccepted (expressionAllocation allocation below))))
   case matchCases_tail fuel context scrutinee expected saved arm arms initial patternState patternValue result body tail

@@ -1735,6 +1735,7 @@ theorem index_base
     (form : source.value = .index base brackets key)
     (allocation : initial.allocateExpressionId = (id, allocated))
     (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseResult, baseState))
+    (notArray : (baseState.resolve baseResult.type).arrayElement? = none)
     (keyFresh : baseState.fresh = (keyType, keyState))
     (valueFresh : keyState.fresh = (valueType, valueState))
     (mappingAccepted : Detail.unify valueState baseResult.type (.mapping keyType valueType) = .ok mappingState)
@@ -1797,7 +1798,7 @@ theorem index_base
     (valueProperties.1.trans (mappingProgress.trans indexProperties.1)))
   have recorded : recordExpressionWithExpected context source id (indexState.resolve valueType)
       (.index baseResult.id keyResult.id) [] expected indexState = .ok final := by
-    simpa only [inferExprFuel, allocation, form, baseAccepted, keyFresh, valueFresh,
+    simpa only [inferExprFuel, allocation, form, baseAccepted, notArray, keyFresh, valueFresh,
       mappingAccepted, keyAccepted, bind, Except.bind] using accepted
   have finalLife := indexLife.recordExpression catalog.catalog indexProperties.2.1
     (indexProperties.2.1.solved.variablesBelow_apply valueBelow)
@@ -1812,6 +1813,7 @@ theorem index_key
     (form : source.value = .index base brackets key)
     (allocation : initial.allocateExpressionId = (id, allocated))
     (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseResult, baseState))
+    (notArray : (baseState.resolve baseResult.type).arrayElement? = none)
     (keyFresh : baseState.fresh = (keyType, keyState))
     (valueFresh : keyState.fresh = (valueType, valueState))
     (mappingAccepted : Detail.unify valueState baseResult.type (.mapping keyType valueType) = .ok mappingState)
@@ -1848,13 +1850,94 @@ theorem index_key
   have indexLife := lifetime.weaken_entry (sameNext ▸ prefixProgress.next_le)
   have recorded : recordExpressionWithExpected context source id (indexState.resolve valueType)
       (.index baseResult.id keyResult.id) [] expected indexState = .ok final := by
-    simpa only [inferExprFuel, allocation, form, baseAccepted, keyFresh, valueFresh,
+    simpa only [inferExprFuel, allocation, form, baseAccepted, notArray, keyFresh, valueFresh,
       mappingAccepted, keyAccepted, bind, Except.bind] using accepted
   have finalLife := indexLife.recordExpression catalog.catalog indexProperties.2.1
     (indexProperties.2.1.solved.variablesBelow_apply (valueAtMapping.weaken indexProperties.1.next_le))
     (fun type member => (sameNext ▸ expectedBelow type member).weaken
       (Nat.le_trans prefixProgress.next_le indexProperties.1.next_le))
     (safe_resolved indexProperties.2.1 valueSafe)
+    (fun type member => indexLife.older type (expectedBelow type member)) recorded
+  exact finalLife.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
+
+/-- An array read's base: the index, inferred with no expected type after it,
+and the read, recorded at the element of the base's resolved type, keep the
+event's lifetime. -/
+theorem index_array_base {element : Ty}
+    (ready : initial.InferenceReady) (wellFormed : initial.RequirementsWellFormed)
+    (catalog : LifetimeInferenceContext context)
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (form : source.value = .index base brackets key)
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseResult, baseState))
+    (array : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (keyAccepted : inferExprFuel fuel context key none baseState = .ok (keyResult, indexState))
+    (accepted : inferExprFuel (fuel + 1) context source expected initial = .ok final)
+    (lifetime : GeneralizationLifetime event allocated.inference.next baseState [baseResult.type]) :
+    GeneralizationLifetime event initial.inference.next final.2 [final.1.type] := by
+  have allocatedEq : allocated = initial.allocateExpressionId.2 :=
+    (congrArg Prod.snd allocation).symm
+  have sameNext : allocated.inference.next = initial.inference.next := by
+    rw [allocatedEq]; rfl
+  have lifetime : GeneralizationLifetime event initial.inference.next baseState [baseResult.type] := by
+    simpa only [sameNext] using lifetime
+  have baseProperties := inferExprFuel_inferenceProperties
+    (allocatedEq ▸ ready.allocateExpressionId) catalog.formation catalog.canonical (by simp) baseAccepted
+  have allocatedWellFormed : allocated.RequirementsWellFormed := by
+    rw [allocatedEq]
+    exact wellFormed
+  have baseWellFormed := (inferExprFuel_direct_progress baseAccepted).wellFormed allocatedWellFormed
+  have indexProperties := inferExprFuel_inferenceProperties baseProperties.2.1
+    catalog.formation catalog.canonical (by simp) keyAccepted
+  have indexLife := lifetime.inferExpr baseProperties.2.1 baseWellFormed catalog
+    (by simp) (by simp) keyAccepted
+  have elementBelow := arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2 array
+  have prefixProgress := baseProperties.1.trans indexProperties.1
+  have recorded : recordExpressionWithExpected context source id element
+      (.arrayIndex baseResult.id keyResult.id) [] expected indexState = .ok final := by
+    simpa only [inferExprFuel, allocation, form, baseAccepted, array, keyAccepted, bind,
+      Except.bind] using accepted
+  have finalLife := indexLife.recordExpression catalog.catalog indexProperties.2.1
+    (elementBelow.weaken indexProperties.1.next_le)
+    (fun type member => (sameNext ▸ expectedBelow type member).weaken prefixProgress.next_le)
+    (safe_arrayElement indexProperties.1.substitution_extends array
+      (indexLife.values _ (by simp)))
+    (fun type member => indexLife.older type (expectedBelow type member)) recorded
+  exact finalLife.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
+
+/-- An array read's index: the read, recorded at the element of the base's
+resolved type, which is older than the index, keeps the event's lifetime. -/
+theorem index_array {element : Ty}
+    (ready : initial.InferenceReady) (catalog : LifetimeInferenceContext context)
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (form : source.value = .index base brackets key)
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseResult, baseState))
+    (array : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (keyAccepted : inferExprFuel fuel context key none baseState = .ok (keyResult, indexState))
+    (accepted : inferExprFuel (fuel + 1) context source expected initial = .ok final)
+    (lifetime : GeneralizationLifetime event baseState.inference.next indexState [keyResult.type]) :
+    GeneralizationLifetime event initial.inference.next final.2 [final.1.type] := by
+  have allocatedEq : allocated = initial.allocateExpressionId.2 :=
+    (congrArg Prod.snd allocation).symm
+  have sameNext : allocated.inference.next = initial.inference.next := by
+    rw [allocatedEq]; rfl
+  have baseProperties := inferExprFuel_inferenceProperties
+    (allocatedEq ▸ ready.allocateExpressionId) catalog.formation catalog.canonical (by simp) baseAccepted
+  have indexProperties := inferExprFuel_inferenceProperties baseProperties.2.1
+    catalog.formation catalog.canonical (by simp) keyAccepted
+  have elementBelow := arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2 array
+  have elementSafe := lifetime.older element elementBelow
+  have indexLife := lifetime.weaken_entry (sameNext ▸ baseProperties.1.next_le)
+  have recorded : recordExpressionWithExpected context source id element
+      (.arrayIndex baseResult.id keyResult.id) [] expected indexState = .ok final := by
+    simpa only [inferExprFuel, allocation, form, baseAccepted, array, keyAccepted, bind,
+      Except.bind] using accepted
+  have finalLife := indexLife.recordExpression catalog.catalog indexProperties.2.1
+    (elementBelow.weaken indexProperties.1.next_le)
+    (fun type member => (sameNext ▸ expectedBelow type member).weaken
+      (Nat.le_trans baseProperties.1.next_le indexProperties.1.next_le))
+    elementSafe
     (fun type member => indexLife.older type (expectedBelow type member)) recorded
   exact finalLife.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
 

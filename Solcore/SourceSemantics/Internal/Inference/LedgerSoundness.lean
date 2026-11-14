@@ -180,8 +180,17 @@ theorem inferExprFuelLedgerPreservation_step
     obtain ⟨_, _, recorded⟩ := Detail.inferExprFuel_success_proxy_facts form allocation accepted
     exact allocatedTracked.recordExpressionWithExpected recorded
   | index base brackets key =>
+    obtain ⟨baseResult, baseState, baseRun⟩ :=
+      Detail.inferExprFuel_success_index_base form allocation accepted
+    cases arrayEq : (baseState.resolve baseResult.type).arrayElement?
+    case some _ =>
+      obtain ⟨_, _, second, recorded⟩ :=
+        Detail.inferExprFuel_success_arrayIndex_facts form allocation baseRun arrayEq accepted
+      exact (expressionIH second (expressionIH baseRun allocatedTracked)).recordExpressionWithExpected
+        recorded
     obtain ⟨_, _, _, _, _, _, _, _, _, first, keyFresh, valueFresh,
-      unified, second, recorded⟩ := Detail.inferExprFuel_success_index_facts form allocation accepted
+      unified, second, recorded⟩ := Detail.inferExprFuel_success_index_facts form allocation
+        (Detail.index_notArray_of_run baseRun arrayEq) accepted
     have keyTracked := (expressionIH first allocatedTracked).fresh
     rw [keyFresh] at keyTracked
     have valueTracked := keyTracked.fresh

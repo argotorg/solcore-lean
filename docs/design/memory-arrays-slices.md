@@ -341,7 +341,11 @@ wait for the native pipeline's contracts and ABI.
   expected type. Open literal elements wait as row 1's literals do, then default to `uint256`.
 - **Reads.** `a[i]` on an array or a slice takes `i` at `word` or one of the twelve types. An open
   literal index defaults to `uint256`, and the read has the element type. On a mapping, or on a base
-  whose type is still open, `a[i]` keeps today's mapping rule.
+  whose type is still open, `a[i]` keeps today's mapping rule. As built in step 3b, inference
+  records `a[i]` on a base whose resolved type is a memory array as the read, at the element type,
+  and infers the index on its own. Finalization defaults an open literal index to `uint256` and
+  rejects another index type with `operatorNotSupported "Typedef"` (`validateArrayIndex`), as
+  upstream's `bool: Typedef<word>` fails.
 - **Writes.** `a[i] = v`, the compound assignments, in-place `~` and the unchecked forms take the
   element type, with row 1's rules for each type. A write through a slice is rejected.
 - **Slices** take `uint256` bounds and a base that is an array or a slice, and have the type
@@ -509,7 +513,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 2b-ii | The lengths: `a.length`, `a.length()` and `Length.length(a)`. Four commits: 2b-ii-a, the typed form of a memory array's length with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet; 2b-ii-b, inference's typing of `Length.length(a)`, a compiler function's qualified name as `Typedef.abs` is; 2b-ii-c, inference's typing of `a.length`, a field that names no constructor, whose base is a new child of inference's call tree; then 2b-ii-d, `a.length()`, a call of that field with no arguments | 30–50 files, +600–1,000/−100–200; 2b-ii-a measured at 27 files, +160/−10, 2b-ii-b at 19 files, +484/−10, 2b-ii-c at 23 files, +602/−90, 2b-ii-d at 20 files, +593/−51 | none |
 | 2b-iii | The lowering: the Core cells of `new` and the lengths | 15–30 files, +400–800/−50–150; measured at 10 files, +175/−6 | newLen(n), oversized(n) |
 | 3a | Element reads: the typed form of `a[i]` on a memory array with its static rule, evaluation, faults with `0x32`, sized copies, stage and preservation, which no source produces yet | 28–32 files, +400–550/−5–15; measured at 27 files, +352/−10 | none |
-| 3b | Element reads: inference's typing of `a[i]` on a memory array, whose index waits for its type until finalization checks that it is `word` or one of the twelve types | 26–32 files, +800–1,000/−100–180 | none |
+| 3b | Element reads: inference's typing of `a[i]` on a memory array, whose index waits for its type until finalization checks that it is `word` or one of the twelve types | 26–32 files, +800–1,000/−100–180; measured at 28 files, +1,156/−57 | none |
 | 3c | Element reads: the lowering, with `0x32` | 4–6 files, +120–200 | defaultZero(n, i), nestedEmpty(n) |
 | 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
 | 5 | Element writes and compound assignments, with the place checked before the right side | 55–72 files, +1,200–1,700/−300–450 | setGet(n, i, v), fillAndSum(n), compound(v), nestedReplace(n, v), alias(v); ret(n), sum(xs), echo(xs), grid(n) adapted |

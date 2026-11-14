@@ -102,16 +102,27 @@ theorem ChildStep.lifetime_expression
         (by simpa only [allocation] using parametersAccepted) prefixFacts childAccepted unified
         (by simpa only [allocation] using restored)
         (by simpa only [allocation] using recorded)
-  | expression_index_base accepted form allocation childAccepted =>
+  | @expression_index_base _ _ _ _ _ _ _ _ _ _ _ _ inferred childFinal accepted form allocation
+      childAccepted =>
+      cases arrayEq : (childFinal.resolve inferred.type).arrayElement?
+      case some _ =>
+        obtain ⟨indexResult, indexState, keyRun, _⟩ :=
+          inferExprFuel_success_arrayIndex_facts form allocation childAccepted arrayEq accepted
+        exact GeneralizationLifetime.index_array_base inputs.ready inputs.wellFormed inputs.catalog
+          inputs.bounds form allocation childAccepted arrayEq keyRun accepted life
       obtain ⟨baseResult, baseState, keyType, keyState, valueType, valueState, mappingState,
         indexResult, indexState, baseRun, keyFresh, valueFresh, fitted, keyRun, _⟩ :=
-        inferExprFuel_success_index_facts form allocation accepted
+        inferExprFuel_success_index_facts form allocation (index_notArray_of_run childAccepted arrayEq)
+          accepted
       cases Except.ok.inj (baseRun.symm.trans childAccepted)
       exact GeneralizationLifetime.index_base inputs.ready inputs.wellFormed inputs.catalog
-        inputs.bounds form allocation childAccepted keyFresh valueFresh fitted keyRun accepted life
-  | expression_index_key accepted form allocation baseAccepted keyFresh valueFresh fitted childAccepted =>
+        inputs.bounds form allocation childAccepted arrayEq keyFresh valueFresh fitted keyRun accepted life
+  | expression_index_key accepted form allocation baseAccepted notArray keyFresh valueFresh fitted childAccepted =>
       exact GeneralizationLifetime.index_key inputs.ready inputs.catalog inputs.bounds
-        form allocation baseAccepted keyFresh valueFresh fitted childAccepted accepted life
+        form allocation baseAccepted notArray keyFresh valueFresh fitted childAccepted accepted life
+  | expression_index_array accepted form allocation baseAccepted array childAccepted =>
+      exact GeneralizationLifetime.index_array inputs.ready inputs.catalog inputs.bounds
+        form allocation baseAccepted array childAccepted accepted life
   | expression_call_arguments accepted form allocation nonconstructor childAccepted =>
       exact GeneralizationLifetime.call_arguments inputs.ready inputs.wellFormed inputs.catalog
         inputs.bounds form allocation nonconstructor childAccepted accepted life
@@ -420,6 +431,31 @@ theorem index_suffix_progress
     (fun type member => (expectedBelow type member).weaken beforeRecord.next_le) recorded).1
   exact ⟨beforeRecord.trans recordedProgress, recordedProgress⟩
 
+/-- An array read's suffix after its base: the index, inferred with no expected
+type, then the read, recorded at the element of the base's resolved type,
+progress from the base's final state. -/
+theorem arrayIndex_suffix_progress
+    {fuel : Nat} {context : SourceInference.Context} {source key : Syntax.Expr}
+    {id : ExpressionId} {expected : Option Ty}
+    {baseResult keyResult : InferredExpression}
+    {baseState indexState : State} {element : Ty} {result : InferredExpression × State}
+    (ready : baseState.InferenceReady) (catalog : LifetimeInferenceContext context)
+    (baseBelow : baseResult.type.VariablesBelow baseState.inference.next)
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow baseState.inference.next)
+    (array : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (keyRun : inferExprFuel fuel context key none baseState = .ok (keyResult, indexState))
+    (recorded : recordExpressionWithExpected context source id element
+      (.arrayIndex baseResult.id keyResult.id) [] expected indexState = .ok result) :
+    baseState.InferenceProgress result.2 ∧ indexState.InferenceProgress result.2 := by
+  have indexProperties := inferExprFuel_inferenceProperties ready catalog.formation
+    catalog.canonical (by simp) keyRun
+  have elementBelow := arrayElement_variablesBelow ready baseBelow array
+  have recordedProgress := (recordExpressionWithExpected_inferenceProperties indexProperties.2.1
+    (elementBelow.weaken indexProperties.1.next_le)
+    (fun type member => (expectedBelow type member).weaken indexProperties.1.next_le)
+    recorded).1
+  exact ⟨indexProperties.1.trans recordedProgress, recordedProgress⟩
+
 theorem lambda_suffix_progress
     {childFuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
     {parameters : Syntax.DelimitedList Syntax.LambdaParameter} {annotation : Option Syntax.TypeExpr}
@@ -620,19 +656,44 @@ theorem ChildStep.progress_expression
         (by simpa only [allocation] using parametersAccepted) prefixFacts childAccepted unified
         (by simpa only [allocation] using restored)
         (by simpa only [allocation] using recorded)
-  | expression_index_base accepted form allocation childAccepted =>
+  | @expression_index_base _ _ _ _ _ _ _ _ _ _ _ _ inferred childFinal accepted form allocation
+      childAccepted =>
+      cases arrayEq : (childFinal.resolve inferred.type).arrayElement?
+      case some _ =>
+        obtain ⟨indexResult, indexState, keyRun, recorded⟩ :=
+          inferExprFuel_success_arrayIndex_facts form allocation childAccepted arrayEq accepted
+        exact (arrayIndex_suffix_progress childProperties.2.1 inputs.catalog
+          (childProperties.2.2 _ (by simp [CallIndex.outputTypes]))
+          (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken
+            childProperties.1.next_le)
+          arrayEq keyRun recorded).1
       obtain ⟨baseResult, baseState, keyType, keyState, valueType, valueState, mappingState,
         indexResult, indexState, baseRun, keyFresh, valueFresh, fitted, keyRun, recorded⟩ :=
-        inferExprFuel_success_index_facts form allocation accepted
+        inferExprFuel_success_index_facts form allocation (index_notArray_of_run childAccepted arrayEq)
+          accepted
       cases Except.ok.inj (baseRun.symm.trans childAccepted)
       exact (index_suffix_progress childProperties.2.1 inputs.catalog
         (childProperties.2.2 _ (by simp [CallIndex.outputTypes]))
         (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken childProperties.1.next_le)
         keyFresh valueFresh fitted keyRun recorded).1
-  | expression_index_key accepted form allocation baseAccepted keyFresh valueFresh fitted childAccepted =>
+  | expression_index_array accepted form allocation baseAccepted array childAccepted =>
+      obtain ⟨indexResult, indexState, keyRun, recorded⟩ :=
+        inferExprFuel_success_arrayIndex_facts form allocation baseAccepted array accepted
+      cases Except.ok.inj (keyRun.symm.trans childAccepted)
+      have baseProperties := inferExprFuel_inferenceProperties
+        (allocation_ready inputs.ready allocation)
+        inputs.catalog.formation inputs.catalog.canonical (by simp) baseAccepted
+      have elementBelow := arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2 array
+      exact (recordExpressionWithExpected_inferenceProperties childProperties.2.1
+        (elementBelow.weaken childProperties.1.next_le)
+        (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken
+          (Nat.le_trans baseProperties.1.next_le childProperties.1.next_le))
+        recorded).1
+  | expression_index_key accepted form allocation baseAccepted notArray keyFresh valueFresh fitted childAccepted =>
       obtain ⟨baseResult, baseState, keyType, keyState, valueType, valueState, mappingState,
         indexResult, indexState, baseRun, actualKeyFresh, actualValueFresh, actualFitted, keyRun, recorded⟩ :=
-        inferExprFuel_success_index_facts form allocation accepted
+        inferExprFuel_success_index_facts form allocation (index_notArray_of_run baseAccepted notArray)
+          accepted
       cases Except.ok.inj (baseRun.symm.trans baseAccepted)
       cases actualKeyFresh.symm.trans keyFresh
       cases actualValueFresh.symm.trans valueFresh

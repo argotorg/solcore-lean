@@ -1186,6 +1186,229 @@ private theorem unify_success_typingSourceExtends
     rw [(Detail.unify_occurrenceState_eq success).1]
     exact List.prefix_rfl
 
+/-- A memory array read, `.arrayIndex` of the array and the index at the
+element type, has its raw type once the array, a memory array once resolved,
+and its index are typed in the final source, with an index type that
+finalization admits. -/
+theorem arrayIndex_formType
+    {semanticSource : TypedSource} {active : SourceSemantics.Context}
+    {substitution : Substitution} {state : State} {array index : InferredExpression}
+    {element : Ty}
+    (resolved : state.resolve array.type = Ty.array element)
+    (extension : substitution.SemanticallyExtends state.inference.substitution)
+    (arrayTyped : ExpressionHasType semanticSource active array.id
+      (substitution.apply array.type))
+    (indexTyped : ExpressionHasType semanticSource active index.id
+      (substitution.apply index.type))
+    (indexFits : Detail.arrayIndexFits (substitution.apply index.type) = true) :
+    ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.arrayIndex array.id index.id).applySubstitution substitution)
+      (substitution.apply element) (.ordinary []) := by
+  have arrayTypeEq : substitution.apply array.type =
+      Ty.array (substitution.apply element) := by
+    rw [← extension array.type]
+    change substitution.apply (state.resolve array.type) = _
+    rw [resolved]
+    rfl
+  have arrayType : ExpressionHasType semanticSource active array.id
+      (Ty.array (substitution.apply element)) := by
+    rw [← arrayTypeEq]
+    exact arrayTyped
+  exact .arrayIndex arrayType indexTyped (arrayIndexType_of_fits indexFits)
+
+/-- `a[i]` on a memory array types its base and its index, each inferred with
+no expected type, from their own retained subtrees, and records the read at the
+element of the base's resolved type, whose index type finalization checks. -/
+theorem actualArrayIndex_typing {fuel : Nat}
+    (recursive : ActualInferExprFuelRetainedSoundness fuel)
+    {wholeContext inferenceContext : Frontend.SourceInference.Context}
+    {wholeReturn : Ty} {expression base index : Syntax.Expr} {brackets : Syntax.SourceSpan}
+    {expected : Option Ty}
+    {initial allocated baseState resultState evidenceState : State} {id : ExpressionId}
+    {baseResult inferred : InferredExpression} {element : Ty} {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    {semanticSource : TypedSource}
+    {frames : List InitializedLetBinding}
+    {semanticContext : SourceSemantics.Context}
+    (expressionEq : expression.value = .index base brackets index)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (baseSuccess : Detail.inferExprFuel fuel inferenceContext base none allocated =
+      .ok (baseResult, baseState))
+    (arrayEq : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression expected initial =
+      .ok (inferred, resultState))
+    (resources : FinalInferenceResources wholeContext wholeReturn evidenceState roots finalized)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces wholeContext.signatures
+      finalized.solvedRequirements finalized.typedSource)
+    (resultSubstitutionExtension : finalized.substitution.SemanticallyExtends
+      resultState.inference.substitution)
+    (signaturesEq : inferenceContext.signatures = wholeContext.signatures)
+    (ownerEq : inferenceContext.scope.genericOwner = wholeContext.scope.genericOwner)
+    (typeParametersEq : inferenceContext.typeParameters = wholeContext.typeParameters)
+    (assumptionsEq : inferenceContext.assumptions = wholeContext.assumptions)
+    (signatureFormation : ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ candidate ∈ inferenceContext.signatures.functions,
+      candidate.scheme.body = .function
+        (Ty.productMany candidate.parameterTypes)
+        (Ty.productMany candidate.returnTypes))
+    (catalog : SignatureCatalogWellFormed inferenceContext.signatures)
+    (canonical : SignatureParametersWellFormed inferenceContext.scope.genericOwner
+      inferenceContext.typeParameters)
+    (invariant : RecursiveExpressionInvariant wholeContext finalized initial semanticContext)
+    (actual : ActualContext wholeContext finalized frames semanticContext)
+    (allocatedInvariant : RecursiveExpressionInvariant wholeContext finalized allocated semanticContext)
+    (allocatedOperational : ActualStateInvariant allocated (evidenceState.toTypedSource roots))
+    (allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next)
+    (finalPreserved : ProperDescendantsPreserved finalized.substitution
+      (resultState.toTypedSource roots) finalized.typedSource (.expression inferred.id))
+    (rawProper : RawProperDescendantsPreserved (resultState.toTypedSource roots)
+      (evidenceState.toTypedSource roots) (.expression inferred.id))
+    (integerPatternsSubset : resultState.integerPatterns ⊆ evidenceState.integerPatterns)
+    (integerLiteralsSubset : resultState.integerLiterals ⊆ evidenceState.integerLiterals)
+    (requirementsSubset : resultState.requirements ⊆ evidenceState.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (coercionsRetained : ExpressionCoercionPrimariesRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (operatorsRetained : ExpressionOperatorSiteRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (childrenRetained : ExpressionDirectChildrenRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (covered : TemplateScopeCovered finalized.typedSource semanticContext (.expression inferred.id))
+    (semanticPreserved : ProperDescendantsPreserved finalized.substitution
+      (resultState.toTypedSource roots) semanticSource (.expression inferred.id))
+    (actualCovered : ActualContext.Covers finalized frames (.expression inferred.id)) :
+    ExpressionTypingBase (resultState.toTypedSource roots) semanticSource
+      semanticContext finalized.substitution inferred := by
+  obtain ⟨indexResult, indexState, indexSuccess, recorded⟩ :=
+    Detail.inferExprFuel_success_arrayIndex_facts expressionEq allocationEq baseSuccess arrayEq
+      success
+  have baseProperties := Detail.inferExprFuel_inferenceProperties allocatedInvariant.ready
+    signatureFormation functionsCanonical (by intro _ member; simp at member) baseSuccess
+  have indexProperties := Detail.inferExprFuel_inferenceProperties baseProperties.2.1
+    signatureFormation functionsCanonical (by intro _ member; simp at member) indexSuccess
+  have elementBelow := Detail.arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2
+    arrayEq
+  have expectedAtIndex : ∀ type ∈ expected, type.VariablesBelow indexState.inference.next :=
+    fun type member => (allocatedExpected type member).weaken
+      (baseProperties.1.trans indexProperties.1).next_le
+  have recordedProperties := Detail.recordExpressionWithExpected_inferenceProperties
+    indexProperties.2.1 (elementBelow.weaken indexProperties.1.next_le) expectedAtIndex recorded
+  have laterIndex : finalized.substitution.SemanticallyExtends
+      indexState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans resultSubstitutionExtension
+      recordedProperties.1.substitution_extends
+  have laterBase : finalized.substitution.SemanticallyExtends
+      baseState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans laterIndex
+      indexProperties.1.substitution_extends
+  have baseBelow : baseState.NodesBelowNextOccurrence :=
+    (Detail.inferExprFuel_occurrenceBoundExtends baseSuccess
+      ).nodesBelowNextOccurrence allocatedInvariant.nodesBelow
+  have baseToIndex := inferExprFuel_success_typingSourceExtends indexSuccess baseBelow roots
+  have indexToParent : TypingSourceExtends (indexState.toTypedSource roots)
+      (resultState.toTypedSource roots) :=
+    ⟨Detail.recordExpressionWithExpected_preserves_owner recorded,
+      recordExpressionWithExpected_success_nodesPrefix recorded⟩
+  have baseToParent := TypingSourceExtends.trans baseToIndex indexToParent
+  have indexIntegerLiteralsSubset :
+      indexState.integerLiterals ⊆ resultState.integerLiterals := by
+    intro origin member
+    rw [Detail.recordExpressionWithExpected_integerLiterals_eq recorded]
+    exact member
+  have baseIntegerLiteralsSubset :
+      baseState.integerLiterals ⊆ resultState.integerLiterals :=
+    List.Subset.trans (Detail.inferExprFuel_integerLiterals_subset indexSuccess)
+      indexIntegerLiteralsSubset
+  have indexIntegerPatternsSubset :
+      indexState.integerPatterns ⊆ resultState.integerPatterns := by
+    intro origin member
+    rw [recordExpressionWithExpected_integerPatterns_eq recorded]
+    exact member
+  have baseIntegerPatternsSubset :
+      baseState.integerPatterns ⊆ resultState.integerPatterns :=
+    List.Subset.trans (Detail.inferExprFuel_integerPatterns_subset indexSuccess)
+      indexIntegerPatternsSubset
+  have indexRequirementsSubset :
+      indexState.requirements ⊆ resultState.requirements :=
+    Detail.recordExpressionWithExpected_requirements_subset recorded
+  have baseRequirementsSubset :
+      baseState.requirements ⊆ resultState.requirements :=
+    List.Subset.trans (Detail.inferExprFuel_requirements_subset indexSuccess)
+      indexRequirementsSubset
+  have baseInvariant := allocatedInvariant.ofExpression signatureFormation functionsCanonical
+    (by simp) laterBase baseSuccess
+  have baseOperational := allocatedOperational.ofExpression baseSuccess baseProperties.1.next_le
+  obtain ⟨coercions, contains⟩ := recordExpressionWithExpected_success_containsExpression recorded roots
+  have edge : ∀ child ∈ [baseResult.id, indexResult.id],
+      DirectChild (resultState.toTypedSource roots) (.expression inferred.id) (.expression child) := by
+    intro child member
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    simpa [nodeChildIds, Node.references, ExpressionForm.references] using
+      (List.mem_map.mpr ⟨child, member, rfl⟩ : NodeId.expression child ∈
+        [baseResult.id, indexResult.id].map NodeId.expression)
+  have baseEdge := edge baseResult.id (by simp)
+  have indexEdge := edge indexResult.id (by simp)
+  have baseTyped := actualInferExprFuelFinalSubtreeSoundness_of_retainedSoundness recursive
+    baseSuccess resources interfaces laterBase signaturesEq ownerEq typeParametersEq assumptionsEq
+    signatureFormation functionsCanonical catalog canonical allocatedInvariant actual
+    allocatedOperational (by simp) (by simp)
+    ((semanticPreserved.childSubtree baseEdge).monoBefore baseToParent)
+    ((finalPreserved.childSubtree baseEdge).monoBefore baseToParent)
+    ((rawProper.childSubtree baseEdge).monoBefore baseToParent).proper
+    (List.Subset.trans baseIntegerPatternsSubset integerPatternsSubset)
+    (List.Subset.trans baseIntegerLiteralsSubset integerLiteralsSubset)
+    (List.Subset.trans baseRequirementsSubset requirementsSubset)
+    (covered.expressionChild resources.graph_closed (childrenRetained baseEdge))
+    (actualCovered.directChild (childrenRetained baseEdge))
+  have indexTyped := actualInferExprFuelFinalSubtreeSoundness_of_retainedSoundness recursive
+    indexSuccess resources interfaces laterIndex signaturesEq ownerEq typeParametersEq assumptionsEq
+    signatureFormation functionsCanonical catalog canonical baseInvariant actual baseOperational
+    (by simp) (by simp)
+    ((semanticPreserved.childSubtree indexEdge).monoBefore indexToParent)
+    ((finalPreserved.childSubtree indexEdge).monoBefore indexToParent)
+    ((rawProper.childSubtree indexEdge).monoBefore indexToParent).proper
+    (List.Subset.trans indexIntegerPatternsSubset integerPatternsSubset)
+    (List.Subset.trans indexIntegerLiteralsSubset integerLiteralsSubset)
+    (List.Subset.trans indexRequirementsSubset requirementsSubset)
+    (covered.expressionChild resources.graph_closed (childrenRetained indexEdge))
+    (actualCovered.directChild (childrenRetained indexEdge))
+  -- The index's typing in the finalized source, where finalization checked its type.
+  have indexFinal := actualInferExprFuelFinalSubtreeSoundness_of_retainedSoundness recursive
+    indexSuccess resources interfaces laterIndex signaturesEq ownerEq typeParametersEq assumptionsEq
+    signatureFormation functionsCanonical catalog canonical baseInvariant actual baseOperational
+    (by simp) (by simp)
+    ((finalPreserved.childSubtree indexEdge).monoBefore indexToParent)
+    ((finalPreserved.childSubtree indexEdge).monoBefore indexToParent)
+    ((rawProper.childSubtree indexEdge).monoBefore indexToParent).proper
+    (List.Subset.trans indexIntegerPatternsSubset integerPatternsSubset)
+    (List.Subset.trans indexIntegerLiteralsSubset integerLiteralsSubset)
+    (List.Subset.trans indexRequirementsSubset requirementsSubset)
+    (covered.expressionChild resources.graph_closed (childrenRetained indexEdge))
+    (actualCovered.directChild (childrenRetained indexEdge))
+  obtain ⟨indexNode, indexContains, indexNodeType⟩ := indexFinal.stored_type
+  have indexFits : Detail.arrayIndexFits (finalized.substitution.apply indexResult.type) = true := by
+    have fits := SourceArrayIndexesFit.of_operatorSite
+      (@FinalInferenceResources.array_indexes_fit _ _ _ _ _ resources) operatorsRetained contains rfl
+      (by simp) indexContains
+    rw [indexNodeType] at fits
+    exact fits
+  have arrayTypeEq : finalized.substitution.apply baseResult.type =
+      Ty.array (finalized.substitution.apply element) := by
+    rw [← laterBase baseResult.type]
+    change finalized.substitution.apply (baseState.resolve baseResult.type) = _
+    rw [Ty.arrayElement?_eq_some arrayEq]
+    rfl
+  have formType := arrayIndex_formType (Ty.arrayElement?_eq_some arrayEq) laterBase baseTyped
+    indexTyped indexFits
+  have rawAdmissible : TypeAdmissible semanticContext (finalized.substitution.apply element) := by
+    have baseAdmissible := baseTyped.type_admissible
+    rw [arrayTypeEq] at baseAdmissible
+    exact TypeAdmissible.array_element baseAdmissible
+  exact recordExpressionWithExpected_success_expressionTypingBase_actual resources interfaces
+    recorded resultSubstitutionExtension requirementsSubset retained coercionsRetained
+    catalog signaturesEq invariant formType rawAdmissible covered
+
 theorem actualInferExprFuelRetainedSoundness_index {fuel : Nat}
     (recursive : ActualInferExprFuelRetainedSoundness fuel) :
   ∀ {wholeContext inferenceContext : Frontend.SourceInference.Context}
@@ -1255,7 +1478,7 @@ theorem actualInferExprFuelRetainedSoundness_index {fuel : Nat}
     ownerEq typeParametersEq assumptionsEq signatureFormation
     functionsCanonical catalog canonical invariant actual operational expectedBelow expectedAdmissible
     finalPreserved rawProper integerPatternsSubset integerLiteralsSubset requirementsSubset
-    retained coercionsRetained _operatorsRetained childrenRetained covered semanticPreserved actualCovered
+    retained coercionsRetained operatorsRetained childrenRetained covered semanticPreserved actualCovered
   generalize allocationEq : initial.allocateExpressionId = allocatedPair
   rcases allocatedPair with ⟨id, allocated⟩
   have allocatedInvariant := invariant.allocateExpressionId allocationEq
@@ -1274,10 +1497,21 @@ theorem actualInferExprFuelRetainedSoundness_index {fuel : Nat}
   have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
     rw [allocateExpressionId_inferenceNext_eq allocationEq]
     exact expectedBelow
+  obtain ⟨arrayBase, arrayBaseState, arrayBaseRun⟩ :=
+    Detail.inferExprFuel_success_index_base expressionEq allocationEq success
+  cases arrayEq : (arrayBaseState.resolve arrayBase.type).arrayElement?
+  case some _ =>
+    exact actualArrayIndex_typing recursive expressionEq allocationEq arrayBaseRun arrayEq success
+      resources interfaces resultSubstitutionExtension signaturesEq ownerEq typeParametersEq
+      assumptionsEq signatureFormation functionsCanonical catalog canonical invariant actual
+      allocatedInvariant allocatedOperational allocatedExpected finalPreserved rawProper
+      integerPatternsSubset integerLiteralsSubset requirementsSubset retained coercionsRetained
+      operatorsRetained childrenRetained covered semanticPreserved actualCovered
   obtain ⟨baseResult, baseState, keyType, keyState, valueType, valueState,
       mappingState, indexResult, indexState, baseSuccess, keyFresh, valueFresh,
       mappingSuccess, indexSuccess, recorded⟩ :=
-    Detail.inferExprFuel_success_index_facts expressionEq allocationEq success
+    Detail.inferExprFuel_success_index_facts expressionEq allocationEq
+      (Detail.index_notArray_of_run arrayBaseRun arrayEq) success
   have baseProperties := Detail.inferExprFuel_inferenceProperties
     allocatedInvariant.ready signatureFormation functionsCanonical (by
       intro expectedType member

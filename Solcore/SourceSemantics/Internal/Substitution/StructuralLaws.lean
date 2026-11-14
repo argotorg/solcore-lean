@@ -6136,6 +6136,16 @@ theorem mapping_value
     exact (admissible.typeWellScoped.mapping_components key value rfl).2
   exact component admissible componentScoped
 
+/-- The element of an admissible memory array type is admissible. -/
+theorem array_element
+    {context : Context} {element : Ty}
+    (admissible : TypeAdmissible context (Ty.array element)) :
+    TypeAdmissible context element := by
+  have componentScoped : TypeWellScoped context
+      (admissibleTypeVariables context (Ty.array element)) element :=
+    admissible.typeWellScoped.array_element element rfl
+  exact component admissible componentScoped
+
 end Solcore.SourceSemantics.TypeAdmissible
 
 namespace Solcore.SourceSemantics.DeclarationInstantiation.Admissible

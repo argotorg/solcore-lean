@@ -157,6 +157,8 @@ open ExecutableCoercionInterfaces
 def OperatorApplicationForm : ExpressionForm → Prop
   | .unary _ _ => True
   | .binary _ _ _ => True
+  -- A memory array read keeps its form too, which finalization's index check reads.
+  | .arrayIndex _ _ => True
   | _ => False
 
 /-- An operator dispatched to a trait method applies an operator. -/
@@ -319,6 +321,23 @@ theorem SourceShiftOperandsFit.of_operatorSite
     retained contains [] (by simpa [Detail.coercionRequirements] using requirements)
       (by simp [OperatorApplicationForm, form])
   exact fits finalFound (finalForm.trans form) shift leftContains rightContains
+
+/-- A memory array read keeps its form through later coercion attachment, so
+finalization's check of the finalized occurrence covers its index. -/
+theorem SourceArrayIndexesFit.of_operatorSite
+    {before source : TypedSource} {id base index : ExpressionId}
+    {node indexNode : ExpressionNode}
+    (fits : SourceArrayIndexesFit source)
+    (retained : ExpressionOperatorSiteRetainedAt before source id)
+    (contains : ContainsExpression before id node)
+    (form : node.form = .arrayIndex base index)
+    (requirements : node.requirements = Detail.coercionRequirements node.coercions)
+    (indexContains : ContainsExpression source index indexNode) :
+    Detail.arrayIndexFits indexNode.type = true := by
+  obtain ⟨finalNode, finalFound, _, finalForm⟩ :=
+    retained contains [] (by simpa [Detail.coercionRequirements] using requirements)
+      (by simp [OperatorApplicationForm, form])
+  exact fits finalFound (finalForm.trans form) indexContains
 end Solcore.SourceSemantics.SourceInferenceSoundness
 end
 

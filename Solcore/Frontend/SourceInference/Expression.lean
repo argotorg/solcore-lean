@@ -2032,13 +2032,21 @@ mutual
             (.proxy inner) [] expected state
       | .index base _ index => do
           let (base, state) ← inferExprFuel fuel context base none state
-          let (keyType, state) := state.fresh
-          let (valueType, state) := state.fresh
-          let state ← unify state base.type (.mapping keyType valueType)
-          let (index, state) ← inferExprFuel fuel context index
-            (some (state.resolve keyType)) state
-          recordExpressionWithExpected context expression id
-            (state.resolve valueType) (.index base.id index.id) [] expected state
+          match (state.resolve base.type).arrayElement? with
+          | none =>
+              let (keyType, state) := state.fresh
+              let (valueType, state) := state.fresh
+              let state ← unify state base.type (.mapping keyType valueType)
+              let (index, state) ← inferExprFuel fuel context index
+                (some (state.resolve keyType)) state
+              recordExpressionWithExpected context expression id
+                (state.resolve valueType) (.index base.id index.id) [] expected state
+          -- A memory array's read infers its index on its own, which finalization checks
+          -- (`validateArrayIndex`), and has the element type.
+          | some element =>
+              let (index, state) ← inferExprFuel fuel context index none state
+              recordExpressionWithExpected context expression id element
+                (.arrayIndex base.id index.id) [] expected state
       | .field base _ name => do
           let candidates ← constructorCalleeCandidates context state expression
           match candidates with

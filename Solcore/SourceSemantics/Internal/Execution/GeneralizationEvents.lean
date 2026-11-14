@@ -196,6 +196,7 @@ local macro "actual_descend " parent:term : tactic => `(tactic|
    | (apply ChildStep.expression_lambda_body <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.expression_index_base <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.expression_index_key <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
+   | (apply ChildStep.expression_index_array <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.expression_call_constructor <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.expression_call_arguments <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.expression_call_callee <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))

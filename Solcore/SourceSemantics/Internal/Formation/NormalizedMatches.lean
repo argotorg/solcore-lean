@@ -954,7 +954,8 @@ theorem inferExprFuel_index_formation
     (form : expression.value = .index base brackets key)
     (baseIH : InferExprFuelFormation semantic outer fuel context base none initial.allocateExpressionId.2)
     (keyIH : ∀ keyType state, InferExprFuelFormation semantic outer fuel context key
-      (some (state.resolve keyType)) state) :
+      (some (state.resolve keyType)) state)
+    (arrayIH : ∀ state, InferExprFuelFormation semantic outer fuel context key none state) :
     InferExprFuelFormation semantic outer (fuel + 1) context expression expected initial := by
   intro ready nodes formed formation expectedBelow expectedFormed result accepted continuation noCapture
   unfold inferExprFuel at accepted
@@ -964,6 +965,49 @@ theorem inferExprFuel_index_formation
   | ok basePair =>
     rcases basePair with ⟨baseValue,baseState⟩
     simp only [baseRun] at accepted
+    cases arrayEq : (baseState.resolve baseValue.type).arrayElement?
+    case some element =>
+      simp only [arrayEq] at accepted
+      cases keyRun : inferExprFuel fuel context key none baseState with
+      | error error => simp [keyRun] at accepted
+      | ok keyPair =>
+        rcases keyPair with ⟨keyValue,keyState⟩
+        simp only [keyRun] at accepted
+        have allocation : initial.InferenceProgress initial.allocateExpressionId.2 ∧
+            initial.allocateExpressionId.2.InferenceReady :=
+          ⟨State.InferenceProgress.allocateExpressionId initial ready.solved, ready.allocateExpressionId⟩
+        have allocatedNodes := (State.OccurrenceBoundExtends.allocateExpressionId initial).nodesBelowNextOccurrence nodes
+        have baseProperties := inferExprFuel_inferenceProperties allocation.2
+          formation.validated formation.functionShapes (by simp) baseRun
+        have baseNodes := (inferExprFuel_occurrenceBoundExtends baseRun).nodesBelowNextOccurrence allocatedNodes
+        have keyProperties := inferExprFuel_inferenceProperties baseProperties.2.1
+          formation.validated formation.functionShapes (by simp) keyRun
+        have elementBelow := arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2 arrayEq
+        have throughKey := allocation.1.trans (baseProperties.1.trans keyProperties.1)
+        have expectedAtKey : ∀ type ∈ expected, type.VariablesBelow keyState.inference.next :=
+          fun type member => (expectedBelow type member).weaken throughKey.next_le
+        have recorded := recordExpressionWithExpected_inferenceProperties keyProperties.2.1
+          (elementBelow.weaken keyProperties.1.next_le) expectedAtKey accepted
+        have recordFields := recording_fields accepted
+        have keyContinuation := continuation.trans recorded.1.substitution_extends
+        have baseContinuation := keyContinuation.trans keyProperties.1.substitution_extends
+        have keyNoCapture := noCapture.of_prefix recordFields.2
+        have basePrefix : baseState.nodes <+: keyState.nodes :=
+          inferExprFuel_preserves_nodesPrefix keyRun List.prefix_rfl baseNodes (Nat.le_refl _)
+        have baseFormed := baseIH allocation.2 allocatedNodes (formed.congr rfl rfl) formation
+          (by simp) (by simp) _ baseRun baseContinuation (keyNoCapture.of_prefix basePrefix)
+        have keyFormed := arrayIH baseState baseProperties.2.1 baseNodes baseFormed.2 formation
+          (by simp) (by simp) _ keyRun keyContinuation keyNoCapture
+        have elementFormed : TypeAdmissible semantic (outer.apply element) := by
+          have baseType := baseFormed.1
+          rw [← baseContinuation baseValue.type] at baseType
+          change TypeAdmissible semantic (outer.apply (baseState.resolve baseValue.type)) at baseType
+          rw [Ty.arrayElement?_eq_some arrayEq] at baseType
+          exact TypeAdmissible.array_element baseType
+        have fitted := recordExpressionWithExpected_normalized_formation formation.toFormationContext
+          continuation elementFormed expectedFormed accepted
+        exact ⟨fitted.1,keyFormed.2.of_new_rows recordFields.1 fitted.2⟩
+    simp only [arrayEq] at accepted
     cases unified : unify baseState.fresh.2.fresh.2 baseValue.type
         (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1) with
     | error error => simp [unified] at accepted

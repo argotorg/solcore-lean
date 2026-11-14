@@ -1530,6 +1530,36 @@ private def testArrayLength : IO Unit := do
     "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); return m.length(1); }"
     fun _ => true
 
+/-- `a[i]` on a memory array has its element type and takes an index of `word`
+or one of the twelve types, an open literal defaulting to `uint256`; a `bool`
+index is rejected with `Typedef`'s name, and an element write stays rejected. -/
+private def testArrayIndex : IO Unit := do
+  let functions ← check "array index" (String.intercalate "\n" [
+    "function read(n: uint256, i: uint256) returns (uint256) {",
+    "  let m: uint256[] = new uint256[](n);",
+    "  let rows: uint256[][] = new uint256[][](n);",
+    "  let k: int8 = -1;",
+    "  let w: word = 1;",
+    "  let j = 1;",
+    "  return m[i] + m[k] + m[w] + m[j] + m[0] + Length.length(rows[n - 1]);",
+    "}"
+  ])
+  let function ← match functions with
+    | [function] => pure function
+    | _ => throw (IO.userError "array index fixture lost its checked function")
+  let reads := function.typedBody.nodes.filterMap fun
+    | .expression { form := .arrayIndex _ _, type, .. } => some type
+    | _ => none
+  let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
+  assertTrue (decide (reads = [uint256, uint256, uint256, uint256, uint256, .array uint256]))
+    s!"a[i] did not type the arrays' reads at their element types: {reprStr reads}"
+  expectInferenceError "a bool index"
+    "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); return m[true]; }"
+    fun error => error == .operatorNotSupported "Typedef" .bool
+  expectInferenceError "an element write"
+    "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[0] = n; return n; }"
+    fun _ => true
+
 /-- Inference rejects the slices until row 4 gives them a meaning. -/
 private def testSliceRejected : IO Unit := do
   expectInferenceError "array slice"
@@ -1546,6 +1576,7 @@ def testSourcePhase7Inference : IO Unit := do
   testNonterminalMatch
   testNewArray
   testArrayLength
+  testArrayIndex
   testSliceRejected
   IO.println "phase-7 source inference GREEN"
 

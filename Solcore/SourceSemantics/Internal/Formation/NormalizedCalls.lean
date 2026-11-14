@@ -2491,9 +2491,11 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
     · exact rightIH
   case case19 =>
     intro context expression expected initial fuel id allocated allocationEq base brackets index form baseIH indexIH
+      arrayIH
     apply inferExprFuel_index_formation form
     · simpa only [allocationEq] using baseIH
     · exact indexIH
+    · exact arrayIH
   case case69 =>
     intro context target initial fuel base brackets key form baseIH keyIH
     exact inferPlaceFuel_index_formation form baseIH keyIH

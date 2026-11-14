@@ -728,9 +728,85 @@ theorem inferExprFuel_success_conditional_facts
                     rfl, thenSuccess, elseSuccess, unifySuccess,
                     success⟩
 
-/-- Invert successful index inference through base traversal, both fresh type
-allocations, mapping-shape unification, index traversal, and the exact final
-recording operation. -/
+/-- A successful index inference first infers its base with no expected
+type. -/
+theorem inferExprFuel_success_index_base
+    {fuel : Nat} {context : Context} {expression base index : Syntax.Expr}
+    {brackets : Syntax.SourceSpan}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .index base brackets index)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ baseResult baseState,
+      inferExprFuel fuel context base none allocated = .ok (baseResult, baseState) := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases baseSuccess : inferExprFuel fuel context base none allocated with
+  | error error =>
+      simp [baseSuccess] at success
+  | ok basePair =>
+      rcases basePair with ⟨baseResult, baseState⟩
+      exact ⟨baseResult, baseState, rfl⟩
+
+/-- Inference is a function, so a base run that is not a memory array decides
+every run of the same base. -/
+theorem index_notArray_of_run
+    {fuel : Nat} {context : Context} {base : Syntax.Expr} {allocated baseState : State}
+    {baseValue : InferredExpression}
+    (run : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
+    (notArray : (baseState.resolve baseValue.type).arrayElement? = none) :
+    ∀ {baseResult : InferredExpression} {otherState : State},
+      inferExprFuel fuel context base none allocated = .ok (baseResult, otherState) →
+        (otherState.resolve baseResult.type).arrayElement? = none := by
+  intro baseResult otherState other
+  cases Except.ok.inj (other.symm.trans run)
+  exact notArray
+
+/-- The element of a memory array type that a ready state resolved is below the
+state's next variable whenever the array's type is. -/
+theorem arrayElement_variablesBelow {state : State} {type element : Ty}
+    (ready : state.InferenceReady) (below : type.VariablesBelow state.inference.next)
+    (array : (state.resolve type).arrayElement? = some element) :
+    element.VariablesBelow state.inference.next := by
+  have resolvedBelow : (state.resolve type).VariablesBelow state.inference.next :=
+    ready.solved.variablesBelow_apply below
+  rw [Ty.arrayElement?_eq_some array] at resolvedBelow
+  exact ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2
+
+/-- Invert successful `a[i]` inference on a memory array: once the base,
+inferred with no expected type, resolves to an array of `element`, the index is
+inferred with no expected type, and the read is recorded at `element`. -/
+theorem inferExprFuel_success_arrayIndex_facts
+    {fuel : Nat} {context : Context} {expression base index : Syntax.Expr}
+    {brackets : Syntax.SourceSpan}
+    {expected : Option Ty} {initial allocated baseState : State}
+    {id : ExpressionId} {baseResult : InferredExpression} {element : Ty}
+    {result : InferredExpression × State}
+    (expressionEq : expression.value = .index base brackets index)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (baseRun : inferExprFuel fuel context base none allocated = .ok (baseResult, baseState))
+    (array : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ indexResult indexState,
+      inferExprFuel fuel context index none baseState = .ok (indexResult, indexState) ∧
+        recordExpressionWithExpected context expression id element
+          (.arrayIndex baseResult.id indexResult.id) [] expected indexState = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, baseRun, array, bind, Except.bind] at success
+  cases indexRun : inferExprFuel fuel context index none baseState with
+  | error error =>
+      simp [indexRun] at success
+  | ok indexPair =>
+      rcases indexPair with ⟨indexResult, indexState⟩
+      simp only [indexRun] at success
+      exact ⟨indexResult, indexState, rfl, success⟩
+
+/-- Invert successful index inference on a base that is not a memory array
+through base traversal, both fresh type allocations, mapping-shape unification,
+index traversal, and the exact final recording operation. -/
 theorem inferExprFuel_success_index_facts
     {fuel : Nat} {context : Context} {expression base index : Syntax.Expr}
     {brackets : Syntax.SourceSpan}
@@ -738,6 +814,9 @@ theorem inferExprFuel_success_index_facts
     {id : ExpressionId} {result : InferredExpression × State}
     (expressionEq : expression.value = .index base brackets index)
     (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (notArray : ∀ {baseResult : InferredExpression} {baseState : State},
+      inferExprFuel fuel context base none allocated = .ok (baseResult, baseState) →
+        (baseState.resolve baseResult.type).arrayElement? = none)
     (success : inferExprFuel (fuel + 1) context expression expected initial =
       .ok result) :
     ∃ baseResult baseState keyType keyState valueType valueState mappingState
@@ -760,7 +839,7 @@ theorem inferExprFuel_success_index_facts
       simp [baseSuccess, bind, Except.bind] at success
   | ok basePair =>
       rcases basePair with ⟨baseResult, baseState⟩
-      simp only [baseSuccess, bind, Except.bind] at success
+      simp only [baseSuccess, bind, Except.bind, notArray baseSuccess] at success
       generalize keyFresh : baseState.fresh = keyPair at success
       rcases keyPair with ⟨keyType, keyState⟩
       generalize valueFresh : keyState.fresh = valuePair at success
@@ -10488,7 +10567,7 @@ private theorem inferFuel_inferenceProperties_internal :
                       recordedProperties.2⟩
   case case19 =>
     intros context expression expected initial fuel id allocated allocationEq
-      base brackets index expressionEq baseInduction indexInduction
+      base brackets index expressionEq baseInduction indexInduction arrayIndexInduction
     unfold InferExprFuelInferenceProperties
     intro ready validated canonical expectedBelow result success
     have allocationProperties :=
@@ -10503,6 +10582,35 @@ private theorem inferFuel_inferenceProperties_internal :
         simp only [baseResult, bind, Except.bind, Prod.eta] at success
         have baseProperties := baseInduction allocationProperties.2
           validated canonical (by simp) (inferredBase, baseState) baseResult
+        cases arrayEq : (baseState.resolve inferredBase.type).arrayElement?
+        case some element =>
+          simp only [arrayEq] at success
+          cases arrayIndexResult : inferExprFuel fuel context index none baseState with
+          | error error =>
+              simp [arrayIndexResult, bind, Except.bind] at success
+          | ok indexPair =>
+              rcases indexPair with ⟨inferredIndex, indexState⟩
+              simp only [arrayIndexResult, bind, Except.bind, Prod.eta] at success
+              have indexProperties := arrayIndexInduction baseState baseProperties.2.1
+                validated canonical (by simp) (inferredIndex, indexState) arrayIndexResult
+              have resolvedBelow : (baseState.resolve inferredBase.type).VariablesBelow
+                  baseState.inference.next :=
+                baseProperties.2.1.solved.variablesBelow_apply baseProperties.2.2
+              rw [Ty.arrayElement?_eq_some arrayEq] at resolvedBelow
+              have elementBelow : element.VariablesBelow indexState.inference.next :=
+                ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2.weaken
+                  indexProperties.1.next_le
+              have throughIndex :=
+                allocationProperties.1.trans (baseProperties.1.trans indexProperties.1)
+              have expectedAtIndex : ∀ expectedType ∈ expected,
+                  expectedType.VariablesBelow indexState.inference.next := by
+                intro expectedType member
+                exact (expectedBelow expectedType member).weaken throughIndex.next_le
+              have recordedProperties :=
+                recordExpressionWithExpected_inferenceProperties
+                  indexProperties.2.1 elementBelow expectedAtIndex success
+              exact ⟨throughIndex.trans recordedProperties.1, recordedProperties.2⟩
+        simp only [arrayEq] at success
         let keyAllocation := baseState.fresh
         have keyProperties := fresh_eq_inferenceProperties
           baseProperties.2.1 (type := keyAllocation.1)
@@ -14329,7 +14437,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
   -- Mapping index expression.
   case case19 =>
     intros context expression expected initial fuel id allocated allocationEq
-      base brackets index expressionEq baseInduction indexInduction
+      base brackets index expressionEq baseInduction indexInduction arrayIndexInduction
     unfold PreservesLexicalScope at *
     intro result success
     have allocationScope :=
@@ -14344,6 +14452,20 @@ private theorem inferFuel_preserves_lexicalScope_internal :
         simp only [baseResult, bind, Except.bind, Prod.eta] at success
         have baseScope := baseInduction
           (inferredBase, baseState) baseResult
+        cases arrayEq : (baseState.resolve inferredBase.type).arrayElement?
+        case some _ =>
+          simp only [arrayEq] at success
+          cases arrayIndexResult : inferExprFuel fuel context index none baseState with
+          | error error =>
+              simp [arrayIndexResult, bind, Except.bind] at success
+          | ok indexPair =>
+              rcases indexPair with ⟨inferredIndex, indexState⟩
+              simp only [arrayIndexResult, bind, Except.bind, Prod.eta] at success
+              have indexScope := arrayIndexInduction baseState
+                (inferredIndex, indexState) arrayIndexResult
+              exact (recordExpressionWithExpected_lexicalScope success).trans
+                (indexScope.trans (baseScope.trans allocationScope))
+        simp only [arrayEq] at success
         let keyAllocation := baseState.fresh
         let valueAllocation := keyAllocation.2.fresh
         have keyScope :

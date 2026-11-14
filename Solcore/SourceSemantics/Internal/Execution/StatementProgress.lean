@@ -1495,7 +1495,9 @@ theorem ChildStep.progress_nonexpression {parent child : CallIndex}
       exact False.elim nonexpression
   | expression_index_base accepted form allocation child =>
       exact False.elim nonexpression
-  | expression_index_key accepted form allocation baseAccepted keyFresh valueFresh fitting child =>
+  | expression_index_key accepted form allocation baseAccepted notArray keyFresh valueFresh fitting child =>
+      exact False.elim nonexpression
+  | expression_index_array accepted form allocation baseAccepted array child =>
       exact False.elim nonexpression
   | expression_call_constructor accepted form allocation selected fresh child =>
       exact False.elim nonexpression

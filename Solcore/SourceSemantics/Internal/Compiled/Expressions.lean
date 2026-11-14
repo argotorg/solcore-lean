@@ -2476,6 +2476,170 @@ private theorem unify_success_typingSourceExtends
     rw [(Detail.unify_occurrenceState_eq success).1]
     exact List.prefix_rfl
 
+/-- The actual `a[i]` on a memory array checks its base and its index, each with
+no expected type, in the same selected final source, and records the read at the
+element of the base's resolved type, whose index type finalization checks. -/
+theorem expressionRetained_arrayIndex_for
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    {callProvenance : CallIndex → Prop}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRetainedSoundnessFor callProvenance selected childFuel)
+    {inferenceContext : SourceInference.Context}
+    {expression baseExpression indexExpression : Syntax.Expr}
+    {brackets : Syntax.SourceSpan} {expected : Option Ty}
+    {initial allocated baseState resultState : State} {id : ExpressionId}
+    {baseResult inferred : InferredExpression} {element : Ty}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.expression (childFuel + 1) inferenceContext expression expected
+      initial inferred resultState))
+    (expressionEq : expression.value = .index baseExpression brackets indexExpression)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (baseSuccess : Detail.inferExprFuel childFuel inferenceContext baseExpression none allocated =
+      .ok (baseResult, baseState))
+    (arrayEq : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
+      expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  have resources := selected.body.resources
+  have signatureFormation := boundary.scope.formation checked
+  have functionsCanonical := boundary.scope.functionsCanonical checked
+  have catalog := boundary.scope.catalog checked
+  have allocatedInvariant := boundary.invariant.allocateExpressionId allocationEq
+  have allocatedOperational : GeneralizedActualStateInvariant allocated (evidenceSource selected) := by
+    rw [← show initial.allocateExpressionId.2 = allocated from congrArg Prod.snd allocationEq]
+    exact boundary.operational.allocateExpressionId
+  have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
+    rw [allocateExpressionId_inferenceNext_eq allocationEq]
+    exact boundary.expectedBelow
+  obtain ⟨indexResult, indexState, indexSuccess, recorded⟩ :=
+    Detail.inferExprFuel_success_arrayIndex_facts expressionEq allocationEq baseSuccess arrayEq
+      boundary.accepted
+  have baseProperties := Detail.inferExprFuel_inferenceProperties allocatedInvariant.ready
+    signatureFormation functionsCanonical (by simp) baseSuccess
+  have indexProperties := Detail.inferExprFuel_inferenceProperties baseProperties.2.1
+    signatureFormation functionsCanonical (by simp) indexSuccess
+  have elementBelow := Detail.arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2
+    arrayEq
+  have expectedAtIndex : ∀ type ∈ expected, type.VariablesBelow indexState.inference.next :=
+    fun type member => (allocatedExpected type member).weaken
+      (baseProperties.1.trans indexProperties.1).next_le
+  have recording := Detail.recordExpressionWithExpected_inferenceProperties
+    indexProperties.2.1 (elementBelow.weaken indexProperties.1.next_le) expectedAtIndex recorded
+  have laterIndex := boundary.extension.trans recording.1.substitution_extends
+  have laterBase := laterIndex.trans indexProperties.1.substitution_extends
+  have baseBelow : baseState.NodesBelowNextOccurrence :=
+    (Detail.inferExprFuel_occurrenceBoundExtends baseSuccess).nodesBelowNextOccurrence
+      allocatedInvariant.nodesBelow
+  have baseToIndex := inferExprFuel_success_typingSourceExtends indexSuccess baseBelow
+    (bodyRoots selected)
+  have indexToParent : TypingSourceExtends (indexState.toTypedSource (bodyRoots selected))
+      (resultState.toTypedSource (bodyRoots selected)) :=
+    ⟨Detail.recordExpressionWithExpected_preserves_owner recorded,
+      recordExpressionWithExpected_success_nodesPrefix recorded⟩
+  have baseToParent := TypingSourceExtends.trans baseToIndex indexToParent
+  obtain ⟨_, contains⟩ := recordExpressionWithExpected_success_containsExpression recorded
+    (bodyRoots selected)
+  have edge : ∀ child ∈ [baseResult.id, indexResult.id],
+      DirectChild (resultState.toTypedSource (bodyRoots selected)) (.expression inferred.id)
+        (.expression child) := by
+    intro child member
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    simpa [nodeChildIds, Node.references, ExpressionForm.references] using
+      (List.mem_map.mpr ⟨child, member, rfl⟩ : NodeId.expression child ∈
+        [baseResult.id, indexResult.id].map NodeId.expression)
+  have baseEdge := edge baseResult.id (by simp)
+  have indexEdge := edge indexResult.id (by simp)
+  have indexPatterns : indexState.integerPatterns ⊆ selected.body.returned.integerPatterns := by
+    rw [← recordExpressionWithExpected_integerPatterns_eq recorded]
+    exact boundary.integerPatterns
+  have indexLiterals : indexState.integerLiterals ⊆ selected.body.returned.integerLiterals := by
+    rw [← Detail.recordExpressionWithExpected_integerLiterals_eq recorded]
+    exact boundary.integerLiterals
+  have indexRequirements := List.Subset.trans
+    (Detail.recordExpressionWithExpected_requirements_subset recorded) boundary.requirements
+  have basePatterns := List.Subset.trans (Detail.inferExprFuel_integerPatterns_subset indexSuccess)
+    indexPatterns
+  have baseLiterals := List.Subset.trans (Detail.inferExprFuel_integerLiterals_subset indexSuccess)
+    indexLiterals
+  have baseRequirements := List.Subset.trans
+    (Detail.inferExprFuel_requirements_subset indexSuccess) indexRequirements
+  have baseHere := descend here
+    (ChildStep.expression_index_base boundary.accepted expressionEq allocationEq baseSuccess)
+  have baseTyped := expressionRooted_of_retained_for checked recursive baseHere ({
+    accepted := baseSuccess
+    interfaces := boundary.interfaces
+    extension := laterBase
+    scope := boundary.scope
+    invariant := allocatedInvariant
+    actual := boundary.actual
+    operational := allocatedOperational
+    expectedBelow := by simp
+    expectedAdmissible := by simp
+    expectedSafe := by simp
+    rawSubtree := (boundary.rawProper.childSubtree baseEdge).monoBefore baseToParent
+    integerPatterns := basePatterns
+    integerLiterals := baseLiterals
+    requirements := baseRequirements
+    covered := boundary.covered.expressionChild resources.graph_closed
+      (boundary.directChildren baseEdge)
+    actualCovered := boundary.actualCovered.directChild (boundary.directChildren baseEdge) } :
+    RootedExpressionBoundary _ _ _ _ _ _ _ _ _ _)
+  have baseInvariant := allocatedInvariant.ofExpression signatureFormation functionsCanonical
+    (by simp) laterBase baseSuccess
+  have baseOperational := allocatedOperational.ofExpression allocatedInvariant.ready catalog
+    signatureFormation functionsCanonical (by simp) (by simp) baseSuccess
+  have indexHere := descend here
+    (ChildStep.expression_index_array boundary.accepted expressionEq allocationEq baseSuccess
+      arrayEq indexSuccess)
+  have indexTyped := expressionRooted_of_retained_for checked recursive indexHere ({
+    accepted := indexSuccess
+    interfaces := boundary.interfaces
+    extension := laterIndex
+    scope := boundary.scope
+    invariant := baseInvariant
+    actual := boundary.actual
+    operational := baseOperational
+    expectedBelow := by simp
+    expectedAdmissible := by simp
+    expectedSafe := by simp
+    rawSubtree := (boundary.rawProper.childSubtree indexEdge).monoBefore indexToParent
+    integerPatterns := indexPatterns
+    integerLiterals := indexLiterals
+    requirements := indexRequirements
+    covered := boundary.covered.expressionChild resources.graph_closed
+      (boundary.directChildren indexEdge)
+    actualCovered := boundary.actualCovered.directChild (boundary.directChildren indexEdge) } :
+    RootedExpressionBoundary _ _ _ _ _ _ _ _ _ _)
+  obtain ⟨indexNode, indexContains, indexNodeType⟩ := indexTyped.stored_type
+  have indexFits : Detail.arrayIndexFits
+      (selected.body.finalized.substitution.apply indexResult.type) = true := by
+    have fits := SourceArrayIndexesFit.of_operatorSite
+      (@FinalInferenceResources.array_indexes_fit _ _ _ _ _ resources) boundary.operatorSite
+      contains rfl (by simp) indexContains
+    rw [indexNodeType] at fits
+    exact fits
+  have arrayTypeEq : selected.body.finalized.substitution.apply baseResult.type =
+      Ty.array (selected.body.finalized.substitution.apply element) := by
+    rw [← laterBase baseResult.type]
+    change selected.body.finalized.substitution.apply (baseState.resolve baseResult.type) = _
+    rw [Ty.arrayElement?_eq_some arrayEq]
+    rfl
+  have formType := arrayIndex_formType (Ty.arrayElement?_eq_some arrayEq) laterBase baseTyped
+    indexTyped indexFits
+  have rawAdmissible : TypeAdmissible target
+      (selected.body.finalized.substitution.apply element) := by
+    have baseAdmissible := baseTyped.type_admissible
+    rw [arrayTypeEq] at baseAdmissible
+    exact TypeAdmissible.array_element baseAdmissible
+  exact recordExpressionWithExpected_success_expressionTypingBase_actual resources
+    boundary.interfaces recorded boundary.extension boundary.requirements
+    boundary.expressionRequirements boundary.coercionPrimaries catalog boundary.scope.signatures
+    boundary.invariant formType rawAdmissible boundary.covered
+
 theorem expressionRetained_index_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
@@ -2529,10 +2693,17 @@ theorem expressionRetained_index_for
   have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
     rw [allocateExpressionId_inferenceNext_eq allocationEq]
     exact expectedBelow
+  obtain ⟨arrayBase, arrayBaseState, arrayBaseRun⟩ :=
+    Detail.inferExprFuel_success_index_base expressionEq allocationEq success
+  cases arrayEq : (arrayBaseState.resolve arrayBase.type).arrayElement?
+  case some _ =>
+    exact expressionRetained_arrayIndex_for checked descend recursive here expressionEq
+      allocationEq arrayBaseRun arrayEq boundary
   obtain ⟨baseResult, baseState, keyType, keyState, valueType, valueState,
       mappingState, indexResult, indexState, baseSuccess, keyFresh, valueFresh,
       mappingSuccess, indexSuccess, recorded⟩ :=
-    Detail.inferExprFuel_success_index_facts expressionEq allocationEq success
+    Detail.inferExprFuel_success_index_facts expressionEq allocationEq
+      (Detail.index_notArray_of_run arrayBaseRun arrayEq) success
   have baseProperties := Detail.inferExprFuel_inferenceProperties
     allocatedInvariant.ready signatureFormation functionsCanonical (by
       intro expectedType member
@@ -2869,6 +3040,7 @@ theorem expressionRetained_index_for
   have indexEdge := edge indexResult.id (by simp)
   have indexHere := descend here
     (ChildStep.expression_index_key boundary.accepted expressionEq allocationEq baseSuccess
+      (Detail.index_notArray_of_run arrayBaseRun arrayEq baseSuccess)
       keyFresh valueFresh mappingSuccess indexSuccess)
   have indexTypeRaw := expressionRooted_of_retained_for checked recursive indexHere ({
     accepted := indexSuccess

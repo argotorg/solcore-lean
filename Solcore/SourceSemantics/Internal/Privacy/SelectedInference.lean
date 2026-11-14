@@ -2813,7 +2813,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     · exact postIH
   case case19 =>
     intros context expression expected initial fuel id allocated allocationEq
-      base brackets index expressionEq baseInduction indexInduction
+      base brackets index expressionEq baseInduction indexInduction arrayIndexInduction
     unfold InferExprFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical expectedBelow expectedSafe result success
     have allocationProperties :=
@@ -2842,6 +2842,41 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         have baseWF := (inferExprFuel_direct_progress baseResult).wellFormed wfAllocated
         have baseBound : ∀ metavariable ∈ protectedVars, metavariable.index < baseState.inference.next :=
           fun metavariable member => Nat.lt_of_lt_of_le (boundAllocated metavariable member) baseProperties.1.next_le
+        cases arrayEq : (baseState.resolve inferredBase.type).arrayElement?
+        case some element =>
+          simp only [arrayEq] at success
+          cases arrayIndexResult : inferExprFuel fuel context index none baseState with
+          | error error =>
+              simp [arrayIndexResult] at success
+          | ok indexPair =>
+              rcases indexPair with ⟨inferredIndex, indexState⟩
+              simp only [arrayIndexResult] at success
+              have indexProperties := inferExprFuel_inferenceProperties baseProperties.2.1
+                validated canonical (by simp) arrayIndexResult
+              have indexPrivacy := arrayIndexInduction baseState baseProperties.2.1 baseWF baseBound
+                basePrivacy.2.2.1 catalog validated canonical (by simp) (by simp) _ arrayIndexResult
+              have allRows := new_requirements_trans basePrivacy.2.2.2 indexPrivacy.2.2.2
+                indexPrivacy.1
+              have elementBelow := arrayElement_variablesBelow baseProperties.2.1
+                baseProperties.2.2 arrayEq
+              have elementSafe : Safe protectedVars indexState element :=
+                safe_arrayElement indexProperties.1.substitution_extends arrayEq
+                  (indexPrivacy.1 _ basePrivacy.2.1)
+              have prefixProgress := allocationProperties.1.trans
+                (baseProperties.1.trans indexProperties.1)
+              have expectedAtIndex : ∀ expectedType ∈ expected,
+                  expectedType.VariablesBelow indexState.inference.next := by
+                intro expectedType member
+                exact (expectedBelow expectedType member).weaken prefixProgress.next_le
+              have toIndex := allocationPrivacy.1.trans (basePrivacy.1.trans indexPrivacy.1)
+              have recorded := recordExpressionWithExpected_private catalog indexProperties.2.1
+                (elementBelow.weaken indexProperties.1.next_le) expectedAtIndex elementSafe
+                (fun type member => toIndex _ (expectedSafe type member)) indexPrivacy.2.2.1 success
+              refine ⟨toIndex.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+              intro row member freshRow
+              exact new_requirements_trans allRows recorded.2.2.2 recorded.1 row member
+                (by simpa only [allocationPrivacy.2.2] using freshRow)
+        simp only [arrayEq] at success
         let keyAllocation := baseState.fresh
         have keyProperties := fresh_eq_inferenceProperties
           baseProperties.2.1 (type := keyAllocation.1)
