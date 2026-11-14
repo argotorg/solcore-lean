@@ -2774,10 +2774,11 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     intro dataType constructor typeArguments
     simpa only [allocationEq] using constructorIH dataType constructor typeArguments
   case case20 =>
-    intro context expression expected initial fuel id allocated allocationEq base dot name expressionEq constructorIH
+    intro context expression expected initial fuel id allocated allocationEq base dot name expressionEq constructorIH baseIH
     apply inferExprFuel_fieldConstructor_fixes_protected expressionEq
-    intro instantiation state
-    simpa only [allocationEq] using constructorIH instantiation state
+    · intro instantiation state
+      simpa only [allocationEq] using constructorIH instantiation state
+    · simpa only [allocationEq] using baseIH
   case case46 =>
     intro context statement expectedReturn initial fuel id allocated allocationEq headerSpan initializer condition post body form initializerIH conditionIH bodyIH postIH
     apply inferStatementFuel_for_fixes_protected form

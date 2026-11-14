@@ -2439,10 +2439,11 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
     intro dataType constructor typeArguments
     simpa only [allocationEq] using constructorIH dataType constructor typeArguments
   case case20 =>
-    intro context expression expected initial fuel id allocated allocationEq base dot name expressionEq constructorIH
+    intro context expression expected initial fuel id allocated allocationEq base dot name expressionEq constructorIH baseIH
     apply inferExprFuel_fieldConstructor_formation expressionEq
-    intro instantiation state
-    simpa only [allocationEq] using constructorIH instantiation state
+    · intro instantiation state
+      simpa only [allocationEq] using constructorIH instantiation state
+    · simpa only [allocationEq] using baseIH
 
   case case12 =>
     intro context expression expected initial fuel id allocated allocationEq operator operand form operandIH

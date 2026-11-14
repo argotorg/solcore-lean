@@ -292,6 +292,25 @@ theorem expression_newArray_length
       cases Option.some.inj (Option.mem_def.mp member)
       exact Ty.variablesBelow_constructor _ _)⟩
 
+theorem expression_field_length_base
+      {fuel : Nat} {context : SourceInference.Context} {source base : Syntax.Expr}
+      {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
+      {expected : Option Ty} {initial allocated final childFinal : State}
+      {id : ExpressionId} {value childValue : InferredExpression}
+      (_accepted : (CallIndex.expression (fuel + 1) context source expected
+        initial value final).Accepted)
+      (_form : source.value = .field base dot name)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (_nonconstructor : constructorCalleeCandidates context allocated source = .ok [])
+      (_child : inferExprFuel fuel context base none allocated =
+        .ok (childValue, childFinal))
+      (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs) : (CallIndex.expression fuel context base none allocated childValue childFinal).Inputs := by
+  have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+  subst allocated
+  exact ⟨inputs.ready.allocateExpressionId, inputs.wellFormed, inputs.catalog, by
+    intro _ member
+    cases member⟩
+
 theorem expression_conditional_condition
       {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
       {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
@@ -870,6 +889,7 @@ theorem ChildStep.inputs {parent child : CallIndex}
       | solve | apply ActualExpressionInputs.expression_call_constructor <;> assumption
       | solve | apply ActualExpressionInputs.expression_field_constructor <;> assumption
       | solve | apply ActualExpressionInputs.expression_newArray_length <;> assumption
+      | solve | apply ActualExpressionInputs.expression_field_length_base <;> assumption
   | constructorApplication => exact ChildStep.inputs_constructorApplication inputs step
   | constructorArguments => exact ChildStep.inputs_constructorArguments inputs step
   | statements => exact ChildStep.inputs_statements inputs step

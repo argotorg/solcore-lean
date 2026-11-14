@@ -1326,19 +1326,34 @@ def lengthCall : List String → String → Bool
   | ["Length"], "length" => true
   | _, _ => false
 
+/-- Whether inference has made `array`'s type a memory array, as a length needs,
+as `typedefFunction` reads `Typedef.rep`'s argument. A type still open is
+rejected: the choice is made here and does not wait for later uses. -/
+def arrayLengthOf (array : InferredExpression) (state : State) : Except Error Unit :=
+  match (state.resolve array.type).arrayElement? with
+  | some _ => .ok ()
+  | none => .error (.operatorNotSupported "Length" (state.resolve array.type))
+
 /-- The array of `Length.length(a)`: its one argument, once inference has made
-its type a memory array, as `typedefFunction` reads `Typedef.rep`'s argument.
-Another row of arguments, or a type still open, is rejected: the choice is made
-here and does not wait for later uses. -/
+its type a memory array (`arrayLengthOf`). Another row of arguments is
+rejected. -/
 def arrayLengthArgument (arguments : List InferredExpression) (state : State) :
     Except Error InferredExpression :=
   match arguments with
-  | [array] =>
-      match (state.resolve array.type).arrayElement? with
-      | some _ => .ok array
-      | none => .error (.operatorNotSupported "Length" (state.resolve array.type))
+  | [array] => do
+      arrayLengthOf array state
+      pure array
   | arguments => .error (.operatorNotSupported "Length"
       (state.resolve (Ty.productMany (arguments.map (·.type)))))
+
+/-- An array whose length is taken has a memory array type once resolved. -/
+theorem arrayLengthOf_ok {array : InferredExpression} {state : State} {checked : Unit}
+    (success : arrayLengthOf array state = .ok checked) :
+    ∃ element, state.resolve array.type = Ty.array element := by
+  unfold arrayLengthOf at success
+  cases found : (state.resolve array.type).arrayElement? with
+  | none => simp [found] at success
+  | some element => exact ⟨element, Ty.arrayElement?_eq_some found⟩
 
 /-- `Length.length(a)`'s argument row is its one array, whose type is a memory
 array once resolved. -/
@@ -1349,12 +1364,12 @@ theorem arrayLengthArgument_ok {arguments : List InferredExpression} {state : St
   match arguments with
   | [only] =>
       unfold arrayLengthArgument at success
-      cases found : (state.resolve only.type).arrayElement? with
-      | none => simp [found] at success
-      | some element =>
-          simp only [found, Except.ok.injEq] at success
+      cases checked : arrayLengthOf only state with
+      | error error => simp [checked, bind, Except.bind] at success
+      | ok _ =>
+          simp only [checked, bind, Except.bind, pure, Except.pure, Except.ok.injEq] at success
           subst success
-          exact ⟨rfl, element, Ty.arrayElement?_eq_some found⟩
+          exact ⟨rfl, arrayLengthOf_ok checked⟩
   | [] => simp [arrayLengthArgument] at success
   | _ :: _ :: _ => simp [arrayLengthArgument] at success
 
@@ -2009,7 +2024,7 @@ mutual
             (some (state.resolve keyType)) state
           recordExpressionWithExpected context expression id
             (state.resolve valueType) (.index base.id index.id) [] expected state
-      | .field _ _ name => do
+      | .field base _ name => do
           let candidates ← constructorCalleeCandidates context state expression
           match candidates with
           | [(dataType, constructor)] =>
@@ -2021,7 +2036,13 @@ mutual
               match ← missingExplicitConstructor? context state expression with
               | some (qualifiers, missing) =>
                   throw (.unknownConstructor qualifiers missing)
-              | none => .error (.unsupportedExpression "field")
+              | none =>
+                  if name.value == "length" then
+                    let (array, state) ← inferExprFuel fuel context base none state
+                    arrayLengthOf array state
+                    recordExpressionWithExpected context expression id
+                      (.fixed .uint256) (.arrayLength array.id) [] expected state
+                  else .error (.unsupportedExpression "field")
           | _ => throw (.ambiguousConstructor [] name.value
               (candidates.map fun candidate => candidate.2.id))
       | .array .. => .error (.unsupportedExpression "array")
@@ -2584,6 +2605,50 @@ mutual
                 }
 
 end
+
+/-- Invert successful `a.length` inference, a field that names no constructor:
+the field is `length`, and the base, inferred with no expected type, is a
+memory array once resolved, whose length is recorded at `uint256`. -/
+theorem inferExprFuel_success_fieldLength_facts
+    {fuel : Nat} {context : Context} {expression base : Syntax.Expr}
+    {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .field base dot name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (nonconstructor : constructorCalleeCandidates context allocated expression = .ok [])
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ arrayResult arrayState element,
+      inferExprFuel fuel context base none allocated = .ok (arrayResult, arrayState) ∧
+        arrayState.resolve arrayResult.type = Ty.array element ∧
+        recordExpressionWithExpected context expression id (.fixed .uint256)
+          (.arrayLength arrayResult.id) [] expected arrayState = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, nonconstructor, bind, Except.bind] at success
+  cases missing : missingExplicitConstructor? context allocated expression with
+  | error error => simp [missing] at success
+  | ok missingResult =>
+      cases missingResult with
+      | some pair =>
+          rcases pair with ⟨qualifiers, missingName⟩
+          simp [missing] at success
+      | none =>
+          simp only [missing] at success
+          by_cases lengthName : (name.value == "length") = true
+          · simp only [lengthName, ↓reduceIte] at success
+            cases baseRun : inferExprFuel fuel context base none allocated with
+            | error error => simp [baseRun] at success
+            | ok basePair =>
+                rcases basePair with ⟨arrayResult, arrayState⟩
+                simp only [baseRun] at success
+                cases checked : arrayLengthOf arrayResult arrayState with
+                | error error => simp [checked] at success
+                | ok _ =>
+                    simp only [checked] at success
+                    obtain ⟨element, resolved⟩ := arrayLengthOf_ok checked
+                    exact ⟨arrayResult, arrayState, element, rfl, resolved, success⟩
+          · simp [lengthName] at success
 
 end Solcore.Frontend.SourceInference.Detail
 end

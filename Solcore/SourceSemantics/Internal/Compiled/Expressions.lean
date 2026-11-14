@@ -1388,6 +1388,99 @@ theorem constructor_dot_for {callProvenance : CallIndex → Prop}
       boundary.integerPatterns boundary.integerLiterals boundary.requirements boundary.expressionRequirements
       boundary.coercionPrimaries boundary.directChildren boundary.covered boundary.actualCovered
 
+/-- The actual `a.length` checks its base with no expected type in the same
+selected final source and records the length at `uint256`. -/
+theorem expressionRetained_fieldLength_for {callProvenance : CallIndex → Prop}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRetainedSoundnessFor callProvenance selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression base : Syntax.Expr}
+    {dot : Syntax.SourceSpan} {name : Syntax.Identifier} {expected : Option Ty}
+    {initial allocated resultState : State} {id : ExpressionId} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : callProvenance (.expression (childFuel + 1) inferenceContext expression expected initial inferred resultState))
+    (form : expression.value = .field base dot name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (nonconstructor : Detail.constructorCalleeCandidates inferenceContext allocated expression = .ok [])
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
+      expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected)) selected.body.finalized.typedSource
+      target selected.body.finalized.substitution inferred := by
+  have resources := selected.body.resources
+  have allocatedInvariant := boundary.invariant.allocateExpressionId allocationEq
+  have allocatedOperational : GeneralizedActualStateInvariant allocated (evidenceSource selected) := by
+    rw [← show initial.allocateExpressionId.2 = allocated from congrArg Prod.snd allocationEq]
+    exact boundary.operational.allocateExpressionId
+  have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
+    rw [allocateExpressionId_inferenceNext_eq allocationEq]
+    exact boundary.expectedBelow
+  obtain ⟨arrayResult, arrayState, element, baseSuccess, resolved, recorded⟩ :=
+    Detail.inferExprFuel_success_fieldLength_facts form allocationEq nonconstructor boundary.accepted
+  have baseExpected : ∀ type ∈ (none : Option Ty), type.VariablesBelow allocated.inference.next := by
+    intro _ member
+    simp at member
+  have properties := Detail.inferExprFuel_inferenceProperties allocatedInvariant.ready
+    (boundary.scope.formation checked) (boundary.scope.functionsCanonical checked) baseExpected baseSuccess
+  have expectedAtBase : ∀ type ∈ expected, type.VariablesBelow arrayState.inference.next := by
+    intro type member
+    exact (allocatedExpected type member).weaken properties.1.next_le
+  have recording := Detail.recordExpressionWithExpected_inferenceProperties
+    properties.2.1 (Ty.variablesBelow_constructor _ _) expectedAtBase recorded
+  have baseExtension := boundary.extension.trans recording.1.substitution_extends
+  have baseToParent : TypingSourceExtends (arrayState.toTypedSource (bodyRoots selected))
+      (resultState.toTypedSource (bodyRoots selected)) :=
+    ⟨Detail.recordExpressionWithExpected_preserves_owner recorded,
+      recordExpressionWithExpected_success_nodesPrefix recorded⟩
+  obtain ⟨_, contains⟩ := recordExpressionWithExpected_success_containsExpression recorded
+    (bodyRoots selected)
+  have edge : DirectChild (resultState.toTypedSource (bodyRoots selected))
+      (.expression inferred.id) (.expression arrayResult.id) := by
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    simp [nodeChildIds, Node.references, ExpressionForm.references]
+  have finalEdge := boundary.directChildren edge
+  have childPatterns : arrayState.integerPatterns ⊆ selected.body.returned.integerPatterns := by
+    rw [← recordExpressionWithExpected_integerPatterns_eq recorded]
+    exact boundary.integerPatterns
+  have childLiterals : arrayState.integerLiterals ⊆ selected.body.returned.integerLiterals := by
+    rw [← Detail.recordExpressionWithExpected_integerLiterals_eq recorded]
+    exact boundary.integerLiterals
+  have childRequirements := List.Subset.trans
+    (Detail.recordExpressionWithExpected_requirements_subset recorded) boundary.requirements
+  have childHere := descend here
+    (ChildStep.expression_field_length_base boundary.accepted form allocationEq nonconstructor baseSuccess)
+  have typed := expressionRooted_of_retained_for checked recursive childHere ({
+    accepted := baseSuccess
+    interfaces := boundary.interfaces
+    extension := baseExtension
+    scope := boundary.scope
+    invariant := allocatedInvariant
+    actual := boundary.actual
+    operational := allocatedOperational
+    expectedBelow := baseExpected
+    expectedAdmissible := by
+      intro _ member
+      simp at member
+    expectedSafe := by
+      intro _ _ _ member
+      simp at member
+    integerPatterns := childPatterns
+    integerLiterals := childLiterals
+    requirements := childRequirements
+    covered := boundary.covered.expressionChild resources.graph_closed finalEdge
+    actualCovered := boundary.actualCovered.directChild finalEdge
+    rawSubtree := (boundary.rawProper.childSubtree edge).monoBefore baseToParent } :
+    RootedExpressionBoundary selected childFuel inferenceContext base none allocated
+      arrayResult arrayState frames target)
+  have formType := arrayLength_formType resolved baseExtension (.cons typed (.nil _))
+  have rawAdmissible : TypeAdmissible target
+      (selected.body.finalized.substitution.apply (.fixed .uint256)) :=
+    TypeAdmissible.builtin (boundary.invariant.typeParameterBinders
+      ((CheckingScope.refl selected).canonical checked)) (.fixed .uint256)
+  exact recordExpressionWithExpected_success_expressionTypingBase_actual resources boundary.interfaces
+    recorded boundary.extension boundary.requirements boundary.expressionRequirements boundary.coercionPrimaries
+    (boundary.scope.catalog checked) boundary.scope.signatures boundary.invariant formType rawAdmissible
+    boundary.covered
+
 theorem constructor_field_for {callProvenance : CallIndex → Prop}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (descend : ChildClosed callProvenance)
@@ -1412,9 +1505,8 @@ theorem constructor_field_for {callProvenance : CallIndex → Prop}
   | ok candidates =>
     cases candidates with
     | nil =>
-      simp only [discovery] at success
-      repeat' split at success
-      all_goals simp_all [throw]
+      exact expressionRetained_fieldLength_for checked descend recursive here form allocation
+        discovery boundary
     | cons first rest =>
       obtain ⟨dataType, constructor⟩ := first
       cases rest with

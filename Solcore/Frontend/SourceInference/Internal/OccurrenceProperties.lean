@@ -5432,9 +5432,10 @@ private theorem inference_anchoredNodePrefixExtends :
                                               selectionResult resultEq
   case case20 =>
     intros context expression expected initial fuel id allocated allocationEq
-      base dot name expressionEq constructorInduction
+      base dot name expressionEq constructorInduction baseInduction
     unfold PreservesAnchoredNodePrefix
     intro result success
+    have overallSuccess := success
     have allocationExtends :=
       allocateExpressionId_success_anchoredNodePrefixExtends allocationEq
     unfold inferExprFuel at success
@@ -5447,9 +5448,12 @@ private theorem inference_anchoredNodePrefixExtends :
         simp only [candidatesResult, bind, Except.bind] at success
         cases candidates with
         | nil =>
-            simp_all [bind, Except.bind]
-            repeat' first | split at success
-            all_goals contradiction
+            obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
+              inferExprFuel_success_fieldLength_facts expressionEq allocationEq
+                candidatesResult overallSuccess
+            have baseExtends := baseInduction (arrayResult, arrayState) baseRun
+            exact allocationExtends.trans (baseExtends.trans
+              (recordExpressionWithExpected_anchoredNodePrefixExtends recorded))
         | cons candidate rest =>
             cases rest with
             | cons second tail => simp at success

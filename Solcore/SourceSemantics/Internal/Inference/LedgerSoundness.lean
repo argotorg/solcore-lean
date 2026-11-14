@@ -191,12 +191,22 @@ theorem inferExprFuelLedgerPreservation_step
     · contradiction
     · exact constructorIH accepted allocatedTracked
   | field base dot name =>
-    unfold Detail.inferExprFuel at accepted
-    simp only [allocation, form, bind, Except.bind] at accepted
-    repeat' first | split at accepted
-    all_goals try contradiction
-    all_goals
-      exact constructorIH accepted (allocatedTracked.freshDataConstructorInstantiation _ _)
+    cases discovery : Detail.constructorCalleeCandidates context allocated expression with
+    | error error =>
+      simp [Detail.inferExprFuel, allocation, form, discovery, bind, Except.bind] at accepted
+    | ok candidates =>
+      cases candidates with
+      | nil =>
+        obtain ⟨_, _, _, baseRun, _, recorded⟩ :=
+          Detail.inferExprFuel_success_fieldLength_facts form allocation discovery accepted
+        exact (expressionIH baseRun allocatedTracked).recordExpressionWithExpected recorded
+      | cons candidate rest =>
+        unfold Detail.inferExprFuel at accepted
+        simp only [allocation, form, discovery, bind, Except.bind] at accepted
+        repeat' first | split at accepted
+        all_goals try contradiction
+        all_goals
+          exact constructorIH accepted (allocatedTracked.freshDataConstructorInstantiation _ _)
   | newArray keyword sourceType length =>
     obtain ⟨_, _, _, _, _, _, child, recorded⟩ :=
       Detail.inferExprFuel_success_newArray_facts form allocation accepted

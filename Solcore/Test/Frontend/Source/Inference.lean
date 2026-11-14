@@ -1464,8 +1464,8 @@ private def testNewArray : IO Unit := do
       | .unsupportedExpression _ => false
       | _ => true
 
-/-- `Length.length(a)` on a memory array is its length, a `uint256`, and on
-another type it is rejected. -/
+/-- `Length.length(a)` and `a.length` on a memory array are its length, a
+`uint256`, and on another type they are rejected. -/
 private def testArrayLength : IO Unit := do
   let functions ← check "array length" (String.intercalate "\n" [
     "function size(n: uint256) returns (uint256) {",
@@ -1484,6 +1484,24 @@ private def testArrayLength : IO Unit := do
     s!"Length.length did not type an array's length as uint256: {reprStr lengths}"
   expectInferenceError "Length.length of a uint256"
     "function bad(n: uint256) returns (uint256) { return Length.length(n); }" fun error =>
+      error == .operatorNotSupported "Length" uint256
+  let fieldFunctions ← check "array length field" (String.intercalate "\n" [
+    "function size(n: uint256) returns (uint256) {",
+    "  let m: uint256[] = new uint256[](n);",
+    "  let k = new int8[](3).length;",
+    "  return m.length + k;",
+    "}"
+  ])
+  let fieldFunction ← match fieldFunctions with
+    | [function] => pure function
+    | _ => throw (IO.userError "array length field fixture lost its checked function")
+  let fieldLengths := fieldFunction.typedBody.nodes.filterMap fun
+    | .expression { form := .arrayLength _, type, .. } => some type
+    | _ => none
+  assertTrue (decide (fieldLengths = [uint256, uint256]))
+    s!"a.length did not type the arrays' lengths as uint256: {reprStr fieldLengths}"
+  expectInferenceError "the length field of a uint256"
+    "function bad(n: uint256) returns (uint256) { return n.length; }" fun error =>
       error == .operatorNotSupported "Length" uint256
 
 /-- Inference rejects the slices until row 4 gives them a meaning. -/

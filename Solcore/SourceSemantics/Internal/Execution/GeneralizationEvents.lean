@@ -571,7 +571,7 @@ private theorem inferFuel_origins_progress_internal :
       exact allocationProgress.trans (argumentsProgress.trans (calleeProgress.trans
         ((RelativeReadProgress.applyFunctionType application).trans (RelativeReadProgress.recordIndirectCall _ _ _ _))))
   case case20 =>
-    intro context source expected initial fuel id allocated allocation base dot name form ih
+    intro context source expected initial fuel id allocated allocation base dot name form ih baseIH
     intro result accepted here
     have original := accepted
     unfold inferExprFuel at accepted
@@ -581,9 +581,14 @@ private theorem inferFuel_origins_progress_internal :
     | ok candidates =>
       cases candidates with
       | nil =>
-        simp only [discovery, bind, Except.bind] at accepted
-        repeat' first | split at accepted
-        all_goals cases accepted
+        obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
+          Detail.inferExprFuel_success_fieldLength_facts form allocation discovery original
+        have baseProgress := baseIH (arrayResult, arrayState) baseRun
+          (here.child (.expression_field_length_base original form allocation discovery baseRun))
+        have record := RelativeReadProgress.recordExpressionWithExpected (root := root) recorded
+          (by intro _ _ impossible; cases impossible)
+        exact (allocateExpressionId_success_origins_progress allocation).trans
+          (baseProgress.trans record)
       | cons first rest =>
         rcases first with ⟨dataType, constructor⟩
         cases rest with

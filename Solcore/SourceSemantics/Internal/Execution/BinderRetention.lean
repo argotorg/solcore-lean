@@ -252,6 +252,11 @@ theorem ChildStep.expression_binders_retained
       Detail.inferExprFuel_success_newArray_facts form allocation accepted
     cases Except.ok.inj (lengthRun.symm.trans childAccepted)
     exact BindersRetained.recordExpressionWithExpected recorded
+  | expression_field_length_base accepted form allocation nonconstructor childAccepted =>
+    obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
+      Detail.inferExprFuel_success_fieldLength_facts form allocation nonconstructor accepted
+    cases Except.ok.inj (baseRun.symm.trans childAccepted)
+    exact BindersRetained.recordExpressionWithExpected recorded
   | expression_tuple accepted form allocation childAccepted =>
     obtain ⟨elements, elementState, elementsRun, recorded⟩ :=
       inferExprFuel_success_tuple_facts form allocation accepted
@@ -1379,6 +1384,8 @@ theorem ChildStep.nonexpression_binders_retained {parent child : CallIndex}
       exact False.elim nonexpression
   | expression_newArray_length accepted form allocation child =>
       exact False.elim nonexpression
+  | expression_field_length_base accepted form allocation nonconstructor child =>
+      exact False.elim nonexpression
   | expression_tuple accepted form allocation child =>
       exact False.elim nonexpression
   | expressions_head accepted head =>
@@ -1803,6 +1810,9 @@ theorem ChildStep.captureOrigins
     dsimp only [CallIndex.initial] at origins ⊢
     exact origins.allocateExpressionId allocation
   | @expression_newArray_length fuel context source length keyword sourceType expected initial allocated final childFinal id value childValue accepted form allocation child =>
+    dsimp only [CallIndex.initial] at origins ⊢
+    exact origins.allocateExpressionId allocation
+  | @expression_field_length_base fuel context source base dot name expected initial allocated final childFinal id value childValue accepted form allocation nonconstructor child =>
     dsimp only [CallIndex.initial] at origins ⊢
     exact origins.allocateExpressionId allocation
   | @expression_tuple fuel context source elements expected initial allocated final childFinal id value values accepted form allocation child =>

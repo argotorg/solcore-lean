@@ -566,6 +566,143 @@ theorem actualInferExprFuelRetainedSoundness_dotConstructor {fuel : Nat}
       allocatedExpected valid semantic final raw patterns literals requirements retained coercionsRetained childrenRetained
       covered actualCovered
 
+/-- A memory array's length, `.arrayLength` of the array at `uint256`, has its
+raw type once the array, a memory array once resolved, is typed in the final
+source: the one argument of `Length.length(a)` or the base of `a.length`. -/
+theorem arrayLength_formType
+    {semanticSource : TypedSource} {active : SourceSemantics.Context}
+    {substitution : Substitution} {state : State} {array : InferredExpression}
+    {element : Ty}
+    (resolved : state.resolve array.type = Ty.array element)
+    (extension : substitution.SemanticallyExtends state.inference.substitution)
+    (argumentsTyped : ExpressionsHaveTypes semanticSource active ([array].map (·.id))
+      ([array].map fun argument => substitution.apply argument.type)) :
+    ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.arrayLength array.id).applySubstitution substitution)
+      (substitution.apply (.fixed .uint256)) (.ordinary []) := by
+  have arrayTypeEq : substitution.apply array.type =
+      Ty.array (substitution.apply element) := by
+    rw [← extension array.type]
+    change substitution.apply (state.resolve array.type) = _
+    rw [resolved]
+    rfl
+  cases argumentsTyped with
+  | cons head _ =>
+    have arrayType : ExpressionHasType semanticSource active array.id
+        (Ty.array (substitution.apply element)) := by
+      rw [← arrayTypeEq]
+      exact head
+    exact .arrayLength arrayType
+
+/-- `a.length` types its base, inferred with no expected type, from the base's
+own retained subtree, and records the length at `uint256`. -/
+theorem actualFieldLength_typing {fuel : Nat}
+    (recursive : ActualInferExprFuelRetainedSoundness fuel)
+    {wholeContext inferenceContext : Frontend.SourceInference.Context}
+    {wholeReturn : Ty} {expression base : Syntax.Expr} {dot : Syntax.SourceSpan}
+    {name : Syntax.Identifier} {expected : Option Ty}
+    {initial allocated resultState evidenceState : State} {id : ExpressionId}
+    {inferred : InferredExpression} {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    {semanticSource : TypedSource}
+    {frames : List InitializedLetBinding}
+    {semanticContext : SourceSemantics.Context}
+    (expressionEq : expression.value = .field base dot name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (nonconstructor : Detail.constructorCalleeCandidates inferenceContext allocated expression = .ok [])
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression expected initial =
+      .ok (inferred, resultState))
+    (resources : FinalInferenceResources wholeContext wholeReturn evidenceState roots finalized)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces wholeContext.signatures
+      finalized.solvedRequirements finalized.typedSource)
+    (resultSubstitutionExtension : finalized.substitution.SemanticallyExtends
+      resultState.inference.substitution)
+    (signaturesEq : inferenceContext.signatures = wholeContext.signatures)
+    (ownerEq : inferenceContext.scope.genericOwner = wholeContext.scope.genericOwner)
+    (typeParametersEq : inferenceContext.typeParameters = wholeContext.typeParameters)
+    (assumptionsEq : inferenceContext.assumptions = wholeContext.assumptions)
+    (signatureFormation : ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical : ∀ candidate ∈ inferenceContext.signatures.functions,
+      candidate.scheme.body = .function
+        (Ty.productMany candidate.parameterTypes)
+        (Ty.productMany candidate.returnTypes))
+    (catalog : SignatureCatalogWellFormed inferenceContext.signatures)
+    (canonical : SignatureParametersWellFormed inferenceContext.scope.genericOwner
+      inferenceContext.typeParameters)
+    (invariant : RecursiveExpressionInvariant wholeContext finalized initial semanticContext)
+    (actual : ActualContext wholeContext finalized frames semanticContext)
+    (allocatedInvariant : RecursiveExpressionInvariant wholeContext finalized allocated semanticContext)
+    (allocatedOperational : ActualStateInvariant allocated (evidenceState.toTypedSource roots))
+    (allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next)
+    (finalPreserved : ProperDescendantsPreserved finalized.substitution
+      (resultState.toTypedSource roots) finalized.typedSource (.expression inferred.id))
+    (rawProper : RawProperDescendantsPreserved (resultState.toTypedSource roots)
+      (evidenceState.toTypedSource roots) (.expression inferred.id))
+    (integerPatternsSubset : resultState.integerPatterns ⊆ evidenceState.integerPatterns)
+    (integerLiteralsSubset : resultState.integerLiterals ⊆ evidenceState.integerLiterals)
+    (requirementsSubset : resultState.requirements ⊆ evidenceState.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (coercionsRetained : ExpressionCoercionPrimariesRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (childrenRetained : ExpressionDirectChildrenRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (covered : TemplateScopeCovered finalized.typedSource semanticContext (.expression inferred.id))
+    (semanticPreserved : ProperDescendantsPreserved finalized.substitution
+      (resultState.toTypedSource roots) semanticSource (.expression inferred.id))
+    (actualCovered : ActualContext.Covers finalized frames (.expression inferred.id)) :
+    ExpressionTypingBase (resultState.toTypedSource roots) semanticSource
+      semanticContext finalized.substitution inferred := by
+  obtain ⟨arrayResult, arrayState, element, baseSuccess, resolved, recorded⟩ :=
+    Detail.inferExprFuel_success_fieldLength_facts expressionEq allocationEq nonconstructor success
+  have baseExpected : ∀ type ∈ (none : Option Ty), type.VariablesBelow allocated.inference.next := by
+    intro _ member
+    simp at member
+  have properties := Detail.inferExprFuel_inferenceProperties allocatedInvariant.ready
+    signatureFormation functionsCanonical baseExpected baseSuccess
+  have expectedAtBase : ∀ type ∈ expected, type.VariablesBelow arrayState.inference.next :=
+    fun type member => (allocatedExpected type member).weaken properties.1.next_le
+  have recording := Detail.recordExpressionWithExpected_inferenceProperties
+    properties.2.1 (Ty.variablesBelow_constructor _ _) expectedAtBase recorded
+  have baseExtension := resultSubstitutionExtension.trans recording.1.substitution_extends
+  have baseToParent : TypingSourceExtends (arrayState.toTypedSource roots)
+      (resultState.toTypedSource roots) :=
+    ⟨Detail.recordExpressionWithExpected_preserves_owner recorded,
+      recordExpressionWithExpected_success_nodesPrefix recorded⟩
+  obtain ⟨_, contains⟩ := recordExpressionWithExpected_success_containsExpression recorded roots
+  have edge : DirectChild (resultState.toTypedSource roots)
+      (.expression inferred.id) (.expression arrayResult.id) := by
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    simp [nodeChildIds, Node.references, ExpressionForm.references]
+  have finalEdge := childrenRetained edge
+  have childFinal := (finalPreserved.childSubtree edge).monoBefore baseToParent
+  have childSemantic := (semanticPreserved.childSubtree edge).monoBefore baseToParent
+  have childPatterns : arrayState.integerPatterns ⊆ evidenceState.integerPatterns := by
+    rw [← recordExpressionWithExpected_integerPatterns_eq recorded]
+    exact integerPatternsSubset
+  have childLiterals : arrayState.integerLiterals ⊆ evidenceState.integerLiterals := by
+    rw [← Detail.recordExpressionWithExpected_integerLiterals_eq recorded]
+    exact integerLiteralsSubset
+  have childRequirements := List.Subset.trans
+    (Detail.recordExpressionWithExpected_requirements_subset recorded) requirementsSubset
+  have baseTyped := actualInferExprFuelFinalSubtreeSoundness_of_retainedSoundness recursive
+    baseSuccess resources interfaces baseExtension signaturesEq ownerEq typeParametersEq
+    assumptionsEq signatureFormation functionsCanonical catalog canonical allocatedInvariant actual
+    allocatedOperational baseExpected (by intro _ member; simp at member)
+    childSemantic childFinal
+    ((rawProper.childSubtree edge).monoBefore baseToParent).proper childPatterns childLiterals
+    childRequirements (covered.expressionChild resources.graph_closed finalEdge)
+    (actualCovered.directChild finalEdge)
+  have formType := arrayLength_formType resolved baseExtension (.cons baseTyped (.nil _))
+  have rawAdmissible : TypeAdmissible semanticContext
+      (finalized.substitution.apply (.fixed .uint256)) :=
+    TypeAdmissible.builtin
+      (invariant.typeParameterBinders (by simpa only [ownerEq, typeParametersEq] using canonical))
+      (.fixed .uint256)
+  exact recordExpressionWithExpected_success_expressionTypingBase_actual resources interfaces
+    recorded resultSubstitutionExtension requirementsSubset retained coercionsRetained
+    catalog signaturesEq invariant formType rawAdmissible covered
+
 theorem actualInferExprFuelRetainedSoundness_field_constructor {fuel : Nat}
     (recursive : ActualInferExprFuelRetainedSoundness fuel) :
   ∀ {wholeContext inferenceContext : Frontend.SourceInference.Context}
@@ -639,6 +776,7 @@ theorem actualInferExprFuelRetainedSoundness_field_constructor {fuel : Nat}
   have allocatedOperational := operational.allocateExpressionId allocationEq
   have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
     rw [allocateExpressionId_inferenceNext_eq allocationEq]; exact expectedBelow
+  have original := success
   unfold Detail.inferExprFuel at success
   simp only [allocationEq, expressionEq, bind, Except.bind] at success
   cases discovery : Detail.constructorCalleeCandidates inferenceContext allocated expression with
@@ -646,9 +784,11 @@ theorem actualInferExprFuelRetainedSoundness_field_constructor {fuel : Nat}
   | ok candidates =>
     cases candidates with
     | nil =>
-      simp only [discovery] at success
-      repeat' split at success
-      all_goals simp_all [throw]
+      exact actualFieldLength_typing recursive expressionEq allocationEq discovery original
+        resources interfaces extension signaturesEq ownerEq typeParametersEq assumptionsEq formation
+        functions catalog canonical invariant actual allocatedInvariant allocatedOperational
+        allocatedExpected final raw patterns literals requirements retained coercionsRetained
+        childrenRetained covered semantic actualCovered
     | cons first rest =>
       obtain ⟨dataType, constructor⟩ := first
       cases rest with
@@ -1165,34 +1305,6 @@ set_option Elab.async false
 set_option maxHeartbeats 2400000
 namespace Solcore.SourceSemantics.SourceInferenceSoundness
 open Frontend Frontend.SourceInference TypeSystem
-
-/-- `Length.length(a)`'s node, `.arrayLength` of its one argument at `uint256`,
-has its raw type once the argument, a memory array once resolved, is typed in
-the final source. -/
-theorem arrayLength_formType
-    {semanticSource : TypedSource} {active : SourceSemantics.Context}
-    {substitution : Substitution} {state : State} {array : InferredExpression}
-    {element : Ty}
-    (resolved : state.resolve array.type = Ty.array element)
-    (extension : substitution.SemanticallyExtends state.inference.substitution)
-    (argumentsTyped : ExpressionsHaveTypes semanticSource active ([array].map (·.id))
-      ([array].map fun argument => substitution.apply argument.type)) :
-    ExpressionFormHasRawType semanticSource active
-      ((ExpressionForm.arrayLength array.id).applySubstitution substitution)
-      (substitution.apply (.fixed .uint256)) (.ordinary []) := by
-  have arrayTypeEq : substitution.apply array.type =
-      Ty.array (substitution.apply element) := by
-    rw [← extension array.type]
-    change substitution.apply (state.resolve array.type) = _
-    rw [resolved]
-    rfl
-  cases argumentsTyped with
-  | cons head _ =>
-    have arrayType : ExpressionHasType semanticSource active array.id
-        (Ty.array (substitution.apply element)) := by
-      rw [← arrayTypeEq]
-      exact head
-    exact .arrayLength arrayType
 
 theorem actualArrayLengthCall_typing {fuel : Nat}
     (recursive : ∀ smaller, smaller < fuel → ActualInferExprFuelRetainedSoundness smaller) :

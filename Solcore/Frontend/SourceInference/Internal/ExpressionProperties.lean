@@ -10677,9 +10677,10 @@ private theorem inferFuel_inferenceProperties_internal :
           recordedProperties.2⟩
   case case20 =>
     intros context expression expected initial fuel id allocated allocationEq
-      base dot name expressionEq constructorInduction
+      base dot name expressionEq constructorInduction baseInduction
     unfold InferExprFuelInferenceProperties
     intro ready validated canonical expectedBelow result success
+    have overallSuccess := success
     have allocationProperties :=
       allocateExpressionId_eq_inferenceProperties ready allocationEq
     have expectedAtAllocated : ∀ expectedType ∈ expected,
@@ -10697,9 +10698,18 @@ private theorem inferFuel_inferenceProperties_internal :
         simp only [candidatesResult, bind, Except.bind] at success
         cases candidates with
         | nil =>
-            simp_all [bind, Except.bind]
-            repeat' first | split at success
-            all_goals contradiction
+            obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
+              inferExprFuel_success_fieldLength_facts expressionEq allocationEq
+                candidatesResult overallSuccess
+            have baseProperties := baseInduction allocationProperties.2
+              validated canonical (by simp) (arrayResult, arrayState) baseRun
+            have recordedProperties := recordExpressionWithExpected_inferenceProperties
+              baseProperties.2.1 (Ty.variablesBelow_constructor _ _)
+              (fun expectedType member =>
+                (expectedAtAllocated expectedType member).weaken baseProperties.1.next_le)
+              recorded
+            exact ⟨allocationProperties.1.trans (baseProperties.1.trans recordedProperties.1),
+              recordedProperties.2⟩
         | cons candidate rest =>
             cases rest with
             | cons second tail => simp at success
@@ -14309,9 +14319,10 @@ private theorem inferFuel_preserves_lexicalScope_internal :
   -- Field selection or qualified constructor reference.
   case case20 =>
     intros context expression expected initial fuel id allocated allocationEq
-      base dot name expressionEq constructorInduction
+      base dot name expressionEq constructorInduction baseInduction
     unfold PreservesLexicalScope at *
     intro result success
+    have overallSuccess := success
     have allocationScope :=
       allocateExpressionId_success_lexicalScope allocationEq
     unfold inferExprFuel at success
@@ -14324,9 +14335,12 @@ private theorem inferFuel_preserves_lexicalScope_internal :
         simp only [candidatesResult, bind, Except.bind] at success
         cases candidates with
         | nil =>
-            simp_all [bind, Except.bind]
-            repeat' first | split at success
-            all_goals contradiction
+            obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
+              inferExprFuel_success_fieldLength_facts expressionEq allocationEq
+                candidatesResult overallSuccess
+            have baseScope := baseInduction (arrayResult, arrayState) baseRun
+            exact (recordExpressionWithExpected_lexicalScope recorded).trans
+              (baseScope.trans allocationScope)
         | cons candidate rest =>
             cases rest with
             | cons second tail => simp at success

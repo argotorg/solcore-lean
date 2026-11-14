@@ -335,6 +335,41 @@ theorem newArray
     (by intro type member; exact List.mem_append_right _ member)
   simpa only [sameNext] using finalLifetime
 
+theorem fieldLength
+    {fuel : Nat} {context : SourceInference.Context}
+    {source base : Syntax.Expr} {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {child final : InferredExpression × State}
+    (ready : initial.InferenceReady) (catalog : LifetimeInferenceContext context)
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (form : source.value = .field base dot name)
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (nonconstructor : constructorCalleeCandidates context allocated source = .ok [])
+    (childAccepted : inferExprFuel fuel context base none allocated = .ok child)
+    (accepted : inferExprFuel (fuel + 1) context source expected initial = .ok final)
+    (lifetime : GeneralizationLifetime event allocated.inference.next child.2 [child.1.type]) :
+    GeneralizationLifetime event initial.inference.next final.2 [final.1.type] := by
+  have allocatedEq : allocated = initial.allocateExpressionId.2 :=
+    (congrArg Prod.snd allocation).symm
+  have sameNext : allocated.inference.next = initial.inference.next := by
+    rw [allocatedEq]; rfl
+  have childProperties := inferExprFuel_inferenceProperties
+    (allocatedEq ▸ ready.allocateExpressionId) catalog.formation catalog.canonical
+    (by simp) childAccepted
+  obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
+    inferExprFuel_success_fieldLength_facts form allocation nonconstructor accepted
+  cases Except.ok.inj (baseRun.symm.trans childAccepted)
+  have uint256Closed : (Ty.fixed FixedInteger.uint256).VariablesBelow 0 :=
+    Ty.variablesBelow_constructor _ _
+  have result := lifetime.recordExpression catalog.catalog childProperties.2.1
+    (uint256Closed.weaken (Nat.zero_le _))
+    (fun type member => (sameNext ▸ expectedBelow type member).weaken childProperties.1.next_le)
+    (safe_closed _ _ uint256Closed)
+    (fun type member => lifetime.older type (sameNext ▸ expectedBelow type member)) recorded
+  have finalLifetime := result.restrict_outputs (selected := [final.1.type])
+    (by intro type member; exact List.mem_append_right _ member)
+  simpa only [sameNext] using finalLifetime
+
 theorem tuple
     {fuel : Nat} {context : SourceInference.Context}
     {source : Syntax.Expr} {elements : Syntax.DelimitedList Syntax.Expr}

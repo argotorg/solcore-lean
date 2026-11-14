@@ -202,6 +202,11 @@ theorem ChildStep.expression_shapes
       Detail.inferExprFuel_success_newArray_facts form allocation accepted
     cases Except.ok.inj (lengthRun.symm.trans childAccepted)
     exact ActualExpressionNodeShapes.recordExpected recorded
+  | expression_field_length_base accepted form allocation nonconstructor childAccepted =>
+    obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
+      Detail.inferExprFuel_success_fieldLength_facts form allocation nonconstructor accepted
+    cases Except.ok.inj (baseRun.symm.trans childAccepted)
+    exact ActualExpressionNodeShapes.recordExpected recorded
   | expression_tuple accepted form allocation childAccepted =>
     obtain ⟨elements, elementState, elementsRun, recorded⟩ :=
       inferExprFuel_success_tuple_facts form allocation accepted
@@ -1261,6 +1266,8 @@ theorem ChildStep.nonexpression_shapes {parent child : CallIndex}
   | expression_group accepted form allocation child =>
       exact False.elim nonexpression
   | expression_newArray_length accepted form allocation child =>
+      exact False.elim nonexpression
+  | expression_field_length_base accepted form allocation nonconstructor child =>
       exact False.elim nonexpression
   | expression_tuple accepted form allocation child =>
       exact False.elim nonexpression

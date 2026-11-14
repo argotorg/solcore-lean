@@ -1209,9 +1209,12 @@ theorem inferExprFuel_fieldConstructor_fixes_protected
     (expressionEq : expression.value = .field base dot name)
     (constructorInduction : ∀ instantiation state,
       InferConstructorApplicationFuelFixedness protectedVars fuel context expression
-        initial.allocateExpressionId.1 instantiation [] expected state) :
+        initial.allocateExpressionId.1 instantiation [] expected state)
+    (baseInduction : InferExprFuelFixedness protectedVars fuel context base none
+      initial.allocateExpressionId.2) :
     InferExprFuelFixedness protectedVars (fuel+1) context expression expected initial := by
   intro ready wellFormed bound live fixed catalog validated canonical expectedBelow expectedSafe result success
+  have overallSuccess := success
   let id := initial.allocateExpressionId.1
   let allocated := initial.allocateExpressionId.2
   have allocationEq : initial.allocateExpressionId = (id,allocated) := rfl
@@ -1247,9 +1250,23 @@ theorem inferExprFuel_fieldConstructor_fixes_protected
       simp only [candidatesResult] at success
       cases candidates with
       | nil =>
-          simp only [] at success
-          repeat' first | split at success
-          all_goals contradiction
+          obtain ⟨arrayResult, arrayState, _, baseRun, _, recordedSuccess⟩ :=
+            inferExprFuel_success_fieldLength_facts expressionEq allocationEq
+              candidatesResult overallSuccess
+          have noneBelow : ∀ expectedType ∈ (none : Option Ty),
+              expectedType.VariablesBelow allocated.inference.next := by simp
+          have noneSafe : ∀ expectedType ∈ (none : Option Ty),
+              Safe protectedVars allocated expectedType := by simp
+          have basePrivacy := inferExprFuel_private protectedVars fuel context base none allocated
+            allocationProperties.2 wfAllocated boundAllocated allocationPrivacy.2.1 catalog validated
+            canonical noneBelow noneSafe (arrayResult, arrayState) baseRun
+          have baseFixed := baseInduction allocationProperties.2 wfAllocated boundAllocated
+            allocationPrivacy.2.1 allocatedFixed catalog validated canonical noneBelow noneSafe
+            (arrayResult, arrayState) baseRun
+          have beforeFit := allocationPrivacy.1.trans basePrivacy.1
+          exact recordExpressionWithExpected_fixes_protected baseFixed
+            (safe_closed _ _ (Ty.variablesBelow_constructor 0 _))
+            (fun type member => beforeFit _ (expectedSafe _ member)) recordedSuccess
       | cons candidate rest =>
           cases rest with
           | cons second tail => simp at success

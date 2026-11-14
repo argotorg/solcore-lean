@@ -663,6 +663,20 @@ inductive ChildStep : CallIndex → CallIndex → Prop where
         .ok (childValue, childFinal)) :
       ChildStep (.expression (fuel + 1) context source expected initial value final)
         (.expression fuel context length (some (.fixed .uint256)) allocated childValue childFinal)
+  | expression_field_length_base
+      {fuel : Nat} {context : SourceInference.Context} {source base : Syntax.Expr}
+      {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
+      {expected : Option Ty} {initial allocated final childFinal : State}
+      {id : ExpressionId} {value childValue : InferredExpression}
+      (accepted : (CallIndex.expression (fuel + 1) context source expected
+        initial value final).Accepted)
+      (form : source.value = .field base dot name)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (nonconstructor : constructorCalleeCandidates context allocated source = .ok [])
+      (child : inferExprFuel fuel context base none allocated =
+        .ok (childValue, childFinal)) :
+      ChildStep (.expression (fuel + 1) context source expected initial value final)
+        (.expression fuel context base none allocated childValue childFinal)
   | expression_call_constructor
       {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
       {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
