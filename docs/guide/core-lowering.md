@@ -200,7 +200,10 @@ depends on the change.
   `SourceCoreCompatibleDataExpressions` lowers the form. The catalog's inductions in `Compatible/`
   take its case (`registered_prefix_with_closed`, `registered_shapes`, `project_closed`,
   `nominal_project`, `project_wellFormed`). The strict catalog (`SourceCoreDataCatalog`) still
-  rejects the type, so the form stays outside the proved subset.
+  rejects the type, so the form stays outside the proved subset. A later form at a registered type
+  needs no catalog change: the read `a[i]` (6e3b6a2f8) only took its case in
+  `SourceCoreCompatibleDataExpressions` (`lowerWithReasons` and `leafLowerer`), lowered by
+  `SourceCoreDataExpressions.arrayIndex` with `SourceCorePanics.outOfBounds` for `0x32`.
 - **A changed rule** (7ac75aea3, closures by value). Theorems whose statements mention the old
   premise are restated over the new one. Most changes were in `Owned/`, `CellAware/`, `OwnedStaged/`,
   `OwnedPrepared/`, `Callable/`, `Statements/`, `Generalized/`, `Selected/` and `Foundations/`.

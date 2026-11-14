@@ -241,7 +241,10 @@ may, needs no new statement either. A compound form whose operand has its own ty
    shift's case. A compound shift's amount waits too, so `inferAssignedValueFuel_success_sound` also
    takes `AssignmentAmountFits`, which its callers get from
    `FinalInferenceResources.shift_amounts_fit` (`SourceShiftAmountsFit`; `ForItemAmountFits` for
-   `for` headers).
+   `for` headers). A memory array read's index waits as well: the two typing routes, the selected
+   and the compiled, take its fit at the read from `FinalInferenceResources.array_indexes_fit`
+   (`SourceArrayIndexesFit.of_operatorSite`, through `OperatorApplicationForm`, which admits the
+   read).
 6. **Core lowering and tests**: see [Core lowering](core-lowering.md#making-changes). Each commit
    added a public-API test with the probe's results (`Tests.SourceCoreShiftExecution`,
    `Tests.SourceCoreUncheckedExecution`), registered in [Tests/Main.lean](../../Tests/Main.lean).
