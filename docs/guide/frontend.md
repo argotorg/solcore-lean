@@ -202,7 +202,9 @@ the layout refactor; [Conventions](conventions.md#following-older-notes) says ho
    finalization checks it with `validateShiftAmount`.
    A new form also needs its arm in `inferExprFuel` (`SourceInference/Expression`), except a form
    that inference only rejects: it shares the last arm, which names it with `rejectedFormName`
-   (df10f3f11), until the step that gives it a meaning adds its own arm.
+   (df10f3f11), until the step that gives it a meaning adds its own arm. `new T[](n)` took its arm
+   in a commit of its own, which only renumbered the proofs' cases and still rejected it
+   (f1713ae3a), before the commit that typed it (a3407d45f).
 4. **Inference proofs**: the new branch's lemmas next to it (`inferBinaryOperator_shift_result` in
    `SourceInference/Expression`), then every case analysis in
    `SourceInference/Internal/ExpressionProperties`. `unchecked` also touched `RequirementProperties`,
@@ -284,13 +286,13 @@ Worked examples: 7aa1d539d (the re-pin to `e2eef194`) and 32b38d908 (larger nest
   the [core lowering](core-lowering.md) work.
 - **Inference proofs number their cases.** They do functional induction on `inferExprFuel` and name
   its cases by number, in `SourceInference/Internal` and `SourceSemantics/Internal`. A new arm in
-  `inferExprFuel`, or a new syntax constructor it matches on, shifts them (a constructor that only
-  reaches the last arm, as `new T[](n)` and the slices do, shifts nothing). This is why
-  `unchecked` is a pass around the parser. Pattern proofs do the same with
-  `inferMatchPatternFlatFuel.induct`: the arm of `case uint256(p)` (8708ef657) shifted its later
-  cases in `ExpressionProperties`, `Privacy/Active`, `Privacy/ProtectedFrames`,
-  `Privacy/SelectedCalls`, `Inference/ExpressionLedgers`, `Formation/NormalizedMatches` and
-  `Selected/PatternMonomorphism`.
+  `inferExprFuel`, or a new syntax constructor it matches on, shifts them: `new T[](n)`'s arm
+  shifted 281 lines in 14 proof files (f1713ae3a), while a constructor that only reaches the last
+  arm, as the slices do, shifts nothing. This is why `unchecked` is a pass around the parser.
+  Pattern proofs do the same with `inferMatchPatternFlatFuel.induct`: the arm of `case uint256(p)`
+  (8708ef657) shifted its later cases in `ExpressionProperties`, `Privacy/Active`,
+  `Privacy/ProtectedFrames`, `Privacy/SelectedCalls`, `Inference/ExpressionLedgers`,
+  `Formation/NormalizedMatches` and `Selected/PatternMonomorphism`.
 - **The compiler imports the inference proofs.** `ProgramChecking` imports the `SourceInference`
   umbrella, which imports five proof files, so a broken inference proof stops the compiler build.
 - **Files kept apart on purpose.** The layout refactor kept these apart, for these reasons:

@@ -192,6 +192,15 @@ depends on the change.
   `word`). The conversions stay outside the proved subset: `BuiltinCalls.call_of_accepted` takes
   `function.conversion? = none`, which its callers get from `builtinForm`, the supported syntax or a
   receipt's catalog index (`conversion?_of_inventory`).
+- **A form only the compatible profile lowers** (baf67f5b5, `new T[](n)` and the lengths of row 4's
+  memory arrays). The public compiler lowers through the compatible profile
+  (`SourceCoreUnifiedCompilation`), so the type takes its Core representation in that catalog
+  (`SourceCoreCompatibleCatalog.Catalog.project` and `registerType`; the projection reads an
+  application's runtime head, so `Catalog.project_runtimeType` still holds), and
+  `SourceCoreCompatibleDataExpressions` lowers the form. The catalog's inductions in `Compatible/`
+  take its case (`registered_prefix_with_closed`, `registered_shapes`, `project_closed`,
+  `nominal_project`, `project_wellFormed`). The strict catalog (`SourceCoreDataCatalog`) still
+  rejects the type, so the form stays outside the proved subset.
 - **A changed rule** (7ac75aea3, closures by value). Theorems whose statements mention the old
   premise are restated over the new one. Most changes were in `Owned/`, `CellAware/`, `OwnedStaged/`,
   `OwnedPrepared/`, `Callable/`, `Statements/`, `Generalized/`, `Selected/` and `Foundations/`.
@@ -291,6 +300,9 @@ work, under "Remaining work for the second goal". In short:
   reflection direction and the lifting of their Source traces remain.
 - The proof target is a successful selected compilation, not the whole workspace and not checker
   acceptance alone. Each extension ends in a consumer of the real public API.
+- Row 4's memory arrays compile through the compatible profile and stay outside `StaticProfile` and
+  the meaning proofs ([decision 6](../design/memory-arrays-slices.md#6-meaning-proofs)). Relating
+  array objects to their Core cells is a later unit.
 
 ## Pitfalls
 

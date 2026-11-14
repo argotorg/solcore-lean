@@ -61,7 +61,10 @@ it a Core representation.
 4. A Core type, if the type has a runtime representation
    ([Core](core.md#add-an-expression-form-or-a-value-form)).
 5. The source semantics' rules for its values and literals ([Source semantics](source-semantics.md)).
-   `TypeWellScoped.builtin` already admits every builtin.
+   `TypeWellScoped.builtin` already admits every builtin on its own. A builtin applied to a type, as
+   `T[]` is (`Ty.array`, 8f9344bc4), also needs its case in `TypeWellScoped`
+   (`TypeWellScoped.array`) and in the two formation judgments, `SignatureTypeFormationValidated`
+   and `InferenceTypeFormationValidated`, and every induction over types takes it.
 
 ### Extend unification or inference
 
