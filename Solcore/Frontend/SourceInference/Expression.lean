@@ -1346,6 +1346,13 @@ def arrayLengthArgument (arguments : List InferredExpression) (state : State) :
   | arguments => .error (.operatorNotSupported "Length"
       (state.resolve (Ty.productMany (arguments.map (·.type)))))
 
+/-- `a.length()`: a call of a field named `length` with no arguments, which is
+the field itself, as upstream's method call of `Length.length` is. -/
+def lengthMethodCall (callee : Syntax.Expr) (arguments : List InferredExpression) : Bool :=
+  match callee.value, arguments with
+  | .field _ _ name, [] => name.value == "length"
+  | _, _ => false
+
 /-- An array whose length is taken has a memory array type once resolved. -/
 theorem arrayLengthOf_ok {array : InferredExpression} {state : State} {checked : Unit}
     (success : arrayLengthOf array state = .ok checked) :
@@ -1938,10 +1945,14 @@ mutual
                   | some _ =>
                       let (calleeResult, state) ←
                         inferExprFuel fuel context callee none state
-                      let result ← applyFunctionType context id calleeResult.type
-                        arguments expected state
-                      pure <| recordIndirectCall expression calleeResult
-                        arguments result
+                      if lengthMethodCall callee arguments then
+                        recordExpressionWithExpected context expression id
+                          calleeResult.type (.group calleeResult.id) [] expected state
+                      else
+                        let result ← applyFunctionType context id calleeResult.type
+                          arguments expected state
+                        pure <| recordIndirectCall expression calleeResult
+                          arguments result
                   | none =>
                       match ← qualifiedFunctionsNamed context namespacePath name with
                       | some candidates =>
@@ -2001,9 +2012,13 @@ mutual
                   | none =>
                       let (calleeResult, state) ←
                         inferExprFuel fuel context callee none state
-                      let result ← applyFunctionType context id calleeResult.type
-                        arguments expected state
-                      pure <| recordIndirectCall expression calleeResult arguments result
+                      if lengthMethodCall callee arguments then
+                        recordExpressionWithExpected context expression id
+                          calleeResult.type (.group calleeResult.id) [] expected state
+                      else
+                        let result ← applyFunctionType context id calleeResult.type
+                          arguments expected state
+                        pure <| recordIndirectCall expression calleeResult arguments result
       | .dotConstructor _ name arguments => do
           let (dataType, constructor, typeArguments) ←
             contextualConstructorCandidate context state expected name.value

@@ -173,6 +173,9 @@ theorem inferExprFuelLedgerPreservation_step
       exact ((expressionIH calleeAccepted
         (expressionsIH argumentsAccepted allocatedTracked)).applyFunctionType application)
         |>.recordIndirectCall _ _ _
+    | lengthMethod argumentsAccepted calleeAccepted _ recorded =>
+      exact (expressionIH calleeAccepted
+        (expressionsIH argumentsAccepted allocatedTracked)).recordExpressionWithExpected recorded
   | proxy keyword sourceType =>
     obtain ⟨_, _, recorded⟩ := Detail.inferExprFuel_success_proxy_facts form allocation accepted
     exact allocatedTracked.recordExpressionWithExpected recorded

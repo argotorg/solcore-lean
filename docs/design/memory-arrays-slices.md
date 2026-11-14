@@ -352,7 +352,9 @@ wait for the native pipeline's contracts and ABI.
   call is recorded as the length's own typed form, whose evaluation reads the array's cell, rather
   than as a builtin function, whose evaluation reads no heap. Its one argument's type must be a
   memory array once its arguments are inferred, as `Typedef.rep`'s must be `word` or a fixed-width
-  type.
+  type. As built in steps 2b-ii-c and 2b-ii-d, `a.length` is a field that names no constructor, whose
+  base, inferred with no expected type, must be a memory array, and `a.length()`, a call of it with
+  no arguments whose callee inference takes it, is recorded as a group over that field.
 - **Builtins.** `toArray(s)` is a builtin, and so are `lidx(a, i)`, `CanStore.load(r)` and
   `CanStore.store(r, v)` from step 7.
 - **Rejected.** `Typedef` at an array type, `==` on arrays, `push` and `pop`, and assignment to a
@@ -485,7 +487,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 2a-i | The array type: `T[]` resolves to a memory array once aliases are expanded, type resolution checks its element and rejects a mapping that holds an array, and type formation admits it; no value has an array type yet, and elaboration rejects every array type | 25–35 files, +300–500/−20–60; measured at 27 files, +458/−75 | none |
 | 2a-ii | The store: an array object, a reference to it and their typing, with the typing's laws; no expression makes one yet | 20–40 files, +400–800/−50–150; measured at 17 files, +214/−18 | none |
 | 2b-i | `new T[](n)` and `0x41`: inference, evaluation and its fault, the sized and staged copies and preservation. Three commits: 2b-i-a, `new`'s own arm in inference, which still rejects it and renumbers the cases of the proofs by functional induction on `inferExprFuel`; 2b-i-b, the typed form `new` with its static rule, evaluation, faults, sized copies, stage and preservation, which no source produces yet; then 2b-i-c, inference's typing of `new` | 35–60 files, +900–1,500/−100–300; 2b-i-a measured at 15 files, +293/−286, 2b-i-b at 28 files, +338/−6, 2b-i-c at 25 files, +799/−19 | none |
-| 2b-ii | The lengths: `a.length`, `a.length()` and `Length.length(a)`. Four commits: 2b-ii-a, the typed form of a memory array's length with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet; 2b-ii-b, inference's typing of `Length.length(a)`, a compiler function's qualified name as `Typedef.abs` is; 2b-ii-c, inference's typing of `a.length`, a field that names no constructor, whose base is a new child of inference's call tree; then 2b-ii-d, `a.length()`, a call of that field with no arguments | 30–50 files, +600–1,000/−100–200; 2b-ii-a measured at 27 files, +160/−10, 2b-ii-b at 19 files, +484/−10, 2b-ii-c at 23 files, +602/−90 | none |
+| 2b-ii | The lengths: `a.length`, `a.length()` and `Length.length(a)`. Four commits: 2b-ii-a, the typed form of a memory array's length with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet; 2b-ii-b, inference's typing of `Length.length(a)`, a compiler function's qualified name as `Typedef.abs` is; 2b-ii-c, inference's typing of `a.length`, a field that names no constructor, whose base is a new child of inference's call tree; then 2b-ii-d, `a.length()`, a call of that field with no arguments | 30–50 files, +600–1,000/−100–200; 2b-ii-a measured at 27 files, +160/−10, 2b-ii-b at 19 files, +484/−10, 2b-ii-c at 23 files, +602/−90, 2b-ii-d at 20 files, +593/−51 | none |
 | 2b-iii | The lowering: the Core cells of `new` and the lengths | 15–30 files, +400–800/−50–150 | newLen(n), oversized(n) |
 | 3 | Element reads and `0x32` | 35–55 files, +800–1,200/−200–350, between 3c and 3a | defaultZero(n, i), nestedEmpty(n) |
 | 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |

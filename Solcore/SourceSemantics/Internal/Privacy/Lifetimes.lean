@@ -1018,6 +1018,17 @@ theorem call_arguments_suffix
         (after.values _ (List.mem_append_right _ (List.mem_singleton_self _)))
       rw [recorded] at completed
       exact completed.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
+  | @lengthMethod inferredArguments argumentState calleeState inferredCallee _ actualArguments _ calleeAccepted _ recorded =>
+      have same := Except.ok.inj (actualArguments.symm.trans childAccepted)
+      cases same
+      have calleeProperties := inferExprFuel_inferenceProperties properties.2.1 catalog.formation catalog.canonical (by simp) calleeAccepted
+      have afterCallee := lifetime.inferExpr properties.2.1
+        ((inferExprsFuel_direct_progress childAccepted).wellFormed wellFormed) catalog (by simp) (by simp) calleeAccepted
+      have completed := afterCallee.recordExpression catalog.catalog calleeProperties.2.1 calleeProperties.2.2
+        (fun type member => (expectedAfter type member).weaken calleeProperties.1.next_le)
+        (afterCallee.values _ (List.mem_append_right _ (List.mem_singleton_self _)))
+        (fun type member => afterCallee.older _ (expectedBelow type member)) recorded
+      exact completed.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
 
 theorem call_arguments
     {fuel : Nat} {context : SourceInference.Context} {source callee : Syntax.Expr}
@@ -1064,15 +1075,21 @@ theorem call_callee
     catalog.formation catalog.canonical argumentsAccepted
   have calleeProperties := inferExprFuel_inferenceProperties argumentsProperties.2.1
     catalog.formation catalog.canonical (by simp) calleeAccepted
-  obtain ⟨application, applicationAccepted, recorded⟩ :=
-    SourceInferenceExecution.indirectCall_actual_suffix form allocation nonconstructor argumentsAccepted indirect calleeAccepted accepted
   have before : initial.inference.next ≤ argumentState.inference.next := sameNext ▸ argumentsProperties.1.next_le
-  have completed := lifetime.indirect_callee_suffix calleeProperties.2.1 catalog calleeProperties.2.2
-    (fun argument member => (argumentsProperties.2.2 argument member).weaken calleeProperties.1.next_le)
-    (fun type member => (expectedBelow type member).weaken (Nat.le_trans before calleeProperties.1.next_le))
-    argumentsProperties.2.2 (fun type member => (expectedBelow type member).weaken before)
-    applicationAccepted recorded
-  exact completed.weaken_entry before
+  rcases SourceInferenceExecution.indirectCall_actual_suffix form allocation nonconstructor argumentsAccepted
+      indirect calleeAccepted accepted with ⟨application, applicationAccepted, recorded⟩ | recorded
+  · have completed := lifetime.indirect_callee_suffix calleeProperties.2.1 catalog calleeProperties.2.2
+      (fun argument member => (argumentsProperties.2.2 argument member).weaken calleeProperties.1.next_le)
+      (fun type member => (expectedBelow type member).weaken (Nat.le_trans before calleeProperties.1.next_le))
+      argumentsProperties.2.2 (fun type member => (expectedBelow type member).weaken before)
+      applicationAccepted recorded
+    exact completed.weaken_entry before
+  · have completed := lifetime.recordExpression catalog.catalog calleeProperties.2.1 calleeProperties.2.2
+      (fun type member => (expectedBelow type member).weaken (Nat.le_trans before calleeProperties.1.next_le))
+      (lifetime.values _ (List.mem_singleton_self _))
+      (fun type member => lifetime.older type ((expectedBelow type member).weaken before)) recorded
+    exact (completed.restrict_outputs (selected := [result.1.type])
+      (by intro type member; exact List.mem_append_right _ member)).weaken_entry before
 
 end GeneralizationLifetime
 end Solcore.SourceSemantics.SourceInferenceSoundness.ProtectedVariables

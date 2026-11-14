@@ -1573,6 +1573,28 @@ theorem inferExprFuel_call_private
                 (new_requirements_trans argumentsPrivacy.2.2.2 calleePrivacy.2.2.2 calleePrivacy.1) applied.2.2.2 applied.1
               intro row member fresh type typeMember
               exact recorded.1 _ (rows row (recorded.2.2.2 ▸ member) fresh type typeMember)
+            have finishMethod (calleeResult : InferredExpression) (calleeState : State)
+                (calleeSuccess : inferExprFuel fuel context callee none argumentState = .ok (calleeResult,calleeState))
+                (recorded : recordExpressionWithExpected context expression id calleeResult.type
+                  (.group calleeResult.id) [] expected calleeState = .ok result) :
+                SafeTransport protectedVars initial result.2 ∧ Safe protectedVars result.2 result.1.type ∧
+                  LiveBindersSafe protectedVars result.2 ∧
+                  ∀ row ∈ result.2.requirements, row ∉ initial.requirements → PredicateSafe protectedVars result.2 row.predicate := by
+              have calleeProperties := inferExprFuel_inferenceProperties argumentsProperties.2.1 validated canonical (by simp) calleeSuccess
+              have calleePrivacy := calleeInduction argumentState argumentsProperties.2.1
+                ((inferExprsFuel_direct_progress argumentsResult).wellFormed wellFormed) argumentBound argumentsPrivacy.2.2.1
+                catalog validated canonical (by simp) (by simp) (calleeResult,calleeState) calleeSuccess
+              have recordedPrivacy := recordExpressionWithExpected_private catalog calleeProperties.2.1
+                calleeProperties.2.2
+                (fun type member => (expectedAtArguments type member).weaken calleeProperties.1.next_le)
+                calleePrivacy.2.1 (fun type member => calleePrivacy.1 _ (expectedSafeAtArguments type member))
+                calleePrivacy.2.2.1 recorded
+              refine ⟨prefixPrivacy.trans (calleePrivacy.1.trans recordedPrivacy.1), recordedPrivacy.2.1,
+                recordedPrivacy.2.2.1, ?_⟩
+              intro row member fresh
+              exact new_requirements_trans
+                (new_requirements_trans argumentsPrivacy.2.2.2 calleePrivacy.2.2.2 calleePrivacy.1)
+                recordedPrivacy.2.2.2 recordedPrivacy.1 row member fresh
             cases qualifiedEq : calleeQualifiedIdentifier? callee with
             | some qualified =>
                 rcases qualified with ⟨namespacePath, name⟩
@@ -1589,6 +1611,11 @@ theorem inferExprFuel_call_private
                         rcases calleePair with
                           ⟨inferredCallee, calleeState⟩
                         simp only [calleeResult] at success
+                        cases methodEq : lengthMethodCall callee arguments
+                        case true =>
+                          simp only [methodEq, if_true] at success
+                          exact finishMethod inferredCallee calleeState calleeResult success
+                        simp only [methodEq, Bool.false_eq_true, if_false] at success
                         cases applicationResult : applyFunctionType
                             context id inferredCallee.type arguments
                             expected calleeState with
@@ -1709,6 +1736,11 @@ theorem inferExprFuel_call_private
                         rcases calleePair with
                           ⟨inferredCallee, calleeState⟩
                         simp only [calleeResult] at success
+                        cases methodEq : lengthMethodCall callee arguments
+                        case true =>
+                          simp only [methodEq, if_true] at success
+                          exact finishMethod inferredCallee calleeState calleeResult success
+                        simp only [methodEq, Bool.false_eq_true, if_false] at success
                         cases applicationResult : applyFunctionType
                             context id inferredCallee.type arguments
                             expected calleeState with

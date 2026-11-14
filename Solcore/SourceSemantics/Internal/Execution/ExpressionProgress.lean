@@ -323,6 +323,13 @@ theorem call_arguments_suffix_progress
         applicationProperties.2.1 applicationProperties.2.2
       rw [recorded] at after
       exact calleeProperties.1.trans (applicationProperties.1.trans after.1)
+  | @lengthMethod inferredArguments argumentState calleeState inferredCallee _ actualArguments _ calleeAccepted _ recorded =>
+      cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+      have calleeProperties := inferExprFuel_inferenceProperties properties.2.1
+        catalog.formation catalog.canonical (by simp) calleeAccepted
+      exact calleeProperties.1.trans (recordExpressionWithExpected_inferenceProperties
+        calleeProperties.2.1 calleeProperties.2.2
+        (fun type member => (expectedAfter type member).weaken calleeProperties.1.next_le) recorded).1
 
 end Solcore.SourceSemantics.SourceInferenceExecution
 end
@@ -645,20 +652,24 @@ theorem ChildStep.progress_expression
   | @expression_call_callee fuel context source expected initial allocated final id value
       callee arguments values argumentState childFinal inferred
       accepted form allocation nonconstructor argumentsAccepted indirect childAccepted =>
-      obtain ⟨application, applicationRun, recorded⟩ :=
-        indirectCall_actual_suffix form allocation nonconstructor argumentsAccepted indirect childAccepted accepted
       have argumentsProperties := inferExprsFuel_inferenceProperties
         (allocation_ready inputs.ready allocation)
         inputs.catalog.formation inputs.catalog.canonical argumentsAccepted
-      have applicationProperties := applyFunctionType_inferenceProperties childProperties.2.1
-        (childProperties.2.2 _ (by simp [CallIndex.outputTypes]))
-        (fun argument member => (argumentsProperties.2.2 argument member).weaken childProperties.1.next_le)
-        (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken
-          (argumentsProperties.1.trans childProperties.1).next_le) applicationRun
-      have after := recordIndirectCall_inferenceProperties source inferred values application
-        applicationProperties.2.1 applicationProperties.2.2
-      rw [recorded] at after
-      exact applicationProperties.1.trans after.1
+      rcases indirectCall_actual_suffix form allocation nonconstructor argumentsAccepted indirect childAccepted
+          accepted with ⟨application, applicationRun, recorded⟩ | recorded
+      · have applicationProperties := applyFunctionType_inferenceProperties childProperties.2.1
+          (childProperties.2.2 _ (by simp [CallIndex.outputTypes]))
+          (fun argument member => (argumentsProperties.2.2 argument member).weaken childProperties.1.next_le)
+          (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken
+            (argumentsProperties.1.trans childProperties.1).next_le) applicationRun
+        have after := recordIndirectCall_inferenceProperties source inferred values application
+          applicationProperties.2.1 applicationProperties.2.2
+        rw [recorded] at after
+        exact applicationProperties.1.trans after.1
+      · exact (recordExpressionWithExpected_inferenceProperties childProperties.2.1
+          (childProperties.2.2 _ (by simp [CallIndex.outputTypes]))
+          (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken
+            (argumentsProperties.1.trans childProperties.1).next_le) recorded).1
   | @expression_call_constructor fuel context source expected initial allocated final id value
       callee arguments dataType constructor instantiation instantiated childFinal inferred
       accepted form allocation selected fresh childAccepted =>

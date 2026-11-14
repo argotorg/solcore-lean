@@ -139,6 +139,31 @@ theorem inferExprFuel_call_formation
               have applicationFormed := calleeFormation.2.of_new_rows
                 (congrArg LexicalScope.binders (localReadScope_applyFunctionType_lexicalScope applicationSuccess)) applied.2
               exact ⟨fields.2.2.2.1 ▸ applied.1, applicationFormed.congr fields.2.1 fields.2.2.1⟩
+            have finishMethod (calleeResult : InferredExpression) (calleeState : State)
+                (calleeSuccess : inferExprFuel fuel context callee none argumentState = .ok (calleeResult,calleeState))
+                (recorded : recordExpressionWithExpected context expression id calleeResult.type
+                  (.group calleeResult.id) [] expected calleeState = .ok result) :
+                TypeAdmissible semantic (outer.apply result.1.type) ∧ NormalizedStateFormation semantic outer result.2 := by
+              have calleeProperties := inferExprFuel_inferenceProperties argumentsProperties.2.1 formation.validated formation.functionShapes (by simp) calleeSuccess
+              have recording := recordExpressionWithExpected_inferenceProperties calleeProperties.2.1
+                calleeProperties.2.2
+                (fun type member => (expectedAtArguments type member).weaken calleeProperties.1.next_le) recorded
+              have calleeContinuation := continuation.trans recording.1.substitution_extends
+              have argumentContinuation := calleeContinuation.trans calleeProperties.1.substitution_extends
+              have calleeCapture : NoCaptureNodes outer calleeState.nodes := by
+                obtain ⟨_, fit, _, nodes⟩ := recordExpressionWithExpected_success_nodes recorded
+                rw [nodes, (withExpected_occurrenceState_eq fit).1] at capture
+                exact capture.of_prefix (List.prefix_append _ _)
+              have retained : argumentState.nodes <+: calleeState.nodes :=
+                inferExprFuel_preserves_nodesPrefix calleeSuccess (List.prefix_refl _) argumentNodes (Nat.le_refl _)
+              have argumentFormation := argumentsInduction allocatedReady allocatedNodes allocatedFormed formation
+                (arguments,argumentState) argumentsResult argumentContinuation (calleeCapture.of_prefix retained)
+              have calleeFormation := calleeInduction argumentState argumentsProperties.2.1 argumentNodes argumentFormation.2 formation
+                (by simp) (by simp) (calleeResult,calleeState) calleeSuccess calleeContinuation calleeCapture
+              have produced := recordExpressionWithExpected_normalized_formation formation.toFormationContext
+                continuation calleeFormation.1 expectedFormed recorded
+              exact ⟨produced.1, calleeFormation.2.of_new_rows (congrArg LexicalScope.binders
+                (localReadScope_recordExpressionWithExpected_lexicalScope recorded)) produced.2⟩
             cases qualifiedEq : calleeQualifiedIdentifier? callee with
             | some qualified =>
                 rcases qualified with ⟨namespacePath, name⟩
@@ -155,6 +180,11 @@ theorem inferExprFuel_call_formation
                         rcases calleePair with
                           ⟨inferredCallee, calleeState⟩
                         simp only [calleeResult] at success
+                        cases methodEq : lengthMethodCall callee arguments
+                        case true =>
+                          simp only [methodEq, if_true] at success
+                          exact finishMethod inferredCallee calleeState calleeResult success
+                        simp only [methodEq, Bool.false_eq_true, if_false] at success
                         cases applicationResult : applyFunctionType
                             context id inferredCallee.type arguments
                             expected calleeState with
@@ -282,6 +312,11 @@ theorem inferExprFuel_call_formation
                         rcases calleePair with
                           ⟨inferredCallee, calleeState⟩
                         simp only [calleeResult] at success
+                        cases methodEq : lengthMethodCall callee arguments
+                        case true =>
+                          simp only [methodEq, if_true] at success
+                          exact finishMethod inferredCallee calleeState calleeResult success
+                        simp only [methodEq, Bool.false_eq_true, if_false] at success
                         cases applicationResult : applyFunctionType
                             context id inferredCallee.type arguments
                             expected calleeState with

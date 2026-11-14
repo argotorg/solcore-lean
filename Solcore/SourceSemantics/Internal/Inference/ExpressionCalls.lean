@@ -1468,11 +1468,11 @@ theorem
       solveSuccess solvedEq ledger ownership activeSignaturesEq
       activeRequirementsEq assumptionsMono callCovered
 
-/-- The five successful executable tails of a source call.  Constructor
+/-- The six successful executable tails of a source call.  Constructor
 discovery precedes ordinary call dispatch; a non-constructor call first
 traverses its argument row and then records either a selected direct call, a
-builtin call, a memory array's length, or an indirect call through a
-recursively inferred callee. -/
+builtin call, a memory array's length, an indirect call through a recursively
+inferred callee, or, for `a.length()`, that callee itself. -/
 inductive CallExpressionDispatchFacts
     (context : Frontend.SourceInference.Context)
     (source callee : Syntax.Expr)
@@ -1550,6 +1550,20 @@ inductive CallExpressionDispatchFacts
         inferredArguments application = result) :
       CallExpressionDispatchFacts context source callee arguments id expected
         fuel allocated result
+  | lengthMethod
+      {inferredArguments : List InferredExpression}
+      {argumentState calleeState : Frontend.SourceInference.State}
+      {inferredCallee : InferredExpression}
+      (argumentsSuccess : Detail.inferExprsFuel fuel context arguments.elements
+        allocated = .ok (inferredArguments, argumentState))
+      (calleeSuccess : Detail.inferExprFuel fuel context callee none
+        argumentState = .ok (inferredCallee, calleeState))
+      (method : Detail.lengthMethodCall callee inferredArguments = true)
+      (recording : Detail.recordExpressionWithExpected context source id
+        inferredCallee.type (.group inferredCallee.id) [] expected calleeState =
+          .ok result) :
+      CallExpressionDispatchFacts context source callee arguments id expected
+        fuel allocated result
 
 /-- Invert a successful source call into the exact semantic tail executed by
 the frontend. -/
@@ -1585,6 +1599,7 @@ theorem inferExprFuel_success_call_dispatch_facts
             | apply CallExpressionDispatchFacts.indirect <;> assumption
             | apply CallExpressionDispatchFacts.builtin <;> assumption
             | apply CallExpressionDispatchFacts.arrayLength <;> assumption
+            | apply CallExpressionDispatchFacts.lengthMethod <;> assumption
             | apply CallExpressionDispatchFacts.selected
               · assumption
               · first

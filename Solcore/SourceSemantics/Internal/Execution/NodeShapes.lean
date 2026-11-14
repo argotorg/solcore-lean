@@ -161,6 +161,10 @@ theorem callArguments
     rw [recorded] at after
     exact (inferExprFuel_occurrenceGraph calleeAccepted).graph.shapes.trans
       ((ActualExpressionNodeShapes.application applicationAccepted).trans after)
+  | @lengthMethod inferredArguments argumentState calleeState inferredCallee _ actualArguments _ calleeAccepted _ recorded =>
+    cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+    exact (inferExprFuel_occurrenceGraph calleeAccepted).graph.shapes.trans
+      (ActualExpressionNodeShapes.recordExpected recorded)
 
 end Solcore.SourceSemantics.SourceInferenceExecution.ActualExpressionNodeShapes
 end
@@ -299,11 +303,12 @@ theorem ChildStep.expression_shapes
   | @expression_call_callee fuel context source expected initial allocated final id value
       callee arguments values argumentState childFinal inferred
       accepted form allocation nonconstructor argumentsAccepted indirect childAccepted =>
-    obtain ⟨application, applicationRun, recorded⟩ :=
-      indirectCall_actual_suffix form allocation nonconstructor argumentsAccepted indirect childAccepted accepted
-    have after := ActualExpressionNodeShapes.recordIndirect source inferred values application
-    rw [recorded] at after
-    exact (ActualExpressionNodeShapes.application applicationRun).trans after
+    rcases indirectCall_actual_suffix form allocation nonconstructor argumentsAccepted indirect childAccepted
+        accepted with ⟨application, applicationRun, recorded⟩ | recorded
+    · have after := ActualExpressionNodeShapes.recordIndirect source inferred values application
+      rw [recorded] at after
+      exact (ActualExpressionNodeShapes.application applicationRun).trans after
+    · exact ActualExpressionNodeShapes.recordExpected recorded
   | @expression_call_constructor fuel context source expected initial allocated final id value
       callee arguments dataType constructor instantiation instantiated childFinal inferred
       accepted form allocation selected fresh childAccepted =>

@@ -570,6 +570,14 @@ private theorem inferFuel_origins_progress_internal :
       rw [← recording]
       exact allocationProgress.trans (argumentsProgress.trans (calleeProgress.trans
         ((RelativeReadProgress.applyFunctionType application).trans (RelativeReadProgress.recordIndirectCall _ _ _ _))))
+    | lengthMethod nonconstructor argumentsAccepted indirect calleeAccepted _ recording =>
+      have argumentsProgress := argumentsIH _ argumentsAccepted
+        (here.child (.expression_call_arguments accepted form allocation nonconstructor argumentsAccepted))
+      have calleeProgress := calleeIH _ _ calleeAccepted
+        (here.child (.expression_call_callee accepted form allocation nonconstructor argumentsAccepted indirect calleeAccepted))
+      exact allocationProgress.trans (argumentsProgress.trans (calleeProgress.trans
+        (RelativeReadProgress.recordExpressionWithExpected (root := root) recording
+          (by intro _ _ impossible; cases impossible))))
   case case20 =>
     intro context source expected initial fuel id allocated allocation base dot name form ih baseIH
     intro result accepted here

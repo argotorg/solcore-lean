@@ -1426,6 +1426,129 @@ theorem actualArrayLengthCall_typing {fuel : Nat}
     recording resultSubstitutionExtension requirementsSubset retained coercionsRetained
     catalog signaturesEq invariant formType rawAdmissible covered
 
+/-- `a.length()`: the call is a group over its callee `a.length`, inferred after
+its empty argument row, and has the callee's type. -/
+theorem actualLengthMethodCall_typing {fuel : Nat}
+    (recursive : ∀ smaller, smaller < fuel + 1 → ActualInferExprFuelRetainedSoundness smaller) :
+  ∀ {wholeContext inferenceContext : Frontend.SourceInference.Context}
+    {wholeReturn : Ty} {expression callee : Syntax.Expr} {expected : Option Ty}
+    {argumentSources : List Syntax.Expr} {arguments : List InferredExpression}
+    {call : ExpressionId}
+    {initial argumentState calleeState resultState evidenceState : State}
+    {inferredCallee inferred : InferredExpression} {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    {semanticSource : TypedSource}
+    {frames : List InitializedLetBinding}
+    {semanticContext : SourceSemantics.Context},
+    Detail.inferExprsFuel fuel inferenceContext argumentSources initial = .ok (arguments, argumentState) →
+    Detail.inferExprFuel fuel inferenceContext callee none argumentState = .ok (inferredCallee, calleeState) →
+    Detail.recordExpressionWithExpected inferenceContext expression call inferredCallee.type
+      (.group inferredCallee.id) [] expected calleeState = .ok (inferred, resultState) →
+    FinalInferenceResources wholeContext wholeReturn evidenceState roots
+      finalized →
+    ExecutableCoercionInterfaces.SourceInterfaces wholeContext.signatures
+      finalized.solvedRequirements finalized.typedSource →
+    finalized.substitution.SemanticallyExtends
+      resultState.inference.substitution →
+    inferenceContext.signatures = wholeContext.signatures →
+    inferenceContext.scope.genericOwner = wholeContext.scope.genericOwner →
+    inferenceContext.typeParameters = wholeContext.typeParameters →
+    inferenceContext.assumptions = wholeContext.assumptions →
+    ProgramSignatureFormationValidated inferenceContext.signatures →
+    (∀ candidate ∈ inferenceContext.signatures.functions,
+      candidate.scheme.body = .function
+        (Ty.productMany candidate.parameterTypes)
+        (Ty.productMany candidate.returnTypes)) →
+    SignatureCatalogWellFormed inferenceContext.signatures →
+    SignatureParametersWellFormed inferenceContext.scope.genericOwner
+      inferenceContext.typeParameters →
+    RecursiveExpressionInvariant wholeContext finalized initial
+      semanticContext →
+    ActualContext wholeContext finalized frames semanticContext →
+    ActualStateInvariant initial (evidenceState.toTypedSource roots) →
+    (∀ expectedType ∈ expected,
+      expectedType.VariablesBelow initial.inference.next) →
+    (∀ expectedType ∈ expected,
+      TypeAdmissible semanticContext (finalized.substitution.apply expectedType)) →
+    ProperDescendantsPreserved finalized.substitution
+      (resultState.toTypedSource roots) finalized.typedSource
+      (.expression inferred.id) →
+    RawProperDescendantsPreserved (resultState.toTypedSource roots)
+      (evidenceState.toTypedSource roots) (.expression inferred.id) →
+    resultState.integerPatterns ⊆ evidenceState.integerPatterns →
+    resultState.integerLiterals ⊆ evidenceState.integerLiterals →
+    resultState.requirements ⊆ evidenceState.requirements →
+    ExpressionRequirementsRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionCoercionPrimariesRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionOperatorSiteRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionDirectChildrenRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    TemplateScopeCovered finalized.typedSource semanticContext
+      (.expression inferred.id) →
+    ProperDescendantsPreserved finalized.substitution (resultState.toTypedSource roots)
+      semanticSource (.expression inferred.id) →
+    ActualContext.Covers finalized frames (.expression inferred.id) →
+    ExpressionTypingBase (resultState.toTypedSource roots) semanticSource
+      semanticContext finalized.substitution inferred := by
+  intro wholeContext inferenceContext wholeReturn expression callee expected argumentSources arguments
+    call initial argumentState calleeState resultState evidenceState inferredCallee inferred roots
+    finalized semanticSource frames semanticContext argumentsSuccess calleeSuccess recording
+    resources interfaces resultSubstitutionExtension signaturesEq ownerEq
+    typeParametersEq assumptionsEq signatureFormation functionsCanonical catalog canonical invariant
+    actual operational expectedBelow _expectedAdmissible finalPreserved rawProper integerPatternsSubset
+    integerLiteralsSubset requirementsSubset retained coercionsRetained _operatorsRetained childrenRetained covered
+    semanticPreserved actualCovered
+  have argumentProperties := Detail.inferExprsFuel_inferenceProperties invariant.ready
+    signatureFormation functionsCanonical argumentsSuccess
+  have calleeProperties := Detail.inferExprFuel_inferenceProperties argumentProperties.2.1
+    signatureFormation functionsCanonical (by simp) calleeSuccess
+  have expectedAtCallee : ∀ type ∈ expected, type.VariablesBelow calleeState.inference.next :=
+    fun type member => (expectedBelow type member).weaken (argumentProperties.1.trans calleeProperties.1).next_le
+  have recordProperties := Detail.recordExpressionWithExpected_inferenceProperties
+    calleeProperties.2.1 calleeProperties.2.2 expectedAtCallee recording
+  have calleeExtension := resultSubstitutionExtension.trans recordProperties.1.substitution_extends
+  have argumentExtension := calleeExtension.trans calleeProperties.1.substitution_extends
+  have argumentInvariant := invariant.ofExpressions signatureFormation functionsCanonical argumentExtension argumentsSuccess
+  have argumentOperational := operational.ofExpressions argumentsSuccess argumentProperties.1.next_le
+  have calleeToParent : TypingSourceExtends (calleeState.toTypedSource roots)
+      (resultState.toTypedSource roots) :=
+    ⟨Detail.recordExpressionWithExpected_preserves_owner recording,
+      recordExpressionWithExpected_success_nodesPrefix recording⟩
+  obtain ⟨_, contains⟩ := recordExpressionWithExpected_success_containsExpression recording roots
+  have edge : DirectChild (resultState.toTypedSource roots)
+      (.expression inferred.id) (.expression inferredCallee.id) := by
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    simp [nodeChildIds, Node.references, ExpressionForm.references]
+  have finalEdge := childrenRetained edge
+  have childPatterns : calleeState.integerPatterns ⊆ evidenceState.integerPatterns := by
+    rw [← recordExpressionWithExpected_integerPatterns_eq recording]
+    exact integerPatternsSubset
+  have childLiterals : calleeState.integerLiterals ⊆ evidenceState.integerLiterals := by
+    rw [← Detail.recordExpressionWithExpected_integerLiterals_eq recording]
+    exact integerLiteralsSubset
+  have childRequirements := List.Subset.trans
+    (Detail.recordExpressionWithExpected_requirements_subset recording) requirementsSubset
+  have typed := actualInferExprFuelFinalSubtreeSoundness_of_retainedSoundness
+    (recursive fuel (Nat.lt_succ_self _))
+    calleeSuccess resources interfaces calleeExtension signaturesEq ownerEq typeParametersEq
+    assumptionsEq signatureFormation functionsCanonical catalog canonical argumentInvariant actual
+    argumentOperational (by simp) (by simp)
+    ((semanticPreserved.childSubtree edge).monoBefore calleeToParent)
+    ((finalPreserved.childSubtree edge).monoBefore calleeToParent)
+    ((rawProper.childSubtree edge).monoBefore calleeToParent).proper childPatterns childLiterals
+    childRequirements (covered.expressionChild resources.graph_closed finalEdge)
+    (actualCovered.directChild finalEdge)
+  have formType : ExpressionFormHasRawType semanticSource semanticContext
+      ((ExpressionForm.group inferredCallee.id).applySubstitution finalized.substitution)
+      (finalized.substitution.apply inferredCallee.type) (.ordinary []) := by
+    simpa [ExpressionForm.applySubstitution] using ExpressionFormHasRawType.group typed
+  exact recordExpressionWithExpected_success_expressionTypingBase_actual resources interfaces
+    recording resultSubstitutionExtension requirementsSubset retained coercionsRetained
+    catalog signaturesEq invariant formType typed.type_admissible covered
+
 theorem actualInferExprFuelRetainedSoundness_call_nonConstructor {fuel : Nat}
     (recursive : ∀ smaller, smaller < fuel + 1 → ActualInferExprFuelRetainedSoundness smaller) :
   ∀ {wholeContext inferenceContext : Frontend.SourceInference.Context}
@@ -1533,6 +1656,12 @@ theorem actualInferExprFuelRetainedSoundness_call_nonConstructor {fuel : Nat}
       allocatedInvariant actual allocatedOperational allocatedExpected expectedAdmissible finalPreserved rawProper
       integerPatternsSubset integerLiteralsSubset requirementsSubset retained coercionsRetained _operatorsRetained
       childrenRetained covered semanticPreserved actualCovered
+  | lengthMethod argumentsSuccess calleeSuccess _ recording =>
+    exact actualLengthMethodCall_typing recursive argumentsSuccess calleeSuccess recording
+      resources interfaces resultSubstitutionExtension signaturesEq ownerEq typeParametersEq assumptionsEq
+      signatureFormation functionsCanonical catalog canonical allocatedInvariant actual allocatedOperational
+      allocatedExpected expectedAdmissible finalPreserved rawProper integerPatternsSubset integerLiteralsSubset
+      requirementsSubset retained coercionsRetained _operatorsRetained childrenRetained covered semanticPreserved actualCovered
   | indirect argumentsSuccess calleeSuccess applicationSuccess recording =>
     exact actualIndirectCall_typing recursive argumentsSuccess calleeSuccess applicationSuccess recording
       resources interfaces resultSubstitutionExtension signaturesEq ownerEq typeParametersEq assumptionsEq

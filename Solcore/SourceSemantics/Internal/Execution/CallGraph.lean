@@ -1389,7 +1389,8 @@ end
 
 section
 -- leanmerge: from Solcore.SourceSemantics.SourceInferenceActualIndirectCallPrefix
-/-! An accepted indirect dispatch identifies its actual application suffix. -/
+/-! An accepted indirect dispatch identifies its actual application suffix, or,
+for `a.length()`, the group over its callee. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceInferenceExecution
@@ -1408,15 +1409,19 @@ theorem indirectCall_actual_suffix
     (indirect : IndirectCalleeAt context callee argumentState)
     (calleeAccepted : inferExprFuel fuel context callee none argumentState = .ok (inferredCallee, calleeState))
     (accepted : inferExprFuel (fuel + 1) context source expected initial = .ok result) :
-    ∃ application,
+    (∃ application,
       applyFunctionType context id inferredCallee.type inferredArguments expected calleeState = .ok application ∧
-      recordIndirectCall source inferredCallee inferredArguments application = result := by
+      recordIndirectCall source inferredCallee inferredArguments application = result) ∨
+    recordExpressionWithExpected context source id inferredCallee.type
+      (.group inferredCallee.id) [] expected calleeState = .ok result := by
   unfold inferExprFuel at accepted
   simp only [allocation, form, nonconstructor, argumentsAccepted, calleeAccepted,
     bind, Except.bind] at accepted
   repeat' first | split at accepted
   all_goals try simp_all [IndirectCalleeAt, pure, Pure.pure, Except.pure]
-  all_goals exact ⟨_, by assumption, by assumption⟩
+  all_goals first
+    | exact .inl ⟨_, by assumption, by assumption⟩
+    | exact .inr (by assumption)
 
 end Solcore.SourceSemantics.SourceInferenceExecution
 end

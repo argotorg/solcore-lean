@@ -1464,8 +1464,9 @@ private def testNewArray : IO Unit := do
       | .unsupportedExpression _ => false
       | _ => true
 
-/-- `Length.length(a)` and `a.length` on a memory array are its length, a
-`uint256`, and on another type they are rejected. -/
+/-- `Length.length(a)`, `a.length` and `a.length()` on a memory array are its
+length, a `uint256`, and on another type, or with an argument, they are
+rejected. -/
 private def testArrayLength : IO Unit := do
   let functions ← check "array length" (String.intercalate "\n" [
     "function size(n: uint256) returns (uint256) {",
@@ -1503,6 +1504,31 @@ private def testArrayLength : IO Unit := do
   expectInferenceError "the length field of a uint256"
     "function bad(n: uint256) returns (uint256) { return n.length; }" fun error =>
       error == .operatorNotSupported "Length" uint256
+  let methodFunctions ← check "array length method" (String.intercalate "\n" [
+    "function size(n: uint256) returns (uint256) {",
+    "  let m: uint256[] = new uint256[](n);",
+    "  let k = new int8[](3).length();",
+    "  return m.length() + k;",
+    "}"
+  ])
+  let methodFunction ← match methodFunctions with
+    | [function] => pure function
+    | _ => throw (IO.userError "array length method fixture lost its checked function")
+  let methodLengths := methodFunction.typedBody.nodes.filterMap fun
+    | .expression { form := .arrayLength _, type, .. } => some type
+    | _ => none
+  let methodCalls := methodFunction.typedBody.nodes.filterMap fun
+    | .expression { form := .group inner, type, .. } =>
+        if methodFunction.typedBody.nodes.any fun
+          | .expression { id, form := .arrayLength _, .. } => id == inner
+          | _ => false
+        then some type else none
+    | _ => none
+  assertTrue (decide (methodLengths = [uint256, uint256] ∧ methodCalls = [uint256, uint256]))
+    s!"a.length() did not type the arrays' lengths as uint256: {reprStr methodLengths}, {reprStr methodCalls}"
+  expectInferenceError "the length method with an argument"
+    "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); return m.length(1); }"
+    fun _ => true
 
 /-- Inference rejects the slices until row 4 gives them a meaning. -/
 private def testSliceRejected : IO Unit := do

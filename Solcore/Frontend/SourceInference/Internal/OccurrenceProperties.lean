@@ -5217,6 +5217,21 @@ private theorem inference_anchoredNodePrefixExtends :
                           (applicationExtends.trans
                             (recordIndirectCall_anchoredNodePrefixExtends
                               expression calleeResult arguments application)))
+                    have finishMethod
+                        (calleeResult : InferredExpression)
+                        (calleeState : State)
+                        (calleeSuccess :
+                          inferExprFuel fuel context callee none argumentState =
+                            .ok (calleeResult, calleeState))
+                        (recorded :
+                          recordExpressionWithExpected context expression id
+                            calleeResult.type (.group calleeResult.id) [] expected
+                            calleeState = .ok result) :
+                        AnchoredNodePrefixExtends initial result.2 := by
+                      have calleeExtends := calleeInduction argumentState
+                        (calleeResult, calleeState) calleeSuccess
+                      exact throughArguments.trans (calleeExtends.trans
+                        (recordExpressionWithExpected_anchoredNodePrefixExtends recorded))
                     cases qualifiedEq : calleeQualifiedIdentifier? callee with
                     | some qualified =>
                         rcases qualified with ⟨namespacePath, name⟩
@@ -5235,6 +5250,11 @@ private theorem inference_anchoredNodePrefixExtends :
                                   ⟨inferredCallee, calleeState⟩
                                 simp only [calleeResult, bind, Except.bind,
                                   Prod.eta] at success
+                                cases methodEq : lengthMethodCall callee arguments
+                                case true =>
+                                  simp only [methodEq, if_true] at success
+                                  exact finishMethod inferredCallee calleeState calleeResult success
+                                simp only [methodEq, Bool.false_eq_true, if_false] at success
                                 cases applicationResult : applyFunctionType
                                     context id inferredCallee.type arguments
                                     expected calleeState with
@@ -5347,6 +5367,11 @@ private theorem inference_anchoredNodePrefixExtends :
                                   ⟨inferredCallee, calleeState⟩
                                 simp only [calleeResult, bind, Except.bind,
                                   Prod.eta] at success
+                                cases methodEq : lengthMethodCall callee arguments
+                                case true =>
+                                  simp only [methodEq, if_true] at success
+                                  exact finishMethod inferredCallee calleeState calleeResult success
+                                simp only [methodEq, Bool.false_eq_true, if_false] at success
                                 cases applicationResult : applyFunctionType
                                     context id inferredCallee.type arguments
                                     expected calleeState with

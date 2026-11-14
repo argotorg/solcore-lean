@@ -1581,6 +1581,95 @@ namespace Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 open Frontend SourceInference TypeSystem SourceInferenceSoundness
 open SourceCompiledLocalFinalization SourceInferenceExecution
 
+/-- The actual `a.length()` is a group over its callee `a.length`, checked after
+its empty argument row in the same selected final source. -/
+theorem lengthMethodCall_typing_for {callProvenance : CallIndex → Prop}
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel parentFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ∀ smaller, smaller < childFuel + 1 → ExpressionRetainedSoundnessFor callProvenance selected smaller)
+    {inferenceContext : SourceInference.Context} {expression calleeSource : Syntax.Expr}
+    {expected : Option Ty} {parentInitial initial argumentState calleeState resultState : State}
+    {inferred callee : InferredExpression} {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    {argumentSources : List Syntax.Expr} {arguments : List InferredExpression}
+    {call : ExpressionId}
+    (boundary : RetainedExpressionBoundary selected parentFuel inferenceContext expression expected
+      parentInitial inferred resultState frames target)
+    (invariant : RecursiveExpressionInvariant (checkingContext selected) selected.body.finalized initial target)
+    (operational : GeneralizedActualStateInvariant initial (evidenceSource selected))
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (argumentsSuccess : Detail.inferExprsFuel childFuel inferenceContext argumentSources initial =
+      .ok (arguments, argumentState))
+    (calleeHere : callProvenance (.expression childFuel inferenceContext calleeSource none argumentState callee calleeState))
+    (calleeSuccess : Detail.inferExprFuel childFuel inferenceContext calleeSource none argumentState =
+      .ok (callee, calleeState))
+    (recording : Detail.recordExpressionWithExpected inferenceContext expression call callee.type
+      (.group callee.id) [] expected calleeState = .ok (inferred, resultState)) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  let roots := bodyRoots selected
+  have resources := selected.body.resources
+  have signatureFormation := boundary.scope.formation checked
+  have functionsCanonical := boundary.scope.functionsCanonical checked
+  have catalog := boundary.scope.catalog checked
+  have argumentProperties := Detail.inferExprsFuel_inferenceProperties invariant.ready
+    signatureFormation functionsCanonical argumentsSuccess
+  have calleeProperties := Detail.inferExprFuel_inferenceProperties argumentProperties.2.1
+    signatureFormation functionsCanonical (by simp) calleeSuccess
+  have expectedAtCallee : ∀ type ∈ expected, type.VariablesBelow calleeState.inference.next :=
+    fun type member => (expectedBelow type member).weaken (argumentProperties.1.trans calleeProperties.1).next_le
+  have recordProperties := Detail.recordExpressionWithExpected_inferenceProperties
+    calleeProperties.2.1 calleeProperties.2.2 expectedAtCallee recording
+  have calleeExtension := boundary.extension.trans recordProperties.1.substitution_extends
+  have argumentExtension := calleeExtension.trans calleeProperties.1.substitution_extends
+  have argumentInvariant := invariant.ofExpressions signatureFormation functionsCanonical argumentExtension argumentsSuccess
+  have argumentOperational := operational.ofExpressions invariant.ready catalog signatureFormation functionsCanonical argumentsSuccess
+  have calleeToParent : TypingSourceExtends (calleeState.toTypedSource roots)
+      (resultState.toTypedSource roots) :=
+    ⟨Detail.recordExpressionWithExpected_preserves_owner recording,
+      recordExpressionWithExpected_success_nodesPrefix recording⟩
+  obtain ⟨_, contains⟩ := recordExpressionWithExpected_success_containsExpression recording roots
+  have calleeEdge : DirectChild (resultState.toTypedSource roots)
+      (.expression inferred.id) (.expression callee.id) := by
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    simp [nodeChildIds, Node.references, ExpressionForm.references]
+  have calleePatterns : calleeState.integerPatterns ⊆ selected.body.returned.integerPatterns := by
+    rw [← recordExpressionWithExpected_integerPatterns_eq recording]
+    exact boundary.integerPatterns
+  have calleeLiterals : calleeState.integerLiterals ⊆ selected.body.returned.integerLiterals := by
+    rw [← Detail.recordExpressionWithExpected_integerLiterals_eq recording]
+    exact boundary.integerLiterals
+  have calleeRequirements := List.Subset.trans
+    (Detail.recordExpressionWithExpected_requirements_subset recording) boundary.requirements
+  have calleeTyped := expressionRooted_of_retained_for checked
+    (recursive childFuel (Nat.lt_succ_self childFuel)) calleeHere ({
+      accepted := calleeSuccess
+      interfaces := boundary.interfaces
+      extension := calleeExtension
+      scope := boundary.scope
+      invariant := argumentInvariant
+      actual := boundary.actual
+      operational := argumentOperational
+      expectedBelow := by simp
+      expectedAdmissible := by simp
+      expectedSafe := by simp
+      integerPatterns := calleePatterns
+      integerLiterals := calleeLiterals
+      requirements := calleeRequirements
+      covered := boundary.covered.expressionChild resources.graph_closed (boundary.directChildren calleeEdge)
+      actualCovered := boundary.actualCovered.directChild (boundary.directChildren calleeEdge)
+      rawSubtree := (boundary.rawProper.childSubtree calleeEdge).monoBefore calleeToParent } :
+      RootedExpressionBoundary selected childFuel inferenceContext calleeSource none
+        argumentState callee calleeState frames target)
+  have formType : ExpressionFormHasRawType selected.body.finalized.typedSource target
+      ((ExpressionForm.group callee.id).applySubstitution selected.body.finalized.substitution)
+      (selected.body.finalized.substitution.apply callee.type) (.ordinary []) := by
+    simpa [ExpressionForm.applySubstitution] using ExpressionFormHasRawType.group calleeTyped
+  exact recordExpressionWithExpected_success_expressionTypingBase_actual resources boundary.interfaces
+    recording boundary.extension boundary.requirements boundary.expressionRequirements boundary.coercionPrimaries
+    catalog boundary.scope.signatures boundary.invariant formType calleeTyped.type_admissible boundary.covered
+
 /-- The actual `Length.length(a)` types its one argument, a memory array, in
 the same selected final source and records its length at `uint256`. -/
 theorem arrayLengthCall_typing_for {callProvenance : CallIndex → Prop}
@@ -1702,6 +1791,10 @@ theorem expressionRetained_call_for {callProvenance : CallIndex → Prop}
     exact arrayLengthCall_typing_for checked descend
       (fun smaller less => recursive smaller (Nat.lt_trans less (Nat.lt_succ_self _)))
       boundary invariant operational expectedBelow argumentsHere argumentsSuccess argument recording
+  | lengthMethod nonconstructor argumentsSuccess indirect calleeSuccess _ recording =>
+    have calleeHere := descend here (.expression_call_callee boundary.accepted form allocation nonconstructor argumentsSuccess indirect calleeSuccess)
+    exact lengthMethodCall_typing_for checked recursive boundary invariant operational expectedBelow
+      argumentsSuccess calleeHere calleeSuccess recording
   | indirect nonconstructor argumentsSuccess indirect calleeSuccess applicationSuccess recording =>
     have argumentsHere := descend here (.expression_call_arguments boundary.accepted form allocation nonconstructor argumentsSuccess)
     have calleeHere := descend here (.expression_call_callee boundary.accepted form allocation nonconstructor argumentsSuccess indirect calleeSuccess)

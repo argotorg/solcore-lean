@@ -928,6 +928,19 @@ theorem inferExprFuel_call_fixes_protected
                 (fun type member => calleePrivacy.1 _ (expectedSafeAtArguments type member)) calleePrivacy.2.2.1 calleeFixed applicationSuccess
               rw [← resultEq]
               exact recordIndirectCall_fixes_protected expression calleeResult arguments application applied
+            have finishMethod (calleeResult : InferredExpression) (calleeState : State)
+                (calleeSuccess : inferExprFuel fuel context callee none argumentState = .ok (calleeResult,calleeState))
+                (recorded : recordExpressionWithExpected context expression id calleeResult.type
+                  (.group calleeResult.id) [] expected calleeState = .ok result) :
+                FixesProtected protectedVars result.2 := by
+              have calleePrivacy := inferExprFuel_private protectedVars fuel context callee none argumentState argumentsProperties.2.1
+                ((inferExprsFuel_direct_progress argumentsResult).wellFormed wellFormed) argumentBound argumentsPrivacy.2.2.1
+                catalog validated canonical (by simp) (by simp) (calleeResult,calleeState) calleeSuccess
+              have calleeFixed := calleeInduction argumentState argumentsProperties.2.1
+                ((inferExprsFuel_direct_progress argumentsResult).wellFormed wellFormed) argumentBound argumentsPrivacy.2.2.1 argumentsFixed
+                catalog validated canonical (by simp) (by simp) (calleeResult,calleeState) calleeSuccess
+              exact recordExpressionWithExpected_fixes_protected calleeFixed calleePrivacy.2.1
+                (fun type member => calleePrivacy.1 _ (expectedSafeAtArguments type member)) recorded
             cases qualifiedEq : calleeQualifiedIdentifier? callee with
             | some qualified =>
                 rcases qualified with ⟨namespacePath, name⟩
@@ -944,6 +957,11 @@ theorem inferExprFuel_call_fixes_protected
                         rcases calleePair with
                           ⟨inferredCallee, calleeState⟩
                         simp only [calleeResult] at success
+                        cases methodEq : lengthMethodCall callee arguments
+                        case true =>
+                          simp only [methodEq, if_true] at success
+                          exact finishMethod inferredCallee calleeState calleeResult success
+                        simp only [methodEq, Bool.false_eq_true, if_false] at success
                         cases applicationResult : applyFunctionType
                             context id inferredCallee.type arguments
                             expected calleeState with
@@ -1051,6 +1069,11 @@ theorem inferExprFuel_call_fixes_protected
                         rcases calleePair with
                           ⟨inferredCallee, calleeState⟩
                         simp only [calleeResult] at success
+                        cases methodEq : lengthMethodCall callee arguments
+                        case true =>
+                          simp only [methodEq, if_true] at success
+                          exact finishMethod inferredCallee calleeState calleeResult success
+                        simp only [methodEq, Bool.false_eq_true, if_false] at success
                         cases applicationResult : applyFunctionType
                             context id inferredCallee.type arguments
                             expected calleeState with

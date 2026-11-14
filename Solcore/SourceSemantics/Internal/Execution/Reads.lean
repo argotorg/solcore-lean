@@ -840,12 +840,14 @@ theorem ChildStep.local_suffix {parent child : CallIndex} (step : ChildStep pare
   | @expression_call_callee fuel context source expected initial allocated final id value
       callee arguments values argumentState childFinal inferred
       accepted form allocation nonconstructor argumentsAccepted indirect child =>
-      obtain ⟨application, applicationRun, recorded⟩ :=
-        indirectCall_actual_suffix form allocation nonconstructor argumentsAccepted indirect child accepted
-      have after := localReadScope_applyFunctionType_nextLocal applicationRun
-      have finish := (LocalReadScopeProgress.Progress.recordIndirectCall source inferred values application).next
-      rw [recorded] at finish
-      exact Nat.le_trans (Nat.le_of_eq after.symm) finish
+      rcases indirectCall_actual_suffix form allocation nonconstructor argumentsAccepted indirect child
+          accepted with ⟨application, applicationRun, recorded⟩ | recorded
+      · have after := localReadScope_applyFunctionType_nextLocal applicationRun
+        have finish := (LocalReadScopeProgress.Progress.recordIndirectCall source inferred values application).next
+        rw [recorded] at finish
+        exact Nat.le_trans (Nat.le_of_eq after.symm) finish
+      · exact (LocalReadScopeProgress.Progress.recordExpressionWithExpected recorded
+          (by intro _ _ impossible; cases impossible)).next
   | expression_contextual_constructor accepted form allocation selected child =>
       all_goals simp only [CallIndex.Accepted] at *
       all_goals unfold inferExprFuel at accepted

@@ -11815,6 +11815,33 @@ private theorem inferFuel_inferenceProperties_internal :
                             (applicationProperties.1.trans
                               recordedProperties.1)),
                         recordedProperties.2⟩
+                    have finishMethod
+                        (calleeResult : InferredExpression)
+                        (calleeState : State)
+                        (calleeSuccess :
+                          inferExprFuel fuel context callee none argumentState =
+                            .ok (calleeResult, calleeState))
+                        (recorded :
+                          recordExpressionWithExpected context expression id
+                            calleeResult.type (.group calleeResult.id) [] expected
+                            calleeState = .ok result) :
+                        initial.InferenceProgress result.2 ∧
+                          result.2.InferenceReady ∧
+                          result.1.type.VariablesBelow
+                            result.2.inference.next := by
+                      have calleeProperties := calleeInduction argumentState
+                        argumentsProperties.2.1 validated canonical (by simp)
+                        (calleeResult, calleeState) calleeSuccess
+                      have recordedProperties :=
+                        recordExpressionWithExpected_inferenceProperties
+                          calleeProperties.2.1 calleeProperties.2.2
+                          (fun expectedType member =>
+                            (expectedAtArguments expectedType member).weaken
+                              calleeProperties.1.next_le)
+                          recorded
+                      exact ⟨prefixProgress.trans
+                          (calleeProperties.1.trans recordedProperties.1),
+                        recordedProperties.2⟩
                     cases qualifiedEq : calleeQualifiedIdentifier? callee with
                     | some qualified =>
                         rcases qualified with ⟨namespacePath, name⟩
@@ -11832,6 +11859,11 @@ private theorem inferFuel_inferenceProperties_internal :
                                   ⟨inferredCallee, calleeState⟩
                                 simp only [calleeResult, bind, Except.bind,
                                   Prod.eta] at success
+                                cases methodEq : lengthMethodCall callee arguments
+                                case true =>
+                                  simp only [methodEq, if_true] at success
+                                  exact finishMethod inferredCallee calleeState calleeResult success
+                                simp only [methodEq, Bool.false_eq_true, if_false] at success
                                 cases applicationResult : applyFunctionType
                                     context id inferredCallee.type arguments
                                     expected calleeState with
@@ -11956,6 +11988,11 @@ private theorem inferFuel_inferenceProperties_internal :
                                   ⟨inferredCallee, calleeState⟩
                                 simp only [calleeResult, bind, Except.bind,
                                   Prod.eta] at success
+                                cases methodEq : lengthMethodCall callee arguments
+                                case true =>
+                                  simp only [methodEq, if_true] at success
+                                  exact finishMethod inferredCallee calleeState calleeResult success
+                                simp only [methodEq, Bool.false_eq_true, if_false] at success
                                 cases applicationResult : applyFunctionType
                                     context id inferredCallee.type arguments
                                     expected calleeState with
@@ -14051,6 +14088,21 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                         calleeResult arguments application).trans
                           (applicationScope.trans
                             (calleeScope.trans throughArguments))
+                    have finishMethod
+                        (calleeResult : InferredExpression)
+                        (calleeState : State)
+                        (calleeSuccess :
+                          inferExprFuel fuel context callee none argumentState =
+                            .ok (calleeResult, calleeState))
+                        (recorded :
+                          recordExpressionWithExpected context expression id
+                            calleeResult.type (.group calleeResult.id) [] expected
+                            calleeState = .ok result) :
+                        result.2.lexicalScope = initial.lexicalScope := by
+                      have calleeScope := calleeInduction argumentState
+                        (calleeResult, calleeState) calleeSuccess
+                      exact (recordExpressionWithExpected_lexicalScope recorded).trans
+                        (calleeScope.trans throughArguments)
                     cases qualifiedEq : calleeQualifiedIdentifier? callee with
                     | some qualified =>
                         rcases qualified with ⟨namespacePath, name⟩
@@ -14068,6 +14120,11 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                   ⟨inferredCallee, calleeState⟩
                                 simp only [calleeResult, bind, Except.bind,
                                   Prod.eta] at success
+                                cases methodEq : lengthMethodCall callee arguments
+                                case true =>
+                                  simp only [methodEq, if_true] at success
+                                  exact finishMethod inferredCallee calleeState calleeResult success
+                                simp only [methodEq, Bool.false_eq_true, if_false] at success
                                 cases applicationResult : applyFunctionType
                                     context id inferredCallee.type arguments
                                     expected calleeState with
@@ -14180,6 +14237,11 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                   ⟨inferredCallee, calleeState⟩
                                 simp only [calleeResult, bind, Except.bind,
                                   Prod.eta] at success
+                                cases methodEq : lengthMethodCall callee arguments
+                                case true =>
+                                  simp only [methodEq, if_true] at success
+                                  exact finishMethod inferredCallee calleeState calleeResult success
+                                simp only [methodEq, Bool.false_eq_true, if_false] at success
                                 cases applicationResult : applyFunctionType
                                     context id inferredCallee.type arguments
                                     expected calleeState with

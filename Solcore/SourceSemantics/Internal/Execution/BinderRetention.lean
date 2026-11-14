@@ -211,6 +211,10 @@ theorem callArguments
     rw [recorded] at after
     exact (LocalGeneralizationEvents.inferExprFuel_origins_progress calleeAccepted).retained.trans
       ((LocalGeneralizationEvents.Progress.applyFunctionType applicationAccepted).retained.trans after)
+  | @lengthMethod inferredArguments argumentState calleeState inferredCallee _ actualArguments _ calleeAccepted _ recorded =>
+    cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+    exact (LocalGeneralizationEvents.inferExprFuel_origins_progress calleeAccepted).retained.trans
+      (BindersRetained.recordExpressionWithExpected recorded)
 
 end Solcore.SourceSemantics.SourceInferenceExecution.ActualBinderRetention
 end
@@ -349,11 +353,12 @@ theorem ChildStep.expression_binders_retained
   | @expression_call_callee fuel context source expected initial allocated final id value
       callee arguments values argumentState childFinal inferred
       accepted form allocation nonconstructor argumentsAccepted indirect childAccepted =>
-    obtain ⟨application, applicationRun, recorded⟩ :=
-      indirectCall_actual_suffix form allocation nonconstructor argumentsAccepted indirect childAccepted accepted
-    have after := (LocalGeneralizationEvents.Progress.recordIndirectCall source inferred values application).retained
-    rw [recorded] at after
-    exact (LocalGeneralizationEvents.Progress.applyFunctionType applicationRun).retained.trans after
+    rcases indirectCall_actual_suffix form allocation nonconstructor argumentsAccepted indirect childAccepted
+        accepted with ⟨application, applicationRun, recorded⟩ | recorded
+    · have after := (LocalGeneralizationEvents.Progress.recordIndirectCall source inferred values application).retained
+      rw [recorded] at after
+      exact (LocalGeneralizationEvents.Progress.applyFunctionType applicationRun).retained.trans after
+    · exact BindersRetained.recordExpressionWithExpected recorded
   | @expression_call_constructor fuel context source expected initial allocated final id value
       callee arguments dataType constructor instantiation instantiated childFinal inferred
       accepted form allocation selected fresh childAccepted =>

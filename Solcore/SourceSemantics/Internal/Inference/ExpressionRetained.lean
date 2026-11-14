@@ -413,6 +413,22 @@ inductive CallExpressionDispatchProvenanceFacts
         inferredArguments application = result) :
       CallExpressionDispatchProvenanceFacts context source callee arguments id expected
         fuel allocated result
+  | lengthMethod
+      {inferredArguments : List InferredExpression}
+      {argumentState calleeState : Frontend.SourceInference.State}
+      {inferredCallee : InferredExpression}
+      (nonconstructor : Detail.constructorCalleeCandidates context allocated callee = .ok [])
+      (argumentsSuccess : Detail.inferExprsFuel fuel context arguments.elements
+        allocated = .ok (inferredArguments, argumentState))
+      (indirect : SourceInferenceExecution.IndirectCalleeAt context callee argumentState)
+      (calleeSuccess : Detail.inferExprFuel fuel context callee none
+        argumentState = .ok (inferredCallee, calleeState))
+      (method : Detail.lengthMethodCall callee inferredArguments = true)
+      (recording : Detail.recordExpressionWithExpected context source id
+        inferredCallee.type (.group inferredCallee.id) [] expected calleeState =
+          .ok result) :
+      CallExpressionDispatchProvenanceFacts context source callee arguments id expected
+        fuel allocated result
 
 /-- Invert a successful source call into the exact semantic tail executed by
 the frontend. -/
@@ -454,6 +470,13 @@ theorem inferExprFuel_success_call_dispatch_provenance_facts
               · assumption
             | apply CallExpressionDispatchProvenanceFacts.builtin <;> assumption
             | apply CallExpressionDispatchProvenanceFacts.arrayLength <;> assumption
+            | apply CallExpressionDispatchProvenanceFacts.lengthMethod
+              · exact discovery
+              · assumption
+              · simp_all [SourceInferenceExecution.IndirectCalleeAt]
+              · assumption
+              · assumption
+              · assumption
             | apply CallExpressionDispatchProvenanceFacts.selected
               · exact discovery
               · assumption
