@@ -472,10 +472,19 @@ functions over words, as row 1's fixture ports did.
     upstream's error over the `[]` at the pin, and in Lean the `;` and then the `]`, as
     `return a[1] + ;` does, since Lean's recovery of a failed statement does not keep the `[]`'s
     error (`.upstream/lane-d-unit3-memory-arrays/step1/1c-probe`).
+14. **A length needs its array known where the length is.** `Length.length(a)`, `a.length` and
+    `a.length()` are rejected with `operatorNotSupported "Length"` when `a`'s type is still open
+    there, as an open `Typedef` call is
+    ([row 1's conversions](integer-types-unchecked-shifts.md#row-1s-conversions-a-word-becomes-a-value-only-when-canonical)).
+    Only the array must be known, not its element: `arrayLengthOf` reads the resolved type's
+    `arrayElement?`, so an array whose element type is still open is accepted. Upstream's `Length`
+    constraint waits for later uses to fix the type. As with the open `Typedef` call, deferring the
+    choice to finalization could lift this, and nothing schedules it.
 
-Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13 and 13 on
-2026-11-14. Those five change only a diagnostic or the room of a resource limit, never what an
-accepted program means. Difference 1 follows decision 3.
+Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13, and 13 and 14 on
+2026-11-14. Differences 9 to 13 change only a diagnostic or the room of a resource limit, and 14
+only rejects some programs that upstream accepts. None of them changes what an accepted program
+means. Difference 1 follows decision 3.
 
 ## Steps
 
@@ -519,9 +528,9 @@ evaluation, fault and sized rules, as row 1's 3c did, and every induction over t
 array's case. So it split into 2a, the type and the store, then 2b, `new`, the lengths and the
 lowering, and each again by what one part prepares for the next. `new` took its own arm in inference
 in a commit that only renumbers the cases of the proofs by functional induction on `inferExprFuel`
-and still rejects `new`: 285 lines in 14 files, as 1b-ii measured. Each later step stops on the same
-size condition, and on any change to a statement named in the [open decisions](#open-decisions)
-beyond the ones listed there.
+and still rejects `new`: 281 lines in 14 files, within 1b-ii's estimate of 285. Each later step
+stops on the same size condition, and on any change to a statement named in the
+[open decisions](#open-decisions) beyond the ones listed there.
 
 ## Generators, corpora and the smoke
 
