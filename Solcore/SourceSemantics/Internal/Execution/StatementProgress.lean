@@ -1407,6 +1407,8 @@ theorem ChildStep.progress_nonexpression {parent child : CallIndex}
   cases step with
   | expression_group accepted form allocation child =>
       exact False.elim nonexpression
+  | expression_newArray_length accepted form allocation child =>
+      exact False.elim nonexpression
   | expression_tuple accepted form allocation child =>
       exact False.elim nonexpression
   | expressions_head accepted head =>

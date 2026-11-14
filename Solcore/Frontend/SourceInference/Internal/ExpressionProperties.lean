@@ -782,6 +782,59 @@ theorem inferExprFuel_success_index_facts
                 valueState, mappingState, indexResult, indexState, rfl,
                 keyFresh, valueFresh, mappingSuccess, indexSuccess, success⟩
 
+/-- `new T[](n)`'s element is the element of its resolved array type, and a
+memory array admits it. -/
+theorem newArrayElement_ok {type element : Ty}
+    (success : newArrayElement type = .ok element) :
+    type = Ty.array element ∧ element.arrayElementAllowed = true := by
+  unfold newArrayElement at success
+  split at success
+  · rename_i found foundEq
+    by_cases allowed : found.arrayElementAllowed = true
+    · simp only [allowed, ↓reduceIte, pure, Except.pure, Except.ok.injEq] at success
+      subst success
+      exact ⟨Ty.arrayElement?_eq_some foundEq, allowed⟩
+    · simp [allowed] at success
+  · cases success
+
+/-- Invert successful `new T[](n)` inference into the resolved array type, its
+element, the length inferred at `uint256` and the exact recording operation. -/
+theorem inferExprFuel_success_newArray_facts
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {keyword : Syntax.SourceSpan} {sourceType : Syntax.TypeExpr}
+    {length : Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .newArray keyword sourceType length)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ arrayType element lengthResult lengthState,
+      resolveSourceType context sourceType = .ok arrayType ∧
+        newArrayElement arrayType = .ok element ∧
+        inferExprFuel fuel context length (some (.fixed .uint256)) allocated =
+          .ok (lengthResult, lengthState) ∧
+        recordExpressionWithExpected context expression id (Ty.array element)
+          (.newArray element lengthResult.id) [] expected lengthState = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases resolution : resolveSourceType context sourceType with
+  | error error => simp [resolution] at success
+  | ok arrayType =>
+      simp only [resolution] at success
+      cases elementResult : newArrayElement arrayType with
+      | error error => simp [elementResult] at success
+      | ok element =>
+          simp only [elementResult] at success
+          cases lengthSuccess : inferExprFuel fuel context length
+              (some (.fixed .uint256)) allocated with
+          | error error => simp [lengthSuccess] at success
+          | ok lengthPair =>
+              rcases lengthPair with ⟨lengthResult, lengthState⟩
+              simp only [lengthSuccess] at success
+              exact ⟨arrayType, element, lengthResult, lengthState, rfl, elementResult, rfl,
+                success⟩
+
 /-- Invert successful proxy-type expression inference into source-type
 resolution and the exact proxy-recording operation. -/
 theorem inferExprFuel_success_proxy_facts
@@ -10517,7 +10570,35 @@ private theorem inferFuel_inferenceProperties_internal :
   case case21 =>
     simp_all [InferExprFuelInferenceProperties, inferExprFuel]
   case case22 =>
-    simp_all [InferExprFuelInferenceProperties, inferExprFuel]
+    intros context expression expected initial fuel id allocated allocationEq
+      keyword sourceType length expressionEq lengthInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    obtain ⟨arrayType, element, inferredLength, lengthState, resolution, elementResult,
+        lengthResult, recorded⟩ :=
+      inferExprFuel_success_newArray_facts expressionEq allocationEq success
+    have lengthProperties := lengthInduction allocationProperties.2
+      validated canonical
+      (by
+        intro expectedType member
+        simp only [Option.mem_def, Option.some.injEq] at member
+        subst expectedType
+        exact Ty.variablesBelow_constructor _ _)
+      (inferredLength, lengthState) lengthResult
+    have prefixProgress := allocationProperties.1.trans lengthProperties.1
+    have arrayBelow : (Ty.array element).VariablesBelow lengthState.inference.next := by
+      rw [← (newArrayElement_ok elementResult).1]
+      exact resolveSourceType_success_variablesBelow resolution _
+    have expectedAtLength : ∀ expectedType ∈ expected,
+        expectedType.VariablesBelow lengthState.inference.next := by
+      intro expectedType member
+      exact (expectedBelow expectedType member).weaken prefixProgress.next_le
+    have recordedProperties :=
+      recordExpressionWithExpected_inferenceProperties
+        lengthProperties.2.1 arrayBelow expectedAtLength recorded
+    exact ⟨prefixProgress.trans recordedProperties.1, recordedProperties.2⟩
   case case23 =>
     simp_all [InferExprFuelInferenceProperties, inferExprFuel]
   case case17 =>
@@ -14324,6 +14405,17 @@ private theorem inferFuel_preserves_lexicalScope_internal :
       | uncheckedMultiply => exact finishNonEqual .uncheckedMultiply (valueInduction place) success
       | uncheckedDivide => exact finishNonEqual .uncheckedDivide (valueInduction place) success
       | uncheckedModulo => exact finishNonEqual .uncheckedModulo (valueInduction place) success
+  case case22 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      keyword sourceType length expressionEq lengthInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    obtain ⟨_, _, inferredLength, lengthState, _, _, lengthResult, recorded⟩ :=
+      inferExprFuel_success_newArray_facts expressionEq allocationEq success
+    have lengthScope := lengthInduction (inferredLength, lengthState) lengthResult
+    have allocationScope := allocateExpressionId_success_lexicalScope allocationEq
+    have recordedScope := recordExpressionWithExpected_lexicalScope recorded
+    exact recordedScope.trans (lengthScope.trans allocationScope)
   -- A grouped place delegates directly to its inner place.
   case case68 =>
     intros
@@ -14628,12 +14720,12 @@ private theorem inferFuel_advances_nextLocal_internal :
     all_goals simp only [State.restoreLexicalScope_nextLocal] at *
     all_goals try omega
     all_goals grind [State.fresh, unify_preserves_nextLocal]
-  -- Generated case 67 is a grouped place and delegates directly.
+  -- Generated case 68 is a grouped place and delegates directly.
   case case68 =>
     unfold AdvancesNextLocal at *
     intros
     simp_all only [inferPlaceFuel]
-  -- Generated case 70 threads a place through optional operator unification
+  -- Generated case 71 threads a place through optional operator unification
   -- and then through value inference.
   case case71 =>
     intros fuel context target operator value state placeInduction

@@ -566,6 +566,41 @@ theorem
       resources.ownership invariant.signaturesEq
       invariant.solvedRequirementsEq invariant.assumptionsMono covered)
 
+/-- `new T[](n)`'s element is closed, admissible and admitted by a memory array
+in the selected route's active context. -/
+theorem newArray_element_selected
+    {wholeContext inferenceContext : Frontend.SourceInference.Context}
+    {finalized : Frontend.SourceInference.Result} {initial : State}
+    {active : SourceSemantics.Context} {sourceType : Syntax.TypeExpr} {arrayType element : Ty}
+    (resolution : Detail.resolveSourceType inferenceContext sourceType = .ok arrayType)
+    (elementResult : Detail.newArrayElement arrayType = .ok element)
+    (signaturesEq : inferenceContext.signatures = wholeContext.signatures)
+    (ownerEq : inferenceContext.scope.genericOwner = wholeContext.scope.genericOwner)
+    (parametersEq : inferenceContext.typeParameters = wholeContext.typeParameters)
+    (canonical : SignatureParametersWellFormed
+      wholeContext.scope.genericOwner wholeContext.typeParameters)
+    (invariant : RecursiveExpressionInvariant wholeContext finalized initial active) :
+    finalized.substitution.apply element = element ∧ TypeAdmissible active element ∧
+      element.arrayElementAllowed = true := by
+  have canonicalInference : SignatureParametersWellFormed
+      inferenceContext.scope.genericOwner inferenceContext.typeParameters := by
+    simpa [ownerEq, parametersEq] using canonical
+  have activeSignaturesEq : active.signatures = inferenceContext.signatures :=
+    invariant.signatures_eq_whole.trans signaturesEq.symm
+  have activeParametersEq : active.typeParameters = inferenceContext.typeParameters :=
+    invariant.typeParametersEq.trans parametersEq.symm
+  have activeOwnerEq : active.currentDeclaration = some inferenceContext.scope.genericOwner := by
+    simpa [ownerEq] using invariant.declarationEq
+  have arrayWellFormed : TypeWellFormed active arrayType :=
+    resolveSourceType_success_typeWellFormed canonicalInference
+      activeSignaturesEq activeParametersEq activeOwnerEq resolution
+  have fixedArray : finalized.substitution.apply arrayType = arrayType :=
+    Detail.resolveSourceType_success_apply_eq_self finalized.substitution resolution
+  obtain ⟨arrayTypeEq, allowed⟩ := Detail.newArrayElement_ok elementResult
+  rw [arrayTypeEq] at arrayWellFormed fixedArray
+  refine ⟨?_, TypeAdmissible.ofWellFormed (TypeWellFormed.array_element arrayWellFormed), allowed⟩
+  simpa [Ty.array, Substitution.apply] using fixedArray
+
 /-- A resolved proxy annotation is rigidly formed and therefore fixed by the
 whole inference substitution.  Its branch closes in the active recursive
 context without a source-side context-closure certificate. -/

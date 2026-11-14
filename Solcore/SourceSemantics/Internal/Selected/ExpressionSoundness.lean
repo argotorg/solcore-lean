@@ -1031,8 +1031,10 @@ theorem actualInferExprFuelRetainedSoundness_step {fuel : Nat}
       simp only [Detail.inferExprFuel, expressionEq] at success
       cases success
   | newArray keyword type length =>
-      simp only [Detail.inferExprFuel, expressionEq] at success
-      cases success
+      exact actualInferExprFuelRetainedSoundness_newArray predecessor expressionEq success resources interfaces extension
+        signaturesEq ownerEq typeParametersEq assumptionsEq formation functions catalog canonical invariant actual
+        operational expectedBelow expectedAdmissible finalPreserved rawProper patterns literals requirements
+        retained coercions operators children covered semanticPreserved actualCovered
   | slice base brackets start colon stop =>
       simp only [Detail.inferExprFuel, expressionEq] at success
       cases success

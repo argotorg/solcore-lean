@@ -389,7 +389,51 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
   case case21 =>
     simp_all [InferExprFuelFixedness, inferExprFuel]
   case case22 =>
-    simp_all [InferExprFuelFixedness, inferExprFuel]
+    intros context expression expected initial fuel id allocated allocationEq
+      keyword sourceType length expressionEq lengthInduction
+    unfold InferExprFuelFixedness
+    intro ready wellFormed bound live fixed catalog validated canonical expectedBelow expectedSafe result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    have allocationPrivacy := allocateExpressionId_privacy live allocationEq
+    have allocatedEq : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocationEq).symm
+    have fixedAllocated : FixesProtected protectedVars allocated := by
+      apply fixed.of_substitution_eq
+      rw [allocatedEq]
+      rfl
+    have boundAllocated : ∀ metavariable ∈ protectedVars, metavariable.index < allocated.inference.next := by
+      intro metavariable member
+      rw [allocatedEq]
+      change metavariable.index < initial.inference.next
+      exact bound metavariable member
+    have wfAllocated : allocated.RequirementsWellFormed := by
+      rw [allocatedEq]
+      change initial.RequirementsWellFormed
+      exact wellFormed
+    obtain ⟨arrayType, element, inferred, lengthState, resolution, elementResult,
+        lengthResult, recordedSuccess⟩ :=
+      Detail.inferExprFuel_success_newArray_facts expressionEq allocationEq success
+    have uint256Below : ∀ expectedType ∈ some (Ty.fixed FixedInteger.uint256),
+        expectedType.VariablesBelow allocated.inference.next := by
+      intro expectedType member; cases Option.mem_def.mp member
+      exact Ty.variablesBelow_constructor _ _
+    have uint256Safe : ∀ expectedType ∈ some (Ty.fixed FixedInteger.uint256),
+        Safe protectedVars allocated expectedType := by
+      intro expectedType member; cases Option.mem_def.mp member
+      exact safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+    have arrayType_eq := (Detail.newArrayElement_ok elementResult).1
+    have lengthPrivacy := inferExprFuel_private protectedVars fuel context length
+      (some (Ty.fixed FixedInteger.uint256)) allocated allocationProperties.2 wfAllocated
+      boundAllocated allocationPrivacy.2.1 catalog validated canonical uint256Below uint256Safe
+      (inferred, lengthState) lengthResult
+    have childFixed := lengthInduction allocationProperties.2 wfAllocated boundAllocated
+      allocationPrivacy.2.1 fixedAllocated catalog validated canonical uint256Below uint256Safe
+      (inferred, lengthState) lengthResult
+    have beforeFit := allocationPrivacy.1.trans lengthPrivacy.1
+    have arraySafe : Safe protectedVars lengthState (Ty.array element) := by
+      rw [← arrayType_eq]; exact safe_closed _ _ (resolveSourceType_success_variablesBelow resolution 0)
+    exact recordExpressionWithExpected_fixes_protected childFixed arraySafe
+      (fun type member => beforeFit _ (expectedSafe _ member)) recordedSuccess
   case case23 =>
     simp_all [InferExprFuelFixedness, inferExprFuel]
   case case25 =>

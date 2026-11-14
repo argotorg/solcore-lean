@@ -1633,6 +1633,15 @@ private def statementIsMatch (statement : Syntax.Statement) : Bool :=
   | .matchWith .. => true
   | _ => false
 
+/-- The element type of `new T[](n)`'s resolved array type `T[]`, which a memory
+array admits once type resolution has checked it. -/
+def newArrayElement (type : Ty) : Except Error Ty :=
+  match type.arrayElement? with
+  | some element =>
+      if element.arrayElementAllowed then pure element
+      else .error (.unsupportedExpression "new")
+  | none => .error (.unsupportedExpression "new")
+
 /-- What inference calls the forms its last arm rejects: the slices, which row 4
 gives no meaning yet, and the parser's recovery nodes. One arm keeps the
 numbered cases of the proofs by functional induction on `inferExprFuel`. -/
@@ -1970,7 +1979,12 @@ mutual
           | _ => throw (.ambiguousConstructor [] name.value
               (candidates.map fun candidate => candidate.2.id))
       | .array .. => .error (.unsupportedExpression "array")
-      | .newArray .. => .error (.unsupportedExpression "new")
+      | .newArray _ sourceType length => do
+          let element ← newArrayElement (← resolveSourceType context sourceType)
+          let (length, state) ← inferExprFuel fuel context length
+            (some (.fixed .uint256)) state
+          recordExpressionWithExpected context expression id (Ty.array element)
+            (.newArray element length.id) [] expected state
       | value => .error (.unsupportedExpression (rejectedFormName value))
 
   def inferExprsFuel (fuel : Nat) (context : Context) :

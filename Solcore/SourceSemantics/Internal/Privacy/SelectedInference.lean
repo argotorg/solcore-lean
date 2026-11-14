@@ -1281,7 +1281,54 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
   case case21 =>
     simp_all [InferExprFuelPrivacy, inferExprFuel]
   case case22 =>
-    simp_all [InferExprFuelPrivacy, inferExprFuel]
+    intros context expression expected initial fuel id allocated allocationEq
+      keyword sourceType length expressionEq lengthInduction
+    unfold InferExprFuelPrivacy
+    intro ready wellFormed bound live catalog validated canonical expectedBelow expectedSafe result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    have allocationPrivacy := allocateExpressionId_privacy live allocationEq
+    have allocatedEq : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocationEq).symm
+    have boundAllocated : ∀ metavariable ∈ protectedVars, metavariable.index < allocated.inference.next := by
+      intro metavariable member
+      rw [allocatedEq]
+      change metavariable.index < initial.inference.next
+      exact bound metavariable member
+    have wfAllocated : allocated.RequirementsWellFormed := by
+      rw [allocatedEq]
+      change initial.RequirementsWellFormed
+      exact wellFormed
+    obtain ⟨arrayType, element, inferred, lengthState, resolution, elementResult,
+        lengthResult, recordedSuccess⟩ :=
+      Detail.inferExprFuel_success_newArray_facts expressionEq allocationEq success
+    have uint256Below : ∀ expectedType ∈ some (Ty.fixed FixedInteger.uint256),
+        expectedType.VariablesBelow allocated.inference.next := by
+      intro expectedType member; cases Option.mem_def.mp member
+      exact Ty.variablesBelow_constructor _ _
+    have uint256Safe : ∀ expectedType ∈ some (Ty.fixed FixedInteger.uint256),
+        Safe protectedVars allocated expectedType := by
+      intro expectedType member; cases Option.mem_def.mp member
+      exact safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+    have arrayType_eq := (Detail.newArrayElement_ok elementResult).1
+    have lengthPrivacy := lengthInduction allocationProperties.2 wfAllocated boundAllocated
+      allocationPrivacy.2.1 catalog validated canonical uint256Below uint256Safe
+      (inferred, lengthState) lengthResult
+    have lengthProperties := inferExprFuel_inferenceProperties allocationProperties.2
+      validated canonical uint256Below lengthResult
+    have prefixProgress := allocationProperties.1.trans lengthProperties.1
+    have beforeFit := allocationPrivacy.1.trans lengthPrivacy.1
+    have arrayBelow : (Ty.array element).VariablesBelow lengthState.inference.next := by
+      rw [← arrayType_eq]; exact resolveSourceType_success_variablesBelow resolution _
+    have arraySafe : Safe protectedVars lengthState (Ty.array element) := by
+      rw [← arrayType_eq]; exact safe_closed _ _ (resolveSourceType_success_variablesBelow resolution 0)
+    have recorded := recordExpressionWithExpected_private catalog lengthProperties.2.1 arrayBelow
+      (fun type member => (expectedBelow type member).weaken prefixProgress.next_le)
+      arraySafe (fun type member => beforeFit _ (expectedSafe _ member)) lengthPrivacy.2.2.1
+      recordedSuccess
+    refine ⟨beforeFit.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+    intro row member fresh
+    exact new_requirements_trans lengthPrivacy.2.2.2 recorded.2.2.2 recorded.1 row member
+      (by simpa only [allocationPrivacy.2.2] using fresh)
   case case23 =>
     simp_all [InferExprFuelPrivacy, inferExprFuel]
   case case25 =>

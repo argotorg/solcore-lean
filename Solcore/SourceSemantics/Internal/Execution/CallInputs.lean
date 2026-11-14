@@ -273,6 +273,25 @@ theorem expression_index_base
   subst allocated
   exact ⟨inputs.ready.allocateExpressionId, inputs.wellFormed, inputs.catalog, (by intro type member; cases member)⟩
 
+theorem expression_newArray_length
+      {fuel : Nat} {context : SourceInference.Context} {source length : Syntax.Expr}
+      {keyword : Syntax.SourceSpan} {sourceType : Syntax.TypeExpr}
+      {expected : Option Ty} {initial allocated final childFinal : State}
+      {id : ExpressionId} {value childValue : InferredExpression}
+      (_accepted : (CallIndex.expression (fuel + 1) context source expected
+        initial value final).Accepted)
+      (_form : source.value = .newArray keyword sourceType length)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (_child : inferExprFuel fuel context length (some (.fixed .uint256)) allocated =
+        .ok (childValue, childFinal))
+      (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs) : (CallIndex.expression fuel context length (some (.fixed .uint256)) allocated childValue childFinal).Inputs := by
+  have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+  subst allocated
+  exact ⟨inputs.ready.allocateExpressionId, inputs.wellFormed, inputs.catalog, (by
+      intro type member
+      cases Option.some.inj (Option.mem_def.mp member)
+      exact Ty.variablesBelow_constructor _ _)⟩
+
 theorem expression_conditional_condition
       {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
       {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
@@ -850,6 +869,7 @@ theorem ChildStep.inputs {parent child : CallIndex}
       | solve | apply ActualExpressionInputs.expression_contextual_constructor <;> assumption
       | solve | apply ActualExpressionInputs.expression_call_constructor <;> assumption
       | solve | apply ActualExpressionInputs.expression_field_constructor <;> assumption
+      | solve | apply ActualExpressionInputs.expression_newArray_length <;> assumption
   | constructorApplication => exact ChildStep.inputs_constructorApplication inputs step
   | constructorArguments => exact ChildStep.inputs_constructorArguments inputs step
   | statements => exact ChildStep.inputs_statements inputs step

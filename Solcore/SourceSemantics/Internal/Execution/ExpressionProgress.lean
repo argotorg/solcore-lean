@@ -45,6 +45,9 @@ theorem ChildStep.lifetime_expression
   | expression_group accepted form allocation childAccepted =>
       exact GeneralizationLifetime.group inputs.ready inputs.catalog inputs.bounds
         form allocation childAccepted accepted life
+  | expression_newArray_length accepted form allocation childAccepted =>
+      exact GeneralizationLifetime.newArray inputs.ready inputs.catalog inputs.bounds
+        form allocation childAccepted accepted life
   | expression_tuple accepted form allocation childAccepted =>
       exact GeneralizationLifetime.tuple inputs.ready inputs.catalog inputs.bounds
         form allocation childAccepted accepted life
@@ -495,6 +498,17 @@ theorem ChildStep.progress_expression
       cases Except.ok.inj (innerRun.symm.trans childAccepted)
       exact (recordExpressionWithExpected_inferenceProperties childProperties.2.1
         (childProperties.2.2 _ (by simp [CallIndex.outputTypes]))
+        (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken childProperties.1.next_le)
+        recorded).1
+  | expression_newArray_length accepted form allocation childAccepted =>
+      obtain ⟨arrayType, element, lengthResult, lengthState, resolution, elementResult, lengthRun,
+          recorded⟩ := Detail.inferExprFuel_success_newArray_facts form allocation accepted
+      cases Except.ok.inj (lengthRun.symm.trans childAccepted)
+      have arrayBelow : ∀ next, (Ty.array element).VariablesBelow next := by
+        intro next
+        rw [← (Detail.newArrayElement_ok elementResult).1]
+        exact Detail.resolveSourceType_success_variablesBelow resolution next
+      exact (recordExpressionWithExpected_inferenceProperties childProperties.2.1 (arrayBelow _)
         (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken childProperties.1.next_le)
         recorded).1
   | expression_tuple accepted form allocation childAccepted =>

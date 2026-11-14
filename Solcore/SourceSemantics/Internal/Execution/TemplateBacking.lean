@@ -188,6 +188,25 @@ theorem expression_group
   subst allocated
   exact backed.allocateExpressionId
 
+theorem expression_newArray_length
+      {fuel : Nat} {context : SourceInference.Context} {source length : Syntax.Expr}
+      {keyword : Syntax.SourceSpan} {sourceType : Syntax.TypeExpr}
+      {expected : Option Ty} {initial allocated final childFinal : State}
+      {id : ExpressionId} {value childValue : InferredExpression}
+      (accepted : (CallIndex.expression (fuel + 1) context source expected
+        initial value final).Accepted)
+      (form : source.value = .newArray keyword sourceType length)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (child : inferExprFuel fuel context length (some (.fixed .uint256)) allocated =
+        .ok (childValue, childFinal))
+      (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs)
+      (backed : LiveTemplatesBacked initial) : LiveTemplatesBacked (CallIndex.expression fuel context length (some (.fixed .uint256)) allocated childValue childFinal).initial := by
+  have step : ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.expression fuel context length (some (.fixed .uint256)) allocated childValue childFinal) := .expression_newArray_length accepted form allocation child
+  have childInputs := step.inputs inputs
+  have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+  subst allocated
+  exact backed.allocateExpressionId
+
 theorem expression_tuple
       {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
       {elements : Syntax.DelimitedList Syntax.Expr} {expected : Option Ty}
@@ -1445,6 +1464,7 @@ theorem ChildStep.liveTemplatesBacked {parent child : CallIndex}
   | solve | apply ActualTemplateBacking.statement_match_many <;> assumption
   | solve | apply ActualTemplateBacking.statement_match_cases <;> assumption
   | solve | apply ActualTemplateBacking.statement_match_default <;> assumption
+  | solve | apply ActualTemplateBacking.expression_newArray_length <;> assumption
 
 theorem CallOccurrence.liveTemplatesBacked {root call : CallIndex}
     (inputs : root.Inputs) (backed : LiveTemplatesBacked root.initial)

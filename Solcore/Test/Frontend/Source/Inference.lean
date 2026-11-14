@@ -1430,11 +1430,39 @@ private def testNonterminalMatch : IO Unit := do
   assertTrue (functions.length == 1)
     "a nonterminal exhaustive match did not check"
 
-/-- Inference rejects `new T[](n)` until row 4 gives it a meaning. -/
-private def testNewArrayRejected : IO Unit := do
-  expectInferenceError "new array allocation"
-    "function bad(n: Word) returns (Word) { let m = new Word[](n); return n; }" fun error =>
-      error == .unsupportedExpression "new"
+/-- `new T[](n)` has the type `T[]`, and its length is a `uint256`: an open
+literal length defaults to it, and a `word` length is rejected, as difference 7
+says. -/
+private def testNewArray : IO Unit := do
+  let functions ← check "new array allocation" (String.intercalate "\n" [
+    "function make(n: uint256) returns (Word) {",
+    "  let m: uint256[] = new uint256[](n);",
+    "  let grid = new int8[][](3);",
+    "  return 0;",
+    "}"
+  ])
+  let function ← match functions with
+    | [function] => pure function
+    | _ => throw (IO.userError "new array fixture lost its checked function")
+  let arrays := function.typedBody.nodes.filterMap fun
+    | .expression { form := .newArray element length, type, .. } => some (element, length, type)
+    | _ => none
+  let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
+  let int8 : TypeSystem.Ty := .fixed ⟨true, .w8⟩
+  assertTrue (decide (arrays.map (fun array => (array.1, array.2.2)) =
+      [(uint256, .array uint256), (.array int8, .array (.array int8))]))
+    s!"new did not type its arrays: {reprStr arrays}"
+  let lengthTypes := arrays.filterMap fun array =>
+    function.typedBody.nodes.findSome? fun
+      | .expression node => if node.id == array.2.1 then some node.type else none
+      | _ => none
+  assertTrue (decide (lengthTypes = [uint256, uint256]))
+    s!"new did not type its lengths as uint256: {reprStr lengthTypes}"
+  expectInferenceError "new array with a word length"
+    "function bad(n: Word) returns (Word) { let m = new uint256[](n); return n; }" fun error =>
+      match error with
+      | .unsupportedExpression _ => false
+      | _ => true
 
 /-- Inference rejects the slices until row 4 gives them a meaning. -/
 private def testSliceRejected : IO Unit := do
@@ -1450,7 +1478,7 @@ def testSourcePhase7Inference : IO Unit := do
   testAssignments
   testLoopsAndControl
   testNonterminalMatch
-  testNewArrayRejected
+  testNewArray
   testSliceRejected
   IO.println "phase-7 source inference GREEN"
 

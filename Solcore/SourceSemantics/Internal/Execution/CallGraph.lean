@@ -649,6 +649,19 @@ inductive ChildStep : CallIndex → CallIndex → Prop where
       (fitting : unify valueState baseValue.type (.mapping keyType valueType) = .ok fitted)
       (child : (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal).Accepted) :
       ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal)
+  | expression_newArray_length
+      {fuel : Nat} {context : SourceInference.Context} {source length : Syntax.Expr}
+      {keyword : Syntax.SourceSpan} {sourceType : Syntax.TypeExpr}
+      {expected : Option Ty} {initial allocated final childFinal : State}
+      {id : ExpressionId} {value childValue : InferredExpression}
+      (accepted : (CallIndex.expression (fuel + 1) context source expected
+        initial value final).Accepted)
+      (form : source.value = .newArray keyword sourceType length)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (child : inferExprFuel fuel context length (some (.fixed .uint256)) allocated =
+        .ok (childValue, childFinal)) :
+      ChildStep (.expression (fuel + 1) context source expected initial value final)
+        (.expression fuel context length (some (.fixed .uint256)) allocated childValue childFinal)
   | expression_call_constructor
       {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
       {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}

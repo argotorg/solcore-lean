@@ -2528,6 +2528,13 @@ private def testStageErrors : IO Unit := do
         "an array local's rejection lost its type"
   | result => throw (IO.userError
       s!"an array local reached a Core representation: {reprStr result}")
+  let arrayNew := rawWorkspace "main.solc" [("main.solc",
+    "function make(n: uint256) returns (Word) { let m: uint256[] = new uint256[](n); return 0; }")]
+  match prepare arrayNew (Seed.named moduleId "make") generousLimits with
+  | .error (.linking (.sourceCore { reason := .unsupportedExpression .newArray, .. }))
+  | .error (.linking (.sourceCore { reason := .unsupportedType _, .. })) => pure ()
+  | result => throw (IO.userError
+      s!"new reached a Core representation or failed before linking: {reprStr result}")
   let recursive := rawWorkspace "main.solc" [("main.solc",
     "function loop(value: Word) returns (Word) { return loop(value); }")]
   match prepare recursive (Seed.named moduleId "loop") generousLimits with

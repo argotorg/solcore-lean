@@ -237,6 +237,15 @@ def arrayElement? : Ty → Option Ty
   | .application (.constructor (.builtin .memoryArray)) element => some element
   | _ => none
 
+/-- A type whose array element is `element` is the memory array of it. -/
+theorem arrayElement?_eq_some {type element : Ty} (found : type.arrayElement? = some element) :
+    type = array element := by
+  unfold arrayElement? at found
+  split at found
+  · cases found
+    rfl
+  · cases found
+
 /-- Whether a memory array may hold `element`: `word`, one of the twelve types
 or a memory array, the element types with `Typedef<word>` upstream that Lean
 has. -/

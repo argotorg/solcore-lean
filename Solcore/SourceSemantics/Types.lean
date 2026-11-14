@@ -978,6 +978,12 @@ theorem toWellFormed {context : Context} {type : TypeSystem.Ty}
 
 end TypeAdmissible
 
+/-- A well-formed memory array has a well-formed element. -/
+theorem TypeWellFormed.array_element {context : Context} {element : TypeSystem.Ty}
+    (wellFormed : TypeWellFormed context (TypeSystem.Ty.array element)) :
+    TypeWellFormed context element :=
+  ⟨wellFormed.binders, wellFormed.typeWellScoped.array_element element rfl⟩
+
 namespace SchemeWellFormed
 
 /-- A monomorphic scheme may retain the ambient flexible variables of a

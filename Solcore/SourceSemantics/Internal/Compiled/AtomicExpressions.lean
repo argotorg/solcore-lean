@@ -238,6 +238,136 @@ theorem expressionRetained_group
   exact expressionRetained_group_for (provenance := fun _ => True) checked true_childClosed
     (fun _ boundary => recursive boundary) trivial expressionEq boundary
 
+/-- The actual `new T[](n)` length is checked at `uint256` in the same selected final source. -/
+theorem expressionRetained_newArray_for
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed provenance)
+    (recursive : ExpressionRetainedSoundnessFor provenance selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression length : Syntax.Expr}
+    {keyword : Syntax.SourceSpan} {sourceType : Syntax.TypeExpr}
+    {expected : Option Ty} {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.expression (childFuel + 1) inferenceContext expression expected
+      initial inferred resultState))
+    (expressionEq : expression.value = .newArray keyword sourceType length)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  have resources := selected.body.resources
+  generalize allocationEq : initial.allocateExpressionId = allocatedPair
+  rcases allocatedPair with ⟨id, allocated⟩
+  have allocatedInvariant := boundary.invariant.allocateExpressionId allocationEq
+  have allocatedOperational : GeneralizedActualStateInvariant allocated (evidenceSource selected) := by
+    rw [← show initial.allocateExpressionId.2 = allocated from congrArg Prod.snd allocationEq]
+    exact boundary.operational.allocateExpressionId
+  have allocatedSafe : ∀ binder ∈ allocated.localBinders, ∀ type ∈ expected,
+      ProtectedVariables.Safe binder.scheme.quantified allocated type := by
+    rw [← show initial.allocateExpressionId.2 = allocated from congrArg Prod.snd allocationEq]
+    exact boundary.expectedSafe
+  have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
+    rw [allocateExpressionId_inferenceNext_eq allocationEq]
+    exact boundary.expectedBelow
+  obtain ⟨arrayType, element, innerResult, innerState, resolution, elementResult, innerSuccess,
+      recorded⟩ :=
+    Detail.inferExprFuel_success_newArray_facts expressionEq allocationEq boundary.accepted
+  have lengthExpected : ∀ type ∈ (some (Ty.fixed .uint256) : Option Ty),
+      type.VariablesBelow allocated.inference.next := by
+    intro type member
+    have same : type = Ty.fixed .uint256 := (Option.some.inj member).symm
+    subst type
+    exact Ty.variablesBelow_constructor _ _
+  have properties := Detail.inferExprFuel_inferenceProperties allocatedInvariant.ready
+    (boundary.scope.formation checked) (boundary.scope.functionsCanonical checked) lengthExpected innerSuccess
+  have innerExpected : ∀ type ∈ expected, type.VariablesBelow innerState.inference.next := by
+    intro type member
+    exact (allocatedExpected type member).weaken properties.1.next_le
+  have arrayTypeEq := (Detail.newArrayElement_ok elementResult).1
+  have arrayBelow : (Ty.array element).VariablesBelow innerState.inference.next := by
+    rw [← arrayTypeEq]
+    exact Detail.resolveSourceType_success_variablesBelow resolution _
+  have recording := Detail.recordExpressionWithExpected_inferenceProperties
+    properties.2.1 arrayBelow innerExpected recorded
+  have innerExtension := boundary.extension.trans recording.1.substitution_extends
+  have allocatedOwner : allocated.owner = initial.owner := by
+    have stateEq : initial.allocateExpressionId.2 = allocated := congrArg Prod.snd allocationEq
+    rw [← stateEq]
+    rfl
+  have innerToParent : TypingSourceExtends (innerState.toTypedSource (bodyRoots selected))
+      (resultState.toTypedSource (bodyRoots selected)) := by
+    refine ⟨?_, recordExpressionWithExpected_success_nodesPrefix recorded⟩
+    exact (Detail.inferExprFuel_preserves_owner boundary.accepted).trans
+      (allocatedOwner.symm.trans (Detail.inferExprFuel_preserves_owner innerSuccess).symm)
+  obtain ⟨coercions, contains⟩ := recordExpressionWithExpected_success_containsExpression recorded (bodyRoots selected)
+  have edge : DirectChild (resultState.toTypedSource (bodyRoots selected))
+      (.expression inferred.id) (.expression innerResult.id) := by
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    simp [nodeChildIds, Node.references, ExpressionForm.references]
+  have finalEdge := boundary.directChildren edge
+  have childPatterns : innerState.integerPatterns ⊆ selected.body.returned.integerPatterns := by
+    rw [← recordExpressionWithExpected_integerPatterns_eq recorded]
+    exact boundary.integerPatterns
+  have childLiterals : innerState.integerLiterals ⊆ selected.body.returned.integerLiterals := by
+    rw [← Detail.recordExpressionWithExpected_integerLiterals_eq recorded]
+    exact boundary.integerLiterals
+  have childRequirements := List.Subset.trans
+    (Detail.recordExpressionWithExpected_requirements_subset recorded) boundary.requirements
+  have childHere := descend here
+    (ChildStep.expression_newArray_length boundary.accepted expressionEq allocationEq innerSuccess)
+  have typed := expressionRooted_of_retained_for checked recursive childHere ({
+    accepted := innerSuccess
+    interfaces := boundary.interfaces
+    extension := innerExtension
+    scope := boundary.scope
+    invariant := allocatedInvariant
+    actual := boundary.actual
+    operational := allocatedOperational
+    expectedBelow := lengthExpected
+    expectedAdmissible := by
+      intro type member
+      have same : type = Ty.fixed .uint256 := (Option.some.inj member).symm
+      subst type
+      exact TypeAdmissible.builtin (boundary.invariant.typeParameterBinders
+        ((CheckingScope.refl selected).canonical checked)) (.fixed .uint256)
+    expectedSafe := by
+      intro binder _ type member
+      have same : type = Ty.fixed .uint256 := (Option.some.inj member).symm
+      subst type
+      exact ProtectedVariables.safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+    integerPatterns := childPatterns
+    integerLiterals := childLiterals
+    requirements := childRequirements
+    covered := boundary.covered.expressionChild resources.graph_closed finalEdge
+    actualCovered := boundary.actualCovered.directChild finalEdge
+    rawSubtree := (boundary.rawProper.childSubtree edge).monoBefore innerToParent } :
+    RootedExpressionBoundary selected childFuel inferenceContext length
+      (some (Ty.fixed .uint256)) allocated innerResult innerState frames target)
+  have lengthEq : selected.body.finalized.substitution.apply innerResult.type = .fixed .uint256 := by
+    simpa using Detail.inferExprFuel_expected_type_apply_eq innerSuccess innerExtension
+  have lengthType : ExpressionHasType selected.body.finalized.typedSource target innerResult.id
+      (.fixed .uint256) := by
+    rw [← lengthEq]
+    exact typed
+  obtain ⟨fixedElement, elementAdmissible, elementAllowed⟩ :=
+    newArray_element_selected resolution elementResult boundary.scope.signatures boundary.scope.owner
+      boundary.scope.parameters ((CheckingScope.refl selected).canonical checked) boundary.invariant
+  have formType : ExpressionFormHasRawType selected.body.finalized.typedSource target
+      ((ExpressionForm.newArray element innerResult.id).applySubstitution
+        selected.body.finalized.substitution)
+      (selected.body.finalized.substitution.apply (Ty.array element)) (.ordinary []) := by
+    simpa [ExpressionForm.applySubstitution, Ty.array, Substitution.apply, fixedElement] using
+      ExpressionFormHasRawType.newArray elementAllowed elementAdmissible lengthType
+  have rawAdmissible : TypeAdmissible target
+      (selected.body.finalized.substitution.apply (Ty.array element)) := by
+    simpa [Ty.array, Substitution.apply, fixedElement] using TypeAdmissible.array elementAdmissible
+  exact recordExpressionWithExpected_success_expressionTypingBase_actual resources boundary.interfaces
+    recorded boundary.extension boundary.requirements boundary.expressionRequirements boundary.coercionPrimaries
+    (boundary.scope.catalog checked) boundary.scope.signatures boundary.invariant formType rawAdmissible boundary.covered
+
 end Solcore.SourceSemantics.SourceCompiledGeneralizedSoundness
 end
 

@@ -1321,7 +1321,42 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
   case case21 =>
     simp_all [InferExprFuelFormation, inferExprFuel]
   case case22 =>
-    simp_all [InferExprFuelFormation, inferExprFuel]
+    intros context expression expected initial fuel id allocated allocationEq
+      keyword sourceType length expressionEq lengthInduction
+    unfold InferExprFuelFormation
+    intro ready nodes formed formation expectedBelow expectedFormed result success continuation captures
+    have allocation := expression_allocation_normalized allocationEq ready nodes formed
+    have expectedAllocated : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
+      simpa only [allocation.2.2.2] using expectedBelow
+    obtain ⟨arrayType, element, inferredLength, lengthState, resolution, elementResult,
+        lengthRun, recorded⟩ :=
+      Detail.inferExprFuel_success_newArray_facts expressionEq allocationEq success
+    have lengthBelow : ∀ type ∈ some (Ty.fixed FixedInteger.uint256),
+        type.VariablesBelow allocated.inference.next := by
+      intro type member; cases Option.mem_def.mp member; exact Ty.variablesBelow_constructor _ _
+    have lengthFormed : ∀ type ∈ some (Ty.fixed FixedInteger.uint256),
+        TypeAdmissible semantic (outer.apply type) := by
+      intro type member; cases Option.mem_def.mp member
+      exact TypeAdmissible.builtin formation.scope.binders (.fixed .uint256)
+    have properties := inferExprFuel_inferenceProperties allocation.1
+      formation.validated formation.functionShapes lengthBelow lengthRun
+    have arrayBelow : (Ty.array element).VariablesBelow lengthState.inference.next := by
+      rw [← (Detail.newArrayElement_ok elementResult).1]
+      exact Detail.resolveSourceType_success_variablesBelow resolution _
+    have expectedAfter : ∀ type ∈ expected, type.VariablesBelow lengthState.inference.next :=
+      fun type member => (expectedAllocated type member).weaken properties.1.next_le
+    have recording := recordExpressionWithExpected_inferenceProperties properties.2.1
+      arrayBelow expectedAfter recorded
+    have lengthContinuation := continuation.trans recording.1.substitution_extends
+    have childFormation := lengthInduction allocation.1 allocation.2.1 allocation.2.2.1
+      formation lengthBelow lengthFormed _ lengthRun lengthContinuation
+      (captures.before_recordExpressionWithExpected recorded)
+    have arrayFormed : TypeAdmissible semantic (outer.apply (Ty.array element)) := by
+      have resolved : TypeAdmissible semantic (outer.apply arrayType) :=
+        (annotation_normalized_formation formation (.some resolution) 0).2 _ (by simp)
+      rwa [(Detail.newArrayElement_ok elementResult).1] at resolved
+    exact recordExpressionWithExpected_normalized_state formation childFormation.2 continuation
+      arrayFormed expectedFormed recorded
   case case23 =>
     simp_all [InferExprFuelFormation, inferExprFuel]
   case case25 =>

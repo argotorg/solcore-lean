@@ -298,6 +298,43 @@ theorem group
     (by intro type member; exact List.mem_append_right _ member)
   simpa only [sameNext] using finalLifetime
 
+theorem newArray
+    {fuel : Nat} {context : SourceInference.Context}
+    {source length : Syntax.Expr} {keyword : Syntax.SourceSpan} {sourceType : Syntax.TypeExpr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {child final : InferredExpression × State}
+    (ready : initial.InferenceReady) (catalog : LifetimeInferenceContext context)
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (form : source.value = .newArray keyword sourceType length)
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (childAccepted : inferExprFuel fuel context length (some (.fixed .uint256)) allocated = .ok child)
+    (accepted : inferExprFuel (fuel + 1) context source expected initial = .ok final)
+    (lifetime : GeneralizationLifetime event allocated.inference.next child.2 [child.1.type]) :
+    GeneralizationLifetime event initial.inference.next final.2 [final.1.type] := by
+  have allocatedEq : allocated = initial.allocateExpressionId.2 :=
+    (congrArg Prod.snd allocation).symm
+  have sameNext : allocated.inference.next = initial.inference.next := by
+    rw [allocatedEq]; rfl
+  have childProperties := inferExprFuel_inferenceProperties
+    (allocatedEq ▸ ready.allocateExpressionId) catalog.formation catalog.canonical
+    (fun type member => by
+      cases Option.mem_def.mp member
+      exact Ty.variablesBelow_constructor _ _) childAccepted
+  obtain ⟨arrayType, element, lengthResult, lengthState, resolution, elementResult, lengthRun,
+      recorded⟩ := inferExprFuel_success_newArray_facts form allocation accepted
+  cases Except.ok.inj (lengthRun.symm.trans childAccepted)
+  have arrayClosed : (Ty.array element).VariablesBelow 0 := by
+    rw [← (newArrayElement_ok elementResult).1]
+    exact resolveSourceType_success_variablesBelow resolution 0
+  have result := lifetime.recordExpression catalog.catalog childProperties.2.1
+    (arrayClosed.weaken (Nat.zero_le _))
+    (fun type member => (sameNext ▸ expectedBelow type member).weaken childProperties.1.next_le)
+    (safe_closed _ _ arrayClosed)
+    (fun type member => lifetime.older type (sameNext ▸ expectedBelow type member)) recorded
+  have finalLifetime := result.restrict_outputs (selected := [final.1.type])
+    (by intro type member; exact List.mem_append_right _ member)
+  simpa only [sameNext] using finalLifetime
+
 theorem tuple
     {fuel : Nat} {context : SourceInference.Context}
     {source : Syntax.Expr} {elements : Syntax.DelimitedList Syntax.Expr}

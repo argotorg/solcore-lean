@@ -503,6 +503,17 @@ private theorem inferFuel_origins_progress_internal :
       have record := RelativeReadProgress.recordExpressionWithExpected (root := root) (by simpa only [child, bind, Except.bind] using accepted)
         (by intro _ _ impossible; cases impossible)
       exact (allocateExpressionId_success_origins_progress allocation).trans (innerProgress.trans record)
+  case case22 =>
+    intro context source expected initial fuel id allocated allocation keyword sourceType length form ih
+    intro result accepted here
+    have original := accepted
+    obtain ⟨_, _, childValue, childFinal, _, _, child, recorded⟩ :=
+      Detail.inferExprFuel_success_newArray_facts form allocation accepted
+    have lengthProgress := ih (childValue, childFinal) child
+      (here.child (.expression_newArray_length original form allocation child))
+    have record := RelativeReadProgress.recordExpressionWithExpected (root := root) recorded
+      (by intro _ _ impossible; cases impossible)
+    exact (allocateExpressionId_success_origins_progress allocation).trans (lengthProgress.trans record)
   case case15 =>
     intro context source expected initial fuel id allocated allocation keyword parameters annotation body form ih
     intro result accepted here

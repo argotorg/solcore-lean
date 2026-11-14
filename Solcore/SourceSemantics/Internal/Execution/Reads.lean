@@ -636,6 +636,10 @@ theorem ChildStep.local_suffix {parent child : CallIndex} (step : ChildStep pare
       all_goals simp only [CallIndex.Accepted] at *
       all_goals unfold inferExprFuel at accepted
       finish_local_suffix accepted
+  | expression_newArray_length accepted form allocation child =>
+      all_goals simp only [CallIndex.Accepted] at *
+      all_goals unfold inferExprFuel at accepted
+      finish_local_suffix accepted
   | expressions_head accepted head =>
       all_goals simp only [CallIndex.Accepted] at *
       all_goals unfold inferExprsFuel at accepted

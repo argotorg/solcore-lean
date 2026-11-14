@@ -3354,9 +3354,7 @@ theorem expressionRetained_step_for {callProvenance : CallIndex → Prop}
       simp only [Detail.inferExprFuel, form] at success
       cases success
   | newArray keyword type length =>
-      have success := boundary.accepted
-      simp only [Detail.inferExprFuel, form] at success
-      cases success
+      exact expressionRetained_newArray_for checked descend predecessor here form boundary
   | slice base brackets start colon stop =>
       have success := boundary.accepted
       simp only [Detail.inferExprFuel, form] at success

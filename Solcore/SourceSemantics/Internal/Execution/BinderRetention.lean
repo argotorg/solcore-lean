@@ -244,6 +244,11 @@ theorem ChildStep.expression_binders_retained
       Detail.inferExprFuel_success_group_facts form allocation accepted
     cases Except.ok.inj (innerRun.symm.trans childAccepted)
     exact BindersRetained.recordExpressionWithExpected recorded
+  | expression_newArray_length accepted form allocation childAccepted =>
+    obtain ⟨_, _, lengthResult, lengthState, _, _, lengthRun, recorded⟩ :=
+      Detail.inferExprFuel_success_newArray_facts form allocation accepted
+    cases Except.ok.inj (lengthRun.symm.trans childAccepted)
+    exact BindersRetained.recordExpressionWithExpected recorded
   | expression_tuple accepted form allocation childAccepted =>
     obtain ⟨elements, elementState, elementsRun, recorded⟩ :=
       inferExprFuel_success_tuple_facts form allocation accepted
@@ -1369,6 +1374,8 @@ theorem ChildStep.nonexpression_binders_retained {parent child : CallIndex}
   cases step with
   | expression_group accepted form allocation child =>
       exact False.elim nonexpression
+  | expression_newArray_length accepted form allocation child =>
+      exact False.elim nonexpression
   | expression_tuple accepted form allocation child =>
       exact False.elim nonexpression
   | expressions_head accepted head =>
@@ -1790,6 +1797,9 @@ theorem ChildStep.captureOrigins
     ActiveBinderCaptureOrigins destination.initial whole := by
   cases step with
   | @expression_group fuel context source inner expected initial allocated final childFinal id value childValue accepted form allocation child =>
+    dsimp only [CallIndex.initial] at origins ⊢
+    exact origins.allocateExpressionId allocation
+  | @expression_newArray_length fuel context source length keyword sourceType expected initial allocated final childFinal id value childValue accepted form allocation child =>
     dsimp only [CallIndex.initial] at origins ⊢
     exact origins.allocateExpressionId allocation
   | @expression_tuple fuel context source elements expected initial allocated final childFinal id value values accepted form allocation child =>

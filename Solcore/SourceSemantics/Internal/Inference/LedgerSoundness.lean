@@ -195,7 +195,11 @@ theorem inferExprFuelLedgerPreservation_step
     all_goals try contradiction
     all_goals
       exact constructorIH accepted (allocatedTracked.freshDataConstructorInstantiation _ _)
-  | array _ | newArray _ _ _ | slice _ _ _ _ _ | error =>
+  | newArray keyword sourceType length =>
+    obtain ⟨_, _, _, _, _, _, child, recorded⟩ :=
+      Detail.inferExprFuel_success_newArray_facts form allocation accepted
+    exact (expressionIH child allocatedTracked).recordExpressionWithExpected recorded
+  | array _ | slice _ _ _ _ _ | error =>
     simp [Detail.inferExprFuel, allocation, form] at accepted
 
 end Solcore.SourceSemantics.SourceInferenceSoundness
