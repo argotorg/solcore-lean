@@ -1656,6 +1656,14 @@ mutual
         (out_of_bounds : elements.length ≤ position.val) :
         ExpressionFormFaults program context evidence source environment before
           (.arrayIndex base index) requirements coercions (.panic 0x32) after
+    | arrayLiteralElements
+        {context evidence source environment before after element elements
+          requirements coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionsFault program context evidence source environment
+          before elements reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.arrayLiteral element elements) requirements coercions reason after
 
   /-- First fault in a left-to-right expression vector. -/
   inductive ExpressionsFault (program : Program) :

@@ -5134,6 +5134,13 @@ theorem StatementsHaveType.applyParameters
       baseInduction indexInduction catalog contextValid
     exact .arrayIndex (baseInduction catalog contextValid)
       (indexInduction catalog contextValid) (by cases indexKind <;> constructor)
+  · intro context element elements elementWellFormed elementsType elementsInduction catalog
+      contextValid
+    have typed := elementsInduction catalog contextValid
+    simp only [List.map_replicate] at typed
+    exact .arrayLiteral
+      (StructuralSubstitution.TypeAdmissible.applyParameters substitution
+        contextValid.exact contextValid.range elementWellFormed) typed
   · intro context catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction
@@ -12483,6 +12490,12 @@ theorem StatementsHaveType.applySubstitution
       baseInduction indexInduction targetContext catalog contextValid
     exact .arrayIndex (baseInduction targetContext catalog contextValid)
       (indexInduction targetContext catalog contextValid) (by cases indexKind <;> constructor)
+  · intro context element elements elementWellFormed elementsType elementsInduction
+      targetContext catalog contextValid
+    have typed := elementsInduction targetContext catalog contextValid
+    simp only [List.map_replicate] at typed
+    exact .arrayLiteral (TypeAdmissible.applySubstitution contextValid.closes elementWellFormed)
+      typed
   · intro context targetContext catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction

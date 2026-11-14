@@ -1191,6 +1191,16 @@ theorem ValueHasType.arrayObject_replicate {context : Context} {heap : Heap}
       (Ty.arrayObject element) :=
   .arrayObject (by rw [List.length_replicate]; exact ValuesHaveTypes.replicate typed count)
 
+/-- Values typed at copies of one type are an array object of that type. -/
+theorem ValueHasType.arrayObject_of_values {context : Context} {heap : Heap}
+    {element : Ty} {values : List Value} {count : Nat}
+    (typed : ValuesHaveTypes context heap values (List.replicate count element)) :
+    ValueHasType context heap (.arrayObject element values) (Ty.arrayObject element) := by
+  have countEq : values.length = count := by
+    simpa using typed.length_eq
+  subst countEq
+  exact .arrayObject typed
+
 namespace ValueHasType
 
 theorem transportClosed

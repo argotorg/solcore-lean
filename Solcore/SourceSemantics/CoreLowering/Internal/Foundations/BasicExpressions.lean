@@ -1008,7 +1008,7 @@ theorem tree_of_lowerExpression
                                       exact ⟨max leftDepth rightDepth + 1, by omega,
                                         .pair metadata form leftTree rightTree⟩
           | integerLiteral | unary | binary | conditional | lambda | call | constructor | member | proxy | index
-          | newArray | arrayLength | arrayIndex =>
+          | newArray | arrayLength | arrayIndex | arrayLiteral =>
               simp [form] at accepted
 
 theorem lowerExpression_hasType
@@ -1581,7 +1581,7 @@ theorem tree_of_lowerExpression
                       exact ⟨max leftDepth rightDepth + 1, by omega,
                         .pair (same ▸ metadata) form leftTree rightTree⟩
       | literal | reference | integerLiteral | unary | binary | lambda | call | constructor | member | proxy | index
-      | newArray | arrayLength | arrayIndex =>
+      | newArray | arrayLength | arrayIndex | arrayLiteral =>
           simp only [form] at accepted
           exact tree_of_basicLeaf unique found
             (by intro inner impossible; rw [form] at impossible; cases impossible)

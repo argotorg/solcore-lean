@@ -3409,6 +3409,16 @@ theorem preservesWith
             ⟨_, after_typed, index_extension⟩
           exact ⟨(base_typed.mono index_extension).arrayElement after_typed read stored
               element_at, after_typed, base_extension.trans index_extension⟩
+  | arrayLiteral _ elements_type =>
+      cases evaluation with
+      | arrayLiteral layout elements_evaluate allocates =>
+          rcases elements_evaluate.preserves expression_preserves evidence_covers
+              environment_agrees before_typed elements_type with
+            ⟨values_typed, middle_typed, extension⟩
+          exact ⟨.arrayRef allocates.reads_new rfl,
+            middle_typed.allocate (.some (ValueHasType.arrayObject_of_values values_typed))
+              allocates,
+            extension.trans (HeapTypesExtend.of_allocation allocates)⟩
 
 end ExpressionFormEvaluates
 

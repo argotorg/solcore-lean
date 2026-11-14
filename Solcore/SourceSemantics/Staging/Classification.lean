@@ -403,6 +403,13 @@ mutual
         (baseStages : HasStage source scope base baseStage)
         (indexStages : HasStage source scope index indexStage) :
         HasStage source scope id .deferred
+    | arrayLiteral
+        {scope : StageScope} {id : ExpressionId} {node : ExpressionNode}
+        {element : TypeSystem.Ty} {elements : List ExpressionId} {stages : List Stage}
+        (contains : SourceSemantics.ContainsExpression source id node)
+        (form_eq : node.form = .arrayLiteral element elements)
+        (elementStages : ExpressionsHaveStages source scope elements stages) :
+        HasStage source scope id .deferred
 
   /-- Pointwise expression classification in source order. -/
   inductive ExpressionsHaveStages (source : TypedSource) :

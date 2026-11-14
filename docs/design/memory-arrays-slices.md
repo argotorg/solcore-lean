@@ -384,8 +384,11 @@ wait for the native pipeline's contracts and ABI.
   - `new T[](n)` panics with `0x41` when `n ≥ 2^251 − 1`. Otherwise it allocates an object of `n`
     zero elements. For an array element type, the elements are `n` references to one fresh empty
     array, as std's `0x60` is.
-  - A literal allocates its object first, then evaluates and stores its elements from left to
-    right.
+  - A literal allocates its object first, then evaluates and stores its elements from left to right.
+    As built in step 4a, the literal is its own typed form (`ExpressionForm.arrayLiteral`), which
+    evaluates its elements from left to right and then allocates the cell holding them: no element
+    can observe the object, so where the allocation falls changes no result. Unlike `new`'s, its
+    static rule checks no element type; inference's finalization does, in step 4b.
   - A read panics with `0x32` when `i ≥ length`. A read through a slice checks the slice's length,
     then the base's at `start + i`. As built in step 3a, the read is its own typed form
     (`ExpressionForm.arrayIndex`), whose index is a word at `word` or one of the twelve types
@@ -529,14 +532,16 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 3a | Element reads: the typed form of `a[i]` on a memory array with its static rule, evaluation, faults with `0x32`, sized copies, stage and preservation, which no source produces yet | 28–32 files, +400–550/−5–15; measured at 27 files, +352/−10 | none |
 | 3b | Element reads: inference's typing of `a[i]` on a memory array, whose index waits for its type until finalization checks that it is `word` or one of the twelve types | 26–32 files, +800–1,000/−100–180; measured at 28 files, +1,156/−57 | none |
 | 3c | Element reads: the lowering, with `0x32` | 4–6 files, +120–200; measured at 4 files, +73/−13 | defaultZero(n, i), nestedEmpty(n) |
-| 4 | Literals | 30–45 files, +600–900/−100–250, like 7b | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
+| 4a | Literals: the typed form of `[e₀, …, eₙ₋₁]` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–500/−5–15; measured at 27 files, +192/−6 | none |
+| 4b | Literals: inference's typing of `[e₀, …, eₙ₋₁]` at one element type, with `[]` taking it from the expected type, open literal elements defaulting to `uint256` and finalization's check of the element type | 26–34 files, +900–1,300/−30–80 | none |
+| 4c | Literals: the lowering | 4–7 files, +150–300/−5–20 | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
 | 5 | Element writes and compound assignments, with the place checked before the right side | 55–72 files, +1,200–1,700/−300–450 | setGet(n, i, v), fillAndSum(n), compound(v), nestedReplace(n, v), alias(v); ret(n), sum(xs), echo(xs), grid(n) adapted |
 | 6 | Slices and `toArray(s)` | 45–65 files, +1,000–1,400/−200–400 | array-slice's 12 functions; slices(xs) adapted |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
 
-In all, that is about 436 to 632 file changes, +13,100 to 18,450 and −1,900 to 3,500 lines over
-twenty-five commits: about three fifths to four fifths of row 1, whose 23 commits added about 21,700
+In all, that is about 464 to 660 file changes, +13,900 to 19,650 and −1,840 to 3,365 lines over
+twenty-seven commits: about two thirds to nine tenths of row 1, whose 23 commits added about 21,700
 lines, much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600, until
 its first measure: it adds three AST forms through the proved parser, so it became 1a to 1c. 1b's
 first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
@@ -560,6 +565,12 @@ changes, +1,300 to 1,750/−100 to 200. The read takes a typed form with its eva
 faults and their sized rules, as `new` did in 2b-i-b, and inference's index arm takes an array
 branch whose index waits for its type until finalization checks it, as row 1's shift amounts do. So
 it split into 3a, the typed form, 3b, inference's typing, and 3c, the lowering.
+
+Step 4 was one row of 30–45 files, +600–900/−100–250, until its first measure: about 58 to 73 file
+changes, +1,400 to 2,100/−40 to 115. The literal takes a typed form with its evaluation, fault and
+sized rules, as `new` did in 2b-i-b, and inference's array arm infers the elements at one element
+type, which finalization checks, as 3b's index. So it split into 4a, the typed form, 4b, inference's
+typing, and 4c, the lowering.
 
 ## Generators, corpora and the smoke
 

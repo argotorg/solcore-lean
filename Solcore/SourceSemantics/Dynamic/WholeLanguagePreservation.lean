@@ -818,6 +818,17 @@ mutual
               ⟨_, after_typed, index_extension⟩
             exact ⟨(base_typed.mono index_extension).arrayElement after_typed read stored
                 element_at, after_typed, base_extension.trans index_extension⟩
+    | .arrayLiteral layout elements_evaluate allocates => by
+        cases typing with
+        | arrayLiteral _ elements_type =>
+            rcases preserveExpressionsRec program_well_formed runtime
+                evidence_covers environment_agrees before_typed elements_type
+                elements_evaluate with
+              ⟨values_typed, middle_typed, extension⟩
+            exact ⟨.arrayRef allocates.reads_new rfl,
+              middle_typed.allocate (.some (ValueHasType.arrayObject_of_values values_typed))
+                allocates,
+              extension.trans (HeapTypesExtend.of_allocation allocates)⟩
     termination_by structural evaluation
 
   private theorem preserveExpressionsRec

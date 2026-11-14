@@ -393,6 +393,10 @@ private theorem recover_expression_form (original : ExpressionForm)
           (ExpressionForm.newArray.inj same).1)
   | arrayLength base => rfl
   | arrayIndex base index => rfl
+  | arrayLiteral element elements =>
+      exact congrArg (fun selected => ExpressionForm.arrayLiteral selected elements)
+        (recover_type leftClosed rightClosed element leftLocal rightLocal
+          (ExpressionForm.arrayLiteral.inj same).1)
 
 private theorem recover_place (original : PlaceResolution)
     (leftLocal rightLocal : Substitution)

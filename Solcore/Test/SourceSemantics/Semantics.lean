@@ -1116,6 +1116,13 @@ example (context : Context) (heapTyped : HeapWellTyped context arrayHeap) :
 /-- A read takes a signed index too: `int8` is one of the twelve types. -/
 example : ArrayIndexType (.fixed ⟨true, .w8⟩) := .fixed _
 
+/-- A literal's evaluated elements, typed at its element type, are its
+object. -/
+example (context : Context) (heap : Heap) :
+    ValueHasType context heap (.arrayObject .word [.word one, .word two])
+      (Ty.arrayObject .word) :=
+  ValueHasType.arrayObject_of_values (count := 2) (.cons (.word one) (.cons (.word two) .nil))
+
 end Solcore.Test.SourceSemanticsArrayObjects
 end
 

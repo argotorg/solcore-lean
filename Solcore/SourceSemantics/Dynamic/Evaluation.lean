@@ -827,6 +827,19 @@ mutual
         (element_at : elements[position.val]? = some value) :
         ExpressionFormEvaluates program context evidence source environment before
           (.arrayIndex base index) requirements coercions value after
+    /-- `[e₀, …, eₙ₋₁]` evaluates its elements from left to right, then allocates
+    the array's cell holding them. -/
+    | arrayLiteral
+        {context evidence source environment before middle after element elements
+          requirements coercions values location}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (elements_evaluate : ExpressionsEvaluate program context evidence source
+          environment before elements values middle)
+        (allocates : Heap.Allocates middle (TypeSystem.Ty.arrayObject element)
+          (some (.arrayObject element values)) location after) :
+        ExpressionFormEvaluates program context evidence source environment before
+          (.arrayLiteral element elements) requirements coercions
+          (.arrayRef element location) after
 
   /-- Left-to-right evaluation of an expression vector. -/
   inductive ExpressionsEvaluate (program : Program) :
@@ -1786,6 +1799,9 @@ mutual
     | .arrayLength _ base_evaluates _ _ => base_evaluates.initialization_extends
     | .arrayIndex _ base_evaluates index_evaluates _ _ _ =>
         (base_evaluates.initialization_extends).trans index_evaluates.initialization_extends
+    | .arrayLiteral _ elements_evaluate allocates =>
+        (elements_evaluate.initialization_extends).trans
+          (HeapInitializationExtend.of_allocation allocates)
 
   theorem ExpressionsEvaluate.initialization_extends {program : Program}
       {context : Context}

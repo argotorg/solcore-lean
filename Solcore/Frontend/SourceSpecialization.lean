@@ -243,6 +243,7 @@ def applyExpressionForm (substitution : ParameterSubstitution) :
   | .newArray element length => .newArray (substitution.apply element) length
   | .arrayLength base => .arrayLength base
   | .arrayIndex base index => .arrayIndex base index
+  | .arrayLiteral element elements => .arrayLiteral (substitution.apply element) elements
 
 def applyPlaceResolution (substitution : ParameterSubstitution)
     (place : PlaceResolution) : PlaceResolution := {
@@ -463,6 +464,7 @@ private def expressionFormTypes : ExpressionForm → List Ty
   | .constructor instantiation _ => dataInstantiationTypes instantiation
   | .proxy inner => [inner]
   | .newArray element _ => [element]
+  | .arrayLiteral element _ => [element]
   | .literal _
   | .group _
   | .tuple _
@@ -883,6 +885,7 @@ private def expressionChildTasks (variables : List TypeVarId)
   | .newArray _ inner
   | .arrayLength inner => expressionTasks variables [inner]
   | .tuple elements => expressionTasks variables elements
+  | .arrayLiteral _ elements => expressionTasks variables elements
   | .binary left _ right
   | .index left right
   | .arrayIndex left right => expressionTasks variables [left, right]

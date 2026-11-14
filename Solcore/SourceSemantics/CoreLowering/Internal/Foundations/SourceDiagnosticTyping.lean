@@ -228,6 +228,7 @@ private theorem expression_form_references {context : SourceSemantics.Context}
     rcases List.mem_cons.mp member with rfl | member
     · exact .expression base
     · exact expression_single index member
+  | arrayLiteral _ elements => exact expressions_references elements member
 
 private theorem statement_form_references {control : ControlContext} {context final : SourceSemantics.Context}
     {form : StatementForm} (typed : Dynamic.StatementHasType.FormTyping source control context form final)

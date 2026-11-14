@@ -1427,6 +1427,22 @@ theorem analyzeExpressionFormWith_sound
                 expressionSound middleState index indexStage nextState
                   middleValid indexResult
               exact ⟨finalValid, .arrayIndex contains form baseStages indexStages⟩
+  | arrayLiteral element elements =>
+      simp only [analyzeExpressionFormWith, form] at success
+      cases analyzed : analyzeExpressionListWith analyzeExpression elements
+          state with
+      | error problem =>
+          rw [analyzed] at success
+          cases success
+      | ok pair =>
+          rcases pair with ⟨stages, nextState⟩
+          rw [analyzed] at success
+          obtain ⟨rfl, rfl⟩ := success
+          obtain ⟨finalValid, elementStages⟩ :=
+            analyzeExpressionListWith_sound source
+              (toSemanticScope environment) analyzeExpression expressionSound
+              elements state nextState stages valid analyzed
+          exact ⟨finalValid, .arrayLiteral contains form elementStages⟩
 
 theorem analyzeStatementFormWith_sound
     (source : TypedSource) (id : StatementId) (node : StatementNode)

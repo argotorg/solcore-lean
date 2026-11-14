@@ -655,6 +655,16 @@ mutual
         (index_kind : ArrayIndexType indexType) :
         ExpressionFormHasRawType source context (.arrayIndex base index) element
           (.ordinary [])
+    /-- `[e₀, …, eₙ₋₁]`: elements of one type `T`. Unlike `new T[](n)`'s, the rule
+    checks no element type: inference's finalization rejects one that `T[]`
+    cannot hold (`Frontend.SourceInference.Detail.validateArrayLiteral`). -/
+    | arrayLiteral
+        {context : Context} {element : TypeSystem.Ty} {elements : List ExpressionId}
+        (element_well_formed : TypeAdmissible context element)
+        (elements_type : ExpressionsHaveTypes source context elements
+          (List.replicate elements.length element)) :
+        ExpressionFormHasRawType source context (.arrayLiteral element elements)
+          (TypeSystem.Ty.array element) (.ordinary [])
 
   /-- Pointwise expression typing in source order. -/
   inductive ExpressionsHaveTypes (source : TypedSource) :
@@ -1298,6 +1308,8 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
     (fun _ baseInduction => .arrayLength baseInduction)
     (fun _ _ kind baseInduction indexInduction =>
       .arrayIndex baseInduction indexInduction kind)
+    (fun elementWellFormed _ elementsInduction =>
+      .arrayLiteral elementWellFormed elementsInduction)
     (fun _ => .nil _)
     (fun head tail headInduction tailInduction =>
       .cons headInduction tailInduction)

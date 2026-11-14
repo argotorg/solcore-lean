@@ -406,6 +406,18 @@ mutual
         ExpressionFormEvaluates program (stepSize [size_base_evaluates, size_index_evaluates])
           context evidence source environment before (.arrayIndex base index) requirements
           coercions value after
+    | arrayLiteral
+        {size_elements_evaluate : Nat}
+        {context evidence source environment before middle after element elements
+          requirements coercions values location}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (elements_evaluate : ExpressionsEvaluate program size_elements_evaluate context
+          evidence source environment before elements values middle)
+        (allocates : Heap.Allocates middle (TypeSystem.Ty.arrayObject element)
+          (some (.arrayObject element values)) location after) :
+        ExpressionFormEvaluates program (stepSize [size_elements_evaluate]) context evidence
+          source environment before (.arrayLiteral element elements) requirements coercions
+          (.arrayRef element location) after
 
   inductive ExpressionsEvaluate (program : Program) : Nat →
       Context → EvidenceEnvironment → TypedSource → Dynamic.Environment →
@@ -1238,6 +1250,8 @@ theorem ExpressionFormEvaluates.sound {program : Program} {size : Nat} {a0 : Con
   | .arrayIndex layout base_evaluates index_evaluates read stored element_at =>
     exact .arrayIndex layout (ExpressionEvaluates.sound base_evaluates)
       (ExpressionEvaluates.sound index_evaluates) read stored element_at
+  | .arrayLiteral layout elements_evaluate allocates =>
+    exact .arrayLiteral layout (ExpressionsEvaluate.sound elements_evaluate) allocates
 termination_by structural trace
 
 theorem ExpressionsEvaluate.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
@@ -1564,6 +1578,10 @@ theorem ExpressionFormEvaluates.has_size {program : Program} {a0 : Context} {a1 
     obtain ⟨size_base_evaluates, base_evaluates⟩ := ExpressionEvaluates.has_size base_evaluates
     obtain ⟨size_index_evaluates, index_evaluates⟩ := ExpressionEvaluates.has_size index_evaluates
     exact ⟨_, .arrayIndex layout base_evaluates index_evaluates read stored element_at⟩
+  | .arrayLiteral layout elements_evaluate allocates =>
+    obtain ⟨size_elements_evaluate, elements_evaluate⟩ :=
+      ExpressionsEvaluate.has_size elements_evaluate
+    exact ⟨_, .arrayLiteral layout elements_evaluate allocates⟩
 termination_by structural trace
 
 theorem ExpressionsEvaluate.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
@@ -1949,6 +1967,8 @@ theorem ExpressionFormEvaluates.children_below {program : Program} {size : Nat} 
     exact ⟨[size_base_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
   | @arrayIndex size_base_evaluates size_index_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_base_evaluates, size_index_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
+  | @arrayLiteral size_elements_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_elements_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
 
 theorem ExpressionsEvaluate.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
     (trace : ExpressionsEvaluate program size a0 a1 a2 a3 a4 a5 a6 a7) : 0 < size := by
@@ -2912,6 +2932,15 @@ mutual
         ExpressionFormFaults program (stepSize [size_base_evaluates, size_index_evaluates])
           context evidence source environment before (.arrayIndex base index) requirements
           coercions (.panic 0x32) after
+    | arrayLiteralElements
+        {size_fault : Nat}
+        {context evidence source environment before after element elements
+          requirements coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionsFault program size_fault context evidence source environment
+          before elements reason after) :
+        ExpressionFormFaults program (stepSize [size_fault]) context evidence source environment
+          before (.arrayLiteral element elements) requirements coercions reason after
 
   inductive ExpressionsFault (program : Program) : Nat →
       Context → EvidenceEnvironment → TypedSource → Dynamic.Environment →
@@ -3962,6 +3991,8 @@ theorem ExpressionFormFaults.sound {program : Program} {size : Nat} {a0 : Contex
   | .arrayIndexOutOfBounds layout base_evaluates index_evaluates read stored out_of_bounds =>
     exact .arrayIndexOutOfBounds layout (ExpressionEvaluates.sound base_evaluates)
       (ExpressionEvaluates.sound index_evaluates) read stored out_of_bounds
+  | .arrayLiteralElements layout fault =>
+    exact .arrayLiteralElements layout (ExpressionsFault.sound fault)
 termination_by structural trace
 
 theorem ExpressionsFault.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
@@ -4414,6 +4445,9 @@ theorem ExpressionFormFaults.has_size {program : Program} {a0 : Context} {a1 : E
     obtain ⟨size_index_evaluates, index_evaluates⟩ := ExpressionEvaluates.has_size index_evaluates
     exact ⟨_, .arrayIndexOutOfBounds layout base_evaluates index_evaluates read stored
       out_of_bounds⟩
+  | .arrayLiteralElements layout fault =>
+    obtain ⟨size_fault, fault⟩ := ExpressionsFault.has_size fault
+    exact ⟨_, .arrayLiteralElements layout fault⟩
 termination_by structural trace
 
 theorem ExpressionsFault.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
@@ -4914,6 +4948,8 @@ theorem ExpressionFormFaults.children_below {program : Program} {size : Nat} {a0
     exact ⟨[size_base_evaluates, size_index_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
   | @arrayIndexOutOfBounds size_base_evaluates size_index_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_base_evaluates, size_index_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
+  | @arrayLiteralElements size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩
 
 theorem ExpressionsFault.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
     (trace : ExpressionsFault program size a0 a1 a2 a3 a4 a5 a6 a7) : 0 < size := by
