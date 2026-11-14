@@ -5128,6 +5128,8 @@ theorem StatementsHaveType.applyParameters
       (StructuralSubstitution.TypeAdmissible.applyParameters substitution
         contextValid.exact contextValid.range elementWellFormed)
       (lengthInduction catalog contextValid)
+  · intro context base element baseType baseInduction catalog contextValid
+    exact .arrayLength (baseInduction catalog contextValid)
   · intro context catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction
@@ -12461,6 +12463,8 @@ theorem StatementsHaveType.applySubstitution
     exact .newArray (Substitution.arrayElementAllowed_apply _ allowed)
       (TypeAdmissible.applySubstitution contextValid.closes elementWellFormed)
       (lengthInduction targetContext catalog contextValid)
+  · intro context base element baseType baseInduction targetContext catalog contextValid
+    exact .arrayLength (baseInduction targetContext catalog contextValid)
   · intro context targetContext catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction

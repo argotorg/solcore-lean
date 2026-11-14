@@ -388,6 +388,13 @@ mutual
         (form_eq : node.form = .newArray element length)
         (lengthStages : HasStage source scope length lengthStage) :
         HasStage source scope id .deferred
+    | arrayLength
+        {scope : StageScope} {id base : ExpressionId} {node : ExpressionNode}
+        {baseStage : Stage}
+        (contains : SourceSemantics.ContainsExpression source id node)
+        (form_eq : node.form = .arrayLength base)
+        (baseStages : HasStage source scope base baseStage) :
+        HasStage source scope id .deferred
 
   /-- Pointwise expression classification in source order. -/
   inductive ExpressionsHaveStages (source : TypedSource) :

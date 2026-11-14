@@ -241,6 +241,7 @@ def applyExpressionForm (substitution : ParameterSubstitution) :
   | .proxy inner => .proxy (substitution.apply inner)
   | .index base index => .index base index
   | .newArray element length => .newArray (substitution.apply element) length
+  | .arrayLength base => .arrayLength base
 
 def applyPlaceResolution (substitution : ParameterSubstitution)
     (place : PlaceResolution) : PlaceResolution := {
@@ -468,7 +469,8 @@ private def expressionFormTypes : ExpressionForm → List Ty
   | .binary _ _ _
   | .conditional _ _ _
   | .member _ _ _
-  | .index _ _ => []
+  | .index _ _
+  | .arrayLength _ => []
 
 private def forItemTypes : ForItemForm → List Ty
   | .letDecl selectedBinder _ => [selectedBinder.scheme.body]
@@ -876,7 +878,8 @@ private def expressionChildTasks (variables : List TypeVarId)
   | .group inner
   | .unary _ inner
   | .member inner _ _
-  | .newArray _ inner => expressionTasks variables [inner]
+  | .newArray _ inner
+  | .arrayLength inner => expressionTasks variables [inner]
   | .tuple elements => expressionTasks variables elements
   | .binary left _ right
   | .index left right => expressionTasks variables [left, right]

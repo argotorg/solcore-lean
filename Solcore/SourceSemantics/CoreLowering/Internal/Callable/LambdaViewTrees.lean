@@ -1516,6 +1516,9 @@ local macro "transport_static" "(" recursor:term "," before:term "," after:term 
     (fun allowed wellFormed _ length h => by
       simp only [ExpressionForm.references, within_cons, within_nil, and_true] at h
       exact .newArray allowed wellFormed (length h))
+    (fun _ base h => by
+      simp only [ExpressionForm.references, within_cons, within_nil, and_true] at h
+      exact .arrayLength (base h))
     (fun _ _ => .nil _)
     (fun _ _ head tail h => by
       simp only [List.map_cons, within_cons] at h
@@ -1864,6 +1867,7 @@ private def typingChildren : ExpressionForm → List ExpressionId
   | .member base _ _ => [base]
   | .index base key => [base, key]
   | .newArray _ length => [length]
+  | .arrayLength base => [base]
   | _ => []
 
 private theorem atomic_free {form : ExpressionForm} (atomic : CompatibleExpressionLiterals.Atomic form) :
@@ -1947,6 +1951,9 @@ private theorem step {id : ExpressionId} {node : ExpressionNode}
     | newArray allowed wellFormed length =>
       intro children _
       exact .newArray allowed wellFormed (children _ (by simp [typingChildren]) _ _ length)
+    | arrayLength base =>
+      intro children _
+      exact .arrayLength (children _ (by simp [typingChildren]) _ _ base)
 
 
 include edited avoids unique in

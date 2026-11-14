@@ -312,6 +312,7 @@ local macro "transport_rooted" "(" recursor:term "," before:term ","
     (fun _ _ base key refs => .index (base (by rooted_live(refs))) (key (by rooted_live(refs))))
     (fun allowed wellFormed _ length refs =>
       .newArray allowed wellFormed (length (by rooted_live(refs))))
+    (fun _ base refs => .arrayLength (base (by rooted_live(refs))))
     (fun context _ => .nil context)
     (fun _ _ head tail refs => .cons (head (by rooted_live(refs))) (tail (by rooted_live(refs))))
     (fun type _ => .nil type)

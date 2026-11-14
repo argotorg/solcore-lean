@@ -223,6 +223,7 @@ private theorem expression_form_references {context : SourceSemantics.Context}
     · exact .expression base
     · exact expression_single key member
   | newArray _ _ length => exact expression_single length member
+  | arrayLength base => exact expression_single base member
 
 private theorem statement_form_references {control : ControlContext} {context final : SourceSemantics.Context}
     {form : StatementForm} (typed : Dynamic.StatementHasType.FormTyping source control context form final)

@@ -1388,6 +1388,19 @@ theorem analyzeExpressionFormWith_sound
           obtain ⟨finalValid, lengthStages⟩ :=
             expressionSound state length lengthStage nextState valid analyzed
           exact ⟨finalValid, .newArray contains form lengthStages⟩
+  | arrayLength base =>
+      simp only [analyzeExpressionFormWith, form] at success
+      cases analyzed : analyzeExpression state base with
+      | error problem =>
+          rw [analyzed] at success
+          cases success
+      | ok pair =>
+          rcases pair with ⟨baseStage, nextState⟩
+          rw [analyzed] at success
+          obtain ⟨rfl, rfl⟩ := success
+          obtain ⟨finalValid, baseStages⟩ :=
+            expressionSound state base baseStage nextState valid analyzed
+          exact ⟨finalValid, .arrayLength contains form baseStages⟩
 
 theorem analyzeStatementFormWith_sound
     (source : TypedSource) (id : StatementId) (node : StatementNode)

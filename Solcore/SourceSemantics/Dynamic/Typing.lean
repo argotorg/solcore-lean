@@ -1119,6 +1119,13 @@ theorem generalized_inv
 
 end CellWellTyped
 
+/-- Every word is canonical for `uint256`. -/
+theorem uint256_word_canonical (word : Core.Word) :
+    TypeSystem.FixedInteger.uint256.canonical word.val = true := by
+  have bound : word.val < 2 ^ 256 := word.isLt
+  show decide (word.val < 2 ^ 256) = true
+  exact decide_eq_true bound
+
 namespace ValuesHaveTypes
 
 /-- `n` copies of a value of one type have that type `n` times. -/

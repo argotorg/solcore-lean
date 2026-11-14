@@ -1100,6 +1100,12 @@ example {context : Context} {heap : Heap} (count : Nat) :
       (Ty.arrayObject .word) :=
   ValueHasType.arrayObject_replicate (.word _) count
 
+/-- A memory array's length is a word, which `uint256` admits whatever its
+count. -/
+example (context : Context) (heap : Heap) (count : Nat) :
+    ValueHasType context heap (.word (Core.Word.ofNatModulo count)) (.fixed .uint256) :=
+  .fixed _ (uint256_word_canonical _)
+
 end Solcore.Test.SourceSemanticsArrayObjects
 end
 

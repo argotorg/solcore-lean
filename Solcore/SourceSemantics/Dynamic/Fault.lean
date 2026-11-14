@@ -1602,6 +1602,14 @@ mutual
         (too_long : newArrayLengthLimit ≤ count.val) :
         ExpressionFormFaults program context evidence source environment before
           (.newArray element length) requirements coercions (.panic 0x41) after
+    | arrayLengthBase
+        {context evidence source environment before after base requirements coercions
+          reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionFaults program context evidence source environment
+          before base reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.arrayLength base) requirements coercions reason after
 
   /-- First fault in a left-to-right expression vector. -/
   inductive ExpressionsFault (program : Program) :

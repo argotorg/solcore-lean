@@ -797,6 +797,14 @@ mutual
                 (.some (ValueHasType.arrayObject_replicate zero_typed _)) allocates,
               (length_extension.trans default_extension).trans
                 (HeapTypesExtend.of_allocation allocates)⟩
+    | .arrayLength layout base_evaluates read stored => by
+        cases typing with
+        | arrayLength base_type =>
+            rcases preserveExpressionRec program_well_formed runtime
+                evidence_covers environment_agrees before_typed base_type
+                base_evaluates with
+              ⟨_, after_typed, extension⟩
+            exact ⟨.fixed _ (uint256_word_canonical _), after_typed, extension⟩
     termination_by structural evaluation
 
   private theorem preserveExpressionsRec

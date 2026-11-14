@@ -3357,6 +3357,13 @@ theorem preservesWith
               (.some (ValueHasType.arrayObject_replicate zero_typed count.val)) allocates,
             (length_extension.trans default_extension).trans
               (HeapTypesExtend.of_allocation allocates)⟩
+  | arrayLength base_type =>
+      cases evaluation with
+      | arrayLength layout base_evaluates read stored =>
+          rcases expression_preserves _ _ _ _ _ evidence_covers
+              environment_agrees before_typed base_type base_evaluates with
+            ⟨_, after_typed, extension⟩
+          exact ⟨.fixed _ (uint256_word_canonical _), after_typed, extension⟩
 
 end ExpressionFormEvaluates
 

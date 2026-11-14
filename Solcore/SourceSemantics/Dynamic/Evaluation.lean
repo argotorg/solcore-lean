@@ -800,6 +800,18 @@ mutual
         ExpressionFormEvaluates program context evidence source environment before
           (.newArray element length) requirements coercions
           (.arrayRef element location) after
+    /-- A memory array's length is the number of elements its cell holds. -/
+    | arrayLength
+        {context evidence source environment before after base requirements coercions
+          element location cell elements}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base (.arrayRef element location) after)
+        (read : Heap.Reads after location cell)
+        (stored : cell.value = some (.arrayObject element elements)) :
+        ExpressionFormEvaluates program context evidence source environment before
+          (.arrayLength base) requirements coercions
+          (.word (Core.Word.ofNatModulo elements.length)) after
 
   /-- Left-to-right evaluation of an expression vector. -/
   inductive ExpressionsEvaluate (program : Program) :
@@ -1756,6 +1768,7 @@ mutual
     | .newArray _ length_evaluates _ default allocates =>
         ((length_evaluates.initialization_extends).trans default.initialization_extends).trans
           (HeapInitializationExtend.of_allocation allocates)
+    | .arrayLength _ base_evaluates _ _ => base_evaluates.initialization_extends
 
   theorem ExpressionsEvaluate.initialization_extends {program : Program}
       {context : Context}

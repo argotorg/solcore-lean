@@ -638,6 +638,13 @@ mutual
           (.fixed .uint256)) :
         ExpressionFormHasRawType source context (.newArray element length)
           (TypeSystem.Ty.array element) (.ordinary [])
+    /-- A memory array's length is a `uint256`. -/
+    | arrayLength
+        {context : Context} {base : ExpressionId} {element : TypeSystem.Ty}
+        (base_type : ExpressionHasType source context base
+          (TypeSystem.Ty.array element)) :
+        ExpressionFormHasRawType source context (.arrayLength base) (.fixed .uint256)
+          (.ordinary [])
 
   /-- Pointwise expression typing in source order. -/
   inductive ExpressionsHaveTypes (source : TypedSource) :
@@ -1278,6 +1285,7 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
       .index baseInduction keyInduction)
     (fun allowed elementWellFormed _ lengthInduction =>
       .newArray allowed elementWellFormed lengthInduction)
+    (fun _ baseInduction => .arrayLength baseInduction)
     (fun _ => .nil _)
     (fun head tail headInduction tailInduction =>
       .cons headInduction tailInduction)
