@@ -347,8 +347,7 @@ wait for the native pipeline's contracts and ABI.
   (`validateArrayLiteral`), as upstream's `bool: Typedef<word>` fails. An unannotated `let`
   generalizes a literal's element type that is still open there, as it generalizes any open type, so
   in `let m = [];` no use fixes it, and finalization rejects that open type with
-  `operatorNotSupported "Typedef"`, whether the local is used or not; difference 8 names only the
-  unused case.
+  `operatorNotSupported "Typedef"`, whether the local is used or not (difference 8).
 - **Reads.** `a[i]` on an array or a slice takes `i` at `word` or one of the twelve types. An open
   literal index defaults to `uint256`, and the read has the element type. On a mapping, or on a base
   whose type is still open, `a[i]` keeps today's mapping rule. As built in step 3b, inference
@@ -485,8 +484,11 @@ functions over words, as row 1's fixture ports did.
 7. **`new`'s length is a `uint256`, an open literal included.** Upstream's checker passes a `word`
    length on to specialization (SC0405) and finds a `let`-bound literal length ambiguous (SC0299).
    Both are recorded in `questions.md`.
-8. **An unused `let m = [];` is ambiguous**, as any unconstrained type is in Lean. Upstream accepts
-   it.
+8. **An unannotated `let m = [];` is rejected, used or not.** The `let` generalizes the literal's
+   open element type, as Lean generalizes any open type at a `let`, so no use fixes it, and
+   finalization rejects it with `operatorNotSupported "Typedef"`, as an open `Typedef` call is. An
+   annotation (`let m: uint256[] = [];`) or an expected type (`return [];`, an argument) gives the
+   type. Upstream accepts it and takes the type from its uses.
 9. **The suffix room is 127 at every depth.** Upstream's room is 128 less the type's depth, so it
    is smaller inside `<…>`, `(…)` or `@`. Lean bounds no type depth, and counts only the suffixes
    on one type.
@@ -521,9 +523,10 @@ functions over words, as row 1's fixture ports did.
     lift this, and nothing schedules it.
 
 Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13, 13 and 14 on
-2026-11-14, and 15 on 2026-11-15. Differences 9 to 13 change only a diagnostic or the room of a
-resource limit, and 14 and 15 only reject some programs that upstream accepts. None of them changes
-what an accepted program means. Difference 1 follows decision 3.
+2026-11-14, and 15 on 2026-11-15, when 8 was also widened from an unused `let m = [];` to any
+unannotated one. Differences 9 to 13 change only a diagnostic or the room of a resource limit, and
+8, 14 and 15 only reject some programs that upstream accepts. None of them changes what an accepted
+program means. Difference 1 follows decision 3.
 
 ## Steps
 
