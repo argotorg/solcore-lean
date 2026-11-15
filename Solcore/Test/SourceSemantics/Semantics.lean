@@ -1213,6 +1213,25 @@ example (context : Context) (heapTyped : HeapWellTyped context arrayHeap) :
     (.slice (by decide) (.array (.intro .head) rfl rfl)
       : ViewReads arrayHeap (.arraySlice (.arrayRef .word ⟨0⟩) 1 1) 0 (.word two))
 
+/-- `toArray(s)` copies a slice's elements in order. -/
+example : ViewCopies arrayHeap (.arraySlice (.arrayRef .word ⟨0⟩) 0 2) 0 2
+    [.word one, .word two] :=
+  .cons (.slice (by decide) (.array (.intro .head) rfl rfl))
+    (.cons (.slice (by decide) (.array (.intro .head) rfl rfl)) .nil)
+
+/-- The copy's elements have the slice's element type, so the fresh object is
+typed at it. -/
+example (context : Context) (heapTyped : HeapWellTyped context arrayHeap) :
+    ValueHasType context arrayHeap (.arrayObject .word [.word one, .word two])
+      (Ty.arrayObject .word) :=
+  ValueHasType.arrayObject_of_values
+    (ValueHasType.viewElements (.arraySlice (.arrayRef (.intro .head) rfl) rfl)
+      (.slice (.array _)) heapTyped
+      (.cons (.slice (by decide) (.array (.intro .head) rfl rfl))
+        (.cons (.slice (by decide) (.array (.intro .head) rfl rfl)) .nil)
+        : ViewCopies arrayHeap (.arraySlice (.arrayRef .word ⟨0⟩) 0 2) 0 2
+          [.word one, .word two]))
+
 end Solcore.Test.SourceSemanticsArrayObjects
 end
 

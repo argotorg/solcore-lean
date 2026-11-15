@@ -5187,6 +5187,8 @@ theorem StatementsHaveType.applyParameters
     simp only [List.map_replicate] at bounds
     exact .arraySlice (ParameterSubstitution.arraySliceBaseAllowed_apply substitution allowed)
       (baseInduction catalog contextValid) bounds
+  · intro context element slice baseType sliceTypeProof view sliceInduction catalog contextValid
+    exact .toArray (sliceInduction catalog contextValid) (view.applyParameters substitution)
   · intro context catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction
@@ -12569,6 +12571,9 @@ theorem StatementsHaveType.applySubstitution
     simp only [List.map_replicate] at bounds
     exact .arraySlice (Substitution.arraySliceBaseAllowed_apply _ allowed)
       (baseInduction targetContext catalog contextValid) bounds
+  · intro context element slice baseType sliceTypeProof view sliceInduction targetContext catalog
+      contextValid
+    exact .toArray (sliceInduction targetContext catalog contextValid) (view.applySubstitution _)
   · intro context targetContext catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction

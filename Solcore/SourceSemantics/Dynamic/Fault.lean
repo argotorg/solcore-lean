@@ -1709,6 +1709,14 @@ mutual
         (out_of_bounds : last < first ∨ count < last) :
         ExpressionFormFaults program context evidence source environment before
           (.arraySlice base start stop) requirements coercions (.panic 0x32) after
+    | toArraySlice
+        {context evidence source environment before after element slice requirements
+          coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionFaults program context evidence source environment
+          before slice reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.toArray element slice) requirements coercions reason after
 
   /-- First fault in a left-to-right expression vector. -/
   inductive ExpressionsFault (program : Program) :

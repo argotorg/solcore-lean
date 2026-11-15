@@ -1526,6 +1526,9 @@ local macro "transport_static" "(" recursor:term "," before:term "," after:term 
     (fun allowed _ _ base bounds h => by
       simp only [ExpressionForm.references, within_cons] at h
       exact .arraySlice allowed (base h.1) (bounds h.2))
+    (fun _ view slice h => by
+      simp only [ExpressionForm.references, within_cons, within_nil, and_true] at h
+      exact .toArray (slice h) view)
     (fun _ _ => .nil _)
     (fun _ _ head tail h => by
       simp only [List.map_cons, within_cons] at h
@@ -1881,6 +1884,7 @@ private def typingChildren : ExpressionForm → List ExpressionId
   | .arrayIndex base key => [base, key]
   | .arrayLiteral _ elements => elements
   | .arraySlice base start stop => base :: (start.toList ++ stop.toList)
+  | .toArray _ slice => [slice]
   | _ => []
 
 private theorem atomic_free {form : ExpressionForm} (atomic : CompatibleExpressionLiterals.Atomic form) :
@@ -1980,6 +1984,9 @@ private theorem step {id : ExpressionId} {node : ExpressionNode}
       exact .arraySlice allowed (children _ (by simp [typingChildren]) _ _ base)
         (types (fun child member => children child
           (by simpa only [typingChildren] using List.mem_cons_of_mem _ member)) bounds)
+    | toArray slice view =>
+      intro children _
+      exact .toArray (children _ (by simp [typingChildren]) _ _ slice) view
 
 
 include edited avoids unique in

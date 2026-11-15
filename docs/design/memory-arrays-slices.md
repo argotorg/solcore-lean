@@ -445,7 +445,13 @@ wait for the native pipeline's contracts and ABI.
     `s ≤ e ≤ length`, where the length is an array cell's element count or a slice's own
     (`ViewLength`), it holds the base from `s` on for `e − s` elements. It faults with the base's
     fault, a bound's, a bound that is not a word, or `0x32` (`arraySliceOutOfBounds`).
-  - The length rules read the object or the slice, and `toArray(s)` allocates a copy.
+  - The length rules read the object or the slice, and `toArray(s)` allocates a copy. As built in
+    step 6e, `toArray(s)` is its own typed form (`ExpressionForm.toArray`), which evaluates the
+    slice, reads its elements in order (`ViewCopies`) and then allocates a fresh array's cell
+    holding them, as the literal does: no element can observe the fresh cell, so where the
+    allocation falls changes no result. Its result is an array of the slice's element type
+    (`ViewElement`), and it faults only with the slice's fault, since a slice's positions lie within
+    its base's bounds once it is made.
 - **Preservation.** A reference has the type `T[]` when the cell it names has the type
   `arrayObject T`, as Core's runtime typing reads a `cellRef`'s cell in its world, and an object's
   elements each have its element type. A later heap keeps every cell's type, so a reference keeps
@@ -649,7 +655,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 6b | Slices: the slice value, which holds its base value, its start and its length, and its typing in a heap, with the typing's laws; no expression makes one yet | 15–20 files, +200–400/−10–20; measured at 9 files, +101/−10 | none |
 | 6c | Slices: the typed form of `a[s:e]`, `a[s:]`, `a[:e]` and `a[:]` with its static rule, evaluation, faults with `0x32` from its bounds, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–550/−5–15; measured at 27 files, +361/−9 | none |
 | 6d | Slices: reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules, with their faults, sized copies, stage and preservation | 28–32 files, +350–550/−5–15; measured at 15 files, +203/−102 | none |
-| 6e | Slices: the typed form of `toArray(s)` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +300–500/−5–15 | none |
+| 6e | Slices: the typed form of `toArray(s)` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +300–500/−5–15; measured at 26 files, +207/−7 | none |
 | 6f | Slices: inference's typing of the four slice forms on an array or a slice, with `uint256` bounds | 24–30 files, +800–1,100/−20–50 | none |
 | 6g | Slices: inference's typing of reads, lengths and `toArray(s)` on slices | 18–30 files, +600–1,000/−25–55 | none |
 | 6h | Slices: the lowering, a slice as a Core product of its base, its start and its length, and `toArray(s)`'s copy | 4–9 files, +200–400/−10–20 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |

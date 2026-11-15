@@ -431,6 +431,19 @@ mutual
         ExpressionFormEvaluates program (stepSize [size_base_evaluates, size_bounds_evaluate])
           context evidence source environment before (.arraySlice base start stop) requirements
           coercions (.arraySlice baseValue first (last - first)) after
+    | toArray
+        {size_slice_evaluates : Nat}
+        {context evidence source environment before middle after element slice
+          requirements coercions view start length values location}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (slice_evaluates : ExpressionEvaluates program size_slice_evaluates context evidence
+          source environment before slice (.arraySlice view start length) middle)
+        (copies : ViewCopies middle (.arraySlice view start length) 0 length values)
+        (allocates : Heap.Allocates middle (TypeSystem.Ty.arrayObject element)
+          (some (.arrayObject element values)) location after) :
+        ExpressionFormEvaluates program (stepSize [size_slice_evaluates]) context evidence
+          source environment before (.toArray element slice) requirements coercions
+          (.arrayRef element location) after
 
   inductive ExpressionsEvaluate (program : Program) : Nat →
       Context → EvidenceEnvironment → TypedSource → Dynamic.Environment →
@@ -1290,6 +1303,8 @@ theorem ExpressionFormEvaluates.sound {program : Program} {size : Nat} {a0 : Con
   | .arraySlice layout base_evaluates bounds_evaluate counted chosen ordered within =>
     exact .arraySlice layout (ExpressionEvaluates.sound base_evaluates)
       (ExpressionsEvaluate.sound bounds_evaluate) counted chosen ordered within
+  | .toArray layout slice_evaluates copies allocates =>
+    exact .toArray layout (ExpressionEvaluates.sound slice_evaluates) copies allocates
 termination_by structural trace
 
 theorem ExpressionsEvaluate.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
@@ -1628,6 +1643,9 @@ theorem ExpressionFormEvaluates.has_size {program : Program} {a0 : Context} {a1 
     obtain ⟨size_bounds_evaluate, bounds_evaluate⟩ :=
       ExpressionsEvaluate.has_size bounds_evaluate
     exact ⟨_, .arraySlice layout base_evaluates bounds_evaluate counted chosen ordered within⟩
+  | .toArray layout slice_evaluates copies allocates =>
+    obtain ⟨size_slice_evaluates, slice_evaluates⟩ := ExpressionEvaluates.has_size slice_evaluates
+    exact ⟨_, .toArray layout slice_evaluates copies allocates⟩
 termination_by structural trace
 
 theorem ExpressionsEvaluate.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
@@ -2022,6 +2040,8 @@ theorem ExpressionFormEvaluates.children_below {program : Program} {size : Nat} 
     exact ⟨[size_elements_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
   | @arraySlice size_base_evaluates size_bounds_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_base_evaluates, size_bounds_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
+  | @toArray size_slice_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_slice_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
 
 theorem ExpressionsEvaluate.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
     (trace : ExpressionsEvaluate program size a0 a1 a2 a3 a4 a5 a6 a7) : 0 < size := by
@@ -3045,6 +3065,15 @@ mutual
         ExpressionFormFaults program (stepSize [size_base_evaluates, size_bounds_evaluate])
           context evidence source environment before (.arraySlice base start stop) requirements
           coercions (.panic 0x32) after
+    | toArraySlice
+        {size_fault : Nat}
+        {context evidence source environment before after element slice requirements
+          coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionFaults program size_fault context evidence source environment
+          before slice reason after) :
+        ExpressionFormFaults program (stepSize [size_fault]) context evidence source environment
+          before (.toArray element slice) requirements coercions reason after
 
   inductive ExpressionsFault (program : Program) : Nat →
       Context → EvidenceEnvironment → TypedSource → Dynamic.Environment →
@@ -4168,6 +4197,8 @@ theorem ExpressionFormFaults.sound {program : Program} {size : Nat} {a0 : Contex
   | .arraySliceOutOfBounds layout base_evaluates bounds_evaluate counted chosen out_of_bounds =>
     exact .arraySliceOutOfBounds layout (ExpressionEvaluates.sound base_evaluates)
       (ExpressionsEvaluate.sound bounds_evaluate) counted chosen out_of_bounds
+  | .toArraySlice layout fault =>
+    exact .toArraySlice layout (ExpressionFaults.sound fault)
 termination_by structural trace
 
 theorem ExpressionsFault.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
@@ -4656,6 +4687,9 @@ theorem ExpressionFormFaults.has_size {program : Program} {a0 : Context} {a1 : E
       ExpressionsEvaluate.has_size bounds_evaluate
     exact ⟨_, .arraySliceOutOfBounds layout base_evaluates bounds_evaluate counted chosen
       out_of_bounds⟩
+  | .toArraySlice layout fault =>
+    obtain ⟨size_fault, fault⟩ := ExpressionFaults.has_size fault
+    exact ⟨_, .toArraySlice layout fault⟩
 termination_by structural trace
 
 theorem ExpressionsFault.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
@@ -5187,6 +5221,8 @@ theorem ExpressionFormFaults.children_below {program : Program} {size : Nat} {a0
     exact ⟨[size_base_evaluates, size_bounds_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
   | @arraySliceOutOfBounds size_base_evaluates size_bounds_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_base_evaluates, size_bounds_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
+  | @toArraySlice size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩
 
 theorem ExpressionsFault.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
     (trace : ExpressionsFault program size a0 a1 a2 a3 a4 a5 a6 a7) : 0 < size := by

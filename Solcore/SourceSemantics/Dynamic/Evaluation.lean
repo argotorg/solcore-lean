@@ -494,6 +494,15 @@ inductive ViewOutOfBounds (heap : Heap) : Value → Nat → Prop where
       (inner : ViewOutOfBounds heap base (start + position)) :
       ViewOutOfBounds heap (.arraySlice base start length) position
 
+/-- The elements of a memory array or of a slice from a position on, `count` of
+them in order, as std's `toArray` reads them. -/
+inductive ViewCopies (heap : Heap) (view : Value) : Nat → Nat → List Value → Prop where
+  | nil {position : Nat} : ViewCopies heap view position 0 []
+  | cons {position count : Nat} {value : Value} {values : List Value}
+      (reads : ViewReads heap view position value)
+      (rest : ViewCopies heap view (position + 1) count values) :
+      ViewCopies heap view position (count + 1) (value :: values)
+
 /-- A slice's first and last positions in a base of `count` elements, from the
 words its present bounds evaluate to: an absent start is 0 and an absent stop
 is `count`, as std's `sliceFrom`, `sliceTo` and `sliceAll` fill them. -/
@@ -914,6 +923,21 @@ mutual
         ExpressionFormEvaluates program context evidence source environment before
           (.arraySlice base start stop) requirements coercions
           (.arraySlice baseValue first (last - first)) after
+    /-- `toArray(s)` reads the slice's elements in order, then allocates a fresh
+    array's cell holding them, as std's `toArray` copies them into `newArray(n)`:
+    no element can observe the fresh cell, so where the allocation falls changes
+    no result. -/
+    | toArray
+        {context evidence source environment before middle after element slice
+          requirements coercions view start length values location}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (slice_evaluates : ExpressionEvaluates program context evidence source
+          environment before slice (.arraySlice view start length) middle)
+        (copies : ViewCopies middle (.arraySlice view start length) 0 length values)
+        (allocates : Heap.Allocates middle (TypeSystem.Ty.arrayObject element)
+          (some (.arrayObject element values)) location after) :
+        ExpressionFormEvaluates program context evidence source environment before
+          (.toArray element slice) requirements coercions (.arrayRef element location) after
 
   /-- Left-to-right evaluation of an expression vector. -/
   inductive ExpressionsEvaluate (program : Program) :
@@ -1904,6 +1928,9 @@ mutual
           (HeapInitializationExtend.of_allocation allocates)
     | .arraySlice _ base_evaluates bounds_evaluate _ _ _ _ =>
         (base_evaluates.initialization_extends).trans bounds_evaluate.initialization_extends
+    | .toArray _ slice_evaluates _ allocates =>
+        (slice_evaluates.initialization_extends).trans
+          (HeapInitializationExtend.of_allocation allocates)
 
   theorem ExpressionsEvaluate.initialization_extends {program : Program}
       {context : Context}

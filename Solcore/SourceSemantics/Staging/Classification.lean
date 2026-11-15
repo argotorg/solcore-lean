@@ -419,6 +419,13 @@ mutual
         (childStages : ExpressionsHaveStages source scope
           (base :: (start.toList ++ stop.toList)) stages) :
         HasStage source scope id .deferred
+    | toArray
+        {scope : StageScope} {id slice : ExpressionId} {node : ExpressionNode}
+        {element : TypeSystem.Ty} {sliceStage : Stage}
+        (contains : SourceSemantics.ContainsExpression source id node)
+        (form_eq : node.form = .toArray element slice)
+        (sliceStages : HasStage source scope slice sliceStage) :
+        HasStage source scope id .deferred
 
   /-- Pointwise expression classification in source order. -/
   inductive ExpressionsHaveStages (source : TypedSource) :

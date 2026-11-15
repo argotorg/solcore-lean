@@ -1651,6 +1651,20 @@ theorem viewElement
         | slice inner => exact ih base_typed inner
       · cases element_of <;> simp [TypeSystem.Ty.array, TypeSystem.Ty.arraySlice] at equal
 
+/-- The elements a memory array or a slice reads from a position on have the
+view's element type in a well-typed heap. -/
+theorem viewElements
+    {context : Context} {heap : Heap} {view : Value} {viewType element : Ty}
+    {position count : Nat} {values : List Value}
+    (typed : ValueHasType context heap view viewType)
+    (element_of : ViewElement viewType element)
+    (heap_typed : HeapWellTyped context heap)
+    (copies : ViewCopies heap view position count values) :
+    ValuesHaveTypes context heap values (List.replicate count element) := by
+  induction copies with
+  | nil => exact .nil
+  | cons reads _ ih => exact .cons (typed.viewElement element_of heap_typed reads) ih
+
 /-- Catalog validity rules out confusing a nominal constructor result with a
 staging wrapper, so constructor payload typing can be recovered exactly. -/
 theorem constructedPayloads
@@ -3542,6 +3556,16 @@ theorem preservesWith
             ⟨_, after_typed, bounds_extension⟩
           exact ⟨.arraySlice (base_typed.mono bounds_extension) allowed, after_typed,
             base_extension.trans bounds_extension⟩
+  | toArray slice_type view =>
+      cases evaluation with
+      | toArray layout slice_evaluates copies allocates =>
+          rcases expression_preserves _ _ _ _ _ evidence_covers
+              environment_agrees before_typed slice_type slice_evaluates with
+            ⟨slice_typed, middle_typed, extension⟩
+          exact ⟨.arrayRef allocates.reads_new rfl,
+            middle_typed.allocate (.some (ValueHasType.arrayObject_of_values
+              (slice_typed.viewElements (.slice view) middle_typed copies))) allocates,
+            extension.trans (HeapTypesExtend.of_allocation allocates)⟩
 
 end ExpressionFormEvaluates
 

@@ -319,6 +319,7 @@ local macro "transport_rooted" "(" recursor:term "," before:term ","
       .arrayLiteral wellFormed (elements (by rooted_live(refs))))
     (fun allowed _ _ base bounds refs =>
       .arraySlice allowed (base (by rooted_live(refs))) (bounds (by rooted_live(refs))))
+    (fun _ view slice refs => .toArray (slice (by rooted_live(refs))) view)
     (fun context _ => .nil context)
     (fun _ _ head tail refs => .cons (head (by rooted_live(refs))) (tail (by rooted_live(refs))))
     (fun type _ => .nil type)

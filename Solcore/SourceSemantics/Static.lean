@@ -677,6 +677,15 @@ mutual
           (List.replicate (start.toList ++ stop.toList).length (.fixed .uint256))) :
         ExpressionFormHasRawType source context (.arraySlice base start stop)
           (TypeSystem.Ty.arraySlice baseType) (.ordinary [])
+    /-- `toArray(s)`: a fresh memory array of a slice's elements. -/
+    | toArray
+        {context : Context} {element : TypeSystem.Ty} {slice : ExpressionId}
+        {baseType : TypeSystem.Ty}
+        (slice_type : ExpressionHasType source context slice
+          (TypeSystem.Ty.arraySlice baseType))
+        (slice_view : ViewElement baseType element) :
+        ExpressionFormHasRawType source context (.toArray element slice)
+          (TypeSystem.Ty.array element) (.ordinary [])
 
   /-- Pointwise expression typing in source order. -/
   inductive ExpressionsHaveTypes (source : TypedSource) :
@@ -1337,6 +1346,7 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
       .arrayLiteral elementWellFormed elementsInduction)
     (fun allowed _ _ baseInduction boundsInduction =>
       .arraySlice allowed baseInduction boundsInduction)
+    (fun _ view sliceInduction => .toArray sliceInduction view)
     (fun _ => .nil _)
     (fun head tail headInduction tailInduction =>
       .cons headInduction tailInduction)

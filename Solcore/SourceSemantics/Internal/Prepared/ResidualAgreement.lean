@@ -294,6 +294,7 @@ private def expressionTypes : ExpressionForm → List Ty
   | .proxy inner => [inner]
   | .newArray element _ => [element]
   | .arrayLiteral element _ => [element]
+  | .toArray element _ => [element]
   | .literal _
   | .group _
   | .tuple _
@@ -503,6 +504,8 @@ private theorem expression_congr {left right : Substitution} {form : ExpressionF
     exact congrArg (fun element => ExpressionForm.newArray element length) same.head
   | arrayLiteral _ elements =>
     exact congrArg (fun element => ExpressionForm.arrayLiteral element elements) same.head
+  | toArray _ slice =>
+    exact congrArg (fun element => ExpressionForm.toArray element slice) same.head
   | literal | group | tuple | unary | binary | conditional | member | index | arrayLength
   | arrayIndex | arraySlice => rfl
 

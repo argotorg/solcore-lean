@@ -1460,6 +1460,19 @@ theorem analyzeExpressionFormWith_sound
               (toSemanticScope environment) analyzeExpression expressionSound
               (base :: (start.toList ++ stop.toList)) state nextState stages valid analyzed
           exact ⟨finalValid, .arraySlice contains form childStages⟩
+  | toArray element slice =>
+      simp only [analyzeExpressionFormWith, form] at success
+      cases analyzed : analyzeExpression state slice with
+      | error problem =>
+          rw [analyzed] at success
+          cases success
+      | ok pair =>
+          rcases pair with ⟨baseStage, nextState⟩
+          rw [analyzed] at success
+          obtain ⟨rfl, rfl⟩ := success
+          obtain ⟨finalValid, baseStages⟩ :=
+            expressionSound state slice baseStage nextState valid analyzed
+          exact ⟨finalValid, .toArray contains form baseStages⟩
 
 theorem analyzeStatementFormWith_sound
     (source : TypedSource) (id : StatementId) (node : StatementNode)
