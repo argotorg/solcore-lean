@@ -5516,6 +5516,82 @@ private def elementWriteWorkspace : Workspace.RawWorkspace := workspaceOf [
   "    return m[1];",
   "}"]
 
+/-- Row 4's step 5a-iii-b: upstream's mem-array fixture's `setGet`, `fillAndSum`, `nestedReplace`
+and `alias`, and memory-array-abi's `ret`, `sum` and `grid`, as upstream wrote them, with the
+contracts' methods as functions. The last three take or give arrays, so word wrappers call them:
+`retAt(n, i)` and `retLength(n)` read `ret(n)`, `sumFour(a, b, c, d)` and `sumNone()` pass `sum`
+a literal, and `gridLength(n)`, `gridRowLength(n, i)` and `gridAt(n, i, j)` read `grid(n)`. -/
+private def memArrayWriteWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function setGet(n: uint256, i: uint256, v: uint256) returns (uint256) {",
+  "    let m: uint256[] = new uint256[](n);",
+  "    m[i] = v;",
+  "    return m[i];",
+  "}",
+  "function fillAndSum(n: uint256) returns (uint256) {",
+  "    let m: uint256[] = new uint256[](n);",
+  "    for (let i: uint256 = 0; i < n; i += 1) {",
+  "        m[i] = i * 5;",
+  "    }",
+  "    let total: uint256 = 0;",
+  "    for (let i: uint256 = 0; i < n; i += 1) {",
+  "        total += m[i];",
+  "    }",
+  "    return total;",
+  "}",
+  "function nestedReplace(n: uint256, v: uint256) returns (uint256) {",
+  "    let rows: uint256[][] = new uint256[][](2);",
+  "    let row: uint256[] = new uint256[](n);",
+  "    row[n - 1] = v;",
+  "    rows[1] = row;",
+  "    return rows[1][n - 1] + Length.length(rows[0]);",
+  "}",
+  "function alias(v: uint256) returns (uint256) {",
+  "    let m: uint256[] = [uint256(1), uint256(2)];",
+  "    let n: uint256[] = m;",
+  "    n[1] = v;",
+  "    return m[1];",
+  "}",
+  "function ret(n: uint256) returns (uint256[]) {",
+  "    let a = new uint256[](n);",
+  "    for (let i: uint256 = 0; i < n; i += 1) {",
+  "        a[i] = i * 2;",
+  "    }",
+  "    return a;",
+  "}",
+  "function sum(xs: uint256[]) returns (uint256) {",
+  "    let s: uint256 = 0;",
+  "    for (let i: uint256 = 0; i < xs.length; i += 1) {",
+  "        s += xs[i];",
+  "    }",
+  "    return s;",
+  "}",
+  "function grid(n: uint256) returns (uint256[][]) {",
+  "    let g = new uint256[][](n);",
+  "    g[n - 1] = new uint256[](1);",
+  "    return g;",
+  "}",
+  "function retAt(n: uint256, i: uint256) returns (uint256) {",
+  "    return ret(n)[i];",
+  "}",
+  "function retLength(n: uint256) returns (uint256) {",
+  "    return ret(n).length;",
+  "}",
+  "function sumFour(a: uint256, b: uint256, c: uint256, d: uint256) returns (uint256) {",
+  "    return sum([a, b, c, d]);",
+  "}",
+  "function sumNone() returns (uint256) {",
+  "    return sum([]);",
+  "}",
+  "function gridLength(n: uint256) returns (uint256) {",
+  "    return grid(n).length;",
+  "}",
+  "function gridRowLength(n: uint256, i: uint256) returns (uint256) {",
+  "    return grid(n)[i].length;",
+  "}",
+  "function gridAt(n: uint256, i: uint256, j: uint256) returns (uint256) {",
+  "    return grid(n)[i][j];",
+  "}"]
+
 /-- The source semantics and the lowering reject the same first length with `Panic(0x41)`. -/
 example : Solcore.SourceSemantics.Dynamic.newArrayLengthLimit =
     SourceCoreDataExpressions.arrayLengthLimit := rfl
@@ -5528,7 +5604,10 @@ array, and a read from the length on, a negative `int8` index's word included, p
 `#[(4) -> 4]`: literals keep their elements in order, a literal returned from a call, a nested
 literal and a call result's length. Then plain element writes: a nested write changes only its
 row, and an element place panics with `0x32` from its array's length on, before its right side
-runs. -/
+runs. Then mem-array's `#[(3, 1, 99) -> 99]`, `#[(3, 0, 7) -> 7]`, `#[(2, 5, 1) -> 0x32]`,
+`#[(4) -> 30]`, `#[(4, 9) -> 9]` and `#[(8) -> 8]`, and memory-array-abi's `ret(3) -> [0,2,4]`,
+`ret(0) -> []`, `sum([1,2,3,4]) -> 10`, `sum([]) -> 0` and `grid(2) -> [[],[0]]` through their
+wrappers. -/
 def runUpstreamArrayFixtures : IO Unit := do
   let program ← get "array fixture check" (checkProgram arrayFixtureWorkspace)
   let names := ["newLen", "oversized", "nested", "defaultZero", "nestedEmpty", "signedIndex"]
@@ -5592,7 +5671,30 @@ def runUpstreamArrayFixtures : IO Unit := do
   for arguments in [[2, 0, 1], [0, 2, 1]] do
     writeSession ← panics writeSession (← writeKey 1) (arguments.map word) SourceCorePanics.outOfBounds
       s!"writeBack({arguments})"
-  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths; a nested element write changes only its row, and an element place from the length on panics with 0x32 before its right side"
+  let portProgram ← get "mem-array write fixture check" (checkProgram memArrayWriteWorkspace)
+  let portNames := ["setGet", "fillAndSum", "nestedReplace", "alias", "retAt", "retLength",
+    "sumFour", "sumNone", "gridLength", "gridRowLength", "gridAt"]
+  let portSeeds ← portNames.mapM (seed portProgram)
+  let portCompiled ← get "mem-array write fixture compilation"
+    (compile memArrayWriteWorkspace portSeeds
+      {specializationBudget := 256, compilationFuel := 1000})
+  let portKey (index : Nat) : IO Key := match portCompiled.keys[index]? with
+    | some key => pure key
+    | none => throw (IO.userError "mem-array write fixture root missing")
+  let mut portSession ← boot (← portCompiled.open)
+  let portCases : List (Nat × List Nat × Nat) :=
+    [(0, [3, 1, 99], 99), (0, [3, 0, 7], 7), (1, [4], 30), (2, [4, 9], 9), (3, [8], 8),
+      (4, [3, 0], 0), (4, [3, 1], 2), (4, [3, 2], 4), (5, [3], 3), (5, [0], 0),
+      (6, [1, 2, 3, 4], 10), (7, [], 0), (8, [2], 2), (9, [2, 0], 0), (9, [2, 1], 1),
+      (10, [2, 1, 0], 0)]
+  for (index, arguments, expected) in portCases do
+    let completed ← execute portSession (← portKey index) (arguments.map word)
+    require (completed.value == word expected)
+      s!"{portNames[index]!}({arguments}) gave {reprStr completed.value}"
+    portSession := completed.session
+  let _ ← panics portSession (← portKey 0) [word 2, word 5, word 1] SourceCorePanics.outOfBounds
+    "setGet(2, 5, 1)"
+  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths; a nested element write changes only its row, and an element place from the length on panics with 0x32 before its right side; mem-array's setGet, fillAndSum, nestedReplace and alias as upstream wrote them give the fixture's elements and sums, with 0x32 from the length on, and memory-array-abi's ret, sum and grid give the fixture's arrays through word wrappers"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)

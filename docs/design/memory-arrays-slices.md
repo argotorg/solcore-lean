@@ -480,6 +480,17 @@ wait for the native pipeline's contracts and ABI.
 A root whose signature mentions an array or a slice is rejected. Tests reach arrays through
 functions over words, as row 1's fixture ports did.
 
+As built in step 5a-iii-b, the array fixtures test runs mem-array's `setGet`, `fillAndSum`,
+`nestedReplace` and `alias` as upstream wrote them. It runs memory-array-abi's `ret`, `sum` and
+`grid` as upstream wrote them too, behind word wrappers, since a root's signature takes no array:
+`retAt(n, i)` and `retLength(n)` read `ret(n)`; `sumFour(a, b, c, d)` and `sumNone()` pass `sum` the
+literals `[a, b, c, d]` and `[]`; and `gridLength(n)`, `gridRowLength(n, i)` and `gridAt(n, i, j)`
+read `grid(n)`. The wrappers change only how an array arrives, a literal of word arguments instead
+of the ABI's decoding, and how one leaves, read back by index or length instead of ABI-encoded. So
+the fixture's `ret(3) -> [0,2,4]` is checked as 0, 2 and 4 at indexes 0 to 2 and length 3,
+`ret(0) -> []` as length 0, `sum([1,2,3,4]) -> 10` and `sum([]) -> 0` as those sums, and
+`grid(2) -> [[],[0]]` as length 2, rows of lengths 0 and 1, and 0 at `[1][0]`.
+
 ### Outside row 4's Lean side
 
 - Storage arrays, so no `0x31`; calldata arrays; and `T[]` in the ABI. These need the native
@@ -600,7 +611,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 5a-i | Plain element writes: the typed element place `p[i]` (`PlaceProjection.element`), with its static rule, its resolution to the array object's cell, its five faults, `0x32` from the length on before the right side, sized copies, stage and preservation, which no source produces yet | 30–45 files, +500–900/−10–60; measured at 58 files, +890/−65 | none |
 | 5a-ii | Plain element writes: inference's typing of `a[i] = v` on a memory array, a nested place such as `a[i][j] = v` included, whose index finalization checks as a read's; a compound assignment or an in-place `~` to an element stays rejected | 40–60 files, +1,300–2,200/−150–400; measured at 36 files, +1,129/−647 | none |
 | 5a-iii-a | Plain element writes: the lowering, with `0x32` before the right side, the fault-site pass's case and the element-freeness that the statement meaning proofs take | 4–8 files, +200–400/−5–30 at first; measured at 55 files, +706/−261 | none |
-| 5a-iii-b | Plain element writes: the ports | 1–2 files, +100–200 | setGet(n, i, v), fillAndSum(n), nestedReplace(n, v), alias(v); ret(n), sum(xs), grid(n) adapted |
+| 5a-iii-b | Plain element writes: the ports | 1–2 files, +100–200; measured at 1 file, +104/−2 | setGet(n, i, v), fillAndSum(n), nestedReplace(n, v), alias(v); ret(n), sum(xs), grid(n) adapted |
 | 5b | Compound assignments to an element, with in-place `~` and the unchecked forms, after decision 3 | 25–40 files, +600–1,100/−50–150 | compound(v); echo(xs) adapted |
 | 6 | Slices and `toArray(s)`, in eight parts: 6a, the slice type `arraySlice<B>`, its formation and its resolution in annotations; 6b, the slice value and its typing in a heap; 6c, the slice's typed form, with `0x32` from its bounds; 6d, reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules; 6e, `toArray(s)`'s typed form; 6f, inference of the four slice forms, with `uint256` bounds; 6g, inference of reads, lengths and `toArray(s)` on slices; 6h, the lowering | 170–215 files, +3,100–5,000/−100–250 at its first measure; estimated at 45–65 files, +1,000–1,400/−200–400 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
