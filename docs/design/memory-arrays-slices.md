@@ -19,7 +19,8 @@ It records:
 - the decisions still open.
 
 Decisions 1, 2, 4, 5 and 6 were made on 2026-11-13, each as recommended. Decision 3 is with the
-user, and step 5 waits for its answer ([open decisions](#open-decisions)).
+user, and step 5b, compound assignments to an element, waits for its answer
+([open decisions](#open-decisions)); 5a, plain element writes, does not.
 
 ## Upstream at `e2eef194`
 
@@ -553,20 +554,24 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 4a | Literals: the typed form of `[e₀, …, eₙ₋₁]` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–500/−5–15; measured at 27 files, +192/−6 | none |
 | 4b | Literals: inference's typing of `[e₀, …, eₙ₋₁]` at one element type, with `[]` taking it from the expected type, open literal elements defaulting to `uint256` and finalization's check of the element type | 26–34 files, +900–1,300/−30–80; measured at 24 files, +1,005/−19 | none |
 | 4c | Literals: the lowering | 4–7 files, +150–300/−5–20; measured at 3 files, +91/−3 | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
-| 5 | Element writes and compound assignments, with the place checked before the right side | 55–72 files, +1,200–1,700/−300–450 | setGet(n, i, v), fillAndSum(n), compound(v), nestedReplace(n, v), alias(v); ret(n), sum(xs), echo(xs), grid(n) adapted |
-| 6 | Slices and `toArray(s)` | 45–65 files, +1,000–1,400/−200–400 | array-slice's 12 functions; slices(xs) adapted |
+| 5a | Plain element writes: `a[i] = v` on a memory array, a nested place such as `a[i][j] = v` included, with the place's base and index evaluated once and checked, `0x32` from the length on, before the right side | 70–95 files, +1,900–3,100/−100–300 | setGet(n, i, v), fillAndSum(n), nestedReplace(n, v), alias(v); ret(n), sum(xs), grid(n) adapted |
+| 5b | Compound assignments to an element, with in-place `~` and the unchecked forms, after decision 3 | 25–40 files, +600–1,100/−50–150 | compound(v); echo(xs) adapted |
+| 6 | Slices and `toArray(s)`, in eight parts: 6a, the slice type `arraySlice<B>`, its formation and its resolution in annotations; 6b, the slice value and its typing in a heap; 6c, the slice's typed form, with `0x32` from its bounds; 6d, reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules; 6e, `toArray(s)`'s typed form; 6f, inference of the four slice forms, with `uint256` bounds; 6g, inference of reads, lengths and `toArray(s)` on slices; 6h, the lowering | 170–215 files, +3,100–5,000/−100–250 at its first measure; estimated at 45–65 files, +1,000–1,400/−200–400 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
 
-In all, that is about 464 to 660 file changes, +13,900 to 19,650 and −1,840 to 3,365 lines over
-twenty-seven commits: about two thirds to nine tenths of row 1, whose 23 commits added about 21,700
-lines, much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600, until
-its first measure: it adds three AST forms through the proved parser, so it became 1a to 1c. 1b's
-first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
+In all, that is about 630 to 875 file changes, +17,300 to 25,750 and −1,600 to 3,200 lines over
+thirty-five commits: about four fifths to one and a fifth times row 1, whose 23 commits added about
+21,700 lines, much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600,
+until its first measure: it adds three AST forms through the proved parser, so it became 1a to 1c.
+1b's first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
 forms: 1c-i's measure and 1c-ii's estimate together pass the cap. 1c-ii's first measure, +1,854,
 split it again as 1b did, into 1c-ii-a and 1c-ii-b.
 
-Step 5 waits for decision 3.
+Step 5 splits in two (2026-11-15): 5a, plain element writes, which decision 3 does not touch, since
+a plain write checks its place before the right side and evaluates its index once, as upstream's
+does, and 5b, compound assignments to an element, which wait for decision 3. 5a comes before step 6,
+since every array-slice port builds its array with plain writes.
 
 Step 2 was one row of 60–72 files, +1,300–1,700/−300–450, until its first measure: about 110 to 150
 files, +3,000 to 4,500/−400 to 800. `new` and the lengths each take a typed form with its
@@ -589,6 +594,14 @@ changes, +1,400 to 2,100/−40 to 115. The literal takes a typed form with its e
 sized rules, as `new` did in 2b-i-b, and inference's array arm infers the elements at one element
 type, which finalization checks, as 3b's index. So it split into 4a, the typed form, 4b, inference's
 typing, and 4c, the lowering.
+
+Step 6 was one row of 45–65 files, +1,000–1,400/−200–400, until its first measure: about 170 to 215
+file changes, +3,100 to 5,000/−100 to 250. The slice is a new type and a new value, as `T[]` was in
+2a, besides its forms: the slice itself, reads and lengths through a slice and `toArray(s)` each
+take a typed form or a rule's case with its evaluation, faults and sized rules, and each takes its
+inference, as in steps 2b to 4. The lowering copies a slice for `toArray(s)` with a recursive Core
+helper over its indices, as `OrderedMapping`'s lookup is. So it splits into 6a to 6h, each within
+the cap.
 
 ## Generators, corpora and the smoke
 
@@ -673,7 +686,8 @@ accepts.
 
 ### 3. Compound assignment to an element
 
-- **Open, with the user.** Until the answer comes, step 5 does not start.
+- **Open, with the user.** Until the answer comes, step 5b does not start. Step 5a, plain element
+  writes, does not wait for it.
   - Under either answer, the place is resolved and its current value read before the right side,
     then the write, as Lean's places do today. Under (a), only the second evaluation of the base
     and the index differs from upstream.
