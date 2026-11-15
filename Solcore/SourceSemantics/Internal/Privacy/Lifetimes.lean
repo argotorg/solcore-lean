@@ -2258,8 +2258,11 @@ theorem place_index_base
     (baseAccepted : inferPlaceFuel fuel context base initial = .ok (baseResult, baseState))
     (keyFresh : baseState.fresh = (keyType, keyState))
     (valueFresh : keyState.fresh = (valueType, valueState))
-    (mappingAccepted : Detail.unify valueState baseResult.type (.mapping keyType valueType) = .ok mappingState)
-    (keyAccepted : inferExprFuel fuel context key (some (mappingState.resolve keyType)) mappingState =
+    (mappingAccepted : Detail.unify valueState
+      (Detail.placeIndexEquation valueState baseResult.type keyType valueType).1
+      (Detail.placeIndexEquation valueState baseResult.type keyType valueType).2 = .ok mappingState)
+    (keyAccepted : inferExprFuel fuel context key
+      (Detail.placeIndexExpected valueState mappingState baseResult.type keyType) mappingState =
       .ok (keyResult, indexState))
     (accepted : inferPlaceFuel (fuel + 1) context source initial = .ok final)
     (lifetime : GeneralizationLifetime event initial.inference.next baseState [baseResult.type]) :
@@ -2274,36 +2277,35 @@ theorem place_index_base
     simpa only [valueFresh, List.cons_append, List.nil_append] using keyLife.fresh keyProperties.2.1
   have baseBelow := baseProperties.2.2.weaken (keyProperties.1.trans valueProperties.1).next_le
   have keyBelow := keyProperties.2.2.weaken valueProperties.1.next_le
-  have mappingBelow := (Ty.variablesBelow_mapping_iff _ _ _).2 ⟨keyBelow, valueProperties.2.2⟩
-  have mappingReady := unify_preserves_inferenceReady valueProperties.2.1 baseBelow mappingBelow mappingAccepted
-  have mappingProgress := unify_inferenceProgress valueProperties.2.1.solved baseBelow mappingBelow mappingAccepted
-  have mappingLife := valueLife.unify valueProperties.2.1 baseBelow mappingBelow
-    (valueLife.values _ (by simp))
-    ((safe_mapping_iff _ _ _ _).2 ⟨valueLife.values _ (by simp), valueLife.values _ (by simp)⟩)
-    mappingAccepted
+  have equationBelow := placeIndexEquation_variablesBelow (base := baseResult.type)
+    valueProperties.2.1 baseBelow keyBelow valueProperties.2.2
+  have mappingReady := unify_preserves_inferenceReady valueProperties.2.1 equationBelow.1
+    equationBelow.2 mappingAccepted
+  have mappingProgress := unify_inferenceProgress valueProperties.2.1.solved equationBelow.1
+    equationBelow.2 mappingAccepted
+  have equationSafe := safe_placeIndexEquation (base := baseResult.type) (keyType := keyType)
+    (valueType := valueType) valueProperties.2.1 (valueLife.values _ (by simp))
+    (valueLife.values _ (by simp)) (valueLife.values _ (by simp))
+  have mappingLife := valueLife.unify valueProperties.2.1 equationBelow.1 equationBelow.2
+    equationSafe.1 equationSafe.2 mappingAccepted
   have baseWellFormed := (inferPlaceFuel_direct_progress baseAccepted).wellFormed wellFormed
   have valueWellFormed : valueState.RequirementsWellFormed := by
     rw [← show keyState.fresh.2 = valueState from congrArg Prod.snd valueFresh,
       ← show baseState.fresh.2 = keyState from congrArg Prod.snd keyFresh]
     exact baseWellFormed
   have mappingWellFormed := unify_preserves_requirementsWellFormed mappingAccepted valueWellFormed
-  have resolvedKeyBelow := mappingReady.solved.variablesBelow_apply (keyBelow.weaken mappingProgress.next_le)
-  have keyExpected : ∀ type ∈ (some (mappingState.resolve keyType) : Option Ty),
-      type.VariablesBelow mappingState.inference.next := by
-    intro type member
-    cases Option.some.inj (Option.mem_def.mp member)
-    exact resolvedKeyBelow
-  have keySafe : ∀ type ∈ (some (mappingState.resolve keyType) : Option Ty),
-      Safe binder.scheme.quantified mappingState type := by
-    intro type member
-    cases Option.some.inj (Option.mem_def.mp member)
-    exact safe_resolved mappingReady (mappingLife.values _ (by simp))
+  have keyExpected := placeIndexExpected_variablesBelow (state := valueState)
+    (base := baseResult.type) mappingReady (keyBelow.weaken mappingProgress.next_le)
+  have keySafe := placeIndexExpected_forall (state := valueState) (base := baseResult.type)
+    (property := Safe binder.scheme.quantified mappingState)
+    (safe_resolved mappingReady (mappingLife.values keyType (by simp)))
   have indexProperties := inferExprFuel_inferenceProperties mappingReady
     catalog.formation catalog.canonical keyExpected keyAccepted
   have indexLife := mappingLife.inferExpr mappingReady mappingWellFormed catalog
     keyExpected keySafe keyAccepted
   have resultEq : ({baseResult with
-      projections := baseResult.projections ++ [.index keyResult.id]
+      projections := baseResult.projections ++
+        [Detail.placeIndexProjection valueState baseResult.type keyResult.id]
       type := indexState.resolve valueType}, indexState) = final := by
     simpa only [inferPlaceFuel, form, baseAccepted, keyFresh, valueFresh,
       mappingAccepted, keyAccepted, bind, Except.bind, pure, Pure.pure, Except.pure,
@@ -2320,8 +2322,11 @@ theorem place_index_key
     (baseAccepted : inferPlaceFuel fuel context base initial = .ok (baseResult, baseState))
     (keyFresh : baseState.fresh = (keyType, keyState))
     (valueFresh : keyState.fresh = (valueType, valueState))
-    (mappingAccepted : Detail.unify valueState baseResult.type (.mapping keyType valueType) = .ok mappingState)
-    (keyAccepted : inferExprFuel fuel context key (some (mappingState.resolve keyType)) mappingState =
+    (mappingAccepted : Detail.unify valueState
+      (Detail.placeIndexEquation valueState baseResult.type keyType valueType).1
+      (Detail.placeIndexEquation valueState baseResult.type keyType valueType).2 = .ok mappingState)
+    (keyAccepted : inferExprFuel fuel context key
+      (Detail.placeIndexExpected valueState mappingState baseResult.type keyType) mappingState =
       .ok (keyResult, indexState))
     (accepted : inferPlaceFuel (fuel + 1) context source initial = .ok final)
     (lifetime : GeneralizationLifetime event mappingState.inference.next indexState [keyResult.type]) :
@@ -2331,15 +2336,14 @@ theorem place_index_key
   have valueProperties := fresh_eq_inferenceProperties keyProperties.2.1 valueFresh
   have baseBelow := baseProperties.2.2.weaken (keyProperties.1.trans valueProperties.1).next_le
   have keyBelow := keyProperties.2.2.weaken valueProperties.1.next_le
-  have mappingBelow := (Ty.variablesBelow_mapping_iff _ _ _).2 ⟨keyBelow, valueProperties.2.2⟩
-  have mappingReady := unify_preserves_inferenceReady valueProperties.2.1 baseBelow mappingBelow mappingAccepted
-  have mappingProgress := unify_inferenceProgress valueProperties.2.1.solved baseBelow mappingBelow mappingAccepted
-  have resolvedKeyBelow := mappingReady.solved.variablesBelow_apply (keyBelow.weaken mappingProgress.next_le)
-  have keyExpected : ∀ type ∈ (some (mappingState.resolve keyType) : Option Ty),
-      type.VariablesBelow mappingState.inference.next := by
-    intro type member
-    cases Option.some.inj (Option.mem_def.mp member)
-    exact resolvedKeyBelow
+  have equationBelow := placeIndexEquation_variablesBelow (base := baseResult.type)
+    valueProperties.2.1 baseBelow keyBelow valueProperties.2.2
+  have mappingReady := unify_preserves_inferenceReady valueProperties.2.1 equationBelow.1
+    equationBelow.2 mappingAccepted
+  have mappingProgress := unify_inferenceProgress valueProperties.2.1.solved equationBelow.1
+    equationBelow.2 mappingAccepted
+  have keyExpected := placeIndexExpected_variablesBelow (state := valueState)
+    (base := baseResult.type) mappingReady (keyBelow.weaken mappingProgress.next_le)
   have indexProperties := inferExprFuel_inferenceProperties mappingReady
     catalog.formation catalog.canonical keyExpected keyAccepted
   have prefixProgress := baseProperties.1.trans
@@ -2348,7 +2352,8 @@ theorem place_index_key
   have valueSafe := lifetime.older valueType valueAtMapping
   have indexLife := lifetime.weaken_entry prefixProgress.next_le
   have resultEq : ({baseResult with
-      projections := baseResult.projections ++ [.index keyResult.id]
+      projections := baseResult.projections ++
+        [Detail.placeIndexProjection valueState baseResult.type keyResult.id]
       type := indexState.resolve valueType}, indexState) = final := by
     simpa only [inferPlaceFuel, form, baseAccepted, keyFresh, valueFresh,
       mappingAccepted, keyAccepted, bind, Except.bind, pure, Pure.pure, Except.pure,

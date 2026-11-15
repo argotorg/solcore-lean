@@ -519,9 +519,14 @@ inductive ChildStep : CallIndex → CallIndex → Prop where
       (baseAccepted : inferPlaceFuel fuel context base initial = .ok (baseValue, baseState))
       (keyFresh : baseState.fresh = (keyType, keyState))
       (valueFresh : keyState.fresh = (valueType, valueState))
-      (fitting : unify valueState baseValue.type (.mapping keyType valueType) = .ok fitted)
-      (child : (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal).Accepted) :
-      ChildStep (CallIndex.place (fuel + 1) context source initial result final) (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal)
+      (fitting : unify valueState (placeIndexEquation valueState baseValue.type keyType valueType).1
+        (placeIndexEquation valueState baseValue.type keyType valueType).2 = .ok fitted)
+      (child : (CallIndex.expression fuel context key
+        (placeIndexExpected valueState fitted baseValue.type keyType) fitted keyValue
+        childFinal).Accepted) :
+      ChildStep (CallIndex.place (fuel + 1) context source initial result final)
+        (CallIndex.expression fuel context key
+          (placeIndexExpected valueState fitted baseValue.type keyType) fitted keyValue childFinal)
   | constructorApplication_arguments
       {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr} {id : ExpressionId}
       {instantiation : DataConstructorInstantiation} {sources : List Syntax.Expr} {expected : Option Ty}

@@ -261,11 +261,12 @@ theorem place_index_key
       (baseAccepted : inferPlaceFuel fuel context base initial = .ok (baseValue, baseState))
       (keyFresh : baseState.fresh = (keyType, keyState))
       (valueFresh : keyState.fresh = (valueType, valueState))
-      (fitting : unify valueState baseValue.type (.mapping keyType valueType) = .ok fitted)
-      (child : (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal).Accepted)
+      (fitting : unify valueState (placeIndexEquation valueState baseValue.type keyType valueType).1
+        (placeIndexEquation valueState baseValue.type keyType valueType).2 = .ok fitted)
+      (child : (CallIndex.expression fuel context key (placeIndexExpected valueState fitted baseValue.type keyType) fitted keyValue childFinal).Accepted)
     (inputs : (CallIndex.place (fuel + 1) context source initial result final).Inputs) :
-    (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal).final.InferenceProgress (CallIndex.place (fuel + 1) context source initial result final).final := by
-  have step : ChildStep (CallIndex.place (fuel + 1) context source initial result final) (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal) := .place_index_key accepted form baseAccepted keyFresh valueFresh fitting child
+    (CallIndex.expression fuel context key (placeIndexExpected valueState fitted baseValue.type keyType) fitted keyValue childFinal).final.InferenceProgress (CallIndex.place (fuel + 1) context source initial result final).final := by
+  have step : ChildStep (CallIndex.place (fuel + 1) context source initial result final) (CallIndex.expression fuel context key (placeIndexExpected valueState fitted baseValue.type keyType) fitted keyValue childFinal) := .place_index_key accepted form baseAccepted keyFresh valueFresh fitting child
   have childReady := ((step.inputs inputs).progress child).2.1
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.final] at childReady ⊢
@@ -1188,11 +1189,16 @@ private theorem placeBase
     (accepted : inferPlaceFuel (fuel + 1) context source initial = .ok result)
     (lifetime : GeneralizationLifetime event initial.inference.next baseState [baseValue.type]) :
     GeneralizationLifetime event initial.inference.next result.2 [result.1.type] := by
-  cases fitting : Detail.unify baseState.fresh.2.fresh.2 baseValue.type
-      (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1) with
+  cases fitting : Detail.unify baseState.fresh.2.fresh.2
+      (placeIndexEquation baseState.fresh.2.fresh.2 baseValue.type baseState.fresh.1
+        baseState.fresh.2.fresh.1).1
+      (placeIndexEquation baseState.fresh.2.fresh.2 baseValue.type baseState.fresh.1
+        baseState.fresh.2.fresh.1).2 with
   | error error => simp [inferPlaceFuel, form, baseAccepted, fitting, bind, Except.bind] at accepted
   | ok fitted =>
-    cases keyAccepted : inferExprFuel fuel context key (some (fitted.resolve baseState.fresh.1)) fitted with
+    cases keyAccepted : inferExprFuel fuel context key
+        (placeIndexExpected baseState.fresh.2.fresh.2 fitted baseValue.type baseState.fresh.1)
+        fitted with
     | error error => simp [inferPlaceFuel, form, baseAccepted, fitting, keyAccepted, bind, Except.bind] at accepted
     | ok keyResult => exact lifetime.place_index_base inputs.ready inputs.wellFormed inputs.catalog form baseAccepted rfl rfl fitting keyAccepted accepted
 
@@ -1317,10 +1323,16 @@ theorem place_index_base
     (CallIndex.place fuel context base initial value childFinal).final.InferenceProgress (CallIndex.place (fuel + 1) context source initial result final).final := by
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.final] at ⊢
-  cases fitting : Detail.unify childFinal.fresh.2.fresh.2 value.type (.mapping childFinal.fresh.1 childFinal.fresh.2.fresh.1) with
+  cases fitting : Detail.unify childFinal.fresh.2.fresh.2
+      (placeIndexEquation childFinal.fresh.2.fresh.2 value.type childFinal.fresh.1
+        childFinal.fresh.2.fresh.1).1
+      (placeIndexEquation childFinal.fresh.2.fresh.2 value.type childFinal.fresh.1
+        childFinal.fresh.2.fresh.1).2 with
   | error error => simp [inferPlaceFuel, form, child, fitting, bind, Except.bind] at accepted
   | ok fitted =>
-    cases keyAccepted : inferExprFuel fuel context key (some (fitted.resolve childFinal.fresh.1)) fitted with
+    cases keyAccepted : inferExprFuel fuel context key
+        (placeIndexExpected childFinal.fresh.2.fresh.2 fitted value.type childFinal.fresh.1)
+        fitted with
     | error error => simp [inferPlaceFuel, form, child, fitting, keyAccepted, bind, Except.bind] at accepted
     | ok keyResult =>
       have baseProperties := inferPlaceFuel_inferenceProperties inputs.ready inputs.catalog.formation inputs.catalog.canonical child
@@ -1328,8 +1340,10 @@ theorem place_index_base
       have valueProperties := fresh_eq_inferenceProperties keyProperties.2.1 rfl
       have baseBelow := baseProperties.2.2.weaken (keyProperties.1.trans valueProperties.1).next_le
       have keyBelow := keyProperties.2.2.weaken valueProperties.1.next_le
-      have mappingBelow := (Ty.variablesBelow_mapping_iff _ _ _).2 ⟨keyBelow, valueProperties.2.2⟩
-      have mappingProgress := unify_inferenceProgress valueProperties.2.1.solved baseBelow mappingBelow fitting
+      have equationBelow := placeIndexEquation_variablesBelow (base := value.type)
+        valueProperties.2.1 baseBelow keyBelow valueProperties.2.2
+      have mappingProgress := unify_inferenceProgress valueProperties.2.1.solved equationBelow.1
+        equationBelow.2 fitting
       have keyStep := ChildStep.place_index_key accepted form child rfl rfl fitting keyAccepted
       have keyProgress := (keyStep.inputs inputs).progress keyAccepted
       exact keyProperties.1.trans (valueProperties.1.trans (mappingProgress.trans

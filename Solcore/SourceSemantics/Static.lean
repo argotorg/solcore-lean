@@ -705,14 +705,15 @@ mutual
           finalType) :
         SourceProjectionsHaveType source context baseType
           (.member name index :: rest) finalType
-    /-- An element of a memory array, at an index of `word` or one of the twelve
-    types (`ArrayIndexType`). -/
+    /-- An element of a memory array at a typed index. Its run checks that the
+    index is a word (`SourcePlaceFaults.elementIndexType`), and finalization
+    accepts an index of `word` or one of the twelve types, as a read's
+    (`Detail.validatePlaceElements`). -/
     | element
         {context : Context} {index : ExpressionId}
         {element indexType finalType : TypeSystem.Ty}
         {rest : List PlaceProjection}
         (index_type : ExpressionHasType source context index indexType)
-        (index_kind : ArrayIndexType indexType)
         (rest_type : SourceProjectionsHaveType source context element rest
           finalType) :
         SourceProjectionsHaveType source context (TypeSystem.Ty.array element)
@@ -1329,8 +1330,8 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
     (fun keyTypeProof restType keyInduction restInduction =>
       .index keyInduction restInduction)
     (fun selected restType restInduction => .member selected restInduction)
-    (fun _ kind _ indexInduction restInduction =>
-      .element indexInduction kind restInduction)
+    (fun _ _ indexInduction restInduction =>
+      .element indexInduction restInduction)
     (fun rootTypeProof projectionsType storedTypeEq projectionsInduction =>
       .intro rootTypeProof projectionsInduction storedTypeEq)
     (fun targetType valueType requirementsEq targetInduction valueInduction =>
@@ -1620,8 +1621,8 @@ theorem append
       exact .index keyType (append restType trailingType)
     | member selected restType =>
       exact .member selected (append restType trailingType)
-    | element indexType kind restType =>
-      exact .element indexType kind (append restType trailingType)
+    | element indexType restType =>
+      exact .element indexType (append restType trailingType)
 termination_by leading.length
 
 /-- A typed place-projection path splits at any point, the converse of
@@ -1645,9 +1646,9 @@ theorem split
     | member selected restType =>
       obtain ⟨middle, leadingType, trailingType⟩ := induction restType
       exact ⟨middle, .member selected leadingType, trailingType⟩
-    | element indexType kind restType =>
+    | element indexType restType =>
       obtain ⟨middle, leadingType, trailingType⟩ := induction restType
-      exact ⟨middle, .element indexType kind leadingType, trailingType⟩
+      exact ⟨middle, .element indexType leadingType, trailingType⟩
 
 end SourceProjectionsHaveType
 
@@ -1681,6 +1682,25 @@ theorem snocIndex
     exact .intro rootType
       (SourceProjectionsHaveType.append projectionsType
         (.index keyTypeProof (.nil _))) rfl
+
+/-- Appending one typed element index to a well-typed base place of a memory array
+produces a place at the array's element type. -/
+theorem snocElement
+    {source : TypedSource} {context : Context}
+    {place : PlaceResolution} {index : ExpressionId}
+    {element indexType : TypeSystem.Ty}
+    (baseType : SourcePlaceHasType source context place (TypeSystem.Ty.array element))
+    (indexTypeProof : ExpressionHasType source context index indexType) :
+    SourcePlaceHasType source context {
+      place with
+      projections := place.projections ++ [.element index]
+      type := element
+    } element := by
+  cases baseType with
+  | intro rootType projectionsType storedTypeEq =>
+    exact .intro rootType
+      (SourceProjectionsHaveType.append projectionsType
+        (.element indexTypeProof (.nil _))) rfl
 
 end SourcePlaceHasType
 

@@ -1534,9 +1534,9 @@ local macro "transport_static" "(" recursor:term "," before:term "," after:term 
     (fun selected _ ih h => by
       simp only [within_flatMap_cons, PlaceProjection.references, within_nil, true_and] at h
       exact .member selected (ih h))
-    (fun _ kind _ index rest h => by
+    (fun _ _ index rest h => by
       simp only [within_flatMap_cons, PlaceProjection.references, within_cons, within_nil, and_true] at h
-      exact .element (index h.1) kind (rest h.2))
+      exact .element (index h.1) (rest h.2))
     (fun root _ same ih h => .intro root (ih h) same)
     (fun _ _ requirements target value h => by
       simp only [within_append, within_cons, within_nil, and_true] at h

@@ -796,8 +796,11 @@ theorem GeneralizedActualStateInvariant.placeIndexPrefix
       signature.scheme.body = .function (Ty.productMany signature.parameterTypes)
         (Ty.productMany signature.returnTypes))
     (accepted : Detail.inferPlaceFuel fuel context expression initial = .ok (place, baseState))
-    (unified : Detail.unify baseState.fresh.2.fresh.2 place.type
-      (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1) = .ok keyInitial) :
+    (unified : Detail.unify baseState.fresh.2.fresh.2
+      (Detail.placeIndexEquation baseState.fresh.2.fresh.2 place.type baseState.fresh.1
+        baseState.fresh.2.fresh.1).1
+      (Detail.placeIndexEquation baseState.fresh.2.fresh.2 place.type baseState.fresh.1
+        baseState.fresh.2.fresh.1).2 = .ok keyInitial) :
     GeneralizedActualStateInvariant keyInitial source ∧
     ∀ binder ∈ keyInitial.localBinders,
       Safe binder.scheme.quantified keyInitial (keyInitial.resolve baseState.fresh.1) := by
@@ -809,16 +812,18 @@ theorem GeneralizedActualStateInvariant.placeIndexPrefix
     (initial := baseState.fresh.2) (type := baseState.fresh.2.fresh.1)
     (next := baseState.fresh.2.fresh.2) rfl
   have baseBelow := properties.2.2.weaken (keyProperties.1.trans valueProperties.1).next_le
-  have mappingBelow : (Ty.mapping baseState.fresh.1 baseState.fresh.2.fresh.1).VariablesBelow
-      baseState.fresh.2.fresh.2.inference.next :=
-    (Ty.variablesBelow_mapping_iff _ _ _).2
-      ⟨keyProperties.2.2.weaken valueProperties.1.next_le, valueProperties.2.2⟩
+  have equationBelow := Detail.placeIndexEquation_variablesBelow (base := place.type)
+    valueProperties.2.1 baseBelow (keyProperties.2.2.weaken valueProperties.1.next_le)
+    valueProperties.2.2
   have baseSafe : ∀ binder ∈ baseState.localBinders, Safe binder.scheme.quantified baseState place.type :=
     invariant.place_type_private ready catalog formation canonical accepted
   have freshSafety : ∀ binder ∈ baseState.fresh.2.fresh.2.localBinders,
-      Safe binder.scheme.quantified baseState.fresh.2.fresh.2 place.type ∧
       Safe binder.scheme.quantified baseState.fresh.2.fresh.2
-        (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1) ∧
+        (Detail.placeIndexEquation baseState.fresh.2.fresh.2 place.type baseState.fresh.1
+          baseState.fresh.2.fresh.1).1 ∧
+      Safe binder.scheme.quantified baseState.fresh.2.fresh.2
+        (Detail.placeIndexEquation baseState.fresh.2.fresh.2 place.type baseState.fresh.1
+          baseState.fresh.2.fresh.1).2 ∧
       Safe binder.scheme.quantified baseState.fresh.2.fresh.2 baseState.fresh.1 := by
     intro binder member
     have baseMember : binder ∈ baseState.localBinders := member
@@ -827,9 +832,12 @@ theorem GeneralizedActualStateInvariant.placeIndexPrefix
     have valueSafe := ProtectedVariables.fresh_type keyProperties.2.1
       (baseOperational.fresh.quantifiersBelow binder member)
     have keyAtValue := ProtectedVariables.fresh _ keySafe
-    exact ⟨ProtectedVariables.fresh _ (ProtectedVariables.fresh _ (baseSafe binder baseMember)),
-      (safe_mapping_iff _ _ _ _).mpr ⟨keyAtValue, valueSafe⟩, keyAtValue⟩
-  have operational := baseOperational.fresh.fresh.unify valueProperties.2.1 baseBelow mappingBelow
+    have equationSafe := safe_placeIndexEquation valueProperties.2.1
+      (ProtectedVariables.fresh _ (ProtectedVariables.fresh _ (baseSafe binder baseMember)))
+      keyAtValue valueSafe
+    exact ⟨equationSafe.1, equationSafe.2, keyAtValue⟩
+  have operational := baseOperational.fresh.fresh.unify valueProperties.2.1 equationBelow.1
+    equationBelow.2
     (fun binder member => (freshSafety binder member).1)
     (fun binder member => (freshSafety binder member).2.1) unified
   refine ⟨operational, ?_⟩
@@ -838,7 +846,8 @@ theorem GeneralizedActualStateInvariant.placeIndexPrefix
     congrArg LexicalScope.binders (Detail.unify_preserves_lexicalScope unified)
   have safety := freshSafety binder (binders ▸ member)
   exact safe_resolved
-    (Detail.unify_preserves_inferenceReady valueProperties.2.1 baseBelow mappingBelow unified)
+    (Detail.unify_preserves_inferenceReady valueProperties.2.1 equationBelow.1 equationBelow.2
+      unified)
     (ProtectedVariables.unify safety.1 safety.2.1 unified _ safety.2.2)
 
 end Solcore.SourceSemantics.SourceInferenceSoundness

@@ -2073,6 +2073,10 @@ structure FinalizeSuccessWitness
   the literal targets (kept last, so positional patterns keep their fields). -/
   assignmentValidation :
     validateAssignmentTargets finalState finalState.nodes = .ok ()
+  /-- Every element place of a memory array is a plain assignment's, with indexes
+  that a read takes, checked after the assignment targets. -/
+  placeElementValidation :
+    validatePlaceElements finalState finalState.nodes = .ok ()
 
 /-- Invert one successful `finalize` call into all successful pipeline stages
 and the exact result assembled from the final state. -/
@@ -2172,6 +2176,21 @@ def finalize_success_witness
                         | ok assignmentValue =>
                             cases assignmentValue
                             rfl
+                      have placeElementResult :
+                          validatePlaceElements finalState finalState.nodes =
+                            .ok () := by
+                        cases placeElementRun :
+                            validatePlaceElements finalState
+                              finalState.nodes with
+                        | error error =>
+                            simp [graphValidation, localIdentityValidation,
+                              templateTrackingValidation, ledgerResult,
+                              patternResult, literalResult,
+                              patternValidationResult, literalValidationResult,
+                              assignmentResult, placeElementRun, bind, Except.bind] at success
+                        | ok placeElementValue =>
+                            cases placeElementValue
+                            rfl
                       cases ownershipResult :
                           validateSourceRequirementOwnership
                             (finalState.toTypedSource roots)
@@ -2181,6 +2200,7 @@ def finalize_success_witness
                             templateTrackingValidation, ledgerResult,
                             patternResult, literalResult,
                             patternValidationResult, literalValidationResult, assignmentResult,
+                            placeElementResult,
                             ownershipResult, bind, Except.bind] at success
                       | ok ownershipValidation =>
                           cases ownershipValidation
@@ -2192,7 +2212,8 @@ def finalize_success_witness
                                 templateTrackingValidation, ledgerResult,
                                 patternResult, literalResult,
                                 patternValidationResult,
-                                literalValidationResult, assignmentResult, ownershipResult,
+                                literalValidationResult, assignmentResult, placeElementResult,
+                                ownershipResult,
                                 rangeResult, bind, Except.bind]
                                 at success
                           | ok rangeValidation =>
@@ -2207,7 +2228,8 @@ def finalize_success_witness
                                     templateTrackingValidation, ledgerResult,
                                     patternResult, literalResult,
                                     patternValidationResult,
-                                    literalValidationResult, assignmentResult, ownershipResult,
+                                    literalValidationResult, assignmentResult, placeElementResult,
+                                    ownershipResult,
                                     rangeResult, captureResult, bind,
                                     Except.bind]
                                     at success
@@ -2226,6 +2248,7 @@ def finalize_success_witness
                                         ledgerResult, patternResult,
                                         literalResult, patternValidationResult,
                                         literalValidationResult, assignmentResult,
+                                        placeElementResult,
                                         ownershipResult, rangeResult,
                                         captureResult, templateScopeResult,
                                         bind, Except.bind]
@@ -2243,6 +2266,7 @@ def finalize_success_witness
                                             literalResult,
                                             patternValidationResult,
                                             literalValidationResult, assignmentResult,
+                                            placeElementResult,
                                             ownershipResult, rangeResult,
                                             captureResult, templateScopeResult,
                                             requirementsResult, bind,
@@ -2256,6 +2280,7 @@ def finalize_success_witness
                                             literalResult,
                                             patternValidationResult,
                                             literalValidationResult, assignmentResult,
+                                            placeElementResult,
                                             ownershipResult, rangeResult,
                                             captureResult, templateScopeResult,
                                             requirementsResult, bind,
@@ -2283,6 +2308,7 @@ def finalize_success_witness
                                             requirementsSolved :=
                                               requirementsResult
                                             assignmentValidation := assignmentResult
+                                            placeElementValidation := placeElementResult
                                             result_eq := rfl
                                           }
 
@@ -2388,6 +2414,7 @@ private theorem finalize_success_witness_rangeFormationValidation
   simp only [witness.patternValidation] at pipeline
   simp only [witness.literalValidation] at pipeline
   simp only [witness.assignmentValidation] at pipeline
+  simp only [witness.placeElementValidation] at pipeline
   simp only [witness.requirementOwnershipValidation] at pipeline
   cases validation : validateFinalSubstitutionRangeFormation context
       witness.finalState.inference.substitution with
@@ -2493,6 +2520,7 @@ theorem finalize_validateSourceLocalSchemeNoCapture
     simp only [witness.patternValidation] at pipeline
     simp only [witness.literalValidation] at pipeline
     simp only [witness.assignmentValidation] at pipeline
+    simp only [witness.placeElementValidation] at pipeline
     simp only [witness.requirementOwnershipValidation] at pipeline
     have rangeValidation :
         validateFinalSubstitutionRangeFormation context

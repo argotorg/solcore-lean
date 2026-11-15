@@ -38,8 +38,8 @@ theorem sourcePlace_transportExpressions {before after : TypedSource}
           (induction tail (fun id member => children id (by simp [member])))
       | member selected tail =>
         exact .member selected (induction tail (fun id member => children id (by simp [member])))
-      | element index kind tail =>
-        exact .element (children _ (by simp [PlaceProjection.references]) _ index) kind
+      | element index tail =>
+        exact .element (children _ (by simp [PlaceProjection.references]) _ index)
           (induction tail (fun id member => children id (by simp [member])))
   cases typed with
   | intro root rest same => exact .intro root (projections rest children) same

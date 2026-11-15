@@ -3493,7 +3493,8 @@ private theorem inference_occurrenceBoundExtends :
       all_goals try simp_all only [Prod.mk.injEq, List.singleton_inj]
       all_goals occurrence_graph_ihs
       all_goals try simp only [ExpressionForm.references, StatementForm.references,
-        PlaceResolution.references, PlaceProjection.references, AssignmentResolution.references,
+        PlaceResolution.references, ↓placeIndexProjection_references,
+        PlaceProjection.references, AssignmentResolution.references,
         ForItemForm.references, TypedMatchCase.references, MatchResolution.references,
         Node.references, Node.id, List.map_append, List.flatMap_append,
         List.map_cons, List.map_nil, List.flatMap_cons, List.flatMap_nil,
@@ -3596,7 +3597,8 @@ private theorem inference_occurrenceBoundExtends :
       all_goals try simp_all only [Prod.mk.injEq, List.singleton_inj]
       all_goals occurrence_graph_ihs
       all_goals try simp only [ExpressionForm.references, StatementForm.references,
-        PlaceResolution.references, PlaceProjection.references, AssignmentResolution.references,
+        PlaceResolution.references, ↓placeIndexProjection_references,
+        PlaceProjection.references, AssignmentResolution.references,
         ForItemForm.references, TypedMatchCase.references, MatchResolution.references,
         Node.references, Node.id, List.map_append, List.flatMap_append,
         List.map_cons, List.map_nil, List.flatMap_cons, List.flatMap_nil,
@@ -3886,7 +3888,8 @@ private theorem inference_occurrenceBoundExtends :
       all_goals try simp_all only [Prod.mk.injEq, List.singleton_inj]
       all_goals occurrence_graph_ihs
       all_goals try simp only [ExpressionForm.references, StatementForm.references,
-        PlaceResolution.references, PlaceProjection.references, AssignmentResolution.references,
+        PlaceResolution.references, ↓placeIndexProjection_references,
+        PlaceProjection.references, AssignmentResolution.references,
         ForItemForm.references, TypedMatchCase.references, MatchResolution.references,
         Node.references, Node.id, List.map_append, List.flatMap_append,
         List.map_cons, List.map_nil, List.flatMap_cons, List.flatMap_nil,

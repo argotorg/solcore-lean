@@ -2620,7 +2620,7 @@ theorem inferPlaceFuel_success_index_key_childProvenance
   refine ⟨{
     fuel := fuel
     expression := key
-    expected := some expected
+    expected := expected
     initial := keyInitial
     final := final
     inferred := inferredKey
@@ -2692,7 +2692,9 @@ namespace Solcore.SourceSemantics.SourceInferenceSoundness
 open Frontend Frontend.SourceInference TypeSystem
 
 /-- An indexed place is well typed from the two actual child judgments, the
-mapping unification, and the frontend's exact resulting place shape. -/
+index's unification, and the frontend's exact resulting place shape: a mapping
+index on a base unified with a mapping, or an element of a memory array on a base
+resolved to one. -/
 theorem inferPlaceFuel_index_sound_of_actual_typed_children
     {source : TypedSource} {outer : Substitution}
     {target : SourceSemantics.Context}
@@ -2703,15 +2705,19 @@ theorem inferPlaceFuel_index_sound_of_actual_typed_children
     {inferredKey : InferredExpression}
     (_baseSuccess : Detail.inferPlaceFuel fuel inferenceContext base initial =
       .ok (basePlace, baseState))
-    (unifySuccess : Detail.unify baseState.fresh.2.fresh.2 basePlace.type
-      (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1) =
-        .ok keyInitial)
+    (unifySuccess : Detail.unify baseState.fresh.2.fresh.2
+      (Detail.placeIndexEquation baseState.fresh.2.fresh.2 basePlace.type baseState.fresh.1
+        baseState.fresh.2.fresh.1).1
+      (Detail.placeIndexEquation baseState.fresh.2.fresh.2 basePlace.type baseState.fresh.1
+        baseState.fresh.2.fresh.1).2 = .ok keyInitial)
     (keySuccess : Detail.inferExprFuel fuel inferenceContext key
-      (some (keyInitial.resolve baseState.fresh.1)) keyInitial =
-        .ok (inferredKey, final))
+      (Detail.placeIndexExpected baseState.fresh.2.fresh.2 keyInitial basePlace.type
+        baseState.fresh.1) keyInitial = .ok (inferredKey, final))
     (placeEq : place = { basePlace with
-      projections := basePlace.projections ++ [.index inferredKey.id]
+      projections := basePlace.projections ++
+        [Detail.placeIndexProjection baseState.fresh.2.fresh.2 basePlace.type inferredKey.id]
       type := final.resolve baseState.fresh.2.fresh.1 })
+    (outerBase : outer.SemanticallyExtends baseState.inference.substitution)
     (outerUnified : outer.SemanticallyExtends
       keyInitial.inference.substitution)
     (outerFinal : outer.SemanticallyExtends final.inference.substitution)
@@ -2721,51 +2727,102 @@ theorem inferPlaceFuel_index_sound_of_actual_typed_children
       inferredKey.id (outer.apply inferredKey.type)) :
     SourcePlaceHasType (source.applySubstitution outer) target
       (place.applySubstitution outer) (outer.apply place.type) := by
-  have mappingEq : outer.apply basePlace.type =
-      .mapping (outer.apply baseState.fresh.1)
-        (outer.apply baseState.fresh.2.fresh.1) := by
-    calc
-      outer.apply basePlace.type =
-          outer.apply (keyInitial.resolve basePlace.type) := by
-        simpa [State.resolve, TypeSystem.InferState.resolve] using
-          (outerUnified basePlace.type).symm
-      _ = outer.apply (keyInitial.resolve
-            (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1)) :=
-        congrArg outer.apply (Detail.unify_resolve_eq unifySuccess)
-      _ = outer.apply
-            (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1) := by
-        simpa [State.resolve, TypeSystem.InferState.resolve] using
-          outerUnified
-            (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1)
-      _ = .mapping (outer.apply baseState.fresh.1)
-            (outer.apply baseState.fresh.2.fresh.1) := rfl
-  have baseMapping : SourcePlaceHasType (source.applySubstitution outer)
-      target (basePlace.applySubstitution outer)
-      (.mapping (outer.apply baseState.fresh.1)
-        (outer.apply baseState.fresh.2.fresh.1)) := by
-    rw [← mappingEq]
-    exact baseTyped
-  have keyExpectedEq : outer.apply inferredKey.type =
-      outer.apply baseState.fresh.1 := by
-    calc
-      outer.apply inferredKey.type =
-          outer.apply (keyInitial.resolve baseState.fresh.1) :=
-        Detail.inferExprFuel_expected_type_apply_eq keySuccess outerFinal
-      _ = outer.apply baseState.fresh.1 := by
-        simpa [State.resolve, TypeSystem.InferState.resolve] using
-          outerUnified baseState.fresh.1
-  have keyType : ExpressionHasType (source.applySubstitution outer) target
-      inferredKey.id (outer.apply baseState.fresh.1) := by
-    rw [← keyExpectedEq]
-    exact keyTyped
-  have indexed := SourcePlaceHasType.snocIndex baseMapping keyType
-  have resolvedValueEq :
-      outer.apply (final.resolve baseState.fresh.2.fresh.1) =
-        outer.apply baseState.fresh.2.fresh.1 := by
-    simpa [State.resolve, TypeSystem.InferState.resolve] using
-      outerFinal baseState.fresh.2.fresh.1
   subst place
-  simpa [PlaceResolution.applySubstitution, resolvedValueEq] using indexed
+  cases arrayEq : (baseState.fresh.2.fresh.2.resolve basePlace.type).arrayElement? with
+  | none =>
+      have notArray := Detail.placeIndex_of_notArray arrayEq keyInitial
+        baseState.fresh.1 baseState.fresh.2.fresh.1 inferredKey.id
+      simp only [notArray.1] at unifySuccess
+      rw [notArray.2.1] at keySuccess
+      rw [notArray.2.2]
+      have mappingEq : outer.apply basePlace.type =
+          .mapping (outer.apply baseState.fresh.1)
+            (outer.apply baseState.fresh.2.fresh.1) := by
+        calc
+          outer.apply basePlace.type =
+              outer.apply (keyInitial.resolve basePlace.type) := by
+            simpa [State.resolve, TypeSystem.InferState.resolve] using
+              (outerUnified basePlace.type).symm
+          _ = outer.apply (keyInitial.resolve
+                (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1)) :=
+            congrArg outer.apply (Detail.unify_resolve_eq unifySuccess)
+          _ = outer.apply
+                (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1) := by
+            simpa [State.resolve, TypeSystem.InferState.resolve] using
+              outerUnified
+                (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1)
+          _ = .mapping (outer.apply baseState.fresh.1)
+                (outer.apply baseState.fresh.2.fresh.1) := rfl
+      have baseMapping : SourcePlaceHasType (source.applySubstitution outer)
+          target (basePlace.applySubstitution outer)
+          (.mapping (outer.apply baseState.fresh.1)
+            (outer.apply baseState.fresh.2.fresh.1)) := by
+        rw [← mappingEq]
+        exact baseTyped
+      have keyExpectedEq : outer.apply inferredKey.type =
+          outer.apply baseState.fresh.1 := by
+        calc
+          outer.apply inferredKey.type =
+              outer.apply (keyInitial.resolve baseState.fresh.1) :=
+            Detail.inferExprFuel_expected_type_apply_eq keySuccess outerFinal
+          _ = outer.apply baseState.fresh.1 := by
+            simpa [State.resolve, TypeSystem.InferState.resolve] using
+              outerUnified baseState.fresh.1
+      have keyType : ExpressionHasType (source.applySubstitution outer) target
+          inferredKey.id (outer.apply baseState.fresh.1) := by
+        rw [← keyExpectedEq]
+        exact keyTyped
+      have indexed := SourcePlaceHasType.snocIndex baseMapping keyType
+      have resolvedValueEq :
+          outer.apply (final.resolve baseState.fresh.2.fresh.1) =
+            outer.apply baseState.fresh.2.fresh.1 := by
+        simpa [State.resolve, TypeSystem.InferState.resolve] using
+          outerFinal baseState.fresh.2.fresh.1
+      simpa [PlaceResolution.applySubstitution, resolvedValueEq] using indexed
+  | some element =>
+      have array := Detail.placeIndex_of_array arrayEq keyInitial
+        baseState.fresh.1 baseState.fresh.2.fresh.1 inferredKey.id
+      simp only [array.1] at unifySuccess
+      rw [array.2.2]
+      have valueElement : keyInitial.resolve baseState.fresh.2.fresh.1 =
+          keyInitial.resolve element :=
+        Detail.unify_resolve_eq unifySuccess
+      have outerValue : outer.SemanticallyExtends
+          baseState.fresh.2.fresh.2.inference.substitution := by
+        simpa [State.fresh] using outerBase
+      have arrayTypeEq : outer.apply basePlace.type =
+          TypeSystem.Ty.array (outer.apply element) := by
+        calc
+          outer.apply basePlace.type =
+              outer.apply (baseState.fresh.2.fresh.2.resolve basePlace.type) := by
+            simpa [State.resolve, TypeSystem.InferState.resolve] using
+              (outerValue basePlace.type).symm
+          _ = outer.apply (TypeSystem.Ty.array element) := by
+            rw [TypeSystem.Ty.arrayElement?_eq_some arrayEq]
+          _ = TypeSystem.Ty.array (outer.apply element) := rfl
+      have baseArray : SourcePlaceHasType (source.applySubstitution outer)
+          target (basePlace.applySubstitution outer)
+          (TypeSystem.Ty.array (outer.apply element)) := by
+        rw [← arrayTypeEq]
+        exact baseTyped
+      have indexed := SourcePlaceHasType.snocElement baseArray keyTyped
+      have resolvedValueEq :
+          outer.apply (final.resolve baseState.fresh.2.fresh.1) =
+            outer.apply element := by
+        calc
+          outer.apply (final.resolve baseState.fresh.2.fresh.1) =
+              outer.apply baseState.fresh.2.fresh.1 := by
+            simpa [State.resolve, TypeSystem.InferState.resolve] using
+              outerFinal baseState.fresh.2.fresh.1
+          _ = outer.apply (keyInitial.resolve baseState.fresh.2.fresh.1) := by
+            simpa [State.resolve, TypeSystem.InferState.resolve] using
+              (outerUnified baseState.fresh.2.fresh.1).symm
+          _ = outer.apply (keyInitial.resolve element) :=
+            congrArg outer.apply valueElement
+          _ = outer.apply element := by
+            simpa [State.resolve, TypeSystem.InferState.resolve] using
+              outerUnified element
+      simpa [PlaceResolution.applySubstitution, resolvedValueEq] using indexed
 
 end Solcore.SourceSemantics.SourceInferenceSoundness
 end

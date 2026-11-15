@@ -1532,7 +1532,7 @@ private def testArrayLength : IO Unit := do
 
 /-- `a[i]` on a memory array has its element type and takes an index of `word`
 or one of the twelve types, an open literal defaulting to `uint256`; a `bool`
-index is rejected with `Typedef`'s name, and an element write stays rejected. -/
+index is rejected with `Typedef`'s name. -/
 private def testArrayIndex : IO Unit := do
   let functions ← check "array index" (String.intercalate "\n" [
     "function read(n: uint256, i: uint256) returns (uint256) {",
@@ -1556,9 +1556,72 @@ private def testArrayIndex : IO Unit := do
   expectInferenceError "a bool index"
     "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); return m[true]; }"
     fun error => error == .operatorNotSupported "Typedef" .bool
-  expectInferenceError "an element write"
-    "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[0] = n; return n; }"
-    fun _ => true
+
+/-- `a[i] = v` on a memory array writes an element: the place takes an element
+projection at an index of `word` or one of the twelve types, an open literal
+defaulting to `uint256`, and `rows[i][j] = v` takes two; a `bool` index is
+rejected with `Typedef`'s name, and a compound assignment or an in-place `~` on
+an element, which wait for decision 3, are rejected. -/
+private def testArrayElementPlace : IO Unit := do
+  let functions ← check "array element place" (String.intercalate "\n" [
+    "function write(n: uint256, i: uint256, v: uint256) returns (uint256) {",
+    "  let m: uint256[] = new uint256[](n);",
+    "  let rows: uint256[][] = new uint256[][](n);",
+    "  let k: int8 = 1;",
+    "  let w: word = 1;",
+    "  m[i] = v;",
+    "  m[k] = v;",
+    "  m[w] = v;",
+    "  m[0] = 7;",
+    "  rows[i] = m;",
+    "  rows[i][0] = v;",
+    "  for (let j: uint256 = 0; j < n; m[j] = j) { j += 1; }",
+    "  return m[i];",
+    "}"
+  ])
+  let function ← match functions with
+    | [function] => pure function
+    | _ => throw (IO.userError "array element place fixture lost its checked function")
+  let projectionName : PlaceProjection → String
+    | .element _ => "element"
+    | .index _ => "index"
+    | .member _ _ => "member"
+  let places := function.typedBody.nodes.filterMap fun
+    | .statement { form := .assignValue assignment .equal _, .. } => some assignment.target
+    | .statement { form := .forLoop _ _ post _, .. } => post.findSome? fun
+        | .assignValue assignment .equal _ => some assignment.target
+        | _ => none
+    | _ => none
+  let shapes := places.map fun place => place.projections.map projectionName
+  assertTrue (decide (shapes = [["element"], ["element"], ["element"], ["element"], ["element"],
+      ["element", "element"], ["element"]]))
+    s!"element writes did not take their places' elements: {reprStr shapes}"
+  let indexTypes := (places.flatMap fun place => place.projections.filterMap fun
+      | .element index => some index
+      | _ => none).filterMap fun index => function.typedBody.nodes.findSome? fun
+        | .expression node => if node.id == index then some node.type else none
+        | .statement _ => none
+  let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
+  let int8 : TypeSystem.Ty := .fixed ⟨true, .w8⟩
+  assertTrue (decide (indexTypes = [uint256, int8, .word, uint256, uint256, uint256, uint256,
+      uint256]))
+    s!"element writes did not type their indexes: {reprStr indexTypes}"
+  expectInferenceError "a bool element index"
+    "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[true] = n; return n; }"
+    fun error => error == .operatorNotSupported "Typedef" .bool
+  expectInferenceError "a compound assignment to an element"
+    "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[0] += n; return n; }"
+    fun error => match error with
+      | .compoundTargetNotSupported _ .add type => type == uint256
+      | _ => false
+  expectInferenceError "a compound assignment to a nested element"
+    "function bad(n: uint256) returns (uint256) { let rows: uint256[][] = new uint256[][](n); rows[0][1] -= n; return n; }"
+    fun error => match error with
+      | .compoundTargetNotSupported _ .subtract type => type == uint256
+      | _ => false
+  expectInferenceError "an in-place ~ on an element"
+    "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[0] ~=; return n; }"
+    fun error => error == .operatorNotSupported "BitNot" uint256
 
 /-- `[e₀, …, eₙ₋₁]` has the type `T[]` of its elements' one type `T`, which an
 annotation, an element or the expected type gives, `[]` included, and an open
@@ -1619,6 +1682,7 @@ def testSourcePhase7Inference : IO Unit := do
   testNewArray
   testArrayLength
   testArrayIndex
+  testArrayElementPlace
   testArrayLiteral
   testSliceRejected
   IO.println "phase-7 source inference GREEN"

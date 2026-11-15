@@ -664,9 +664,12 @@ theorem inputs_place
       have valueProperties := fresh_eq_inferenceProperties keyProperties.2.1 valueFresh
       have baseBelow := baseProperties.2.2.weaken (keyProperties.1.trans valueProperties.1).next_le
       have keyBelow := keyProperties.2.2.weaken valueProperties.1.next_le
-      have mappingBelow := (Ty.variablesBelow_mapping_iff _ _ _).mpr ⟨keyBelow, valueProperties.2.2⟩
-      have mappingProgress := unify_inferenceProgress valueProperties.2.1.solved baseBelow mappingBelow fitting
-      have mappingReady := unify_preserves_inferenceReady valueProperties.2.1 baseBelow mappingBelow fitting
+      have equationBelow := placeIndexEquation_variablesBelow (base := baseValue.type)
+        valueProperties.2.1 baseBelow keyBelow valueProperties.2.2
+      have mappingProgress := unify_inferenceProgress valueProperties.2.1.solved equationBelow.1
+        equationBelow.2 fitting
+      have mappingReady := unify_preserves_inferenceReady valueProperties.2.1 equationBelow.1
+        equationBelow.2 fitting
       have baseWF := (inferPlaceFuel_direct_progress baseAccepted).wellFormed inputs.wellFormed
       have valueWF : valueState.RequirementsWellFormed := by
         rw [← show keyState.fresh.2 = valueState from congrArg Prod.snd valueFresh,
@@ -674,8 +677,8 @@ theorem inputs_place
         exact baseWF
       refine ⟨mappingReady, unify_preserves_requirementsWellFormed fitting valueWF, inputs.catalog, ?_⟩
       intro type member
-      cases member
-      exact mappingReady.solved.variablesBelow_apply (keyBelow.weaken mappingProgress.next_le)
+      exact placeIndexExpected_variablesBelow mappingReady
+        (keyBelow.weaken mappingProgress.next_le) type member
 
 theorem inputs_assignedValue
     {fuel : Nat} {context : SourceInference.Context} {target source : Syntax.Expr}

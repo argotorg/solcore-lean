@@ -775,6 +775,35 @@ theorem arrayElement_variablesBelow {state : State} {type element : Ty}
   rw [Ty.arrayElement?_eq_some array] at resolvedBelow
   exact ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2
 
+/-- Both sides of an assignable place's index equation are below a ready state's
+next variable whenever its base, key and value types are. -/
+theorem placeIndexEquation_variablesBelow {state : State} {base keyType valueType : Ty}
+    (ready : state.InferenceReady) (baseBelow : base.VariablesBelow state.inference.next)
+    (keyBelow : keyType.VariablesBelow state.inference.next)
+    (valueBelow : valueType.VariablesBelow state.inference.next) :
+    (placeIndexEquation state base keyType valueType).1.VariablesBelow state.inference.next ∧
+      (placeIndexEquation state base keyType valueType).2.VariablesBelow
+        state.inference.next := by
+  unfold placeIndexEquation
+  cases found : (state.resolve base).arrayElement? with
+  | some element => exact ⟨valueBelow, arrayElement_variablesBelow ready baseBelow found⟩
+  | none => exact ⟨baseBelow, (Ty.variablesBelow_mapping_iff _ _ _).2 ⟨keyBelow, valueBelow⟩⟩
+
+/-- An assignable place's index has its expected type, if any, below a ready
+state's next variable whenever its key type is. -/
+theorem placeIndexExpected_variablesBelow {state later : State} {base keyType : Ty}
+    (ready : later.InferenceReady) (keyBelow : keyType.VariablesBelow later.inference.next) :
+    ∀ expectedType ∈ placeIndexExpected state later base keyType,
+      expectedType.VariablesBelow later.inference.next := by
+  intro expectedType member
+  unfold placeIndexExpected at member
+  cases found : (state.resolve base).arrayElement? with
+  | some _ => simp [found] at member
+  | none =>
+      simp only [found, Option.mem_def, Option.some.injEq] at member
+      subst expectedType
+      exact ready.solved.variablesBelow_apply keyBelow
+
 /-- Invert successful `a[i]` inference on a memory array: once the base,
 inferred with no expected type, resolves to an array of `element`, the index is
 inferred with no expected type, and the read is recorded at `element`. -/
@@ -13077,13 +13106,13 @@ private theorem inferFuel_inferenceProperties_internal :
         have keyAtValue : keyAllocation.1.VariablesBelow
             valueAllocation.2.inference.next :=
           keyProperties.2.2.weaken valueProperties.1.next_le
-        have mappingBelow :
-            (Ty.mapping keyAllocation.1 valueAllocation.1).VariablesBelow
-              valueAllocation.2.inference.next :=
-          (Ty.variablesBelow_mapping_iff _ _ _).2
-            ⟨keyAtValue, valueProperties.2.2⟩
-        cases unifyResult : unify valueAllocation.2 basePlace.type
-            (.mapping keyAllocation.1 valueAllocation.1) with
+        have equationBelow := placeIndexEquation_variablesBelow (base := basePlace.type)
+          valueProperties.2.1 baseAtValue keyAtValue valueProperties.2.2
+        cases unifyResult : unify valueAllocation.2
+            (placeIndexEquation valueAllocation.2 basePlace.type keyAllocation.1
+              valueAllocation.1).1
+            (placeIndexEquation valueAllocation.2 basePlace.type keyAllocation.1
+              valueAllocation.1).2 with
         | error error =>
             simp [keyAllocation, valueAllocation, unifyResult, bind,
               Except.bind] at success
@@ -13091,18 +13120,15 @@ private theorem inferFuel_inferenceProperties_internal :
             simp only [keyAllocation, valueAllocation, unifyResult, bind,
               Except.bind] at success
             have unifyProgress := unify_inferenceProgress
-              valueProperties.2.1.solved baseAtValue mappingBelow unifyResult
+              valueProperties.2.1.solved equationBelow.1 equationBelow.2 unifyResult
             have unifiedReady := unify_preserves_inferenceReady
-              valueProperties.2.1 baseAtValue mappingBelow unifyResult
+              valueProperties.2.1 equationBelow.1 equationBelow.2 unifyResult
             have keyAtUnified : keyAllocation.1.VariablesBelow
                 unifiedState.inference.next :=
               keyAtValue.weaken unifyProgress.next_le
-            have resolvedKeyBelow :
-                (unifiedState.resolve keyAllocation.1).VariablesBelow
-                  unifiedState.inference.next :=
-              unifiedReady.solved.variablesBelow_apply keyAtUnified
             cases keyResult : inferExprFuel fuel context key
-                (some (unifiedState.resolve baseState.fresh.1)) unifiedState with
+                (placeIndexExpected baseState.fresh.2.fresh.2 unifiedState basePlace.type
+                  baseState.fresh.1) unifiedState with
             | error error =>
                 simp [keyResult, bind, Except.bind] at success
             | ok keyPair =>
@@ -13111,14 +13137,9 @@ private theorem inferFuel_inferenceProperties_internal :
                   Pure.pure, Except.pure] at success
                 injection success with resultEq
                 rw [← resultEq]
-                have keyExpressionProperties := keyInduction baseState.fresh.1
-                  unifiedState unifiedReady validated canonical
-                  (by
-                    intro expectedType member
-                    simp only [Option.mem_def] at member
-                    injection member with typeEq
-                    subst expectedType
-                    simpa only [keyAllocation] using resolvedKeyBelow)
+                have keyExpressionProperties := keyInduction basePlace baseState.fresh.1
+                  baseState.fresh.2.fresh.2 unifiedState unifiedReady validated canonical
+                  (placeIndexExpected_variablesBelow unifiedReady keyAtUnified)
                   (inferredKey, keyState) keyResult
                 have fromValueToKey :=
                   unifyProgress.trans keyExpressionProperties.1

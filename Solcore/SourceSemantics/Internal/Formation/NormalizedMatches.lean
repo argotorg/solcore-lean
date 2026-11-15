@@ -882,6 +882,33 @@ private theorem mapping_prefix {base final : State} {type : Ty}
     finalReady.solved.variablesBelow_apply (keyBelow.weaken unified.next_le),
     value.2.2.weaken unified.next_le,occurrences.1,occurrences.2,fields.1,fields.2⟩
 
+/-- An assignable place's index unifies its equation as a mapping index's does,
+with the same prefix facts. -/
+private theorem index_prefix {base final : State} {type : Ty}
+    (ready : base.InferenceReady) (below : type.VariablesBelow base.inference.next)
+    (accepted : unify base.fresh.2.fresh.2
+      (placeIndexEquation base.fresh.2.fresh.2 type base.fresh.1 base.fresh.2.fresh.1).1
+      (placeIndexEquation base.fresh.2.fresh.2 type base.fresh.1 base.fresh.2.fresh.1).2 =
+        .ok final) :
+    MappingPrefix base final := by
+  have key := fresh_eq_inferenceProperties ready (type := base.fresh.1)
+    (next := base.fresh.2) rfl
+  have value := fresh_eq_inferenceProperties key.2.1 (type := base.fresh.2.fresh.1)
+    (next := base.fresh.2.fresh.2) rfl
+  have baseBelow := below.weaken (key.1.trans value.1).next_le
+  have keyBelow := key.2.2.weaken value.1.next_le
+  have equationBelow := placeIndexEquation_variablesBelow (base := type) value.2.1 baseBelow
+    keyBelow value.2.2
+  have unified := unify_inferenceProgress value.2.1.solved equationBelow.1 equationBelow.2
+    accepted
+  have finalReady := unify_preserves_inferenceReady value.2.1 equationBelow.1 equationBelow.2
+    accepted
+  have fields := unify_fields accepted
+  have occurrences := unify_occurrenceState_eq accepted
+  exact ⟨key.1.trans (value.1.trans unified),finalReady,
+    finalReady.solved.variablesBelow_apply (keyBelow.weaken unified.next_le),
+    value.2.2.weaken unified.next_le,occurrences.1,occurrences.2,fields.1,fields.2⟩
+
 private theorem fresh_formed {semantic : SourceSemantics.Context}
     {context : SourceInference.Context} {outer : Substitution}
     (formation : InferenceFormationContext semantic context outer) (state : State) :
@@ -895,8 +922,8 @@ theorem inferPlaceFuel_index_formation
     {brackets : Syntax.SourceSpan} {initial : State}
     (form : target.value = .index base brackets key)
     (baseIH : InferPlaceFuelFormation semantic outer fuel context base initial)
-    (keyIH : ∀ keyType state, InferExprFuelFormation semantic outer fuel context key
-      (some (state.resolve keyType)) state) :
+    (keyIH : ∀ (place : PlaceResolution) keyType valueState state, InferExprFuelFormation semantic
+      outer fuel context key (placeIndexExpected valueState state place.type keyType) state) :
     InferPlaceFuelFormation semantic outer (fuel + 1) context target initial := by
   intro ready nodes formed formation result accepted continuation noCapture
   unfold inferPlaceFuel at accepted
@@ -906,13 +933,17 @@ theorem inferPlaceFuel_index_formation
   | ok basePair =>
     rcases basePair with ⟨basePlace,baseState⟩
     simp only [baseRun] at accepted
-    cases unified : unify baseState.fresh.2.fresh.2 basePlace.type
-        (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1) with
+    cases unified : unify baseState.fresh.2.fresh.2
+        (placeIndexEquation baseState.fresh.2.fresh.2 basePlace.type baseState.fresh.1
+          baseState.fresh.2.fresh.1).1
+        (placeIndexEquation baseState.fresh.2.fresh.2 basePlace.type baseState.fresh.1
+          baseState.fresh.2.fresh.1).2 with
     | error error => simp [unified] at accepted
     | ok unifiedState =>
       simp only [unified] at accepted
-      cases keyRun : inferExprFuel fuel context key (some (unifiedState.resolve baseState.fresh.1))
-          unifiedState with
+      cases keyRun : inferExprFuel fuel context key
+          (placeIndexExpected baseState.fresh.2.fresh.2 unifiedState basePlace.type
+            baseState.fresh.1) unifiedState with
       | error error => simp [keyRun] at accepted
       | ok keyPair =>
         rcases keyPair with ⟨keyValue,keyState⟩
@@ -920,15 +951,18 @@ theorem inferPlaceFuel_index_formation
         subst result
         have baseProperties := inferPlaceFuel_inferenceProperties ready
           formation.validated formation.functionShapes baseRun
-        have mappingPrefix := mapping_prefix baseProperties.2.1 baseProperties.2.2 unified
+        have mappingPrefix := index_prefix baseProperties.2.1 baseProperties.2.2 unified
         have baseNodes := (inferPlaceFuel_occurrenceBoundExtends baseRun).nodesBelowNextOccurrence nodes
         have unifiedNodes : unifiedState.NodesBelowNextOccurrence := by
           simpa only [State.NodesBelowNextOccurrence, mappingPrefix.nodes, mappingPrefix.occurrence] using baseNodes
-        have expectedBelow : ∀ type ∈ some (unifiedState.resolve baseState.fresh.1),
-            type.VariablesBelow unifiedState.inference.next := by
+        have expectedBelow : ∀ type ∈ placeIndexExpected baseState.fresh.2.fresh.2 unifiedState
+            basePlace.type baseState.fresh.1, type.VariablesBelow unifiedState.inference.next := by
           intro type member
-          cases Option.mem_def.mp member
-          exact mappingPrefix.keyBelow
+          unfold placeIndexExpected at member
+          split at member
+          · simp at member
+          · cases Option.mem_def.mp member
+            exact mappingPrefix.keyBelow
         have keyProperties := inferExprFuel_inferenceProperties mappingPrefix.ready
           formation.validated formation.functionShapes expectedBelow keyRun
         have unifiedContinuation := continuation.trans keyProperties.1.substitution_extends
@@ -938,12 +972,17 @@ theorem inferPlaceFuel_index_formation
         have baseFormed := baseIH ready nodes formed formation _ baseRun
           (unifiedContinuation.trans mappingPrefix.progress.substitution_extends)
           (noCapture.of_prefix basePrefix)
-        have keyFormed := keyIH baseState.fresh.1 unifiedState mappingPrefix.ready unifiedNodes
-          (baseFormed.2.congr mappingPrefix.binders mappingPrefix.requirements) formation expectedBelow
+        have keyFormed := keyIH basePlace baseState.fresh.1 baseState.fresh.2.fresh.2 unifiedState
+          mappingPrefix.ready
+          unifiedNodes (baseFormed.2.congr mappingPrefix.binders mappingPrefix.requirements)
+          formation expectedBelow
           (by
             intro type member
-            cases Option.mem_def.mp member
-            exact (unifiedContinuation _).symm ▸ fresh_formed formation baseState)
+            unfold placeIndexExpected at member
+            split at member
+            · simp at member
+            · cases Option.mem_def.mp member
+              exact (unifiedContinuation _).symm ▸ fresh_formed formation baseState)
           _ keyRun continuation noCapture
         exact ⟨(continuation _).symm ▸ fresh_formed formation baseState.fresh.2,keyFormed.2⟩
 

@@ -1695,6 +1695,70 @@ private def statementIsMatch (statement : Syntax.Statement) : Bool :=
   | .matchWith .. => true
   | _ => false
 
+/-- The equation an index of an assignable place unifies: on a memory array, its
+value type is the array's element, as a read's type is; otherwise the base is a
+mapping from the key type to it. -/
+def placeIndexEquation (state : State) (base keyType valueType : Ty) : Ty × Ty :=
+  match (state.resolve base).arrayElement? with
+  | some element => (valueType, element)
+  | none => (base, .mapping keyType valueType)
+
+/-- The expected type of an assignable place's index: none on a memory array,
+whose index waits for its type until finalization checks it, as a read's does;
+otherwise the key type, resolved at the later state. -/
+def placeIndexExpected (state later : State) (base keyType : Ty) : Option Ty :=
+  match (state.resolve base).arrayElement? with
+  | some _ => none
+  | none => some (later.resolve keyType)
+
+/-- An assignable place's index projection: an element of a memory array, or a
+mapping index. -/
+def placeIndexProjection (state : State) (base : Ty) (key : ExpressionId) : PlaceProjection :=
+  match (state.resolve base).arrayElement? with
+  | some _ => .element key
+  | none => .index key
+
+/-- Either projection of an index names its index expression. -/
+@[simp high] theorem placeIndexProjection_references (state : State) (base : Ty)
+    (key : ExpressionId) :
+    (placeIndexProjection state base key).references = [.expression key] := by
+  unfold placeIndexProjection
+  split <;> rfl
+
+/-- On a base that is not a memory array, an index unifies the base with a
+mapping, takes the key type and is a mapping index, as before memory arrays. -/
+theorem placeIndex_of_notArray {state : State} {base : Ty}
+    (notArray : (state.resolve base).arrayElement? = none) (later : State)
+    (keyType valueType : Ty) (key : ExpressionId) :
+    placeIndexEquation state base keyType valueType = (base, .mapping keyType valueType) ∧
+      placeIndexExpected state later base keyType = some (later.resolve keyType) ∧
+      placeIndexProjection state base key = .index key := by
+  simp [placeIndexEquation, placeIndexExpected, placeIndexProjection, notArray]
+
+/-- On a memory array, an index's value type is the element type, the index has no
+expected type and is an element. -/
+theorem placeIndex_of_array {state : State} {base element : Ty}
+    (array : (state.resolve base).arrayElement? = some element) (later : State)
+    (keyType valueType : Ty) (key : ExpressionId) :
+    placeIndexEquation state base keyType valueType = (valueType, element) ∧
+      placeIndexExpected state later base keyType = none ∧
+      placeIndexProjection state base key = .element key := by
+  simp [placeIndexEquation, placeIndexExpected, placeIndexProjection, array]
+
+/-- Every expected type of an assignable place's index has a property that its
+resolved key type has. -/
+theorem placeIndexExpected_forall {state later : State} {base keyType : Ty}
+    {property : Ty → Prop} (holds : property (later.resolve keyType)) :
+    ∀ expectedType ∈ placeIndexExpected state later base keyType, property expectedType := by
+  intro expectedType member
+  unfold placeIndexExpected at member
+  cases found : (state.resolve base).arrayElement? with
+  | some _ => simp [found] at member
+  | none =>
+      simp only [found, Option.mem_def, Option.some.injEq] at member
+      subst expectedType
+      exact holds
+
 /-- The element type of `new T[](n)`'s resolved array type `T[]`, which a memory
 array admits once type resolution has checked it. -/
 def newArrayElement (type : Ty) : Except Error Ty :=
@@ -2154,16 +2218,20 @@ mutual
                   throw (.invalidAssignmentTarget target.span)
             | none => throw (.invalidAssignmentTarget target.span)
         | .group inner => inferPlaceFuel fuel context inner state
+        -- An element of a memory array infers its index on its own, as a read does;
+        -- otherwise the base is a mapping (`placeIndexEquation`).
         | .index base _ key => do
             let (base, state) ← inferPlaceFuel fuel context base state
             let (keyType, state) := state.fresh
-            let (valueType, state) := state.fresh
-            let state ← unify state base.type (.mapping keyType valueType)
+            let (valueType, valueState) := state.fresh
+            let state ← unify valueState
+              (placeIndexEquation valueState base.type keyType valueType).1
+              (placeIndexEquation valueState base.type keyType valueType).2
             let (key, state) ← inferExprFuel fuel context key
-              (some (state.resolve keyType)) state
+              (placeIndexExpected valueState state base.type keyType) state
             pure ({
               base with
-              projections := base.projections ++ [.index key.id]
+              projections := base.projections ++ [placeIndexProjection valueState base.type key.id]
               type := state.resolve valueType
             }, state)
         | _ => throw (.invalidAssignmentTarget target.span)

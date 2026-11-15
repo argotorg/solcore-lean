@@ -356,7 +356,10 @@ theorem inferPlaceFuel_ledgerPreservation :
               let keyAllocation := baseState.fresh
               let valueAllocation := keyAllocation.2.fresh
               cases unifyResult : Detail.unify valueAllocation.2
-                  basePlace.type (.mapping keyAllocation.1 valueAllocation.1)
+                  (Detail.placeIndexEquation valueAllocation.2 basePlace.type keyAllocation.1
+                    valueAllocation.1).1
+                  (Detail.placeIndexEquation valueAllocation.2 basePlace.type keyAllocation.1
+                    valueAllocation.1).2
                 with
               | error error =>
                   simp [keyAllocation, valueAllocation, unifyResult] at success
@@ -364,13 +367,14 @@ theorem inferPlaceFuel_ledgerPreservation :
                   simp only [keyAllocation, valueAllocation, unifyResult]
                     at success
                   cases keyResult : Detail.inferExprFuel fuel context key
-                      (some (unifiedState.resolve keyAllocation.1))
+                      (Detail.placeIndexExpected baseState.fresh.2.fresh.2 unifiedState
+                        basePlace.type baseState.fresh.1)
                       unifiedState with
                   | error error =>
-                      simp [keyAllocation, keyResult] at success
+                      simp [keyResult] at success
                   | ok keyPair =>
                       rcases keyPair with ⟨inferredKey, keyState⟩
-                      simp only [keyAllocation, keyResult, pure, Pure.pure,
+                      simp only [keyResult, pure, Pure.pure,
                         Except.pure] at success
                       injection success with resultEq
                       injection resultEq with _ finalEq

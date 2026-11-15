@@ -2467,11 +2467,8 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         have keyAtValue : keyAllocation.1.VariablesBelow
             valueAllocation.2.inference.next :=
           keyProperties.2.2.weaken valueProperties.1.next_le
-        have mappingBelow :
-            (Ty.mapping keyAllocation.1 valueAllocation.1).VariablesBelow
-              valueAllocation.2.inference.next :=
-          (Ty.variablesBelow_mapping_iff _ _ _).2
-            ⟨keyAtValue, valueProperties.2.2⟩
+        have equationBelow := placeIndexEquation_variablesBelow (base := basePlace.type)
+          valueProperties.2.1 baseAtValue keyAtValue valueProperties.2.2
         have twoFresh : SafeTransport protectedVars baseState valueAllocation.2 := fresh.trans fresh
         have keySafe : Safe protectedVars valueAllocation.2 keyAllocation.1 := fresh _ (fresh_type baseProperties.2.1 baseBound)
         have valueSafe : Safe protectedVars valueAllocation.2 valueAllocation.1 :=
@@ -2479,34 +2476,35 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
             intro metavariable member
             exact Nat.lt_of_lt_of_le (baseBound metavariable member) keyProperties.1.next_le)
         have baseSafe := twoFresh _ basePrivacy.2.1
-        have mappingSafe := (safe_mapping_iff _ _ _ _).mpr ⟨keySafe, valueSafe⟩
+        have equationSafe := safe_placeIndexEquation valueProperties.2.1 baseSafe keySafe valueSafe
         have freshLive := basePrivacy.2.2.1.transport (after := valueAllocation.2) rfl twoFresh
-        cases unifyResult : Detail.unify valueAllocation.2 basePlace.type
-            (.mapping keyAllocation.1 valueAllocation.1) with
+        cases unifyResult : Detail.unify valueAllocation.2
+            (Detail.placeIndexEquation valueAllocation.2 basePlace.type keyAllocation.1
+              valueAllocation.1).1
+            (Detail.placeIndexEquation valueAllocation.2 basePlace.type keyAllocation.1
+              valueAllocation.1).2 with
         | error error =>
             simp [keyAllocation, valueAllocation, unifyResult] at success
         | ok unifiedState =>
             simp only [keyAllocation, valueAllocation, unifyResult] at success
             have unifyProgress := unify_inferenceProgress
-              valueProperties.2.1.solved baseAtValue mappingBelow unifyResult
+              valueProperties.2.1.solved equationBelow.1 equationBelow.2 unifyResult
             have unifiedReady := unify_preserves_inferenceReady
-              valueProperties.2.1 baseAtValue mappingBelow unifyResult
-            have unifiedPrivacy := ProtectedVariables.unify baseSafe mappingSafe unifyResult
+              valueProperties.2.1 equationBelow.1 equationBelow.2 unifyResult
+            have unifiedPrivacy := ProtectedVariables.unify equationSafe.1 equationSafe.2
+              unifyResult
             have toUnified := twoFresh.trans unifiedPrivacy
-            have unifiedLive := freshLive.unify baseSafe mappingSafe unifyResult
+            have unifiedLive := freshLive.unify equationSafe.1 equationSafe.2 unifyResult
             have unifiedWF := unify_preserves_requirementsWellFormed unifyResult baseWF
             have unifiedFixed := unify_fixes_protected (baseFixed.of_substitution_eq (after := valueAllocation.2) rfl)
-              baseSafe mappingSafe unifyResult
+              equationSafe.1 equationSafe.2 unifyResult
             have keySafeAtUnified := safe_resolved unifiedReady (unifiedPrivacy _ keySafe)
             have keyAtUnified : keyAllocation.1.VariablesBelow
                 unifiedState.inference.next :=
               keyAtValue.weaken unifyProgress.next_le
-            have resolvedKeyBelow :
-                (unifiedState.resolve keyAllocation.1).VariablesBelow
-                  unifiedState.inference.next :=
-              unifiedReady.solved.variablesBelow_apply keyAtUnified
             cases keyResult : inferExprFuel fuel context key
-                (some (unifiedState.resolve baseState.fresh.1)) unifiedState with
+                (placeIndexExpected baseState.fresh.2.fresh.2 unifiedState basePlace.type
+                  baseState.fresh.1) unifiedState with
             | error error =>
                 simp [keyResult] at success
             | ok keyPair =>
@@ -2515,25 +2513,15 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
                 injection success with resultEq
                 rw [← resultEq]
                 have keyExpressionProperties := inferExprFuel_inferenceProperties unifiedReady validated canonical
-                  (by
-                    intro expectedType member
-                    simp only [Option.mem_def] at member
-                    injection member with typeEq
-                    subst expectedType
-                    simpa only [keyAllocation] using resolvedKeyBelow)
-                  keyResult
-                have keyFixed := keyInduction baseState.fresh.1 unifiedState unifiedReady unifiedWF
+                  (placeIndexExpected_variablesBelow unifiedReady keyAtUnified) keyResult
+                have keyFixed := keyInduction basePlace baseState.fresh.1
+                  baseState.fresh.2.fresh.2 unifiedState unifiedReady unifiedWF
                   (fun metavariable member => Nat.lt_of_lt_of_le (baseBound metavariable member)
                     (keyProperties.1.trans (valueProperties.1.trans unifyProgress)).next_le)
                   unifiedLive unifiedFixed catalog validated canonical
-                  (by
-                    intro type member
-                    cases Option.mem_def.mp member
-                    exact resolvedKeyBelow)
-                  (by
-                    intro type member
-                    cases Option.mem_def.mp member
-                    exact keySafeAtUnified) _ keyResult
+                  (placeIndexExpected_variablesBelow unifiedReady keyAtUnified)
+                  (placeIndexExpected_forall (property := Safe protectedVars unifiedState)
+                    keySafeAtUnified) _ keyResult
                 exact keyFixed
   case case12 =>
     intros context expression expected initial fuel id allocated allocationEq

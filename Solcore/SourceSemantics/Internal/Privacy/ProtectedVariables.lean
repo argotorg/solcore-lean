@@ -146,6 +146,22 @@ theorem safe_arrayElement {protectedVars : List TypeVarId} {earlier later : Stat
   rw [Ty.arrayElement?_eq_some array] at resolvedSafe
   exact ((safe_application_iff protectedVars later _ _).1 resolvedSafe).2
 
+/-- Both sides of an assignable place's index equation are safe at a ready state
+wherever its base, key and value types are. -/
+theorem safe_placeIndexEquation {protectedVars : List TypeVarId} {state : State}
+    {base keyType valueType : Ty} (ready : state.InferenceReady)
+    (baseSafe : Safe protectedVars state base) (keySafe : Safe protectedVars state keyType)
+    (valueSafe : Safe protectedVars state valueType) :
+    Safe protectedVars state (Detail.placeIndexEquation state base keyType valueType).1 ∧
+      Safe protectedVars state (Detail.placeIndexEquation state base keyType valueType).2 := by
+  unfold Detail.placeIndexEquation
+  cases found : (state.resolve base).arrayElement? with
+  | some element =>
+      have resolvedSafe := safe_resolved ready baseSafe
+      rw [Ty.arrayElement?_eq_some found] at resolvedSafe
+      exact ⟨valueSafe, ((safe_application_iff protectedVars state _ _).1 resolvedSafe).2⟩
+  | none => exact ⟨baseSafe, (safe_mapping_iff _ _ _ _).mpr ⟨keySafe, valueSafe⟩⟩
+
 @[simp] theorem safe_proxy_iff (protectedVars : List TypeVarId) (state : State) (inner : Ty) :
     Safe protectedVars state (.proxy inner) ↔ Safe protectedVars state inner := Iff.rfl
 

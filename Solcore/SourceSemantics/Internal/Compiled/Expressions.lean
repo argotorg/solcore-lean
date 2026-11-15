@@ -4126,24 +4126,54 @@ theorem placeRootedSoundness_for
           } : PlaceBoundary selected childFuel inferenceContext base initial basePlace baseState frames target)).1
         obtain ⟨keyOperational, keySafe⟩ := boundary.operational.placeIndexPrefix boundary.invariant.ready
           catalog formation canonical baseSuccess unifySuccess
-        have baseEq : selected.body.finalized.substitution.apply basePlace.type =
-            .mapping (selected.body.finalized.substitution.apply baseState.fresh.1)
-              (selected.body.finalized.substitution.apply baseState.fresh.2.fresh.1) := by
-          calc
-            selected.body.finalized.substitution.apply basePlace.type =
-                selected.body.finalized.substitution.apply (keyInitial.resolve basePlace.type) := by
-              simpa only [State.resolve, InferState.resolve] using
-                (keyInvariant.substitutionExtension basePlace.type).symm
-            _ = selected.body.finalized.substitution.apply
-                (keyInitial.resolve (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1)) :=
-              congrArg selected.body.finalized.substitution.apply (Detail.unify_resolve_eq unifySuccess)
-            _ = .mapping (selected.body.finalized.substitution.apply baseState.fresh.1)
-                  (selected.body.finalized.substitution.apply baseState.fresh.2.fresh.1) := by
-              simpa only [State.resolve, InferState.resolve, Substitution.apply] using
-                keyInvariant.substitutionExtension (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1)
-        have expectedEq : selected.body.finalized.substitution.apply (keyInitial.resolve baseState.fresh.1) =
-            selected.body.finalized.substitution.apply baseState.fresh.1 := by
-          simpa only [State.resolve, InferState.resolve] using keyInvariant.substitutionExtension baseState.fresh.1
+        -- On a memory array the index has no expected type; on a mapping it expects
+        -- the key type, which the base's admissible mapping type makes admissible.
+        have expectedAdmissible : ∀ type ∈ Detail.placeIndexExpected baseState.fresh.2.fresh.2
+              keyInitial basePlace.type baseState.fresh.1,
+            TypeAdmissible target (selected.body.finalized.substitution.apply type) := by
+          cases arrayEq : (baseState.fresh.2.fresh.2.resolve basePlace.type).arrayElement? with
+          | some element =>
+              rw [(Detail.placeIndex_of_array arrayEq keyInitial baseState.fresh.1
+                baseState.fresh.2.fresh.1 inferredKey.id).2.1]
+              intro type member
+              simp at member
+          | none =>
+              have notArray := Detail.placeIndex_of_notArray arrayEq keyInitial
+                baseState.fresh.1 baseState.fresh.2.fresh.1 inferredKey.id
+              rw [notArray.2.1]
+              have mappingSuccess := unifySuccess
+              rw [notArray.1] at mappingSuccess
+              have baseEq : selected.body.finalized.substitution.apply basePlace.type =
+                  .mapping (selected.body.finalized.substitution.apply baseState.fresh.1)
+                    (selected.body.finalized.substitution.apply baseState.fresh.2.fresh.1) := by
+                calc
+                  selected.body.finalized.substitution.apply basePlace.type =
+                      selected.body.finalized.substitution.apply
+                        (keyInitial.resolve basePlace.type) := by
+                    simpa only [State.resolve, InferState.resolve] using
+                      (keyInvariant.substitutionExtension basePlace.type).symm
+                  _ = selected.body.finalized.substitution.apply
+                      (keyInitial.resolve (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1)) :=
+                    congrArg selected.body.finalized.substitution.apply
+                      (Detail.unify_resolve_eq mappingSuccess)
+                  _ = .mapping (selected.body.finalized.substitution.apply baseState.fresh.1)
+                        (selected.body.finalized.substitution.apply baseState.fresh.2.fresh.1) := by
+                    simpa only [State.resolve, InferState.resolve, Substitution.apply] using
+                      keyInvariant.substitutionExtension
+                        (.mapping baseState.fresh.1 baseState.fresh.2.fresh.1)
+              have expectedEq : selected.body.finalized.substitution.apply
+                    (keyInitial.resolve baseState.fresh.1) =
+                  selected.body.finalized.substitution.apply baseState.fresh.1 := by
+                simpa only [State.resolve, InferState.resolve] using
+                  keyInvariant.substitutionExtension baseState.fresh.1
+              intro type member
+              have same : type = keyInitial.resolve baseState.fresh.1 :=
+                (Option.some.inj member).symm
+              subst type
+              rw [expectedEq]
+              have valid := sourcePlace_type_admissible baseTyped
+              rw [baseEq] at valid
+              exact TypeAdmissible.mapping_key valid
         have keyTyped := expressionSound childFuel (Nat.lt_succ_self childFuel)
           (descend here (ChildStep.place_index_key boundary.accepted form baseSuccess rfl rfl
             unifySuccess keySuccess)) ({
@@ -4154,24 +4184,12 @@ theorem placeRootedSoundness_for
           invariant := keyInvariant
           actual := boundary.actual
           operational := keyOperational
-          expectedBelow := by
-            intro type member
-            have same : type = keyInitial.resolve baseState.fresh.1 := (Option.some.inj member).symm
-            subst type
-            exact keyExpectedBelow
-          expectedAdmissible := by
-            intro type member
-            have same : type = keyInitial.resolve baseState.fresh.1 := (Option.some.inj member).symm
-            subst type
-            rw [expectedEq]
-            have valid := sourcePlace_type_admissible baseTyped
-            rw [baseEq] at valid
-            exact TypeAdmissible.mapping_key valid
-          expectedSafe := by
-            intro binder member type typeMember
-            have same : type = keyInitial.resolve baseState.fresh.1 := (Option.some.inj typeMember).symm
-            subst type
-            exact keySafe binder member
+          expectedBelow := keyExpectedBelow
+          expectedAdmissible := expectedAdmissible
+          expectedSafe := fun binder member =>
+            Detail.placeIndexExpected_forall
+              (property := ProtectedVariables.Safe binder.scheme.quantified keyInitial)
+              (keySafe binder member)
           rawSubtree := boundary.rawKeys inferredKey.id keyMember
           integerPatterns := boundary.integerPatterns
           integerLiterals := boundary.integerLiterals
@@ -4179,10 +4197,12 @@ theorem placeRootedSoundness_for
           covered := boundary.covered inferredKey.id keyMember
           actualCovered := boundary.actualCovered inferredKey.id keyMember
         } : RootedExpressionBoundary selected childFuel inferenceContext key
-          (some (keyInitial.resolve baseState.fresh.1)) keyInitial inferredKey final frames target)
+          (Detail.placeIndexExpected baseState.fresh.2.fresh.2 keyInitial basePlace.type
+            baseState.fresh.1) keyInitial inferredKey final frames target)
         rw [selected.body.resources.source_eq] at baseTyped keyTyped ⊢
         exact inferPlaceFuel_index_sound_of_actual_typed_children baseSuccess unifySuccess keySuccess placeEq
-          keyInvariant.substitutionExtension boundary.extension baseTyped keyTyped
+          baseInvariant.substitutionExtension keyInvariant.substitutionExtension
+          boundary.extension baseTyped keyTyped
       all_goals
         have success := boundary.accepted
         simp [Detail.inferPlaceFuel, form] at success

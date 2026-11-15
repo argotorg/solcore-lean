@@ -357,7 +357,17 @@ wait for the native pipeline's contracts and ABI.
   rejects another index type with `operatorNotSupported "Typedef"` (`validateArrayIndex`), as
   upstream's `bool: Typedef<word>` fails.
 - **Writes.** `a[i] = v`, the compound assignments, in-place `~` and the unchecked forms take the
-  element type, with row 1's rules for each type. A write through a slice is rejected.
+  element type, with row 1's rules for each type. A write through a slice is rejected. As built in
+  step 5a-ii, inference's place arm takes `a[i]` on a base whose resolved type is a memory array as
+  an element place, as the read's arm does: the place's type unifies with the element type and the
+  index is inferred on its own (`placeIndexEquation`, `placeIndexExpected`, `placeIndexProjection`),
+  so `a[i][j] = v` takes two element projections, and on any other base the place keeps the mapping
+  rule. Finalization defaults an open literal index to `uint256` (`placeIndexMentions`) and rejects
+  another index type with `operatorNotSupported "Typedef"`, as a read's, and until decision 3 it
+  rejects a compound assignment to an element with `compoundTargetNotSupported` and an in-place `~`
+  on one with `operatorNotSupported "BitNot"` (`validatePlaceElements`). The element place's static
+  rule takes no index kind: its run faults on an index that is not a word, and finalization admits a
+  read's index types.
 - **Slices** take `uint256` bounds and a base that is an array or a slice, and have the type
   `arraySlice<B>`.
 - **Lengths.** `a.length`, `a.length()` and `Length.length(a)` on arrays and slices have the type
@@ -564,7 +574,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 4b | Literals: inference's typing of `[e₀, …, eₙ₋₁]` at one element type, with `[]` taking it from the expected type, open literal elements defaulting to `uint256` and finalization's check of the element type | 26–34 files, +900–1,300/−30–80; measured at 24 files, +1,005/−19 | none |
 | 4c | Literals: the lowering | 4–7 files, +150–300/−5–20; measured at 3 files, +91/−3 | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
 | 5a-i | Plain element writes: the typed element place `p[i]` (`PlaceProjection.element`), with its static rule, its resolution to the array object's cell, its five faults, `0x32` from the length on before the right side, sized copies, stage and preservation, which no source produces yet | 30–45 files, +500–900/−10–60; measured at 58 files, +890/−65 | none |
-| 5a-ii | Plain element writes: inference's typing of `a[i] = v` on a memory array, a nested place such as `a[i][j] = v` included, whose index finalization checks as a read's; a compound assignment or an in-place `~` to an element stays rejected | 40–60 files, +1,300–2,200/−150–400 | none |
+| 5a-ii | Plain element writes: inference's typing of `a[i] = v` on a memory array, a nested place such as `a[i][j] = v` included, whose index finalization checks as a read's; a compound assignment or an in-place `~` to an element stays rejected | 40–60 files, +1,300–2,200/−150–400; measured at 36 files, +1,129/−647 | none |
 | 5a-iii | Plain element writes: the lowering, with `0x32` before the right side | 4–8 files, +200–400/−5–30 | setGet(n, i, v), fillAndSum(n), nestedReplace(n, v), alias(v); ret(n), sum(xs), grid(n) adapted |
 | 5b | Compound assignments to an element, with in-place `~` and the unchecked forms, after decision 3 | 25–40 files, +600–1,100/−50–150 | compound(v); echo(xs) adapted |
 | 6 | Slices and `toArray(s)`, in eight parts: 6a, the slice type `arraySlice<B>`, its formation and its resolution in annotations; 6b, the slice value and its typing in a heap; 6c, the slice's typed form, with `0x32` from its bounds; 6d, reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules; 6e, `toArray(s)`'s typed form; 6f, inference of the four slice forms, with `uint256` bounds; 6g, inference of reads, lengths and `toArray(s)` on slices; 6h, the lowering | 170–215 files, +3,100–5,000/−100–250 at its first measure; estimated at 45–65 files, +1,000–1,400/−200–400 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |

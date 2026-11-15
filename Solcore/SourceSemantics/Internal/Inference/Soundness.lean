@@ -1922,6 +1922,221 @@ theorem inferPlaceFuel_success_identifier_sound
     monomorphic outerExtension
   exact .intro writable (.nil _) rfl
 
+/-- The typing of an assignable place's index from its inference steps: a mapping
+index on a base unified with a mapping, or an element of a memory array on a base
+resolved to one. -/
+theorem inferPlaceFuel_index_typed
+    {source : TypedSource} {outer : TypeSystem.Substitution}
+    {target : SourceSemantics.Context}
+    {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
+    {key : Syntax.Expr}
+    {baseState unifiedState keyState : Frontend.SourceInference.State}
+    {basePlace : PlaceResolution} {inferredKey : InferredExpression}
+    (signatureFormation :
+      ProgramSignatureFormationValidated inferenceContext.signatures)
+    (functionsCanonical :
+      ∀ signature ∈ inferenceContext.signatures.functions,
+        signature.scheme.body = .function
+          (TypeSystem.Ty.productMany signature.parameterTypes)
+          (TypeSystem.Ty.productMany signature.returnTypes))
+    (baseReady : baseState.InferenceReady)
+    (baseBelow : basePlace.type.VariablesBelow baseState.inference.next)
+    (unifyResult : Detail.unify baseState.fresh.2.fresh.2
+      (Detail.placeIndexEquation baseState.fresh.2.fresh.2 basePlace.type
+        baseState.fresh.1 baseState.fresh.2.fresh.1).1
+      (Detail.placeIndexEquation baseState.fresh.2.fresh.2 basePlace.type
+        baseState.fresh.1 baseState.fresh.2.fresh.1).2 = .ok unifiedState)
+    (keyResult : Detail.inferExprFuel fuel inferenceContext key
+      (Detail.placeIndexExpected baseState.fresh.2.fresh.2 unifiedState basePlace.type
+        baseState.fresh.1) unifiedState = .ok (inferredKey, keyState))
+    (outerExtension : outer.SemanticallyExtends keyState.inference.substitution)
+    (baseSound : outer.SemanticallyExtends baseState.inference.substitution →
+      SourcePlaceHasType (source.applySubstitution outer) target
+        (basePlace.applySubstitution outer) (outer.apply basePlace.type))
+    (keyTyped : ExpressionHasType (source.applySubstitution outer) target
+      inferredKey.id (outer.apply inferredKey.type)) :
+    SourcePlaceHasType (source.applySubstitution outer) target
+      ({ basePlace with
+          projections := basePlace.projections ++
+            [Detail.placeIndexProjection baseState.fresh.2.fresh.2 basePlace.type
+              inferredKey.id]
+          type := keyState.resolve baseState.fresh.2.fresh.1 }.applySubstitution outer)
+      (outer.apply (keyState.resolve baseState.fresh.2.fresh.1)) := by
+  have keyProperties :=
+    Detail.fresh_eq_inferenceProperties
+      baseReady
+      (initial := baseState) (type := baseState.fresh.1)
+      (next := baseState.fresh.2) rfl
+  have valueProperties :=
+    Detail.fresh_eq_inferenceProperties
+      keyProperties.2.1
+      (initial := baseState.fresh.2)
+      (type := baseState.fresh.2.fresh.1)
+      (next := baseState.fresh.2.fresh.2) rfl
+  have baseAtValue : basePlace.type.VariablesBelow
+      baseState.fresh.2.fresh.2.inference.next :=
+    baseBelow.weaken
+      (keyProperties.1.trans valueProperties.1).next_le
+  have keyAtValue : baseState.fresh.1.VariablesBelow
+      baseState.fresh.2.fresh.2.inference.next :=
+    keyProperties.2.2.weaken valueProperties.1.next_le
+  have equationBelow :=
+    Detail.placeIndexEquation_variablesBelow (base := basePlace.type)
+      valueProperties.2.1 baseAtValue keyAtValue valueProperties.2.2
+  have unifyProgress := Detail.unify_inferenceProgress
+    valueProperties.2.1.solved equationBelow.1 equationBelow.2
+    unifyResult
+  have unifiedReady :=
+    Detail.unify_preserves_inferenceReady
+      valueProperties.2.1 equationBelow.1 equationBelow.2
+      unifyResult
+  have keyAtUnified : baseState.fresh.1.VariablesBelow
+      unifiedState.inference.next :=
+    keyAtValue.weaken unifyProgress.next_le
+  have keyExpressionProperties :=
+    Detail.inferExprFuel_inferenceProperties unifiedReady
+      signatureFormation functionsCanonical
+      (Detail.placeIndexExpected_variablesBelow unifiedReady
+        keyAtUnified) keyResult
+  have tailProgress : baseState.InferenceProgress keyState :=
+    keyProperties.1.trans
+      (valueProperties.1.trans
+        (unifyProgress.trans keyExpressionProperties.1))
+  have outerBase : outer.SemanticallyExtends
+      baseState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans
+      outerExtension tailProgress.substitution_extends
+  have baseType := baseSound outerBase
+  have outerUnified : outer.SemanticallyExtends
+      unifiedState.inference.substitution :=
+    TypeSystem.Substitution.SemanticallyExtends.trans
+      outerExtension
+      keyExpressionProperties.1.substitution_extends
+  cases arrayEq : (baseState.fresh.2.fresh.2.resolve basePlace.type).arrayElement? with
+  | none =>
+      have notArray := Detail.placeIndex_of_notArray arrayEq unifiedState
+        baseState.fresh.1 baseState.fresh.2.fresh.1 inferredKey.id
+      simp only [notArray.1] at unifyResult
+      have unifiedMapping : unifiedState.resolve basePlace.type =
+          unifiedState.resolve (.mapping baseState.fresh.1
+            baseState.fresh.2.fresh.1) :=
+        Detail.unify_resolve_eq unifyResult
+      rw [notArray.2.2]
+      rw [notArray.2.1] at keyResult
+      have mappingEq : outer.apply basePlace.type =
+          .mapping (outer.apply baseState.fresh.1)
+            (outer.apply baseState.fresh.2.fresh.1) := by
+        calc
+          outer.apply basePlace.type =
+              outer.apply (unifiedState.resolve
+                basePlace.type) := by
+            simpa [Frontend.SourceInference.State.resolve,
+              TypeSystem.InferState.resolve] using
+                (outerUnified basePlace.type).symm
+          _ = outer.apply (unifiedState.resolve
+                (.mapping baseState.fresh.1
+                  baseState.fresh.2.fresh.1)) :=
+            congrArg outer.apply unifiedMapping
+          _ = outer.apply (.mapping baseState.fresh.1
+                baseState.fresh.2.fresh.1) := by
+            simpa [Frontend.SourceInference.State.resolve,
+              TypeSystem.InferState.resolve] using
+                outerUnified (.mapping baseState.fresh.1
+                  baseState.fresh.2.fresh.1)
+          _ = .mapping (outer.apply baseState.fresh.1)
+                (outer.apply baseState.fresh.2.fresh.1) := rfl
+      have baseMapping : SourcePlaceHasType
+          (source.applySubstitution outer) target
+          (basePlace.applySubstitution outer)
+          (.mapping (outer.apply baseState.fresh.1)
+            (outer.apply baseState.fresh.2.fresh.1)) := by
+        rw [← mappingEq]
+        exact baseType
+      have keyExpectedEq : outer.apply inferredKey.type =
+          outer.apply baseState.fresh.1 := by
+        calc
+          outer.apply inferredKey.type =
+              outer.apply (unifiedState.resolve
+                baseState.fresh.1) :=
+            Detail.inferExprFuel_expected_type_apply_eq
+              keyResult outerExtension
+          _ = outer.apply baseState.fresh.1 := by
+            simpa [Frontend.SourceInference.State.resolve,
+              TypeSystem.InferState.resolve] using
+                outerUnified baseState.fresh.1
+      have keyType : ExpressionHasType
+          (source.applySubstitution outer) target inferredKey.id
+          (outer.apply baseState.fresh.1) := by
+        rw [← keyExpectedEq]
+        exact keyTyped
+      have indexed := SourcePlaceHasType.snocIndex baseMapping
+        keyType
+      have resolvedValueEq :
+          outer.apply (keyState.resolve baseState.fresh.2.fresh.1) =
+            outer.apply baseState.fresh.2.fresh.1 := by
+        simpa [Frontend.SourceInference.State.resolve,
+          TypeSystem.InferState.resolve] using
+            outerExtension baseState.fresh.2.fresh.1
+      simpa [
+        PlaceResolution.applySubstitution,
+        resolvedValueEq] using indexed
+  | some element =>
+      have array := Detail.placeIndex_of_array arrayEq unifiedState
+        baseState.fresh.1 baseState.fresh.2.fresh.1 inferredKey.id
+      simp only [array.1] at unifyResult
+      have valueElement : unifiedState.resolve baseState.fresh.2.fresh.1 =
+          unifiedState.resolve element :=
+        Detail.unify_resolve_eq unifyResult
+      rw [array.2.2]
+      have outerValue : outer.SemanticallyExtends
+          baseState.fresh.2.fresh.2.inference.substitution :=
+        TypeSystem.Substitution.SemanticallyExtends.trans
+          outerExtension
+          (unifyProgress.trans keyExpressionProperties.1).substitution_extends
+      have arrayTypeEq : outer.apply basePlace.type =
+          TypeSystem.Ty.array (outer.apply element) := by
+        calc
+          outer.apply basePlace.type =
+              outer.apply (baseState.fresh.2.fresh.2.resolve
+                basePlace.type) := by
+            simpa [Frontend.SourceInference.State.resolve,
+              TypeSystem.InferState.resolve] using
+                (outerValue basePlace.type).symm
+          _ = outer.apply (TypeSystem.Ty.array element) := by
+            rw [TypeSystem.Ty.arrayElement?_eq_some arrayEq]
+          _ = TypeSystem.Ty.array (outer.apply element) := rfl
+      have baseArray : SourcePlaceHasType
+          (source.applySubstitution outer) target
+          (basePlace.applySubstitution outer)
+          (TypeSystem.Ty.array (outer.apply element)) := by
+        rw [← arrayTypeEq]
+        exact baseType
+      have indexed := SourcePlaceHasType.snocElement baseArray keyTyped
+      have resolvedValueEq :
+          outer.apply (keyState.resolve baseState.fresh.2.fresh.1) =
+            outer.apply element := by
+        calc
+          outer.apply (keyState.resolve baseState.fresh.2.fresh.1) =
+              outer.apply baseState.fresh.2.fresh.1 := by
+            simpa [Frontend.SourceInference.State.resolve,
+              TypeSystem.InferState.resolve] using
+                outerExtension baseState.fresh.2.fresh.1
+          _ = outer.apply (unifiedState.resolve
+                baseState.fresh.2.fresh.1) := by
+            simpa [Frontend.SourceInference.State.resolve,
+              TypeSystem.InferState.resolve] using
+                (outerUnified baseState.fresh.2.fresh.1).symm
+          _ = outer.apply (unifiedState.resolve element) :=
+            congrArg outer.apply valueElement
+          _ = outer.apply element := by
+            simpa [Frontend.SourceInference.State.resolve,
+              TypeSystem.InferState.resolve] using
+                outerUnified element
+      simpa [
+        PlaceResolution.applySubstitution,
+        resolvedValueEq] using indexed
+
+
 /-- Every successful executable place traversal reconstructs a declaratively
 typed source place in one fixed finalized source.  Expression typing remains
 an explicit recursive callback for mapping keys; local roots, grouping, fresh
@@ -1980,21 +2195,24 @@ theorem inferPlaceFuel_success_sound
               simp only [baseResult] at success
               let keyAllocation := baseState.fresh
               let valueAllocation := keyAllocation.2.fresh
-              cases unifyResult : Detail.unify valueAllocation.2 basePlace.type
-                  (.mapping keyAllocation.1 valueAllocation.1) with
+              cases unifyResult : Detail.unify valueAllocation.2
+                  (Detail.placeIndexEquation valueAllocation.2 basePlace.type
+                    keyAllocation.1 valueAllocation.1).1
+                  (Detail.placeIndexEquation valueAllocation.2 basePlace.type
+                    keyAllocation.1 valueAllocation.1).2 with
               | error error =>
                   simp [keyAllocation, valueAllocation, unifyResult] at success
               | ok unifiedState =>
                   simp only [keyAllocation, valueAllocation, unifyResult]
                     at success
                   cases keyResult : Detail.inferExprFuel fuel inferenceContext
-                      key (some (unifiedState.resolve keyAllocation.1))
-                      unifiedState with
+                      key (Detail.placeIndexExpected baseState.fresh.2.fresh.2 unifiedState
+                        basePlace.type baseState.fresh.1) unifiedState with
                   | error error =>
-                      simp [keyAllocation, keyResult] at success
+                      simp [keyResult] at success
                   | ok keyPair =>
                       rcases keyPair with ⟨inferredKey, keyState⟩
-                      simp only [keyAllocation, keyResult, pure, Pure.pure,
+                      simp only [keyResult, pure, Pure.pure,
                         Except.pure] at success
                       injection success with resultEq
                       injection resultEq with placeEq finalEq
@@ -2003,125 +2221,10 @@ theorem inferPlaceFuel_success_sound
                       have baseProperties :=
                         Detail.inferPlaceFuel_inferenceProperties ready
                           signatureFormation functionsCanonical baseResult
-                      have keyProperties :=
-                        Detail.fresh_eq_inferenceProperties
-                          baseProperties.2.1
-                          (initial := baseState) (type := keyAllocation.1)
-                          (next := keyAllocation.2) rfl
-                      have valueProperties :=
-                        Detail.fresh_eq_inferenceProperties
-                          keyProperties.2.1
-                          (initial := keyAllocation.2)
-                          (type := valueAllocation.1)
-                          (next := valueAllocation.2) rfl
-                      have baseAtValue : basePlace.type.VariablesBelow
-                          valueAllocation.2.inference.next :=
-                        baseProperties.2.2.weaken
-                          (keyProperties.1.trans valueProperties.1).next_le
-                      have keyAtValue : keyAllocation.1.VariablesBelow
-                          valueAllocation.2.inference.next :=
-                        keyProperties.2.2.weaken valueProperties.1.next_le
-                      have mappingBelow :
-                          (TypeSystem.Ty.mapping keyAllocation.1
-                            valueAllocation.1).VariablesBelow
-                              valueAllocation.2.inference.next :=
-                        (TypeSystem.Ty.variablesBelow_mapping_iff _ _ _).2
-                          ⟨keyAtValue, valueProperties.2.2⟩
-                      have unifyProgress := Detail.unify_inferenceProgress
-                        valueProperties.2.1.solved baseAtValue mappingBelow
-                        unifyResult
-                      have unifiedReady :=
-                        Detail.unify_preserves_inferenceReady
-                          valueProperties.2.1 baseAtValue mappingBelow
-                          unifyResult
-                      have keyAtUnified : keyAllocation.1.VariablesBelow
-                          unifiedState.inference.next :=
-                        keyAtValue.weaken unifyProgress.next_le
-                      have resolvedKeyBelow :
-                          (unifiedState.resolve keyAllocation.1).VariablesBelow
-                            unifiedState.inference.next :=
-                        unifiedReady.solved.variablesBelow_apply keyAtUnified
-                      have keyExpressionProperties :=
-                        Detail.inferExprFuel_inferenceProperties unifiedReady
-                          signatureFormation functionsCanonical (by
-                            intro expectedType member
-                            simp only [Option.mem_def] at member
-                            injection member with typeEq
-                            subst expectedType
-                            exact resolvedKeyBelow) keyResult
-                      have tailProgress : baseState.InferenceProgress keyState :=
-                        keyProperties.1.trans
-                          (valueProperties.1.trans
-                            (unifyProgress.trans keyExpressionProperties.1))
-                      have outerBase : outer.SemanticallyExtends
-                          baseState.inference.substitution :=
-                        TypeSystem.Substitution.SemanticallyExtends.trans
-                          outerExtension tailProgress.substitution_extends
-                      have baseType := induction ready invariant outerBase
-                        baseResult
-                      have outerUnified : outer.SemanticallyExtends
-                          unifiedState.inference.substitution :=
-                        TypeSystem.Substitution.SemanticallyExtends.trans
-                          outerExtension
-                          keyExpressionProperties.1.substitution_extends
-                      have mappingEq : outer.apply basePlace.type =
-                          .mapping (outer.apply keyAllocation.1)
-                            (outer.apply valueAllocation.1) := by
-                        calc
-                          outer.apply basePlace.type =
-                              outer.apply (unifiedState.resolve
-                                basePlace.type) := by
-                            simpa [Frontend.SourceInference.State.resolve,
-                              TypeSystem.InferState.resolve] using
-                                (outerUnified basePlace.type).symm
-                          _ = outer.apply (unifiedState.resolve
-                                (.mapping keyAllocation.1
-                                  valueAllocation.1)) :=
-                            congrArg outer.apply
-                              (Detail.unify_resolve_eq unifyResult)
-                          _ = outer.apply (.mapping keyAllocation.1
-                                valueAllocation.1) := by
-                            simpa [Frontend.SourceInference.State.resolve,
-                              TypeSystem.InferState.resolve] using
-                                outerUnified (.mapping keyAllocation.1
-                                  valueAllocation.1)
-                          _ = .mapping (outer.apply keyAllocation.1)
-                                (outer.apply valueAllocation.1) := rfl
-                      have baseMapping : SourcePlaceHasType
-                          (source.applySubstitution outer) target
-                          (basePlace.applySubstitution outer)
-                          (.mapping (outer.apply keyAllocation.1)
-                            (outer.apply valueAllocation.1)) := by
-                        rw [← mappingEq]
-                        exact baseType
-                      have keyExpectedEq : outer.apply inferredKey.type =
-                          outer.apply keyAllocation.1 := by
-                        calc
-                          outer.apply inferredKey.type =
-                              outer.apply (unifiedState.resolve
-                                keyAllocation.1) :=
-                            Detail.inferExprFuel_expected_type_apply_eq
-                              keyResult outerExtension
-                          _ = outer.apply keyAllocation.1 := by
-                            simpa [Frontend.SourceInference.State.resolve,
-                              TypeSystem.InferState.resolve] using
-                                outerUnified keyAllocation.1
-                      have keyType : ExpressionHasType
-                          (source.applySubstitution outer) target inferredKey.id
-                          (outer.apply keyAllocation.1) := by
-                        rw [← keyExpectedEq]
-                        exact expressionSound keyResult
-                      have indexed := SourcePlaceHasType.snocIndex baseMapping
-                        keyType
-                      have resolvedValueEq :
-                          outer.apply (keyState.resolve valueAllocation.1) =
-                            outer.apply valueAllocation.1 := by
-                        simpa [Frontend.SourceInference.State.resolve,
-                          TypeSystem.InferState.resolve] using
-                            outerExtension valueAllocation.1
-                      simpa [keyAllocation, valueAllocation,
-                        PlaceResolution.applySubstitution,
-                        resolvedValueEq] using indexed
+                      exact inferPlaceFuel_index_typed signatureFormation functionsCanonical
+                        baseProperties.2.1 baseProperties.2.2 unifyResult keyResult outerExtension
+                        (fun outerBase => induction ready invariant outerBase baseResult)
+                        (expressionSound keyResult)
       | literal literal =>
           simp [Detail.inferPlaceFuel, targetEq] at success
       | dotConstructor dot name arguments =>

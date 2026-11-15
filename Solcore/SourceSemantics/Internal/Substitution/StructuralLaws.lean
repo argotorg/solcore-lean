@@ -5159,10 +5159,9 @@ theorem StatementsHaveType.applyParameters
       (StructuralSubstitution.UniformMemberProjection.applyParameters catalog
         contextValid selected)
       (restInduction catalog contextValid)
-  · intro context index element indexType finalType rest indexTypeProof indexKind restType
+  · intro context index element indexType finalType rest indexTypeProof restType
       indexInduction restInduction catalog contextValid
-    exact .element (indexInduction catalog contextValid) (by cases indexKind <;> constructor)
-      (restInduction catalog contextValid)
+    exact .element (indexInduction catalog contextValid) (restInduction catalog contextValid)
   · intro context place rootType finalType rootTypeProof projectionsType
       storedTypeEq projectionsInduction catalog contextValid
     exact .intro
@@ -12517,10 +12516,10 @@ theorem StatementsHaveType.applySubstitution
     exact .member
       (UniformMemberProjection.applySubstitution catalog contextValid selected)
       (restInduction targetContext catalog contextValid)
-  · intro context index element indexType finalType rest indexTypeProof indexKind restType
+  · intro context index element indexType finalType rest indexTypeProof restType
       indexInduction restInduction targetContext catalog contextValid
     exact .element (indexInduction targetContext catalog contextValid)
-      (by cases indexKind <;> constructor) (restInduction targetContext catalog contextValid)
+      (restInduction targetContext catalog contextValid)
   · intro context place rootType finalType rootTypeProof projectionsType
       storedTypeEq projectionsInduction targetContext catalog contextValid
     exact .intro

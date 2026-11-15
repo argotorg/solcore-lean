@@ -955,11 +955,12 @@ theorem place_index_key
       (baseAccepted : inferPlaceFuel fuel context base initial = .ok (baseValue, baseState))
       (keyFresh : baseState.fresh = (keyType, keyState))
       (valueFresh : keyState.fresh = (valueType, valueState))
-      (fitting : unify valueState baseValue.type (.mapping keyType valueType) = .ok fitted)
-      (child : (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal).Accepted)
+      (fitting : unify valueState (placeIndexEquation valueState baseValue.type keyType valueType).1
+        (placeIndexEquation valueState baseValue.type keyType valueType).2 = .ok fitted)
+      (child : (CallIndex.expression fuel context key (placeIndexExpected valueState fitted baseValue.type keyType) fitted keyValue childFinal).Accepted)
       (inputs : (CallIndex.place (fuel + 1) context source initial result final).Inputs)
-      (backed : LiveTemplatesBacked initial) : LiveTemplatesBacked (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal).initial := by
-  have step : ChildStep (CallIndex.place (fuel + 1) context source initial result final) (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal) := .place_index_key accepted form baseAccepted keyFresh valueFresh fitting child
+      (backed : LiveTemplatesBacked initial) : LiveTemplatesBacked (CallIndex.expression fuel context key (placeIndexExpected valueState fitted baseValue.type keyType) fitted keyValue childFinal).initial := by
+  have step : ChildStep (CallIndex.place (fuel + 1) context source initial result final) (CallIndex.expression fuel context key (placeIndexExpected valueState fitted baseValue.type keyType) fitted keyValue childFinal) := .place_index_key accepted form baseAccepted keyFresh valueFresh fitting child
   have childInputs := step.inputs inputs
   have before := ChildStep.inputs inputs (.place_index_base accepted form baseAccepted)
   have baseBacked := place before backed baseAccepted

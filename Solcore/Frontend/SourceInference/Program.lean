@@ -395,10 +395,25 @@ def expressionTypeAt? (state : State) (expression : ExpressionId) : Option Ty :=
     | .expression node => if node.id = expression then some (state.resolve node.type) else none
     | .statement _ => none
 
+/-- The indexes of a place's elements of memory arrays, in order. -/
+def placeElementIndexes (place : PlaceResolution) : List ExpressionId :=
+  place.projections.filterMap fun
+    | .element index => some index
+    | .index _ | .member _ _ => none
+
+/-- Whether a type variable occurs in the type of one of a place's element indexes,
+which waits for its type as a read's index does. -/
+def placeIndexMentions (state : State) (typeVar : TypeVarId) (place : PlaceResolution) : Bool :=
+  (placeElementIndexes place).any fun index =>
+    match expressionTypeAt? state index with
+    | some type => type.freeVariables.contains typeVar
+    | none => false
+
 /-- Whether a type variable occurs in a compound assignment's target type, for
-an operator that takes its target's type (`compoundTakesTargetType`), or in a
+an operator that takes its target's type (`compoundTakesTargetType`), in a
 compound shift's amount type: upstream reads `x <<= n` as `x = x << n`, whose
-value and amount are both a shift's operands. -/
+value and amount are both a shift's operands; or in one of the target's element
+indexes' types. -/
 def assignmentMentions (state : State) (typeVar : TypeVarId)
     (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp)
     (value : ExpressionId) : Bool :=
@@ -407,13 +422,16 @@ def assignmentMentions (state : State) (typeVar : TypeVarId)
   (isShiftAssign operator &&
     match expressionTypeAt? state value with
     | some type => type.freeVariables.contains typeVar
-    | none => false)
+    | none => false) ||
+  placeIndexMentions state typeVar assignment.target
 
 /-- Whether a type variable occurs in an in-place `~` target's type: upstream
-reads `x ~=` as `x = ~x`, whose operand is the target. -/
+reads `x ~=` as `x = ~x`, whose operand is the target; or in one of its element
+indexes' types. -/
 def bitNotMentions (state : State) (typeVar : TypeVarId)
     (assignment : AssignmentResolution) : Bool :=
-  (state.resolve assignment.target.type).freeVariables.contains typeVar
+  (state.resolve assignment.target.type).freeVariables.contains typeVar ||
+    placeIndexMentions state typeVar assignment.target
 
 /-- Whether a type variable occurs in a `for` item's compound or in-place `~`
 target type. -/
@@ -613,6 +631,19 @@ def validateShiftAmount (state : State) (operator : Syntax.ValueAssignOp)
       ((expressionTypeAt? state value).getD .word))
   else .ok ()
 
+/-- An element place's indexes, once the defaults are in, have `word` or one of
+the twelve types, as a read's index does (`validateArrayIndex`). -/
+def validatePlaceIndexes (state : State) (place : PlaceResolution) : Except Error Unit :=
+  match (placeElementIndexes place).find? fun index =>
+      state.nodes.any (operandMisfits state index arrayIndexFits) with
+  | some index =>
+      throw (.operatorNotSupported "Typedef" ((expressionTypeAt? state index).getD .word))
+  | none => .ok ()
+
+/-- Whether a place takes an element of a memory array. -/
+def placeHasElement (place : PlaceResolution) : Bool :=
+  !(placeElementIndexes place).isEmpty
+
 /-- Check one value assignment's target type once the defaults are in
 (`compoundTargetFits`), naming the assigned value, and a compound shift's amount
 (`validateShiftAmount`). -/
@@ -748,6 +779,55 @@ def validateAssignmentTargets (state : State) : List Node → Except Error Unit
       validateAssignmentTargetNode state node
       validateAssignmentTargets state rest
 
+/-- One value assignment's element places: a compound assignment to an element of
+a memory array waits for decision 3 and is rejected, naming the assigned value,
+and an element place's indexes are checked as a read's (`validatePlaceIndexes`). -/
+def validateElementAssignment (state : State) (assignment : AssignmentResolution)
+    (operator : Syntax.ValueAssignOp) (value : ExpressionId) : Except Error Unit :=
+  if operator != .equal && placeHasElement assignment.target then
+    throw (.compoundTargetNotSupported value operator (state.resolve assignment.target.type))
+  else validatePlaceIndexes state assignment.target
+
+/-- An in-place `~` takes no element of a memory array: it waits for decision 3,
+as a compound assignment to one does. -/
+def validateElementBitNot (state : State) (assignment : AssignmentResolution) :
+    Except Error Unit :=
+  if placeHasElement assignment.target then
+    throw (.operatorNotSupported "BitNot" (state.resolve assignment.target.type))
+  else .ok ()
+
+/-- The element places among a `for` header's items. -/
+def validateForItemElements (state : State) : List ForItemForm → Except Error Unit
+  | [] => .ok ()
+  | .assignValue assignment operator value :: rest => do
+      validateElementAssignment state assignment operator value
+      validateForItemElements state rest
+  | .assignBitNot assignment :: rest => do
+      validateElementBitNot state assignment
+      validateForItemElements state rest
+  | _ :: rest => validateForItemElements state rest
+
+/-- The element places of one node: an assignment statement's, an in-place `~`'s
+and a `for` header's items. -/
+def validatePlaceElementNode (state : State) : Node → Except Error Unit
+  | .statement node =>
+      match node.form with
+      | .assignValue assignment operator value =>
+          validateElementAssignment state assignment operator value
+      | .assignBitNot assignment => validateElementBitNot state assignment
+      | .forLoop initializer _ post _ => do
+          validateForItemElements state initializer
+          validateForItemElements state post
+      | _ => .ok ()
+  | .expression _ => .ok ()
+
+/-- Check every element place once the defaults are in. -/
+def validatePlaceElements (state : State) : List Node → Except Error Unit
+  | [] => .ok ()
+  | node :: rest => do
+      validatePlaceElementNode state node
+      validatePlaceElements state rest
+
 /-- Check the source spelling and exact inference metadata retained by one
 integer-literal expression node. -/
 def validateIntegerLiteralNode (state : State) : Node → Except Error Unit
@@ -806,6 +886,7 @@ def finalize (context : Context) (type : Ty) (state : State)
   validateIntegerPatternTargets state state.integerPatterns
   validateIntegerLiteralTargets state state.integerLiterals
   validateAssignmentTargets state state.nodes
+  validatePlaceElements state state.nodes
   validateSourceRequirementOwnership (state.toTypedSource roots)
     state.requirements
   let substitution := state.inference.substitution

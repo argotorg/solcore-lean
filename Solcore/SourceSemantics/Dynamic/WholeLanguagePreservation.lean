@@ -981,7 +981,7 @@ mutual
         obtain ⟨middleType, leading_type, element_type⟩ :=
           SourceProjectionsHaveType.split projections_type
         cases element_type with
-        | element index_type _ rest_type =>
+        | element index_type rest_type =>
           cases rest_type
           have prefix_typing : SourcePlaceHasType source context
               { place with projections := leading, type := TypeSystem.Ty.array place.type }

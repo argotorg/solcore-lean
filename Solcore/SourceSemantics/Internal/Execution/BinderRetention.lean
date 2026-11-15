@@ -689,9 +689,10 @@ theorem place_index_key
       (baseAccepted : inferPlaceFuel fuel context base initial = .ok (baseValue, baseState))
       (keyFresh : baseState.fresh = (keyType, keyState))
       (valueFresh : keyState.fresh = (valueType, valueState))
-      (fitting : unify valueState baseValue.type (.mapping keyType valueType) = .ok fitted)
-      (child : (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal).Accepted)  :
-    BindersRetained (CallIndex.expression fuel context key (some (fitted.resolve keyType)) fitted keyValue childFinal).final.nodes (CallIndex.place (fuel + 1) context source initial result final).final.nodes := by
+      (fitting : unify valueState (placeIndexEquation valueState baseValue.type keyType valueType).1
+        (placeIndexEquation valueState baseValue.type keyType valueType).2 = .ok fitted)
+      (child : (CallIndex.expression fuel context key (placeIndexExpected valueState fitted baseValue.type keyType) fitted keyValue childFinal).Accepted)  :
+    BindersRetained (CallIndex.expression fuel context key (placeIndexExpected valueState fitted baseValue.type keyType) fitted keyValue childFinal).final.nodes (CallIndex.place (fuel + 1) context source initial result final).final.nodes := by
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.final] at ⊢
   unfold inferPlaceFuel at accepted
@@ -1345,10 +1346,16 @@ theorem place_index_base
     BindersRetained (CallIndex.place fuel context base initial value childFinal).final.nodes (CallIndex.place (fuel + 1) context source initial result final).final.nodes := by
   simp only [CallIndex.Accepted] at accepted child
   dsimp only [CallIndex.final] at ⊢
-  cases fitting : Detail.unify childFinal.fresh.2.fresh.2 value.type (.mapping childFinal.fresh.1 childFinal.fresh.2.fresh.1) with
+  cases fitting : Detail.unify childFinal.fresh.2.fresh.2
+      (placeIndexEquation childFinal.fresh.2.fresh.2 value.type childFinal.fresh.1
+        childFinal.fresh.2.fresh.1).1
+      (placeIndexEquation childFinal.fresh.2.fresh.2 value.type childFinal.fresh.1
+        childFinal.fresh.2.fresh.1).2 with
   | error error => simp [inferPlaceFuel, form, child, fitting, bind, Except.bind] at accepted
   | ok fitted =>
-    cases keyAccepted : inferExprFuel fuel context key (some (fitted.resolve childFinal.fresh.1)) fitted with
+    cases keyAccepted : inferExprFuel fuel context key
+        (placeIndexExpected childFinal.fresh.2.fresh.2 fitted value.type childFinal.fresh.1)
+        fitted with
     | error error => simp [inferPlaceFuel, form, child, fitting, keyAccepted, bind, Except.bind] at accepted
     | ok keyResult =>
       exact (unify_retained fitting).trans ((inferExprFuel_origins_progress keyAccepted).retained.trans
