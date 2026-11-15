@@ -626,6 +626,8 @@ private theorem syntaxTree (mode : Bool) : CompatibleAssignmentStatements.Syntax
     have same := Except.ok.inj (this.symm.trans found)
     cases same
     exact writable
+  · intro index member
+    simp [assignment] at member
   · exact .of_type booleanTyped
   · exact .inl rfl
   · exact .tail (.body (.returnValue [] rfl rfl rfl rfl rfl booleanTyped (.fragment (.fragment (.fragment (.fragment (.primitive (.product (.literal rfl (.bool "true" true))))))))))
@@ -1057,7 +1059,7 @@ private def inspect {checked : SourceCoreCompatibleCatalog.Checked}
       reasonAt invalid invalid (fun _ => invalid) with
   | .error error => throw (IO.userError s!"actual renamed assignment lowering failed: {reprStr error}")
   | .ok lowered =>
-    have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower accepted
+    have receipt := fun plain => CompatiblePlaceCompilerCertificates.generated_of_lower plain accepted
     let _receipt := receipt
     let frame : SourceCoreCallableIndexedFrames.Layout := ⟨⟨checked.catalog.definitions.length⟩⟩
     let frameExpr := SourceCoreCallableIndexedFrames.empty frame
@@ -1185,7 +1187,7 @@ private def inspect {checked : SourceCoreCompatibleCatalog.Checked}
       reasonAt invalid invalid (fun _ => invalid) with
   | .error error => throw (IO.userError s!"actual renamed assignment fault lowering failed: {reprStr error}")
   | .ok lowered =>
-    have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower accepted
+    have receipt := fun plain => CompatiblePlaceCompilerCertificates.generated_of_lower plain accepted
     let _receipt := receipt
     let frame : SourceCoreCallableIndexedFrames.Layout := ⟨⟨checked.catalog.definitions.length⟩⟩
     let frameExpr := SourceCoreCallableIndexedFrames.empty frame
@@ -2718,7 +2720,7 @@ private def inspect {checked : SourceCoreCompatibleCatalog.Checked}
       reasonAt invalid invalid (fun _ => invalid) with
   | .error error => throw (IO.userError s!"actual typed assignment lowering failed: {reprStr error}")
   | .ok lowered =>
-    have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower accepted
+    have receipt := fun plain => CompatiblePlaceCompilerCertificates.generated_of_lower plain accepted
     let _receipt := receipt
     let frame : SourceCoreCallableIndexedFrames.Layout := ⟨⟨checked.catalog.definitions.length⟩⟩
     let frameExpr := SourceCoreCallableIndexedFrames.empty frame
@@ -2912,7 +2914,7 @@ private def inspect {checked : SourceCoreCompatibleCatalog.Checked}
       reasonAt invalid invalid (fun _ => invalid) with
   | .error error => throw (IO.userError s!"actual typed assignment fault lowering failed: {reprStr error}")
   | .ok lowered =>
-    have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower accepted
+    have receipt := fun plain => CompatiblePlaceCompilerCertificates.generated_of_lower plain accepted
     let _receipt := receipt
     let frame : SourceCoreCallableIndexedFrames.Layout := ⟨⟨checked.catalog.definitions.length⟩⟩
     let frameExpr := SourceCoreCallableIndexedFrames.empty frame
@@ -3603,7 +3605,7 @@ private def inspect {checked : SourceCoreCompatibleCatalog.Checked}
       reasonAt invalid invalid (fun _ => invalid) with
   | .error error => throw (IO.userError s!"actual typed place lowering failed: {reprStr error}")
   | .ok lowered =>
-    have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower accepted
+    have receipt := fun plain => CompatiblePlaceCompilerCertificates.generated_of_lower plain accepted
     let _receipt := receipt
     let frame : SourceCoreCallableIndexedFrames.Layout := ⟨⟨checked.catalog.definitions.length⟩⟩
     let frameExpr := SourceCoreCallableIndexedFrames.empty frame

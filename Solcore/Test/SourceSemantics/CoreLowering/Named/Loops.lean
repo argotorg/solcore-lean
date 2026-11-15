@@ -1701,6 +1701,8 @@ private theorem assigned {source : TypedSource} {context : SourceSemantics.Conte
             cases projections
             have word := target.symm.trans targetType
             simpa only [word, scheme, TypeSystem.Scheme.mono] using writable
+          · intro index member
+            simp [bare] at member
           · rw [target]; exact .of_type rhs
           · exact .inl rfl
           · intro child member
@@ -1738,6 +1740,8 @@ private theorem header_assigned {source : TypedSource} {context : SourceSemantic
             cases projections
             have word := target.symm.trans targetType
             simpa only [word, scheme, TypeSystem.Scheme.mono] using writable
+          · intro index member
+            simp [bare] at member
           · rw [target]; exact .of_type rhs
           · exact .inl rfl
           · intro child member
@@ -3152,6 +3156,8 @@ private theorem assigned {source : TypedSource} {context : SourceSemantics.Conte
             cases projections
             have word := target.symm.trans targetType
             simpa only [word, scheme, TypeSystem.Scheme.mono] using writable
+          · intro index member
+            simp [bare] at member
           · rw [target]; exact .of_type rhs
           · exact .inl rfl
           · intro child member

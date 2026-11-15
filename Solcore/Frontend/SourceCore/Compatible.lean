@@ -1357,7 +1357,123 @@ def execute (prepared : Prepared) (reference : Core.Expr) (keys : SourceCoreBasi
               (SourceCoreDataPlaces.guard outputType operator
                 (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next))))))))
 
-def lower (context : Context) (signatures : ProgramSignatures) (expression : ExpressionLowerer)
+/-- Whether a place takes an element of a memory array. -/
+def takesElement (projections : List PlaceProjection) : Bool :=
+  projections.any fun
+    | .element _ => true
+    | .index _ | .member _ _ => false
+
+/-- The right side of a plain write `p[i] = v` to an element of a memory array. Inference
+rejects a compound assignment or an in-place `~` on an element until decision 3, and every
+other place keeps its route. -/
+def elementWrite? (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp)
+    (rhs : Option ExpressionId) : Option ExpressionId :=
+  match operator, rhs with
+  | .equal, some rhs => if takesElement assignment.target.projections then some rhs else none
+  | _, _ => none
+
+/-- An in-place `~` writes no element. -/
+theorem elementWrite?_bitNot (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) :
+    elementWrite? assignment operator none = none := by
+  cases operator <;> rfl
+
+/-- A place that takes no element keeps its route. -/
+theorem elementWrite?_of_free {assignment : AssignmentResolution} (operator : Syntax.ValueAssignOp)
+    (rhs : Option ExpressionId)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections) :
+    elementWrite? assignment operator rhs = none := by
+  have none : takesElement assignment.target.projections = false := by
+    unfold takesElement
+    rw [List.any_eq_false]
+    intro projection member
+    cases projection with
+    | element index => exact absurd member (free index)
+    | index _ => simp
+    | member _ _ => simp
+  unfold elementWrite?
+  split
+  · simp [none]
+  · rfl
+
+/-- `p[i₀]⋯[iₖ] = v` from the root array bound at `var 0`, `depth` binders above the
+statement's scope: each index's effects, then `Panic(0x32)` from its array's length on, then
+the next array, the element present at the index or the array's default element, as a read's;
+after the last index the right side's effects, then the last array's cell takes the value at
+that index, keeping its length and default element, and `next` runs. Each element names its
+array's mapping layout and its index. -/
+def arrayElementWrite (outputType : Core.Ty) (comparison rhs next : Core.Expr) :
+    Nat → List (Core.OrderedMapping.Layout × Core.Expr) → Core.Expr
+  | _, [] => Core.LanguageResult.failure outputType
+      (.word (SourceCorePanics.reason SourceCorePanics.outOfBounds))
+  | depth, [(layout, index)] =>
+      Core.LanguageResult.bind outputType (shift depth index)
+        (.ifE (Core.Expr.wordLt (.var 0) (.first (.loadCell (.var 1))))
+          (Core.LanguageResult.bind outputType (shift (depth + 1) rhs)
+            (Core.LanguageResult.bind outputType
+              (Core.OrderedMapping.insert layout (shift (depth + 2) comparison)
+                (.second (.second (.loadCell (.var 2)))) (.var 1) (.var 0))
+              (.letE (.storeCell (.var 3) (.pair (.first (.loadCell (.var 3)))
+                  (.pair (.first (.second (.loadCell (.var 3)))) (.var 0))))
+                (shift (depth + 4) next))))
+          (Core.LanguageResult.failure outputType
+            (.word (SourceCorePanics.reason SourceCorePanics.outOfBounds))))
+  | depth, (layout, index) :: rest =>
+      Core.LanguageResult.bind outputType (shift depth index)
+        (.ifE (Core.Expr.wordLt (.var 0) (.first (.loadCell (.var 1))))
+          (Core.LanguageResult.bind outputType
+            (Core.OrderedMapping.lookup layout (shift (depth + 1) comparison)
+              (.second (.second (.loadCell (.var 1)))) (.var 0))
+            (Core.LanguageResult.bind outputType
+              (.caseE (.var 0)
+                (Core.LanguageResult.success (.first (.second (.loadCell (.var 3)))))
+                (Core.LanguageResult.success (.var 0)))
+              (arrayElementWrite outputType comparison rhs next (depth + 3) rest)))
+          (Core.LanguageResult.failure outputType
+            (.word (SourceCorePanics.reason SourceCorePanics.outOfBounds))))
+
+/-- `p[i₀]⋯[iₖ] = v` on memory arrays, a root local followed by elements only: the root's
+array, or the place's reason when the root is not yet initialized, as the route's getter
+fails, then `arrayElementWrite`. Each element's mapping layout is read off its array's Core
+cell type, as a read's, and its index is a word. -/
+def lowerElements (context : Context) (expression : ExpressionLowerer) (fuel : Nat)
+    (source : TypedSource) (scope : Scope) (site : SourceCoreElaboration.ErrorSite)
+    (assignment : AssignmentResolution) (rhs : ExpressionId) (outputType : Core.Ty)
+    (next : Core.Expr) (reasonAt : ExpressionId → Core.Word) (invalidProjection : Core.Word) :
+    Except Error Core.Expr := do
+  let root := assignment.target.root
+  unless assignment.requirements.isEmpty do throw (.assignmentRequirementsPresent root)
+  let binder ← rootBinder source root
+  let rootType ← project context.checked (.binder root) binder.scheme.body
+  let (index, storedType) ← match SourceCoreLocalCell.lookup? scope root with
+    | some found => pure found
+    | none => throw (.missingBinding root)
+  SourceCoreBasic.ensureType site rootType storedType
+  let comparison ← (SourceCoreCompatibleDataEquality.prepare fuel context.checked
+    (.constructor (.builtin .word))).mapError (fun _ => SourceCoreBasic.Error.projectedAssignment root)
+  let (steps, leafType) ← assignment.target.projections.foldlM (init := ([], rootType))
+    fun (steps, arrayType) projection => do
+      let key ← match projection with
+        | .element key => pure key
+        | .index _ | .member _ _ => throw (.projectedAssignment root)
+      let (elementType, identity) ← match arrayType with
+        | .cell (.product .word (.product elementType (.namedData identity))) =>
+            pure (elementType, identity)
+        | _ => throw (.projectedAssignment root)
+      let key ← expression fuel source scope key reasonAt
+      SourceCoreBasic.ensureType site .word key.type
+      pure (steps ++ [((⟨.word, elementType, identity⟩ : Core.OrderedMapping.Layout),
+        key.expression)], elementType)
+  SourceCoreBasic.ensureType site (← project context.checked site assignment.target.type) leafType
+  let value ← expression fuel source scope rhs reasonAt
+  SourceCoreBasic.ensureType site leafType value.type
+  pure (Core.LanguageResult.bind outputType
+    (.caseE (.loadCell (.var index)) (Core.LanguageResult.failure storedType (.word invalidProjection))
+      (Core.LanguageResult.success (.var 0)))
+    (arrayElementWrite outputType comparison.expression value.expression next 1 steps))
+
+/-- The route of a place's write: keys, getter, right side, modifier, setter and guard, then
+the root's store (`execute`). -/
+def lowerRoute (context : Context) (signatures : ProgramSignatures) (expression : ExpressionLowerer)
     (fuel : Nat) (source : TypedSource) (scope : Scope) (site : SourceCoreElaboration.ErrorSite)
     (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) (rhs : Option ExpressionId)
     (outputType : Core.Ty) (next : Core.Expr) (reasonAt : ExpressionId → Core.Word)
@@ -1385,6 +1501,57 @@ def lower (context : Context) (signatures : ProgramSignatures) (expression : Exp
   pure (execute prepared (.var index) (SourceCoreCalls.packArguments keys) rhs next outputType
     (placeModifier assignment.target.type (route.leafType = .integer) operator bitNot) bitNot invalidOperand
     (SourceCoreDataPlaces.placeWrap assignment.target.type operator bitNot))
+
+/-- A place's write: a plain write to an element of a memory array by `lowerElements`, every
+other place by its route. -/
+def lower (context : Context) (signatures : ProgramSignatures) (expression : ExpressionLowerer)
+    (fuel : Nat) (source : TypedSource) (scope : Scope) (site : SourceCoreElaboration.ErrorSite)
+    (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) (rhs : Option ExpressionId)
+    (outputType : Core.Ty) (next : Core.Expr) (reasonAt : ExpressionId → Core.Word)
+    (invalidProjection invalidOperand : Core.Word) (missing : TypeSystem.Ty → Core.Word) : Except Error Core.Expr :=
+  match elementWrite? assignment operator rhs with
+  | some value => lowerElements context expression fuel source scope site assignment value outputType next
+      reasonAt invalidProjection
+  | none => lowerRoute context signatures expression fuel source scope site assignment operator rhs outputType
+      next reasonAt invalidProjection invalidOperand missing
+
+/-- A place that writes no element is lowered by its route. -/
+theorem lower_of_plain {context : Context} {signatures : ProgramSignatures} {expression : ExpressionLowerer}
+    {fuel : Nat} {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : Option ExpressionId}
+    {outputType : Core.Ty} {next : Core.Expr} {reasonAt : ExpressionId → Core.Word}
+    {invalidProjection invalidOperand : Core.Word} {missing : TypeSystem.Ty → Core.Word}
+    (plain : elementWrite? assignment operator rhs = none) :
+    lower context signatures expression fuel source scope site assignment operator rhs outputType next reasonAt
+        invalidProjection invalidOperand missing =
+      lowerRoute context signatures expression fuel source scope site assignment operator rhs outputType next
+        reasonAt invalidProjection invalidOperand missing := by
+  simp only [lower, plain]
+
+/-- A successful place write found its root's binder: the element path and the route both
+take it first. -/
+theorem rootBinder_of_lower {context : Context} {signatures : ProgramSignatures}
+    {expression : ExpressionLowerer} {fuel : Nat} {source : TypedSource} {scope : Scope}
+    {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {rhs : Option ExpressionId} {outputType : Core.Ty}
+    {next : Core.Expr} {reasonAt : ExpressionId → Core.Word}
+    {invalidProjection invalidOperand : Core.Word} {missing : TypeSystem.Ty → Core.Word}
+    {code : Core.Expr}
+    (accepted : lower context signatures expression fuel source scope site assignment operator rhs
+      outputType next reasonAt invalidProjection invalidOperand missing = .ok code) :
+    ∃ binder, rootBinder source assignment.target.root = .ok binder := by
+  cases found : rootBinder source assignment.target.root with
+  | ok binder => exact ⟨binder, rfl⟩
+  | error error =>
+    exfalso
+    unfold lower at accepted
+    split at accepted
+    · unfold lowerElements at accepted
+      by_cases empty : assignment.requirements.isEmpty <;>
+        simp [empty, found, bind, Except.bind] at accepted
+    · unfold lowerRoute describe at accepted
+      by_cases empty : assignment.requirements.isEmpty <;>
+        simp [empty, found, bind, Except.bind] at accepted
 
 /-- A key failure stops before snapshot selection, RHS and structural write.
 The premise uses the actual inserted reference environment. -/
@@ -1617,34 +1784,46 @@ def prepare (context : Context) (plan : Plan) (root : Key)
             let concrete := SourceCoreDataCatalog.closed assignment.target.type &&
               declared.any (fun binder => SourceCoreDataCatalog.closed binder.scheme.body)
             if concrete then
-              let route ← (SourceCoreCompatibleDataPlaces.describe context context.checked.signatures source site assignment)
-                |>.mapError Error.lowering
-              unless route.steps.isEmpty || places.any (fun previous => decide
-                  (previous.owner = owner ∧ previous.location = site ∧
-                   previous.binder = assignment.target.root ∧ previous.missingType = none)) do
-                let reason ← word next
-                next := next + 1
-                let diagnostic : Diagnostic := {error := .invalidPlaceProjection, site, span := some node.span}
-                places := places ++ [⟨owner, site, assignment.target.root, none, reason, diagnostic⟩]
-                fixed := fixed ++ [(reason, diagnostic)]
-              for step in route.steps do
-                match step with
-                | .index _ key valueType =>
-                    let reason ← match places.find? (fun previous => decide
-                        (previous.owner = owner ∧ previous.location = site ∧
-                         previous.binder = assignment.target.root ∧ previous.missingType = some valueType)) with
-                      | some previous => pure previous.reason
-                      | none => do
-                          let reason ← word next
-                          discard <| word (next + width - 1)
-                          next := next + width
-                          let diagnostic : Diagnostic := {error := .typeMismatch valueType none, site, span := some node.span}
-                          places := places ++ [⟨owner, site, assignment.target.root, some valueType, reason, diagnostic⟩]
-                          pure reason
-                    let keyNode ← match source.lookupExpression? key with
-                      | some keyNode => pure keyNode | none => throw (.lowering (.missingExpression key))
-                    missing := missing ++ [⟨owner, site, some assignment.target.root, keyNode.type, valueType, node.span, reason⟩]
-                | _ => pure ()
+              -- A plain write to an element of a memory array has no route: its one fault word is
+              -- its place's, for a root not yet initialized, as a projected route's is.
+              if SourceCoreCompatibleDataPlaces.takesElement assignment.target.projections then
+                unless places.any (fun previous => decide
+                    (previous.owner = owner ∧ previous.location = site ∧
+                     previous.binder = assignment.target.root ∧ previous.missingType = none)) do
+                  let reason ← word next
+                  next := next + 1
+                  let diagnostic : Diagnostic := {error := .invalidPlaceProjection, site, span := some node.span}
+                  places := places ++ [⟨owner, site, assignment.target.root, none, reason, diagnostic⟩]
+                  fixed := fixed ++ [(reason, diagnostic)]
+              else
+                let route ← (SourceCoreCompatibleDataPlaces.describe context context.checked.signatures source site assignment)
+                  |>.mapError Error.lowering
+                unless route.steps.isEmpty || places.any (fun previous => decide
+                    (previous.owner = owner ∧ previous.location = site ∧
+                     previous.binder = assignment.target.root ∧ previous.missingType = none)) do
+                  let reason ← word next
+                  next := next + 1
+                  let diagnostic : Diagnostic := {error := .invalidPlaceProjection, site, span := some node.span}
+                  places := places ++ [⟨owner, site, assignment.target.root, none, reason, diagnostic⟩]
+                  fixed := fixed ++ [(reason, diagnostic)]
+                for step in route.steps do
+                  match step with
+                  | .index _ key valueType =>
+                      let reason ← match places.find? (fun previous => decide
+                          (previous.owner = owner ∧ previous.location = site ∧
+                           previous.binder = assignment.target.root ∧ previous.missingType = some valueType)) with
+                        | some previous => pure previous.reason
+                        | none => do
+                            let reason ← word next
+                            discard <| word (next + width - 1)
+                            next := next + width
+                            let diagnostic : Diagnostic := {error := .typeMismatch valueType none, site, span := some node.span}
+                            places := places ++ [⟨owner, site, assignment.target.root, some valueType, reason, diagnostic⟩]
+                            pure reason
+                      let keyNode ← match source.lookupExpression? key with
+                        | some keyNode => pure keyNode | none => throw (.lowering (.missingExpression key))
+                      missing := missing ++ [⟨owner, site, some assignment.target.root, keyNode.type, valueType, node.span, reason⟩]
+                  | _ => pure ()
   let extra ← missingDiagnostics context.registry missing
   let rootTable := {base.rootTable with additional := fixed ++ extra}
   let expressions : SourceCoreDataFaultSites.Program := {base, indices, rootTable}

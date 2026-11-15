@@ -1528,7 +1528,7 @@ theorem tail {program : Program} {evidence : Dynamic.EvidenceEnvironment}
   | whileLoop found form conditionFound conditionType typed conditionSyntax loopBody remaining =>
     obtain ⟨same, _⟩ := ScalarStatementViews.whileLoop unique (lookupStatement?_sound found) form executed
     exact same.symm ▸ remaining
-  | assign found form sourceTyped writable rightTyped profile children remaining =>
+  | assign found form sourceTyped writable free rightTyped profile children remaining =>
     obtain ⟨same, _⟩ := ScalarStatementViews.assignValue unique (lookupStatement?_sound found) form executed
     exact same.symm ▸ remaining
   | forLoop found form sourceType initial remaining =>

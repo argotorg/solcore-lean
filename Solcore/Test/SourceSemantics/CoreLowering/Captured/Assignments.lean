@@ -1051,6 +1051,8 @@ theorem ObservedFactory.body_syntax {fixture : CompiledFixture} (observed : Obse
                   cases projections
                   have word := targetType.symm.trans observed.shape.targetType
                   simpa only [word, observed.binderScheme, TypeSystem.Scheme.mono] using writable
+                · intro index member
+                  simp [observed.shape.targetBare] at member
                 · rw [targetType]; exact .of_type rhs
                 · exact .inl rfl
                 · intro id member

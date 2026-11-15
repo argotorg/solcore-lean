@@ -96,6 +96,7 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+      (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -143,6 +144,7 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
+      (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)

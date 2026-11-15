@@ -47,6 +47,7 @@ inductive Syntax (source : TypedSource) : SourceSemantics.Context → List ForIt
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
+      (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -293,7 +294,7 @@ theorem tree_of_lowerForItems
       obtain ⟨actualNode, actualFound, child, _⟩ := expressions context scope fuel expression lowered closed residual sourceSignatures declarations generated
       obtain ⟨_, bodyTyped⟩ := TypedLexicalWhile.Native.discard_child nativeTyped
       exact .discard found child (ih closed residual sourceSignatures declarations generatedBody bodyTyped)
-  | @assign context assignment operator rhs rest sourceTyped writable rightTyped profile remaining ih =>
+  | @assign context assignment operator rhs rest sourceTyped writable free rightTyped profile remaining ih =>
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
@@ -304,7 +305,7 @@ theorem tree_of_lowerForItems
           (invalidProjection parentSite assignment.target.root) (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered generated => expressions context scope fuel id lowered closed residual sourceSignatures declarations generated) compiled nativeTyped
       exact .assign head (ih closed residual sourceSignatures declarations generatedBody (TypedImperative.Native.execute_continuation nativeTyped))
 
@@ -1043,6 +1044,7 @@ inductive UnarySyntax (source : TypedSource) : SourceSemantics.Context → List 
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
+      (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -1158,7 +1160,7 @@ theorem tree_of_lowerForItems_withBitNot
       obtain ⟨actualNode, actualFound, child, _⟩ := expressions context scope fuel expression lowered closed residual sourceSignatures declarations generated
       obtain ⟨_, bodyTyped⟩ := TypedLexicalWhile.Native.discard_child nativeTyped
       exact .discard found child (ih closed residual sourceSignatures declarations generatedBody bodyTyped)
-  | @assign context assignment operator rhs rest sourceTyped writable rightTyped profile remaining ih =>
+  | @assign context assignment operator rhs rest sourceTyped writable free rightTyped profile remaining ih =>
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
@@ -1169,7 +1171,7 @@ theorem tree_of_lowerForItems_withBitNot
           (invalidProjection parentSite assignment.target.root) (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered generated => expressions context scope fuel id lowered closed residual sourceSignatures declarations generated) compiled nativeTyped
       exact .assign head (ih closed residual sourceSignatures declarations generatedBody (TypedImperative.Native.execute_continuation nativeTyped))
 

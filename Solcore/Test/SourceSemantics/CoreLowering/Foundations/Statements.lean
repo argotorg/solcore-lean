@@ -70,6 +70,7 @@ theorem actual_compiler_operand_diagnostic
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
@@ -89,7 +90,7 @@ theorem actual_compiler_operand_diagnostic
       (∀ previous right, Dynamic.AssignmentOperandsInvalid operator previous right →
         ∃ diagnostic rawType, table.diagnostic? head.invalid = some diagnostic ∧
           diagnostic.error = .invalidAssignmentOperands operator none (some rawType)) := by
-  obtain ⟨head, emitted, same, law⟩ := Head.of_prepared_policy unique signatures sourceTyped writable rightTyped rawProfile
+  obtain ⟨head, emitted, same, law⟩ := Head.of_prepared_policy unique signatures sourceTyped writable free rightTyped rawProfile
     extract prepared member occurs (fun _ _ proof => proof) accepted typed
   refine ⟨head, emitted, ?_, law⟩
   intro equal

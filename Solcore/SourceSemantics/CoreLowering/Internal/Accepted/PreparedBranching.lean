@@ -676,9 +676,9 @@ theorem GenericForHeader.PreparedSyntax.bareUnary {source : TypedSource} {approv
   | discard found typed syntaxTree remaining ih =>
     intro shape
     exact .discard found typed syntaxTree (ih shape.tail)
-  | assign sourceTyped writable rightTyped profile children remaining ih =>
+  | assign sourceTyped writable free rightTyped profile children remaining ih =>
     intro shape
-    exact .assign sourceTyped writable rightTyped profile children (ih shape.tail)
+    exact .assign sourceTyped writable free rightTyped profile children (ih shape.tail)
   | bitNot writable bare profile remaining ih =>
     intro shape
     exact .bitNot writable bare profile (ih shape.tail)
@@ -715,9 +715,9 @@ theorem GenericImperativeMatch.PreparedSyntax.bareUnary {source : TypedSource} {
     intro shape
     exact .whileLoop found form conditionFound conditionType typed syntaxTree
       (innerIH (shape.loop found form)) (restIH shape.tail)
-  | assign found form sourceTyped writable rightTyped profile children remaining ih =>
+  | assign found form sourceTyped writable free rightTyped profile children remaining ih =>
     intro shape
-    exact .assign found form sourceTyped writable rightTyped profile children (ih shape.tail)
+    exact .assign found form sourceTyped writable free rightTyped profile children (ih shape.tail)
   | forLoop found form sourceType initial remaining initialIH restIH =>
     intro shape
     have parts := shape.for_children found form
@@ -734,9 +734,9 @@ theorem GenericImperativeMatch.PreparedSyntax.bareUnary {source : TypedSource} {
   | initializerDiscard found typed syntaxTree remaining ih =>
     intro shape
     exact .initializerDiscard found typed syntaxTree (ih ⟨shape.1.tail, shape.2⟩)
-  | initializerAssign sourceTyped writable rightTyped profile children remaining ih =>
+  | initializerAssign sourceTyped writable free rightTyped profile children remaining ih =>
     intro shape
-    exact .initializerAssign sourceTyped writable rightTyped profile children (ih ⟨shape.1.tail, shape.2⟩)
+    exact .initializerAssign sourceTyped writable free rightTyped profile children (ih ⟨shape.1.tail, shape.2⟩)
   | bitNot found form writable bare profile remaining ih =>
     intro shape
     exact .bitNot found form writable bare profile (ih shape.tail)
@@ -798,9 +798,9 @@ theorem GenericForHeader.PreparedSyntax.legacy {source : TypedSource} {approved 
   | discard found typed syntaxTree remaining ih =>
     intro shape
     exact .discard found typed syntaxTree (ih shape.discard_tail)
-  | assign sourceTyped writable rightTyped profile children remaining ih =>
+  | assign sourceTyped writable free rightTyped profile children remaining ih =>
     intro shape
-    exact .assign sourceTyped writable rightTyped profile children (ih shape.assign_tail.2.2)
+    exact .assign sourceTyped writable free rightTyped profile children (ih shape.assign_tail.2.2)
   | bitNot writable bare profile remaining ih =>
     intro shape
     exact .bitNot writable bare profile (ih shape.bitNot_tail.2.2)
@@ -837,9 +837,9 @@ theorem GenericImperativeMatch.PreparedSyntax.legacy {source : TypedSource} {app
     intro shape
     exact .whileLoop found form conditionFound conditionType typed syntaxTree
       (innerIH (shape.loop found form).1) (restIH (shape.loop found form).2)
-  | assign found form sourceTyped writable rightTyped profile children remaining ih =>
+  | assign found form sourceTyped writable free rightTyped profile children remaining ih =>
     intro shape
-    exact .assign found form sourceTyped writable rightTyped profile children (ih (shape.assign_tail found form).2.2)
+    exact .assign found form sourceTyped writable free rightTyped profile children (ih (shape.assign_tail found form).2.2)
   | forLoop found form sourceType initial remaining initialIH restIH =>
     intro shape
     have parts := shape.for_children found form
@@ -856,9 +856,9 @@ theorem GenericImperativeMatch.PreparedSyntax.legacy {source : TypedSource} {app
   | initializerDiscard found typed syntaxTree remaining ih =>
     intro shape
     exact .initializerDiscard found typed syntaxTree (ih ⟨shape.1.discard_tail, shape.2⟩)
-  | initializerAssign sourceTyped writable rightTyped profile children remaining ih =>
+  | initializerAssign sourceTyped writable free rightTyped profile children remaining ih =>
     intro shape
-    exact .initializerAssign sourceTyped writable rightTyped profile children (ih ⟨shape.1.assign_tail.2.2, shape.2⟩)
+    exact .initializerAssign sourceTyped writable free rightTyped profile children (ih ⟨shape.1.assign_tail.2.2, shape.2⟩)
   | bitNot found form writable bare profile remaining ih =>
     intro shape
     exact .bitNot found form writable bare profile (ih (shape.bitNot_tail found form).2.2)

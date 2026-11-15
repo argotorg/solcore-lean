@@ -45,6 +45,7 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -57,7 +58,7 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result definitions) :
     ∃ head : Head readFuel values source context solved reasonAt scope administrative definitions assignment operator rhs,
       code = head.emit next output :=
-  GenericAssignmentStatements.Head.of_lower unique signatures sourceTyped writable rightTyped profile extract accepted typed
+  GenericAssignmentStatements.Head.of_lower unique signatures sourceTyped writable free rightTyped profile extract accepted typed
 
 /-- Actual contextual lowering supplies concrete builtin expression certificates
 for every reached key/RHS. Source syntax/typing and the native checker receipt
@@ -85,6 +86,7 @@ theorem Head.of_contextual_lower
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -101,7 +103,7 @@ theorem Head.of_contextual_lower
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result definitions) :
     ∃ head : Head readFuel values source context compilation.solvedRequirements reasonAt scope administrative definitions assignment operator rhs,
       code = head.emit next output := by
-  apply Head.of_lower unique sourceSignatures sourceTyped writable rightTyped profile ?_ accepted typed
+  apply Head.of_lower unique sourceSignatures sourceTyped writable free rightTyped profile ?_ accepted typed
   intro id lowered member generated
   obtain ⟨node, found, syntaxTree, sourceTyped, nativeTyped⟩ := children id lowered member generated
   exact ⟨node, found, CompatibleExpressionBuiltins.tree_of_contextual ordinary unique closed residual declarations sourceSignatures

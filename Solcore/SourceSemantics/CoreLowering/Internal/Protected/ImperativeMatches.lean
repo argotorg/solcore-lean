@@ -96,7 +96,7 @@ theorem assignment {context : SourceSemantics.Context} {resolution : AssignmentR
     Facts source expressionSyntax context rest condition post statements expected := by
   obtain ⟨control, final, bodyFinal, bodyFacts, postFinal, syntaxTree, typed, conditionTyped, bodyTyped, postTyped⟩ := facts
   cases syntaxTree with
-  | initializerAssign _ _ _ _ _ remaining =>
+  | initializerAssign _ _ _ _ _ _ remaining =>
     cases typed with
     | cons head tail => cases head; exact ⟨control, final, bodyFinal, bodyFacts, postFinal, remaining, tail, conditionTyped, bodyTyped, postTyped⟩
 

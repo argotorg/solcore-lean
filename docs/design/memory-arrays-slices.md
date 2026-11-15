@@ -365,9 +365,9 @@ wait for the native pipeline's contracts and ABI.
   rule. Finalization defaults an open literal index to `uint256` (`placeIndexMentions`) and rejects
   another index type with `operatorNotSupported "Typedef"`, as a read's, and until decision 3 it
   rejects a compound assignment to an element with `compoundTargetNotSupported` and an in-place `~`
-  on one with `operatorNotSupported "BitNot"` (`validatePlaceElements`). The element place's static
-  rule takes no index kind: its run faults on an index that is not a word, and finalization admits a
-  read's index types.
+  on one with `operatorNotSupported "BitNot"` (`validatePlaceElements`). A write's base is a place
+  rooted at a local (difference 16). The element place's static rule takes no index kind: its run
+  faults on an index that is not a word, and finalization admits a read's index types.
 - **Slices** take `uint256` bounds and a base that is an array or a slice, and have the type
   `arraySlice<B>`.
 - **Lengths.** `a.length`, `a.length()` and `Length.length(a)` on arrays and slices have the type
@@ -457,6 +457,20 @@ wait for the native pipeline's contracts and ABI.
   the default element and the element at each index below `n`
   (`SourceCoreDataExpressions.arrayLiteral`), as the source semantics evaluates the elements before
   it allocates.
+- As built in step 5a-iii-a, the place lowering lowers a plain write to an element of a memory
+  array, a root local followed by elements (`SourceCoreCompatibleDataPlaces.lowerElements`); every
+  other place keeps its route (`lowerRoute`). It reads the root's array, failing with the place's
+  reason when the root is not yet initialized, then each index, panicking with `0x32` from its
+  array's length on, and for an inner index the next array, as a read does. Only then does it
+  evaluate the right side, and the last array's cell takes the value at its index
+  (`arrayElementWrite`). That is the source semantics' order and upstream's `lidx(a[i], j)`; the
+  route's `execute` evaluates every key first, so it could not be reused. The compatible fault-site
+  pass reserves the write's place reason, as a projected route's
+  (`SourceCoreCompatibleDataPlaceFaultSites.prepare`). The place lowering's receipt takes the
+  write's plain-ness (`CompatiblePlaceCompilerCertificates.generated_of_lower`), which a bare place,
+  an in-place `~` and a mapping route give (`Route.elementFree`), and the statement recognizers'
+  value-assignment cases and the heads that reach the receipt take the place's element-freeness, as
+  a field or a hypothesis.
 - A slice is a Core product of its base, its start and its length.
 - Arrays stay outside `StaticProfile` and the proved subset, as row 1's conversions did. The
   meaning proofs and their statements do not change.
@@ -542,11 +556,21 @@ functions over words, as row 1's fixture ports did.
     later uses to fix the type. As with difference 14, deferring the choice to finalization could
     lift this, and nothing schedules it.
 
+16. **An element write's base is a local, or an element of one.** Lean's assignment target is a
+    place rooted at a local: an identifier, a group, or an index of a place. So `same(m)[1] = v`,
+    whose base is a call's result, is rejected with `invalidAssignmentTarget`, while the pinned
+    driver accepts it, as it accepts a struct field's element `s.xs[1] = v`
+    (`.upstream/lane-d-unit3-memory-arrays/step5a/probe`); Lean has no `struct`. Binding the array
+    to a local first, `let r = same(m); r[1] = v;`, writes the same object, since an array is a
+    reference. No element place has a member or a mapping index before its elements, since
+    inference's places hold no member and a mapping of arrays is rejected (difference 5), so the
+    lowering takes a local followed by elements only.
+
 Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13, 13 and 14 on
-2026-11-14, and 15 on 2026-11-15, when 8 was also widened from an unused `let m = [];` to any
+2026-11-14, and 15 and 16 on 2026-11-15, when 8 was also widened from an unused `let m = [];` to any
 unannotated one. Differences 9 to 13 change only a diagnostic or the room of a resource limit, and
-8, 14 and 15 only reject some programs that upstream accepts. None of them changes what an accepted
-program means. Difference 1 follows decision 3.
+8, 14, 15 and 16 only reject some programs that upstream accepts. None of them changes what an
+accepted program means. Difference 1 follows decision 3.
 
 ## Steps
 
@@ -575,14 +599,15 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 4c | Literals: the lowering | 4–7 files, +150–300/−5–20; measured at 3 files, +91/−3 | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
 | 5a-i | Plain element writes: the typed element place `p[i]` (`PlaceProjection.element`), with its static rule, its resolution to the array object's cell, its five faults, `0x32` from the length on before the right side, sized copies, stage and preservation, which no source produces yet | 30–45 files, +500–900/−10–60; measured at 58 files, +890/−65 | none |
 | 5a-ii | Plain element writes: inference's typing of `a[i] = v` on a memory array, a nested place such as `a[i][j] = v` included, whose index finalization checks as a read's; a compound assignment or an in-place `~` to an element stays rejected | 40–60 files, +1,300–2,200/−150–400; measured at 36 files, +1,129/−647 | none |
-| 5a-iii | Plain element writes: the lowering, with `0x32` before the right side | 4–8 files, +200–400/−5–30 | setGet(n, i, v), fillAndSum(n), nestedReplace(n, v), alias(v); ret(n), sum(xs), grid(n) adapted |
+| 5a-iii-a | Plain element writes: the lowering, with `0x32` before the right side, the fault-site pass's case and the element-freeness that the statement meaning proofs take | 4–8 files, +200–400/−5–30 at first; measured at 55 files, +706/−261 | none |
+| 5a-iii-b | Plain element writes: the ports | 1–2 files, +100–200 | setGet(n, i, v), fillAndSum(n), nestedReplace(n, v), alias(v); ret(n), sum(xs), grid(n) adapted |
 | 5b | Compound assignments to an element, with in-place `~` and the unchecked forms, after decision 3 | 25–40 files, +600–1,100/−50–150 | compound(v); echo(xs) adapted |
 | 6 | Slices and `toArray(s)`, in eight parts: 6a, the slice type `arraySlice<B>`, its formation and its resolution in annotations; 6b, the slice value and its typing in a heap; 6c, the slice's typed form, with `0x32` from its bounds; 6d, reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules; 6e, `toArray(s)`'s typed form; 6f, inference of the four slice forms, with `uint256` bounds; 6g, inference of reads, lengths and `toArray(s)` on slices; 6h, the lowering | 170–215 files, +3,100–5,000/−100–250 at its first measure; estimated at 45–65 files, +1,000–1,400/−200–400 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
 
-In all, that is about 634 to 893 file changes, +17,400 to 26,150 and −1,665 to 3,390 lines over
-thirty-seven commits: about four fifths to one and a fifth times row 1, whose 23 commits added about
+In all, that is about 635 to 895 file changes, +17,500 to 26,350 and −1,665 to 3,390 lines over
+thirty-eight commits: about four fifths to one and a fifth times row 1, whose 23 commits added about
 21,700 lines, much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600,
 until its first measure: it adds three AST forms through the proved parser, so it became 1a to 1c.
 1b's first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
@@ -602,6 +627,14 @@ data-place proofs, whose route rejects an element, take an element-free hypothes
 compiled path supplies. Inference's place arm takes an array branch whose index waits for its type
 until finalization checks it, as 3b's read. So it split into 5a-i, the typed place, 5a-ii,
 inference's typing, and 5a-iii, the lowering.
+
+5a-ii measured 36 files, +1,129/−647, past the cap's −448 in deletions. Its deletions are rewritten
+proofs: the two typing routes came to share one proof of the place index arm, and the mapping-only
+proofs became splits on the base's type. It was kept as one commit on 2026-11-15. 5a-iii passed its
+row many times over once begun: an element place satisfies the place typing that the statement
+meaning proofs assume, so once the lowering accepts a write to one, every proof that inverts the
+place lowering's receipt must rule it out, and the fault-site pass must reserve the write's fault
+word. So it split into 5a-iii-a, the lowering with those proofs, and 5a-iii-b, the ports.
 
 Step 2 was one row of 60–72 files, +1,300–1,700/−300–450, until its first measure: about 110 to 150
 files, +3,000 to 4,500/−400 to 800. `new` and the lengths each take a typed form with its

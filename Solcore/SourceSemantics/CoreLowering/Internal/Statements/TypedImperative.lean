@@ -204,6 +204,7 @@ inductive Syntax (source : TypedSource) :
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+      (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -1210,7 +1211,7 @@ theorem tree_of_typed_flow
         loopTyped
         (restIH closed residual sourceSignatures declarations projection generatedBody tailTyped)
 
-  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable rightTyped profile remaining ih =>
+  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable free rightTyped profile remaining ih =>
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
@@ -1228,7 +1229,7 @@ theorem tree_of_typed_flow
           (invalidOperand (.occurrence id.occurrence) assignment.target.root operator)
           (missingDefault (.occurrence id.occurrence) assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered generated => assignmentExpressions context scope fuel id lowered closed residual sourceSignatures declarations generated) compiled nativeTyped
       exact .assign found form head (ih closed residual sourceSignatures declarations projection compiledBody (Native.execute_continuation nativeTyped))
 

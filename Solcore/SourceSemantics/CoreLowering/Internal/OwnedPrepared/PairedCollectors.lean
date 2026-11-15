@@ -431,6 +431,7 @@ private theorem fixed_assignment_occurrence
     {next code : Expr} {output result : Ty} {invalidProjection invalidOperand : Word} {missing : TypeSystem.Ty → Word}
     (accepted : SourceCoreCompatibleDataPlaces.lower values values.checked.signatures expression fuel source scope site assignment operator (some rhs)
       output next reasonAt invalidProjection invalidOperand missing = .ok code)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result definitions)
     {id : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr}
     (member : id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections)
@@ -448,7 +449,7 @@ private theorem fixed_assignment_occurrence
       (prepared := prepared) (reference := .var index) (keys := SourceCoreCalls.packArguments [])
       (rhs := value.expression) (next := next) (output := output) (target := assignment.target.type)
       (operator := operator) (codeEq ▸ typed)⟩
-  · cases generated_of_lower accepted with
+  · cases generated_of_lower (SourceCoreCompatibleDataPlaces.elementWrite?_of_free _ _ free) accepted with
     | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
       cases rhsGenerated with
       | @present actualId right rightGenerated rhsType =>
@@ -597,7 +598,7 @@ private theorem paired_for_header (residualMode : Bool) {tracked : Bool} {diagno
       obtain ⟨_, fixedBodyTyped⟩ := TypedLexicalWhile.Native.discard_child fixedTyped
       exact ⟨CoupledTokenDiagnosticExtraction.discard (factory := factory) found child (Classical.choice (ih closed residual sourceSignatures declarations generatedBody bodyTyped fixedBodyTyped origin.tail))⟩
 
-  | @assign context assignment operator rhs rest sourceTyped writable rightTyped profile children remaining ih =>
+  | @assign context assignment operator rhs rest sourceTyped writable free rightTyped profile children remaining ih =>
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
@@ -608,11 +609,11 @@ private theorem paired_for_header (residualMode : Bool) {tracked : Bool} {diagno
           (invalidProjection parentSite assignment.target.root) (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered member generated raw => by
           obtain ⟨syntaxTree, node, found, typed⟩ := children id member
           obtain ⟨childType, childNative⟩ := raw
-          obtain ⟨fixedChildType, fixedChildNative⟩ := fixed_assignment_occurrence compiled fixedTyped member generated
+          obtain ⟨fixedChildType, fixedChildNative⟩ := fixed_assignment_occurrence compiled free fixedTyped member generated
           exact ⟨node, found, expressions context closed residual sourceSignatures declarations
             syntaxTree found typed generated childNative fixedChildNative⟩) compiled nativeTyped
       exact ⟨CoupledTokenDiagnosticExtraction.assign (factory := factory) head parentSite origin.operand sameToken sourceTyped rightTyped profile fuel prepared (Classical.choice (ih closed residual sourceSignatures declarations generatedBody (TypedImperative.Native.execute_continuation nativeTyped) (TypedImperative.Native.execute_continuation fixedTyped) origin.tail))⟩
@@ -932,7 +933,7 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
         loopTyped
         (Classical.choice (restIH closed residual sourceSignatures declarations projection generatedBody tailTyped fixedTailTyped))⟩
 
-  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable rightTyped profile children remaining ih =>
+  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable free rightTyped profile children remaining ih =>
     simp only [AssignmentDiagnosticOrigins.AcceptedFor] at accepted
     cases fuel with
     | zero => cases accepted
@@ -951,11 +952,11 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
           (invalidOperand (.occurrence id.occurrence) assignment.target.root operator)
           (missingDefault (.occurrence id.occurrence) assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered member generated raw => by
           obtain ⟨syntaxTree, node, found, typed⟩ := children id member
           obtain ⟨childType, childNative⟩ := raw
-          obtain ⟨fixedChildType, fixedChildNative⟩ := fixed_assignment_occurrence compiled fixedTyped member generated
+          obtain ⟨fixedChildType, fixedChildNative⟩ := fixed_assignment_occurrence compiled free fixedTyped member generated
           exact ⟨node, found, expressions context closed residual sourceSignatures declarations
             syntaxTree found typed generated childNative fixedChildNative⟩) compiled nativeTyped
       exact ⟨CatalogCoupledExtractionFor.assign (factory := factory) found form head (.occurrence id.occurrence) (AssignmentDiagnosticOrigins.OccursFor.statement found form) sameToken sourceTyped rightTyped profile fuel prepared (Classical.choice (ih closed residual sourceSignatures declarations projection compiledBody (TypedImperative.Native.execute_continuation nativeTyped) (TypedImperative.Native.execute_continuation fixedTyped)))⟩
@@ -1063,7 +1064,7 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
       obtain ⟨_, bodyTyped⟩ := TypedLexicalWhile.Native.discard_child nativeTyped
       obtain ⟨_, fixedBodyTyped⟩ := TypedLexicalWhile.Native.discard_child fixedTyped
       exact ⟨CatalogCoupledExtractionFor.initializerDiscard (factory := factory) found child (Classical.choice (ih closed residual sourceSignatures declarations projection ⟨headerFuel, parentSite, next, origin.tail, generatedBody, nextReceipt⟩ bodyTyped fixedBodyTyped))⟩
-  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable rightTyped profile children remaining ih =>
+  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable free rightTyped profile children remaining ih =>
     obtain ⟨headerFuel, parentSite, next, origin, accepted, nextReceipt⟩ := accepted
     cases headerFuel with
     | zero => cases accepted
@@ -1075,11 +1076,11 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
           (invalidProjection parentSite assignment.target.root) (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered member generated raw => by
           obtain ⟨syntaxTree, node, found, typed⟩ := children id member
           obtain ⟨childType, childNative⟩ := raw
-          obtain ⟨fixedChildType, fixedChildNative⟩ := fixed_assignment_occurrence compiled fixedTyped member generated
+          obtain ⟨fixedChildType, fixedChildNative⟩ := fixed_assignment_occurrence compiled free fixedTyped member generated
           exact ⟨node, found, expressions context closed residual sourceSignatures declarations
             syntaxTree found typed generated childNative fixedChildNative⟩) compiled nativeTyped
       exact ⟨CatalogCoupledExtractionFor.initializerAssign (factory := factory) head parentSite origin.header.operand sameToken sourceTyped rightTyped profile headerFuel prepared (Classical.choice (ih closed residual sourceSignatures declarations projection ⟨headerFuel, parentSite, next, origin.tail, generatedBody, nextReceipt⟩ (TypedImperative.Native.execute_continuation nativeTyped) (TypedImperative.Native.execute_continuation fixedTyped)))⟩

@@ -102,6 +102,7 @@ inductive Syntax (source : TypedSource) :
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+      (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -147,6 +148,7 @@ inductive Syntax (source : TypedSource) :
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
+      (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -814,7 +816,7 @@ theorem tree_of_typed_position
         loopTyped
         (restIH closed residual sourceSignatures declarations projection generatedBody tailTyped)
 
-  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable rightTyped profile remaining ih =>
+  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable free rightTyped profile remaining ih =>
     simp only [Accepted] at accepted
     cases fuel with
     | zero => cases accepted
@@ -833,7 +835,7 @@ theorem tree_of_typed_position
           (invalidOperand (.occurrence id.occurrence) assignment.target.root operator)
           (missingDefault (.occurrence id.occurrence) assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered generated => assignmentExpressions context scope fuel id lowered closed residual sourceSignatures declarations generated) compiled nativeTyped
       exact .assign found form head (ih closed residual sourceSignatures declarations projection compiledBody (TypedImperative.Native.execute_continuation nativeTyped))
 
@@ -930,7 +932,7 @@ theorem tree_of_typed_position
       obtain ⟨actualNode, actualFound, child, _⟩ := assignmentExpressions context scope headerFuel expression lowered closed residual sourceSignatures declarations generated
       obtain ⟨_, bodyTyped⟩ := TypedLexicalWhile.Native.discard_child nativeTyped
       exact .initializerDiscard found child (ih closed residual sourceSignatures declarations projection ⟨headerFuel, parentSite, next, generatedBody, nextReceipt⟩ bodyTyped)
-  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable rightTyped profile remaining ih =>
+  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable free rightTyped profile remaining ih =>
     obtain ⟨headerFuel, parentSite, next, accepted, nextReceipt⟩ := accepted
     cases headerFuel with
     | zero => cases accepted
@@ -942,7 +944,7 @@ theorem tree_of_typed_position
           (invalidProjection parentSite assignment.target.root) (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered generated => assignmentExpressions context scope headerFuel id lowered closed residual sourceSignatures declarations generated) compiled nativeTyped
       exact .initializerAssign head (ih closed residual sourceSignatures declarations projection ⟨headerFuel, parentSite, next, generatedBody, nextReceipt⟩ (TypedImperative.Native.execute_continuation nativeTyped))
 
@@ -1802,6 +1804,7 @@ inductive UnarySyntax (source : TypedSource) :
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+      (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -1847,6 +1850,7 @@ inductive UnarySyntax (source : TypedSource) :
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
+      (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -2137,7 +2141,7 @@ theorem tree_of_typed_position_withBitNot
         loopTyped
         (restIH closed residual sourceSignatures declarations projection generatedBody tailTyped)
 
-  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable rightTyped profile remaining ih =>
+  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable free rightTyped profile remaining ih =>
     simp only [Accepted] at accepted
     cases fuel with
     | zero => cases accepted
@@ -2156,7 +2160,7 @@ theorem tree_of_typed_position_withBitNot
           (invalidOperand (.occurrence id.occurrence) assignment.target.root operator)
           (missingDefault (.occurrence id.occurrence) assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered generated => assignmentExpressions context scope fuel id lowered closed residual sourceSignatures declarations generated) compiled nativeTyped
       exact .assign found form head (ih closed residual sourceSignatures declarations projection compiledBody (TypedImperative.Native.execute_continuation nativeTyped))
 
@@ -2253,7 +2257,7 @@ theorem tree_of_typed_position_withBitNot
       obtain ⟨actualNode, actualFound, child, _⟩ := assignmentExpressions context scope headerFuel expression lowered closed residual sourceSignatures declarations generated
       obtain ⟨_, bodyTyped⟩ := TypedLexicalWhile.Native.discard_child nativeTyped
       exact .initializerDiscard found child (ih closed residual sourceSignatures declarations projection ⟨headerFuel, parentSite, next, generatedBody, nextReceipt⟩ bodyTyped)
-  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable rightTyped profile remaining ih =>
+  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable free rightTyped profile remaining ih =>
     obtain ⟨headerFuel, parentSite, next, accepted, nextReceipt⟩ := accepted
     cases headerFuel with
     | zero => cases accepted
@@ -2265,7 +2269,7 @@ theorem tree_of_typed_position_withBitNot
           (invalidProjection parentSite assignment.target.root) (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl⟩ := CompatibleAssignmentStatements.Head.of_lower unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered generated => assignmentExpressions context scope headerFuel id lowered closed residual sourceSignatures declarations generated) compiled nativeTyped
       exact .initializerAssign head (ih closed residual sourceSignatures declarations projection ⟨headerFuel, parentSite, next, generatedBody, nextReceipt⟩ (TypedImperative.Native.execute_continuation nativeTyped))
 

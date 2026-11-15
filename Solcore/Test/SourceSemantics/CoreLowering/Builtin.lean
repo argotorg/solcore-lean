@@ -3572,6 +3572,8 @@ private theorem headerSyntax : BuiltinForHeader.Syntax source context items := b
     have same := Except.ok.inj ((show SourceCoreDataPlaces.rootBinder source binder.id = .ok binder from rfl).symm.trans binding)
     subst actual
     exact writable
+  · intro index member
+    simp [assignment] at member
   · exact .of_type groupTyped
   · exact .inl rfl
   · intro expression member
@@ -3848,6 +3850,8 @@ private theorem assignmentSyntax {rest : List ForItemForm} (remaining : GenericF
     have : SourceCoreCompatibleDataPlaces.rootBinder source binder.id = .ok binder := rfl
     cases Except.ok.inj (this.symm.trans found)
     exact writable
+  · intro index member
+    simp [assignment] at member
   · exact .of_type booleanTyped
   · exact .inl rfl
   · exact children
@@ -3865,6 +3869,8 @@ private theorem syntaxTree (mode : Bool) : BuiltinImperativeFor.Syntax source co
         have : SourceCoreCompatibleDataPlaces.rootBinder source binder.id = .ok binder := rfl
         cases Except.ok.inj (this.symm.trans found)
         exact writable
+      · intro index member
+        simp [assignment] at member
       · exact .of_type booleanTyped
       · exact .inl rfl
       · exact children

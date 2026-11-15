@@ -57,7 +57,8 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments []) value.expression next outputType
         (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand
         (SourceCoreDataPlaces.placeWrap assignment.target.type operator false) := by
-  cases generated_of_lower accepted with
+  cases generated_of_lower (elementWrite?_of_free _ _ (fun _ member => by simp [bare] at member))
+      accepted with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
     cases rhsGenerated with
     | present rhsAccepted rhsType =>
@@ -853,7 +854,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
       Layout prepared ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit) next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) true invalidOperand := by
-  cases generated_of_lower accepted with
+  cases generated_of_lower (elementWrite?_bitNot _ _) accepted with
   | intro route prepared index codes value described lookup preparedBy generated _ rhsGenerated =>
     cases rhsGenerated with
     | absent =>
@@ -1404,20 +1405,31 @@ theorem prepare_prefix {context : SourceCoreCompatibleDataPlaceFaultSites.Contex
           obtain ⟨next, places, missing, fixed⟩ := current
           dsimp only at ran
           split at ran
-          · obtain ⟨route, _described, ran⟩ := bind_ok ran
-            split at ran
-            · obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
-              exact ⟨_, (Except.ok.inj finished).symm, route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) previous stepsLoop⟩
-            · obtain ⟨reason, generated, ran⟩ := bind_ok ran
-              have number := word_number generated
-              have issued := previous.place_fixed (place := ⟨owner, .occurrence node.id.occurrence,
-                assignment.target.root, none, reason,
-                ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩) number rfl
-              try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-              obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
-              refine ⟨_, (Except.ok.inj finished).symm, ?_⟩
-              apply route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) _ stepsLoop
-              exact issued
+          · split at ran
+            · -- A plain write to an element of a memory array reserves its place's reason only.
+              split at ran
+              · exact ⟨_, (Except.ok.inj ran).symm, previous⟩
+              · obtain ⟨reason, generated, ran⟩ := bind_ok ran
+                have number := word_number generated
+                have issued := previous.place_fixed (place := ⟨owner, .occurrence node.id.occurrence,
+                  assignment.target.root, none, reason,
+                  ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩) number rfl
+                try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                exact ⟨_, (Except.ok.inj ran).symm, issued⟩
+            · obtain ⟨route, _described, ran⟩ := bind_ok ran
+              split at ran
+              · obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
+                exact ⟨_, (Except.ok.inj finished).symm, route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) previous stepsLoop⟩
+              · obtain ⟨reason, generated, ran⟩ := bind_ok ran
+                have number := word_number generated
+                have issued := previous.place_fixed (place := ⟨owner, .occurrence node.id.occurrence,
+                  assignment.target.root, none, reason,
+                  ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩) number rfl
+                try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
+                refine ⟨_, (Except.ok.inj finished).symm, ?_⟩
+                apply route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) _ stepsLoop
+                exact issued
           · exact ⟨_, (Except.ok.inj ran).symm, previous⟩
   obtain ⟨extra, _extraAccepted, finished⟩ := bind_ok accepted
   have same := Except.ok.inj finished

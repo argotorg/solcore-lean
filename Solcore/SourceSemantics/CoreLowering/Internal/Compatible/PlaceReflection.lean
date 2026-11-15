@@ -592,11 +592,13 @@ theorem generated_of_lower {compilation : SourceCoreCompatibleDataPlaces.Context
     {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : Option ExpressionId}
     {outputType : Ty} {next : Expr} {reasonAt : ExpressionId → Word}
     {invalidProjection invalidOperand : Word} {missing : TypeSystem.Ty → Word} {lowered : Expr}
+    (plain : elementWrite? assignment operator rhs = none)
     (accepted : lower compilation signatures expression fuel source scope site assignment operator rhs outputType next
       reasonAt invalidProjection invalidOperand missing = .ok lowered) :
     Generated compilation signatures expression fuel source scope site assignment operator rhs outputType next
       reasonAt invalidProjection invalidOperand missing lowered := by
-  unfold lower at accepted
+  rw [lower_of_plain plain] at accepted
+  unfold lowerRoute at accepted
   obtain ⟨route, described, accepted⟩ := bind_ok accepted
   cases lookup : SourceCoreLocalCell.lookup? scope assignment.target.root with
   | none => simp [lookup, throw, bind, Except.bind] at accepted
@@ -661,6 +663,25 @@ theorem generated_of_lower {compilation : SourceCoreCompatibleDataPlaces.Context
             · simp [same, integer, shift, throw] at accepted
           · simp [same, word, integer, throw] at accepted
 
+
+/-- A route's path takes no element of a memory array: `routeSteps` rejects one. -/
+theorem path_takesElement {checked : Checked} {source : TypedSource}
+    {site : SourceCoreElaboration.ErrorSite} {root leaf : TypeSystem.Ty}
+    {projections : List PlaceProjection} {steps : List Step}
+    (path : CompatibleMixedRoute.Path checked source site root projections steps leaf) :
+    takesElement projections = false := by
+  induction path with
+  | nil => rfl
+  | member _ _ _ _ ih | index _ _ ih => simpa [takesElement] using ih
+
+/-- A described route takes no element of a memory array. -/
+theorem describe_takesElement {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    {route : Route}
+    (described : describe compilation compilation.checked.signatures source site assignment = .ok route) :
+    takesElement assignment.target.projections = false := by
+  obtain ⟨_, _, description⟩ := CompatiblePlaceDescription.of_describe described
+  exact path_takesElement (CompatibleMixedRoute.of_routeSteps description.routed)
 
 theorem PreparedPath.key_ids {checked : Checked} {source : TypedSource} {site : SourceCoreElaboration.ErrorSite}
     {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat}
@@ -872,6 +893,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (nonempty : assignment.target.projections ≠ [])
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id code ∧
       HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) code.expression (LanguageResult.resultType code.type)
@@ -895,7 +917,8 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments codes) right.expression next outputType
         (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand
         (SourceCoreDataPlaces.placeWrap assignment.target.type operator false) := by
-  have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower accepted
+  have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower
+    (elementWrite?_of_free _ _ free) accepted
   cases receipt with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
     cases rhsGenerated with
@@ -1607,47 +1630,69 @@ theorem prepare_missing_origins {context : SourceCoreCompatibleDataPlaceFaultSit
               obtain ⟨next, places, missing, fixed⟩ := current
               dsimp only at ran
               split at ran
-              · obtain ⟨route, _described, ran⟩ := bind_ok ran
-                split at ran
-                · obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
-                  have result := route_receipt (owner := owner) (source := source) (node := node)
-                    (assignment := assignment) (steps := route.steps) (fun _ => rfl) previous.1 stepsLoop
-                  have retained := result.2.1.apply missingOrigins.inventory issuer owns statementContains (by
-                    intro index member
-                    have below := previous.1.bounds.issued index.reason (previous.1.reused_index member)
-                    omega)
-                  obtain ⟨added, missingEq, _⟩ := result.2.1.missing
-                  have updatedOrigins := missingOrigins.replace [] (by simpa only [List.append_nil] using retained)
-                    (fun _ member => missingEq ▸ List.mem_append_left _ member)
-                  exact ⟨_, (Except.ok.inj finished).symm, ⟨result.1, previous.2⟩,
-                    by simpa only [List.append_nil] using updatedOrigins⟩
-                · obtain ⟨reason, generated, ran⟩ := bind_ok ran
-                  have number := word_number generated
-                  let place : SourceCoreDataPlaceFaultSites.Site := ⟨owner, .occurrence node.id.occurrence,
-                    assignment.target.root, none, reason,
-                    ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩
-                  have issued := previous.1.place_fixed (place := place) rfl number
-                  have issuedMissing := missingOrigins.inventory.fixed_place place rfl
-                  try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-                  obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
-                  have result := route_receipt (capacity := capacity) (indices := indices)
-                    (original := original) (fixed := fixed ++ [(reason, place.diagnostic)])
-                    (owner := owner) (source := source) (node := node)
-                    (assignment := assignment) (steps := route.steps) (fun _ => rfl)
-                    (by simpa only [List.map_append, List.map_cons, List.map_nil, List.append_assoc] using issued) stepsLoop
-                  have retained := result.2.1.apply issuedMissing issuer owns statementContains (by
-                    intro index member
-                    have below := issued.bounds.issued index.reason (issued.reused_index member)
-                    omega)
-                  obtain ⟨added, missingEq, _⟩ := result.2.1.missing
-                  have updatedOrigins := missingOrigins.replace [] (by simpa only [List.append_nil] using retained)
-                    (fun _ member => missingEq ▸ List.mem_append_left _ member)
-                  refine ⟨_, (Except.ok.inj finished).symm, ⟨result.1, ?_⟩,
-                    by simpa only [List.append_nil] using updatedOrigins⟩
-                  apply CompatiblePlaceMissingReservedReceipts.ReadSafe.append previous.2 _ number
-                  intro read member
-                  exact previous.1.bounds.blockedBelow read.reason
-                    (List.mem_append_left _ (List.mem_append_left _ (List.mem_map.mpr ⟨read, member, rfl⟩)))
+              · split at ran
+                · -- A plain write to an element of a memory array reserves its place's reason, and no
+                  -- missing site.
+                  split at ran
+                  · exact ⟨_, (Except.ok.inj ran).symm, previous, missingOrigins⟩
+                  · obtain ⟨reason, generated, ran⟩ := bind_ok ran
+                    have number := word_number generated
+                    let place : SourceCoreDataPlaceFaultSites.Site := ⟨owner, .occurrence node.id.occurrence,
+                      assignment.target.root, none, reason,
+                      ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩
+                    have issued := previous.1.place_fixed (place := place) rfl number
+                    have issuedMissing := missingOrigins.inventory.fixed_place place rfl
+                    try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                    refine ⟨_, (Except.ok.inj ran).symm, ⟨?_, ?_⟩, ?_⟩
+                    · simpa only [List.map_append, List.map_cons, List.map_nil, List.append_assoc] using issued
+                    · apply CompatiblePlaceMissingReservedReceipts.ReadSafe.append previous.2 _ number
+                      intro read member
+                      exact previous.1.bounds.blockedBelow read.reason
+                        (List.mem_append_left _ (List.mem_append_left _ (List.mem_map.mpr ⟨read, member, rfl⟩)))
+                    · simpa only [List.append_nil] using
+                        missingOrigins.replace [] (by simpa only [List.append_nil] using issuedMissing)
+                          (fun _ member => member)
+                · obtain ⟨route, _described, ran⟩ := bind_ok ran
+                  split at ran
+                  · obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
+                    have result := route_receipt (owner := owner) (source := source) (node := node)
+                      (assignment := assignment) (steps := route.steps) (fun _ => rfl) previous.1 stepsLoop
+                    have retained := result.2.1.apply missingOrigins.inventory issuer owns statementContains (by
+                      intro index member
+                      have below := previous.1.bounds.issued index.reason (previous.1.reused_index member)
+                      omega)
+                    obtain ⟨added, missingEq, _⟩ := result.2.1.missing
+                    have updatedOrigins := missingOrigins.replace [] (by simpa only [List.append_nil] using retained)
+                      (fun _ member => missingEq ▸ List.mem_append_left _ member)
+                    exact ⟨_, (Except.ok.inj finished).symm, ⟨result.1, previous.2⟩,
+                      by simpa only [List.append_nil] using updatedOrigins⟩
+                  · obtain ⟨reason, generated, ran⟩ := bind_ok ran
+                    have number := word_number generated
+                    let place : SourceCoreDataPlaceFaultSites.Site := ⟨owner, .occurrence node.id.occurrence,
+                      assignment.target.root, none, reason,
+                      ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩
+                    have issued := previous.1.place_fixed (place := place) rfl number
+                    have issuedMissing := missingOrigins.inventory.fixed_place place rfl
+                    try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                    obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
+                    have result := route_receipt (capacity := capacity) (indices := indices)
+                      (original := original) (fixed := fixed ++ [(reason, place.diagnostic)])
+                      (owner := owner) (source := source) (node := node)
+                      (assignment := assignment) (steps := route.steps) (fun _ => rfl)
+                      (by simpa only [List.map_append, List.map_cons, List.map_nil, List.append_assoc] using issued) stepsLoop
+                    have retained := result.2.1.apply issuedMissing issuer owns statementContains (by
+                      intro index member
+                      have below := issued.bounds.issued index.reason (issued.reused_index member)
+                      omega)
+                    obtain ⟨added, missingEq, _⟩ := result.2.1.missing
+                    have updatedOrigins := missingOrigins.replace [] (by simpa only [List.append_nil] using retained)
+                      (fun _ member => missingEq ▸ List.mem_append_left _ member)
+                    refine ⟨_, (Except.ok.inj finished).symm, ⟨result.1, ?_⟩,
+                      by simpa only [List.append_nil] using updatedOrigins⟩
+                    apply CompatiblePlaceMissingReservedReceipts.ReadSafe.append previous.2 _ number
+                    intro read member
+                    exact previous.1.bounds.blockedBelow read.reason
+                      (List.mem_append_left _ (List.mem_append_left _ (List.mem_map.mpr ⟨read, member, rfl⟩)))
               · exact ⟨_, (Except.ok.inj ran).symm, previous, missingOrigins⟩
             refine ⟨⟨targetsGenerated.1, nodeOrigins.step
               (CompatibleExpressionIndexSourceReceipts.NodeSelected.statement owner node indices)⟩,
@@ -2152,29 +2197,41 @@ theorem prepare_coverage {context : SourceCoreCompatibleDataPlaceFaultSites.Cont
                 dsimp only at ran
                 split at ran
                 · rename_i visited
-                  obtain ⟨route, actualDescription, ran⟩ := bind_ok ran
                   split at ran
-                  · obtain ⟨updated, stepsLoop, finished⟩ := bind_ok ran
-                    obtain ⟨growth, receipts⟩ := route_receipts (owner := owner) (source := source)
-                      (node := node) (assignment := assignment) (steps := route.steps) stepsLoop
-                    refine ⟨_, (Except.ok.inj finished).symm, growth, ?_⟩
-                    intro requested _concrete described layout key valueType member
-                    rw [described] at actualDescription
-                    have same := Except.ok.inj actualDescription
-                    subst route
-                    exact receipts _ member
-                  · obtain ⟨reason, _generated, ran⟩ := bind_ok ran
-                    try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-                    obtain ⟨updated, stepsLoop, finished⟩ := bind_ok ran
-                    obtain ⟨growth, receipts⟩ := route_receipts (owner := owner) (source := source)
-                      (node := node) (assignment := assignment) (steps := route.steps) stepsLoop
-                    refine ⟨_, (Except.ok.inj finished).symm,
-                      (Growth.mk ⟨[_], rfl⟩ ⟨[], (List.append_nil _).symm⟩).trans growth, ?_⟩
-                    intro requested _concrete described layout key valueType member
-                    rw [described] at actualDescription
-                    have same := Except.ok.inj actualDescription
-                    subst route
-                    exact receipts _ member
+                  · -- A plain write to an element of a memory array has no route, so no index receipt.
+                    rename_i element
+                    split at ran
+                    · refine ⟨_, (Except.ok.inj ran).symm, Growth.refl _ _, ?_⟩
+                      intro requested _concrete described
+                      simp [CompatiblePlaceCompilerCertificates.describe_takesElement described] at element
+                    · obtain ⟨reason, _generated, ran⟩ := bind_ok ran
+                      try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                      refine ⟨_, (Except.ok.inj ran).symm, Growth.mk ⟨[_], rfl⟩ ⟨[], (List.append_nil _).symm⟩, ?_⟩
+                      intro requested _concrete described
+                      simp [CompatiblePlaceCompilerCertificates.describe_takesElement described] at element
+                  · obtain ⟨route, actualDescription, ran⟩ := bind_ok ran
+                    split at ran
+                    · obtain ⟨updated, stepsLoop, finished⟩ := bind_ok ran
+                      obtain ⟨growth, receipts⟩ := route_receipts (owner := owner) (source := source)
+                        (node := node) (assignment := assignment) (steps := route.steps) stepsLoop
+                      refine ⟨_, (Except.ok.inj finished).symm, growth, ?_⟩
+                      intro requested _concrete described layout key valueType member
+                      rw [described] at actualDescription
+                      have same := Except.ok.inj actualDescription
+                      subst route
+                      exact receipts _ member
+                    · obtain ⟨reason, _generated, ran⟩ := bind_ok ran
+                      try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                      obtain ⟨updated, stepsLoop, finished⟩ := bind_ok ran
+                      obtain ⟨growth, receipts⟩ := route_receipts (owner := owner) (source := source)
+                        (node := node) (assignment := assignment) (steps := route.steps) stepsLoop
+                      refine ⟨_, (Except.ok.inj finished).symm,
+                        (Growth.mk ⟨[_], rfl⟩ ⟨[], (List.append_nil _).symm⟩).trans growth, ?_⟩
+                      intro requested _concrete described layout key valueType member
+                      rw [described] at actualDescription
+                      have same := Except.ok.inj actualDescription
+                      subst route
+                      exact receipts _ member
                 · rename_i skipped
                   refine ⟨_, (Except.ok.inj ran).symm, Growth.refl _ _, ?_⟩
                   intro route required
@@ -2231,6 +2288,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (rootTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (nonempty : assignment.target.projections ≠ [])
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id code ∧
       HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) code.expression (LanguageResult.resultType code.type)
@@ -2260,7 +2318,8 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
       environment coreEnvironment before store mapping world next outputType result finalStore := by
   obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, right, node, actualPreparation, binding, rootEq, slot, layout, ordinary,
       generated, found, certified, leafView, rhsView, rhsType, lowering⟩ :=
-    CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped nonempty extract accepted typed
+    CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped nonempty free extract accepted
+      typed
   rw [assignmentModifier_plain (checkedCompound_of_profile operatorProfile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile operatorProfile)] at lowering
   have profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false := by
     simpa only [leafView] using operatorProfile

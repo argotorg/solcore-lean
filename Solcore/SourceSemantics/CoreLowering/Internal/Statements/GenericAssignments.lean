@@ -227,6 +227,7 @@ theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSour
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -247,7 +248,7 @@ theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSour
         obtain ⟨node, found, tree, _⟩ := extract rhs lowered (by simp) generated
         exact ⟨node, found, tree⟩) accepted
     exact ⟨head, emitted, token, .bare bare⟩
-  · cases generated_of_lower accepted with
+  · cases generated_of_lower (elementWrite?_of_free _ _ free) accepted with
     | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
       cases rhsGenerated with
       | @present id right rhsGenerated rhsType =>
@@ -302,6 +303,7 @@ theorem Head.of_lower_with_token {values : ValuesContext} {source : TypedSource}
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -314,7 +316,7 @@ theorem Head.of_lower_with_token {values : ValuesContext} {source : TypedSource}
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result definitions) :
     ∃ head : Head values source context certificate scope administrative definitions assignment operator rhs,
       code = head.emit next output ∧ head.invalid = invalidOperand := by
-  obtain ⟨head, emitted, token, _preparedAt⟩ := Head.of_lower_with_prepared unique signatures sourceTyped writable
+  obtain ⟨head, emitted, token, _preparedAt⟩ := Head.of_lower_with_prepared unique signatures sourceTyped writable free
     rightTyped profile extract accepted typed
   exact ⟨head, emitted, token⟩
 
@@ -330,6 +332,7 @@ theorem Head.of_lower {values : ValuesContext} {source : TypedSource}
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -342,7 +345,7 @@ theorem Head.of_lower {values : ValuesContext} {source : TypedSource}
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result definitions) :
     ∃ head : Head values source context certificate scope administrative definitions assignment operator rhs,
       code = head.emit next output := by
-  obtain ⟨head, emitted, _⟩ := Head.of_lower_with_token unique signatures sourceTyped writable rightTyped profile extract accepted typed
+  obtain ⟨head, emitted, _⟩ := Head.of_lower_with_token unique signatures sourceTyped writable free rightTyped profile extract accepted typed
   exact ⟨head, emitted⟩
 
 end Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatements
@@ -536,6 +539,7 @@ theorem Head.of_prepared_policy
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
@@ -561,7 +565,7 @@ theorem Head.of_prepared_policy
     · exact .inl equal
     · exact .inr (.inl (by rw [word]; rfl))
     · exact .inr (.inr ⟨by rw [integer]; rfl, notWordOnly⟩)
-  obtain ⟨head, emitted, same⟩ := Head.of_lower_with_token unique signatures sourceTyped writable rightTyped profile extract accepted typed
+  obtain ⟨head, emitted, same⟩ := Head.of_lower_with_token unique signatures sourceTyped writable free rightTyped profile extract accepted typed
   exact ⟨head, emitted, same, same.symm ▸ prepared_operands_included included prepared member occurs rawProfile⟩
 
 end Solcore.SourceSemantics.CoreLowering.GenericAssignmentStatements

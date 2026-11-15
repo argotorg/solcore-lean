@@ -3250,6 +3250,17 @@ inductive Route (source : TypedSource) : TypeSystem.Ty → List PlaceProjection 
       (tail : Route source valueType rest leaf) :
       Route source (.mapping keyType valueType) (.index key :: rest) leaf
 
+/-- A mapping route takes no element of a memory array. -/
+theorem Route.elementFree {source : TypedSource} {root leaf : TypeSystem.Ty}
+    {projections : List PlaceProjection} (route : Route source root projections leaf) :
+    ∀ index, PlaceProjection.element index ∉ projections := by
+  induction route with
+  | nil => intro index member; cases member
+  | index _ _ _ ih =>
+      intro index member
+      simp only [List.mem_cons, reduceCtorEq, false_or] at member
+      exact ih index member
+
 /-- The original key nodes and final leaf fix every mapping layer. -/
 theorem Route.root_type {source : TypedSource} {context : SourceSemantics.Context}
     {declared actual leaf : TypeSystem.Ty} {projections : List PlaceProjection}

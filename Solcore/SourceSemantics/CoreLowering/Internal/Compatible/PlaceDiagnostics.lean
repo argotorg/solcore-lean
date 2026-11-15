@@ -649,20 +649,31 @@ theorem prepare_fixed {context : SourceCoreCompatibleDataPlaceFaultSites.Context
           obtain ⟨next, places, missing, fixed⟩ := current
           dsimp only at ran
           split at ran
-          · obtain ⟨route, _described, ran⟩ := bind_ok ran
-            split at ran
-            · obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
-              exact ⟨_, (Except.ok.inj finished).symm, route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) previous stepsLoop⟩
-            · obtain ⟨reason, generated, ran⟩ := bind_ok ran
-              have number := word_number generated
-              have issued := previous.place_fixed (place := ⟨owner, .occurrence node.id.occurrence,
-                assignment.target.root, none, reason,
-                ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩) number rfl
-              try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-              obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
-              refine ⟨_, (Except.ok.inj finished).symm, ?_⟩
-              apply route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) _ stepsLoop
-              simpa only [List.map_append, List.map_cons, List.map_nil, List.append_assoc] using issued
+          · split at ran
+            · -- A plain write to an element of a memory array reserves its place's reason only.
+              split at ran
+              · exact ⟨_, (Except.ok.inj ran).symm, previous⟩
+              · obtain ⟨reason, generated, ran⟩ := bind_ok ran
+                have number := word_number generated
+                have issued := previous.place_fixed (place := ⟨owner, .occurrence node.id.occurrence,
+                  assignment.target.root, none, reason,
+                  ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩) number rfl
+                try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                exact ⟨_, (Except.ok.inj ran).symm, issued⟩
+            · obtain ⟨route, _described, ran⟩ := bind_ok ran
+              split at ran
+              · obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
+                exact ⟨_, (Except.ok.inj finished).symm, route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) previous stepsLoop⟩
+              · obtain ⟨reason, generated, ran⟩ := bind_ok ran
+                have number := word_number generated
+                have issued := previous.place_fixed (place := ⟨owner, .occurrence node.id.occurrence,
+                  assignment.target.root, none, reason,
+                  ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩) number rfl
+                try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                obtain ⟨current, stepsLoop, finished⟩ := bind_ok ran
+                refine ⟨_, (Except.ok.inj finished).symm, ?_⟩
+                apply route_ranges (owner := owner) (source := source) (node := node) (assignment := assignment) (steps := route.steps) (fun _ => rfl) _ stepsLoop
+                simpa only [List.map_append, List.map_cons, List.map_nil, List.append_assoc] using issued
           · exact ⟨_, (Except.ok.inj ran).symm, previous⟩
   obtain ⟨extra, _extraAccepted, finished⟩ := bind_ok accepted
   have same := Except.ok.inj finished
@@ -1044,41 +1055,53 @@ theorem prepare_coverage {context : SourceCoreCompatibleDataPlaceFaultSites.Cont
                 dsimp only at ran
                 split at ran
                 · rename_i visited
-                  obtain ⟨route, actualDescription, ran⟩ := bind_ok ran
                   split at ran
-                  · rename_i skippedPlace
-                    obtain ⟨updated, stepsLoop, finished⟩ := bind_ok ran
-                    have growth := route_receipts (owner := owner) (source := source)
-                      (node := node) (assignment := assignment) (steps := route.steps) stepsLoop
-                    refine ⟨_, (Except.ok.inj finished).symm, growth, ?_⟩
-                    intro requested _concrete described nonempty
-                    rw [described] at actualDescription
-                    have same := Except.ok.inj actualDescription
-                    subst route
-                    have present : places.any (selects owner node assignment) = true := by
-                      have notEmpty : requested.steps.isEmpty = false := List.isEmpty_eq_false_iff.mpr nonempty
-                      change places.any (fun previous => decide
-                        (previous.owner = owner ∧ previous.location = .occurrence node.id.occurrence ∧
-                          previous.binder = assignment.target.root ∧ previous.missingType = none)) = true
-                      simpa only [notEmpty, Bool.false_or] using skippedPlace
-                    exact (receipt_of_any present).grows growth
-                  · obtain ⟨reason, _generated, ran⟩ := bind_ok ran
-                    try dsimp only [pure, Except.pure, bind, Except.bind] at ran
-                    obtain ⟨updated, stepsLoop, finished⟩ := bind_ok ran
-                    have growth := route_receipts (owner := owner) (source := source)
-                      (node := node) (assignment := assignment) (steps := route.steps) stepsLoop
-                    refine ⟨_, (Except.ok.inj finished).symm,
-                      (Growth.mk ⟨[_], rfl⟩ ⟨[], (List.append_nil _).symm⟩).trans growth, ?_⟩
-                    intro requested _concrete described _nonempty
-                    rw [described] at actualDescription
-                    have same := Except.ok.inj actualDescription
-                    subst route
-                    have created : Receipt owner node assignment (places ++ [⟨owner,
-                      .occurrence node.id.occurrence, assignment.target.root, none, reason,
-                      ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩]) missing := by
-                      apply receipt_of_any
-                      simp [List.any_append, selects]
-                    exact created.grows growth
+                  · -- A plain write to an element of a memory array has no route, so no route receipt.
+                    rename_i element
+                    split at ran
+                    · refine ⟨_, (Except.ok.inj ran).symm, Growth.refl _ _, ?_⟩
+                      intro requested _concrete described _nonempty
+                      simp [CompatiblePlaceCompilerCertificates.describe_takesElement described] at element
+                    · obtain ⟨reason, _generated, ran⟩ := bind_ok ran
+                      try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                      refine ⟨_, (Except.ok.inj ran).symm, Growth.mk ⟨[_], rfl⟩ ⟨[], (List.append_nil _).symm⟩, ?_⟩
+                      intro requested _concrete described _nonempty
+                      simp [CompatiblePlaceCompilerCertificates.describe_takesElement described] at element
+                  · obtain ⟨route, actualDescription, ran⟩ := bind_ok ran
+                    split at ran
+                    · rename_i skippedPlace
+                      obtain ⟨updated, stepsLoop, finished⟩ := bind_ok ran
+                      have growth := route_receipts (owner := owner) (source := source)
+                        (node := node) (assignment := assignment) (steps := route.steps) stepsLoop
+                      refine ⟨_, (Except.ok.inj finished).symm, growth, ?_⟩
+                      intro requested _concrete described nonempty
+                      rw [described] at actualDescription
+                      have same := Except.ok.inj actualDescription
+                      subst route
+                      have present : places.any (selects owner node assignment) = true := by
+                        have notEmpty : requested.steps.isEmpty = false := List.isEmpty_eq_false_iff.mpr nonempty
+                        change places.any (fun previous => decide
+                          (previous.owner = owner ∧ previous.location = .occurrence node.id.occurrence ∧
+                            previous.binder = assignment.target.root ∧ previous.missingType = none)) = true
+                        simpa only [notEmpty, Bool.false_or] using skippedPlace
+                      exact (receipt_of_any present).grows growth
+                    · obtain ⟨reason, _generated, ran⟩ := bind_ok ran
+                      try dsimp only [pure, Except.pure, bind, Except.bind] at ran
+                      obtain ⟨updated, stepsLoop, finished⟩ := bind_ok ran
+                      have growth := route_receipts (owner := owner) (source := source)
+                        (node := node) (assignment := assignment) (steps := route.steps) stepsLoop
+                      refine ⟨_, (Except.ok.inj finished).symm,
+                        (Growth.mk ⟨[_], rfl⟩ ⟨[], (List.append_nil _).symm⟩).trans growth, ?_⟩
+                      intro requested _concrete described _nonempty
+                      rw [described] at actualDescription
+                      have same := Except.ok.inj actualDescription
+                      subst route
+                      have created : Receipt owner node assignment (places ++ [⟨owner,
+                        .occurrence node.id.occurrence, assignment.target.root, none, reason,
+                        ⟨.invalidPlaceProjection, .occurrence node.id.occurrence, some node.span⟩⟩]) missing := by
+                        apply receipt_of_any
+                        simp [List.any_append, selects]
+                      exact created.grows growth
                 · rename_i skipped
                   refine ⟨_, (Except.ok.inj ran).symm, Growth.refl _ _, ?_⟩
                   intro route required

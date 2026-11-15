@@ -2215,7 +2215,8 @@ theorem actual_lower_reflects {code : Expr}
   haveI : FunctionCalls.FaultTokens (fun _ _ => True) := ⟨fun _ => trivial⟩
   have reflected := CompatiblePlaceLowerReflection.reflects (compilation := compilation) (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (certificate := Child)
     unique rfl (fun actual found => by cases binding actual found; exact .index keyTyped (.nil _)) (.of_type keyTyped)
-    (fun actual found => by cases binding actual found; exact rootWritable) (by simp [assignment]) childReceipt accepted typed
+    (fun actual found => by cases binding actual found; exact rootWritable) (by simp [assignment])
+    (fun _ member => by simp [assignment] at member) childReceipt accepted typed
     (.refl _) (childReflects compilation.registry (fun _ _ => True)) functionViews faithful observations
     (fun _ _ => True.intro) (fun _ => True.intro) (.inl rfl) environments heaps localAgrees completed
   cases reflected with

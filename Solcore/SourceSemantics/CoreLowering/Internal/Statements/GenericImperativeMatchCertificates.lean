@@ -698,7 +698,7 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
         loopTyped
         (Classical.choice (restIH closed residual sourceSignatures declarations projection generatedBody tailTyped))⟩
 
-  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable rightTyped profile children remaining ih =>
+  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable free rightTyped profile children remaining ih =>
     simp only [AssignmentDiagnosticOrigins.AcceptedFor] at accepted
     cases fuel with
     | zero => cases accepted
@@ -717,7 +717,7 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
           (invalidOperand (.occurrence id.occurrence) assignment.target.root operator)
           (missingDefault (.occurrence id.occurrence) assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl, sameToken, prepared⟩ := GenericAssignmentStatements.Head.of_lower_with_prepared unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl, sameToken, prepared⟩ := GenericAssignmentStatements.Head.of_lower_with_prepared unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered member generated => by
           obtain ⟨syntaxTree, node, found, typed⟩ := children id member
           exact ⟨node, found, assignmentExpressions context scope fuel id lowered closed residual sourceSignatures declarations syntaxTree node found typed generated⟩) compiled nativeTyped
@@ -817,7 +817,7 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
       have child := expressions context closed residual sourceSignatures declarations syntaxTree found typed generated
       obtain ⟨_, bodyTyped⟩ := TypedLexicalWhile.Native.discard_child nativeTyped
       exact ⟨CatalogCoupledExtractionFor.initializerDiscard (factory := factory) found child (Classical.choice (ih closed residual sourceSignatures declarations projection ⟨headerFuel, parentSite, next, origin.tail, generatedBody, nextReceipt⟩ bodyTyped))⟩
-  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable rightTyped profile children remaining ih =>
+  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable free rightTyped profile children remaining ih =>
     obtain ⟨headerFuel, parentSite, next, origin, accepted, nextReceipt⟩ := accepted
     cases headerFuel with
     | zero => cases accepted
@@ -829,7 +829,7 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
           (invalidProjection parentSite assignment.target.root) (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl, sameToken, prepared⟩ := GenericAssignmentStatements.Head.of_lower_with_prepared unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl, sameToken, prepared⟩ := GenericAssignmentStatements.Head.of_lower_with_prepared unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered member generated => by
           obtain ⟨syntaxTree, node, found, typed⟩ := children id member
           exact ⟨node, found, assignmentExpressions context scope headerFuel id lowered closed residual sourceSignatures declarations syntaxTree node found typed generated⟩) compiled nativeTyped

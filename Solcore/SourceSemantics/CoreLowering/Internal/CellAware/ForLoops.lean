@@ -998,7 +998,7 @@ theorem collected
         ScopedSourceForItemsAdmission.projected_assignment_facts unique declaration route profile typed
       obtain ⟨head, emitted, token, preparedAt⟩ :=
         CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
-          unique sourceSignatures sourceTyped writable rightTyped runtimeProfile
+          unique sourceSignatures sourceTyped writable route.elementFree rightTyped runtimeProfile
           (certificate := certificates context)
           (fun child lowered member generated raw => by
             obtain ⟨_, native⟩ := raw

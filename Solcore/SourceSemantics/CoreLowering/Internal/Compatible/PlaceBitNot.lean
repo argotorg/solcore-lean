@@ -640,7 +640,8 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
       (prepared.route.leafType = .word ∨ prepared.route.leafType = .integer) ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments codes) (LanguageResult.success .unit) next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) true invalidOperand := by
-  have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower accepted
+  have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower
+    (elementWrite?_bitNot _ _) accepted
   cases receipt with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
     cases rhsGenerated with

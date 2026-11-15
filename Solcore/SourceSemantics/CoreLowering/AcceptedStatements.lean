@@ -570,7 +570,7 @@ theorem projected_head (index : ActualBodyInvocation.Index compiled bodyRelation
   obtain ⟨sourceTyped, writable, rightTyped, profile⟩ :=
     ScopedSourceForItemsAdmission.projected_assignment_facts unique receipt.description.binding route receipt.sourceProfile typed
   exact CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
-    unique signatures sourceTyped writable rightTyped profile
+    unique signatures sourceTyped writable route.elementFree rightTyped profile
     (fun id _ member generated _ => by
       rcases List.mem_cons.mp member with same | member
       · subst id

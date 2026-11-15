@@ -132,7 +132,7 @@ theorem extraction_of_lowerForItems_with_coupled (residualMode : Bool) {tracked 
       obtain ⟨_, bodyTyped⟩ := TypedLexicalWhile.Native.discard_child nativeTyped
       exact ⟨CoupledTokenDiagnosticExtraction.discard (factory := factory) found child (Classical.choice (ih closed residual sourceSignatures declarations generatedBody bodyTyped origin.tail))⟩
 
-  | @assign context assignment operator rhs rest sourceTyped writable rightTyped profile children remaining ih =>
+  | @assign context assignment operator rhs rest sourceTyped writable free rightTyped profile children remaining ih =>
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
@@ -143,7 +143,7 @@ theorem extraction_of_lowerForItems_with_coupled (residualMode : Bool) {tracked 
           (invalidProjection parentSite assignment.target.root) (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl, sameToken, prepared⟩ := GenericAssignmentStatements.Head.of_lower_with_prepared unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl, sameToken, prepared⟩ := GenericAssignmentStatements.Head.of_lower_with_prepared unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered member generated => by
           obtain ⟨syntaxTree, node, found, typed⟩ := children id member
           obtain ⟨tree, nativeTyped⟩ := expressions context scope fuel id lowered closed residual sourceSignatures declarations syntaxTree node found typed generated

@@ -760,6 +760,8 @@ private theorem syntaxTree : TypedForHeader.Syntax source context items := by
     have same := Except.ok.inj (expected.symm.trans found)
     cases same
     exact writable
+  · intro index member
+    simp [assignment] at member
   · exact .of_type booleanTyped
   · exact .inl rfl
   · exact .nil
@@ -1010,6 +1012,8 @@ private theorem syntaxTree (mode : Bool) : TypedImperative.Syntax source context
       have same := Except.ok.inj (this.symm.trans found)
       cases same
       exact writable
+    · intro index member
+      simp [assignment] at member
     · exact .of_type booleanTyped
     · exact .inl rfl
     · exact .breaking (node := breakNode) rfl rfl
@@ -1247,6 +1251,8 @@ private theorem assignmentSyntax {rest : List ForItemForm} (remaining : TypedFor
     have : SourceCoreCompatibleDataPlaces.rootBinder source binder.id = .ok binder := rfl
     cases Except.ok.inj (this.symm.trans found)
     exact writable
+  · intro index member
+    simp [assignment] at member
   · exact .of_type booleanTyped
   · exact .inl rfl
   · exact remaining
@@ -1263,6 +1269,8 @@ private theorem syntaxTree (mode : Bool) : TypedImperativeFor.Syntax source cont
         have : SourceCoreCompatibleDataPlaces.rootBinder source binder.id = .ok binder := rfl
         cases Except.ok.inj (this.symm.trans found)
         exact writable
+      · intro index member
+        simp [assignment] at member
       · exact .of_type booleanTyped
       · exact .inl rfl
       · exact .breaking (node := breakNode) rfl rfl

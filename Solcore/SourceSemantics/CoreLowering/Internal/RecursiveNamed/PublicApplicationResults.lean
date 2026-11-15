@@ -298,7 +298,7 @@ theorem syntax_of_typed {source : TypedSource} {expressionSyntax : ExpressionId 
       refine ⟨?_, ?_, ?_⟩
       · intro mode rest _ tail
         exact .assign (lookupStatement?_complete unique (by assumption)) (by assumption)
-          leaf.projections leaf.writable leaf.right leaf.profile leaf.children tail
+          leaf.projections leaf.writable leaf.free leaf.right leaf.profile leaf.children tail
       · intros; contradiction
       · intros; contradiction
     case assignBitNot =>
@@ -488,8 +488,8 @@ theorem syntax_of_typed {source : TypedSource} {expressionSyntax : ExpressionId 
     case assignValue =>
       intros
       rename_i leaf
-      exact ⟨fun rest tail => .assign leaf.projections leaf.writable leaf.right leaf.profile leaf.children tail,
-        fun rest condition post statements expected tail => .initializerAssign leaf.projections leaf.writable leaf.right leaf.profile leaf.children tail⟩
+      exact ⟨fun rest tail => .assign leaf.projections leaf.writable leaf.free leaf.right leaf.profile leaf.children tail,
+        fun rest condition post statements expected tail => .initializerAssign leaf.projections leaf.writable leaf.free leaf.right leaf.profile leaf.children tail⟩
     case assignBitNot =>
       intros
       rename_i leaf

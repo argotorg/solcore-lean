@@ -166,6 +166,9 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
     (matched : AssignmentPolicy policy values invalidProjection invalidOperand missing)
     (sourceProfile : operator = .equal ∨ assignment.target.type = .word)
     (projected : assignment.target.projections ≠ [])
+    (routed : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+      AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections
+        assignment.target.type)
     (accepted : SourceCoreLoops.assignValue policy fuel source scope site assignment operator rhs
       output next reasonAt = .ok code) :
     Nonempty (Receipt policy fuel source scope site assignment operator rhs output next reasonAt code) := by
@@ -174,7 +177,10 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
       (invalidProjection site assignment.target.root) (invalidOperand site assignment.target.root operator)
       (missing site assignment.target.root) = .ok code := by
     cases operator <;> simpa only [SourceCoreLoops.assignValue, matched.equal, matched.value] using accepted
-  cases CompatiblePlaceCompilerCertificates.generated_of_lower lowered with
+  obtain ⟨binder, found⟩ := SourceCoreCompatibleDataPlaces.rootBinder_of_lower lowered
+  have plain := SourceCoreCompatibleDataPlaces.elementWrite?_of_free operator (some rhs)
+    (routed binder found).elementFree
+  cases CompatiblePlaceCompilerCertificates.generated_of_lower plain lowered with
   | intro route place index keys value described slot prepared keysGenerated operatorValid rhsGenerated =>
     cases rhsGenerated with
     | @present id child generated childType =>
@@ -352,7 +358,8 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
       (missing site assignment.target.root) = .ok code := by
     have same := Option.some.inj (callbackSelected.symm.trans matched)
     simpa only [same] using accepted
-  cases CompatiblePlaceCompilerCertificates.generated_of_lower lowered with
+  cases CompatiblePlaceCompilerCertificates.generated_of_lower
+      (SourceCoreCompatibleDataPlaces.elementWrite?_bitNot _ _) lowered with
   | intro route place index keys value described slot prepared keysGenerated operatorValid rhsGenerated =>
     cases rhsGenerated with
     | absent =>
@@ -699,7 +706,7 @@ theorem refine {values : SourceCoreCompatibleValues.Context}
       obtain ⟨receipt⟩ := AcceptedBareAssignmentReceipt.of_accepted matched profile bare assigned
       exact ⟨.assigned remaining receipt (type receipt.binder receipt.declaration), ready⟩
     · by_cases projected : ProjectedAssignable source assignment operator
-      · obtain ⟨receipt⟩ := AcceptedProjectedAssignmentReceipt.of_accepted matched projected.1 projected.2.1 assigned
+      · obtain ⟨receipt⟩ := AcceptedProjectedAssignmentReceipt.of_accepted matched projected.1 projected.2.1 projected.2.2 assigned
         exact ⟨.projectedAssigned remaining receipt (projected.2.2 receipt.binder receipt.description.binding), ready⟩
       · exact ⟨.assigning remaining assigned, (fun eligible => eligible.elim supported projected), ready⟩
   | assigned remaining receipt targetType ih =>
@@ -1557,7 +1564,7 @@ theorem Tree.refine {values : SourceCoreCompatibleValues.Context}
           obtain ⟨receipt⟩ := AcceptedBareAssignmentReceipt.of_accepted matched profile bare assigned
           exact ⟨.assigned read form statementType tail receipt (target receipt.binder receipt.declaration), ready⟩
         · by_cases projected : ProjectedAssignable source assignment operator
-          · obtain ⟨receipt⟩ := AcceptedProjectedAssignmentReceipt.of_accepted matched projected.1 projected.2.1 assigned
+          · obtain ⟨receipt⟩ := AcceptedProjectedAssignmentReceipt.of_accepted matched projected.1 projected.2.1 projected.2.2 assigned
             exact ⟨.projectedAssigned read form statementType tail receipt (projected.2.2 receipt.binder receipt.description.binding), ready⟩
           · exact ⟨.assigning read form statementType tail assigned,
               (fun eligible => eligible.elim supported projected), ready⟩

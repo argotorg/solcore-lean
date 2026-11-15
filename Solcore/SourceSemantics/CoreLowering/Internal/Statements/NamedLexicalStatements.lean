@@ -1310,6 +1310,7 @@ theorem Tree.of_assignment_lower {values : ValuesContext} {source : TypedSource}
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, SourceCoreCompatibleDataPlaces.rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -1323,7 +1324,7 @@ theorem Tree.of_assignment_lower {values : ValuesContext} {source : TypedSource}
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrative) code result definitions)
     (tail : Tree values source context certificate scope administrative definitions mode rest expected type next) :
     Tree values source context certificate scope administrative definitions mode (id :: rest) expected type code := by
-  obtain ⟨head, same⟩ := GenericAssignmentStatements.Head.of_lower unique signatures sourceTyped writable rightTyped profile extract accepted typed
+  obtain ⟨head, same⟩ := GenericAssignmentStatements.Head.of_lower unique signatures sourceTyped writable free rightTyped profile extract accepted typed
   have project : ∀ {codes leaf}, GenericAssignmentStatements.Shape values source context certificate scope
       administrative definitions assignment.target head.prepared codes leaf → head.prepared.steps ≠ [] := by
     intro codes leaf shape

@@ -917,7 +917,8 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
         | assignValue assignment =>
           obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
             assignment_facts declaration targetType bare profile assignment
-          apply GenericForHeader.PreparedSyntax.assign sourceTyped writable rightTyped numeric
+          apply GenericForHeader.PreparedSyntax.assign sourceTyped writable
+            (fun _ member => by simp [bare] at member) rightTyped numeric
           · intro child member
             simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
             subst child
@@ -931,7 +932,8 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
         | assignValue assignment =>
           obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
             projected_assignment_facts unique declaration route profile assignment
-          apply GenericForHeader.PreparedSyntax.assign sourceTyped writable rightTyped numeric
+          apply GenericForHeader.PreparedSyntax.assign sourceTyped writable route.elementFree rightTyped
+            numeric
           · intro child member
             rcases List.mem_cons.mp member with equal | member
             · subst child
@@ -1001,11 +1003,11 @@ theorem initializers {source : TypedSource} {approved : ExpressionId → Prop}
       | cons head tail =>
         cases head
         exact .initializerDiscard found child value (ih tail next)
-  | assign sourceTyped writable rightTyped profile children remaining ih =>
+  | assign sourceTyped writable free rightTyped profile children remaining ih =>
       cases typed with
       | cons head tail =>
         cases head
-        exact .initializerAssign sourceTyped writable rightTyped profile children (ih tail next)
+        exact .initializerAssign sourceTyped writable free rightTyped profile children (ih tail next)
   | bitNotProjected sourceTyped writable projected profile children remaining ih =>
       cases typed with
       | cons head tail =>
@@ -1328,7 +1330,8 @@ theorem Scan.syntax {source approved expected mode statements}
       | assignValue assignment =>
         obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
           ScopedSourceForItemsAdmission.assignment_facts declaration targetType bare profile assignment
-        apply GenericImperativeMatch.PreparedSyntax.assign found form sourceTyped writable rightTyped numeric
+        apply GenericImperativeMatch.PreparedSyntax.assign found form sourceTyped writable
+          (fun _ member => by simp [bare] at member) rightTyped numeric
         · intro child member
           simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
           subst child
@@ -1343,7 +1346,8 @@ theorem Scan.syntax {source approved expected mode statements}
       | assignValue assignment =>
         obtain ⟨sourceTyped, writable, rightTyped, numeric⟩ :=
           ScopedSourceForItemsAdmission.projected_assignment_facts unique declaration route profile assignment
-        apply GenericImperativeMatch.PreparedSyntax.assign found form sourceTyped writable rightTyped numeric
+        apply GenericImperativeMatch.PreparedSyntax.assign found form sourceTyped writable route.elementFree
+          rightTyped numeric
         · intro child member
           rcases List.mem_cons.mp member with equal | member
           · subst child

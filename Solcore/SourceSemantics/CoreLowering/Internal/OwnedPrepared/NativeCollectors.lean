@@ -334,6 +334,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -361,7 +362,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
         subst lowered
         exact extract rhs value (by simp) generated ⟨_, rhsNative⟩) accepted
     exact ⟨head, emitted, token, .bare bare⟩
-  · cases generated_of_lower accepted with
+  · cases generated_of_lower (elementWrite?_of_free _ _ free) accepted with
     | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
       cases rhsGenerated with
       | @present id right rhsGenerated rhsType =>
@@ -546,7 +547,7 @@ theorem extraction_of_lowerForItems_with_coupled (residualMode : Bool) {tracked 
       obtain ⟨_, bodyTyped⟩ := TypedLexicalWhile.Native.discard_child nativeTyped
       exact ⟨CoupledTokenDiagnosticExtraction.discard (factory := factory) found child (Classical.choice (ih closed residual sourceSignatures declarations generatedBody bodyTyped origin.tail))⟩
 
-  | @assign context assignment operator rhs rest sourceTyped writable rightTyped profile children remaining ih =>
+  | @assign context assignment operator rhs rest sourceTyped writable free rightTyped profile children remaining ih =>
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
@@ -557,7 +558,7 @@ theorem extraction_of_lowerForItems_with_coupled (residualMode : Bool) {tracked 
           (invalidProjection parentSite assignment.target.root) (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered member generated raw => by
           obtain ⟨syntaxTree, node, found, typed⟩ := children id member
           obtain ⟨childType, childNative⟩ := raw
@@ -934,7 +935,7 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
         loopTyped
         (Classical.choice (restIH closed residual sourceSignatures declarations projection generatedBody tailTyped))⟩
 
-  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable rightTyped profile children remaining ih =>
+  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable free rightTyped profile children remaining ih =>
     simp only [AssignmentDiagnosticOrigins.AcceptedFor] at accepted
     cases fuel with
     | zero => cases accepted
@@ -953,7 +954,7 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
           (invalidOperand (.occurrence id.occurrence) assignment.target.root operator)
           (missingDefault (.occurrence id.occurrence) assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered member generated raw => by
           obtain ⟨syntaxTree, node, found, typed⟩ := children id member
           obtain ⟨childType, childNative⟩ := raw
@@ -1058,7 +1059,7 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
       have child := expressions context closed residual sourceSignatures declarations syntaxTree found typed generated discardedTyped
       obtain ⟨_, bodyTyped⟩ := TypedLexicalWhile.Native.discard_child nativeTyped
       exact ⟨CatalogCoupledExtractionFor.initializerDiscard (factory := factory) found child (Classical.choice (ih closed residual sourceSignatures declarations projection ⟨headerFuel, parentSite, next, origin.tail, generatedBody, nextReceipt⟩ bodyTyped))⟩
-  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable rightTyped profile children remaining ih =>
+  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable free rightTyped profile children remaining ih =>
     obtain ⟨headerFuel, parentSite, next, origin, accepted, nextReceipt⟩ := accepted
     cases headerFuel with
     | zero => cases accepted
@@ -1070,7 +1071,7 @@ theorem extraction_of_typed_position_with_catalog_coupled (residualMode : Bool) 
           (invalidProjection parentSite assignment.target.root) (invalidOperand parentSite assignment.target.root operator)
           (missingDefault parentSite assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, assignments.equal, assignments.value] using accepted
-      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable rightTyped profile
+      obtain ⟨head, rfl, sameToken, prepared⟩ := CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences unique sourceSignatures sourceTyped writable free rightTyped profile
         (fun id lowered member generated raw => by
           obtain ⟨syntaxTree, node, found, typed⟩ := children id member
           obtain ⟨childType, childNative⟩ := raw
@@ -1614,7 +1615,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
     ∃ head : Head values source context certificate scope administrative definitions assignment,
       code = head.emit next output ∧ head.invalid = invalidUnary ∧
         head.PreparedAt site fuel invalidProjection missing := by
-  cases generated_of_lower accepted with
+  cases generated_of_lower (elementWrite?_bitNot _ _) accepted with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
     cases rhsGenerated with
     | absent =>
@@ -1859,7 +1860,7 @@ theorem collected
       exact .discard (found := found)
         (value := ⟨expressionNode, found, typed, children context fields declarations syntaxValue accessible found typed generated childTyped⟩)
         (remaining := tail) (tailSites registry)
-  | @assign context assignment operator rhs rest sourceTyped writable rightTyped profile childSyntax remaining ih =>
+  | @assign context assignment operator rhs rest sourceTyped writable free rightTyped profile childSyntax remaining ih =>
     obtain ⟨sourceProfile, restShape⟩ := shape.assignment_tail
     cases fuel with
     | zero => cases accepted
@@ -1885,7 +1886,7 @@ theorem collected
         (fun child member => expression_lookup edited avoids (accessible child (List.mem_cons_of_mem _ member)))).trans compiled
       obtain ⟨originalHead, emittedOriginal, sameToken, preparedAt⟩ :=
         CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
-          unique sourceSignatures sourceTyped writable rightTyped profile
+          unique sourceSignatures sourceTyped writable free rightTyped profile
           (certificate := TypedCertificate source certificates context)
           (fun child lowered member generated raw => by
             obtain ⟨approved, node, found, typed⟩ := childSyntax child member
@@ -2346,7 +2347,7 @@ theorem collected_at
         ⟨expressionNode, expressionFound, typed, children context fields declarations syntaxValue accessible expressionFound typed generated childTyped⟩
         (ih restShape fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped)
-  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable rightTyped profile childSyntax remaining ih =>
+  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable free rightTyped profile childSyntax remaining ih =>
     obtain ⟨sourceProfile, restShape⟩ := shape.assignment_tail found form
     cases fuel with
     | zero => cases accepted
@@ -2378,7 +2379,7 @@ theorem collected_at
         (fun child member => expression_lookup edited avoids (accessible child (List.mem_cons_of_mem _ member)))).trans compiled
       obtain ⟨originalHead, emittedOriginal, sameToken, preparedAt⟩ :=
         CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
-          unique sourceSignatures sourceTyped writable rightTyped profile
+          unique sourceSignatures sourceTyped writable free rightTyped profile
           (certificate := TypedCertificate source certificates context)
           (fun child lowered member generated raw => by
             obtain ⟨approved, node, found, typed⟩ := childSyntax child member
@@ -2928,7 +2929,7 @@ theorem collected_at
         ⟨expressionNode, found, typed, children context fields declarations syntaxValue accessible found typed generated childTyped⟩
         (ih ⟨shape.1.discard_tail, shape.2⟩ fields closed residual sourceSignatures declarations
           (fun child member => reached child (by simpa only [List.flatMap_cons, List.append_assoc] using (List.mem_append_right (ForItemForm.references _) member))) projection ⟨headerFuel, parentSite, next, AssignmentDiagnosticOrigins.ForOriginFor.tail (tracked := true) origin, generatedBody, nextReceipt⟩ tailTyped)
-  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable rightTyped profile childSyntax remaining ih =>
+  | @initializerAssign context assignment operator rhs rest condition post statements expected sourceTyped writable free rightTyped profile childSyntax remaining ih =>
     obtain ⟨sourceProfile, restShape⟩ := shape.1.assignment_tail
     obtain ⟨headerFuel, parentSite, next, origin, accepted, nextReceipt⟩ := accepted
     cases headerFuel with
@@ -2955,7 +2956,7 @@ theorem collected_at
         (fun child member => expression_lookup edited avoids (accessible child (List.mem_cons_of_mem _ member)))).trans compiled
       obtain ⟨originalHead, emittedOriginal, sameToken, preparedAt⟩ :=
         CallableIndexedOwnedPreparedNativeAssignmentHeadCollectors.Head.of_lower_with_raw_occurrences
-          unique sourceSignatures sourceTyped writable rightTyped profile
+          unique sourceSignatures sourceTyped writable free rightTyped profile
           (certificate := TypedCertificate source certificates context)
           (fun child lowered member generated raw => by
             obtain ⟨approved, node, found, typed⟩ := childSyntax child member
@@ -3485,7 +3486,7 @@ theorem tree
         ⟨expressionNode, expressionFound, typed, children context fields declarations syntaxValue accessible expressionFound typed generated childTyped⟩
         (ih rfl restShape fields closed residual sourceSignatures declarations
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody tailTyped)
-  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable rightTyped profile childSyntax remaining ih =>
+  | @assign context mode id node assignment operator rhs rest expected found form sourceTyped writable free rightTyped profile childSyntax remaining ih =>
     cases atStatements
     obtain ⟨sameOperator, bare, restShape⟩ := shape.assign_tail found form
     cases sameOperator

@@ -5491,6 +5491,31 @@ private def arraySyntaxWorkspace : Workspace.RawWorkspace := workspaceOf [
   "    return pair(n, n).length + new uint256[](n).length - 2;",
   "}"]
 
+/-- Row 4's step 5a-iii-a: plain element writes, not upstream's. `placeFirst(i, v)` checks its
+place before a right side that divides by zero, and `writeBack(i, j, v)` writes an element of one
+row of two and reads both rows back. `throughLocal(v)` writes a call's result through a local, which
+writes the caller's array (difference 16). -/
+private def elementWriteWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function placeFirst(i: uint256, v: uint256) returns (uint256) {",
+  "    let m: uint256[] = new uint256[](2);",
+  "    m[i] = v / (v - v);",
+  "    return m[0];",
+  "}",
+  "function writeBack(i: uint256, j: uint256, v: uint256) returns (uint256) {",
+  "    let rows: uint256[][] = [new uint256[](2), new uint256[](2)];",
+  "    rows[i][j] = v;",
+  "    return rows[i][j] * 10 + rows[1 - i][j];",
+  "}",
+  "function same(xs: uint256[]) returns (uint256[]) {",
+  "    return xs;",
+  "}",
+  "function throughLocal(v: uint256) returns (uint256) {",
+  "    let m: uint256[] = new uint256[](2);",
+  "    let r: uint256[] = same(m);",
+  "    r[1] = v;",
+  "    return m[1];",
+  "}"]
+
 /-- The source semantics and the lowering reject the same first length with `Panic(0x41)`. -/
 example : Solcore.SourceSemantics.Dynamic.newArrayLengthLimit =
     SourceCoreDataExpressions.arrayLengthLimit := rfl
@@ -5501,7 +5526,9 @@ allocates nothing more, an element nothing wrote reads as zero, a row of `new T[
 array, and a read from the length on, a negative `int8` index's word included, panics with
 `0x32`. Then array-syntax's `#[(3, 4) -> 10]`, `#[(3, 4) -> 4]`, `#[() -> 5]` and
 `#[(4) -> 4]`: literals keep their elements in order, a literal returned from a call, a nested
-literal and a call result's length. -/
+literal and a call result's length. Then plain element writes: a nested write changes only its
+row, and an element place panics with `0x32` from its array's length on, before its right side
+runs. -/
 def runUpstreamArrayFixtures : IO Unit := do
   let program ← get "array fixture check" (checkProgram arrayFixtureWorkspace)
   let names := ["newLen", "oversized", "nested", "defaultZero", "nestedEmpty", "signedIndex"]
@@ -5544,7 +5571,28 @@ def runUpstreamArrayFixtures : IO Unit := do
     require (completed.value == word expected)
       s!"{syntaxNames[index]!}({arguments}) gave {reprStr completed.value}"
     syntaxSession := completed.session
-  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths"
+  let writeProgram ← get "element write check" (checkProgram elementWriteWorkspace)
+  let writeNames := ["placeFirst", "writeBack", "throughLocal"]
+  let writeSeeds ← writeNames.mapM (seed writeProgram)
+  let writeCompiled ← get "element write compilation"
+    (compile elementWriteWorkspace writeSeeds {specializationBudget := 256, compilationFuel := 1000})
+  let writeKey (index : Nat) : IO Key := match writeCompiled.keys[index]? with
+    | some key => pure key
+    | none => throw (IO.userError "element write root missing")
+  let mut writeSession ← boot (← writeCompiled.open)
+  for (index, arguments, expected) in [(1, [0, 1, 7], 70), (1, [1, 0, 3], 30), (2, [9], 9)] do
+    let completed ← execute writeSession (← writeKey index) (arguments.map word)
+    require (completed.value == word expected)
+      s!"{writeNames[index]!}({arguments}) gave {reprStr completed.value}"
+    writeSession := completed.session
+  writeSession ← panics writeSession (← writeKey 0) [word 5, word 1] SourceCorePanics.outOfBounds
+    "placeFirst(5, 1)"
+  writeSession ← panics writeSession (← writeKey 0) [word 0, word 1] SourceCorePanics.divisionByZero
+    "placeFirst(0, 1)"
+  for arguments in [[2, 0, 1], [0, 2, 1]] do
+    writeSession ← panics writeSession (← writeKey 1) (arguments.map word) SourceCorePanics.outOfBounds
+      s!"writeBack({arguments})"
+  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths; a nested element write changes only its row, and an element place from the length on panics with 0x32 before its right side"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)

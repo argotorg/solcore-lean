@@ -1674,6 +1674,7 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
     (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -1700,7 +1701,8 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
     · exact .inr (.inr ⟨rawView.trans integer, notWordOnly⟩)
   · obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, lowered, node, _, binding, rootType, slot, layout, ordinary,
       _, found, tree, targetView, rawView, sameType, codeEq⟩ :=
-      CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped bare extract accepted typed
+      CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped bare free extract accepted
+        typed
     rw [assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)] at codeEq
     refine ⟨⟨prepared, index, codes, leaf, lowered, node, invalidOperand,
       .projected layout ordinary, slot, rootType ▸ writable binder binding, found, tree, rawView, sameType, ?_,
@@ -1720,6 +1722,7 @@ inductive Syntax (source : TypedSource) (context : SourceSemantics.Context) : Bo
       (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
+      (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
       (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
@@ -1801,7 +1804,7 @@ theorem tree_of_flow {layouts : SourceCoreAllocationLayouts.Prepared} {owner : S
       mode statements expected type code := by
   induction syntaxTree generalizing fuel code with
   | tail body => exact .tail (tails body accepted)
-  | @assign id node assignment operator rhs rest expected found form sourceTyped writable rightTyped profile remaining ih =>
+  | @assign id node assignment operator rhs rest expected found form sourceTyped writable free rightTyped profile remaining ih =>
     cases fuel with
     | zero => cases accepted
     | succ fuel =>
@@ -1820,7 +1823,7 @@ theorem tree_of_flow {layouts : SourceCoreAllocationLayouts.Prepared} {owner : S
           (invalidOperand (.occurrence id.occurrence) assignment.target.root operator)
           (missing (.occurrence id.occurrence) assignment.target.root) = .ok code := by
         cases operator <;> simpa only [SourceCoreLoops.assignValue, matched.equal, matched.value] using accepted
-      obtain ⟨head, rfl⟩ := Head.of_lower unique signatures sourceTyped writable rightTyped profile (expressions fuel) compiled typed
+      obtain ⟨head, rfl⟩ := Head.of_lower unique signatures sourceTyped writable free rightTyped profile (expressions fuel) compiled typed
       exact .assign found form head (ih compiledBody)
 end Solcore.SourceSemantics.CoreLowering.CompatibleAssignmentStatements
 end

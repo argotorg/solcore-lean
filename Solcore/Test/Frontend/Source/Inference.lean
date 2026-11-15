@@ -1561,7 +1561,8 @@ private def testArrayIndex : IO Unit := do
 projection at an index of `word` or one of the twelve types, an open literal
 defaulting to `uint256`, and `rows[i][j] = v` takes two; a `bool` index is
 rejected with `Typedef`'s name, and a compound assignment or an in-place `~` on
-an element, which wait for decision 3, are rejected. -/
+an element, which wait for decision 3, are rejected, as is a write through a call's result,
+which is no place (difference 16). -/
 private def testArrayElementPlace : IO Unit := do
   let functions ← check "array element place" (String.intercalate "\n" [
     "function write(n: uint256, i: uint256, v: uint256) returns (uint256) {",
@@ -1622,6 +1623,13 @@ private def testArrayElementPlace : IO Unit := do
   expectInferenceError "an in-place ~ on an element"
     "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[0] ~=; return n; }"
     fun error => error == .operatorNotSupported "BitNot" uint256
+  expectInferenceError "an element write through a call's result"
+    (String.intercalate "\n" [
+      "function same(xs: uint256[]) returns (uint256[]) { return xs; }",
+      "function bad(v: uint256) returns (uint256) { let m: uint256[] = new uint256[](2); same(m)[1] = v; return m[1]; }"])
+    fun error => match error with
+      | .invalidAssignmentTarget _ => true
+      | _ => false
 
 /-- `[e₀, …, eₙ₋₁]` has the type `T[]` of its elements' one type `T`, which an
 annotation, an element or the expected type gives, `[]` included, and an open
