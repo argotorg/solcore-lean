@@ -397,6 +397,7 @@ private theorem recover_expression_form (original : ExpressionForm)
       exact congrArg (fun selected => ExpressionForm.arrayLiteral selected elements)
         (recover_type leftClosed rightClosed element leftLocal rightLocal
           (ExpressionForm.arrayLiteral.inj same).1)
+  | arraySlice base start stop => rfl
 
 private theorem recover_place (original : PlaceResolution)
     (leftLocal rightLocal : Substitution)

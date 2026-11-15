@@ -1176,6 +1176,20 @@ example (context : Context) (heap : Heap) (base : Ty) :
   · cases baseTyped <;> simp [Ty.arraySliceBaseAllowed, Ty.word, Ty.fixed] at allowed
   · simp [Ty.arraySlice] at equal
 
+/-- A slice's positions: an absent start is 0 and an absent stop is the base's
+length. -/
+example : SliceBounds 2 none none [] 0 2 := .whole
+
+example (start stop : Frontend.SourceInference.ExpressionId) :
+    SliceBounds 2 (some start) (some stop) [.word one, .word two] one.val two.val := .range
+
+/-- A slice is made against an array's cell's element count, or a slice's own
+length. -/
+example : ViewLength arrayHeap (.arrayRef .word ⟨0⟩) 2 :=
+  .array (elements := [.word one, .word two]) (.intro .head) rfl
+
+example (base : Value) : ViewLength ⟨[]⟩ (.arraySlice base 1 3) 3 := .slice
+
 end Solcore.Test.SourceSemanticsArrayObjects
 end
 

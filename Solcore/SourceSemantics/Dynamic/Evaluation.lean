@@ -450,6 +450,31 @@ inductive NewArrayDefault : Heap → TypeSystem.Ty → Value → Heap → Prop w
         (some (.arrayObject inner [])) location after) :
       NewArrayDefault heap (TypeSystem.Ty.array inner) (.arrayRef inner location) after
 
+/-- The length of a memory array or of a slice: the number of elements the
+array's cell holds, or the slice's own length. -/
+inductive ViewLength (heap : Heap) : Value → Nat → Prop where
+  | array {element : TypeSystem.Ty} {location : Location} {cell : Cell}
+      {elements : List Value}
+      (read : Heap.Reads heap location cell)
+      (stored : cell.value = some (.arrayObject element elements)) :
+      ViewLength heap (.arrayRef element location) elements.length
+  | slice {base : Value} {start length : Nat} :
+      ViewLength heap (.arraySlice base start length) length
+
+/-- A slice's first and last positions in a base of `count` elements, from the
+words its present bounds evaluate to: an absent start is 0 and an absent stop
+is `count`, as std's `sliceFrom`, `sliceTo` and `sliceAll` fill them. -/
+inductive SliceBounds (count : Nat) :
+    Option ExpressionId → Option ExpressionId → List Value → Nat → Nat → Prop where
+  | whole : SliceBounds count none none [] 0 count
+  | suffix {start : ExpressionId} {first : Core.Word} :
+      SliceBounds count (some start) none [.word first] first.val count
+  | prefix {stop : ExpressionId} {last : Core.Word} :
+      SliceBounds count none (some stop) [.word last] 0 last.val
+  | range {start stop : ExpressionId} {first last : Core.Word} :
+      SliceBounds count (some start) (some stop) [.word first, .word last] first.val
+        last.val
+
 /-- A selected match branch after its pattern bindings have been allocated. -/
 inductive MatchBranchExecutes
     (ExecuteStatements : Environment → Heap →
@@ -840,6 +865,24 @@ mutual
         ExpressionFormEvaluates program context evidence source environment before
           (.arrayLiteral element elements) requirements coercions
           (.arrayRef element location) after
+    /-- A slice evaluates its base, then its present bounds from left to right,
+    and holds the base from its first position on, up to its last, once
+    `first ≤ last ≤ length`, as std's `sliceRange` does. -/
+    | arraySlice
+        {context evidence source environment before middle after base start stop
+          requirements coercions baseValue bounds count first last}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base baseValue middle)
+        (bounds_evaluate : ExpressionsEvaluate program context evidence source
+          environment middle (start.toList ++ stop.toList) bounds after)
+        (counted : ViewLength after baseValue count)
+        (chosen : SliceBounds count start stop bounds first last)
+        (ordered : first ≤ last)
+        (within : last ≤ count) :
+        ExpressionFormEvaluates program context evidence source environment before
+          (.arraySlice base start stop) requirements coercions
+          (.arraySlice baseValue first (last - first)) after
 
   /-- Left-to-right evaluation of an expression vector. -/
   inductive ExpressionsEvaluate (program : Program) :
@@ -1828,6 +1871,8 @@ mutual
     | .arrayLiteral _ elements_evaluate allocates =>
         (elements_evaluate.initialization_extends).trans
           (HeapInitializationExtend.of_allocation allocates)
+    | .arraySlice _ base_evaluates bounds_evaluate _ _ _ _ =>
+        (base_evaluates.initialization_extends).trans bounds_evaluate.initialization_extends
 
   theorem ExpressionsEvaluate.initialization_extends {program : Program}
       {context : Context}

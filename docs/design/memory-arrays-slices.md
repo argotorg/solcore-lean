@@ -432,7 +432,14 @@ wait for the native pipeline's contracts and ABI.
     on, or, when its leading is a local not yet initialized, `uninitializedLocation`, as reading
     that local does, all before the right side. The staged traces stage no element place:
     `Staging.Recursive.ProjectedTarget.keys` stops at an element projection.
-  - A slice panics with `0x32` when `s > e` or when `e` exceeds the base's length.
+  - A slice panics with `0x32` when `s > e` or when `e` exceeds the base's length. As built in step
+    6c, a slice is its own typed form (`ExpressionForm.arraySlice`), whose start and stop are
+    optional, so the four slice forms share it. It evaluates the base, then its present bounds from
+    left to right, each a `uint256` word, and fills an absent start with 0 and an absent stop with
+    the base's length (`SliceBounds`), as std's `sliceFrom`, `sliceTo` and `sliceAll` do. Once
+    `s ≤ e ≤ length`, where the length is an array cell's element count or a slice's own
+    (`ViewLength`), it holds the base from `s` on for `e − s` elements. It faults with the base's
+    fault, a bound's, a bound that is not a word, or `0x32` (`arraySliceOutOfBounds`).
   - The length rules read the object or the slice, and `toArray(s)` allocates a copy.
 - **Preservation.** A reference has the type `T[]` when the cell it names has the type
   `arrayObject T`, as Core's runtime typing reads a `cellRef`'s cell in its world, and an object's
@@ -635,7 +642,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 5b | Compound assignments to an element, with in-place `~` and the unchecked forms, after decision 3 | 25–40 files, +600–1,100/−50–150 | compound(v); echo(xs) adapted |
 | 6a | Slices: the slice type `arraySlice<B>`, which resolves once aliases are expanded, over a memory array or a slice; type formation admits it, an array or a mapping that holds one is rejected, and elaboration rejects every slice type | 25–30 files, +300–500/−20–60; measured at 27 files, +386/−62 | none |
 | 6b | Slices: the slice value, which holds its base value, its start and its length, and its typing in a heap, with the typing's laws; no expression makes one yet | 15–20 files, +200–400/−10–20; measured at 9 files, +101/−10 | none |
-| 6c | Slices: the typed form of `a[s:e]`, `a[s:]`, `a[:e]` and `a[:]` with its static rule, evaluation, faults with `0x32` from its bounds, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–550/−5–15 | none |
+| 6c | Slices: the typed form of `a[s:e]`, `a[s:]`, `a[:e]` and `a[:]` with its static rule, evaluation, faults with `0x32` from its bounds, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–550/−5–15; measured at 27 files, +361/−9 | none |
 | 6d | Slices: reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules, with their faults, sized copies, stage and preservation | 28–32 files, +350–550/−5–15 | none |
 | 6e | Slices: the typed form of `toArray(s)` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +300–500/−5–15 | none |
 | 6f | Slices: inference's typing of the four slice forms on an array or a slice, with `uint256` bounds | 24–30 files, +800–1,100/−20–50 | none |

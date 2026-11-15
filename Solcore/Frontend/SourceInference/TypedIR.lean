@@ -377,6 +377,9 @@ inductive ExpressionForm where
   /-- `[e₀, …, eₙ₋₁]`: a memory array of `element` holding the elements in
   order. -/
   | arrayLiteral (element : Ty) (elements : List ExpressionId)
+  /-- `a[s:e]`, `a[s:]`, `a[:e]` or `a[:]` on a memory array or a slice: a
+  slice of it from `s`, or 0, to `e`, or its length. -/
+  | arraySlice (base : ExpressionId) (start stop : Option ExpressionId)
   deriving Repr, BEq, DecidableEq
 
 /-- One typed expression occurrence.  `requirements` contains every obligation
@@ -504,6 +507,8 @@ def references : ExpressionForm → List NodeId
   | .arrayLength base => [NodeId.expression base]
   | .arrayIndex base key => [NodeId.expression base, NodeId.expression key]
   | .arrayLiteral _ elements => elements.map NodeId.expression
+  | .arraySlice base start stop =>
+      NodeId.expression base :: (start.toList ++ stop.toList).map NodeId.expression
 
 end ExpressionForm
 
@@ -735,6 +740,7 @@ def applySubstitution (substitution : Substitution) : ExpressionForm → Express
     | .arrayLength base => .arrayLength base
     | .arrayIndex base key => .arrayIndex base key
     | .arrayLiteral element elements => .arrayLiteral (substitution.apply element) elements
+    | .arraySlice base start stop => .arraySlice base start stop
 
 end ExpressionForm
 
@@ -968,7 +974,7 @@ def definedLocalIds : ExpressionForm → List Resolved.LocalId
   | .literal _ | .integerLiteral .. | .reference .. | .group _ | .tuple _ |
       .unary .. | .binary .. | .conditional .. | .call .. | .constructor .. |
       .member .. | .proxy _ | .index .. | .newArray .. | .arrayLength _ | .arrayIndex .. |
-      .arrayLiteral .. => []
+      .arrayLiteral .. | .arraySlice .. => []
 
 end ExpressionForm
 

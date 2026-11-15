@@ -1664,6 +1664,53 @@ mutual
           before elements reason after) :
         ExpressionFormFaults program context evidence source environment before
           (.arrayLiteral element elements) requirements coercions reason after
+    | arraySliceBase
+        {context evidence source environment before after base start stop requirements
+          coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionFaults program context evidence source environment
+          before base reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.arraySlice base start stop) requirements coercions reason after
+    | arraySliceBounds
+        {context evidence source environment before middle after base start stop
+          requirements coercions baseValue reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base baseValue middle)
+        (fault : ExpressionsFault program context evidence source environment
+          middle (start.toList ++ stop.toList) reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.arraySlice base start stop) requirements coercions reason after
+    | arraySliceBoundType
+        {context evidence source environment before middle after base start stop
+          requirements coercions baseValue bounds value actual}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base baseValue middle)
+        (bounds_evaluate : ExpressionsEvaluate program context evidence source
+          environment middle (start.toList ++ stop.toList) bounds after)
+        (member : value ∈ bounds)
+        (not_word : ¬ WordValue value)
+        (actual_type : ValueRuntimeType value actual) :
+        ExpressionFormFaults program context evidence source environment before
+          (.arraySlice base start stop) requirements coercions
+          (.typeMismatch (.fixed .uint256) actual) after
+    /-- A slice whose first position passes its last, or whose last passes the
+    base's length, panics with `0x32`, as std's `sliceRange` does. -/
+    | arraySliceOutOfBounds
+        {context evidence source environment before middle after base start stop
+          requirements coercions baseValue bounds count first last}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base baseValue middle)
+        (bounds_evaluate : ExpressionsEvaluate program context evidence source
+          environment middle (start.toList ++ stop.toList) bounds after)
+        (counted : ViewLength after baseValue count)
+        (chosen : SliceBounds count start stop bounds first last)
+        (out_of_bounds : last < first ∨ count < last) :
+        ExpressionFormFaults program context evidence source environment before
+          (.arraySlice base start stop) requirements coercions (.panic 0x32) after
 
   /-- First fault in a left-to-right expression vector. -/
   inductive ExpressionsFault (program : Program) :

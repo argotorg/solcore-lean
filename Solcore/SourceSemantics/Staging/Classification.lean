@@ -411,6 +411,14 @@ mutual
         (form_eq : node.form = .arrayLiteral element elements)
         (elementStages : ExpressionsHaveStages source scope elements stages) :
         HasStage source scope id .deferred
+    | arraySlice
+        {scope : StageScope} {id base : ExpressionId} {start stop : Option ExpressionId}
+        {node : ExpressionNode} {stages : List Stage}
+        (contains : SourceSemantics.ContainsExpression source id node)
+        (form_eq : node.form = .arraySlice base start stop)
+        (childStages : ExpressionsHaveStages source scope
+          (base :: (start.toList ++ stop.toList)) stages) :
+        HasStage source scope id .deferred
 
   /-- Pointwise expression classification in source order. -/
   inductive ExpressionsHaveStages (source : TypedSource) :

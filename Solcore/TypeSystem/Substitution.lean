@@ -105,4 +105,18 @@ theorem ParameterSubstitution.arrayElementAllowed_apply (substitution : Paramete
   unfold Ty.arrayElementAllowed at allowed
   split at allowed <;> first | rfl | cases allowed
 
+/-- A flexible substitution keeps a base that a slice admits. -/
+theorem Substitution.arraySliceBaseAllowed_apply (substitution : Substitution) {base : Ty}
+    (allowed : base.arraySliceBaseAllowed = true) :
+    (substitution.apply base).arraySliceBaseAllowed = true := by
+  unfold Ty.arraySliceBaseAllowed at allowed
+  split at allowed <;> first | rfl | cases allowed
+
+/-- A rigid substitution keeps a base that a slice admits. -/
+theorem ParameterSubstitution.arraySliceBaseAllowed_apply (substitution : ParameterSubstitution)
+    {base : Ty} (allowed : base.arraySliceBaseAllowed = true) :
+    (substitution.apply base).arraySliceBaseAllowed = true := by
+  unfold Ty.arraySliceBaseAllowed at allowed
+  split at allowed <;> first | rfl | cases allowed
+
 end Solcore.TypeSystem

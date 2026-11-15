@@ -665,6 +665,17 @@ mutual
           (List.replicate elements.length element)) :
         ExpressionFormHasRawType source context (.arrayLiteral element elements)
           (TypeSystem.Ty.array element) (.ordinary [])
+    /-- `a[s:e]`, `a[s:]`, `a[:e]` or `a[:]`: a slice of a memory array or of a
+    slice, whose present bounds are `uint256`s. -/
+    | arraySlice
+        {context : Context} {base : ExpressionId} {start stop : Option ExpressionId}
+        {baseType : TypeSystem.Ty}
+        (base_allowed : baseType.arraySliceBaseAllowed = true)
+        (base_type : ExpressionHasType source context base baseType)
+        (bounds_type : ExpressionsHaveTypes source context (start.toList ++ stop.toList)
+          (List.replicate (start.toList ++ stop.toList).length (.fixed .uint256))) :
+        ExpressionFormHasRawType source context (.arraySlice base start stop)
+          (TypeSystem.Ty.arraySlice baseType) (.ordinary [])
 
   /-- Pointwise expression typing in source order. -/
   inductive ExpressionsHaveTypes (source : TypedSource) :
@@ -1323,6 +1334,8 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
       .arrayIndex baseInduction indexInduction kind)
     (fun elementWellFormed _ elementsInduction =>
       .arrayLiteral elementWellFormed elementsInduction)
+    (fun allowed _ _ baseInduction boundsInduction =>
+      .arraySlice allowed baseInduction boundsInduction)
     (fun _ => .nil _)
     (fun head tail headInduction tailInduction =>
       .cons headInduction tailInduction)

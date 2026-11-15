@@ -829,6 +829,19 @@ mutual
               middle_typed.allocate (.some (ValueHasType.arrayObject_of_values values_typed))
                 allocates,
               extension.trans (HeapTypesExtend.of_allocation allocates)⟩
+    | .arraySlice layout base_evaluates bounds_evaluate counted chosen ordered within => by
+        cases typing with
+        | arraySlice allowed base_type bounds_type =>
+            rcases preserveExpressionRec program_well_formed runtime
+                evidence_covers environment_agrees before_typed base_type
+                base_evaluates with
+              ⟨base_typed, middle_typed, base_extension⟩
+            rcases preserveExpressionsRec program_well_formed runtime
+                evidence_covers (environment_agrees.mono base_extension) middle_typed
+                bounds_type bounds_evaluate with
+              ⟨_, after_typed, bounds_extension⟩
+            exact ⟨.arraySlice (base_typed.mono bounds_extension) allowed, after_typed,
+              base_extension.trans bounds_extension⟩
     termination_by structural evaluation
 
   private theorem preserveExpressionsRec

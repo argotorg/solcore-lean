@@ -3503,6 +3503,17 @@ theorem preservesWith
             middle_typed.allocate (.some (ValueHasType.arrayObject_of_values values_typed))
               allocates,
             extension.trans (HeapTypesExtend.of_allocation allocates)⟩
+  | arraySlice allowed base_type bounds_type =>
+      cases evaluation with
+      | arraySlice layout base_evaluates bounds_evaluate counted chosen ordered within =>
+          rcases expression_preserves _ _ _ _ _ evidence_covers
+              environment_agrees before_typed base_type base_evaluates with
+            ⟨base_typed, middle_typed, base_extension⟩
+          rcases bounds_evaluate.preserves expression_preserves evidence_covers
+              (environment_agrees.mono base_extension) middle_typed bounds_type with
+            ⟨_, after_typed, bounds_extension⟩
+          exact ⟨.arraySlice (base_typed.mono bounds_extension) allowed, after_typed,
+            base_extension.trans bounds_extension⟩
 
 end ExpressionFormEvaluates
 

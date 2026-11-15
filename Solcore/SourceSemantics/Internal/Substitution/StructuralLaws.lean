@@ -5181,6 +5181,12 @@ theorem StatementsHaveType.applyParameters
     exact .arrayLiteral
       (StructuralSubstitution.TypeAdmissible.applyParameters substitution
         contextValid.exact contextValid.range elementWellFormed) typed
+  · intro context base start stop baseType allowed baseTypeProof boundsType baseInduction
+      boundsInduction catalog contextValid
+    have bounds := boundsInduction catalog contextValid
+    simp only [List.map_replicate] at bounds
+    exact .arraySlice (ParameterSubstitution.arraySliceBaseAllowed_apply substitution allowed)
+      (baseInduction catalog contextValid) bounds
   · intro context catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction
@@ -12554,6 +12560,12 @@ theorem StatementsHaveType.applySubstitution
     simp only [List.map_replicate] at typed
     exact .arrayLiteral (TypeAdmissible.applySubstitution contextValid.closes elementWellFormed)
       typed
+  · intro context base start stop baseType allowed baseTypeProof boundsType baseInduction
+      boundsInduction targetContext catalog contextValid
+    have bounds := boundsInduction targetContext catalog contextValid
+    simp only [List.map_replicate] at bounds
+    exact .arraySlice (Substitution.arraySliceBaseAllowed_apply _ allowed)
+      (baseInduction targetContext catalog contextValid) bounds
   · intro context targetContext catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction
