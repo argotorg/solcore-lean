@@ -656,14 +656,15 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 6c | Slices: the typed form of `a[s:e]`, `a[s:]`, `a[:e]` and `a[:]` with its static rule, evaluation, faults with `0x32` from its bounds, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–550/−5–15; measured at 27 files, +361/−9 | none |
 | 6d | Slices: reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules, with their faults, sized copies, stage and preservation | 28–32 files, +350–550/−5–15; measured at 15 files, +203/−102 | none |
 | 6e | Slices: the typed form of `toArray(s)` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +300–500/−5–15; measured at 26 files, +207/−7 | none |
-| 6f | Slices: inference's typing of the four slice forms on an array or a slice, with `uint256` bounds | 24–30 files, +800–1,100/−20–50 | none |
+| 6f-i | Slices: the slices' own arm in inference, which still rejects them and renumbers the cases of the proofs by functional induction on `inferExprFuel` | 14–15 files, +285–295/−285–295; measured at 15 files, +292/−289 | none |
+| 6f-ii | Slices: inference's typing of the four slice forms on an array or a slice, with `uint256` bounds | 24–30 files, +800–1,100/−20–50 | none |
 | 6g | Slices: inference's typing of reads, lengths and `toArray(s)` on slices | 18–30 files, +600–1,000/−25–55 | none |
 | 6h | Slices: the lowering, a slice as a Core product of its base, its start and its length, and `toArray(s)`'s copy | 4–9 files, +200–400/−10–20 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
 
-In all, that is about 635 to 895 file changes, +17,500 to 26,350 and −1,665 to 3,390 lines over
-thirty-eight commits: about four fifths to one and a fifth times row 1, whose 23 commits added about
+In all, that is about 649 to 910 file changes, +17,785 to 26,645 and −1,950 to 3,685 lines over
+thirty-nine commits: about four fifths to one and a fifth times row 1, whose 23 commits added about
 21,700 lines, much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600,
 until its first measure: it adds three AST forms through the proved parser, so it became 1a to 1c.
 1b's first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
@@ -721,6 +722,12 @@ take a typed form or a rule's case with its evaluation, faults and sized rules, 
 inference, as in steps 2b to 4. The lowering copies a slice for `toArray(s)` with a recursive Core
 helper over its indices, as `OrderedMapping`'s lookup is. So it splits into 6a to 6h, each within
 the cap, whose estimates add up to that measure.
+
+6f split as 2b-i did: the slices first took their own arm in inference, which still rejects them, in
+a commit that only renumbers the cases of the proofs by functional induction on `inferExprFuel`
+(6f-i): the arm is case 23, so every later case moves up by one, and the four proofs that name the
+rejecting arms name it too. 6f-ii then gives the arm its typing. The totals gain 6f-i's estimate and
+one commit.
 
 ## Generators, corpora and the smoke
 

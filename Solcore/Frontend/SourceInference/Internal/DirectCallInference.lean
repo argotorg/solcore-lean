@@ -270,7 +270,7 @@ private theorem inferFuel_classified_progress_internal :
       PreservesClassification MatchCasesResult.state state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
           cases state))
-  case case45 =>
+  case case46 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources notSingleton
       casesInduction bodyInduction expressionsInduction
@@ -311,7 +311,7 @@ private theorem inferFuel_classified_progress_internal :
       State.restoreLexicalScope, State.withLocals, State.fresh,
       Detail.recordExpression, Detail.recordIndirectCall] at *
     all_goals grind [ProgressFields.trans, ProgressFields.refl]
-  case case71 =>
+  case case72 =>
     intros fuel context target operator value state placeInduction valueInduction
     unfold PreservesClassification at *
     intro result success
@@ -347,7 +347,7 @@ private theorem inferFuel_classified_progress_internal :
       State.restoreLexicalScope, State.withLocals, State.fresh,
       Detail.recordExpression, Detail.recordIndirectCall] at *
     all_goals grind [ProgressFields.trans, ProgressFields.refl]
-  case case68 =>
+  case case69 =>
     unfold PreservesClassification at *
     intros
     simp_all only [inferPlaceFuel]
@@ -882,7 +882,7 @@ private theorem inferFuel_origins_progress_internal :
       PreservesOrigins MatchCasesResult.state state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
           cases state))
-  case case45 =>
+  case case46 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources notSingleton
       casesInduction bodyInduction expressionsInduction
@@ -927,7 +927,7 @@ private theorem inferFuel_origins_progress_internal :
       | apply ProgressFields.trans (second := ProgressFields.expression _ _ _)
       | skip
     all_goals grind [ProgressFields.trans]
-  case case71 =>
+  case case72 =>
     intros fuel context target operator value state placeInduction valueInduction
     unfold PreservesOrigins at *
     intro result success
@@ -966,7 +966,7 @@ private theorem inferFuel_origins_progress_internal :
       | apply ProgressFields.trans (second := ProgressFields.expression _ _ _)
       | skip
     all_goals grind [ProgressFields.trans]
-  case case68 =>
+  case case69 =>
     unfold PreservesOrigins at *
     intros
     simp_all only [inferPlaceFuel]

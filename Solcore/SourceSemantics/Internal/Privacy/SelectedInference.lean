@@ -1409,45 +1409,47 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
       (by simpa only [allocationPrivacy.2.2] using fresh)
   case case23 =>
     simp_all [InferExprFuelPrivacy, inferExprFuel]
-  case case25 =>
+  case case24 =>
+    simp_all [InferExprFuelPrivacy, inferExprFuel]
+  case case26 =>
     simp_all [InferConstructorApplicationFuelPrivacy,
       inferConstructorApplicationFuel, bind, Except.bind]
-  case case28 =>
+  case case29 =>
     simp_all [InferConstructorArgumentsFuelPrivacy,
       inferConstructorArgumentsFuel]
-  case case29 =>
+  case case30 =>
     simp [InferStatementsFuelPrivacy, inferStatementsFuel]
-  case case32 =>
-    simp [InferStatementFuelPrivacy, inferStatementFuel]
   case case33 =>
+    simp [InferStatementFuelPrivacy, inferStatementFuel]
+  case case34 =>
     simp_all [InferStatementFuelPrivacy, inferStatementFuel,
       bind, Except.bind]
-  case case48 =>
-    simp_all [InferStatementFuelPrivacy, inferStatementFuel]
   case case49 =>
     simp_all [InferStatementFuelPrivacy, inferStatementFuel]
-  case case51 =>
+  case case50 =>
     simp_all [InferStatementFuelPrivacy, inferStatementFuel]
-  case case53 =>
+  case case52 =>
     simp_all [InferStatementFuelPrivacy, inferStatementFuel]
-  case case56 =>
-    simp [InferForItemFuelPrivacy, inferForItemFuel]
+  case case54 =>
+    simp_all [InferStatementFuelPrivacy, inferStatementFuel]
   case case57 =>
+    simp [InferForItemFuelPrivacy, inferForItemFuel]
+  case case58 =>
     simp_all [InferForItemFuelPrivacy, inferForItemFuel, bind,
       Except.bind]
-  case case64 =>
+  case case65 =>
     simp [InferPlaceFuelPrivacy, inferPlaceFuel]
-  case case66 =>
-    simp_all [InferPlaceFuelPrivacy, inferPlaceFuel]
   case case67 =>
     simp_all [InferPlaceFuelPrivacy, inferPlaceFuel]
-  case case70 =>
+  case case68 =>
     simp_all [InferPlaceFuelPrivacy, inferPlaceFuel]
-  case case72 =>
+  case case71 =>
+    simp_all [InferPlaceFuelPrivacy, inferPlaceFuel]
+  case case73 =>
     simp [InferExprsFuelPrivacy, inferExprsFuel]
-  case case75 =>
+  case case76 =>
     simp [InferMatchCasesFuelPrivacy, inferMatchCasesFuel]
-  case case26 =>
+  case case27 =>
     intros fuel context initial
     unfold InferConstructorArgumentsFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical below safe result success
@@ -1455,7 +1457,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     injection success with resultEq
     subst result
     exact ⟨.refl _ _, by simp, live, new_rows_of_eq rfl⟩
-  case case30 =>
+  case case31 =>
     intros context expectedReturn initial fuel
     unfold InferStatementsFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical below safe result success
@@ -1463,7 +1465,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     injection success with resultEq
     subst result
     exact ⟨.refl _ _, safe_closed _ _ (Ty.variablesBelow_constructor 0 _), live, new_rows_of_eq rfl⟩
-  case case54 =>
+  case case55 =>
     intros fuel context initial
     unfold InferForItemsFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical result success
@@ -1471,7 +1473,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     injection success with resultEq
     subst result
     exact ⟨.refl _ _, live, new_rows_of_eq rfl⟩
-  case case73 =>
+  case case74 =>
     intros context initial fuel
     unfold InferExprsFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical result success
@@ -1479,7 +1481,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     injection success with resultEq
     subst result
     exact ⟨.refl _ _, by simp, live, new_rows_of_eq rfl⟩
-  case case76 =>
+  case case77 =>
     intros context scrutineeType expectedReturn outerScope initial fuel
     unfold InferMatchCasesFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical scrutineeBelow scrutineeSafe returnBelow returnSafe scopeEq result success
@@ -1489,7 +1491,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     exact ⟨.refl _ _, live, new_rows_of_eq rfl⟩
 
 
-  case case55 =>
+  case case56 =>
     intros fuel context item items initial itemIH tailIH
     unfold InferForItemsFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical result success
@@ -1512,7 +1514,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
           itemPrivacy.2.1 catalog validated canonical tail tailRun
         exact ⟨itemPrivacy.1.trans tailPrivacy.1, tailPrivacy.2.1,
           new_requirements_trans itemPrivacy.2.2 tailPrivacy.2.2 tailPrivacy.1⟩
-  case case74 =>
+  case case75 =>
     intros context initial fuel expression rest expressionIH tailIH
     unfold InferExprsFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical result success
@@ -1542,7 +1544,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         · exact tailPrivacy.1 _ expressionPrivacy.2.1
         · exact tailPrivacy.2.1 element tailMember
 
-  case case61 =>
+  case case62 =>
     intros context item initial fuel expression itemEq expressionInduction
     unfold InferForItemFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical result success
@@ -1559,7 +1561,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         have expressionProperties := expressionInduction ready wellFormed bound live catalog validated
           canonical (by simp) (by simp) (inferred, expressionState) expressionResult
         exact ⟨expressionProperties.1, expressionProperties.2.2.1, expressionProperties.2.2.2⟩
-  case case62 =>
+  case case63 =>
     intros context item initial fuel target operator value itemEq
       assignmentInduction
     unfold InferForItemFuelPrivacy
@@ -1580,7 +1582,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
           canonical (assignment, inferredValue, assignmentState)
           assignmentResult
         exact ⟨assignmentProperties.1, assignmentProperties.2.2.2.1, assignmentProperties.2.2.2.2⟩
-  case case63 =>
+  case case64 =>
     intros context item initial fuel target operator itemEq placeInduction
     unfold InferForItemFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical result success
@@ -1613,13 +1615,13 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
               new_requirements_trans placeProperties.2.2.2
                 (new_rows_of_eq (unify_requirements unifyResult)) unifiedPrivacy⟩
 
-  case case68 =>
+  case case69 =>
     intros context target initial fuel inner targetEq innerIH
     unfold InferPlaceFuelPrivacy at *
     intro ready wellFormed bound live catalog validated canonical result success
     apply innerIH ready wellFormed bound live catalog validated canonical result
     simpa only [inferPlaceFuel, targetEq] using success
-  case case27 =>
+  case case28 =>
     intros fuel context source sources expected expectedTypes initial sourceIH tailIH
     unfold InferConstructorArgumentsFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical expectedBelow expectedSafe result success
@@ -1664,10 +1666,10 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         · exact tailPrivacy.1 _ sourcePrivacy.2.1
         · exact tailPrivacy.2.1 element member
 
-  case case77 =>
+  case case78 =>
     intros context scrutineeType expectedReturn outerScope initial fuel arm rest bodyIH tailIH
     exact inferMatchCasesFuel_cons_private bodyIH tailIH
-  case case24 =>
+  case case25 =>
     intros fuel context source id instantiation arguments expected initial
       arityEq argumentsInduction
     unfold InferConstructorApplicationFuelPrivacy
@@ -1773,7 +1775,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                 intro row member freshRow
                 exact new_requirements_trans argumentsPrivacy.2.2.2 recorded.2.2.2 recorded.1 row member
                   (by simpa only [unify_requirements fittedResult] using freshRow)
-  case case59 =>
+  case case60 =>
     intros context item initial fuel name initializer itemEq
       initializerInduction
     unfold InferForItemFuelPrivacy
@@ -1806,7 +1808,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         refine ⟨initializerPrivacy.1.trans bindingPrivacy.1, bindingPrivacy.2.1, ?_⟩
         exact new_requirements_trans initializerPrivacy.2.2.2
           (new_rows_of_eq bindingPrivacy.2.2) bindingPrivacy.1
-  case case35 =>
+  case case36 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq name initializer statementEq initializerInduction
     unfold InferStatementFuelPrivacy
@@ -1858,7 +1860,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
           apply SafeTransport.of_substitution_eq (before := initializerState) rfl
           exact initializerPrivacy.2.2.2 row member
             (by simpa only [allocationPrivacy.2.2] using freshRow) type typeMember
-  case case34 =>
+  case case35 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq name sourceType statementEq
     unfold InferStatementFuelPrivacy
@@ -1900,7 +1902,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         · exact bindingPrivacy.2.1.transport rfl (.of_substitution_eq rfl)
         · exact new_rows_of_eq allocationPrivacy.2.2
 
-  case case58 =>
+  case case59 =>
     intros context item initial fuel name sourceType itemEq
     unfold InferForItemFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical result success
@@ -1925,7 +1927,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         rw [← resultEq]
         exact ⟨bindingPrivacy.1, bindingPrivacy.2.1, new_rows_of_eq bindingPrivacy.2.2⟩
 
-  case case36 =>
+  case case37 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq name sourceType initializer statementEq
       initializerInduction
@@ -2005,7 +2007,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
               exact initializerPrivacy.2.2.2 row member
                 (by simpa only [allocationPrivacy.2.2] using freshRow) type typeMember
 
-  case case60 =>
+  case case61 =>
     intros context item initial fuel name sourceType initializer itemEq
       initializerInduction
     unfold InferForItemFuelPrivacy
@@ -2065,7 +2067,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
             rw [← resultEq]
             exact ⟨initializerPrivacy.1.trans bindingPrivacy.1, bindingPrivacy.2.1,
               new_requirements_trans initializerPrivacy.2.2.2 (new_rows_of_eq bindingPrivacy.2.2) bindingPrivacy.1⟩
-  case case39 =>
+  case case40 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq expression trailingSemicolon statementEq
       expressionInduction
@@ -2106,7 +2108,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
           apply SafeTransport.of_substitution_eq (before := expressionState) rfl
           exact expressionPrivacy.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using freshRow) type typeMember
 
-  case case41 =>
+  case case42 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq body statementEq bodyInduction
     unfold InferStatementFuelPrivacy
@@ -2145,7 +2147,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         apply SafeTransport.of_substitution_eq (before := bodyResult.state) rfl
         exact bodyPrivacy.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using freshRow) type typeMember
 
-  case case42 =>
+  case case43 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq target operator value statementEq assignmentInduction
     unfold InferStatementFuelPrivacy
@@ -2184,7 +2186,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         apply SafeTransport.of_substitution_eq (before := assignmentState) rfl
         exact assignmentPrivacy.2.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using freshRow) type typeMember
 
-  case case43 =>
+  case case44 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq target operator statementEq placeInduction
     unfold InferStatementFuelPrivacy
@@ -2236,7 +2238,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
             apply SafeTransport.of_substitution_eq (before := unifiedState) rfl
             exact newRows row member (by simpa only [allocationPrivacy.2.2] using freshRow) type typeMember
 
-  case case50 =>
+  case case51 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq statementEq loopNonzero
     unfold InferStatementFuelPrivacy
@@ -2268,7 +2270,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
       safe_closed _ _ (Ty.variablesBelow_constructor 0 _),
       allocationPrivacy.2.1.transport rfl (.of_substitution_eq rfl), new_rows_of_eq allocationPrivacy.2.2⟩
 
-  case case52 =>
+  case case53 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq statementEq loopNonzero
     unfold InferStatementFuelPrivacy
@@ -2332,7 +2334,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         intro row member freshRow
         exact recorded.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using freshRow)
 
-  case case65 =>
+  case case66 =>
     intros context target initial fuel name targetEq binder lookupEq monomorphic
     unfold InferPlaceFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical result success
@@ -2352,7 +2354,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     rw [Ty.apply_eq_self_of_domain_disjoint_freeVariables [] binder.scheme.body (by simp [Substitution.domain])] at bodySafe
     exact ⟨.refl _ _, safe_resolved ready bodySafe, live, new_rows_of_eq rfl⟩
 
-  case case31 =>
+  case case32 =>
     intros context expectedReturn initial fuel statement rest
       statementInduction tailInduction
     unfold InferStatementsFuelPrivacy
@@ -2403,7 +2405,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     · simpa only [allocationEq] using argumentsIH
     · exact calleeIH
 
-  case case37 =>
+  case case38 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq statementEq
     unfold InferStatementFuelPrivacy
@@ -2450,7 +2452,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
           unifiedLive.transport rfl (.of_substitution_eq rfl),
           new_rows_of_eq ((unify_requirements unifyResult).trans allocationPrivacy.2.2)⟩
 
-  case case38 =>
+  case case39 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq value statementEq valueInduction
     unfold InferStatementFuelPrivacy
@@ -2658,7 +2660,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                 apply finished.2.2.2 row member
                 simpa only [freshResult, freshDataConstructorInstantiation_requirements, allocationPrivacy.2.2] using freshRow
 
-  case case71 =>
+  case case72 =>
     intros fuel context target operator value initial placeIH valueIH
     unfold InferAssignedValueFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical result success
@@ -2801,7 +2803,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
       | uncheckedMultiply => exact finishNonEqual (valueIH place) success
       | uncheckedDivide => exact finishNonEqual (valueIH place) success
       | uncheckedModulo => exact finishNonEqual (valueIH place) success
-  case case47 =>
+  case case48 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq condition body statementEq conditionInduction bodyInduction
     unfold InferStatementFuelPrivacy
@@ -2870,19 +2872,19 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         apply SafeTransport.of_substitution_eq (before := inferredBody.state) rfl
         exact rows row member (by simpa only [allocationPrivacy.2.2] using freshRow) type typeMember
 
-  case case44 =>
+  case case45 =>
     intro context statement expectedReturn initial fuel id allocated allocationEq scrutinees arms form
     dsimp only
     intro source single casesIH bodyIH sourceIH
     apply inferStatementFuel_match_single_private form single casesIH bodyIH
     simpa only [allocationEq] using sourceIH
-  case case45 =>
+  case case46 =>
     intro context statement expectedReturn initial fuel id allocated allocationEq scrutinees arms form
     dsimp only
     intro notSingleton casesIH bodyIH sourcesIH
     apply inferStatementFuel_match_many_private form notSingleton casesIH bodyIH
     simpa only [allocationEq] using sourcesIH
-  case case46 =>
+  case case47 =>
     intro context statement expectedReturn initial fuel id allocated allocationEq headerSpan initializer condition post body form initializerIH conditionIH bodyIH postIH
     apply inferStatementFuel_for_private form
     · simpa only [allocationEq] using initializerIH
@@ -3061,7 +3063,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                 exact new_requirements_trans allRows recorded.2.2.2 recorded.1 row member
                   (by simpa only [allocationPrivacy.2.2] using freshRow)
 
-  case case69 =>
+  case case70 =>
     intros context target initial fuel base brackets key targetEq
       baseInduction keyInduction
     unfold InferPlaceFuelPrivacy
@@ -3157,7 +3159,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                   fromValueToKey.resolve_variablesBelow
                     valueProperties.2.2
                 exact ⟨basePrivacy.1.trans (toUnified.trans keyPrivacy.1), finalValueSafe, keyPrivacy.2.2.1, allRows⟩
-  case case40 =>
+  case case41 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq condition thenBody elseBody statementEq
       conditionInduction thenInduction elseInduction

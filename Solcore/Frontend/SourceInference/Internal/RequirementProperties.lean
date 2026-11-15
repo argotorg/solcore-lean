@@ -2626,7 +2626,7 @@ private theorem inferFuel_preserves_requirements_internal :
       PreservesRequirements MatchCasesResult.state state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
           cases state))
-  case case45 =>
+  case case46 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources notSingleton
       casesInduction bodyInduction expressionsInduction
@@ -2657,7 +2657,7 @@ private theorem inferFuel_preserves_requirements_internal :
     all_goals try simp_all
     all_goals intro requirement member
     all_goals try solve_by_elim (maxDepth := 30)
-  case case71 =>
+  case case72 =>
     intros fuel context target operator value state placeInduction valueInduction
     unfold PreservesRequirements at *
     intro result success
@@ -2682,7 +2682,7 @@ private theorem inferFuel_preserves_requirements_internal :
     all_goals simp_all
     all_goals intro requirement member
     all_goals grind
-  case case68 =>
+  case case69 =>
     unfold PreservesRequirements at *
     intros
     simp_all only [inferPlaceFuel]
@@ -3663,7 +3663,7 @@ private theorem inferFuel_preserves_integerPatterns_internal :
       PreservesIntegerPatterns MatchCasesResult.state state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
           cases state))
-  case case45 =>
+  case case46 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources notSingleton
       casesInduction bodyInduction expressionsInduction
@@ -3700,7 +3700,7 @@ private theorem inferFuel_preserves_integerPatterns_internal :
           (next := stateAfterId) (initial := state) (by rfl) statementIdEq
     all_goals intro origin member
     all_goals try solve_by_elim (maxDepth := 30)
-  case case71 =>
+  case case72 =>
     intros fuel context target operator value state placeInduction valueInduction
     unfold PreservesIntegerPatterns at *
     intro result success
@@ -3726,7 +3726,7 @@ private theorem inferFuel_preserves_integerPatterns_internal :
     all_goals simp_all
     all_goals intro origin member
     all_goals grind
-  case case68 =>
+  case case69 =>
     unfold PreservesIntegerPatterns at *
     intros
     simp_all only [inferPlaceFuel]
@@ -4873,7 +4873,7 @@ private theorem inferFuel_preserves_integerLiterals_internal :
       PreservesIntegerLiterals MatchCasesResult.state state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
           cases state))
-  case case45 =>
+  case case46 =>
     intros context statement expectedReturn state fuel id stateAfterId
       statementIdEq scrutinees arms statementEq sources notSingleton
       casesInduction bodyInduction expressionsInduction
@@ -4910,7 +4910,7 @@ private theorem inferFuel_preserves_integerLiterals_internal :
           (next := stateAfterId) (initial := state) (by rfl) statementIdEq
     all_goals intro origin member
     all_goals try solve_by_elim (maxDepth := 30)
-  case case71 =>
+  case case72 =>
     intros fuel context target operator value state placeInduction valueInduction
     unfold PreservesIntegerLiterals at *
     intro result success
@@ -4936,7 +4936,7 @@ private theorem inferFuel_preserves_integerLiterals_internal :
     all_goals simp_all
     all_goals intro origin member
     all_goals grind
-  case case68 =>
+  case case69 =>
     unfold PreservesIntegerLiterals at *
     intros
     simp_all only [inferPlaceFuel]

@@ -1768,13 +1768,6 @@ def newArrayElement (type : Ty) : Except Error Ty :=
       else .error (.unsupportedExpression "new")
   | none => .error (.unsupportedExpression "new")
 
-/-- What inference calls the forms its last arm rejects: the slices, which row 4
-gives no meaning yet, and the parser's recovery nodes. One arm keeps the
-numbered cases of the proofs by functional induction on `inferExprFuel`. -/
-def rejectedFormName : Syntax.ExprValue → String
-  | .slice .. => "slice"
-  | _ => "parser recovery"
-
 mutual
 
   def inferExprFuel (fuel : Nat) (context : Context)
@@ -2148,7 +2141,9 @@ mutual
             (some (.fixed .uint256)) state
           recordExpressionWithExpected context expression id (Ty.array element)
             (.newArray element length.id) [] expected state
-      | value => .error (.unsupportedExpression (rejectedFormName value))
+      | .slice .. => .error (.unsupportedExpression "slice")
+      -- The parser's recovery nodes.
+      | _ => .error (.unsupportedExpression "parser recovery")
 
   def inferExprsFuel (fuel : Nat) (context : Context) :
       List Syntax.Expr → State →

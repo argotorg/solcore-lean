@@ -513,45 +513,47 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
       (fun type member => beforeFit _ (expectedSafe _ member)) recordedSuccess
   case case23 =>
     simp_all [InferExprFuelFixedness, inferExprFuel]
-  case case25 =>
+  case case24 =>
+    simp_all [InferExprFuelFixedness, inferExprFuel]
+  case case26 =>
     simp_all [InferConstructorApplicationFuelFixedness,
       inferConstructorApplicationFuel, bind, Except.bind]
-  case case28 =>
+  case case29 =>
     simp_all [InferConstructorArgumentsFuelFixedness,
       inferConstructorArgumentsFuel]
-  case case29 =>
+  case case30 =>
     simp [InferStatementsFuelFixedness, inferStatementsFuel]
-  case case32 =>
-    simp [InferStatementFuelFixedness, inferStatementFuel]
   case case33 =>
+    simp [InferStatementFuelFixedness, inferStatementFuel]
+  case case34 =>
     simp_all [InferStatementFuelFixedness, inferStatementFuel,
       bind, Except.bind]
-  case case48 =>
-    simp_all [InferStatementFuelFixedness, inferStatementFuel]
   case case49 =>
     simp_all [InferStatementFuelFixedness, inferStatementFuel]
-  case case51 =>
+  case case50 =>
     simp_all [InferStatementFuelFixedness, inferStatementFuel]
-  case case53 =>
+  case case52 =>
     simp_all [InferStatementFuelFixedness, inferStatementFuel]
-  case case56 =>
-    simp [InferForItemFuelFixedness, inferForItemFuel]
+  case case54 =>
+    simp_all [InferStatementFuelFixedness, inferStatementFuel]
   case case57 =>
+    simp [InferForItemFuelFixedness, inferForItemFuel]
+  case case58 =>
     simp_all [InferForItemFuelFixedness, inferForItemFuel, bind,
       Except.bind]
-  case case64 =>
+  case case65 =>
     simp [InferPlaceFuelFixedness, inferPlaceFuel]
-  case case66 =>
-    simp_all [InferPlaceFuelFixedness, inferPlaceFuel]
   case case67 =>
     simp_all [InferPlaceFuelFixedness, inferPlaceFuel]
-  case case70 =>
+  case case68 =>
     simp_all [InferPlaceFuelFixedness, inferPlaceFuel]
-  case case72 =>
+  case case71 =>
+    simp_all [InferPlaceFuelFixedness, inferPlaceFuel]
+  case case73 =>
     simp [InferExprsFuelFixedness, inferExprsFuel]
-  case case75 =>
+  case case76 =>
     simp [InferMatchCasesFuelFixedness, inferMatchCasesFuel]
-  case case26 =>
+  case case27 =>
     intros fuel context initial
     unfold InferConstructorArgumentsFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical below safe result success
@@ -559,7 +561,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     injection success with resultEq
     subst result
     exact fixed
-  case case30 =>
+  case case31 =>
     intros context expectedReturn initial fuel
     unfold InferStatementsFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical below safe result success
@@ -567,7 +569,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     injection success with resultEq
     subst result
     exact fixed
-  case case54 =>
+  case case55 =>
     intros fuel context initial
     unfold InferForItemsFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical result success
@@ -575,7 +577,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     injection success with resultEq
     subst result
     exact fixed
-  case case73 =>
+  case case74 =>
     intros context initial fuel
     unfold InferExprsFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical result success
@@ -583,7 +585,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     injection success with resultEq
     subst result
     exact fixed
-  case case76 =>
+  case case77 =>
     intros context scrutineeType expectedReturn outerScope initial fuel
     unfold InferMatchCasesFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical scrutineeBelow scrutineeSafe returnBelow returnSafe scopeEq result success
@@ -599,7 +601,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     intro ready _ bound live fixed _ _ _ _ expectedSafe result success
     exact LocalVariableFrame.inferExprFuel_local_fixes_protected expressionEq allocationEq lookupEq
       success ready bound live fixed expectedSafe
-  case case27 =>
+  case case28 =>
     intros fuel context source sources expected expectedTypes initial sourceIH tailIH
     unfold InferConstructorArgumentsFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical expectedBelow expectedSafe result success
@@ -640,7 +642,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
           (fun type member => (expectedBelow type (by simp [member])).weaken sourceProperties.1.next_le)
           (fun type member => sourcePrivacy.1 _ (expectedSafe type (by simp [member]))) _ tailRun
         exact tailFixed
-  case case55 =>
+  case case56 =>
     intros fuel context item items initial itemIH tailIH
     unfold InferForItemsFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical result success
@@ -663,7 +665,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
           (fun metavariable member => Nat.lt_of_lt_of_le (bound metavariable member) itemProperties.1.next_le)
           itemPrivacy.2.1 itemFixed catalog validated canonical tail tailRun
         exact tailFixed
-  case case74 =>
+  case case75 =>
     intros context initial fuel expression rest expressionIH tailIH
     unfold InferExprsFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical result success
@@ -689,7 +691,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
           (fun metavariable member => Nat.lt_of_lt_of_le (bound metavariable member) expressionProperties.1.next_le)
           expressionPrivacy.2.2.1 expressionFixed catalog validated canonical _ tailRun
         exact tailFixed
-  case case65 =>
+  case case66 =>
     intros context target initial fuel name targetEq binder lookupEq monomorphic
     unfold InferPlaceFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical result success
@@ -698,13 +700,13 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     injection success with resultEq
     subst result
     exact fixed
-  case case68 =>
+  case case69 =>
     intros context target initial fuel inner targetEq innerIH
     unfold InferPlaceFuelFixedness at *
     intro ready wellFormed bound live fixed catalog validated canonical result success
     apply innerIH ready wellFormed bound live fixed catalog validated canonical result
     simpa only [inferPlaceFuel, targetEq] using success
-  case case61 =>
+  case case62 =>
     intros context item initial fuel expression itemEq expressionInduction
     unfold InferForItemFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical result success
@@ -721,7 +723,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         have childFixed := expressionInduction ready wellFormed bound live fixed catalog validated
           canonical (by simp) (by simp) (inferred, expressionState) expressionResult
         exact childFixed
-  case case58 =>
+  case case59 =>
     intros context item initial fuel name sourceType itemEq
     unfold InferForItemFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical result success
@@ -743,7 +745,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         injection success with resultEq
         rw [← resultEq]
         exact fixed.of_substitution_eq rfl
-  case case34 =>
+  case case35 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq name sourceType statementEq
     unfold InferStatementFuelFixedness
@@ -783,7 +785,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         injection success with resultEq
         rw [← resultEq]
         exact fixedAllocated.of_substitution_eq rfl
-  case case35 =>
+  case case36 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq name initializer statementEq initializerInduction
     unfold InferStatementFuelFixedness
@@ -829,7 +831,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         injection success with resultEq
         rw [← resultEq]
         exact initializerFixed.of_substitution_eq rfl
-  case case36 =>
+  case case37 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq name sourceType initializer statementEq
       initializerInduction
@@ -903,7 +905,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
             injection success with resultEq
             rw [← resultEq]
             exact initializerFixed.of_substitution_eq rfl
-  case case59 =>
+  case case60 =>
     intros context item initial fuel name initializer itemEq
       initializerInduction
     unfold InferForItemFuelFixedness
@@ -931,7 +933,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         injection success with resultEq
         rw [← resultEq]
         exact initializerFixed.of_substitution_eq rfl
-  case case60 =>
+  case case61 =>
     intros context item initial fuel name sourceType initializer itemEq
       initializerInduction
     unfold InferForItemFuelFixedness
@@ -987,7 +989,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
             injection success with resultEq
             rw [← resultEq]
             exact initializerFixed.of_substitution_eq rfl
-  case case38 =>
+  case case39 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq value statementEq valueInduction
     unfold InferStatementFuelFixedness
@@ -1046,7 +1048,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         injection success with resultEq
         rw [← resultEq]
         exact childFixed.of_substitution_eq rfl
-  case case39 =>
+  case case40 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq expression trailingSemicolon statementEq
       expressionInduction
@@ -1083,7 +1085,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         injection success with resultEq
         rw [← resultEq]
         exact childFixed.of_substitution_eq rfl
-  case case41 =>
+  case case42 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq body statementEq bodyInduction
     unfold InferStatementFuelFixedness
@@ -1119,7 +1121,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         injection success with resultEq
         rw [← resultEq]
         exact childFixed.of_substitution_eq rfl
-  case case42 =>
+  case case43 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq target operator value statementEq assignmentInduction
     unfold InferStatementFuelFixedness
@@ -1156,7 +1158,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         injection success with resultEq
         rw [← resultEq]
         exact childFixed.of_substitution_eq rfl
-  case case62 =>
+  case case63 =>
     intros context item initial fuel target operator value itemEq
       assignmentInduction
     unfold InferForItemFuelFixedness
@@ -1462,7 +1464,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
         exact recordExpressionWithExpected_fixes_protected fixedAllocated
           ((safe_proxy_iff _ _ _).mpr (safe_closed _ _ (resolveSourceType_success_variablesBelow sourceTypeResult 0)))
           (fun type member => allocationPrivacy.1 _ (expectedSafe type member)) success
-  case case50 =>
+  case case51 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq statementEq loopNonzero
     unfold InferStatementFuelFixedness
@@ -1495,7 +1497,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     injection success with resultEq
     subst result
     exact fixedAllocated.of_substitution_eq rfl
-  case case52 =>
+  case case53 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq statementEq loopNonzero
     unfold InferStatementFuelFixedness
@@ -1528,7 +1530,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     injection success with resultEq
     subst result
     exact fixedAllocated.of_substitution_eq rfl
-  case case37 =>
+  case case38 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq statementEq
     unfold InferStatementFuelFixedness
@@ -1677,7 +1679,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
           exact elementsPrivacy.2.1 element elementMember
         exact recordExpressionWithExpected_fixes_protected childFixed tupleSafe
           (fun type member => beforeFit _ (expectedSafe _ member)) success
-  case case31 =>
+  case case32 =>
     intros context expectedReturn initial fuel statement rest statementInduction tailInduction
     unfold InferStatementsFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical returnBelow returnSafe result success
@@ -1708,7 +1710,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
             (fun metavariable member => Nat.lt_of_lt_of_le (bound metavariable member) headProperties.1.next_le)
             headPrivacy.2.2.1 headFixed catalog validated canonical
             (returnBelow.weaken headProperties.1.next_le) (headPrivacy.1 _ returnSafe) tail tailResult
-  case case63 =>
+  case case64 =>
     intros context item initial fuel target operator itemEq placeInduction
     unfold InferForItemFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical result success
@@ -1738,7 +1740,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
                 (Detail.bitNotTargetType (placeState.resolve place.type)) :=
               safe_bitNotTargetType (safe_resolved placeReady placeProperties.2.1)
             exact unify_fixes_protected placeFixed placeProperties.2.1 wordSafe unifyResult
-  case case43 =>
+  case case44 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq target operator statementEq placeInduction
     unfold InferStatementFuelFixedness
@@ -1787,7 +1789,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
             injection success with resultEq
             rw [← resultEq]
             exact unifiedFixed.of_substitution_eq rfl
-  case case71 =>
+  case case72 =>
     intros fuel context target operator value initial placeIH valueIH
     unfold InferAssignedValueFuelFixedness
     intro ready wellFormed bound live fixed catalog validated canonical result success
@@ -1919,7 +1921,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
       | uncheckedMultiply => exact finishNonEqual (valueIH place) success
       | uncheckedDivide => exact finishNonEqual (valueIH place) success
       | uncheckedModulo => exact finishNonEqual (valueIH place) success
-  case case40 =>
+  case case41 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq condition thenBody elseBody statementEq
       conditionInduction thenInduction elseInduction
@@ -2031,7 +2033,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
                     injection success with resultEq
                     rw [← resultEq]
                     exact elseFixed.of_substitution_eq rfl
-  case case47 =>
+  case case48 =>
     intros context statement expectedReturn initial fuel id allocated
       allocationEq condition body statementEq conditionInduction bodyInduction
     unfold InferStatementFuelFixedness
@@ -2156,7 +2158,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     intro context expression expected initial fuel id allocated allocation keyword parameters returnType body form bodyIH
     exact inferExprFuel_lambda_fixes_protected form bodyIH
 
-  case case24 =>
+  case case25 =>
     intros fuel context source id instantiation arguments expected initial
       arityEq argumentsInduction
     unfold InferConstructorApplicationFuelFixedness
@@ -2433,7 +2435,7 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
                 have toIndex := allocationPrivacy.1.trans (basePrivacy.1.trans (toUnified.trans keyPrivacy.1))
                 exact recordExpressionWithExpected_fixes_protected keyFixed finalValueSafe
                   (fun type member => toIndex _ (expectedSafe type member)) success
-  case case69 =>
+  case case70 =>
     intros context target initial fuel base brackets key targetEq
       baseInduction keyInduction
     unfold InferPlaceFuelFixedness
@@ -2868,14 +2870,14 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     · intro instantiation state
       simpa only [allocationEq] using constructorIH instantiation state
     · simpa only [allocationEq] using baseIH
-  case case46 =>
+  case case47 =>
     intro context statement expectedReturn initial fuel id allocated allocationEq headerSpan initializer condition post body form initializerIH conditionIH bodyIH postIH
     apply inferStatementFuel_for_fixes_protected form
     · simpa only [allocationEq] using initializerIH
     · exact conditionIH
     · exact bodyIH
     · exact postIH
-  case case77 =>
+  case case78 =>
     intro context scrutineeType expectedReturn outerScope initial fuel arm rest bodyIH tailIH
     exact inferMatchCasesFuel_cons_fixes_protected bodyIH tailIH
   case case14 =>
@@ -3043,13 +3045,13 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
                       (safe_resolved unifiedReady (unifyPrivacy _ thenSafe))
                       (fun type member => toUnified _ (expectedSafe type member)) success
 
-  case case44 =>
+  case case45 =>
     intro context statement expectedReturn initial fuel id allocated allocationEq scrutinees arms form
     dsimp only
     intro source single casesIH bodyIH sourceIH
     apply inferStatementFuel_match_single_fixes_protected form single casesIH bodyIH
     simpa only [allocationEq] using sourceIH
-  case case45 =>
+  case case46 =>
     intro context statement expectedReturn initial fuel id allocated allocationEq scrutinees arms form
     dsimp only
     intro notSingleton casesIH bodyIH sourcesIH
