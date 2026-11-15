@@ -5168,11 +5168,11 @@ theorem StatementsHaveType.applyParameters
       (StructuralSubstitution.TypeAdmissible.applyParameters substitution
         contextValid.exact contextValid.range elementWellFormed)
       (lengthInduction catalog contextValid)
-  · intro context base element baseType baseInduction catalog contextValid
-    exact .arrayLength (baseInduction catalog contextValid)
-  · intro context base index element indexType baseType indexTypeProof indexKind
-      baseInduction indexInduction catalog contextValid
-    exact .arrayIndex (baseInduction catalog contextValid)
+  · intro context base baseType element baseTypeProof view baseInduction catalog contextValid
+    exact .arrayLength (baseInduction catalog contextValid) (view.applyParameters substitution)
+  · intro context base index baseType element indexType baseTypeProof view indexTypeProof
+      indexKind baseInduction indexInduction catalog contextValid
+    exact .arrayIndex (baseInduction catalog contextValid) (view.applyParameters substitution)
       (indexInduction catalog contextValid) (by cases indexKind <;> constructor)
   · intro context element elements elementWellFormed elementsType elementsInduction catalog
       contextValid
@@ -12548,11 +12548,14 @@ theorem StatementsHaveType.applySubstitution
     exact .newArray (Substitution.arrayElementAllowed_apply _ allowed)
       (TypeAdmissible.applySubstitution contextValid.closes elementWellFormed)
       (lengthInduction targetContext catalog contextValid)
-  · intro context base element baseType baseInduction targetContext catalog contextValid
+  · intro context base baseType element baseTypeProof view baseInduction targetContext catalog
+      contextValid
     exact .arrayLength (baseInduction targetContext catalog contextValid)
-  · intro context base index element indexType baseType indexTypeProof indexKind
-      baseInduction indexInduction targetContext catalog contextValid
+      (view.applySubstitution _)
+  · intro context base index baseType element indexType baseTypeProof view indexTypeProof
+      indexKind baseInduction indexInduction targetContext catalog contextValid
     exact .arrayIndex (baseInduction targetContext catalog contextValid)
+      (view.applySubstitution _)
       (indexInduction targetContext catalog contextValid) (by cases indexKind <;> constructor)
   · intro context element elements elementWellFormed elementsType elementsInduction
       targetContext catalog contextValid

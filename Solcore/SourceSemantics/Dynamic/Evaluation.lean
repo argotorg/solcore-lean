@@ -461,6 +461,39 @@ inductive ViewLength (heap : Heap) : Value → Nat → Prop where
   | slice {base : Value} {start length : Nat} :
       ViewLength heap (.arraySlice base start length) length
 
+/-- The element at a position of a memory array or of a slice: the array cell's
+element there, or, once the position is below a slice's length, its base's
+element at the slice's start plus the position, as std's read through a slice
+reads its base. -/
+inductive ViewReads (heap : Heap) : Value → Nat → Value → Prop where
+  | array {element : TypeSystem.Ty} {location : Location} {cell : Cell}
+      {elements : List Value} {position : Nat} {value : Value}
+      (read : Heap.Reads heap location cell)
+      (stored : cell.value = some (.arrayObject element elements))
+      (element_at : elements[position]? = some value) :
+      ViewReads heap (.arrayRef element location) position value
+  | slice {base : Value} {start length position : Nat} {value : Value}
+      (within : position < length)
+      (inner : ViewReads heap base (start + position) value) :
+      ViewReads heap (.arraySlice base start length) position value
+
+/-- A position from a memory array's length on, from a slice's length on, or
+one that a slice's base has no element at. -/
+inductive ViewOutOfBounds (heap : Heap) : Value → Nat → Prop where
+  | array {element : TypeSystem.Ty} {location : Location} {cell : Cell}
+      {elements : List Value} {position : Nat}
+      (read : Heap.Reads heap location cell)
+      (stored : cell.value = some (.arrayObject element elements))
+      (out_of_bounds : elements.length ≤ position) :
+      ViewOutOfBounds heap (.arrayRef element location) position
+  | slice {base : Value} {start length position : Nat}
+      (out_of_bounds : length ≤ position) :
+      ViewOutOfBounds heap (.arraySlice base start length) position
+  | inner {base : Value} {start length position : Nat}
+      (within : position < length)
+      (inner : ViewOutOfBounds heap base (start + position)) :
+      ViewOutOfBounds heap (.arraySlice base start length) position
+
 /-- A slice's first and last positions in a base of `count` elements, from the
 words its present bounds evaluate to: an absent start is 0 and an absent stop
 is `count`, as std's `sliceFrom`, `sliceTo` and `sliceAll` fill them. -/
@@ -825,31 +858,29 @@ mutual
         ExpressionFormEvaluates program context evidence source environment before
           (.newArray element length) requirements coercions
           (.arrayRef element location) after
-    /-- A memory array's length is the number of elements its cell holds. -/
+    /-- A memory array's length is the number of elements its cell holds, and a
+    slice's is its own. -/
     | arrayLength
         {context evidence source environment before after base requirements coercions
-          element location cell elements}
+          baseValue count}
         (layout : OrdinaryRequirementLayout requirements coercions [])
         (base_evaluates : ExpressionEvaluates program context evidence source
-          environment before base (.arrayRef element location) after)
-        (read : Heap.Reads after location cell)
-        (stored : cell.value = some (.arrayObject element elements)) :
+          environment before base baseValue after)
+        (counted : ViewLength after baseValue count) :
         ExpressionFormEvaluates program context evidence source environment before
           (.arrayLength base) requirements coercions
-          (.word (Core.Word.ofNatModulo elements.length)) after
-    /-- `a[i]` below the array's length is its element `i`. The index is a word,
-    as `word` and the twelve types are. -/
+          (.word (Core.Word.ofNatModulo count)) after
+    /-- `a[i]` below the array's or the slice's length is its element `i`. The
+    index is a word, as `word` and the twelve types are. -/
     | arrayIndex
         {context evidence source environment before middle after base index
-          requirements coercions element location position cell elements value}
+          requirements coercions baseValue position value}
         (layout : OrdinaryRequirementLayout requirements coercions [])
         (base_evaluates : ExpressionEvaluates program context evidence source
-          environment before base (.arrayRef element location) middle)
+          environment before base baseValue middle)
         (index_evaluates : ExpressionEvaluates program context evidence source
           environment middle index (.word position) after)
-        (read : Heap.Reads after location cell)
-        (stored : cell.value = some (.arrayObject element elements))
-        (element_at : elements[position.val]? = some value) :
+        (reads : ViewReads after baseValue position.val value) :
         ExpressionFormEvaluates program context evidence source environment before
           (.arrayIndex base index) requirements coercions value after
     /-- `[e₀, …, eₙ₋₁]` evaluates its elements from left to right, then allocates
@@ -1865,8 +1896,8 @@ mutual
     | .newArray _ length_evaluates _ default allocates =>
         ((length_evaluates.initialization_extends).trans default.initialization_extends).trans
           (HeapInitializationExtend.of_allocation allocates)
-    | .arrayLength _ base_evaluates _ _ => base_evaluates.initialization_extends
-    | .arrayIndex _ base_evaluates index_evaluates _ _ _ =>
+    | .arrayLength _ base_evaluates _ => base_evaluates.initialization_extends
+    | .arrayIndex _ base_evaluates index_evaluates _ =>
         (base_evaluates.initialization_extends).trans index_evaluates.initialization_extends
     | .arrayLiteral _ elements_evaluate allocates =>
         (elements_evaluate.initialization_extends).trans

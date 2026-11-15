@@ -1516,12 +1516,12 @@ local macro "transport_static" "(" recursor:term "," before:term "," after:term 
     (fun allowed wellFormed _ length h => by
       simp only [ExpressionForm.references, within_cons, within_nil, and_true] at h
       exact .newArray allowed wellFormed (length h))
-    (fun _ base h => by
+    (fun _ view base h => by
       simp only [ExpressionForm.references, within_cons, within_nil, and_true] at h
-      exact .arrayLength (base h))
-    (fun _ _ kind first second h => by
+      exact .arrayLength (base h) view)
+    (fun _ view _ kind first second h => by
       simp only [ExpressionForm.references, within_cons, within_nil, and_true] at h
-      exact .arrayIndex (first h.1) (second h.2) kind)
+      exact .arrayIndex (first h.1) view (second h.2) kind)
     (fun wellFormed _ ih h => .arrayLiteral wellFormed (ih h))
     (fun allowed _ _ base bounds h => by
       simp only [ExpressionForm.references, within_cons] at h
@@ -1964,12 +1964,12 @@ private theorem step {id : ExpressionId} {node : ExpressionNode}
     | newArray allowed wellFormed length =>
       intro children _
       exact .newArray allowed wellFormed (children _ (by simp [typingChildren]) _ _ length)
-    | arrayLength base =>
+    | arrayLength base view =>
       intro children _
-      exact .arrayLength (children _ (by simp [typingChildren]) _ _ base)
-    | arrayIndex base index kind =>
+      exact .arrayLength (children _ (by simp [typingChildren]) _ _ base) view
+    | arrayIndex base view index kind =>
       intro children _
-      exact .arrayIndex (children _ (by simp [typingChildren]) _ _ base)
+      exact .arrayIndex (children _ (by simp [typingChildren]) _ _ base) view
         (children _ (by simp [typingChildren]) _ _ index) kind
     | arrayLiteral wellFormed typed =>
       intro children _

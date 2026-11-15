@@ -1623,6 +1623,34 @@ theorem arrayElement
         · simp [TypeSystem.Ty.arrayObject] at impossible
   · simp [TypeSystem.Ty.array] at impossible
 
+/-- An element that a memory array or a slice reads at a position has the
+view's element type in a well-typed heap: a slice's base is typed at the base
+of its type, down to the array whose cell holds the element. -/
+theorem viewElement
+    {context : Context} {heap : Heap} {view value : Value} {viewType element : Ty}
+    {position : Nat}
+    (typed : ValueHasType context heap view viewType)
+    (element_of : ViewElement viewType element)
+    (heap_typed : HeapWellTyped context heap)
+    (reads : ViewReads heap view position value) :
+    ValueHasType context heap value element := by
+  revert viewType
+  induction reads with
+  | array read stored element_at =>
+      intro viewType typed element_of
+      cases element_of with
+      | array _ => exact typed.arrayElement heap_typed read stored element_at
+      | slice _ =>
+          rcases typed.arrayRef_inv with ⟨equal, _⟩ | ⟨_, equal, _⟩ <;>
+            simp [TypeSystem.Ty.array, TypeSystem.Ty.arraySlice] at equal
+  | slice _ _ ih =>
+      intro viewType typed element_of
+      rcases typed.arraySlice_inv with ⟨baseType, equal, base_typed, _⟩ | ⟨_, equal, _⟩
+      · subst equal
+        cases element_of with
+        | slice inner => exact ih base_typed inner
+      · cases element_of <;> simp [TypeSystem.Ty.array, TypeSystem.Ty.arraySlice] at equal
+
 /-- Catalog validity rules out confusing a nominal constructor result with a
 staging wrapper, so constructor payload typing can be recovered exactly. -/
 theorem constructedPayloads
@@ -3474,16 +3502,16 @@ theorem preservesWith
               (.some (ValueHasType.arrayObject_replicate zero_typed count.val)) allocates,
             (length_extension.trans default_extension).trans
               (HeapTypesExtend.of_allocation allocates)⟩
-  | arrayLength base_type =>
+  | arrayLength base_type _ =>
       cases evaluation with
-      | arrayLength layout base_evaluates read stored =>
+      | arrayLength layout base_evaluates counted =>
           rcases expression_preserves _ _ _ _ _ evidence_covers
               environment_agrees before_typed base_type base_evaluates with
             ⟨_, after_typed, extension⟩
           exact ⟨.fixed _ (uint256_word_canonical _), after_typed, extension⟩
-  | arrayIndex base_type index_type _ =>
+  | arrayIndex base_type view index_type _ =>
       cases evaluation with
-      | arrayIndex layout base_evaluates index_evaluates read stored element_at =>
+      | arrayIndex layout base_evaluates index_evaluates reads =>
           rcases expression_preserves _ _ _ _ _ evidence_covers
               environment_agrees before_typed base_type base_evaluates with
             ⟨base_typed, middle_typed, base_extension⟩
@@ -3491,8 +3519,8 @@ theorem preservesWith
               (environment_agrees.mono base_extension) middle_typed index_type
               index_evaluates with
             ⟨_, after_typed, index_extension⟩
-          exact ⟨(base_typed.mono index_extension).arrayElement after_typed read stored
-              element_at, after_typed, base_extension.trans index_extension⟩
+          exact ⟨(base_typed.mono index_extension).viewElement view after_typed reads,
+            after_typed, base_extension.trans index_extension⟩
   | arrayLiteral _ elements_type =>
       cases evaluation with
       | arrayLiteral layout elements_evaluate allocates =>

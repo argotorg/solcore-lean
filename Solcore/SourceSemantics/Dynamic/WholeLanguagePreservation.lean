@@ -797,17 +797,17 @@ mutual
                 (.some (ValueHasType.arrayObject_replicate zero_typed _)) allocates,
               (length_extension.trans default_extension).trans
                 (HeapTypesExtend.of_allocation allocates)⟩
-    | .arrayLength layout base_evaluates read stored => by
+    | .arrayLength layout base_evaluates counted => by
         cases typing with
-        | arrayLength base_type =>
+        | arrayLength base_type _ =>
             rcases preserveExpressionRec program_well_formed runtime
                 evidence_covers environment_agrees before_typed base_type
                 base_evaluates with
               ⟨_, after_typed, extension⟩
             exact ⟨.fixed _ (uint256_word_canonical _), after_typed, extension⟩
-    | .arrayIndex layout base_evaluates index_evaluates read stored element_at => by
+    | .arrayIndex layout base_evaluates index_evaluates reads => by
         cases typing with
-        | arrayIndex base_type index_type _ =>
+        | arrayIndex base_type view index_type _ =>
             rcases preserveExpressionRec program_well_formed runtime
                 evidence_covers environment_agrees before_typed base_type
                 base_evaluates with
@@ -816,8 +816,8 @@ mutual
                 evidence_covers (environment_agrees.mono base_extension)
                 middle_typed index_type index_evaluates with
               ⟨_, after_typed, index_extension⟩
-            exact ⟨(base_typed.mono index_extension).arrayElement after_typed read stored
-                element_at, after_typed, base_extension.trans index_extension⟩
+            exact ⟨(base_typed.mono index_extension).viewElement view after_typed reads,
+              after_typed, base_extension.trans index_extension⟩
     | .arrayLiteral layout elements_evaluate allocates => by
         cases typing with
         | arrayLiteral _ elements_type =>

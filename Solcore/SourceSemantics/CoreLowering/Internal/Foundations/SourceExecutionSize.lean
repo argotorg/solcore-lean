@@ -382,27 +382,24 @@ mutual
     | arrayLength
         {size_base_evaluates : Nat}
         {context evidence source environment before after base requirements coercions
-          element location cell elements}
+          baseValue count}
         (layout : OrdinaryRequirementLayout requirements coercions [])
         (base_evaluates : ExpressionEvaluates program size_base_evaluates context evidence
-          source environment before base (.arrayRef element location) after)
-        (read : Heap.Reads after location cell)
-        (stored : cell.value = some (.arrayObject element elements)) :
+          source environment before base baseValue after)
+        (counted : ViewLength after baseValue count) :
         ExpressionFormEvaluates program (stepSize [size_base_evaluates]) context evidence source
           environment before (.arrayLength base) requirements coercions
-          (.word (Core.Word.ofNatModulo elements.length)) after
+          (.word (Core.Word.ofNatModulo count)) after
     | arrayIndex
         {size_base_evaluates size_index_evaluates : Nat}
         {context evidence source environment before middle after base index
-          requirements coercions element location position cell elements value}
+          requirements coercions baseValue position value}
         (layout : OrdinaryRequirementLayout requirements coercions [])
         (base_evaluates : ExpressionEvaluates program size_base_evaluates context evidence
-          source environment before base (.arrayRef element location) middle)
+          source environment before base baseValue middle)
         (index_evaluates : ExpressionEvaluates program size_index_evaluates context evidence
           source environment middle index (.word position) after)
-        (read : Heap.Reads after location cell)
-        (stored : cell.value = some (.arrayObject element elements))
-        (element_at : elements[position.val]? = some value) :
+        (reads : ViewReads after baseValue position.val value) :
         ExpressionFormEvaluates program (stepSize [size_base_evaluates, size_index_evaluates])
           context evidence source environment before (.arrayIndex base index) requirements
           coercions value after
@@ -1283,11 +1280,11 @@ theorem ExpressionFormEvaluates.sound {program : Program} {size : Nat} {a0 : Con
     exact .indexDefault layout (ExpressionEvaluates.sound base_evaluates) (ExpressionEvaluates.sound index_evaluates) absent defaulted
   | .newArray layout length_evaluates fits default allocates =>
     exact .newArray layout (ExpressionEvaluates.sound length_evaluates) fits default allocates
-  | .arrayLength layout base_evaluates read stored =>
-    exact .arrayLength layout (ExpressionEvaluates.sound base_evaluates) read stored
-  | .arrayIndex layout base_evaluates index_evaluates read stored element_at =>
+  | .arrayLength layout base_evaluates counted =>
+    exact .arrayLength layout (ExpressionEvaluates.sound base_evaluates) counted
+  | .arrayIndex layout base_evaluates index_evaluates reads =>
     exact .arrayIndex layout (ExpressionEvaluates.sound base_evaluates)
-      (ExpressionEvaluates.sound index_evaluates) read stored element_at
+      (ExpressionEvaluates.sound index_evaluates) reads
   | .arrayLiteral layout elements_evaluate allocates =>
     exact .arrayLiteral layout (ExpressionsEvaluate.sound elements_evaluate) allocates
   | .arraySlice layout base_evaluates bounds_evaluate counted chosen ordered within =>
@@ -1615,13 +1612,13 @@ theorem ExpressionFormEvaluates.has_size {program : Program} {a0 : Context} {a1 
   | .newArray layout length_evaluates fits default allocates =>
     obtain ⟨size_length_evaluates, length_evaluates⟩ := ExpressionEvaluates.has_size length_evaluates
     exact ⟨_, .newArray layout length_evaluates fits default allocates⟩
-  | .arrayLength layout base_evaluates read stored =>
+  | .arrayLength layout base_evaluates counted =>
     obtain ⟨size_base_evaluates, base_evaluates⟩ := ExpressionEvaluates.has_size base_evaluates
-    exact ⟨_, .arrayLength layout base_evaluates read stored⟩
-  | .arrayIndex layout base_evaluates index_evaluates read stored element_at =>
+    exact ⟨_, .arrayLength layout base_evaluates counted⟩
+  | .arrayIndex layout base_evaluates index_evaluates reads =>
     obtain ⟨size_base_evaluates, base_evaluates⟩ := ExpressionEvaluates.has_size base_evaluates
     obtain ⟨size_index_evaluates, index_evaluates⟩ := ExpressionEvaluates.has_size index_evaluates
-    exact ⟨_, .arrayIndex layout base_evaluates index_evaluates read stored element_at⟩
+    exact ⟨_, .arrayIndex layout base_evaluates index_evaluates reads⟩
   | .arrayLiteral layout elements_evaluate allocates =>
     obtain ⟨size_elements_evaluate, elements_evaluate⟩ :=
       ExpressionsEvaluate.has_size elements_evaluate
@@ -2017,9 +2014,9 @@ theorem ExpressionFormEvaluates.children_below {program : Program} {size : Nat} 
     exact ⟨[size_base_evaluates, size_index_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
   | @newArray size_length_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_length_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
-  | @arrayLength size_base_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @arrayLength size_base_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_base_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
-  | @arrayIndex size_base_evaluates size_index_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @arrayIndex size_base_evaluates size_index_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_base_evaluates, size_index_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
   | @arrayLiteral size_elements_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_elements_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
@@ -2978,15 +2975,13 @@ mutual
     | arrayIndexOutOfBounds
         {size_base_evaluates size_index_evaluates : Nat}
         {context evidence source environment before middle after base index
-          requirements coercions element location position cell elements}
+          requirements coercions baseValue position}
         (layout : OrdinaryRequirementLayout requirements coercions [])
         (base_evaluates : ExpressionEvaluates program size_base_evaluates context evidence
-          source environment before base (.arrayRef element location) middle)
+          source environment before base baseValue middle)
         (index_evaluates : ExpressionEvaluates program size_index_evaluates context evidence
           source environment middle index (.word position) after)
-        (read : Heap.Reads after location cell)
-        (stored : cell.value = some (.arrayObject element elements))
-        (out_of_bounds : elements.length ≤ position.val) :
+        (out_of_bounds : ViewOutOfBounds after baseValue position.val) :
         ExpressionFormFaults program (stepSize [size_base_evaluates, size_index_evaluates])
           context evidence source environment before (.arrayIndex base index) requirements
           coercions (.panic 0x32) after
@@ -4157,9 +4152,9 @@ theorem ExpressionFormFaults.sound {program : Program} {size : Nat} {a0 : Contex
   | .arrayIndexType layout base_evaluates index_evaluates not_word actual_type =>
     exact .arrayIndexType layout (ExpressionEvaluates.sound base_evaluates)
       (ExpressionEvaluates.sound index_evaluates) not_word actual_type
-  | .arrayIndexOutOfBounds layout base_evaluates index_evaluates read stored out_of_bounds =>
+  | .arrayIndexOutOfBounds layout base_evaluates index_evaluates out_of_bounds =>
     exact .arrayIndexOutOfBounds layout (ExpressionEvaluates.sound base_evaluates)
-      (ExpressionEvaluates.sound index_evaluates) read stored out_of_bounds
+      (ExpressionEvaluates.sound index_evaluates) out_of_bounds
   | .arrayLiteralElements layout fault =>
     exact .arrayLiteralElements layout (ExpressionsFault.sound fault)
   | .arraySliceBase layout fault =>
@@ -4635,11 +4630,10 @@ theorem ExpressionFormFaults.has_size {program : Program} {a0 : Context} {a1 : E
     obtain ⟨size_base_evaluates, base_evaluates⟩ := ExpressionEvaluates.has_size base_evaluates
     obtain ⟨size_index_evaluates, index_evaluates⟩ := ExpressionEvaluates.has_size index_evaluates
     exact ⟨_, .arrayIndexType layout base_evaluates index_evaluates not_word actual_type⟩
-  | .arrayIndexOutOfBounds layout base_evaluates index_evaluates read stored out_of_bounds =>
+  | .arrayIndexOutOfBounds layout base_evaluates index_evaluates out_of_bounds =>
     obtain ⟨size_base_evaluates, base_evaluates⟩ := ExpressionEvaluates.has_size base_evaluates
     obtain ⟨size_index_evaluates, index_evaluates⟩ := ExpressionEvaluates.has_size index_evaluates
-    exact ⟨_, .arrayIndexOutOfBounds layout base_evaluates index_evaluates read stored
-      out_of_bounds⟩
+    exact ⟨_, .arrayIndexOutOfBounds layout base_evaluates index_evaluates out_of_bounds⟩
   | .arrayLiteralElements layout fault =>
     obtain ⟨size_fault, fault⟩ := ExpressionsFault.has_size fault
     exact ⟨_, .arrayLiteralElements layout fault⟩
@@ -5181,7 +5175,7 @@ theorem ExpressionFormFaults.children_below {program : Program} {size : Nat} {a0
     exact ⟨[size_base_evaluates, size_fault], rfl, fun _ member => child_lt_stepSize member⟩
   | @arrayIndexType size_base_evaluates size_index_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_base_evaluates, size_index_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
-  | @arrayIndexOutOfBounds size_base_evaluates size_index_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | @arrayIndexOutOfBounds size_base_evaluates size_index_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_base_evaluates, size_index_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
   | @arrayLiteralElements size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩

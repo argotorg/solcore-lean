@@ -1214,7 +1214,7 @@ theorem arrayIndex_formType
       (Ty.array (substitution.apply element)) := by
     rw [← arrayTypeEq]
     exact arrayTyped
-  exact .arrayIndex arrayType indexTyped (arrayIndexType_of_fits indexFits)
+  exact .arrayIndex arrayType (.array _) indexTyped (arrayIndexType_of_fits indexFits)
 
 /-- `a[i]` on a memory array types its base and its index, each inferred with
 no expected type, from their own retained subtrees, and records the read at the

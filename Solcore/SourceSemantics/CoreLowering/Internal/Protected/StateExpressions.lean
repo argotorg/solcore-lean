@@ -516,8 +516,8 @@ theorem operand_types {source : TypedSource} {context : Context}
     | member child _ => exact ⟨_, .cons child (.nil context)⟩
     | index base key => exact ⟨_, .cons base (.cons key (.nil context))⟩
     | newArray _ _ length => exact ⟨_, .cons length (.nil context)⟩
-    | arrayLength base => exact ⟨_, .cons base (.nil context)⟩
-    | arrayIndex base index _ => exact ⟨_, .cons base (.cons index (.nil context))⟩
+    | arrayLength base _ => exact ⟨_, .cons base (.nil context)⟩
+    | arrayIndex base _ index _ => exact ⟨_, .cons base (.cons index (.nil context))⟩
     | arrayLiteral _ children => exact ⟨_, children⟩
     | arraySlice _ base bounds => exact ⟨_, .cons base bounds⟩
 

@@ -1366,6 +1366,29 @@ inductive ArrayIndexType : TypeSystem.Ty → Prop where
   | word : ArrayIndexType .word
   | fixed (type : TypeSystem.FixedInteger) : ArrayIndexType (.fixed type)
 
+/-- The element type of a memory array or of a slice: an array's element, or a
+slice's base's. -/
+inductive ViewElement : TypeSystem.Ty → TypeSystem.Ty → Prop where
+  | array (element : TypeSystem.Ty) : ViewElement (TypeSystem.Ty.array element) element
+  | slice {base element : TypeSystem.Ty} (inner : ViewElement base element) :
+      ViewElement (TypeSystem.Ty.arraySlice base) element
+
+/-- A rigid substitution keeps a view's element. -/
+theorem ViewElement.applyParameters (substitution : TypeSystem.ParameterSubstitution)
+    {view element : TypeSystem.Ty} (found : ViewElement view element) :
+    ViewElement (substitution.apply view) (substitution.apply element) := by
+  induction found with
+  | array element => exact .array (substitution.apply element)
+  | slice _ inner => exact .slice inner
+
+/-- A flexible substitution keeps a view's element. -/
+theorem ViewElement.applySubstitution (substitution : TypeSystem.Substitution)
+    {view element : TypeSystem.Ty} (found : ViewElement view element) :
+    ViewElement (substitution.apply view) (substitution.apply element) := by
+  induction found with
+  | array element => exact .array (substitution.apply element)
+  | slice _ inner => exact .slice inner
+
 /-- The operand type of a compound assignment: Word's operators at a Word
 target, or the fixed-width ones at a target of a fixed-width integer type. -/
 inductive CompoundAssignmentTyping : Syntax.ValueAssignOp → TypeSystem.Ty → Prop where

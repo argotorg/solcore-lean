@@ -1190,6 +1190,29 @@ example : ViewLength arrayHeap (.arrayRef .word ⟨0⟩) 2 :=
 
 example (base : Value) : ViewLength ⟨[]⟩ (.arraySlice base 1 3) 3 := .slice
 
+/-- A read through a slice reads its base at the slice's start plus the
+position, below the slice's length. -/
+example : ViewReads arrayHeap (.arraySlice (.arrayRef .word ⟨0⟩) 1 1) 0 (.word two) :=
+  .slice (by decide) (.array (.intro .head) rfl rfl)
+
+/-- From the slice's length on, a read is out of bounds, though its base has an
+element there. -/
+example : ViewOutOfBounds arrayHeap (.arraySlice (.arrayRef .word ⟨0⟩) 0 1) 1 :=
+  .slice (by decide)
+
+/-- A slice of a slice of `word[]` has the element type `word`. -/
+example : ViewElement (Ty.arraySlice (Ty.arraySlice (Ty.array .word))) .word :=
+  .slice (.slice (.array _))
+
+/-- An element read through a slice has the view's element type in a well-typed
+heap. -/
+example (context : Context) (heapTyped : HeapWellTyped context arrayHeap) :
+    ValueHasType context arrayHeap (.word two) .word :=
+  ValueHasType.viewElement (.arraySlice (.arrayRef (.intro .head) rfl) rfl)
+    (.slice (.array _)) heapTyped
+    (.slice (by decide) (.array (.intro .head) rfl rfl)
+      : ViewReads arrayHeap (.arraySlice (.arrayRef .word ⟨0⟩) 1 1) 0 (.word two))
+
 end Solcore.Test.SourceSemanticsArrayObjects
 end
 

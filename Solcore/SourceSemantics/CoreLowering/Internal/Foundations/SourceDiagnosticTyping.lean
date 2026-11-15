@@ -227,8 +227,8 @@ private theorem expression_form_references {context : SourceSemantics.Context}
     · exact .expression base
     · exact expression_single key member
   | newArray _ _ length => exact expression_single length member
-  | arrayLength base => exact expression_single base member
-  | arrayIndex base index _ =>
+  | arrayLength base _ => exact expression_single base member
+  | arrayIndex base _ index _ =>
     rcases List.mem_cons.mp member with rfl | member
     · exact .expression base
     · exact expression_single index member

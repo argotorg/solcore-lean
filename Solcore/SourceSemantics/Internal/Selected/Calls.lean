@@ -592,7 +592,7 @@ theorem arrayLength_formType
         (Ty.array (substitution.apply element)) := by
       rw [← arrayTypeEq]
       exact head
-    exact .arrayLength arrayType
+    exact .arrayLength arrayType (.array _)
 
 /-- `a.length` types its base, inferred with no expected type, from the base's
 own retained subtree, and records the length at `uint256`. -/

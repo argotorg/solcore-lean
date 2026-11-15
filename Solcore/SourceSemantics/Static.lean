@@ -638,19 +638,20 @@ mutual
           (.fixed .uint256)) :
         ExpressionFormHasRawType source context (.newArray element length)
           (TypeSystem.Ty.array element) (.ordinary [])
-    /-- A memory array's length is a `uint256`. -/
+    /-- A memory array's or a slice's length is a `uint256`. -/
     | arrayLength
-        {context : Context} {base : ExpressionId} {element : TypeSystem.Ty}
-        (base_type : ExpressionHasType source context base
-          (TypeSystem.Ty.array element)) :
+        {context : Context} {base : ExpressionId} {baseType element : TypeSystem.Ty}
+        (base_type : ExpressionHasType source context base baseType)
+        (base_view : ViewElement baseType element) :
         ExpressionFormHasRawType source context (.arrayLength base) (.fixed .uint256)
           (.ordinary [])
-    /-- `a[i]` on a memory array has its element type, and takes an index of
-    `word` or one of the twelve types. -/
+    /-- `a[i]` on a memory array or a slice has its element type, and takes an
+    index of `word` or one of the twelve types. -/
     | arrayIndex
-        {context : Context} {base index : ExpressionId} {element indexType : TypeSystem.Ty}
-        (base_type : ExpressionHasType source context base
-          (TypeSystem.Ty.array element))
+        {context : Context} {base index : ExpressionId}
+        {baseType element indexType : TypeSystem.Ty}
+        (base_type : ExpressionHasType source context base baseType)
+        (base_view : ViewElement baseType element)
         (index_type : ExpressionHasType source context index indexType)
         (index_kind : ArrayIndexType indexType) :
         ExpressionFormHasRawType source context (.arrayIndex base index) element
@@ -1329,9 +1330,9 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
       .index baseInduction keyInduction)
     (fun allowed elementWellFormed _ lengthInduction =>
       .newArray allowed elementWellFormed lengthInduction)
-    (fun _ baseInduction => .arrayLength baseInduction)
-    (fun _ _ kind baseInduction indexInduction =>
-      .arrayIndex baseInduction indexInduction kind)
+    (fun _ view baseInduction => .arrayLength baseInduction view)
+    (fun _ view _ kind baseInduction indexInduction =>
+      .arrayIndex baseInduction view indexInduction kind)
     (fun elementWellFormed _ elementsInduction =>
       .arrayLiteral elementWellFormed elementsInduction)
     (fun allowed _ _ baseInduction boundsInduction =>

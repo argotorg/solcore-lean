@@ -420,7 +420,12 @@ wait for the native pipeline's contracts and ABI.
     then the base's at `start + i`. As built in step 3a, the read is its own typed form
     (`ExpressionForm.arrayIndex`), whose index is a word at `word` or one of the twelve types
     (`ArrayIndexType`), and it faults with the base's fault, the index's, an index that is not a
-    word, or `0x32` (`arrayIndexOutOfBounds`).
+    word, or `0x32` (`arrayIndexOutOfBounds`). As built in step 6d, a read through a slice is a case
+    of the read's rules: the read takes its element through `ViewReads`, which checks a slice's
+    length and reads its base at the slice's start plus the position, down to the array's cell, and
+    a position out of a view's bounds, the slice's or its base's, panics with `0x32`
+    (`ViewOutOfBounds`). The length rule reads `ViewLength`, a slice's own length. Both static rules
+    take a base whose type is a memory array or a slice, with its element type (`ViewElement`).
   - An element place `a[i]` evaluates `a` and `i` once and checks `i < length` before the right
     side, as `lidx(a, i)` does. The write replaces the element.
     As built in step 5a-i, an element place is a place whose last projection is an element
@@ -643,7 +648,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 6a | Slices: the slice type `arraySlice<B>`, which resolves once aliases are expanded, over a memory array or a slice; type formation admits it, an array or a mapping that holds one is rejected, and elaboration rejects every slice type | 25–30 files, +300–500/−20–60; measured at 27 files, +386/−62 | none |
 | 6b | Slices: the slice value, which holds its base value, its start and its length, and its typing in a heap, with the typing's laws; no expression makes one yet | 15–20 files, +200–400/−10–20; measured at 9 files, +101/−10 | none |
 | 6c | Slices: the typed form of `a[s:e]`, `a[s:]`, `a[:e]` and `a[:]` with its static rule, evaluation, faults with `0x32` from its bounds, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–550/−5–15; measured at 27 files, +361/−9 | none |
-| 6d | Slices: reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules, with their faults, sized copies, stage and preservation | 28–32 files, +350–550/−5–15 | none |
+| 6d | Slices: reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules, with their faults, sized copies, stage and preservation | 28–32 files, +350–550/−5–15; measured at 15 files, +203/−102 | none |
 | 6e | Slices: the typed form of `toArray(s)` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +300–500/−5–15 | none |
 | 6f | Slices: inference's typing of the four slice forms on an array or a slice, with `uint256` bounds | 24–30 files, +800–1,100/−20–50 | none |
 | 6g | Slices: inference's typing of reads, lengths and `toArray(s)` on slices | 18–30 files, +600–1,000/−25–55 | none |
