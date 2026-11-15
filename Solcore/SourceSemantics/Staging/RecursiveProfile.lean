@@ -129,6 +129,9 @@ theorem of_resolves {program : Program} {context : Context}
       cases evaluate
       cases selection
       exact ⟨rfl, .intro bare lookup currentRead initial⟩
+  | element projectionsEq _ _ _ _ _ _ =>
+      rw [bare] at projectionsEq
+      simp at projectionsEq
 
 end BareTarget
 end Solcore.SourceSemantics.Staging.Recursive
@@ -159,6 +162,13 @@ theorem bitNot_fault_heap {program : Program} {context : Context}
       rw [bare] at evaluated
       cases evaluated
       rfl
+    | elementPrefix projectionsEq _
+    | elementIndex projectionsEq _ _
+    | elementIndexType projectionsEq _ _ _ _
+    | elementOutOfBounds projectionsEq _ _ _ _ _ _
+    | elementUninitialized projectionsEq _ _ =>
+      rw [bare] at projectionsEq
+      simp at projectionsEq
   | uninitialized resolved _ | operand resolved _ _ =>
     exact (BareTarget.of_resolves bare resolved).1.symm
 
@@ -200,11 +210,14 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.Staging.Recursive.ProjectedTarget
 open Frontend Frontend.SourceInference Solcore.SourceSemantics.Dynamic
 
-/-- Members have no expression child; every index occurrence stays in order. -/
+/-- Members have no expression child; every index occurrence stays in order. An
+element projection ends the keys: this profile stages no element place, whose
+`Values` has no case, so only its root and leading keys can fault here. -/
 def keys : List PlaceProjection → List ExpressionId
   | [] => []
   | .member _ _ :: rest => keys rest
   | .index key :: rest => key :: keys rest
+  | .element _ :: _ => []
 
 inductive Values : List PlaceProjection → List Dynamic.Value → List EvaluatedProjection → Prop where
   | nil : Values [] [] []
@@ -314,6 +327,7 @@ theorem keys_fault {program : Program} {context : Context}
           cases trace with
           | head failed => exact .indexHead failed
           | tail head tail => exact .indexTail head (ih tail)
+      | element key => cases trace
 
 theorem Snapshot.resolves {program : Program} {context : Context}
     {evidence : EvidenceEnvironment} {source : TypedSource} {environment : Environment}

@@ -125,6 +125,10 @@ private theorem projections_references {context : SourceSemantics.Context}
       · exact ih tail member
     | member selected tail =>
       exact ih tail (by simpa [PlaceProjection.references] using member)
+    | element index _ tail =>
+      rcases List.mem_append.mp member with member | member
+      · exact expression_single index member
+      · exact ih tail member
 
 private theorem place_references {context : SourceSemantics.Context} {place : PlaceResolution} {type : TypeSystem.Ty}
     (typed : SourcePlaceHasType source context place type) {child : NodeId}

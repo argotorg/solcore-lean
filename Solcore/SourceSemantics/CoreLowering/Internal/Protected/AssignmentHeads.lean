@@ -32,6 +32,7 @@ theorem reflects_bounded_with_sequence (budget : Nat) {checked : Checked} {regis
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
     (_children : DataExpressionSequence.Tree source certificate scope (DataPlaceKeyOrder.sourceKeys place.projections) sourceTypes codes)
+    (free : ∀ index, PlaceProjection.element index ∉ place.projections)
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context} {ξ : Renaming}
     {environment : Dynamic.Environment} {canonical coreEnvironment : Environment} {before : Dynamic.Heap} {store finalStore : Store}
@@ -66,7 +67,7 @@ theorem reflects_bounded_with_sequence (budget : Nat) {checked : Checked} {regis
   have reflectKeys := fun {keySize : Nat} {keyValue : Value} {keyStore : Store}
       (evaluated : CoreProof.EvaluationSize keySize (referenceEnvironment prepared.route.rootType target coreEnvironment) store
         (shift 1 (SourceCoreCalls.packArguments (renamedCodes codes ξ)).expression) keyValue keyStore) (keyBound : keySize < size) =>
-    ProtectedPlaceKeys.Stateful.reflects_bounded_with_sequence budget protocol initialState
+    ProtectedPlaceKeys.Stateful.reflects_bounded_with_sequence budget protocol initialState free
       (sequenceMeaning target (agrees selected) (.cons (.cellRef reference.typed) actualTyped))
       (by simpa only [DataPlaceChildExpressions.rename_prefix, packed_renamed_expression, List.length_cons, List.length_nil,
         List.cons_append, List.nil_append, referenceEnvironment, SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated) (Nat.lt_of_lt_of_le keyBound bounded)
@@ -112,6 +113,7 @@ theorem reflects_bounded (budget : Nat) {checked : Checked} {registry : SourceCo
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
     (children : DataExpressionSequence.Tree source certificate scope (DataPlaceKeyOrder.sourceKeys place.projections) sourceTypes codes)
+    (free : ∀ index, PlaceProjection.element index ∉ place.projections)
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.ReflectsAt protocol (payloadModel checked registry functions) program context evidence source certificate faults size))
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context} {ξ : Renaming}
@@ -134,6 +136,7 @@ theorem reflects_bounded (budget : Nat) {checked : Checked} {registry : SourceCo
       coreEnvironment before store mapping world scope canonical initialState (ξ index) rhs next outputType operator bitNot invalid result finalStore := by
   exact reflects_bounded_with_sequence    (budget := budget)
     (_children := children)
+    (free := free)
     (protocol := protocol)
     (environments := environments)
     (_heaps := heaps)
@@ -163,6 +166,7 @@ theorem reflects_bounded (budget : Nat) {checked : Checked} {registry : SourceCo
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
     (children : DataExpressionSequence.Tree source certificate scope (DataPlaceKeyOrder.sourceKeys place.projections) sourceTypes codes)
+    (free : ∀ index, PlaceProjection.element index ∉ place.projections)
     {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.ReflectsAt size (payloadModel checked registry functions) program context evidence source certificate faults entry))
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context} {ξ : Renaming}
@@ -183,7 +187,7 @@ theorem reflects_bounded (budget : Nat) {checked : Checked} {registry : SourceCo
       (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) (bounded : size ≤ budget) :
     RecursiveNamedPlaceAssignmentContracts.KeyResultAt size checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place environment
       coreEnvironment before store mapping world (ξ index) rhs next outputType operator bitNot invalid result finalStore := by
-  exact (Stateful.reflects_bounded budget children (ProtectedStatePlaceAssignment.legacyProtocol entry)
+  exact (Stateful.reflects_bounded budget children free (ProtectedStatePlaceAssignment.legacyProtocol entry)
     (fun size smaller => ProtectedStatePlaceAssignment.legacy_reflects transport (meaning size smaller))
     environments heaps locals agrees actualTyped ⟨installed⟩ slot rootTyped lookup initialRead completed bounded).forget
 
@@ -194,6 +198,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
     (children : DataExpressionSequence.Tree source certificate scope (DataPlaceKeyOrder.sourceKeys place.projections) sourceTypes codes)
+    (free : ∀ index, PlaceProjection.element index ∉ place.projections)
     {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
     (meaning : ProtectedExpressionMeaning.Reflects (payloadModel checked registry functions) program context evidence source certificate faults entry)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context} {ξ : Renaming}
@@ -216,7 +221,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
       coreEnvironment before store mapping world (ξ index) rhs next outputType operator bitNot invalid result finalStore := by
   obtain ⟨size, sized⟩ := CoreProof.evaluation_has_size completed
   exact (reflects_bounded size
-    children transport (RecursiveNamedBoundedContracts.reflects_below_of_unbounded meaning size) environments heaps locals agrees actualTyped installed slot rootTyped lookup initialRead sized (Nat.le_refl size)).erase
+    children free transport (RecursiveNamedBoundedContracts.reflects_below_of_unbounded meaning size) environments heaps locals agrees actualTyped installed slot rootTyped lookup initialRead sized (Nat.le_refl size)).erase
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedPlaceAssignmentKeyReflection
 
@@ -287,7 +292,8 @@ theorem reflects_bounded_with_sequence_with_diagnostics (budget : Nat) {compilat
   have getterTyped := getter_typed layout closed (environment_respects environments.runtime_hasTypes actualTyped agrees)
   obtain ⟨scheme, staticLookup, _, _, _⟩ := rootTyped.scheme
   obtain ⟨location, initialCell, lookup, initialRead, _, _⟩ := locals.lookup staticLookup
-  have keyPhase := ProtectedPlaceAssignmentKeyReflection.Stateful.reflects_bounded_with_sequence budget layout.children protocol environments heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead completed bounded
+  have keyPhase := ProtectedPlaceAssignmentKeyReflection.Stateful.reflects_bounded_with_sequence budget layout.children
+    layout.path.elementFree protocol environments heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead completed bounded
   cases keyPhase with
   | fault sourceFault resultEq tokenRep finalHeaps maps worlds frame metadata post =>
     exact .fault sourceFault resultEq tokenRep finalHeaps maps worlds frame metadata post

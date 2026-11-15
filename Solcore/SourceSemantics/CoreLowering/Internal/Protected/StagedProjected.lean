@@ -125,6 +125,7 @@ theorem reflects_keys (budget : Nat) {checked : Checked} {registry : SourceCoreR
     {certificate : Certificate} {faults : RecursiveStageMeaning.FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
     (_children : DataExpressionSequence.Tree invocation.source certificate scope (DataPlaceKeyOrder.sourceKeys place.projections) sourceTypes codes)
+    (free : ∀ index, PlaceProjection.element index ∉ place.projections)
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context} {ξ : Renaming}
     {environment : Dynamic.Environment} {canonical coreEnvironment : Environment} {before : Dynamic.Heap} {store finalStore : Store}
@@ -191,7 +192,7 @@ theorem reflects_keys (budget : Nat) {checked : Checked} {registry : SourceCoreR
       obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, sourceHeap, post⟩ := reflectKeys keysEvaluated (by omega)
       cases represented with
       | @values sources values related =>
-        obtain ⟨resolved, shaped, _plain⟩ := DataPlaceKeyOrder.values_projections
+        obtain ⟨resolved, shaped, _plain⟩ := DataPlaceKeyOrder.values_projections free
           (by simpa only [Staging.Recursive.ProjectedTarget.keys_eq_sourceKeys] using values_plain sourceTrace)
         obtain ⟨scheme, staticLookup, _, _, bodyEq⟩ := rootTyped.scheme
         obtain ⟨staticLocation, staticCell, staticLookupRuntime, staticRead, staticCellType, _⟩ := locals.lookup staticLookup
@@ -264,7 +265,7 @@ theorem reflects_getter (budget : Nat) {compilation : SourceCoreCompatibleDataPl
   have getterTyped := getter_typed layout closed (environment_respects environments.runtime_hasTypes actualTyped agrees)
   obtain ⟨scheme, staticLookup, _, _, _⟩ := rootTyped.scheme
   obtain ⟨location, initialCell, lookup, initialRead, _, _⟩ := locals.lookup staticLookup
-  have keyPhase := reflects_keys budget layout.children protocol environments heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead completed bounded
+  have keyPhase := reflects_keys budget layout.children layout.path.elementFree protocol environments heaps locals agrees actualTyped initialState sequenceMeaning slot rootTyped lookup initialRead completed bounded
   cases keyPhase with
   | fault ready sourceFault resultEq tokenRep finalHeaps maps worlds frame metadata post =>
     exact .keyFault ready sourceFault resultEq tokenRep finalHeaps maps worlds frame metadata post
@@ -412,7 +413,7 @@ private theorem read_present {root : Dynamic.Value} {projections : List Dynamic.
   generalize initialEq : some root = initial at read
   induction read generalizing root with
   | nil => exact ⟨root, initialEq.symm⟩
-  | indexFound _ _ ih | indexDefault _ _ _ ih | member _ _ ih => exact ih rfl
+  | indexFound _ _ ih | indexDefault _ _ _ ih | member _ _ ih | element _ _ ih => exact ih rfl
 
 theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
@@ -624,6 +625,7 @@ private theorem resolved_type {program : Program} {context : SourceSemantics.Con
     (trace : Dynamic.SourcePlaceResolves program context evidence source environment before place target targetHeap)
     {cell : Dynamic.Cell} (read : Dynamic.Heap.Reads targetHeap target.location cell) : target.rootType = cell.type := by
   cases trace with
+  | element _ _ _ _ objectRead _ _ => exact congrArg Dynamic.Cell.type (objectRead.functional read)
   | intro _ _ _ currentRead _ _ => exact congrArg Dynamic.Cell.type (currentRead.functional read)
 
 private theorem absent_initial {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}

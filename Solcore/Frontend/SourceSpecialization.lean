@@ -854,6 +854,7 @@ private def projectionTasks (variables : List TypeVarId)
     (projections : List PlaceProjection) : List ResidualScopeTask :=
   projections.filterMap fun
     | .index key => some { node := .expression key, variables }
+    | .element key => some { node := .expression key, variables }
     | .member _ _ => none
 
 private def assignmentTasks (variables : List TypeVarId)
@@ -1708,7 +1709,7 @@ private theorem residual_projection_task_variables {variables : List TypeVarId}
     (member : task ∈ projectionTasks variables projections) : task.variables = variables := by
   obtain ⟨projection, _, found⟩ := List.mem_filterMap.mp member
   cases projection with
-  | index key =>
+  | index key | element key =>
       cases Option.some.inj found
       rfl
   | member name index => cases found

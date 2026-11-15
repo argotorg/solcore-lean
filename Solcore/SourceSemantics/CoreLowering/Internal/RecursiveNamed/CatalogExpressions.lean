@@ -2417,6 +2417,7 @@ private theorem key_typed {source : TypedSource} {context : SourceSemantics.Cont
       · exact ⟨_, head⟩
       · exact ih rest tail
     | member _ rest => exact ih rest member
+    | element _ _ _ => cases member
 
 /-- Only RHS and real ordered-key members are selected from source typing. -/
 theorem assignment_child_source {source : TypedSource} {context : SourceSemantics.Context}

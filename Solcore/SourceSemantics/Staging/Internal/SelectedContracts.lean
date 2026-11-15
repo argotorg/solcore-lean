@@ -532,6 +532,7 @@ theorem projected_keys_typed {source : TypedSource} {context : Context}
           | index typed path =>
               obtain ⟨types, tail⟩ := ih path
               exact ⟨_ :: types, .cons typed tail⟩
+      | element key => exact ⟨[], .nil _⟩
 
 theorem projected_place_keys_typed {source : TypedSource} {context : Context}
     {place : PlaceResolution} {leaf : Ty}

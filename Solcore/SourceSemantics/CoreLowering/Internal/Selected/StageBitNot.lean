@@ -389,7 +389,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
     ⟨assignedSize, tailSize, updated, written, strict, tailStrict, assigned, tail⟩
   · cases failed with
     | target failed =>
-      rcases SelectedCompilationStageProjectedTargetInversion.failed failed with
+      rcases SelectedCompilationStageProjectedTargetInversion.failed layout.path.elementFree failed with
         ⟨rfl, rootFault⟩ | ⟨keySize, keyStrict, ready, keysFailed⟩ |
         ⟨keySize, values, keyStrict, ordinaryKeys, getterFault⟩
       · exact ⟨_, _, _, .bitNotProjectedRootFault (lookupStatement?_sound found) form projected rootFault, .completed (.fault reason)⟩
@@ -592,7 +592,7 @@ theorem bitNotProjected {budget : Nat} {context : SourceSemantics.Context} {scop
     ⟨assignedSize, tailSize, updated, written, strict, tailStrict, assigned, tail⟩
   · cases failed with
     | target failed =>
-      rcases SelectedCompilationStageProjectedTargetInversion.failed failed with
+      rcases SelectedCompilationStageProjectedTargetInversion.failed layout.path.elementFree failed with
         ⟨rfl, rootFault⟩ | ⟨keySize, keyStrict, ready, keysFailed⟩ |
         ⟨keySize, values, keyStrict, ordinaryKeys, getterFault⟩
       · exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_bitNot_root_fault projected rootFault, .completed (.fault reason)⟩

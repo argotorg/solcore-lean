@@ -1158,6 +1158,7 @@ theorem sourcePlace_type_admissible {source : TypedSource} {context : SourceSema
       cases typed with
       | index key tail => exact induction tail (TypeAdmissible.mapping_value valid)
       | member selected tail => exact induction tail selected.member_type_admissible
+      | element _ _ tail => exact induction tail (TypeAdmissible.array_element valid)
   cases typed with
   | intro root rest _ => exact projections rest root.type_admissible
 

@@ -2128,6 +2128,13 @@ inductive EvaluatedProjectionsHaveType (context : Context) (heap : Heap) :
       (tail : EvaluatedProjectionsHaveType context heap memberType rest finalType) :
       EvaluatedProjectionsHaveType context heap baseType
         (.member name index :: rest) finalType
+  /-- An element of a memory array's object, whose cell holds `element`s. -/
+  | element
+      {position : Nat} {element finalType : Ty}
+      {rest : List EvaluatedProjection}
+      (tail : EvaluatedProjectionsHaveType context heap element rest finalType) :
+      EvaluatedProjectionsHaveType context heap (TypeSystem.Ty.arrayObject element)
+        (.element position :: rest) finalType
 
 namespace EvaluatedProjectionsHaveType
 
@@ -2146,6 +2153,7 @@ theorem mono
       exact .member catalog
         (Solcore.SourceSemantics.Dynamic.UniformMemberProjection.preservesType
           catalog) induction
+  | element _ induction => exact .element induction
 
 end EvaluatedProjectionsHaveType
 
@@ -2195,6 +2203,19 @@ theorem preserves
           | some constructed_typed =>
               exact inductionHypothesis
                 (.some (payload.read _ _ _ constructed_typed selectedAt)) next
+  | element tail inductionHypothesis =>
+      cases read with
+      | element selectedAt next =>
+          cases current_typed with
+          | some object_typed =>
+              rcases object_typed.arrayObject_inv with
+                ⟨type_eq, elements_typed⟩ | ⟨_, impossible, _⟩
+              · simp [TypeSystem.Ty.arrayObject] at type_eq
+                subst type_eq
+                exact inductionHypothesis
+                  (.some (selectedAt.preserves elements_typed
+                    (selectedAt.replicate_getElem? _))) next
+              · simp [TypeSystem.Ty.arrayObject] at impossible
 
 end ProjectionsRead
 
@@ -2248,6 +2269,22 @@ theorem preserves
                 modify_typed child
               exact payload.update _ _ _ _ _ constructed_typed selectedAt
                 child_typed replacement
+  | element tail inductionHypothesis =>
+      cases update with
+      | element selectedAt child replace =>
+          cases current_typed with
+          | some object_typed =>
+              rcases object_typed.arrayObject_inv with
+                ⟨type_eq, elements_typed⟩ | ⟨_, impossible, _⟩
+              · simp [TypeSystem.Ty.arrayObject] at type_eq
+                subst type_eq
+                have child_typed := inductionHypothesis
+                  (.some (selectedAt.preserves elements_typed
+                    (selectedAt.replicate_getElem? _))) modify_typed child
+                exact ValueHasType.arrayObject_of_values
+                  (replace.preserves elements_typed (selectedAt.replicate_getElem? _)
+                    child_typed)
+              · simp [TypeSystem.Ty.arrayObject] at impossible
 
 end ProjectionsUpdate
 
@@ -2635,6 +2672,53 @@ theorem preserves
             projections := evaluated_typed
             selected := by simpa [stored_type_eq] using selected_typed
           }
+      | @element _ _ _ _ _ middle _ _ leading index prefixTarget element location position
+          cell elements selected projections_eq prefix_resolves prefix_selected
+          index_evaluates read stored selection =>
+          rw [projections_eq] at projections_type
+          obtain ⟨middleType, leading_type, element_type⟩ :=
+            SourceProjectionsHaveType.split projections_type
+          cases element_type with
+          | element index_type _ rest_type =>
+              cases rest_type
+              have prefix_typing : SourcePlaceHasType source context
+                  { place with projections := leading, type := TypeSystem.Ty.array place.type }
+                  (TypeSystem.Ty.array place.type) :=
+                .intro writable (by rw [stored_type_eq]; exact leading_type) rfl
+              rcases preserves expression_preserves evidence_covers environment_agrees
+                  before_typed prefix_typing prefix_resolves with
+                ⟨_, prefix_typed, middle_typed, prefix_extension⟩
+              have reference_typed : ValueHasType context middle
+                  (.arrayRef element location) (TypeSystem.Ty.array place.type) := by
+                have selected_typed := prefix_typed.selected
+                rw [prefix_selected] at selected_typed
+                cases selected_typed with
+                | some typed => exact typed
+              rcases expression_preserves _ _ _ _ _ evidence_covers
+                  (environment_agrees.mono prefix_extension) middle_typed index_type
+                  index_evaluates with
+                ⟨_, after_typed, index_extension⟩
+              have reference_after := reference_typed.mono index_extension
+              have selected_typed :=
+                ValueHasType.arrayElement reference_after after_typed read stored.arrayObject_value
+                  selection.getElem?_eq
+              rcases reference_after.arrayRef_inv with
+                ⟨type_eq, typedCell, typed_read, cell_type⟩ | ⟨_, impossible, _⟩
+              · simp [TypeSystem.Ty.array] at type_eq
+                subst type_eq
+                have cell_eq := read.functional typed_read
+                subst cell_eq
+                refine ⟨TypeSystem.Ty.arrayObject place.type, ?_, after_typed,
+                  prefix_extension.trans index_extension⟩
+                exact {
+                  root_type := cell_type
+                  value_type := stored_type_eq
+                  projections := by rw [← stored_type_eq]; exact .element (.nil _)
+                  selected := by rw [← stored_type_eq]; exact .some selected_typed
+                }
+              · simp [TypeSystem.Ty.array] at impossible
+termination_by place.projections.length
+decreasing_by all_goals simp_all
 
 end SourcePlaceResolves
 

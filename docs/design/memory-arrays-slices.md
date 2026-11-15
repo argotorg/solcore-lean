@@ -406,6 +406,15 @@ wait for the native pipeline's contracts and ABI.
     word, or `0x32` (`arrayIndexOutOfBounds`).
   - An element place `a[i]` evaluates `a` and `i` once and checks `i < length` before the right
     side, as `lidx(a, i)` does. The write replaces the element.
+    As built in step 5a-i, an element place is a place whose last projection is an element
+    (`PlaceProjection.element`): its leading place resolves first, to an array reference, then the
+    index, and the place resolves to the array object's own cell with the element's position as its
+    one evaluated projection (`SourcePlaceResolves.element`), so a write replaces the element there
+    through `ProjectionsUpdate`'s element case and `ResolvedPlaceWrites` keeps its text. It faults
+    with its leading place's fault, the index's, an index that is not a word, `0x32` from the length
+    on, or, when its leading is a local not yet initialized, `uninitializedLocation`, as reading
+    that local does, all before the right side. The staged traces stage no element place:
+    `Staging.Recursive.ProjectedTarget.keys` stops at an element projection.
   - A slice panics with `0x32` when `s > e` or when `e` exceeds the base's length.
   - The length rules read the object or the slice, and `toArray(s)` allocates a copy.
 - **Preservation.** A reference has the type `T[]` when the cell it names has the type
@@ -554,14 +563,16 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 4a | Literals: the typed form of `[e₀, …, eₙ₋₁]` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–500/−5–15; measured at 27 files, +192/−6 | none |
 | 4b | Literals: inference's typing of `[e₀, …, eₙ₋₁]` at one element type, with `[]` taking it from the expected type, open literal elements defaulting to `uint256` and finalization's check of the element type | 26–34 files, +900–1,300/−30–80; measured at 24 files, +1,005/−19 | none |
 | 4c | Literals: the lowering | 4–7 files, +150–300/−5–20; measured at 3 files, +91/−3 | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
-| 5a | Plain element writes: `a[i] = v` on a memory array, a nested place such as `a[i][j] = v` included, with the place's base and index evaluated once and checked, `0x32` from the length on, before the right side | 70–95 files, +1,900–3,100/−100–300 | setGet(n, i, v), fillAndSum(n), nestedReplace(n, v), alias(v); ret(n), sum(xs), grid(n) adapted |
+| 5a-i | Plain element writes: the typed element place `p[i]` (`PlaceProjection.element`), with its static rule, its resolution to the array object's cell, its five faults, `0x32` from the length on before the right side, sized copies, stage and preservation, which no source produces yet | 30–45 files, +500–900/−10–60; measured at 58 files, +890/−65 | none |
+| 5a-ii | Plain element writes: inference's typing of `a[i] = v` on a memory array, a nested place such as `a[i][j] = v` included, whose index finalization checks as a read's; a compound assignment or an in-place `~` to an element stays rejected | 40–60 files, +1,300–2,200/−150–400 | none |
+| 5a-iii | Plain element writes: the lowering, with `0x32` before the right side | 4–8 files, +200–400/−5–30 | setGet(n, i, v), fillAndSum(n), nestedReplace(n, v), alias(v); ret(n), sum(xs), grid(n) adapted |
 | 5b | Compound assignments to an element, with in-place `~` and the unchecked forms, after decision 3 | 25–40 files, +600–1,100/−50–150 | compound(v); echo(xs) adapted |
 | 6 | Slices and `toArray(s)`, in eight parts: 6a, the slice type `arraySlice<B>`, its formation and its resolution in annotations; 6b, the slice value and its typing in a heap; 6c, the slice's typed form, with `0x32` from its bounds; 6d, reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules; 6e, `toArray(s)`'s typed form; 6f, inference of the four slice forms, with `uint256` bounds; 6g, inference of reads, lengths and `toArray(s)` on slices; 6h, the lowering | 170–215 files, +3,100–5,000/−100–250 at its first measure; estimated at 45–65 files, +1,000–1,400/−200–400 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
 
-In all, that is about 630 to 875 file changes, +17,300 to 25,750 and −1,600 to 3,200 lines over
-thirty-five commits: about four fifths to one and a fifth times row 1, whose 23 commits added about
+In all, that is about 634 to 893 file changes, +17,400 to 26,150 and −1,665 to 3,390 lines over
+thirty-seven commits: about four fifths to one and a fifth times row 1, whose 23 commits added about
 21,700 lines, much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600,
 until its first measure: it adds three AST forms through the proved parser, so it became 1a to 1c.
 1b's first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
@@ -572,6 +583,15 @@ Step 5 splits in two (2026-11-15): 5a, plain element writes, which decision 3 do
 a plain write checks its place before the right side and evaluates its index once, as upstream's
 does, and 5b, compound assignments to an element, which wait for decision 3. 5a comes before step 6,
 since every array-slice port builds its array with plain writes.
+
+Step 5a was one row of 70–95 files, +1,900–3,100/−100–300, already over the cap, until its first
+measure: about 70 to 100 file changes, +2,150 to 3,500/−80 to 270. The element place takes a
+projection with its static rule, its resolution, five faults and their sized rules, as the read did
+in 3a, and every proof that cases on place projections or place rules takes it; the lowering's
+data-place proofs, whose route rejects an element, take an element-free hypothesis that their
+compiled path supplies. Inference's place arm takes an array branch whose index waits for its type
+until finalization checks it, as 3b's read. So it split into 5a-i, the typed place, 5a-ii,
+inference's typing, and 5a-iii, the lowering.
 
 Step 2 was one row of 60–72 files, +1,300–1,700/−300–450, until its first measure: about 110 to 150
 files, +3,000 to 4,500/−400 to 800. `new` and the lengths each take a typed form with its

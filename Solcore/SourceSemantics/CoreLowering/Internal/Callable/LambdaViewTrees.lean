@@ -1534,6 +1534,9 @@ local macro "transport_static" "(" recursor:term "," before:term "," after:term 
     (fun selected _ ih h => by
       simp only [within_flatMap_cons, PlaceProjection.references, within_nil, true_and] at h
       exact .member selected (ih h))
+    (fun _ kind _ index rest h => by
+      simp only [within_flatMap_cons, PlaceProjection.references, within_cons, within_nil, and_true] at h
+      exact .element (index h.1) kind (rest h.2))
     (fun root _ same ih h => .intro root (ih h) same)
     (fun _ _ requirements target value h => by
       simp only [within_append, within_cons, within_nil, and_true] at h
@@ -3347,6 +3350,7 @@ theorem key_reference {projections : List PlaceProjection} {id : ExpressionId}
           · subst id
             simp [PlaceProjection.references]
           · exact List.mem_append_right _ (ih member)
+      | element key => cases member
 
 private theorem routes {source view : TypedSource} (metadata : LambdaMetadataViews.MetadataView source view)
     {checked : Checked} {signatures : ProgramSignatures} {site : SourceCoreElaboration.ErrorSite}
@@ -3365,6 +3369,7 @@ private theorem routes {source view : TypedSource} (metadata : LambdaMetadataVie
           have first := keys key (List.mem_cons_self)
           have rest := fun id member => keys id (List.mem_cons_of_mem _ member)
           simp only [routeSteps, metadata.owner, first, ih rest]
+      | element key => rfl
 
 theorem lower {source view : TypedSource} (metadata : LambdaMetadataViews.MetadataView source view)
     {values : SourceCoreCompatibleValues.Context} {signatures : ProgramSignatures} {expression : ExpressionLowerer}

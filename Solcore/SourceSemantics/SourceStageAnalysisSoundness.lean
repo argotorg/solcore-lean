@@ -810,6 +810,7 @@ def projectionIndexExpressions : List PlaceProjection → List ExpressionId
   | [] => []
   | .member _ _ :: rest => projectionIndexExpressions rest
   | .index key :: rest => key :: projectionIndexExpressions rest
+  | .element key :: rest => key :: projectionIndexExpressions rest
 
 theorem placeIndexExpressions_eq (place : PlaceResolution) :
     Staging.placeIndexExpressions place =
@@ -852,7 +853,7 @@ theorem analyzePlaceProjectionsWith_sound
               .ok finalState := by
             simpa only [analyzePlaceProjectionsWith] using success
           exact induction state valid tailSuccess
-      | index key =>
+      | index key | element key =>
           cases headResult : analyze state key with
           | error error =>
               simp only [analyzePlaceProjectionsWith] at success

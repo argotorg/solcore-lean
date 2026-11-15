@@ -1083,6 +1083,7 @@ theorem resolve_bare
     after = heap ∧ target.projections = [] ∧
       Dynamic.Environment.LooksUp environment place.root target.location := by
   cases resolved with
+  | element projectionsEq _ _ _ _ _ _ => rw [bare] at projectionsEq; simp at projectionsEq
   | intro lookup _ projections _ _ _ =>
       rw [bare] at projections
       cases projections
@@ -1147,6 +1148,10 @@ theorem target_cannot_fault
       have same := Dynamic.Environment.LooksUp.functional lookup otherLookup
       subst_vars
       exact missing.excludes_read read
+  | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
+  | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+  | elementUninitialized projectionsEq _ _ =>
+    rw [bare] at projectionsEq; simp at projectionsEq
   | projectionExpression _ _ fault => rw [bare] at fault; cases fault
   | danglingAfterProjections otherLookup _ projections missing =>
       rw [bare] at projections

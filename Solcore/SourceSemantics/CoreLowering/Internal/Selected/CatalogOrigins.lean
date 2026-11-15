@@ -362,7 +362,9 @@ theorem keys_eq_sourceKeys (projections : List PlaceProjection) :
   induction projections with
   | nil => rfl
   | cons projection rest ih =>
-      cases projection <;> simp only [keys, DataPlaceKeyOrder.sourceKeys, ih]
+      cases projection with
+      | member _ _ | index _ => simp only [keys, DataPlaceKeyOrder.sourceKeys, ih]
+      | element _ => rfl
 
 theorem Values.to_data {projections : List PlaceProjection} {values : List Dynamic.Value}
     {evaluated : List EvaluatedProjection} (ordered : Values projections values evaluated) :
@@ -1709,12 +1711,15 @@ variable {program : Program} {source : TypedSource} {context : SourceSemantics.C
 
 /-- The actual projection derivation supplies its ordered key row and snapshot. -/
 theorem resolved
+    (free : ∀ index, PlaceProjection.element index ∉ place.projections)
     (trace : SourceExecutionSize.SourcePlaceResolves program size context evidence source environment before place target after) :
     ∃ keySize values, keySize < size ∧
       SourceExecutionSize.ExpressionsEvaluate program keySize context evidence source environment before
         (ProjectedTarget.keys place.projections) values after ∧
       ProjectedTarget.Snapshot environment before after place values target := by
   cases trace with
+  | element projectionsEq _ _ _ _ _ _ =>
+    exact (free _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
   | intro lookup initialRead projections currentRead initialValue selection =>
       obtain ⟨values, keySize, shaped, keys, bound⟩ := RecursiveNamedPlaceKeyContracts.projections_values projections
       refine ⟨keySize, values, Nat.lt_of_le_of_lt bound (SourceExecutionSize.child_lt_stepSize (by simp)), ?_,
@@ -1723,6 +1728,7 @@ theorem resolved
 
 /-- No earlier fault is replaced by a getter or RHS result. -/
 theorem failed
+    (free : ∀ index, PlaceProjection.element index ∉ place.projections)
     (trace : SourceExecutionSize.SourcePlaceFaults program size context evidence source environment before place reason after) :
     (after = before ∧ ProjectedTarget.RootFault environment before place reason) ∨
     (∃ keySize, keySize < size ∧ ProjectedTarget.RootReady environment before place ∧
@@ -1733,6 +1739,10 @@ theorem failed
         (ProjectedTarget.keys place.projections) values after ∧
       ProjectedTarget.GetterFault environment before after place values reason) := by
   cases trace with
+  | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
+  | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+  | elementUninitialized projectionsEq _ _ =>
+    exact (free _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
   | unbound missing => exact .inl ⟨rfl, .unbound missing⟩
   | dangling lookup missing => exact .inl ⟨rfl, .dangling lookup missing⟩
   | projectionExpression lookup read fault =>

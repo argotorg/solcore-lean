@@ -191,6 +191,10 @@ private theorem target_fault_excluded {program : Program} {source : TypedSource}
     | dangling lookup missing =>
       cases lookup.functional present
       exact missing.excludes_read cell
+    | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
+    | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+    | elementUninitialized projectionsEq _ _ =>
+      rw [bare] at projectionsEq; simp at projectionsEq
     | projectionExpression _ _ failed => rw [bare] at failed; cases failed
     | danglingAfterProjections lookup _ evaluated missing =>
       rw [bare] at evaluated
@@ -425,7 +429,7 @@ theorem lifts (budget : Nat)
         (CompatibleRenamedPlace.renamedCodes codes ξ) sourceTypes place leaf target actual store mapping world before after,
         ∃ reached : callerProtocol.State ⟨scope, resolution.mapping, resolution.world, after, resolution.store, canonical⟩,
           callerProtocol.Relates initial reached ∧ Admission bridge context reached) := by
-  obtain ⟨keySize, sources, keyBound, ordinaryKeys, snapshot⟩ := SelectedCompilationStageProjectedTargetInversion.resolved trace
+  obtain ⟨keySize, sources, keyBound, ordinaryKeys, snapshot⟩ := SelectedCompilationStageProjectedTargetInversion.resolved layout.path.elementFree trace
   have rowTyped := CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.tree_typed layout.children unique keyTyped
   obtain ⟨outcome, reached, stagedKeys, adapted⟩ := SelectedCompilationStageLiftSequence.values bridge budget
     layout.children unique rowTyped children preservation environments heaps locals agrees actualTyped initial admitted
@@ -533,7 +537,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
       ⟨assignedSize, tailSize, updated, written, strict, tailStrict, assigned, tail⟩
     · cases failed with
       | target failed =>
-        rcases SelectedCompilationStageProjectedTargetInversion.failed failed with
+        rcases SelectedCompilationStageProjectedTargetInversion.failed layout.path.elementFree failed with
           ⟨rfl, rootFault⟩ | ⟨keySize, keyStrict, ready, keysFailed⟩ |
           ⟨keySize, values, keyStrict, ordinaryKeys, getterFault⟩
         · exact ⟨_, _, _, .assignProjectedRootFault (lookupStatement?_sound found) form projected rootFault, .completed (.fault reason)⟩
@@ -908,7 +912,7 @@ theorem assignProjected {budget : Nat} {context : SourceSemantics.Context} {scop
       ⟨assignedSize, tailSize, updated, written, strict, tailStrict, assigned, tail⟩
     · cases failed with
       | target failed =>
-        rcases SelectedCompilationStageProjectedTargetInversion.failed failed with
+        rcases SelectedCompilationStageProjectedTargetInversion.failed layout.path.elementFree failed with
           ⟨rfl, rootFault⟩ | ⟨keySize, keyStrict, ready, keysFailed⟩ |
           ⟨keySize, values, keyStrict, ordinaryKeys, getterFault⟩
         · exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_root_fault projected rootFault, .completed (.fault reason)⟩

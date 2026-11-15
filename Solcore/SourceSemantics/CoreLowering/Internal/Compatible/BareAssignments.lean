@@ -261,6 +261,7 @@ theorem Snapshot.resolve_unique {program : Program} {context : SourceSemantics.C
     (trace : Dynamic.SourcePlaceResolves program context evidence source environment heap place resolved after) :
     resolved = snapshot.resolved ∧ after = heap := by
   cases trace with
+  | element projectionsEq _ _ _ _ _ _ => rw [bare] at projectionsEq; simp at projectionsEq
   | intro lookup _ projections read initial selected =>
     rw [bare] at projections
     cases projections
@@ -1640,6 +1641,7 @@ theorem preserves (layout : Layout prepared) (bare : place.projections = [])
   cases trace with
   | intro resolve written =>
     cases resolve with
+    | element projectionsEq _ _ _ _ _ _ => rw [bare] at projectionsEq; simp at projectionsEq
     | @intro _ _ _ _ _ _ _ location initialCell currentCell resolved initial selected lookup initialRead keys currentRead root selection =>
       rw [bare] at keys
       cases keys

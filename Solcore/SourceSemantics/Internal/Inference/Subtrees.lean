@@ -322,6 +322,8 @@ local macro "transport_rooted" "(" recursor:term "," before:term ","
     (fun type _ => .nil type)
     (fun _ _ key tail refs => .index (key (by rooted_live(refs))) (tail (by rooted_live(refs))))
     (fun selected _ tail refs => .member selected (tail (by rooted_live(refs))))
+    (fun _ kind _ index tail refs =>
+      .element (index (by rooted_live(refs))) kind (tail (by rooted_live(refs))))
     (fun root _ same projections refs => .intro root (projections (by rooted_live(refs))) same)
     (fun _ _ requirements target value refs => .equal (target (by rooted_live(refs))) (value (by rooted_live(refs))) requirements)
     (fun operator _ _ requirements target value refs => .wordCompound operator (target (by rooted_live(refs))) (value (by rooted_live(refs))) requirements)

@@ -2110,6 +2110,7 @@ theorem named_key_reflects [FunctionCalls.FaultTokens faults]
     (tree : DataExpressionSequence.Tree source
       (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)
       scope (DataPlaceKeyOrder.sourceKeys projections) types codes)
+    (free : ∀ index, PlaceProjection.element index ∉ projections)
     {value : Core.Value} {finalStore : Core.Store}
     (complete : Evaluates actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore) :
     ∃ outcome after finalMap finalWorld,
@@ -2120,7 +2121,7 @@ theorem named_key_reflects [FunctionCalls.FaultTokens faults]
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
   ProtectedPlaceKeys.reflects
-    (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix) tree
+    (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix) tree free
     (NamedCallExpressions.Tree.reflects functions extension faithful leaves runtimeViews caller valid
       uninitialized missing bodyUninitialized bodyMissing)
     environments heaps locals agrees typed installed complete

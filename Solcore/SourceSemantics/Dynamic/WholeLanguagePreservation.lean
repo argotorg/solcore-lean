@@ -972,6 +972,53 @@ mutual
           projections := evaluated_typed
           selected := by simpa [stored_type_eq] using selected_typed
         }
+    | @SourcePlaceResolves.element _ _ _ _ _ _ middle _ _ leading _ _ element location _
+        cell elements _ projections_eq prefix_resolves prefix_selected index_evaluates read
+        stored selection => by
+      cases typing with
+      | @intro _ _ rootType finalType writable projections_type stored_type_eq =>
+        rw [projections_eq] at projections_type
+        obtain ⟨middleType, leading_type, element_type⟩ :=
+          SourceProjectionsHaveType.split projections_type
+        cases element_type with
+        | element index_type _ rest_type =>
+          cases rest_type
+          have prefix_typing : SourcePlaceHasType source context
+              { place with projections := leading, type := TypeSystem.Ty.array place.type }
+              (TypeSystem.Ty.array place.type) :=
+            .intro writable (by rw [stored_type_eq]; exact leading_type) rfl
+          rcases preservePlaceRec program_well_formed runtime evidence_covers
+              environment_agrees before_typed prefix_typing prefix_resolves with
+            ⟨_, prefix_typed, middle_typed, prefix_extension⟩
+          have reference_typed : ValueHasType context middle
+              (.arrayRef element location) (TypeSystem.Ty.array place.type) := by
+            have selected_typed := prefix_typed.selected
+            rw [prefix_selected] at selected_typed
+            cases selected_typed with
+            | some typed => exact typed
+          rcases preserveExpressionRec program_well_formed runtime evidence_covers
+              (environment_agrees.mono prefix_extension) middle_typed index_type
+              index_evaluates with
+            ⟨_, after_typed, index_extension⟩
+          have reference_after := reference_typed.mono index_extension
+          have selected_typed :=
+            ValueHasType.arrayElement reference_after after_typed read stored.arrayObject_value
+              selection.getElem?_eq
+          rcases reference_after.arrayRef_inv with
+            ⟨type_eq, typedCell, typed_read, cell_type⟩ | ⟨_, impossible, _⟩
+          · simp [TypeSystem.Ty.array] at type_eq
+            subst type_eq
+            have cell_eq := read.functional typed_read
+            subst cell_eq
+            refine ⟨TypeSystem.Ty.arrayObject place.type, ?_, after_typed,
+              prefix_extension.trans index_extension⟩
+            exact {
+              root_type := cell_type
+              value_type := stored_type_eq
+              projections := by rw [← stored_type_eq]; exact .element (.nil _)
+              selected := by rw [← stored_type_eq]; exact .some selected_typed
+            }
+          · simp [TypeSystem.Ty.array] at impossible
     termination_by structural evaluation
 
   private theorem preserveAssignmentRec

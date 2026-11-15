@@ -328,6 +328,9 @@ def analyzePlaceProjectionsWith
   | .index key :: rest, state => do
       let (_, state) ← analyzeExpression state key
       analyzePlaceProjectionsWith analyzeExpression rest state
+  | .element key :: rest, state => do
+      let (_, state) ← analyzeExpression state key
+      analyzePlaceProjectionsWith analyzeExpression rest state
 
 /-- Source-ordered match-arm traversal, factored out so stage soundness can
 induct on the arm list without changing the classifier's execution. -/

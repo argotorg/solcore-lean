@@ -1612,6 +1612,10 @@ private theorem excludes_target_fault {program : Program} {context : SourceSeman
   cases fault with
   | unbound missing => exact missing.excludes_lookup lookup
   | dangling found missing => exact missing.excludes_read (found.functional lookup ▸ read)
+  | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
+  | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+  | elementUninitialized projectionsEq _ _ =>
+    rw [bare] at projectionsEq; simp at projectionsEq
   | projectionExpression found initialRead fault => rw [bare] at fault; cases fault
   | danglingAfterProjections found initialRead keys missing =>
     rw [bare] at keys
@@ -1654,6 +1658,7 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
   | target fault => exact (excludes_target_fault bare staticLookup staticRead fault).elim
   | uninitialized resolve empty =>
     cases resolve with
+    | element projectionsEq _ _ _ _ _ _ => rw [bare] at projectionsEq; simp at projectionsEq
     | intro lookup initialRead keys currentRead root selection =>
       rw [bare] at keys
       cases keys
@@ -1668,6 +1673,7 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
             CompatibleBareBitNotNative.absent_evaluates layout nativeLookup nativeRead next outputType operator invalid⟩
   | operand resolve selected invalidOperand =>
     cases resolve with
+    | element projectionsEq _ _ _ _ _ _ => rw [bare] at projectionsEq; simp at projectionsEq
     | intro lookup initialRead keys currentRead root selection =>
       rw [bare] at keys
       cases keys

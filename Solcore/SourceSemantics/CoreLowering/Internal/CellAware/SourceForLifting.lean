@@ -99,7 +99,7 @@ theorem lifts (budget : Nat)
         (CompatibleRenamedPlace.renamedCodes codes ξ) sourceTypes place leaf target actual store mapping world before after,
         ∃ reached : callerProtocol.State ⟨scope, resolution.mapping, resolution.world, after, resolution.store, canonical⟩,
           callerProtocol.Relates initial reached ∧ Admission bridge context reached) := by
-  obtain ⟨keySize, sources, keyBound, ordinaryKeys, snapshot⟩ := SelectedCompilationStageProjectedTargetInversion.resolved trace
+  obtain ⟨keySize, sources, keyBound, ordinaryKeys, snapshot⟩ := SelectedCompilationStageProjectedTargetInversion.resolved layout.path.elementFree trace
   have rowTyped := CellAwareScopeProjectedAssignmentHeads.tree_typed layout.children unique keyTyped
   obtain ⟨outcome, reached, stagedKeys, adapted⟩ := CellAwareScopeSourceSequenceLifting.values bridge budget
     layout.children unique rowTyped children preservation environments heaps locals agrees actualTyped initial admitted authority physical owner ownerFrame
@@ -223,7 +223,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
       ⟨assignedSize, tailSize, updated, written, strict, tailStrict, assigned, tail⟩
     · cases failed with
       | target failed =>
-        rcases SelectedCompilationStageProjectedTargetInversion.failed failed with
+        rcases SelectedCompilationStageProjectedTargetInversion.failed layout.path.elementFree failed with
           ⟨rfl, rootFault⟩ | ⟨keySize, keyStrict, ready, keysFailed⟩ |
           ⟨keySize, values, keyStrict, ordinaryKeys, getterFault⟩
         · exact ⟨_, _, _, .assignProjectedRootFault (lookupStatement?_sound found) form projected rootFault, .completed (.fault reason)⟩
@@ -856,7 +856,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
       ⟨assignedSize, tailSize, updated, written, strict, tailStrict, assigned, tail⟩
     · cases failed with
       | target failed =>
-        rcases SelectedCompilationStageProjectedTargetInversion.failed failed with
+        rcases SelectedCompilationStageProjectedTargetInversion.failed layout.path.elementFree failed with
           ⟨rfl, rootFault⟩ | ⟨keySize, keyStrict, ready, keysFailed⟩ |
           ⟨keySize, values, keyStrict, ordinaryKeys, getterFault⟩
         · exact ⟨_, _, _, CallableIndexedOwnedAdmittedStagedForInitializerSource.projected_root_fault projected rootFault, .completed (.fault reason)⟩
@@ -2151,7 +2151,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
       ⟨assignedSize, tailSize, updated, written, strict, tailStrict, assigned, tail⟩
     · cases failed with
       | target failed =>
-        rcases SelectedCompilationStageProjectedTargetInversion.failed failed with
+        rcases SelectedCompilationStageProjectedTargetInversion.failed layout.path.elementFree failed with
           ⟨rfl, rootFault⟩ | ⟨keySize, keyStrict, ready, keysFailed⟩ |
           ⟨keySize, values, keyStrict, ordinaryKeys, getterFault⟩
         · exact ⟨_, _, _, .projectedAssignmentRootFault projected rootFault, .completed (.fault reason)⟩

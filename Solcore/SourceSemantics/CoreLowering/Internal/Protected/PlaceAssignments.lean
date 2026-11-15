@@ -106,6 +106,7 @@ theorem reflects_bounded_with_sequence (budget : Nat) {catalog : SourceCoreDataC
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
     {store finalStore : Store} {ξ : Renaming} {value : Value}
     (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
+    (free : ∀ index, PlaceProjection.element index ∉ projections)
     (meaning : ProtectedStateExpressionSequenceProducer.Reflects
       (program := program) (context := context) (evidence := evidence) (source := source)
       (ids := sourceKeys projections) (sourceTypes := types) (codes := codes) (faults := faults)
@@ -123,7 +124,7 @@ theorem reflects_bounded_with_sequence (budget : Nat) {catalog : SourceCoreDataC
     maps, worlds, frame, metadata, post⟩ := meaning evaluated bounded
   cases sourceTrace with
   | values trace =>
-    obtain ⟨sourceSize, evaluated, shaped, sourceTrace⟩ := RecursiveNamedPlaceKeyContracts.values_projections trace
+    obtain ⟨sourceSize, evaluated, shaped, sourceTrace⟩ := RecursiveNamedPlaceKeyContracts.values_projections free trace
     exact ⟨sourceSize, _, after, finalMap, finalWorld, .values shaped sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, post⟩
   | fault trace =>
     obtain ⟨sourceSize, sourceTrace⟩ := RecursiveNamedPlaceKeyContracts.fault_projections trace
@@ -202,6 +203,7 @@ theorem reflects_bounded (budget : Nat) {catalog : SourceCoreDataCatalog.Catalog
     {projections : List PlaceProjection} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
     {Records : Type v} (protocol : ProtectedStateTransition.Protocol.{u, v} Records)
     (tree : DataExpressionSequence.Tree source certificate scope (sourceKeys projections) types codes)
+    (free : ∀ index, PlaceProjection.element index ∉ projections)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       ProtectedStateTransition.ReflectsAt protocol model program context evidence source certificate faults size))
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
@@ -222,7 +224,7 @@ theorem reflects_bounded (budget : Nat) {catalog : SourceCoreDataCatalog.Catalog
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
-  exact reflects_bounded_with_sequence budget protocol initial
+  exact reflects_bounded_with_sequence budget protocol initial free
     (ProtectedStateExpressionSequenceProducer.Reflects.of_uniform initial budget tree
       (fun size bound => ProtectedStateTransition.SequenceBridge.reflects_at protocol (meaning size bound))
       environments heaps locals layout actualTyped) evaluated bounded
@@ -297,6 +299,7 @@ theorem reflects_bounded (budget : Nat) {catalog : SourceCoreDataCatalog.Catalog
     {projections : List PlaceProjection} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
     {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
     (tree : DataExpressionSequence.Tree source certificate scope (sourceKeys projections) types codes)
+    (free : ∀ index, PlaceProjection.element index ∉ projections)
     (meaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       RecursiveNamedBoundedContracts.ReflectsAt size model program context evidence source certificate faults entry))
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
@@ -316,7 +319,7 @@ theorem reflects_bounded (budget : Nat) {catalog : SourceCoreDataCatalog.Catalog
       GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ := Stateful.reflects_bounded budget (ProtectedStatePlaceAssignment.legacyProtocol entry) tree
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata, _⟩ := Stateful.reflects_bounded budget (ProtectedStatePlaceAssignment.legacyProtocol entry) tree free
     (fun size smaller => ProtectedStatePlaceAssignment.legacy_reflects transport (meaning size smaller))
     environments heaps locals layout actualTyped ⟨installed⟩ evaluated bounded
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps, worlds, frame, metadata⟩
@@ -385,6 +388,7 @@ theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHe
     {projections : List PlaceProjection} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
     {entry : ProtectedExpressionMeaning.Entry} (transport : ProtectedExpressionMeaning.Transport entry)
     (tree : DataExpressionSequence.Tree source certificate scope (sourceKeys projections) types codes)
+    (free : ∀ index, PlaceProjection.element index ∉ projections)
     (meaning : ProtectedExpressionMeaning.Reflects model program context evidence source certificate faults entry)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
@@ -404,7 +408,7 @@ theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHe
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
   obtain ⟨size, sized⟩ := CoreProof.evaluation_has_size evaluated
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, rest⟩ :=
-    reflects_bounded (size + 1) transport tree (RecursiveNamedBoundedContracts.reflects_below_of_unbounded meaning (size + 1))
+    reflects_bounded (size + 1) transport tree free (RecursiveNamedBoundedContracts.reflects_below_of_unbounded meaning (size + 1))
       environments heaps locals layout actualTyped installed sized (by omega)
   exact ⟨outcome, after, finalMap, finalWorld, trace.sound, rest⟩
 
@@ -444,7 +448,7 @@ private theorem read_present {root : Dynamic.Value} {projections : List Dynamic.
   generalize initialEq : some root = initial at read
   induction read generalizing root with
   | nil => exact ⟨root, initialEq.symm⟩
-  | indexFound _ _ ih | indexDefault _ _ _ ih | member _ _ ih => exact ih rfl
+  | indexFound _ _ ih | indexDefault _ _ _ ih | member _ _ ih | element _ _ ih => exact ih rfl
 
 /- Successful source resolution constructs the actual key and getter runs.
 The protected child theorem receives the real entry at every key heap
@@ -504,6 +508,8 @@ theorem preserves_bounded_with_sequence (budget : Nat) {compilation : SourceCore
       coreEnvironment[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) execution.target) ∧
       ProtectedStateTransition.Transition protocol initialState ⟨scope, execution.mapping, execution.world, after, execution.store, canonical⟩ := by
   cases trace with
+  | element projectionsEq _ _ _ _ _ _ =>
+    exact (path.elementFree _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
   | @intro _ _ _ _ _ _ _ _ sourceLocation initialCell currentCell projections initial selected
       lookup initialRead evaluate currentRead initialValue selection =>
     obtain ⟨target, coreLookup, reference⟩ := environments.lookup_visible lookup slot
@@ -3529,6 +3535,10 @@ theorem preserves_bounded_with_producers_with_diagnostics (budget : Nat) {compil
       have same := lookup.functional sourceLookup
       cases same
       exact (missing.excludes_read sourceRead).elim
+    | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
+    | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+    | elementUninitialized projectionsEq _ _ =>
+      exact (layout.path.elementFree _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
     | projectionExpression lookup read fault =>
       obtain ⟨token, finalStore, finalMap, finalWorld, _, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
         ProtectedPlaceAssignmentFailures.Stateful.keys_bounded_with_sequence budget layout.children protocol environments _heaps locals agrees actualTyped initialState sequenceMeaning slot lookup read fault (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)

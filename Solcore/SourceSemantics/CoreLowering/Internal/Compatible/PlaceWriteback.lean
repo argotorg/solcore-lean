@@ -66,8 +66,7 @@ theorem resolved_valueType {program : Program} {context : SourceSemantics.Contex
     {before after : Dynamic.Heap} {place : PlaceResolution} {target : Dynamic.ResolvedPlace}
     (resolve : Dynamic.SourcePlaceResolves program context evidence source environment before place target after) :
     target.valueType = place.type := by
-  cases resolve
-  rfl
+  cases resolve <;> rfl
 
 /-- Away from checked arithmetic at the place's type, so at its resolved
 target. -/
@@ -1412,7 +1411,8 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
       coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore := by
   obtain ⟨scheme, staticLookup, _, _, _⟩ := rootTyped.scheme
   obtain ⟨location, initialCell, lookup, initialRead, _, _⟩ := locals.lookup staticLookup
-  have keyPhase := CompatiblePlaceKeyReflection.reflects layout.children meaning environments heaps locals slot rootTyped lookup initialRead completed
+  have keyPhase := CompatiblePlaceKeyReflection.reflects layout.children layout.path.elementFree
+    meaning environments heaps locals slot rootTyped lookup initialRead completed
   cases keyPhase with
   | fault sourceFault resultEq tokenRep finalHeaps maps worlds frame metadata =>
     exact .fault sourceFault resultEq tokenRep finalHeaps maps worlds frame metadata

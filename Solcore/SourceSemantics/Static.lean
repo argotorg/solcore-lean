@@ -705,6 +705,18 @@ mutual
           finalType) :
         SourceProjectionsHaveType source context baseType
           (.member name index :: rest) finalType
+    /-- An element of a memory array, at an index of `word` or one of the twelve
+    types (`ArrayIndexType`). -/
+    | element
+        {context : Context} {index : ExpressionId}
+        {element indexType finalType : TypeSystem.Ty}
+        {rest : List PlaceProjection}
+        (index_type : ExpressionHasType source context index indexType)
+        (index_kind : ArrayIndexType indexType)
+        (rest_type : SourceProjectionsHaveType source context element rest
+          finalType) :
+        SourceProjectionsHaveType source context (TypeSystem.Ty.array element)
+          (.element index :: rest) finalType
 
   /-- A source place rooted at a monomorphic writable local. -/
   inductive SourcePlaceHasType (source : TypedSource) :
@@ -1317,6 +1329,8 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
     (fun keyTypeProof restType keyInduction restInduction =>
       .index keyInduction restInduction)
     (fun selected restType restInduction => .member selected restInduction)
+    (fun _ kind _ indexInduction restInduction =>
+      .element indexInduction kind restInduction)
     (fun rootTypeProof projectionsType storedTypeEq projectionsInduction =>
       .intro rootTypeProof projectionsInduction storedTypeEq)
     (fun targetType valueType requirementsEq targetInduction valueInduction =>
@@ -1606,7 +1620,34 @@ theorem append
       exact .index keyType (append restType trailingType)
     | member selected restType =>
       exact .member selected (append restType trailingType)
+    | element indexType kind restType =>
+      exact .element indexType kind (append restType trailingType)
 termination_by leading.length
+
+/-- A typed place-projection path splits at any point, the converse of
+`append`. -/
+theorem split
+    {source : TypedSource} {context : Context}
+    {initial final : TypeSystem.Ty}
+    {leading trailing : List PlaceProjection}
+    (typed : SourceProjectionsHaveType source context initial (leading ++ trailing)
+      final) :
+    ∃ middle, SourceProjectionsHaveType source context initial leading middle ∧
+      SourceProjectionsHaveType source context middle trailing final := by
+  induction leading generalizing initial with
+  | nil => exact ⟨initial, .nil initial, typed⟩
+  | cons projection rest induction =>
+    rw [List.cons_append] at typed
+    cases typed with
+    | index keyType restType =>
+      obtain ⟨middle, leadingType, trailingType⟩ := induction restType
+      exact ⟨middle, .index keyType leadingType, trailingType⟩
+    | member selected restType =>
+      obtain ⟨middle, leadingType, trailingType⟩ := induction restType
+      exact ⟨middle, .member selected leadingType, trailingType⟩
+    | element indexType kind restType =>
+      obtain ⟨middle, leadingType, trailingType⟩ := induction restType
+      exact ⟨middle, .element indexType kind leadingType, trailingType⟩
 
 end SourceProjectionsHaveType
 

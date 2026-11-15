@@ -346,6 +346,7 @@ theorem projections_values {size : Nat} {projections : List PlaceProjection} {ev
         refine ⟨_ :: values, _, .index shaped, .cons head executed, ?_⟩
         simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *
         omega
+    | element key => cases trace
 
 theorem projections_fault {size : Nat} {projections : List PlaceProjection} {reason : Dynamic.SemanticFault}
     (trace : SourceExecutionSize.SourceProjectionsFault program size context evidence source environment before projections reason after) :
@@ -369,24 +370,29 @@ theorem projections_fault {size : Nat} {projections : List PlaceProjection} {rea
         refine ⟨_, .tail head failed, ?_⟩
         simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *
         omega
+    | element key => cases trace
 
 /-- Reflection reconstructs a source size; it makes no comparison to Core cost. -/
 theorem values_projections {size : Nat} {projections : List PlaceProjection} {values : List Dynamic.Value}
+    (free : ∀ index, PlaceProjection.element index ∉ projections)
     (trace : SourceExecutionSize.ExpressionsEvaluate program size context evidence source environment before (sourceKeys projections) values after) :
     ∃ sourceSize evaluated, Values projections values evaluated ∧
       SourceExecutionSize.SourceProjectionsEvaluate program sourceSize context evidence source environment before projections evaluated after := by
   induction projections generalizing size before values with
   | nil => cases trace; exact ⟨_, [], .nil, .nil⟩
   | cons projection rest ih =>
+    have restFree : ∀ index, PlaceProjection.element index ∉ rest :=
+      fun index found => free index (List.mem_cons_of_mem _ found)
     cases projection with
     | member name index =>
-      obtain ⟨sourceSize, evaluated, shaped, executed⟩ := ih trace
+      obtain ⟨sourceSize, evaluated, shaped, executed⟩ := ih restFree trace
       exact ⟨_, _, .member shaped, .member executed⟩
     | index key =>
       cases trace with
       | cons head tail =>
-        obtain ⟨sourceSize, evaluated, shaped, executed⟩ := ih tail
+        obtain ⟨sourceSize, evaluated, shaped, executed⟩ := ih restFree tail
         exact ⟨_, _, .index shaped, .index head executed⟩
+    | element key => exact (free key (by simp)).elim
 
 theorem fault_projections {size : Nat} {projections : List PlaceProjection} {reason : Dynamic.SemanticFault}
     (trace : SourceExecutionSize.ExpressionsFault program size context evidence source environment before (sourceKeys projections) reason after) :
@@ -404,6 +410,7 @@ theorem fault_projections {size : Nat} {projections : List PlaceProjection} {rea
       | tail head failed =>
         obtain ⟨sourceSize, failed⟩ := ih failed
         exact ⟨_, .indexTail head failed⟩
+    | element key => cases trace
 
 inductive OutcomeAt (program : Program) (size : Nat) (context : SourceSemantics.Context)
     (evidence : Dynamic.EvidenceEnvironment) (source : TypedSource) (environment : Dynamic.Environment)

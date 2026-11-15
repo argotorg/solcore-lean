@@ -2246,6 +2246,73 @@ mutual
         (has_projection : evaluated ≠ []) :
         SourcePlaceFaults program context evidence source environment before place
           (.uninitializedLocation location) after
+    /-- An element place's leading faults. -/
+    | elementPrefix
+        {context evidence source environment before after place leading index reason}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (fault : SourcePlaceFaults program context evidence source environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type }
+          reason after) :
+        SourcePlaceFaults program context evidence source environment before place
+          reason after
+    /-- An element place's index faults. -/
+    | elementIndex
+        {context evidence source environment before middle after place leading index
+          prefixTarget reason}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (prefix_resolves : SourcePlaceResolves program context evidence source
+          environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type }
+          prefixTarget middle)
+        (fault : ExpressionFaults program context evidence source environment middle
+          index reason after) :
+        SourcePlaceFaults program context evidence source environment before place
+          reason after
+    /-- An element place's index is not a word. -/
+    | elementIndexType
+        {context evidence source environment before middle after place leading index
+          prefixTarget value actual}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (prefix_resolves : SourcePlaceResolves program context evidence source
+          environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type }
+          prefixTarget middle)
+        (index_evaluates : ExpressionEvaluates program context evidence source
+          environment middle index value after)
+        (not_word : ¬ WordValue value)
+        (actual_type : ValueRuntimeType value actual) :
+        SourcePlaceFaults program context evidence source environment before place
+          (.typeMismatch .word actual) after
+    /-- An element place from the array's length on panics with `0x32`, as std's
+    `lidx` does, before the right side. -/
+    | elementOutOfBounds
+        {context evidence source environment before middle after place leading index
+          element prefixTarget location position cell elements}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (prefix_resolves : SourcePlaceResolves program context evidence source
+          environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type }
+          prefixTarget middle)
+        (prefix_selected : prefixTarget.selected = some (.arrayRef element location))
+        (index_evaluates : ExpressionEvaluates program context evidence source
+          environment middle index (.word position) after)
+        (read : Heap.Reads after location cell)
+        (stored : cell.value = some (.arrayObject element elements))
+        (out_of_bounds : elements.length ≤ position.val) :
+        SourcePlaceFaults program context evidence source environment before place
+          (.panic 0x32) after
+    /-- An element place whose leading is a local not yet initialized faults as
+    reading that local does, before the index. -/
+    | elementUninitialized
+        {context evidence source environment before after place leading index prefixTarget}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (prefix_resolves : SourcePlaceResolves program context evidence source
+          environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type }
+          prefixTarget after)
+        (prefix_empty : prefixTarget.selected = none) :
+        SourcePlaceFaults program context evidence source environment before place
+          (.uninitializedLocation prefixTarget.location) after
 
   /-- First fault in left-to-right place projection evaluation. -/
   inductive SourceProjectionsFault (program : Program) :
@@ -2706,5 +2773,8 @@ theorem SourcePlaceResolves.excludes_projection_fault
       cases sameInitial
       intro fault
       exact fault.excludes_read selected
+  | element _ _ _ _ _ _ _ =>
+      intro fault
+      cases fault
 
 end Solcore.SourceSemantics.Dynamic

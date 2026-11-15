@@ -2600,6 +2600,7 @@ theorem named_key_reflects [FunctionCalls.FaultTokens faults] (budget size : Nat
     (tree : DataExpressionSequence.Tree source
       (NamedCallExpressions.Tree bodies compilation fuel source context solved reasonAt)
       scope (DataPlaceKeyOrder.sourceKeys projections) types codes)
+    (free : ∀ index, PlaceProjection.element index ∉ projections)
     {value : Core.Value} {finalStore : Core.Store}
     (complete : CoreProof.EvaluationSize size actual store ((SourceCoreCalls.packArguments codes).expression.rename ξ) value finalStore) :
     ∃ sourceSize outcome after finalMap finalWorld,
@@ -2610,7 +2611,7 @@ theorem named_key_reflects [FunctionCalls.FaultTokens faults] (budget size : Nat
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after :=
   ProtectedPlaceKeys.reflects_bounded budget
-    (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix) tree
+    (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix) tree free
     (RecursiveNamedBoundedContracts.reflects_below_of_unbounded
       (NamedCallExpressions.Tree.reflects functions extension faithful leaves runtimeViews caller valid
         uninitialized missing bodyUninitialized bodyMissing) budget)

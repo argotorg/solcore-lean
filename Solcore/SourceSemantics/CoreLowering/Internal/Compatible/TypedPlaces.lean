@@ -470,7 +470,7 @@ private theorem read_present {root : Dynamic.Value} {projections : List Dynamic.
   generalize initialEq : some root = initial at read
   induction read generalizing root with
   | nil => exact ⟨root, initialEq.symm⟩
-  | indexFound _ _ ih | indexDefault _ _ _ ih | member _ _ ih => exact ih rfl
+  | indexFound _ _ ih | indexDefault _ _ _ ih | member _ _ ih | element _ _ ih => exact ih rfl
 
 /-- Successful source resolution constructs the actual key and getter runs.
 The universal child theorem covers every intermediate key heap and hidden
@@ -513,6 +513,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       coreEnvironment store mapping world before after,
       coreEnvironment[index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) execution.target) := by
   cases trace with
+  | element projectionsEq _ _ _ _ _ _ =>
+    exact (path.elementFree _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
   | @intro _ _ _ _ _ _ _ sourceLocation initialCell currentCell projections initial selected
       lookup initialRead evaluate currentRead initialValue selection =>
     obtain ⟨target, coreLookup, reference⟩ := environments.lookup_visible lookup slot
@@ -964,6 +966,10 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       have same := lookup.functional sourceLookup
       cases same
       exact (missing.excludes_read sourceRead).elim
+    | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
+    | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+    | elementUninitialized projectionsEq _ _ =>
+      exact (layout.path.elementFree _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
     | projectionExpression lookup read fault =>
       obtain ⟨token, finalStore, finalMap, finalWorld, _, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata⟩ :=
         CompatibleTypedPlaceFailures.keys layout.children meaning environments heaps locals slot lookup read fault
@@ -1038,6 +1044,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
     (children : DataExpressionSequence.Tree source certificate scope (DataPlaceKeyOrder.sourceKeys place.projections) sourceTypes codes)
+    (free : ∀ index, PlaceProjection.element index ∉ place.projections)
     (meaning : TypedGenericExpressionMeaning.Reflects (payloadModel checked registry functions) program context evidence source certificate faults)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {coreEnvironment : Environment} {before : Dynamic.Heap} {store finalStore : Store}
@@ -1059,7 +1066,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
   have reflectKeys := fun {keyValue : Value} {keyStore : Store}
       (evaluated : Evaluates (referenceEnvironment prepared.route.rootType target coreEnvironment) store
         (shift 1 (SourceCoreCalls.packArguments codes).expression) keyValue keyStore) =>
-    TypedDataPlaceKeyOrder.reflects children meaning environments heaps locals
+    TypedDataPlaceKeyOrder.reflects children free meaning environments heaps locals
       (DataPlaceChildExpressions.prefix_agrees sameEnvironment [.cellRef (OptionalCell.cellType prepared.route.rootType) target])
       (.cons (.cellRef reference.typed) environments.runtime_hasTypes)
       (by simpa only [DataPlaceChildExpressions.rename_prefix, Expr.rename_id, List.length_cons, List.length_nil,
@@ -1149,7 +1156,8 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
       coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore := by
   obtain ⟨scheme, staticLookup, _, _, _⟩ := rootTyped.scheme
   obtain ⟨location, initialCell, lookup, initialRead, _, _⟩ := locals.lookup staticLookup
-  have keyPhase := CompatibleTypedPlaceKeyReflection.reflects layout.children meaning environments heaps locals slot rootTyped lookup initialRead completed
+  have keyPhase := CompatibleTypedPlaceKeyReflection.reflects layout.children layout.path.elementFree
+    meaning environments heaps locals slot rootTyped lookup initialRead completed
   cases keyPhase with
   | fault sourceFault resultEq tokenRep finalHeaps maps worlds frame metadata =>
     exact .fault sourceFault resultEq tokenRep finalHeaps maps worlds frame metadata
@@ -1629,7 +1637,8 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap after ∧ Dynamic.HeapMetadataExtend before sourceAfter := by
   obtain ⟨outcome, sourceAfter, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
-    TypedDataPlaceKeyOrder.reflects tree meaning environments heaps locals layout actualTyped completed
+    TypedDataPlaceKeyOrder.reflects tree path.elementFree meaning environments heaps locals layout actualTyped
+      completed
   refine ⟨sourceAfter, finalMap, finalWorld, ?_, finalHeaps, maps, worlds, frame, metadata⟩
   cases trace with
   | values shaped sourceTrace => cases represented with

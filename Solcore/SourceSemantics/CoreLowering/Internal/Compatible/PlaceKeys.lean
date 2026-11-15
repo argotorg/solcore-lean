@@ -153,7 +153,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap after ∧ Dynamic.HeapMetadataExtend before sourceAfter := by
   obtain ⟨outcome, sourceAfter, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
-    DataPlaceKeyOrder.reflects tree meaning environments heaps locals layout completed
+    DataPlaceKeyOrder.reflects tree path.elementFree meaning environments heaps locals layout completed
   refine ⟨sourceAfter, finalMap, finalWorld, ?_, finalHeaps, maps, worlds, frame, metadata⟩
   cases trace with
   | values shaped sourceTrace => cases represented with
@@ -395,7 +395,7 @@ private theorem read_present {root : Dynamic.Value} {projections : List Dynamic.
   generalize initialEq : some root = initial at read
   induction read generalizing root with
   | nil => exact ⟨root, initialEq.symm⟩
-  | indexFound _ _ ih | indexDefault _ _ _ ih | member _ _ ih => exact ih rfl
+  | indexFound _ _ ih | indexDefault _ _ _ ih | member _ _ ih | element _ _ ih => exact ih rfl
 
 /-- The source selected value and exact key/snapshot native runs are outputs
 of resolution. The source heap is unchanged by snapshot helper allocation. -/
@@ -476,6 +476,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       coreEnvironment store mapping world before after,
       coreEnvironment[index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) execution.target) := by
   cases trace with
+  | element projectionsEq _ _ _ _ _ _ =>
+    exact (path.elementFree _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
   | @intro _ _ _ _ _ _ _ sourceLocation initialCell currentCell projections initial selected
       lookup initialRead evaluate currentRead initialValue selection =>
     obtain ⟨target, coreLookup, reference⟩ := environments.lookup_visible lookup slot
@@ -1011,6 +1013,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty}
     (children : DataExpressionSequence.Tree source certificate scope (DataPlaceKeyOrder.sourceKeys place.projections) sourceTypes codes)
+    (free : ∀ index, PlaceProjection.element index ∉ place.projections)
     (meaning : Reflects (payloadModel checked registry functions) program context evidence source certificate faults)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {coreEnvironment : Environment} {before : Dynamic.Heap} {store finalStore : Store}
@@ -1032,7 +1035,7 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
   have reflectKeys := fun {keyValue : Value} {keyStore : Store}
       (evaluated : Evaluates (referenceEnvironment prepared.route.rootType target coreEnvironment) store
         (shift 1 (SourceCoreCalls.packArguments codes).expression) keyValue keyStore) =>
-    DataPlaceKeyOrder.reflects children meaning environments heaps locals
+    DataPlaceKeyOrder.reflects children free meaning environments heaps locals
       (DataPlaceChildExpressions.prefix_agrees sameEnvironment [.cellRef (OptionalCell.cellType prepared.route.rootType) target])
       (by simpa only [DataPlaceChildExpressions.rename_prefix, Expr.rename_id, List.length_cons, List.length_nil,
         List.cons_append, List.nil_append, referenceEnvironment, SourceCoreDataPlaces.shift, shift, Nat.zero_add] using evaluated)

@@ -1074,6 +1074,7 @@ def routeSteps (checked : Checked) (signatures : ProgramSignatures)
   | type, projection :: rest => do
       let (step, selected) ← match projection with
         | .member _ index => memberStep checked signatures site root type index
+        | .element _ => throw (.projectedAssignment root)
         | .index key => do
             let (keySource, valueSource) ← match SourceCoreRawMetadata.runtimeType type with
               | .mapping key value => pure (key, value)

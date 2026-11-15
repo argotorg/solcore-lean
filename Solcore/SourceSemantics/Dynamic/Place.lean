@@ -34,6 +34,8 @@ open TypeSystem
 inductive EvaluatedProjection where
   | index (key : Value)
   | member (name : String) (index : Nat)
+  /-- An element of a memory array's object, at a position below its length. -/
+  | element (position : Nat)
   deriving Repr
 
 /-- Abstract interface property needed to show that projection evaluation is
@@ -133,6 +135,23 @@ theorem functional {values : List Value} {index : Nat} {left right : Value}
       cases rightAt with
       | tail rightTail => exact inductionHypothesis rightTail
 
+theorem getElem?_eq {values : List Value} {index : Nat} {selected : Value}
+    (selectedAt : ValueAt values index selected) : values[index]? = some selected := by
+  induction selectedAt with
+  | head => rfl
+  | tail _ inductionHypothesis => simpa using inductionHypothesis
+
+theorem lt_length {values : List Value} {index : Nat} {selected : Value}
+    (selectedAt : ValueAt values index selected) : index < values.length :=
+  (List.getElem?_eq_some_iff.mp selectedAt.getElem?_eq).1
+
+/-- A position that selects a value is below the length, so copies of one type
+as long as the values have that type there. -/
+theorem replicate_getElem? {values : List Value} {index : Nat} {selected : Value}
+    (selectedAt : ValueAt values index selected) (type : Ty) :
+    (List.replicate values.length type)[index]? = some type := by
+  simp [selectedAt.lt_length]
+
 end ValueAt
 
 namespace ValuesReplaceAt
@@ -188,6 +207,13 @@ theorem functional {cell : Cell} {left right : Option Value}
     (rightInitial : RootInitialValue cell right) : left = right := by
   cases leftInitial <;> cases rightInitial <;> simp_all
 
+/-- A memory array's object cell that a write can take holds the object. -/
+theorem arrayObject_value {cell : Cell} {element : Ty} {elements : List Value}
+    (initial : RootInitialValue cell (some (.arrayObject element elements))) :
+    cell.value = some (.arrayObject element elements) := by
+  cases initial
+  rfl
+
 end RootInitialValue
 
 /-- Read through an evaluated projection path.  A missing mapping entry uses
@@ -215,6 +241,12 @@ inductive ProjectionsRead :
       (tail : ProjectionsRead (some selected) projections result) :
       ProjectionsRead (some (.constructed instantiation arguments))
         (.member name index :: projections) result
+  | element
+      {element values position selected projections result}
+      (selectedAt : ValueAt values position selected)
+      (tail : ProjectionsRead (some selected) projections result) :
+      ProjectionsRead (some (.arrayObject element values))
+        (.element position :: projections) result
 
 namespace ProjectionsRead
 
@@ -245,6 +277,12 @@ theorem functional
   | member leftAt _ inductionHypothesis =>
       cases rightRead with
       | member rightAt rightTail =>
+          have selected_eq := leftAt.functional rightAt
+          cases selected_eq
+          exact inductionHypothesis rightTail
+  | element leftAt _ inductionHypothesis =>
+      cases rightRead with
+      | element rightAt rightTail =>
           have selected_eq := leftAt.functional rightAt
           cases selected_eq
           exact inductionHypothesis rightTail
@@ -369,6 +407,14 @@ inductive ProjectionsUpdate (Modify : Option Value → Value → Prop) :
       ProjectionsUpdate Modify (some (.constructed instantiation arguments))
         (.member name index :: projections)
         (.constructed instantiation updatedArguments)
+  | element
+      {element values position selected projections updatedChild updatedValues}
+      (selectedAt : ValueAt values position selected)
+      (child : ProjectionsUpdate Modify (some selected) projections updatedChild)
+      (replace : ValuesReplaceAt values position updatedChild updatedValues) :
+      ProjectionsUpdate Modify (some (.arrayObject element values))
+        (.element position :: projections)
+        (.arrayObject element updatedValues)
 
 namespace ProjectionsUpdate
 
@@ -390,6 +436,9 @@ theorem readable
   | member selectedAt _ _ inductionHypothesis =>
       obtain ⟨selected, read⟩ := inductionHypothesis
       exact ⟨selected, .member selectedAt read⟩
+  | element selectedAt _ _ inductionHypothesis =>
+      obtain ⟨selected, read⟩ := inductionHypothesis
+      exact ⟨selected, .element selectedAt read⟩
 
 /-- A deterministic leaf operation induces a deterministic structural update. -/
 theorem functional
@@ -427,6 +476,14 @@ theorem functional
   | member leftAt _ leftReplace inductionHypothesis =>
       cases rightUpdate with
       | member rightAt rightChild rightReplace =>
+          have selected_eq := leftAt.functional rightAt
+          cases selected_eq
+          have child_eq := inductionHypothesis rightChild
+          cases child_eq
+          rw [leftReplace.functional rightReplace]
+  | element leftAt _ leftReplace inductionHypothesis =>
+      cases rightUpdate with
+      | element rightAt rightChild rightReplace =>
           have selected_eq := leftAt.functional rightAt
           cases selected_eq
           have child_eq := inductionHypothesis rightChild
@@ -481,6 +538,70 @@ inductive PlaceResolves
           projections := evaluated
           selected := selected }
         after
+  /-- An element place `p[i]` on a memory array: its leading `p` resolves first,
+  then the index, and the array's object, read after both, holds an element at
+  the index, which is the snapshot. The resolved place is the object's own cell,
+  so a write replaces the element there. -/
+  | element
+      {before middle after : Heap} {place : PlaceResolution}
+      {leading : List PlaceProjection} {index : ExpressionId}
+      {prefixTarget : ResolvedPlace} {element : Ty} {location : Location}
+      {position : Core.Word} {cell : Cell} {elements : List Value} {selected : Value}
+      (projections_eq : place.projections = leading ++ [.element index])
+      (prefix_resolves : PlaceResolves EvaluateExpression environment before
+        { place with projections := leading, type := Ty.array place.type } prefixTarget middle)
+      (prefix_selected : prefixTarget.selected = some (.arrayRef element location))
+      (index_evaluates : EvaluateExpression environment middle index (.word position) after)
+      (read : Heap.Reads after location cell)
+      (initial_value : RootInitialValue cell (some (.arrayObject element elements)))
+      (selection : ValueAt elements position.val selected) :
+      PlaceResolves EvaluateExpression environment before place
+        { location := location
+          rootType := cell.type
+          valueType := place.type
+          projections := [.element position.val]
+          selected := some selected }
+        after
+
+namespace ProjectionsEvaluate
+
+/-- No left-to-right index evaluation passes an element projection: an element
+place resolves through its own rule. -/
+theorem no_element
+    {EvaluateExpression :
+      Environment → Heap → ExpressionId → Value → Heap → Prop}
+    {environment : Environment} {before after : Heap}
+    {leading : List PlaceProjection} {index : ExpressionId}
+    {evaluated : List EvaluatedProjection} :
+    ¬ ProjectionsEvaluate EvaluateExpression environment before
+      (leading ++ [.element index]) evaluated after := by
+  intro evaluate
+  generalize projectionsEq : leading ++ [PlaceProjection.element index] = projections
+    at evaluate
+  induction evaluate generalizing leading with
+  | nil =>
+      cases leading <;> simp at projectionsEq
+  | member _ inductionHypothesis =>
+      cases leading with
+      | nil => simp at projectionsEq
+      | cons head tail =>
+          simp only [List.cons_append, List.cons.injEq] at projectionsEq
+          exact inductionHypothesis projectionsEq.2
+  | index _ _ inductionHypothesis =>
+      cases leading with
+      | nil => simp at projectionsEq
+      | cons head tail =>
+          simp only [List.cons_append, List.cons.injEq] at projectionsEq
+          exact inductionHypothesis projectionsEq.2
+
+end ProjectionsEvaluate
+
+/-- An element place holds its element projection. -/
+theorem element_mem_of_projections_eq {place : PlaceResolution}
+    {leading : List PlaceProjection} {index : ExpressionId}
+    (projections_eq : place.projections = leading ++ [.element index]) :
+    PlaceProjection.element index ∈ place.projections := by
+  simp [projections_eq]
 
 namespace PlaceResolves
 
@@ -497,7 +618,7 @@ theorem functional
     (right : PlaceResolves EvaluateExpression environment before place rightTarget
       rightHeap) :
     leftTarget = rightTarget ∧ leftHeap = rightHeap := by
-  cases left with
+  induction left generalizing rightTarget rightHeap with
   | intro leftLookup leftInitialRead leftEvaluate leftCurrentRead
       leftInitialValue leftSelection =>
       cases right with
@@ -517,6 +638,40 @@ theorem functional
           cases initial_eq
           have selected_eq := leftSelection.functional rightSelection
           cases selected_eq
+          exact ⟨rfl, rfl⟩
+      | element projectionsEq _ _ _ _ _ _ =>
+          rw [projectionsEq] at leftEvaluate
+          exact (ProjectionsEvaluate.no_element leftEvaluate).elim
+  | element leftProjectionsEq _ leftSelected leftIndex leftRead leftInitial leftSelection
+      inductionHypothesis =>
+      cases right with
+      | intro _ _ rightEvaluate _ _ _ =>
+          rw [leftProjectionsEq] at rightEvaluate
+          exact (ProjectionsEvaluate.no_element rightEvaluate).elim
+      | element rightProjectionsEq rightPrefix rightSelected rightIndex rightRead rightInitial
+          rightSelection =>
+          rw [leftProjectionsEq] at rightProjectionsEq
+          obtain ⟨prefixEq, indexEq⟩ := List.append_inj' rightProjectionsEq rfl
+          cases prefixEq
+          simp only [List.cons.injEq, PlaceProjection.element.injEq, and_true] at indexEq
+          cases indexEq
+          rcases inductionHypothesis rightPrefix with ⟨targetEq, middleEq⟩
+          cases targetEq
+          cases middleEq
+          rw [leftSelected] at rightSelected
+          simp only [Option.some.injEq, Value.arrayRef.injEq] at rightSelected
+          obtain ⟨rfl, rfl⟩ := rightSelected
+          rcases expression_functional _ _ _ _ _ _ _ leftIndex rightIndex with
+            ⟨valueEq, rfl⟩
+          simp only [Value.word.injEq] at valueEq
+          cases valueEq
+          have cellEq := leftRead.functional rightRead
+          cases cellEq
+          have objectEq := leftInitial.functional rightInitial
+          simp only [Option.some.injEq, Value.arrayObject.injEq, true_and] at objectEq
+          cases objectEq
+          have selectedEq := leftSelection.functional rightSelection
+          cases selectedEq
           exact ⟨rfl, rfl⟩
 
 end PlaceResolves

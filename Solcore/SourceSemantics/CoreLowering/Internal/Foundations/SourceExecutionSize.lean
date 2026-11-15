@@ -485,6 +485,28 @@ mutual
             projections := evaluated
             selected := selected }
           after
+    | element
+        {size_leading size_index : Nat}
+        {context evidence source environment before middle after place leading index
+          prefixTarget element location position cell elements selected}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (prefix_resolves : SourcePlaceResolves program size_leading context evidence source
+          environment before { place with projections := leading, type := TypeSystem.Ty.array place.type }
+          prefixTarget middle)
+        (prefix_selected : prefixTarget.selected = some (.arrayRef element location))
+        (index_evaluates : ExpressionEvaluates program size_index context evidence source
+          environment middle index (.word position) after)
+        (read : Heap.Reads after location cell)
+        (initial_value : RootInitialValue cell (some (.arrayObject element elements)))
+        (selection : ValueAt elements position.val selected) :
+        SourcePlaceResolves program (stepSize [size_leading, size_index]) context evidence
+          source environment before place
+          { location := location
+            rootType := cell.type
+            valueType := place.type
+            projections := [.element position.val]
+            selected := some selected }
+          after
 
   inductive SourcePlaceAssignment (program : Program) : Nat →
       Context → EvidenceEnvironment → TypedSource →
@@ -1279,6 +1301,9 @@ theorem SourcePlaceResolves.sound {program : Program} {size : Nat} {a0 : Context
   match trace with
   | .intro root_lookup initial_read evaluate current_read initial_value selection =>
     exact .intro root_lookup initial_read (SourceProjectionsEvaluate.sound evaluate) current_read initial_value selection
+  | .element projections_eq prefix_resolves prefix_selected index_evaluates read stored selection =>
+    exact .element projections_eq (SourcePlaceResolves.sound prefix_resolves) prefix_selected
+      (ExpressionEvaluates.sound index_evaluates) read stored selection
 termination_by structural trace
 
 theorem SourcePlaceAssignment.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : (Option Value → Value → Value → Prop)} {a4 : Dynamic.Environment} {a5 : Heap} {a6 : PlaceResolution} {a7 : ExpressionId} {a8 : Value} {a9 : Heap}
@@ -1615,6 +1640,11 @@ theorem SourcePlaceResolves.has_size {program : Program} {a0 : Context} {a1 : Ev
   | .intro root_lookup initial_read evaluate current_read initial_value selection =>
     obtain ⟨size_evaluate, evaluate⟩ := SourceProjectionsEvaluate.has_size evaluate
     exact ⟨_, .intro root_lookup initial_read evaluate current_read initial_value selection⟩
+  | .element projections_eq prefix_resolves prefix_selected index_evaluates read stored selection =>
+    obtain ⟨_, prefix_resolves⟩ := SourcePlaceResolves.has_size prefix_resolves
+    obtain ⟨_, index_evaluates⟩ := ExpressionEvaluates.has_size index_evaluates
+    exact ⟨_, .element projections_eq prefix_resolves prefix_selected index_evaluates read stored
+      selection⟩
 termination_by structural trace
 
 theorem SourcePlaceAssignment.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : (Option Value → Value → Value → Prop)} {a4 : Dynamic.Environment} {a5 : Heap} {a6 : PlaceResolution} {a7 : ExpressionId} {a8 : Value} {a9 : Heap}
@@ -2020,6 +2050,8 @@ theorem SourcePlaceResolves.children_below {program : Program} {size : Nat} {a0 
   cases trace with
   | @intro size_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
+  | @element size_leading size_index _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_leading, size_index], rfl, fun _ member => child_lt_stepSize member⟩
 
 theorem SourcePlaceAssignment.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : (Option Value → Value → Value → Prop)} {a4 : Dynamic.Environment} {a5 : Heap} {a6 : PlaceResolution} {a7 : ExpressionId} {a8 : Value} {a9 : Heap}
     (trace : SourcePlaceAssignment program size a0 a1 a2 a3 a4 a5 a6 a7 a8 a9) : 0 < size := by
@@ -3545,6 +3577,66 @@ mutual
         (has_projection : evaluated ≠ []) :
         SourcePlaceFaults program (stepSize [size_evaluate]) context evidence source environment before place
           (.uninitializedLocation location) after
+    | elementPrefix
+        {size_fault : Nat}
+        {context evidence source environment before after place leading index reason}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (fault : SourcePlaceFaults program size_fault context evidence source environment
+          before { place with projections := leading, type := TypeSystem.Ty.array place.type } reason after) :
+        SourcePlaceFaults program (stepSize [size_fault]) context evidence source environment
+          before place reason after
+    | elementIndex
+        {size_leading size_fault : Nat}
+        {context evidence source environment before middle after place leading index
+          prefixTarget reason}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (prefix_resolves : SourcePlaceResolves program size_leading context evidence source
+          environment before { place with projections := leading, type := TypeSystem.Ty.array place.type }
+          prefixTarget middle)
+        (fault : ExpressionFaults program size_fault context evidence source environment
+          middle index reason after) :
+        SourcePlaceFaults program (stepSize [size_leading, size_fault]) context evidence
+          source environment before place reason after
+    | elementIndexType
+        {size_leading size_index : Nat}
+        {context evidence source environment before middle after place leading index
+          prefixTarget value actual}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (prefix_resolves : SourcePlaceResolves program size_leading context evidence source
+          environment before { place with projections := leading, type := TypeSystem.Ty.array place.type }
+          prefixTarget middle)
+        (index_evaluates : ExpressionEvaluates program size_index context evidence source
+          environment middle index value after)
+        (not_word : ¬ WordValue value)
+        (actual_type : ValueRuntimeType value actual) :
+        SourcePlaceFaults program (stepSize [size_leading, size_index]) context evidence
+          source environment before place (.typeMismatch .word actual) after
+    | elementOutOfBounds
+        {size_leading size_index : Nat}
+        {context evidence source environment before middle after place leading index
+          prefixTarget element location position cell elements}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (prefix_resolves : SourcePlaceResolves program size_leading context evidence source
+          environment before { place with projections := leading, type := TypeSystem.Ty.array place.type }
+          prefixTarget middle)
+        (prefix_selected : prefixTarget.selected = some (.arrayRef element location))
+        (index_evaluates : ExpressionEvaluates program size_index context evidence source
+          environment middle index (.word position) after)
+        (read : Heap.Reads after location cell)
+        (stored : cell.value = some (.arrayObject element elements))
+        (out_of_bounds : elements.length ≤ position.val) :
+        SourcePlaceFaults program (stepSize [size_leading, size_index]) context evidence
+          source environment before place (.panic 0x32) after
+    | elementUninitialized
+        {size_leading : Nat}
+        {context evidence source environment before after place leading index prefixTarget}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (prefix_resolves : SourcePlaceResolves program size_leading context evidence source
+          environment before { place with projections := leading, type := TypeSystem.Ty.array place.type }
+          prefixTarget after)
+        (prefix_empty : prefixTarget.selected = none) :
+        SourcePlaceFaults program (stepSize [size_leading]) context evidence source environment
+          before place (.uninitializedLocation prefixTarget.location) after
 
   inductive SourceProjectionsFault (program : Program) : Nat →
       Context → EvidenceEnvironment → TypedSource → Dynamic.Environment → Heap →
@@ -4166,6 +4258,21 @@ theorem SourcePlaceFaults.sound {program : Program} {size : Nat} {a0 : Context} 
     exact .projectionRead lookup initial_read (SourceProjectionsEvaluate.sound evaluate) current_read initial_value fault
   | .uninitialized lookup initial_read evaluate current_read empty not_mapping has_projection =>
     exact .uninitialized lookup initial_read (SourceProjectionsEvaluate.sound evaluate) current_read empty not_mapping has_projection
+  | .elementPrefix projections_eq fault =>
+    exact .elementPrefix projections_eq (SourcePlaceFaults.sound fault)
+  | .elementIndex projections_eq prefix_resolves fault =>
+    exact .elementIndex projections_eq (SourcePlaceResolves.sound prefix_resolves)
+      (ExpressionFaults.sound fault)
+  | .elementIndexType projections_eq prefix_resolves index_evaluates not_word actual_type =>
+    exact .elementIndexType projections_eq (SourcePlaceResolves.sound prefix_resolves)
+      (ExpressionEvaluates.sound index_evaluates) not_word actual_type
+  | .elementOutOfBounds projections_eq prefix_resolves prefix_selected index_evaluates read stored
+      out_of_bounds =>
+    exact .elementOutOfBounds projections_eq (SourcePlaceResolves.sound prefix_resolves)
+      prefix_selected (ExpressionEvaluates.sound index_evaluates) read stored out_of_bounds
+  | .elementUninitialized projections_eq prefix_resolves prefix_empty =>
+    exact .elementUninitialized projections_eq (SourcePlaceResolves.sound prefix_resolves)
+      prefix_empty
 termination_by structural trace
 
 theorem SourceProjectionsFault.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List PlaceProjection} {a6 : SemanticFault} {a7 : Heap}
@@ -4669,6 +4776,27 @@ theorem SourcePlaceFaults.has_size {program : Program} {a0 : Context} {a1 : Evid
   | .uninitialized lookup initial_read evaluate current_read empty not_mapping has_projection =>
     obtain ⟨size_evaluate, evaluate⟩ := SourceProjectionsEvaluate.has_size evaluate
     exact ⟨_, .uninitialized lookup initial_read evaluate current_read empty not_mapping has_projection⟩
+  | .elementPrefix projections_eq fault =>
+    obtain ⟨_, fault⟩ := SourcePlaceFaults.has_size fault
+    exact ⟨_, .elementPrefix projections_eq fault⟩
+  | .elementIndex projections_eq prefix_resolves fault =>
+    obtain ⟨_, prefix_resolves⟩ := SourcePlaceResolves.has_size prefix_resolves
+    obtain ⟨_, fault⟩ := ExpressionFaults.has_size fault
+    exact ⟨_, .elementIndex projections_eq prefix_resolves fault⟩
+  | .elementIndexType projections_eq prefix_resolves index_evaluates not_word actual_type =>
+    obtain ⟨_, prefix_resolves⟩ := SourcePlaceResolves.has_size prefix_resolves
+    obtain ⟨_, index_evaluates⟩ := ExpressionEvaluates.has_size index_evaluates
+    exact ⟨_, .elementIndexType projections_eq prefix_resolves index_evaluates not_word
+      actual_type⟩
+  | .elementOutOfBounds projections_eq prefix_resolves prefix_selected index_evaluates read stored
+      out_of_bounds =>
+    obtain ⟨_, prefix_resolves⟩ := SourcePlaceResolves.has_size prefix_resolves
+    obtain ⟨_, index_evaluates⟩ := ExpressionEvaluates.has_size index_evaluates
+    exact ⟨_, .elementOutOfBounds projections_eq prefix_resolves prefix_selected index_evaluates
+      read stored out_of_bounds⟩
+  | .elementUninitialized projections_eq prefix_resolves prefix_empty =>
+    obtain ⟨_, prefix_resolves⟩ := SourcePlaceResolves.has_size prefix_resolves
+    exact ⟨_, .elementUninitialized projections_eq prefix_resolves prefix_empty⟩
 termination_by structural trace
 
 theorem SourceProjectionsFault.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List PlaceProjection} {a6 : SemanticFault} {a7 : Heap}
@@ -5211,6 +5339,16 @@ theorem SourcePlaceFaults.children_below {program : Program} {size : Nat} {a0 : 
     exact ⟨[size_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
   | @uninitialized size_evaluate _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_evaluate], rfl, fun _ member => child_lt_stepSize member⟩
+  | @elementPrefix size_fault _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩
+  | @elementIndex size_leading size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_leading, size_fault], rfl, fun _ member => child_lt_stepSize member⟩
+  | @elementIndexType size_leading size_index _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_leading, size_index], rfl, fun _ member => child_lt_stepSize member⟩
+  | @elementOutOfBounds size_leading size_index _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_leading, size_index], rfl, fun _ member => child_lt_stepSize member⟩
+  | @elementUninitialized size_leading _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_leading], rfl, fun _ member => child_lt_stepSize member⟩
 
 theorem SourceProjectionsFault.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List PlaceProjection} {a6 : SemanticFault} {a7 : Heap}
     (trace : SourceProjectionsFault program size a0 a1 a2 a3 a4 a5 a6 a7) : 0 < size := by
@@ -5365,7 +5503,7 @@ theorem ForLoopFaults.children_below {program : Program} {size : Nat} {a0 : Cont
 
 /-! ## Rule coverage
 
-The first mutual group has 92 rules; the fault group has 130.
+The first mutual group has 93 rules; the fault group has 135.
 Each dynamic premise is assigned one size binder and appears once in the
 constructor result sum. The table records rule and premise counts, in source
 order; `children_below` covers every constructor in each family.
@@ -5376,7 +5514,7 @@ order; `children_below` covers every constructor in each family.
 | `ExpressionFormEvaluates` | 23 | 26 |
 | `ExpressionsEvaluate` | 2 | 2 |
 | `SourceProjectionsEvaluate` | 3 | 3 |
-| `SourcePlaceResolves` | 1 | 1 |
+| `SourcePlaceResolves` | 2 | 3 |
 | `SourcePlaceAssignment` | 1 | 2 |
 | `SourcePlaceSnapshotUpdate` | 1 | 1 |
 | `UnaryOperationApplies` | 2 | 1 |
@@ -5404,7 +5542,7 @@ order; `children_below` covers every constructor in each family.
 | `StatementFaults` | 19 | 22 |
 | `StatementsFault` | 2 | 3 |
 | `FunctionStatementsFault` | 4 | 5 |
-| `SourcePlaceFaults` | 6 | 4 |
+| `SourcePlaceFaults` | 11 | 12 |
 | `SourceProjectionsFault` | 3 | 4 |
 | `SourcePlaceAssignmentFaults` | 4 | 7 |
 | `SourcePlaceBitNotFaults` | 3 | 3 |

@@ -62,6 +62,11 @@ theorem write_exists {program : Program} {context : SourceSemantics.Context}
     exact ⟨updated, _, .intro currentRead rfl initial
       (DataPlaceCommitReflection.update_of_replacement changed (fun _ => applies))
       (DataPlaceCommitReflection.source_writes currentRead updated)⟩
+  | element _ _ _ _ objectRead initial selection =>
+    obtain ⟨updated, changed⟩ := DataPlaceUpdateTotality.read_update (.element selection .nil) replacement
+    exact ⟨updated, _, .intro objectRead rfl initial
+      (DataPlaceCommitReflection.update_of_replacement changed (fun _ => applies))
+      (DataPlaceCommitReflection.source_writes objectRead updated)⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotModifier
 end
@@ -894,6 +899,10 @@ theorem preserves_numeric
       have same := found.functional lookup
       subst_vars
       exact (missing.excludes_read initialRead).elim
+    | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
+    | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+    | elementUninitialized projectionsEq _ _ =>
+      exact (layout.path.elementFree _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
     | projectionExpression found read failed =>
       obtain ⟨token, finalStore, finalMap, finalWorld, _, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata⟩ :=
         keys layout.children meaning environments heaps locals slot found read failed operator (LanguageResult.success .unit) next outputType invalidOperand

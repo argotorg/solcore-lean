@@ -379,6 +379,7 @@ private theorem resolved_type {program : Program} {context : SourceSemantics.Con
     (trace : Dynamic.SourcePlaceResolves program context evidence source environment before place target targetHeap)
     {cell : Dynamic.Cell} (read : Dynamic.Heap.Reads targetHeap target.location cell) : target.rootType = cell.type := by
   cases trace with
+  | element _ _ _ _ objectRead _ _ => exact congrArg Dynamic.Cell.type (objectRead.functional read)
   | intro _ _ _ currentRead _ _ => exact congrArg Dynamic.Cell.type (currentRead.functional read)
 
 private theorem absent_initial {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}

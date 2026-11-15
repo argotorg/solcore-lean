@@ -172,6 +172,7 @@ def placeIndexExpressions (place : PlaceResolution) : List ExpressionId :=
   place.projections.filterMap fun projection =>
     match projection with
     | .index key => some key
+    | .element key => some key
     | .member _ _ => none
 
 /-- Every binder retained by one flat prefix-pattern instruction. -/

@@ -275,6 +275,9 @@ position rather than repeating source lookup at runtime. -/
 inductive PlaceProjection where
   | index (key : ExpressionId)
   | member (name : String) (index : Nat)
+  /-- `a[i]` on a memory array: the index occurrence, at `word` or one of the
+  twelve types. The write replaces the element in the array's object. -/
+  | element (index : ExpressionId)
   deriving Repr, BEq, DecidableEq
 
 /-- A place rooted at one stable lexical binder. -/
@@ -442,6 +445,7 @@ namespace PlaceProjection
 def references : PlaceProjection → List NodeId
   | .index key => [.expression key]
   | .member _ _ => []
+  | .element key => [.expression key]
 
 end PlaceProjection
 

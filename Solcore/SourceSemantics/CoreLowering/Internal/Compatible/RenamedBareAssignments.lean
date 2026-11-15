@@ -37,6 +37,7 @@ private theorem resolved_type {program : Program} {context : SourceSemantics.Con
     (trace : Dynamic.SourcePlaceResolves program context evidence source environment before place target targetHeap)
     {cell : Dynamic.Cell} (read : Dynamic.Heap.Reads targetHeap target.location cell) : target.rootType = cell.type := by
   cases trace with
+  | element _ _ _ _ objectRead _ _ => exact congrArg Dynamic.Cell.type (objectRead.functional read)
   | intro _ _ _ currentRead _ _ => exact congrArg Dynamic.Cell.type (currentRead.functional read)
 
 private theorem absent_initial {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
@@ -1199,6 +1200,10 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       have same := lookup.functional sourceLookup
       cases same
       exact (missing.excludes_read sourceRead).elim
+    | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
+    | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+    | elementUninitialized projectionsEq _ _ =>
+      exact (layout.path.elementFree _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
     | projectionExpression lookup read fault =>
       obtain ⟨token, finalStore, finalMap, finalWorld, _, evaluated, tokenRep, finalHeaps, maps, worlds, frame, metadata⟩ :=
         CompatibleRenamedPlaceFailures.keys layout.children meaning environments heaps locals agrees actualTyped slot lookup read fault
@@ -1365,6 +1370,10 @@ private theorem no_target_fault
     have same := lookup.functional snapshot.lookup
     cases same
     exact missing.excludes_read snapshot.read
+  | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
+  | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+  | elementUninitialized projectionsEq _ _ =>
+    rw [bare] at projectionsEq; simp at projectionsEq
   | projectionExpression _ _ fault => rw [bare] at fault; cases fault
   | danglingAfterProjections lookup _ evaluated missing =>
     rw [bare] at evaluated
@@ -2020,6 +2029,7 @@ theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = 
   cases trace with
   | intro resolve written =>
     cases resolve with
+    | element projectionsEq _ _ _ _ _ _ => rw [bare] at projectionsEq; simp at projectionsEq
     | @intro _ _ _ _ _ _ _ location initialCell currentCell resolved initial selected lookup initialRead keys currentRead root selection =>
       rw [bare] at keys
       cases keys
@@ -2140,6 +2150,10 @@ private theorem excludes_target_fault {heap after : Dynamic.Heap} {location : Dy
   cases fault with
   | unbound missing => exact missing.excludes_lookup lookup
   | dangling found missing => exact missing.excludes_read (found.functional lookup ▸ read)
+  | elementPrefix projectionsEq _ | elementIndex projectionsEq _ _
+  | elementIndexType projectionsEq _ _ _ _ | elementOutOfBounds projectionsEq _ _ _ _ _ _
+  | elementUninitialized projectionsEq _ _ =>
+    rw [bare] at projectionsEq; simp at projectionsEq
   | projectionExpression found initialRead fault => rw [bare] at fault; cases fault
   | danglingAfterProjections found initialRead keys missing =>
     rw [bare] at keys
@@ -2180,6 +2194,7 @@ theorem preserves_fault (layout : Layout prepared) (bare : place.projections = [
   | target fault => exact (excludes_target_fault bare staticLookup staticRead fault).elim
   | uninitialized resolve empty =>
     cases resolve with
+    | element projectionsEq _ _ _ _ _ _ => rw [bare] at projectionsEq; simp at projectionsEq
     | intro lookup initialRead keys currentRead root selection =>
       rw [bare] at keys
       cases keys
@@ -2194,6 +2209,7 @@ theorem preserves_fault (layout : Layout prepared) (bare : place.projections = [
             absent_evaluates layout (agrees nativeLookup) nativeRead next output operator invalid⟩
   | operand resolve selected invalidOperand =>
     cases resolve with
+    | element projectionsEq _ _ _ _ _ _ => rw [bare] at projectionsEq; simp at projectionsEq
     | intro lookup initialRead keys currentRead root selection =>
       rw [bare] at keys
       cases keys

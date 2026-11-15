@@ -884,6 +884,7 @@ private theorem sourceKeys_references {projections : List PlaceProjection} {id :
       rcases member with rfl | member
       · simp [PlaceProjection.references]
       · exact List.mem_append_right _ (ih member)
+    | element key => cases member
 
 section Headers
 open CallableLambdaViewStaticTyping (Within)

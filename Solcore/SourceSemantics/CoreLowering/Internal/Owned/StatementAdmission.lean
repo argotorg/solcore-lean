@@ -46,6 +46,7 @@ theorem projections_keys_typed {source : TypedSource} {context : SourceSemantics
       | index keyTyped restTyped =>
         obtain ⟨types, typed⟩ := projections_keys_typed (projections := rest) restTyped
         exact ⟨_ :: types, .cons keyTyped typed⟩
+    | element key => exact ⟨[], .nil _⟩
 termination_by projections.length
 
 /-- A genuinely typed target supplies the same ordered key row without a

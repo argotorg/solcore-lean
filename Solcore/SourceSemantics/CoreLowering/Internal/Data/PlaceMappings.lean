@@ -1231,10 +1231,13 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
 open Core Frontend Frontend.SourceInference SourceCoreDataPlaces DataPatternValues
 
+/-- An element projection ends the keys: this lowering compiles no element
+place, since `routeSteps` rejects one. -/
 def sourceKeys : List PlaceProjection → List ExpressionId
   | [] => []
   | .member _ _ :: rest => sourceKeys rest
   | .index key :: rest => key :: sourceKeys rest
+  | .element _ :: _ => []
 
 def stepKeys : List Step → List ExpressionId
   | [] => []
@@ -1266,21 +1269,30 @@ theorem projections_values {program : Program} {context : SourceSemantics.Contex
     | index key =>
       cases trace with
       | index head tail => obtain ⟨values, related, evaluated⟩ := ih tail; exact ⟨_ :: values, .index related, .cons head evaluated⟩
+    | element key => cases trace
 
 theorem values_projections {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {environment : Dynamic.Environment}
     {before after : Dynamic.Heap} {projections : List PlaceProjection} {values : List Dynamic.Value}
+    (free : ∀ index, PlaceProjection.element index ∉ projections)
     (trace : Dynamic.ExpressionsEvaluate program context evidence source environment before (sourceKeys projections) values after) :
     ∃ evaluated, Values projections values evaluated ∧
       Dynamic.SourceProjectionsEvaluate program context evidence source environment before projections evaluated after := by
   induction projections generalizing before values with
   | nil => cases trace; exact ⟨[], .nil, .nil⟩
   | cons projection rest ih =>
+    have restFree : ∀ index, PlaceProjection.element index ∉ rest :=
+      fun index found => free index (List.mem_cons_of_mem _ found)
     cases projection with
-    | member name index => obtain ⟨evaluated, related, executed⟩ := ih trace; exact ⟨_, .member related, .member executed⟩
+    | member name index =>
+      obtain ⟨evaluated, related, executed⟩ := ih restFree trace
+      exact ⟨_, .member related, .member executed⟩
     | index key =>
       cases trace with
-      | cons head tail => obtain ⟨evaluated, related, executed⟩ := ih tail; exact ⟨_, .index related, .index head executed⟩
+      | cons head tail =>
+        obtain ⟨evaluated, related, executed⟩ := ih restFree tail
+        exact ⟨_, .index related, .index head executed⟩
+    | element key => exact (free key (by simp)).elim
 
 theorem projections_fault {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {environment : Dynamic.Environment}
@@ -1296,6 +1308,7 @@ theorem projections_fault {program : Program} {context : SourceSemantics.Context
     | index key => cases trace with
       | indexHead fault => exact .head fault
       | indexTail head tail => exact .tail head (ih tail)
+    | element key => cases trace
 
 theorem fault_projections {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {environment : Dynamic.Environment}
@@ -1310,6 +1323,7 @@ theorem fault_projections {program : Program} {context : SourceSemantics.Context
     | index key => cases trace with
       | head fault => exact .indexHead fault
       | tail head rest => exact .indexTail head (ih rest)
+    | element key => cases trace
 
 private theorem bind_ok {α β ε : Type} {first : Except ε α} {next : α → Except ε β} {value : β}
     (accepted : first >>= next = .ok value) : ∃ input, first = .ok input ∧ next input = .ok value := by
@@ -1374,6 +1388,10 @@ theorem routeSteps_keys {checked : Checked} {signatures : ProgramSignatures}
       obtain ⟨remainingSteps, finalType⟩ := remaining
       cases accepted
       exact congrArg (key :: ·) (ih tail)
+    | element key =>
+      rw [routeSteps.eq_def] at accepted
+      simp only [pure, Except.pure, bind, Except.bind, throw] at accepted
+      all_goals cases accepted
 
 /-- The preparation loop's real key table keeps route order. Comparator and
 default preparation introduce no additional source expression occurrences. -/
@@ -1513,6 +1531,7 @@ theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHe
     {source : TypedSource} {scope : Scope} {certificate : GenericExpressionMeaning.Certificate} {faults : FaultRep}
     {projections : List PlaceProjection} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
     (tree : DataExpressionSequence.Tree source certificate scope (sourceKeys projections) types codes)
+    (free : ∀ index, PlaceProjection.element index ∉ projections)
     (meaning : Reflects model program context evidence source certificate faults)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
@@ -1532,7 +1551,9 @@ theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHe
     maps, worlds, frame, metadata⟩ := tree.reflects meaning environments heaps locals layout evaluated
   refine ⟨outcome, after, finalMap, finalWorld, ?_, represented, finalHeaps, maps, worlds, frame, metadata⟩
   cases sourceTrace with
-  | values trace => obtain ⟨evaluated, shaped, sourceTrace⟩ := values_projections trace; exact .values shaped sourceTrace
+  | values trace =>
+    obtain ⟨evaluated, shaped, sourceTrace⟩ := values_projections free trace
+    exact .values shaped sourceTrace
   | fault trace => exact .fault (fault_projections trace)
 
 end Solcore.SourceSemantics.CoreLowering.DataPlaceKeyOrder
@@ -2683,6 +2704,7 @@ theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHe
     {source : TypedSource} {scope : Scope} {certificate : GenericExpressionMeaning.Certificate} {faults : FaultRep}
     {projections : List PlaceProjection} {types : List TypeSystem.Ty} {codes : List SourceCoreBasic.LoweredExpr}
     (tree : DataExpressionSequence.Tree source certificate scope (sourceKeys projections) types codes)
+    (free : ∀ index, PlaceProjection.element index ∉ projections)
     (meaning : TypedGenericExpressionMeaning.Reflects model program context evidence source certificate faults)
     {mapping : LocationMap} {world : StoreTyping} {administrativeContext actualContext : Core.Context}
     {environment : Dynamic.Environment} {canonical actual : Environment} {before : Dynamic.Heap}
@@ -2703,7 +2725,9 @@ theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHe
     maps, worlds, frame, metadata⟩ := TypedDataExpressionSequence.reflects tree meaning environments heaps locals layout actualTyped evaluated
   refine ⟨outcome, after, finalMap, finalWorld, ?_, represented, finalHeaps, maps, worlds, frame, metadata⟩
   cases sourceTrace with
-  | values trace => obtain ⟨evaluated, shaped, sourceTrace⟩ := values_projections trace; exact .values shaped sourceTrace
+  | values trace =>
+    obtain ⟨evaluated, shaped, sourceTrace⟩ := values_projections free trace
+    exact .values shaped sourceTrace
   | fault trace => exact .fault (fault_projections trace)
 
 end Solcore.SourceSemantics.CoreLowering.TypedDataPlaceKeyOrder
@@ -2748,6 +2772,10 @@ theorem read_update {initial selected : Option Value} {projections : List Evalua
     obtain ⟨child, changed⟩ := ih
     obtain ⟨values, replaced⟩ := replace_at (replacement := child) found
     exact ⟨_, .member found changed replaced⟩
+  | element found read ih =>
+    obtain ⟨child, changed⟩ := ih
+    obtain ⟨values, replaced⟩ := replace_at (replacement := child) found
+    exact ⟨_, .element found changed replaced⟩
 
 end Solcore.SourceSemantics.CoreLowering.DataPlaceUpdateTotality
 end
@@ -3134,6 +3162,7 @@ theorem read_none {initial : Option Value} {projections : List EvaluatedProjecti
     | indexFound _ _ ih => intro absent; cases (ih absent).1
     | indexDefault _ _ _ ih => intro absent; cases (ih absent).1
     | member _ _ ih => intro absent; cases (ih absent).1
+    | element _ _ ih => intro absent; cases (ih absent).1
   exact aux read rfl
 
 theorem resolve_none {program : Program} {context : Context} {evidence : EvidenceEnvironment}
@@ -3146,6 +3175,7 @@ theorem resolve_none {program : Program} {context : Context} {evidence : Evidenc
     simp only at absent
     rw [absent] at selection
     exact (read_none selection).2
+  | element _ _ _ _ _ _ _ => simp at absent
 
 /-- The resolved target retains the declaration type of the original root.
 Index expression effects may change its value, but preserve this metadata. -/
@@ -3153,10 +3183,12 @@ theorem resolve_root_type {program : Program} {context : Context} {evidence : Ev
     {source : TypedSource} {environment : Environment} {before after : Heap}
     {place : PlaceResolution} {target : ResolvedPlace}
     (resolve : SourcePlaceResolves program context evidence source environment before place target after)
+    (free : ∀ index, PlaceProjection.element index ∉ place.projections)
     (metadata : HeapMetadataExtend before after) {location : Location} {cell : Cell}
     (lookup : Environment.LooksUp environment place.root location)
     (read : Heap.Reads before location cell) : target.rootType = cell.type := by
   cases resolve with
+  | element projectionsEq _ _ _ _ _ _ => exact (free _ (element_mem_of_projections_eq projectionsEq)).elim
   | intro actualLookup initialRead keys currentRead root selection =>
     have same := lookup.functional actualLookup
     subst_vars
@@ -3188,6 +3220,14 @@ theorem latest_uninitialized_impossible {program : Program} {context : Context} 
         exact present rfl
       | emptyMapping key value => exact notMapping ⟨key, value, sameType⟩
       | uninitialized => cases selection; exact nonempty rfl
+  | element _ _ _ _ objectRead stored _ =>
+    cases absent with
+    | uninitialized notMapping =>
+      obtain ⟨latest, latestRead, present⟩ :=
+        rhs.initialization_extends _ _ objectRead (by simp [stored.arrayObject_value])
+      have same := read.functional latestRead
+      subst latest
+      exact present rfl
 
 end Solcore.SourceSemantics.CoreLowering.DataPlaceSourceOrder
 end
@@ -3261,6 +3301,7 @@ def check (source : TypedSource) (root : TypeSystem.Ty) (projections : List Plac
   match projections with
   | [] => if same : root = leaf then some ⟨same ▸ .nil⟩ else none
   | .member _ _ :: _ => none
+  | .element _ :: _ => none
   | .index key :: rest =>
       match root with
       | .mapping keyType valueType => do

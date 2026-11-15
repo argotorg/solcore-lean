@@ -1058,6 +1058,7 @@ private theorem read_present {source : Dynamic.Value} {projections : List Dynami
   | indexFound _ _ ih => exact ih rfl
   | indexDefault _ _ _ ih => exact ih rfl
   | member _ _ ih => exact ih rfl
+  | element _ _ ih => exact ih rfl
 
 theorem path_empty {checked : SourceCoreDataCatalog.Checked} {signatures : ProgramSignatures}
     {functions : GenericHeap.PayloadModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
@@ -1253,6 +1254,8 @@ structure Layout (checked : SourceCoreDataCatalog.Checked) (signatures : Program
   getterTyped : HasType ((SourceCoreCalls.packArguments codes).type :: OptionalCell.referenceType prepared.route.rootType :: context)
     (.apply (getter prepared (SourceCoreCalls.packArguments codes).type) (.pair (.loadCell (.var 1)) (.var 0)))
     (LanguageResult.resultType prepared.optionalLeaf) checked.catalog.definitions
+  /-- The place holds no element of a memory array, which `routeSteps` rejects. -/
+  free : ∀ index, PlaceProjection.element index ∉ place.projections
 
 /-- This is a semantic output witness, including the exact code inserted by
 execute. The source heap is the post-index heap throughout getter execution. -/
@@ -1310,6 +1313,8 @@ theorem preserves {checked : SourceCoreDataCatalog.Checked} {signatures : Progra
       store mapping world before after,
       coreEnvironment[index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) execution.target) := by
   cases trace with
+  | element projectionsEq _ _ _ _ _ _ =>
+    exact (layout.free _ (Dynamic.element_mem_of_projections_eq projectionsEq)).elim
   | @intro _ _ _ _ _ _ _ sourceLocation initialCell currentCell projections initial selected
       lookup initialRead evaluate currentRead initialValue selection =>
     obtain ⟨target, coreLookup, reference⟩ := environments.lookup_visible lookup slot
@@ -1470,6 +1475,16 @@ inductive RawPath (checked : Checked) (signatures : ProgramSignatures) (source :
       (tail : RawPath checked signatures source value layout.valueType steps rest leaf leafType keys) :
       RawPath checked signatures source (.mapping key value) layout.type
         (.index layout id value :: steps) (.index id :: rest) leaf leafType (key :: keys)
+
+/-- A raw path holds no element of a memory array. -/
+theorem RawPath.elementFree {checked : Checked} {signatures : ProgramSignatures}
+    {source : TypedSource} {root leaf : TypeSystem.Ty} {rootType leafType : Ty}
+    {steps : List Step} {projections : List PlaceProjection} {keys : List TypeSystem.Ty}
+    (raw : RawPath checked signatures source root rootType steps projections leaf leafType keys) :
+    ∀ index, PlaceProjection.element index ∉ projections := by
+  induction raw with
+  | nil => simp
+  | member _ _ _ _ ih | index _ _ _ _ _ _ _ ih => simpa using ih
 
 /-- Successful actual traversal produces the static mixed route. This theorem
 never runs or assumes the meaning of a generated getter, comparator or default. -/
@@ -2256,7 +2271,7 @@ theorem of_describe_prepare {checked : Checked} {signatures : ProgramSignatures}
   have typesSame := raw.keyTypes.tree_types tree
   subst sourceTypes
   obtain ⟨sameRoute, _, preparation⟩ := DataPlaceMappingPreparation.steps_of_prepare preparedBy
-  refine ⟨rawTypes, tree, keyTypes, ?_, ?_, DataPlaceGetterTyping.of_execute typed⟩
+  refine ⟨rawTypes, tree, keyTypes, ?_, ?_, DataPlaceGetterTyping.of_execute typed, raw.elementFree⟩
   · apply RootShape.layout
     simpa only [sameRoute] using root
   · intro mapping world sources values projections shaped represented

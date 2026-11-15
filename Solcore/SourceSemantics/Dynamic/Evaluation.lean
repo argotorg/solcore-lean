@@ -907,6 +907,32 @@ mutual
             projections := evaluated
             selected := selected }
           after
+    /-- An element place `p[i]` on a memory array: its leading `p` resolves first,
+    then the index, and the array's object, read after both, holds an element at
+    the index, which is the snapshot. The resolved place is the object's own
+    cell, so the write replaces the element there; an index from the length on
+    faults with `Panic(0x32)` before the right side (`SourcePlaceFaults`). -/
+    | element
+        {context evidence source environment before middle after place leading index
+          prefixTarget element location position cell elements selected}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (prefix_resolves : SourcePlaceResolves program context evidence source
+          environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type }
+          prefixTarget middle)
+        (prefix_selected : prefixTarget.selected = some (.arrayRef element location))
+        (index_evaluates : ExpressionEvaluates program context evidence source
+          environment middle index (.word position) after)
+        (read : Heap.Reads after location cell)
+        (initial_value : RootInitialValue cell (some (.arrayObject element elements)))
+        (selection : ValueAt elements position.val selected) :
+        SourcePlaceResolves program context evidence source environment before place
+          { location := location
+            rootType := cell.type
+            valueType := place.type
+            projections := [.element position.val]
+            selected := some selected }
+          after
 
   /-- Full target-before-RHS assignment transaction, specialized to source
   expression evaluation. -/
@@ -1847,6 +1873,8 @@ mutual
       HeapInitializationExtend before after :=
     match trace with
     | .intro _ _ evaluate _ _ _ => evaluate.initialization_extends
+    | .element _ leadingResolves _ indexEvaluates _ _ _ =>
+        leadingResolves.initialization_extends.trans indexEvaluates.initialization_extends
 
   theorem SourcePlaceAssignment.initialization_extends {program : Program}
       {context : Context}

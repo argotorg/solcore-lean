@@ -369,6 +369,9 @@ theorem replacement_of_update {Modify : Dynamic.Value → Prop} {initial : Optio
   | member selected _ replaced ih =>
     obtain ⟨replacement, modified, changed⟩ := ih
     exact ⟨replacement, modified, .member selected changed replaced⟩
+  | element selected _ replaced ih =>
+    obtain ⟨replacement, modified, changed⟩ := ih
+    exact ⟨replacement, modified, .element selected changed replaced⟩
 
 private theorem empty_represents {checked : SourceCoreDataCatalog.Checked} {signatures : ProgramSignatures}
     {functions : GenericHeap.PayloadModel checked.catalog} {mapping : LocationMap} {world : StoreTyping}
@@ -1012,6 +1015,7 @@ theorem update_of_replacement {Modify : Option Dynamic.Value → Dynamic.Value �
   | indexFound found _ inserted ih => exact .indexFound found ih inserted
   | indexDefault absent defaulted _ inserted ih => exact .indexDefault absent defaulted ih inserted
   | member selected _ replaced ih => exact .member selected ih replaced
+  | element selected _ replaced ih => exact .element selected ih replaced
 
 /-- Any completed actual storeCell commits precisely the reconstructed source
 root once. The mapped heap and old administrative cells are preserved at the
@@ -1224,7 +1228,7 @@ theorem reflects {checked : SourceCoreDataCatalog.Checked} {signatures : Program
   have reflectKeys := fun {keyValue : Value} {keyStore : Store}
       (evaluated : Evaluates (referenceEnvironment prepared.route.rootType target coreEnvironment) store
         (shift 1 (SourceCoreCalls.packArguments codes).expression) keyValue keyStore) =>
-    DataPlaceKeyOrder.reflects layout.keys meaning environments heaps locals
+    DataPlaceKeyOrder.reflects layout.keys layout.free meaning environments heaps locals
       (DataPlaceChildExpressions.prefix_agrees sameEnvironment
         [.cellRef (OptionalCell.cellType prepared.route.rootType) target])
       (by simpa only [DataPlaceChildExpressions.rename_prefix, Expr.rename_id, List.length_cons, List.length_nil,
@@ -1600,6 +1604,7 @@ theorem reflects_ready {checked : SourceCoreDataCatalog.Checked} {signatures : P
   have oldRead : ∃ cell, Dynamic.Heap.Reads targetHeap target.location cell ∧ cell.type = target.rootType := by
     cases sourceTrace with
     | intro _ _ _ read _ _ => exact ⟨_, read, rfl⟩
+    | element _ _ _ _ read _ _ => exact ⟨_, read, rfl⟩
   obtain ⟨oldCell, oldRead, oldType⟩ := oldRead
   obtain ⟨cell, currentRead, currentType, _⟩ := right.metadata target.location oldCell oldRead
   have cellType : cell.type = target.rootType := currentType.trans oldType
@@ -1827,7 +1832,8 @@ theorem reflects {checked : SourceCoreDataCatalog.Checked} {signatures : Program
   | fault sourceFault resultEq tokenRep heaps maps worlds frame metadata =>
     exact .fault sourceFault resultEq tokenRep heaps maps worlds frame metadata
   | ready sourceTrace resolution right continuation =>
-    have targetType := (DataPlaceSourceOrder.resolve_root_type sourceTrace resolution.metadata lookup initialRead).trans rootType
+    have targetType := (DataPlaceSourceOrder.resolve_root_type sourceTrace raw.elementFree resolution.metadata
+      lookup initialRead).trans rootType
     exact DataPlaceTailReflection.reflects_ready functionTypes layouts observations faithful raw preparation layout.root layout.keyTypes
       missingTokens operatorProfile invalidOperandToken setterTyped environments sourceTrace targetType resolution right continuation
 

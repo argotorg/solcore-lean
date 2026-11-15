@@ -489,6 +489,9 @@ theorem of_routeSteps {checked : Checked} {source : TypedSource} {site : SourceC
       simp only [pure, Except.pure, Except.ok.injEq, Prod.mk.injEq] at accepted
       obtain ⟨rfl, rfl⟩ := accepted
       exact .member nominal selected certificate (ih restGenerated)
+    | element key =>
+      simp only [routeSteps] at accepted
+      simp [throw, throwThe, bind, Except.bind] at accepted
     | index key =>
       simp only [routeSteps] at accepted
       cases view : SourceCoreRawMetadata.runtimeType root <;> try (simp [view, throw, throwThe, bind, Except.bind] at accepted)
@@ -550,6 +553,17 @@ inductive PreparedPath (checked : Checked) (source : TypedSource) (site : Source
       (tail : PreparedPath checked source site valueSource projections (position + 1) steps keys leaf) :
       PreparedPath checked source site root (.index key :: projections) position
         (.index ⟨layout, key, position, comparison, missing⟩ :: steps) ((key, layout.keyType) :: keys) leaf
+
+/-- A prepared path holds no element of a memory array. -/
+theorem PreparedPath.elementFree {checked : Checked} {source : TypedSource}
+    {site : SourceCoreElaboration.ErrorSite} {root leaf : TypeSystem.Ty}
+    {projections : List PlaceProjection} {position : Nat} {steps : List PreparedStep}
+    {keys : List (ExpressionId × Ty)}
+    (path : PreparedPath checked source site root projections position steps keys leaf) :
+    ∀ index, PlaceProjection.element index ∉ projections := by
+  induction path with
+  | nil => simp
+  | member _ _ _ _ ih | index _ _ _ ih => simpa using ih
 
 /-- Every retained index carries its actual raw catalog/site certificate,
 generated helper and original missing-reason provider. -/

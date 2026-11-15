@@ -1805,6 +1805,7 @@ private theorem key_typed {context : SourceSemantics.Context}
       · exact ⟨_, head⟩
       · exact ih rest tail
     | member _ rest => exact ih rest member
+    | element _ _ _ => cases member
 
 theorem expression {context : SourceSemantics.Context} {item : ForItemForm}
     {id : ExpressionId} {node : ExpressionNode} (unique : NodeOccurrencesUnique source)

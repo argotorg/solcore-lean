@@ -1123,6 +1123,23 @@ example (context : Context) (heap : Heap) :
       (Ty.arrayObject .word) :=
   ValueHasType.arrayObject_of_values (count := 2) (.cons (.word one) (.cons (.word two) .nil))
 
+/-- A write to an element replaces it in the array's object: `a[1] = 2` on
+`[1, 1]`. -/
+example : ProjectionsUpdate (ReplacesWith (.word two))
+    (some (.arrayObject .word [.word one, .word one])) [.element 1]
+    (.arrayObject .word [.word one, .word two]) :=
+  .element (.tail .head) (.leaf (.intro _)) (.tail .head)
+
+/-- An object written at an element of its type keeps its type. -/
+example (context : Context) (heap : Heap) {updated : Value}
+    (update : ProjectionsUpdate (ReplacesWith (.word two))
+      (some (.arrayObject .word [.word one, .word one])) [.element 1] updated) :
+    ValueHasType context heap updated (Ty.arrayObject .word) :=
+  update.preserves (.element (.nil _))
+    (.some (ValueHasType.arrayObject_of_values (count := 2)
+      (.cons (.word one) (.cons (.word one) .nil))))
+    (ReplacesWith.preservesType (.word two))
+
 end Solcore.Test.SourceSemanticsArrayObjects
 end
 

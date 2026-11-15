@@ -98,7 +98,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
       ⟨assignedSize, tailSize, updated, written, strict, tailStrict, assigned, tail⟩
     · cases failed with
       | target failed =>
-        rcases SelectedCompilationStageProjectedTargetInversion.failed failed with
+        rcases SelectedCompilationStageProjectedTargetInversion.failed layout.path.elementFree failed with
           ⟨rfl, rootFault⟩ | ⟨keySize, keyStrict, ready, keysFailed⟩ |
           ⟨keySize, values, keyStrict, ordinaryKeys, getterFault⟩
         · exact ⟨_, _, _, .projectedAssignmentRootFault projected rootFault, .completed (.fault reason)⟩
@@ -308,7 +308,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
     ⟨assignedSize, tailSize, updated, written, strict, tailStrict, assigned, tail⟩
   · cases failed with
     | target failed =>
-      rcases SelectedCompilationStageProjectedTargetInversion.failed failed with
+      rcases SelectedCompilationStageProjectedTargetInversion.failed layout.path.elementFree failed with
         ⟨rfl, rootFault⟩ | ⟨keySize, keyStrict, ready, keysFailed⟩ |
         ⟨keySize, values, keyStrict, ordinaryKeys, getterFault⟩
       · exact ⟨_, _, _, .projectedBitNotRootFault projected rootFault, .completed (.fault reason)⟩

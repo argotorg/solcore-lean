@@ -114,7 +114,7 @@ private theorem locals : Dynamic.EnvironmentAgrees before context.locals sourceE
   .cons (.intro .head) rfl (.ordinary rfl rfl) .nil
 private theorem targetLayout : DataPlaceResolvedTarget.Layout checked signatures functions source Child scope assignment.target
     prepared [] [] (SourceCoreLocalCell.coreContext scope ++ [referenceType]) := by
-  refine ⟨.nil, rfl, .ordinary (by intro impossible; rcases impossible with ⟨_, _, same⟩; cases same) rfl, ?_, ?_⟩
+  refine ⟨.nil, rfl, .ordinary (by intro impossible; rcases impossible with ⟨_, _, same⟩; cases same) rfl, ?_, ?_, fun _ member => by simp [assignment] at member⟩
   · intro mapping world sources values projections shaped represented
     cases shaped
     exact ⟨0, .nil rfl⟩
@@ -290,7 +290,7 @@ private theorem locals : Dynamic.EnvironmentAgrees heap sourceContext.locals sou
   .cons (.intro .head) rfl (.ordinary rfl rfl) .nil
 private theorem targetLayout : DataPlaceResolvedTarget.Layout checked signatures functions source Child scope place prepared [] []
     (SourceCoreLocalCell.coreContext scope ++ []) := by
-  refine ⟨.nil, rfl, .ordinary ?_ rfl, ?_, infer_sound (by decide)⟩
+  refine ⟨.nil, rfl, .ordinary ?_ rfl, ?_, infer_sound (by decide), fun _ member => by simp [place] at member⟩
   · intro impossible; obtain ⟨_, _, same⟩ := impossible; cases same
   · intro mapping world sources values projections shaped related
     cases shaped
@@ -430,7 +430,7 @@ private theorem locals : Dynamic.EnvironmentAgrees heap sourceContext.locals sou
   .cons (.intro .head) rfl (.ordinary rfl rfl) .nil
 private theorem targetLayout : DataPlaceResolvedTarget.Layout checked signatures functions source Child scope place prepared [] []
     (SourceCoreLocalCell.coreContext scope ++ []) := by
-  refine ⟨.nil, rfl, .ordinary ?_ rfl, ?_, infer_sound (by decide)⟩
+  refine ⟨.nil, rfl, .ordinary ?_ rfl, ?_, infer_sound (by decide), fun _ member => by simp [place] at member⟩
   · intro impossible; obtain ⟨_, _, same⟩ := impossible; cases same
   · intro mapping world sources values projections shaped related
     cases shaped
@@ -1491,7 +1491,7 @@ private theorem locals : Dynamic.EnvironmentAgrees heap sourceContext.locals sou
   .cons (.intro .head) rfl (.ordinary rfl rfl) .nil
 private theorem targetLayout : DataPlaceResolvedTarget.Layout checked signatures functions source Child scope place
     prepared [] [] (SourceCoreLocalCell.coreContext scope ++ [.unit]) := by
-  refine ⟨.nil, rfl, rootLayout, ?_, infer_sound (by decide)⟩
+  refine ⟨.nil, rfl, rootLayout, ?_, infer_sound (by decide), fun _ member => by simp [place, projections] at member⟩
   intro mapping world sources values evaluated shaped related
   cases shaped with
   | member shaped =>
@@ -1526,6 +1526,8 @@ example (program : SourceSemantics.Program) :
   | fault sourceFault resultEq tokenRep heaps maps worlds frame metadata => exact ⟨_, _, _, _, sourceFault, heaps, frame⟩
   | resolved sourceTrace execution continuation =>
     cases sourceTrace with
+    | element projectionsEq _ _ _ _ _ _ =>
+      exact absurd (Dynamic.element_mem_of_projections_eq projectionsEq) (by simp [place, projections])
     | intro lookup initialRead evaluate currentRead initialValue selection =>
       have locationEq := lookup.functional (show Dynamic.Environment.LooksUp sourceEnvironment place.root ⟨0⟩ from .head)
       cases locationEq
@@ -1542,7 +1544,7 @@ private def barePrepared : Prepared := ⟨bareRoute, [], [], invalid⟩
 private def barePlace : PlaceResolution := ⟨binder.id, [], boxType⟩
 private theorem bareLayout : DataPlaceResolvedTarget.Layout checked signatures functions source Child scope barePlace
     barePrepared [] [] (SourceCoreLocalCell.coreContext scope ++ [.unit]) := by
-  refine ⟨.nil, rfl, .ordinary nonMapping rfl, ?_, infer_sound (by decide)⟩
+  refine ⟨.nil, rfl, .ordinary nonMapping rfl, ?_, infer_sound (by decide), fun _ member => by simp [barePlace] at member⟩
   intro mapping world sources values projections shaped related
   cases shaped
   exact ⟨0, .nil rfl⟩
@@ -2641,7 +2643,7 @@ private theorem locals : Dynamic.EnvironmentAgrees heap sourceContext.locals sou
   .cons (.intro .head) rfl (.ordinary rfl rfl) .nil
 private theorem targetLayout : DataPlaceResolvedTarget.Layout checked signatures functions source Child scope place prepared [] []
     (SourceCoreLocalCell.coreContext scope ++ []) := by
-  refine ⟨.nil, rfl, .ordinary ?_ rfl, ?_, infer_sound (by decide)⟩
+  refine ⟨.nil, rfl, .ordinary ?_ rfl, ?_, infer_sound (by decide), fun _ member => by simp [place] at member⟩
   · intro impossible; obtain ⟨_, _, same⟩ := impossible; cases same
   · intro mapping world sources values projections shaped related
     cases shaped
