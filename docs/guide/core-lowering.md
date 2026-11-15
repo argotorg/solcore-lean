@@ -205,6 +205,12 @@ depends on the change.
   only took their cases in `SourceCoreCompatibleDataExpressions` (`lowerWithReasons` and
   `leafLowerer`), lowered by `SourceCoreDataExpressions.arrayIndex`, with
   `SourceCorePanics.outOfBounds` for `0x32`, and by `SourceCoreDataExpressions.arrayLiteral`.
+  A write to an element (ad21bb069) took a branch of the place lowering instead
+  (`SourceCoreCompatibleDataPlaces.lowerElements`) and a case of the fault-site pass
+  (`SourceCoreCompatibleDataPlaceFaultSites.prepare`). An element place satisfies the place typing
+  that the statement meaning proofs assume, so the inversion of the place receipt takes the write's
+  plain-ness (`CompatiblePlaceCompilerCertificates.generated_of_lower`), and the value-assignment
+  cases of the statement recognizers take the place's element-freeness as a field.
 - **A changed rule** (7ac75aea3, closures by value). Theorems whose statements mention the old
   premise are restated over the new one. Most changes were in `Owned/`, `CellAware/`, `OwnedStaged/`,
   `OwnedPrepared/`, `Callable/`, `Statements/`, `Generalized/`, `Selected/` and `Foundations/`.
