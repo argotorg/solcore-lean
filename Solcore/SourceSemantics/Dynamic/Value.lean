@@ -106,6 +106,9 @@ inductive Value where
   /-- The elements of a memory array of `element`, which only the array's heap
   cell holds. -/
   | arrayObject (element : Ty) (elements : List Value)
+  /-- A slice: `length` elements of `base`, a memory array or a slice, from its
+  element `start` on, as upstream's `arraySlice(coll, start, length)`. -/
+  | arraySlice (base : Value) (start length : Nat)
   deriving Repr
 
 /-- Semantic failures are observable stuck outcomes of source evaluation.
@@ -263,6 +266,10 @@ inductive ValueRuntimeType : Value → Ty → Prop where
       ValueRuntimeType (.arrayRef element location) (.array element)
   | arrayObject (element : Ty) (elements : List Value) :
       ValueRuntimeType (.arrayObject element elements) (.arrayObject element)
+  | arraySlice
+      {base : Value} {baseType : Ty} (start length : Nat)
+      (base_type : ValueRuntimeType base baseType) :
+      ValueRuntimeType (.arraySlice base start length) (.arraySlice baseType)
 
 /-- The retained shallow metadata of a mathematical value is unique. -/
 theorem ValueRuntimeType.functional {value : Value} {first second : Ty}
@@ -273,6 +280,9 @@ theorem ValueRuntimeType.functional {value : Value} {first second : Ty}
   | product left right first second =>
     cases other with
     | product a b => simp only [first a, second b]
+  | arraySlice start length base ih =>
+    cases other with
+    | arraySlice _ _ other => rw [ih other]
 
 /-- A key passes its runtime type guard when its canonical shallow type
 and the retained expected type have the same runtime shape. -/

@@ -1784,6 +1784,7 @@ private theorem boolean_of_typed {context : SourceSemantics.Context} {heap value
   | product => cases typeEq
   | arrayRef => simp [TypeSystem.Ty.bool, TypeSystem.Ty.array] at typeEq
   | arrayObject => simp [TypeSystem.Ty.bool, TypeSystem.Ty.arrayObject] at typeEq
+  | arraySlice => simp [TypeSystem.Ty.bool, TypeSystem.Ty.arraySlice] at typeEq
   | proxy => cases typeEq
   | mapping => cases typeEq
   | closure => cases typeEq

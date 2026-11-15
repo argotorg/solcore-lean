@@ -254,6 +254,14 @@ mutual
           (List.replicate elements.length element)) :
         ValueHasType context heap (.arrayObject element elements)
           (Ty.arrayObject element)
+    /-- A slice is typed by its base, a memory array or a slice. Its start and
+    length are the base's to check when the slice is made. -/
+    | arraySlice
+        {base : Value} {baseType : Ty} {start length : Nat}
+        (base_typed : ValueHasType context heap base baseType)
+        (allowed : baseType.arraySliceBaseAllowed = true) :
+        ValueHasType context heap (.arraySlice base start length)
+          (Ty.arraySlice baseType)
     | comptime
         {value : Value} {inner : Ty}
         (inner_typed : ValueHasType context heap value inner) :
@@ -325,6 +333,7 @@ mutual
         mappingEntriesWeight entries + typeWeight keyType + typeWeight valueType + 1
     | .arrayObject element elements =>
         valuesWeight elements + typesWeight (List.replicate elements.length element) + 1
+    | .arraySlice base _ _ => valueWeight base + 1
 
   def valuesWeight : List Value → Nat
     | [] => 0
@@ -865,12 +874,14 @@ mutual
         exact .arrayRef updatedRead (updatedType.trans cell_type)
     | arrayObject elements_typed =>
         exact .arrayObject (ValuesHaveTypes.mono extension elements_typed)
+    | arraySlice base_typed allowed =>
+        exact .arraySlice (ValueHasType.mono extension base_typed) allowed
     | comptime inner_typed =>
         exact .comptime (ValueHasType.mono extension inner_typed)
     termination_by valueWeight value + typeWeight type
     decreasing_by
       all_goals
-        simp_all [valueWeight, typeWeight] <;> omega
+        simp_all [valueWeight, typeWeight, Ty.arraySlice] <;> omega
 
   theorem ValuesHaveTypes.mono
       {context : Context} {before after : Heap}
@@ -946,12 +957,14 @@ mutual
     | arrayRef read cell_type => exact .arrayRef read cell_type
     | arrayObject elements_typed =>
         exact .arrayObject (ValuesHaveTypes.transportContext supports elements_typed)
+    | arraySlice base_typed allowed =>
+        exact .arraySlice (ValueHasType.transportContext supports base_typed) allowed
     | comptime inner_typed =>
         exact .comptime (ValueHasType.transportContext supports inner_typed)
     termination_by valueWeight value + typeWeight type
     decreasing_by
       all_goals
-        simp_all [valueWeight, typeWeight] <;> omega
+        simp_all [valueWeight, typeWeight, Ty.arraySlice] <;> omega
 
   theorem ValuesHaveTypes.transportContext
       {source target : Context} {heap : Heap}
@@ -1369,6 +1382,19 @@ theorem arrayObject_inv
       ValueHasType context heap (.arrayObject element elements) inner) := by
   cases typed with
   | arrayObject elements_typed => exact .inl ⟨rfl, elements_typed⟩
+  | comptime inner_typed => exact .inr ⟨_, rfl, inner_typed⟩
+
+/-- A slice's base is a memory array or a slice. -/
+theorem arraySlice_inv
+    {context : Context} {heap : Heap}
+    {base : Value} {start length : Nat} {type : Ty}
+    (typed : ValueHasType context heap (.arraySlice base start length) type) :
+    (∃ baseType, type = Ty.arraySlice baseType ∧
+      ValueHasType context heap base baseType ∧ baseType.arraySliceBaseAllowed = true) ∨
+    (∃ inner, type = .comptime inner ∧
+      ValueHasType context heap (.arraySlice base start length) inner) := by
+  cases typed with
+  | arraySlice base_typed allowed => exact .inl ⟨_, rfl, base_typed, allowed⟩
   | comptime inner_typed => exact .inr ⟨_, rfl, inner_typed⟩
 
 end ValueHasType

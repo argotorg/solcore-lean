@@ -437,7 +437,11 @@ wait for the native pipeline's contracts and ABI.
 - **Preservation.** A reference has the type `T[]` when the cell it names has the type
   `arrayObject T`, as Core's runtime typing reads a `cellRef`'s cell in its world, and an object's
   elements each have its element type. A later heap keeps every cell's type, so a reference keeps
-  its type, and `Dynamic.HeapWellTyped` keeps its text.
+  its type, and `Dynamic.HeapWellTyped` keeps its text. As built in step 6b, a slice
+  (`Dynamic.Value.arraySlice`) holds its base value, its start and its length, and has the type
+  `arraySlice<B>` when its base has the type `B`, a memory array or a slice
+  (`ValueHasType.arraySlice`). Its typing reads no bound: a slice is made only once its bounds are
+  checked, and a read through it checks them again, so a later heap keeps its type too.
 - **Panics** reuse `SemanticFault.panic`.
 
 ### Lowering
@@ -630,7 +634,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 5a-iii-b | Plain element writes: the ports | 1–2 files, +100–200; measured at 1 file, +104/−2 | setGet(n, i, v), fillAndSum(n), nestedReplace(n, v), alias(v); ret(n), sum(xs), grid(n) adapted |
 | 5b | Compound assignments to an element, with in-place `~` and the unchecked forms, after decision 3 | 25–40 files, +600–1,100/−50–150 | compound(v); echo(xs) adapted |
 | 6a | Slices: the slice type `arraySlice<B>`, which resolves once aliases are expanded, over a memory array or a slice; type formation admits it, an array or a mapping that holds one is rejected, and elaboration rejects every slice type | 25–30 files, +300–500/−20–60; measured at 27 files, +386/−62 | none |
-| 6b | Slices: the slice value, which holds its base value, its start and its length, and its typing in a heap, with the typing's laws; no expression makes one yet | 15–20 files, +200–400/−10–20 | none |
+| 6b | Slices: the slice value, which holds its base value, its start and its length, and its typing in a heap, with the typing's laws; no expression makes one yet | 15–20 files, +200–400/−10–20; measured at 9 files, +101/−10 | none |
 | 6c | Slices: the typed form of `a[s:e]`, `a[s:]`, `a[:e]` and `a[:]` with its static rule, evaluation, faults with `0x32` from its bounds, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–550/−5–15 | none |
 | 6d | Slices: reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules, with their faults, sized copies, stage and preservation | 28–32 files, +350–550/−5–15 | none |
 | 6e | Slices: the typed form of `toArray(s)` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +300–500/−5–15 | none |

@@ -1140,6 +1140,42 @@ example (context : Context) (heap : Heap) {updated : Value}
       (.cons (.word one) (.cons (.word one) .nil))))
     (ReplacesWith.preservesType (.word two))
 
+/-- A slice of the array has the slice type, and so does a slice of that
+slice. -/
+example (context : Context) :
+    ValueHasType context arrayHeap (.arraySlice (.arrayRef .word ⟨0⟩) 1 1)
+      (Ty.arraySlice (Ty.array .word)) :=
+  .arraySlice (.arrayRef (.intro .head) rfl) rfl
+
+example (context : Context) :
+    ValueHasType context arrayHeap
+      (.arraySlice (.arraySlice (.arrayRef .word ⟨0⟩) 0 2) 1 1)
+      (Ty.arraySlice (Ty.arraySlice (Ty.array .word))) :=
+  .arraySlice (.arraySlice (.arrayRef (.intro .head) rfl) rfl) rfl
+
+/-- A slice's runtime type is the slice of its base's. -/
+example : ValueRuntimeType (.arraySlice (.arrayRef .word ⟨0⟩) 1 1)
+    (.arraySlice (.array .word)) :=
+  .arraySlice 1 1 (.arrayRef _ _)
+
+/-- A later heap keeps every cell's type, so a slice keeps its type. -/
+example {context : Context} {before after : Heap} {base : Value} {baseType : Ty}
+    {start length : Nat}
+    (extension : HeapTypesExtend before after)
+    (typed : ValueHasType context before (.arraySlice base start length)
+      (Ty.arraySlice baseType)) :
+    ValueHasType context after (.arraySlice base start length) (Ty.arraySlice baseType) :=
+  typed.mono extension
+
+/-- A slice of a word is not typed: a slice views a memory array or a
+slice. -/
+example (context : Context) (heap : Heap) (base : Ty) :
+    ¬ ValueHasType context heap (.arraySlice (.word one) 0 0) (Ty.arraySlice base) := by
+  intro typed
+  rcases typed.arraySlice_inv with ⟨_, _, baseTyped, allowed⟩ | ⟨_, equal, _⟩
+  · cases baseTyped <;> simp [Ty.arraySliceBaseAllowed, Ty.word, Ty.fixed] at allowed
+  · simp [Ty.arraySlice] at equal
+
 end Solcore.Test.SourceSemanticsArrayObjects
 end
 

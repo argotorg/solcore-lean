@@ -2145,7 +2145,7 @@ private theorem value_is_function {context : SourceSemantics.Context} {heap : Dy
           (ParameterSubstitution.orderedArguments instantiation.parameterSubstitution dataType.parameters)
           parameter result) impossible.symm)
     · cases impossible
-  | unit | bool | word | integer | product | proxy | mapping | arrayRef | arrayObject =>
+  | unit | bool | word | integer | product | proxy | mapping | arrayRef | arrayObject | arraySlice =>
     cases typed
 
 include positive caller view originalUnique sourceEq found sourceParent tree unique parentTyped in
