@@ -662,6 +662,9 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(texts(self.site("literal", "0", literal="number")), ["1", str(U256 - 1)])
         # A hex literal keeps its digit count where the value fits.
         self.assertEqual(texts(self.site("literal", "0x40", literal="hex")), ["0x00", "0x01", "0x41", "0x3f", hex(U256 - 1), "0x80"])
+        # A negation folded into its literal: the sign is read before the base, and each replacement is in that base.
+        self.assertEqual(texts(self.site("literal", "-0x80", literal="hex")), ["0x00", "0x01", hex(U256 - 1)])
+        self.assertEqual(texts(self.site("literal", "-128", literal="number")), ["0", "1", str(U256 - 1)])
         self.assertEqual(texts(self.site("literal", '"hi"', literal="string")), ['""'])
         self.assertEqual(texts(self.site("literal", '""', literal="string")), [])
         self.assertEqual([texts(self.site("binary", token)) for token in ("+", "/", "<", "==", "&", "&&")],

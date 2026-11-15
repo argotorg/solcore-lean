@@ -1694,10 +1694,11 @@ def literal_values(value: int) -> list[int]:
 
 
 def literal_text(text: str, value: int) -> str:
-    """A replacement written in the literal's base; a hex literal keeps its digit count when the value fits."""
-    if not text.lower().startswith("0x"):
+    """A replacement written in the literal's base; a hex literal keeps its digit count after the sign when the value fits."""
+    unsigned = text.removeprefix("-")
+    if not unsigned.lower().startswith("0x"):
         return str(value)
-    digits = len(text) - 2
+    digits = len(unsigned) - 2
     return "0x" + (f"{value:0{digits}x}" if value < 16**digits else f"{value:x}")
 
 
@@ -1705,7 +1706,9 @@ def replacements(site: dict) -> list[tuple[str, str]]:
     """Each operator's replacement of one site's text, in order, as (operator, replacement)."""
     kind, text = site["kind"], site["text"]
     if kind in ("literal", "yul-literal") and site["literal"] in ("number", "hex"):
-        value = int(text.replace("_", ""), 16 if text.lower().startswith("0x") else 10)
+        # The pinned parser folds a negation into its literal, as in `-42` and `-0x80`: the sign comes before the base.
+        base = 16 if text.removeprefix("-").lower().startswith("0x") else 10
+        value = int(text.replace("_", ""), base)
         return [("literal", literal_text(text, item)) for item in literal_values(value)]
     if kind in ("literal", "yul-literal") and site["literal"] == "string":
         return [] if text == '""' else [("empty-string", '""')]
