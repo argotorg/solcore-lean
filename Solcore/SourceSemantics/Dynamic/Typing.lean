@@ -508,7 +508,7 @@ theorem TypeWellScoped.transportContext
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexible type)
     (motive_2 := fun types _ => TypesWellScoped target flexible types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -536,6 +536,8 @@ theorem TypeWellScoped.transportContext
     exact .comptime innerInduction
   · intro element _ elementInduction
     exact .array elementInduction
+  · intro base _ baseInduction
+    exact .arraySlice baseInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -548,7 +550,7 @@ theorem TypesWellScoped.transportContext
   refine TypesWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped target flexible type)
     (motive_2 := fun types _ => TypesWellScoped target flexible types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -576,6 +578,8 @@ theorem TypesWellScoped.transportContext
     exact .comptime innerInduction
   · intro element _ elementInduction
     exact .array elementInduction
+  · intro base _ baseInduction
+    exact .arraySlice baseInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction

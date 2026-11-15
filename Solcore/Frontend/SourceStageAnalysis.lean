@@ -818,7 +818,7 @@ theorem typeIsComptimeOnly_eq_true_iff (type : Ty) :
             | bool => simp [typeIsComptimeOnly] at accepted
             | word => simp [typeIsComptimeOnly] at accepted
             | fixed _ => simp [typeIsComptimeOnly] at accepted
-            | memoryArray | arrayObject => simp [typeIsComptimeOnly] at accepted
+            | memoryArray | arrayObject | arraySlice => simp [typeIsComptimeOnly] at accepted
             | integer => exact .integer
         | declaration declaration =>
             simp [typeIsComptimeOnly] at accepted

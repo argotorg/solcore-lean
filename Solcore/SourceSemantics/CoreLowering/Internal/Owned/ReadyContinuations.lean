@@ -957,7 +957,7 @@ private theorem scoped_at_catalog {context : SourceSemantics.Context} {type : Ty
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped (.ofSignatures context.signatures) [] type)
     (motive_2 := fun types _ => TypesWellScoped (.ofSignatures context.signatures) [] types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ scopedType
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ scopedType
   · intro metavariable member
     cases member
   · intro parameter member _
@@ -981,6 +981,8 @@ private theorem scoped_at_catalog {context : SourceSemantics.Context} {type : Ty
     exact .comptime innerTyping
   · intro element _ elementTyping
     exact .array elementTyping
+  · intro base _ baseTyping
+    exact .arraySlice baseTyping
   · exact .nil
   · intro head tail _ _ headTyping tailTyping
     exact .cons headTyping tailTyping

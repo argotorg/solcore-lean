@@ -56,8 +56,8 @@ inductive ProgramTypeResolutionError where
   | aliasExpansionLimit
   | nestingLimit
   /-- A memory array whose element is not `word`, one of the twelve types or a
-  memory array, as `TypeSystem.Ty.arrayElementAllowed` admits, or a mapping
-  that holds a memory array. -/
+  memory array, as `TypeSystem.Ty.arrayElementAllowed` admits, a slice whose
+  base is not a memory array or a slice, or a mapping that holds either. -/
   | unsupportedArrayType (type : TypeSystem.Ty)
   deriving Repr, DecidableEq
 
@@ -110,9 +110,10 @@ private def uniqueDeclaredType
   | declarations =>
       .error (.ambiguousTypeName components (declarations.map (·.id)))
 
-/-- Resolve the staged integer intrinsic after the caller has exhausted every
-user-defined type visible at the current lookup boundary. -/
-private def resolveIntegerFallback
+/-- Resolve the staged integer intrinsic, or the slice type `arraySlice<B>`, which
+upstream's std exports, after the caller has exhausted every user-defined type
+visible at the current lookup boundary. -/
+private def resolveBuiltinFallback
     (components : List String) (name : String)
     (arguments : List TypeSystem.Ty) :
     Except ProgramTypeResolutionError TypeSystem.Ty :=
@@ -121,6 +122,10 @@ private def resolveIntegerFallback
       .ok TypeSystem.Ty.integer
     else
       .error (.typeArityMismatch components 0 arguments.length)
+  else if name = "arraySlice" then
+    match arguments with
+    | [base] => .ok (TypeSystem.Ty.arraySlice base)
+    | _ => .error (.typeArityMismatch components 1 arguments.length)
   else
     .error (.unknownTypeName components)
 
@@ -152,7 +157,7 @@ private def resolveNamedProgramType
                   | .ok visibility =>
                       match visibility.typesNamed name with
                       | [] =>
-                          resolveIntegerFallback components name arguments
+                          resolveBuiltinFallback components name arguments
                       | importedCandidates =>
                           uniqueDeclaredType components arguments
                             importedCandidates
@@ -655,13 +660,14 @@ private theorem uniqueDeclaredType_variablesBelow
       | cons nextDeclaration tail =>
           simp [uniqueDeclaredType] at success
 
-private theorem resolveIntegerFallback_variablesBelow
+private theorem resolveBuiltinFallback_variablesBelow
     {next : Nat} {components : List String} {name : String}
     {arguments : List TypeSystem.Ty} {resolved : TypeSystem.Ty}
-    (success : resolveIntegerFallback components name arguments =
+    (argumentsBelow : ProgramTypesVariablesBelow next arguments)
+    (success : resolveBuiltinFallback components name arguments =
       .ok resolved) :
     resolved.VariablesBelow next := by
-  simp only [resolveIntegerFallback] at success
+  simp only [resolveBuiltinFallback] at success
   split at success
   · split at success
     · injection success with resolvedEq
@@ -669,7 +675,15 @@ private theorem resolveIntegerFallback_variablesBelow
       exact TypeSystem.Ty.variablesBelow_constructor next
         (.builtin .integer)
     · simp at success
-  · simp at success
+  · split at success
+    · match arguments, argumentsBelow, success with
+      | [base], argumentsBelow, success =>
+          injection success with resolvedEq
+          subst resolved
+          simpa [TypeSystem.Ty.arraySlice] using argumentsBelow base (by simp)
+      | [], _, success => simp at success
+      | _ :: _ :: _, _, success => simp at success
+    · simp at success
 
 private theorem resolveNamedProgramType_variablesBelow
     {next : Nat} {environment : ProgramEnvironment}
@@ -701,7 +715,7 @@ private theorem resolveNamedProgramType_variablesBelow
               · split at success
                 · simp at success
                 · split at success
-                  · exact resolveIntegerFallback_variablesBelow success
+                  · exact resolveBuiltinFallback_variablesBelow argumentsBelow success
                   · exact uniqueDeclaredType_variablesBelow argumentsBelow success
               · exact uniqueDeclaredType_variablesBelow argumentsBelow success
       | cons second tail =>

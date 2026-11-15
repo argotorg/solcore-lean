@@ -33,7 +33,7 @@ theorem SignatureTypeFormationValidated.variablesBelow
     (motive_1 := fun type _ => type.VariablesBelow next)
     (motive_2 := fun types _ => ∀ type ∈ types,
       type.VariablesBelow next)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
   · intro parameter _ _
     exact Ty.variablesBelow_parameter next parameter
   · intro builtin
@@ -58,6 +58,9 @@ theorem SignatureTypeFormationValidated.variablesBelow
   · intro _ _ elementInduction
     exact (Ty.variablesBelow_application_iff _ _ _).mpr
       ⟨Ty.variablesBelow_constructor next _, elementInduction⟩
+  · intro _ _ baseInduction
+    exact (Ty.variablesBelow_application_iff _ _ _).mpr
+      ⟨Ty.variablesBelow_constructor next _, baseInduction⟩
   · intro type member
     simp at member
   · intro head tail _ _ headInduction tailInduction type member
@@ -138,7 +141,7 @@ theorem SignatureTypeFormationValidated.apply_eq_self
   refine SignatureTypeFormationValidated.rec
     (motive_1 := fun type _ => substitution.apply type = type)
     (motive_2 := fun types _ => types.map substitution.apply = types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
   · intro parameter _ _
     rfl
   · intro builtin
@@ -169,6 +172,9 @@ theorem SignatureTypeFormationValidated.apply_eq_self
   · intro element _ elementInduction
     simp only [Ty.array, Substitution.apply]
     rw [elementInduction]
+  · intro base _ baseInduction
+    simp only [Ty.arraySlice, Substitution.apply]
+    rw [baseInduction]
   · rfl
   · intro head tail _ _ headInduction tailInduction
     simp only [List.map_cons]

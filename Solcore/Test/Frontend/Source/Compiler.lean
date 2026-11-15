@@ -2528,6 +2528,14 @@ private def testStageErrors : IO Unit := do
         "an array local's rejection lost its type"
   | result => throw (IO.userError
       s!"an array local reached a Core representation: {reprStr result}")
+  let sliceLocal := rawWorkspace "main.solc" [("main.solc",
+    "function count() returns (Word) { let s: arraySlice<uint256[]>; return 0; }")]
+  match prepare sliceLocal (Seed.named moduleId "count") generousLimits with
+  | .error (.linking (.sourceCore { reason := .unsupportedType type, .. })) =>
+      assertTrue (decide (type = .arraySlice (.array (.fixed ⟨false, .w256⟩))))
+        "a slice local's rejection lost its type"
+  | result => throw (IO.userError
+      s!"a slice local reached a Core representation: {reprStr result}")
   let arrayNew := rawWorkspace "main.solc" [("main.solc",
     "function make(n: uint256) returns (Word) { let m: uint256[] = new uint256[](n); return 0; }")]
   match prepare arrayNew (Seed.named moduleId "make") generousLimits with

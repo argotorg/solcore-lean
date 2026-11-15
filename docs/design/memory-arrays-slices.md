@@ -369,7 +369,14 @@ wait for the native pipeline's contracts and ABI.
   rooted at a local (difference 16). The element place's static rule takes no index kind: its run
   faults on an index that is not a word, and finalization admits a read's index types.
 - **Slices** take `uint256` bounds and a base that is an array or a slice, and have the type
-  `arraySlice<B>`.
+  `arraySlice<B>`. As built in step 6a, `arraySlice<B>` resolves to a slice type once aliases are
+  expanded, as an intrinsic that a user type of the same name hides, as `integer` is
+  (`resolveBuiltinFallback`), with one argument (`typeArityMismatch` otherwise).
+  `Ty.arraysWellFormed` admits it when `B` is a memory array or a slice
+  (`Ty.arraySliceBaseAllowed`), and `Ty.containsArray` counts it, so a mapping that holds a slice is
+  rejected with `unsupportedArrayType`, as is an array of slices, whose element
+  `Ty.arrayElementAllowed` does not admit (difference 17). Elaboration and both catalogs reject
+  every slice type until step 6h.
 - **Lengths.** `a.length`, `a.length()` and `Length.length(a)` on arrays and slices have the type
   `uint256`. `Length.length` is a builtin qualified call when no namespace `Length` exists, as
   `Typedef.abs` is (`typedefCall?`). As built in step 2b-ii-b, `lengthCall` finds the name, and the
@@ -566,7 +573,6 @@ the fixture's `ret(3) -> [0,2,4]` is checked as 0, 2 and 4 at indexes 0 to 2 and
     memory array is rejected with a type mismatch. Upstream's `RValueIdxAccess` constraint waits for
     later uses to fix the type. As with difference 14, deferring the choice to finalization could
     lift this, and nothing schedules it.
-
 16. **An element write's base is a local, or an element of one.** Lean's assignment target is a
     place rooted at a local: an identifier, a group, or an index of a place. So `same(m)[1] = v`,
     whose base is a call's result, is rejected with `invalidAssignmentTarget`, while the pinned
@@ -576,12 +582,22 @@ the fixture's `ret(3) -> [0,2,4]` is checked as 0, 2 and 4 at indexes 0 to 2 and
     reference. No element place has a member or a mapping index before its elements, since
     inference's places hold no member and a mapping of arrays is rejected (difference 5), so the
     lowering takes a local followed by elements only.
+17. **A slice views a memory array or a slice, and no array or mapping holds a slice.** Lean forms
+    `arraySlice<B>` only over the bases of the four slice forms, so `arraySlice<uint256>` is
+    rejected with `unsupportedArrayType`, while the pinned driver forms it, since its
+    `arraySlice<coll>` is an enum over any `coll`, whose values over other bases only its
+    constructor makes (difference 4). An array of slices is rejected where the type is formed, as
+    `bool[]` is (difference 6): the pinned driver accepts the annotation `arraySlice<uint256[]>[]`,
+    and fails `new arraySlice<uint256[]>[](2)` with SC0207, since a slice has no `Typedef<word>`. A
+    mapping that holds a slice is rejected as one that holds an array is (difference 5), while the
+    pinned driver accepts a contract field of that type
+    (`.upstream/lane-d-unit3-memory-arrays/step6/probe`).
 
 Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13, 13 and 14 on
-2026-11-14, and 15 and 16 on 2026-11-15, when 8 was also widened from an unused `let m = [];` to any
-unannotated one. Differences 9 to 13 change only a diagnostic or the room of a resource limit, and
-8, 14, 15 and 16 only reject some programs that upstream accepts. None of them changes what an
-accepted program means. Difference 1 follows decision 3.
+2026-11-14, and 15 to 17 on 2026-11-15, when 8 was also widened from an unused `let m = [];` to any
+unannotated one. Differences 9 to 13 change only a diagnostic or the room of a resource limit, and 8
+and 14 to 17 only reject some programs that upstream accepts. None of them changes what an accepted
+program means. Difference 1 follows decision 3.
 
 ## Steps
 
@@ -613,7 +629,14 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 5a-iii-a | Plain element writes: the lowering, with `0x32` before the right side, the fault-site pass's case and the element-freeness that the statement meaning proofs take | 4–8 files, +200–400/−5–30 at first; measured at 55 files, +706/−261 | none |
 | 5a-iii-b | Plain element writes: the ports | 1–2 files, +100–200; measured at 1 file, +104/−2 | setGet(n, i, v), fillAndSum(n), nestedReplace(n, v), alias(v); ret(n), sum(xs), grid(n) adapted |
 | 5b | Compound assignments to an element, with in-place `~` and the unchecked forms, after decision 3 | 25–40 files, +600–1,100/−50–150 | compound(v); echo(xs) adapted |
-| 6 | Slices and `toArray(s)`, in eight parts: 6a, the slice type `arraySlice<B>`, its formation and its resolution in annotations; 6b, the slice value and its typing in a heap; 6c, the slice's typed form, with `0x32` from its bounds; 6d, reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules; 6e, `toArray(s)`'s typed form; 6f, inference of the four slice forms, with `uint256` bounds; 6g, inference of reads, lengths and `toArray(s)` on slices; 6h, the lowering | 170–215 files, +3,100–5,000/−100–250 at its first measure; estimated at 45–65 files, +1,000–1,400/−200–400 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
+| 6a | Slices: the slice type `arraySlice<B>`, which resolves once aliases are expanded, over a memory array or a slice; type formation admits it, an array or a mapping that holds one is rejected, and elaboration rejects every slice type | 25–30 files, +300–500/−20–60; measured at 27 files, +386/−62 | none |
+| 6b | Slices: the slice value, which holds its base value, its start and its length, and its typing in a heap, with the typing's laws; no expression makes one yet | 15–20 files, +200–400/−10–20 | none |
+| 6c | Slices: the typed form of `a[s:e]`, `a[s:]`, `a[:e]` and `a[:]` with its static rule, evaluation, faults with `0x32` from its bounds, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–550/−5–15 | none |
+| 6d | Slices: reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules, with their faults, sized copies, stage and preservation | 28–32 files, +350–550/−5–15 | none |
+| 6e | Slices: the typed form of `toArray(s)` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +300–500/−5–15 | none |
+| 6f | Slices: inference's typing of the four slice forms on an array or a slice, with `uint256` bounds | 24–30 files, +800–1,100/−20–50 | none |
+| 6g | Slices: inference's typing of reads, lengths and `toArray(s)` on slices | 18–30 files, +600–1,000/−25–55 | none |
+| 6h | Slices: the lowering, a slice as a Core product of its base, its start and its length, and `toArray(s)`'s copy | 4–9 files, +200–400/−10–20 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
 
@@ -675,7 +698,7 @@ file changes, +3,100 to 5,000/−100 to 250. The slice is a new type and a new v
 take a typed form or a rule's case with its evaluation, faults and sized rules, and each takes its
 inference, as in steps 2b to 4. The lowering copies a slice for `toArray(s)` with a recursive Core
 helper over its indices, as `OrderedMapping`'s lookup is. So it splits into 6a to 6h, each within
-the cap.
+the cap, whose estimates add up to that measure.
 
 ## Generators, corpora and the smoke
 

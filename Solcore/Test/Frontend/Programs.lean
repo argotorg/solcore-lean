@@ -1950,6 +1950,45 @@ private def testArrayTypes : IO Unit := do
     | result => throw (IO.userError
         s!"{name} was not rejected as an array type: {reprStr result}")
 
+/-- `arraySlice<B>` resolves to a slice once aliases are expanded, of a memory
+array or of a slice. A slice of any other type or of a generic base, a slice
+with no argument or two, and an array or a mapping that holds a slice are
+rejected. -/
+private def testSliceTypes : IO Unit := do
+  let module ← parsed .main "slices.solc" (String.intercalate "\n" [
+    "type Words = word[];",
+    "type View = arraySlice<Words>;",
+    "type Again = arraySlice<arraySlice<uint256[]>>;",
+    "type OfWord = arraySlice<uint256>;",
+    "type Generic(t) = arraySlice<t>;",
+    "type Views = arraySlice<word[]>[];",
+    "type Stored = mapping(word => arraySlice<word[]>);",
+    "type Bare = arraySlice;",
+    "type Pair = arraySlice<word[], word[]>;"
+  ])
+  let environment ← build [module]
+  let view ← resolvedAlias environment "slices" "View"
+  assertTrue (decide (view = TypeSystem.Ty.arraySlice (.array .word)))
+    "an alias of `word[]` did not form a slice of words"
+  let again ← resolvedAlias environment "slices" "Again"
+  assertTrue (decide (again = .arraySlice (.arraySlice (.array (.fixed ⟨false, .w256⟩)))))
+    "`arraySlice<arraySlice<uint256[]>>` did not form a slice of a slice"
+  for name in ["OfWord", "Generic", "Views", "Stored"] do
+    let declaration ← declaration environment "slices" name
+    let source ← aliasValue declaration
+    match resolveProgramTypeExpr environment (.ofDeclaration declaration) source with
+    | .error (.unsupportedArrayType _) => pure ()
+    | result => throw (IO.userError
+        s!"{name} was not rejected as a slice type: {reprStr result}")
+  for (name, count) in [("Bare", 0), ("Pair", 2)] do
+    let declaration ← declaration environment "slices" name
+    let source ← aliasValue declaration
+    match resolveProgramTypeExpr environment (.ofDeclaration declaration) source with
+    | .error (.typeArityMismatch ["arraySlice"] 1 actual) =>
+        assertTrue (actual == count) s!"{name} counted {actual} arguments"
+    | result => throw (IO.userError
+        s!"{name} was not rejected for its arity: {reprStr result}")
+
 private def testStrictImportVisibility : IO Unit := do
   let provider ← parsed .main "provider.solc"
     "export {*}; enum Hidden { Only }"
@@ -2022,6 +2061,7 @@ def testProgramEnvironmentAndTypeResolution : IO Unit := do
   ProgramEnvironmentAndTypeResolution.testIntegerFallbackPriority
   ProgramEnvironmentAndTypeResolution.testStrictImportVisibility
   ProgramEnvironmentAndTypeResolution.testArrayTypes
+  ProgramEnvironmentAndTypeResolution.testSliceTypes
   ProgramEnvironmentAndTypeResolution.expectEnvironmentFailures
 
 end Tests

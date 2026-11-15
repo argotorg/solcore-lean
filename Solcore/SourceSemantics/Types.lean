@@ -95,6 +95,11 @@ inductive TypeWellScoped (context : Context)
       {element : TypeSystem.Ty}
       (elementWellScoped : TypeWellScoped context flexibleVariables element) :
       TypeWellScoped context flexibleVariables (TypeSystem.Ty.array element)
+  /-- `arraySlice<B>`, a slice of a well-scoped base. -/
+  | arraySlice
+      {base : TypeSystem.Ty}
+      (baseWellScoped : TypeWellScoped context flexibleVariables base) :
+      TypeWellScoped context flexibleVariables (TypeSystem.Ty.arraySlice base)
 
 /-- Pointwise well-scopedness for nominal type arguments. -/
 inductive TypesWellScoped (context : Context)
@@ -330,7 +335,7 @@ theorem weakenTo
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped context larger type)
     (motive_2 := fun types _ => TypesWellScoped context larger types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable (included metavariable bound)
   · intro parameter bound owned
@@ -353,6 +358,8 @@ theorem weakenTo
     exact .comptime innerInduction
   · intro element _ elementInduction
     exact .array elementInduction
+  · intro base _ baseInduction
+    exact .arraySlice baseInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -371,7 +378,7 @@ theorem withLocal
       (context.withLocal id scheme requirements) flexibleVariables type)
     (motive_2 := fun types _ => TypesWellScoped
       (context.withLocal id scheme requirements) flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -397,6 +404,8 @@ theorem withLocal
     exact .comptime innerInduction
   · intro element _ elementInduction
     exact .array elementInduction
+  · intro base _ baseInduction
+    exact .arraySlice baseInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -495,6 +504,15 @@ private theorem nominal_ne_array
   rw [applicationHead_nominal] at heads
   cases heads
 
+private theorem nominal_ne_arraySlice
+    (declaration : Resolved.DeclarationId)
+    (arguments : List TypeSystem.Ty) (base : TypeSystem.Ty) :
+    TypeSystem.Ty.nominal declaration arguments ≠ TypeSystem.Ty.arraySlice base := by
+  intro equal
+  have heads := congrArg applicationHead equal
+  rw [applicationHead_nominal] at heads
+  cases heads
+
 /-- Inversion for flexible variables: every occurrence is explicitly bound by
 the flexible-variable list of the judgment. -/
 theorem variable_mem {context : Context}
@@ -523,6 +541,7 @@ theorem variable_mem {context : Context}
   | .proxy _ => by intro _ equal; cases equal
   | .comptime _ => by intro _ equal; cases equal
   | .array _ => by intro _ equal; cases equal
+  | .arraySlice _ => by intro _ equal; cases equal
 
 /-- Inversion for rigid parameters records both binder membership and
 declaration ownership. -/
@@ -553,6 +572,7 @@ theorem parameter_scope {context : Context}
   | .proxy _ => by intro _ equal; cases equal
   | .comptime _ => by intro _ equal; cases equal
   | .array _ => by intro _ equal; cases equal
+  | .arraySlice _ => by intro _ equal; cases equal
 
 /-- Recovery types never occur in a well-scoped source type. -/
 theorem ne_error {context : Context}
@@ -574,6 +594,7 @@ theorem ne_error {context : Context}
   | .proxy _ => by intro equal; cases equal
   | .comptime _ => by intro equal; cases equal
   | .array _ => by intro equal; cases equal
+  | .arraySlice _ => by intro equal; cases equal
 
 /-- Inversion for function types exposes both structurally scoped
 components. -/
@@ -605,6 +626,7 @@ theorem function_components
   | .proxy _ => by intro _ _ equal; cases equal
   | .comptime _ => by intro _ _ equal; cases equal
   | .array _ => by intro _ _ equal; cases equal
+  | .arraySlice _ => by intro _ _ equal; cases equal
 
 /-- Inversion for product types exposes both structurally scoped
 components. -/
@@ -636,6 +658,7 @@ theorem product_components
   | .proxy _ => by intro _ _ equal; cases equal
   | .comptime _ => by intro _ _ equal; cases equal
   | .array _ => by intro _ _ equal; cases equal
+  | .arraySlice _ => by intro _ _ equal; cases equal
 
 /-- Inversion for mapping types exposes both structurally scoped
 components. -/
@@ -667,6 +690,7 @@ theorem mapping_components
   | .proxy _ => by intro _ _ equal; cases equal
   | .comptime _ => by intro _ _ equal; cases equal
   | .array _ => by intro _ _ equal; cases equal
+  | .arraySlice _ => by intro _ _ equal; cases equal
 
 /-- Inversion for memory array types exposes the scoped element. -/
 theorem array_element
@@ -694,6 +718,35 @@ theorem array_element
       intro _ equal
       cases equal
       exact elementScoped
+  | .arraySlice _ => by intro _ equal; cases equal
+
+/-- Inversion for slice types exposes the scoped base. -/
+theorem arraySlice_base
+    {context : Context} {flexibleVariables : List TypeSystem.TypeVarId}
+    {type : TypeSystem.Ty}
+    (wellScoped : TypeWellScoped context flexibleVariables type) :
+    ∀ base, type = TypeSystem.Ty.arraySlice base →
+      TypeWellScoped context flexibleVariables base :=
+  match wellScoped with
+  | .variable _ => by intro _ equal; cases equal
+  | .parameter _ _ => by intro _ equal; cases equal
+  | .builtin _ => by intro _ equal; cases equal
+  | .nominal dataType arguments _ _ _ => by
+      intro base equal
+      exact False.elim (nominal_ne_arraySlice dataType.id arguments base equal)
+  | .contractNominal contract arguments _ _ _ => by
+      intro base equal
+      exact False.elim (nominal_ne_arraySlice contract.id arguments base equal)
+  | .function _ _ => by intro _ equal; cases equal
+  | .product _ _ => by intro _ equal; cases equal
+  | .mapping _ _ => by intro _ equal; cases equal
+  | .proxy _ => by intro _ equal; cases equal
+  | .comptime _ => by intro _ equal; cases equal
+  | .array _ => by intro _ equal; cases equal
+  | .arraySlice baseScoped => by
+      intro _ equal
+      cases equal
+      exact baseScoped
 
 theorem variable_iff {context : Context}
     {flexibleVariables : List TypeSystem.TypeVarId}
@@ -903,6 +956,17 @@ theorem array
       (TypeSystem.Ty.mem_freeVariables_array_iff metavariable element).mpr member)
 }
 
+/-- Admissibility is compositional for slices. -/
+theorem arraySlice
+    {context : Context} {base : TypeSystem.Ty}
+    (baseAdmissible : TypeAdmissible context base) :
+    TypeAdmissible context (TypeSystem.Ty.arraySlice base) := {
+  binders := baseAdmissible.binders
+  typeWellScoped := .arraySlice
+    (baseAdmissible.typeWellScopedWithin fun metavariable member =>
+      (TypeSystem.Ty.mem_freeVariables_arraySlice_iff metavariable base).mpr member)
+}
+
 /-- A source-ordered row of admissible element types has an admissible
 right-associated product. -/
 theorem productMany
@@ -983,6 +1047,12 @@ theorem TypeWellFormed.array_element {context : Context} {element : TypeSystem.T
     (wellFormed : TypeWellFormed context (TypeSystem.Ty.array element)) :
     TypeWellFormed context element :=
   ⟨wellFormed.binders, wellFormed.typeWellScoped.array_element element rfl⟩
+
+/-- A well-formed slice has a well-formed base. -/
+theorem TypeWellFormed.arraySlice_base {context : Context} {base : TypeSystem.Ty}
+    (wellFormed : TypeWellFormed context (TypeSystem.Ty.arraySlice base)) :
+    TypeWellFormed context base :=
+  ⟨wellFormed.binders, wellFormed.typeWellScoped.arraySlice_base base rfl⟩
 
 namespace SchemeWellFormed
 

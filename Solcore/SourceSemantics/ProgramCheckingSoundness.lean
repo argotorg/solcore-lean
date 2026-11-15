@@ -128,7 +128,7 @@ theorem SignatureTypeFormationValidated.typeWellScoped
       (signatureContext signatures owner parameters assumptions) [] type)
     (motive_2 := fun types _ => TypesWellScoped
       (signatureContext signatures owner parameters assumptions) [] types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
   · intro parameter bound owned
     exact .parameter
       (by simpa [signatureContext, Context.withAssumptions,
@@ -153,6 +153,8 @@ theorem SignatureTypeFormationValidated.typeWellScoped
     exact .comptime innerInduction
   · intro element _ elementInduction
     exact .array elementInduction
+  · intro base _ baseInduction
+    exact .arraySlice baseInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -178,7 +180,7 @@ theorem InferenceTypeFormationValidated.typeWellScoped
     (motive_2 := fun types _ => TypesWellScoped
       (signatureContext signatures owner parameters assumptions)
       flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -205,6 +207,8 @@ theorem InferenceTypeFormationValidated.typeWellScoped
     exact .comptime innerInduction
   · intro element _ elementInduction
     exact .array elementInduction
+  · intro base _ baseInduction
+    exact .arraySlice baseInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction

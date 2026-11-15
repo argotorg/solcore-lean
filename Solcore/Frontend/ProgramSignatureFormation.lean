@@ -127,6 +127,14 @@ mutual
           SignatureTypeFormationValidated signatures owner parameters element) :
         SignatureTypeFormationValidated signatures owner parameters
           (TypeSystem.Ty.array element)
+    /-- `arraySlice<B>`, a slice of a formed base. Type resolution has already
+    checked the base (`TypeSystem.Ty.arraysWellFormed`). -/
+    | arraySlice
+        {base : TypeSystem.Ty}
+        (baseValidated :
+          SignatureTypeFormationValidated signatures owner parameters base) :
+        SignatureTypeFormationValidated signatures owner parameters
+          (TypeSystem.Ty.arraySlice base)
 
   /-- Source-order companion for a row of validated signature types. -/
   inductive SignatureTypesFormationValidated
@@ -243,6 +251,14 @@ mutual
             flexibleVariables element) :
         InferenceTypeFormationValidated signatures owner parameters
           flexibleVariables (TypeSystem.Ty.array element)
+    /-- `arraySlice<B>`, a slice of a formed base. -/
+    | arraySlice
+        {base : TypeSystem.Ty}
+        (baseValidated :
+          InferenceTypeFormationValidated signatures owner parameters
+            flexibleVariables base) :
+        InferenceTypeFormationValidated signatures owner parameters
+          flexibleVariables (TypeSystem.Ty.arraySlice base)
 
   /-- Source-order companion for a row of open inference types. -/
   inductive InferenceTypesFormationValidated
@@ -428,6 +444,8 @@ private def validateSignatureTypeFuel
                 signatures owner nominal arguments
           | (.constructor (.builtin .memoryArray), [element]) =>
               validateSignatureTypeFuel signatures owner parameters fuel element
+          | (.constructor (.builtin .arraySlice), [base]) =>
+              validateSignatureTypeFuel signatures owner parameters fuel base
           | _ => .error (.invalidApplication owner type)
       | .function parameter result =>
           match validateSignatureTypeFuel signatures owner parameters fuel
@@ -485,6 +503,9 @@ private def validateInferenceTypeFuel
           | (.constructor (.builtin .memoryArray), [element]) =>
               validateInferenceTypeFuel signatures owner parameters
                 flexibleVariables fuel element
+          | (.constructor (.builtin .arraySlice), [base]) =>
+              validateInferenceTypeFuel signatures owner parameters
+                flexibleVariables fuel base
           | _ => .error (.invalidApplication owner type)
       | .function parameter result =>
           match validateInferenceTypeFuel signatures owner parameters
@@ -932,6 +953,15 @@ private theorem validateSignatureTypeFuel_success
                             rw [← signatureTypeApplicationSpine_reconstruct spine]
                             exact .array (induction elementSuccess)
                           · simp [validateSignatureTypeFuel, spine] at success
+                      | arraySlice =>
+                          rcases arguments with _ | ⟨base, _ | ⟨next, rest⟩⟩
+                          · simp [validateSignatureTypeFuel, spine] at success
+                          · have baseSuccess : validateSignatureTypeFuel
+                                signatures owner parameters fuel base = .ok () := by
+                              simpa [validateSignatureTypeFuel, spine] using success
+                            rw [← signatureTypeApplicationSpine_reconstruct spine]
+                            exact .arraySlice (induction baseSuccess)
+                          · simp [validateSignatureTypeFuel, spine] at success
                       | _ => simp [validateSignatureTypeFuel, spine] at success
               | «variable» metavariable =>
                   simp [validateSignatureTypeFuel, spine] at success
@@ -1181,6 +1211,16 @@ private theorem validateInferenceTypeFuel_success
                               simpa [validateInferenceTypeFuel, spine] using success
                             rw [← signatureTypeApplicationSpine_reconstruct spine]
                             exact .array (induction elementSuccess)
+                          · simp [validateInferenceTypeFuel, spine] at success
+                      | arraySlice =>
+                          rcases arguments with _ | ⟨base, _ | ⟨next, rest⟩⟩
+                          · simp [validateInferenceTypeFuel, spine] at success
+                          · have baseSuccess : validateInferenceTypeFuel
+                                signatures owner parameters flexibleVariables fuel
+                                base = .ok () := by
+                              simpa [validateInferenceTypeFuel, spine] using success
+                            rw [← signatureTypeApplicationSpine_reconstruct spine]
+                            exact .arraySlice (induction baseSuccess)
                           · simp [validateInferenceTypeFuel, spine] at success
                       | _ => simp [validateInferenceTypeFuel, spine] at success
               | «variable» metavariable =>

@@ -3218,7 +3218,8 @@ theorem unused_nominal_boundary (owner : Resolved.DeclarationId) (parameter : Ty
   intro range
   have scopeProof := (range parameter (.constructor (.declaration owner)) (by simp)).typeWellScoped
   generalize typeEq : Ty.constructor (TypeConstructorId.declaration owner) = type at scopeProof
-  cases scopeProof <;> simp_all [Context.ofSignatures, TypeSystem.Ty.array]
+  cases scopeProof <;> simp_all [Context.ofSignatures, TypeSystem.Ty.array,
+    TypeSystem.Ty.arraySlice]
 
 private def content : String := String.intercalate "\n" [
   "function choose<A, B>(first: A, second: B) returns (A) { let saved = first; return saved; }",

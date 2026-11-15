@@ -76,7 +76,8 @@ def Catalog.project (catalog : Catalog) : Ty → Except Error Core.Ty
               (SourceCoreRawMetadata.runtimeType (.application function element))))
   -- The bare constructors name no source type.
   | type@(.constructor (.builtin .memoryArray))
-  | type@(.constructor (.builtin .arrayObject)) =>
+  | type@(.constructor (.builtin .arrayObject))
+  | type@(.constructor (.builtin .arraySlice)) =>
       throw (.catalog (.missingRepresentation (SourceCoreRawMetadata.runtimeType type)))
   | .product left right => do pure (.product (← catalog.project left) (← catalog.project right))
   | .function parameter result => do
