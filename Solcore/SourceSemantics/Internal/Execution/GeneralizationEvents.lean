@@ -154,6 +154,7 @@ local macro "actual_descend " parent:term : tactic => `(tactic|
    first
    | (apply ChildStep.expression_group <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.expression_tuple <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
+   | (apply ChildStep.expression_array_elements <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.expressions_head <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.expressions_tail <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.statements_head <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
@@ -504,6 +505,21 @@ private theorem inferFuel_origins_progress_internal :
       have record := RelativeReadProgress.recordExpressionWithExpected (root := root) (by simpa only [child, bind, Except.bind] using accepted)
         (by intro _ _ impossible; cases impossible)
       exact (allocateExpressionId_success_origins_progress allocation).trans (innerProgress.trans record)
+  case case21 =>
+    intro context source expected initial fuel id allocated allocation elements form ih
+    intro result accepted here
+    have original := accepted
+    obtain ⟨values, elementsState, element, elementState, unifiedState, child, elementFresh,
+        unified, recorded⟩ :=
+      Detail.inferExprFuel_success_arrayLiteral_facts form allocation accepted
+    have elementsProgress := ih (values, elementsState) child
+      (here.child (.expression_array_elements original form allocation child))
+    have freshProgress := state_fresh_success_origins_progress (root := root) elementFresh
+    have record := RelativeReadProgress.recordExpressionWithExpected (root := root) recorded
+      (by intro _ _ impossible; cases impossible)
+    exact (allocateExpressionId_success_origins_progress allocation).trans
+      (elementsProgress.trans (freshProgress.trans
+        ((RelativeReadProgress.unify (root := root) unified).trans record)))
   case case22 =>
     intro context source expected initial fuel id allocated allocation keyword sourceType length form ih
     intro result accepted here

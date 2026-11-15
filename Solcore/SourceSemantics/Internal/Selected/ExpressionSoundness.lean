@@ -1028,8 +1028,11 @@ theorem actualInferExprFuelRetainedSoundness_step {fuel : Nat}
         operational expectedBelow expectedAdmissible finalPreserved rawProper patterns literals requirements
         retained coercions operators children covered semanticPreserved actualCovered
   | array elements =>
-      simp only [Detail.inferExprFuel, expressionEq] at success
-      cases success
+      exact actualInferExprFuelRetainedSoundness_arrayLiteral recursive expressionEq success resources
+        interfaces extension signaturesEq ownerEq typeParametersEq assumptionsEq formation functions
+        catalog canonical invariant actual operational expectedBelow expectedAdmissible finalPreserved
+        rawProper patterns literals requirements retained coercions operators children covered
+        semanticPreserved actualCovered
   | newArray keyword type length =>
       exact actualInferExprFuelRetainedSoundness_newArray predecessor expressionEq success resources interfaces extension
         signaturesEq ownerEq typeParametersEq assumptionsEq formation functions catalog canonical invariant actual

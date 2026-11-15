@@ -266,6 +266,15 @@ theorem ChildStep.expression_binders_retained
       inferExprFuel_success_tuple_facts form allocation accepted
     cases Except.ok.inj (elementsRun.symm.trans childAccepted)
     exact BindersRetained.recordExpressionWithExpected recorded
+  | expression_array_elements accepted form allocation childAccepted =>
+    obtain ⟨elements, elementsState, element, elementState, unifiedState, elementsRun,
+      elementFresh, unification, recorded⟩ :=
+      inferExprFuel_success_arrayLiteral_facts form allocation accepted
+    have stateEq : elementsState.fresh.2 = elementState := congrArg Prod.snd elementFresh
+    subst stateEq
+    cases Except.ok.inj (elementsRun.symm.trans childAccepted)
+    exact (LocalGeneralizationEvents.Progress.unify unification).retained.trans
+      (BindersRetained.recordExpressionWithExpected recorded)
   | expression_unary accepted form allocation childAccepted =>
     obtain ⟨operand, operandState, operandRun, dispatch⟩ :=
       inferExprFuel_success_unary_facts form allocation accepted
@@ -1408,6 +1417,8 @@ theorem ChildStep.nonexpression_binders_retained {parent child : CallIndex}
       exact False.elim nonexpression
   | expression_tuple accepted form allocation child =>
       exact False.elim nonexpression
+  | expression_array_elements accepted form allocation child =>
+      exact False.elim nonexpression
   | expressions_head accepted head =>
       exact ActualBinderRetention.expressions_head accepted head
   | expressions_tail accepted head tail =>
@@ -1838,6 +1849,9 @@ theorem ChildStep.captureOrigins
     dsimp only [CallIndex.initial] at origins ⊢
     exact origins.allocateExpressionId allocation
   | @expression_tuple fuel context source elements expected initial allocated final childFinal id value values accepted form allocation child =>
+    dsimp only [CallIndex.initial] at origins ⊢
+    exact origins.allocateExpressionId allocation
+  | @expression_array_elements fuel context source elements expected initial allocated final childFinal id value values accepted form allocation child =>
     dsimp only [CallIndex.initial] at origins ⊢
     exact origins.allocateExpressionId allocation
   | @expressions_head fuel context source sources initial middle final value values accepted head =>

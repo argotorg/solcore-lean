@@ -2558,5 +2558,195 @@ theorem actualInferExprFuelRetainedSoundness_tuple {fuel : Nat}
     recorded resultSubstitutionExtension requirementsSubset retained coercionsRetained
     catalog signaturesEq invariant formType rawAdmissible covered
 
+/-- An actual `[e₀, …, eₙ₋₁]` types its elements as a tuple's are, and their
+types, unified with one fresh element type, give the literal the array of that
+type. -/
+theorem actualInferExprFuelRetainedSoundness_arrayLiteral {fuel : Nat}
+    (recursive : ∀ smaller, smaller < fuel + 1 → ActualInferExprFuelRetainedSoundness smaller) :
+  ∀ {wholeContext inferenceContext : Frontend.SourceInference.Context}
+    {wholeReturn : Ty} {expression : Syntax.Expr} {elements : Syntax.DelimitedList Syntax.Expr} {expected : Option Ty}
+    {initial resultState evidenceState : State}
+    {inferred : InferredExpression} {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    {semanticSource : TypedSource}
+    {frames : List InitializedLetBinding}
+    {semanticContext : SourceSemantics.Context},
+    expression.value = .array elements →
+    Detail.inferExprFuel (fuel + 1) inferenceContext expression expected initial =
+        .ok (inferred, resultState) →
+    FinalInferenceResources wholeContext wholeReturn evidenceState roots
+      finalized →
+    ExecutableCoercionInterfaces.SourceInterfaces wholeContext.signatures
+      finalized.solvedRequirements finalized.typedSource →
+    finalized.substitution.SemanticallyExtends
+      resultState.inference.substitution →
+    inferenceContext.signatures = wholeContext.signatures →
+    inferenceContext.scope.genericOwner = wholeContext.scope.genericOwner →
+    inferenceContext.typeParameters = wholeContext.typeParameters →
+    inferenceContext.assumptions = wholeContext.assumptions →
+    ProgramSignatureFormationValidated inferenceContext.signatures →
+    (∀ candidate ∈ inferenceContext.signatures.functions,
+      candidate.scheme.body = .function
+        (Ty.productMany candidate.parameterTypes)
+        (Ty.productMany candidate.returnTypes)) →
+    SignatureCatalogWellFormed inferenceContext.signatures →
+    SignatureParametersWellFormed inferenceContext.scope.genericOwner
+      inferenceContext.typeParameters →
+    RecursiveExpressionInvariant wholeContext finalized initial
+      semanticContext →
+    ActualContext wholeContext finalized frames semanticContext →
+    ActualStateInvariant initial (evidenceState.toTypedSource roots) →
+    (∀ expectedType ∈ expected,
+      expectedType.VariablesBelow initial.inference.next) →
+    (∀ expectedType ∈ expected,
+      TypeAdmissible semanticContext (finalized.substitution.apply expectedType)) →
+    ProperDescendantsPreserved finalized.substitution
+      (resultState.toTypedSource roots) finalized.typedSource
+      (.expression inferred.id) →
+    RawProperDescendantsPreserved (resultState.toTypedSource roots)
+      (evidenceState.toTypedSource roots) (.expression inferred.id) →
+    resultState.integerPatterns ⊆ evidenceState.integerPatterns →
+    resultState.integerLiterals ⊆ evidenceState.integerLiterals →
+    resultState.requirements ⊆ evidenceState.requirements →
+    ExpressionRequirementsRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionCoercionPrimariesRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionOperatorSiteRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionDirectChildrenRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    TemplateScopeCovered finalized.typedSource semanticContext
+      (.expression inferred.id) →
+    ProperDescendantsPreserved finalized.substitution (resultState.toTypedSource roots)
+      semanticSource (.expression inferred.id) →
+    ActualContext.Covers finalized frames (.expression inferred.id) →
+    ExpressionTypingBase (resultState.toTypedSource roots) semanticSource
+      semanticContext finalized.substitution inferred := by
+  intro wholeContext inferenceContext wholeReturn expression elements expected initial
+    resultState evidenceState inferred roots finalized semanticSource
+    frames semanticContext expressionEq success resources interfaces resultSubstitutionExtension signaturesEq
+    ownerEq typeParametersEq assumptionsEq signatureFormation
+    functionsCanonical catalog canonical invariant actual operational expectedBelow expectedAdmissible
+    finalPreserved rawProper integerPatternsSubset integerLiteralsSubset requirementsSubset
+    retained coercionsRetained _operatorsRetained childrenRetained covered semanticPreserved actualCovered
+  generalize allocationEq : initial.allocateExpressionId = allocatedPair
+  rcases allocatedPair with ⟨id, allocated⟩
+  have allocatedInvariant := invariant.allocateExpressionId allocationEq
+  have allocatedOperational : ActualStateInvariant allocated (evidenceState.toTypedSource roots) := by
+    obtain ⟨pending, ledger⟩ := operational.ledger
+    have stateEq : initial.allocateExpressionId.2 = allocated := congrArg Prod.snd allocationEq
+    refine ⟨⟨pending, ?_⟩, ?_, ?_, operational.sourceMonomorphic⟩
+    · rw [← stateEq]
+      exact ledger.allocateExpressionId
+    · apply operational.origins.congr_localBinders
+      rw [← stateEq]
+      rfl
+    · apply activeQuantifiersBelowNext_transport operational.quantifiersBelow
+      · rw [← stateEq]; rfl
+      · rw [← stateEq]; exact Nat.le_refl _
+  have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
+    rw [allocateExpressionId_inferenceNext_eq allocationEq]
+    exact expectedBelow
+  obtain ⟨elementsResult, elementsState, element, elementState, unifiedState, elementsSuccess,
+      elementFresh, unifySuccess, recorded⟩ :=
+    Detail.inferExprFuel_success_arrayLiteral_facts expressionEq allocationEq success
+  have properties := Detail.inferExprsFuel_inferenceProperties allocatedInvariant.ready
+    signatureFormation functionsCanonical elementsSuccess
+  have freshProperties := Detail.fresh_eq_inferenceProperties properties.2.1 elementFresh
+  have operands := Detail.arrayLiteral_unify_operands_variablesBelow properties.2.2 elementFresh
+  have unifyProgress := Detail.unify_inferenceProgress freshProperties.2.1.solved operands.1
+    operands.2.1 unifySuccess
+  have unifiedReady := Detail.unify_preserves_inferenceReady freshProperties.2.1 operands.1
+    operands.2.1 unifySuccess
+  have throughUnified := properties.1.trans (freshProperties.1.trans unifyProgress)
+  have unifiedExpected : ∀ type ∈ expected, type.VariablesBelow unifiedState.inference.next :=
+    fun type member => (allocatedExpected type member).weaken throughUnified.next_le
+  have arrayBelow : (Ty.array element).VariablesBelow unifiedState.inference.next :=
+    (Ty.variablesBelow_application_iff _ _ _).2
+      ⟨Ty.variablesBelow_constructor _ _, operands.2.2.weaken unifyProgress.next_le⟩
+  have recording := Detail.recordExpressionWithExpected_inferenceProperties
+    unifiedReady arrayBelow unifiedExpected recorded
+  have unifiedExtension := resultSubstitutionExtension.trans recording.1.substitution_extends
+  have elementsExtension := unifiedExtension.trans
+    (freshProperties.1.trans unifyProgress).substitution_extends
+  have unifiedToParent : TypingSourceExtends (unifiedState.toTypedSource roots)
+      (resultState.toTypedSource roots) :=
+    ⟨Detail.recordExpressionWithExpected_preserves_owner recorded,
+      recordExpressionWithExpected_success_nodesPrefix recorded⟩
+  have elementsToParent := TypingSourceExtends.trans (fresh_eq_typingSourceExtends elementFresh roots)
+    (TypingSourceExtends.trans (unify_success_typingSourceExtends unifySuccess roots)
+      unifiedToParent)
+  obtain ⟨coercions, contains⟩ := recordExpressionWithExpected_success_containsExpression recorded roots
+  have edge : ∀ value ∈ elementsResult, DirectChild (resultState.toTypedSource roots)
+      (.expression inferred.id) (.expression value.id) := by
+    intro value member
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    simpa [nodeChildIds, Node.references, ExpressionForm.references] using
+      (List.mem_map.mpr ⟨value.id, List.mem_map.mpr ⟨value, member, rfl⟩, rfl⟩ :
+        NodeId.expression value.id ∈ (elementsResult.map (·.id)).map NodeId.expression)
+  have childPatterns : elementsState.integerPatterns ⊆ evidenceState.integerPatterns := by
+    intro origin member
+    apply integerPatternsSubset
+    rw [recordExpressionWithExpected_integerPatterns_eq recorded,
+      (Detail.unify_integerPatternMetadata_eq unifySuccess).1, fresh_eq_integerPatterns_eq elementFresh]
+    exact member
+  have childLiterals : elementsState.integerLiterals ⊆ evidenceState.integerLiterals := by
+    intro origin member
+    apply integerLiteralsSubset
+    rw [Detail.recordExpressionWithExpected_integerLiterals_eq recorded,
+      Detail.unify_integerLiterals unifySuccess, fresh_eq_integerLiterals_eq elementFresh]
+    exact member
+  have childRequirements : elementsState.requirements ⊆ evidenceState.requirements := by
+    intro requirement member
+    apply requirementsSubset
+    apply Detail.recordExpressionWithExpected_requirements_subset recorded
+    rw [Detail.unify_requirements_eq unifySuccess, fresh_eq_requirements_eq elementFresh]
+    exact member
+  have typed := actualInferExprsFuelFinalSubtreeSoundness fuel
+    (fun smaller less => recursive smaller (Nat.lt_trans less (Nat.lt_succ_self fuel)))
+    elementsSuccess resources interfaces elementsExtension signaturesEq ownerEq typeParametersEq assumptionsEq
+    signatureFormation functionsCanonical catalog canonical allocatedInvariant actual allocatedOperational
+    (fun value member => (semanticPreserved.childSubtree (edge value member)).monoBefore elementsToParent)
+    (fun value member => (finalPreserved.childSubtree (edge value member)).monoBefore elementsToParent)
+    (fun value member => ((rawProper.childSubtree (edge value member)).monoBefore elementsToParent).proper)
+    childPatterns childLiterals childRequirements
+    (fun value member => covered.expressionChild resources.graph_closed (childrenRetained (edge value member)))
+    (fun value member => actualCovered.directChild (childrenRetained (edge value member)))
+  have typesEq := Detail.arrayLiteral_unify_types unifySuccess unifiedExtension
+  have binders := invariant.typeParameterBinders (by
+    simpa only [ownerEq, typeParametersEq] using canonical)
+  have range := resources.substitutionRangeAdmissible binders invariant.signatures_eq_whole
+    invariant.typeParametersEq invariant.declarationEq invariant.residual
+  have elementAdmissible : TypeAdmissible semanticContext (finalized.substitution.apply element) := by
+    have elementEq : elementsState.fresh.1 = element := congrArg Prod.fst elementFresh
+    rw [← elementEq]
+    change TypeAdmissible semanticContext
+      (finalized.substitution.apply (.variable ⟨elementsState.inference.next⟩))
+    cases found : finalized.substitution.lookup? ⟨elementsState.inference.next⟩ with
+    | none =>
+      simp only [Substitution.apply, found, Option.getD_none]
+      exact TypeAdmissible.variableOfResidual binders invariant.residual _
+    | some type =>
+      simp only [Substitution.apply, found, Option.getD_some]
+      exact range _ type (Substitution.lookup?_eq_some_mem found)
+  have arrayAdmissible : TypeAdmissible semanticContext
+      (finalized.substitution.apply (Ty.array element)) := by
+    simpa [Ty.array, Substitution.apply] using TypeAdmissible.array elementAdmissible
+  have elementsTyped : ExpressionsHaveTypes semanticSource semanticContext
+      (elementsResult.map (·.id))
+      (List.replicate (elementsResult.map (·.id)).length (finalized.substitution.apply element)) := by
+    rw [List.length_map, ← typesEq]
+    simpa [List.map_map, Function.comp_def] using typed
+  have formType : ExpressionFormHasRawType semanticSource semanticContext
+      ((ExpressionForm.arrayLiteral element (elementsResult.map (·.id))).applySubstitution
+        finalized.substitution)
+      (finalized.substitution.apply (Ty.array element)) (.ordinary []) := by
+    simpa [ExpressionForm.applySubstitution, Ty.array, Substitution.apply] using
+      ExpressionFormHasRawType.arrayLiteral elementAdmissible elementsTyped
+  exact recordExpressionWithExpected_success_expressionTypingBase_actual resources interfaces
+    recorded resultSubstitutionExtension requirementsSubset retained coercionsRetained
+    catalog signaturesEq invariant formType arrayAdmissible covered
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
 end

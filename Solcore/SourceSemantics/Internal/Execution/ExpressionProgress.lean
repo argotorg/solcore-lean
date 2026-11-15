@@ -54,6 +54,9 @@ theorem ChildStep.lifetime_expression
   | expression_tuple accepted form allocation childAccepted =>
       exact GeneralizationLifetime.tuple inputs.ready inputs.catalog inputs.bounds
         form allocation childAccepted accepted life
+  | expression_array_elements accepted form allocation childAccepted =>
+      exact GeneralizationLifetime.arrayLiteral inputs.ready inputs.catalog inputs.bounds
+        form allocation childAccepted accepted life
   | expression_unary accepted form allocation childAccepted =>
       exact GeneralizationLifetime.unary inputs.ready inputs.catalog inputs.bounds
         form allocation childAccepted accepted life
@@ -577,6 +580,28 @@ theorem ChildStep.progress_expression
       exact (recordExpressionWithExpected_inferenceProperties childProperties.2.1 productBelow
         (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken childProperties.1.next_le)
         recorded).1
+  | expression_array_elements accepted form allocation childAccepted =>
+      obtain ⟨elements, elementsState, element, elementState, unifiedState, elementsRun,
+        elementFresh, unification, recorded⟩ :=
+        inferExprFuel_success_arrayLiteral_facts form allocation accepted
+      cases Except.ok.inj (elementsRun.symm.trans childAccepted)
+      have freshProperties := fresh_eq_inferenceProperties childProperties.2.1 elementFresh
+      have operands := arrayLiteral_unify_operands_variablesBelow
+        (fun value member => childProperties.2.2 _ (List.mem_map.mpr ⟨value, member, rfl⟩))
+        elementFresh
+      have unifyProgress := unify_inferenceProgress freshProperties.2.1.solved operands.1
+        operands.2.1 unification
+      have unifiedReady := unify_preserves_inferenceReady freshProperties.2.1 operands.1
+        operands.2.1 unification
+      have throughUnified := childProperties.1.trans (freshProperties.1.trans unifyProgress)
+      have arrayBelow : (Ty.array element).VariablesBelow unifiedState.inference.next :=
+        (Ty.variablesBelow_application_iff _ _ _).2
+          ⟨Ty.variablesBelow_constructor _ _, operands.2.2.weaken unifyProgress.next_le⟩
+      exact freshProperties.1.trans (unifyProgress.trans
+        (recordExpressionWithExpected_inferenceProperties unifiedReady arrayBelow
+          (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken
+            throughUnified.next_le)
+          recorded).1)
   | expression_unary accepted form allocation childAccepted =>
       obtain ⟨operand, operandState, operandRun, dispatch⟩ :=
         inferExprFuel_success_unary_facts form allocation accepted

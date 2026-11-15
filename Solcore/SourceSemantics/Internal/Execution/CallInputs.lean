@@ -212,6 +212,22 @@ theorem expression_tuple
   subst allocated
   exact ⟨inputs.ready.allocateExpressionId, inputs.wellFormed, inputs.catalog, trivial⟩
 
+theorem expression_array_elements
+      {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
+      {elements : Syntax.DelimitedList Syntax.Expr} {expected : Option Ty}
+      {initial allocated final childFinal : State} {id : ExpressionId}
+      {value : InferredExpression} {values : List InferredExpression}
+      (_accepted : (CallIndex.expression (fuel + 1) context source expected
+        initial value final).Accepted)
+      (_form : source.value = .array elements)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (_child : inferExprsFuel fuel context elements.elements allocated =
+        .ok (values, childFinal))
+      (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs) : (CallIndex.expressions fuel context elements.elements allocated values childFinal).Inputs := by
+  have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+  subst allocated
+  exact ⟨inputs.ready.allocateExpressionId, inputs.wellFormed, inputs.catalog, trivial⟩
+
 theorem expression_call_arguments
       {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
       {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
@@ -897,6 +913,7 @@ theorem ChildStep.inputs {parent child : CallIndex}
       all_goals first
       | solve | apply ActualExpressionInputs.expression_group <;> assumption
       | solve | apply ActualExpressionInputs.expression_tuple <;> assumption
+      | solve | apply ActualExpressionInputs.expression_array_elements <;> assumption
       | solve | apply ActualExpressionInputs.expression_call_arguments <;> assumption
       | solve | apply ActualExpressionInputs.expression_unary <;> assumption
       | solve | apply ActualExpressionInputs.expression_binary_left <;> assumption

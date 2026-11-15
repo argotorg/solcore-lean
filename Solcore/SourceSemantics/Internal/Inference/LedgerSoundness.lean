@@ -223,7 +223,13 @@ theorem inferExprFuelLedgerPreservation_step
     obtain ⟨_, _, _, _, _, _, child, recorded⟩ :=
       Detail.inferExprFuel_success_newArray_facts form allocation accepted
     exact (expressionIH child allocatedTracked).recordExpressionWithExpected recorded
-  | array _ | slice _ _ _ _ _ | error =>
+  | array elements =>
+    obtain ⟨_, _, _, _, _, children, elementFresh, unified, recorded⟩ :=
+      Detail.inferExprFuel_success_arrayLiteral_facts form allocation accepted
+    have freshTracked := (expressionsIH children allocatedTracked).fresh
+    rw [elementFresh] at freshTracked
+    exact (freshTracked.unify unified).recordExpressionWithExpected recorded
+  | slice _ _ _ _ _ | error =>
     simp [Detail.inferExprFuel, allocation, form] at accepted
 
 end Solcore.SourceSemantics.SourceInferenceSoundness

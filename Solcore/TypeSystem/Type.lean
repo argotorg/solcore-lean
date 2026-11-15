@@ -585,6 +585,35 @@ theorem variablesBelow_productMany
                 intro type member
                 exact typesBelow type (by simp [member]))⟩
 
+/-- Right-associated products of equally many types are equal only when their
+types are. -/
+theorem productMany_inj {left right : List Ty} (length : left.length = right.length)
+    (same : productMany left = productMany right) : left = right := by
+  induction left generalizing right with
+  | nil =>
+      cases right with
+      | nil => rfl
+      | cons _ _ => simp at length
+  | cons first rest induction =>
+      cases right with
+      | nil => simp at length
+      | cons second rest' =>
+          cases rest with
+          | nil =>
+              cases rest' with
+              | nil =>
+                  change first = second at same
+                  rw [same]
+              | cons _ _ => simp at length
+          | cons next tail =>
+              cases rest' with
+              | nil => simp at length
+              | cons next' tail' =>
+                  change Ty.product first (productMany (next :: tail)) =
+                    Ty.product second (productMany (next' :: tail')) at same
+                  injection same with headEq tailEq
+                  rw [headEq, induction (right := next' :: tail') (by simpa using length) tailEq]
+
 /-- A nominal type application is allocator-bounded when all of its type
 arguments are allocator-bounded. -/
 theorem variablesBelow_nominal

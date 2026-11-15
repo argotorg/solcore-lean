@@ -2068,7 +2068,16 @@ mutual
                   else .error (.unsupportedExpression "field")
           | _ => throw (.ambiguousConstructor [] name.value
               (candidates.map fun candidate => candidate.2.id))
-      | .array .. => .error (.unsupportedExpression "array")
+      -- A literal infers its elements with no expected type, as a tuple does, and
+      -- unifies their types with one fresh element type, as upstream's
+      -- `infer_array_expr` does. Finalization checks that type (`validateArrayLiteral`).
+      | .array elements => do
+          let (values, state) ← inferExprsFuel fuel context elements.elements state
+          let (element, state) := state.fresh
+          let state ← unify state (Ty.productMany (values.map (·.type)))
+            (Ty.productMany (List.replicate values.length element))
+          recordExpressionWithExpected context expression id (Ty.array element)
+            (.arrayLiteral element (values.map (·.id))) [] expected state
       | .newArray _ sourceType length => do
           let element ← newArrayElement (← resolveSourceType context sourceType)
           let (length, state) ← inferExprFuel fuel context length

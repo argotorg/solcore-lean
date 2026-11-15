@@ -26603,7 +26603,8 @@ theorem validateExpressionNode_ok {state : Frontend.SourceInference.State}
     (success : Detail.validateAssignmentTargetNode state (.expression node) = .ok ()) :
     Detail.validateUncheckedOperand state node = .ok () ∧
       Detail.validateShiftOperands state node = .ok () ∧
-      Detail.validateArrayIndex state node = .ok () := by
+      Detail.validateArrayIndex state node = .ok () ∧
+      Detail.validateArrayLiteral state node = .ok () := by
   simp only [Detail.validateAssignmentTargetNode, Detail.validateExpressionNode] at success
   cases unchecked : Detail.validateUncheckedOperand state node with
   | error error => simp [unchecked, bind, Except.bind] at success
@@ -26613,7 +26614,11 @@ theorem validateExpressionNode_ok {state : Frontend.SourceInference.State}
     | error error => simp [shift] at success
     | ok _ =>
       simp only [shift] at success
-      exact ⟨rfl, rfl, success⟩
+      cases index : Detail.validateArrayIndex state node with
+      | error error => simp [index] at success
+      | ok _ =>
+        simp only [index] at success
+        exact ⟨rfl, rfl, rfl, success⟩
 
 /-- One successful check of an unchecked operator gives its left operand's fit
 under the checked state's substitution. -/
@@ -26821,7 +26826,7 @@ theorem finalize_arrayIndexesFit
       simp only [Node.applySubstitution, Node.expression.injEq] at rawEq rawIndexEq
       subst rawEq rawIndexEq
       have check := (validateExpressionNode_ok
-        (validateAssignmentTargets_member witness.assignmentValidation rawMember)).2.2
+        (validateAssignmentTargets_member witness.assignmentValidation rawMember)).2.2.1
       have formRaw : rawNode.form = .arrayIndex base index := by
         cases rawForm : rawNode.form <;>
           simp_all [ExpressionNode.applySubstitution, ExpressionForm.applySubstitution]

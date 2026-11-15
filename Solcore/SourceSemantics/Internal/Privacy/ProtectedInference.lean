@@ -387,7 +387,84 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     simp_all [InferExprFuelFixedness, inferExprFuel]
 
   case case21 =>
-    simp_all [InferExprFuelFixedness, inferExprFuel]
+    intros context expression expected initial fuel id allocated allocationEq
+      elements expressionEq elementsInduction
+    unfold InferExprFuelFixedness
+    intro ready wellFormed bound live fixed catalog validated canonical expectedBelow expectedSafe result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    have allocationPrivacy := allocateExpressionId_privacy live allocationEq
+    have allocatedEq : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocationEq).symm
+    have boundAllocated : ∀ metavariable ∈ protectedVars, metavariable.index < allocated.inference.next := by
+      intro metavariable member
+      rw [allocatedEq]
+      change metavariable.index < initial.inference.next
+      exact bound metavariable member
+    have wfAllocated : allocated.RequirementsWellFormed := by
+      rw [allocatedEq]
+      change initial.RequirementsWellFormed
+      exact wellFormed
+    have fixedAllocated : FixesProtected protectedVars allocated := by
+      apply fixed.of_substitution_eq
+      rw [allocatedEq]
+      rfl
+    obtain ⟨inferredElements, elementsState, element, elementState, unifiedState,
+        elementsResult, elementFresh, unifyResult, recordedSuccess⟩ :=
+      Detail.inferExprFuel_success_arrayLiteral_facts expressionEq allocationEq success
+    have elementsPrivacy := inferExprsFuel_private protectedVars fuel context elements.elements
+      allocated allocationProperties.2 wfAllocated boundAllocated allocationPrivacy.2.1
+      catalog validated canonical (inferredElements, elementsState) elementsResult
+    have elementsProperties := inferExprsFuel_inferenceProperties allocationProperties.2
+      validated canonical elementsResult
+    have freshProperties := fresh_eq_inferenceProperties elementsProperties.2.1 elementFresh
+    have operands := arrayLiteral_unify_operands_variablesBelow elementsProperties.2.2
+      elementFresh
+    have stateEq : elementsState.fresh.2 = elementState := congrArg Prod.snd elementFresh
+    have elementEq : elementsState.fresh.1 = element := congrArg Prod.fst elementFresh
+    subst stateEq elementEq
+    have elementsBound : ∀ metavariable ∈ protectedVars,
+        metavariable.index < elementsState.inference.next :=
+      fun metavariable member =>
+        Nat.lt_of_lt_of_le (boundAllocated metavariable member) elementsProperties.1.next_le
+    have freshTransport : SafeTransport protectedVars elementsState elementsState.fresh.2 := fresh
+    have elementSafe : Safe protectedVars elementsState.fresh.2 elementsState.fresh.1 :=
+      fresh_type elementsProperties.2.1 elementsBound
+    have valuesSafe : Safe protectedVars elementsState.fresh.2
+        (Ty.productMany (inferredElements.map (·.type))) := by
+      apply safe_productMany
+      intro type member
+      obtain ⟨value, valueMember, rfl⟩ := List.mem_map.mp member
+      exact freshTransport _ (elementsPrivacy.2.1 value valueMember)
+    have replicatedSafe : Safe protectedVars elementsState.fresh.2
+        (Ty.productMany (List.replicate inferredElements.length elementsState.fresh.1)) := by
+      apply safe_productMany
+      intro type member
+      rw [List.eq_of_mem_replicate member]
+      exact elementSafe
+    have unifyProgress := unify_inferenceProgress freshProperties.2.1.solved operands.1
+      operands.2.1 unifyResult
+    have unifiedReady := unify_preserves_inferenceReady freshProperties.2.1 operands.1
+      operands.2.1 unifyResult
+    have unifiedPrivacy := ProtectedVariables.unify valuesSafe replicatedSafe unifyResult
+    have toUnified := freshTransport.trans unifiedPrivacy
+    have arrayBelow : (Ty.array elementsState.fresh.1).VariablesBelow
+        unifiedState.inference.next :=
+      (Ty.variablesBelow_application_iff _ _ _).2
+        ⟨Ty.variablesBelow_constructor _ _, operands.2.2.weaken unifyProgress.next_le⟩
+    have arraySafe : Safe protectedVars unifiedState (Ty.array elementsState.fresh.1) :=
+      (safe_application_iff _ _ _ _).2
+        ⟨safe_closed _ _ (Ty.variablesBelow_constructor 0 _), unifiedPrivacy _ elementSafe⟩
+    have prefixProgress := allocationProperties.1.trans
+      (elementsProperties.1.trans (freshProperties.1.trans unifyProgress))
+    have beforeFit := allocationPrivacy.1.trans (elementsPrivacy.1.trans toUnified)
+    have elementsFixed := elementsInduction allocationProperties.2 wfAllocated boundAllocated
+      allocationPrivacy.2.1 fixedAllocated catalog validated canonical
+      (inferredElements, elementsState) elementsResult
+    have unifiedFixed := unify_fixes_protected
+      (elementsFixed.of_substitution_eq (after := elementsState.fresh.2) rfl)
+      valuesSafe replicatedSafe unifyResult
+    exact recordExpressionWithExpected_fixes_protected unifiedFixed arraySafe
+      (fun type member => beforeFit _ (expectedSafe _ member)) recordedSuccess
   case case22 =>
     intros context expression expected initial fuel id allocated allocationEq
       keyword sourceType length expressionEq lengthInduction

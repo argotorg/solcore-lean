@@ -1377,7 +1377,53 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
     simp_all [InferExprFuelFormation, inferExprFuel]
 
   case case21 =>
-    simp_all [InferExprFuelFormation, inferExprFuel]
+    intros context expression expected initial fuel id allocated allocationEq
+      elements expressionEq elementsInduction
+    unfold InferExprFuelFormation
+    intro ready nodes formed formation expectedBelow expectedFormed result success continuation captures
+    have allocation := expression_allocation_normalized allocationEq ready nodes formed
+    have expectedAllocated : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
+      simpa only [allocation.2.2.2] using expectedBelow
+    obtain ⟨inferredElements, elementsState, element, elementState, unifiedState,
+        elementsResult, elementFresh, unifyResult, recorded⟩ :=
+      Detail.inferExprFuel_success_arrayLiteral_facts expressionEq allocationEq success
+    have properties := inferExprsFuel_inferenceProperties allocation.1
+      formation.validated formation.functionShapes elementsResult
+    have freshProperties := fresh_eq_inferenceProperties properties.2.1 elementFresh
+    have operands := arrayLiteral_unify_operands_variablesBelow properties.2.2 elementFresh
+    have stateEq : elementsState.fresh.2 = elementState := congrArg Prod.snd elementFresh
+    have elementEq : elementsState.fresh.1 = element := congrArg Prod.fst elementFresh
+    subst stateEq elementEq
+    have unifyProgress := unify_inferenceProgress freshProperties.2.1.solved operands.1
+      operands.2.1 unifyResult
+    have unifiedReady := unify_preserves_inferenceReady freshProperties.2.1 operands.1
+      operands.2.1 unifyResult
+    have throughUnified := properties.1.trans (freshProperties.1.trans unifyProgress)
+    have arrayBelow : (Ty.array elementsState.fresh.1).VariablesBelow unifiedState.inference.next :=
+      (Ty.variablesBelow_application_iff _ _ _).2
+        ⟨Ty.variablesBelow_constructor _ _, operands.2.2.weaken unifyProgress.next_le⟩
+    have expectedAfter : ∀ type ∈ expected, type.VariablesBelow unifiedState.inference.next :=
+      fun type member => (expectedAllocated type member).weaken throughUnified.next_le
+    have recording := recordExpressionWithExpected_inferenceProperties unifiedReady
+      arrayBelow expectedAfter recorded
+    have unifiedContinuation := continuation.trans recording.1.substitution_extends
+    have unifiedCaptures :=
+      (captures.before_recordExpressionWithExpected recorded).before_unify unifyResult
+    have elementsCaptures : NoCaptureNodes outer elementsState.nodes := unifiedCaptures
+    have childFormation := elementsInduction allocation.1 allocation.2.1 allocation.2.2.1 formation
+      _ elementsResult
+      (unifiedContinuation.trans (freshProperties.1.trans unifyProgress).substitution_extends)
+      elementsCaptures
+    have freshFormation : NormalizedStateFormation semantic outer elementsState.fresh.2 :=
+      childFormation.2.congr rfl rfl
+    have freshFormed : TypeAdmissible semantic (outer.apply elementsState.fresh.1) :=
+      SourceInferenceRequirementFormation.type_applySubstitution_residual formation.residual
+        formation.range (.variableOfResidual formation.scope.binders formation.residual
+          ⟨elementsState.inference.next⟩)
+    have arrayFormed : TypeAdmissible semantic (outer.apply (Ty.array elementsState.fresh.1)) := by
+      simpa [Ty.array, Substitution.apply] using TypeAdmissible.array freshFormed
+    exact recordExpressionWithExpected_normalized_state formation
+      (freshFormation.unify unifyResult) continuation arrayFormed expectedFormed recorded
   case case22 =>
     intros context expression expected initial fuel id allocated allocationEq
       keyword sourceType length expressionEq lengthInduction

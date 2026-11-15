@@ -2640,6 +2640,152 @@ theorem expressionRetained_arrayIndex_for
     boundary.expressionRequirements boundary.coercionPrimaries catalog boundary.scope.signatures
     boundary.invariant formType rawAdmissible boundary.covered
 
+/-- The actual `[e₀, …, eₙ₋₁]` checks its elements with no expected type, as a
+tuple's, in the same selected final source, and records the literal at the
+array of the fresh element type that their types unify with. -/
+theorem expressionRetained_arrayLiteral_for
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed provenance)
+    (recursive : ∀ smaller, smaller < childFuel + 1 →
+      ExpressionRetainedSoundnessFor provenance selected smaller)
+    {inferenceContext : SourceInference.Context} {expression : Syntax.Expr}
+    {elements : Syntax.DelimitedList Syntax.Expr}
+    {expected : Option Ty} {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (here : provenance (.expression (childFuel + 1) inferenceContext expression expected
+      initial inferred resultState))
+    (expressionEq : expression.value = .array elements)
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  have resources := selected.body.resources
+  generalize allocationEq : initial.allocateExpressionId = allocatedPair
+  rcases allocatedPair with ⟨id, allocated⟩
+  have allocatedInvariant := boundary.invariant.allocateExpressionId allocationEq
+  have allocatedOperational : GeneralizedActualStateInvariant allocated (evidenceSource selected) := by
+    rw [← show initial.allocateExpressionId.2 = allocated from congrArg Prod.snd allocationEq]
+    exact boundary.operational.allocateExpressionId
+  have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
+    rw [allocateExpressionId_inferenceNext_eq allocationEq]
+    exact boundary.expectedBelow
+  obtain ⟨elementsResult, elementsState, element, elementState, unifiedState, elementsSuccess,
+      elementFresh, unifySuccess, recorded⟩ :=
+    Detail.inferExprFuel_success_arrayLiteral_facts expressionEq allocationEq boundary.accepted
+  have properties := Detail.inferExprsFuel_inferenceProperties allocatedInvariant.ready
+    (boundary.scope.formation checked) (boundary.scope.functionsCanonical checked) elementsSuccess
+  have freshProperties := Detail.fresh_eq_inferenceProperties properties.2.1 elementFresh
+  have operands := Detail.arrayLiteral_unify_operands_variablesBelow properties.2.2 elementFresh
+  have unifyProgress := Detail.unify_inferenceProgress freshProperties.2.1.solved operands.1
+    operands.2.1 unifySuccess
+  have unifiedReady := Detail.unify_preserves_inferenceReady freshProperties.2.1 operands.1
+    operands.2.1 unifySuccess
+  have throughUnified := properties.1.trans (freshProperties.1.trans unifyProgress)
+  have unifiedExpected : ∀ type ∈ expected, type.VariablesBelow unifiedState.inference.next :=
+    fun type member => (allocatedExpected type member).weaken throughUnified.next_le
+  have arrayBelow : (Ty.array element).VariablesBelow unifiedState.inference.next :=
+    (Ty.variablesBelow_application_iff _ _ _).2
+      ⟨Ty.variablesBelow_constructor _ _, operands.2.2.weaken unifyProgress.next_le⟩
+  have recording := Detail.recordExpressionWithExpected_inferenceProperties
+    unifiedReady arrayBelow unifiedExpected recorded
+  have unifiedExtension := boundary.extension.trans recording.1.substitution_extends
+  have elementsExtension := unifiedExtension.trans
+    (freshProperties.1.trans unifyProgress).substitution_extends
+  have unifiedToParent : TypingSourceExtends (unifiedState.toTypedSource (bodyRoots selected))
+      (resultState.toTypedSource (bodyRoots selected)) :=
+    ⟨Detail.recordExpressionWithExpected_preserves_owner recorded,
+      recordExpressionWithExpected_success_nodesPrefix recorded⟩
+  have elementsToParent := TypingSourceExtends.trans
+    (fresh_eq_typingSourceExtends elementFresh (bodyRoots selected))
+    (TypingSourceExtends.trans (unify_success_typingSourceExtends unifySuccess (bodyRoots selected))
+      unifiedToParent)
+  obtain ⟨_, contains⟩ := recordExpressionWithExpected_success_containsExpression recorded
+    (bodyRoots selected)
+  have edge : ∀ value ∈ elementsResult, DirectChild (resultState.toTypedSource (bodyRoots selected))
+      (.expression inferred.id) (.expression value.id) := by
+    intro value member
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    simpa [nodeChildIds, Node.references, ExpressionForm.references] using
+      (List.mem_map.mpr ⟨value.id, List.mem_map.mpr ⟨value, member, rfl⟩, rfl⟩ :
+        NodeId.expression value.id ∈ (elementsResult.map (·.id)).map NodeId.expression)
+  have childPatterns : elementsState.integerPatterns ⊆
+      selected.body.returned.integerPatterns := by
+    intro origin member
+    apply boundary.integerPatterns
+    rw [recordExpressionWithExpected_integerPatterns_eq recorded,
+      (Detail.unify_integerPatternMetadata_eq unifySuccess).1, fresh_eq_integerPatterns_eq elementFresh]
+    exact member
+  have childLiterals : elementsState.integerLiterals ⊆
+      selected.body.returned.integerLiterals := by
+    intro origin member
+    apply boundary.integerLiterals
+    rw [Detail.recordExpressionWithExpected_integerLiterals_eq recorded,
+      Detail.unify_integerLiterals unifySuccess, fresh_eq_integerLiterals_eq elementFresh]
+    exact member
+  have childRequirements : elementsState.requirements ⊆ selected.body.returned.requirements := by
+    intro requirement member
+    apply boundary.requirements
+    apply Detail.recordExpressionWithExpected_requirements_subset recorded
+    rw [Detail.unify_requirements_eq unifySuccess, fresh_eq_requirements_eq elementFresh]
+    exact member
+  have elementsHere := descend here
+    (ChildStep.expression_array_elements boundary.accepted expressionEq allocationEq elementsSuccess)
+  have typed := expressionsRooted_for checked descend childFuel
+    (fun smaller less => recursive smaller (Nat.lt_trans less (Nat.lt_succ_self childFuel)))
+    elementsHere elementsSuccess boundary.interfaces elementsExtension boundary.scope
+    allocatedInvariant boundary.actual allocatedOperational
+    (fun value member => (boundary.rawProper.childSubtree (edge value member)).monoBefore
+      elementsToParent)
+    childPatterns childLiterals childRequirements
+    (fun value member => boundary.covered.expressionChild resources.graph_closed
+      (boundary.directChildren (edge value member)))
+    (fun value member => boundary.actualCovered.directChild
+      (boundary.directChildren (edge value member)))
+  have typesEq := Detail.arrayLiteral_unify_types unifySuccess unifiedExtension
+  have binders := boundary.invariant.typeParameterBinders (by
+    simpa only [boundary.scope.owner, boundary.scope.parameters] using
+      boundary.scope.canonical checked)
+  have range := resources.substitutionRangeAdmissible binders
+    boundary.invariant.signatures_eq_whole boundary.invariant.typeParametersEq
+    boundary.invariant.declarationEq boundary.invariant.residual
+  have elementAdmissible : TypeAdmissible target
+      (selected.body.finalized.substitution.apply element) := by
+    have elementEq : elementsState.fresh.1 = element := congrArg Prod.fst elementFresh
+    rw [← elementEq]
+    change TypeAdmissible target (selected.body.finalized.substitution.apply
+      (.variable ⟨elementsState.inference.next⟩))
+    cases found : selected.body.finalized.substitution.lookup? ⟨elementsState.inference.next⟩ with
+    | none =>
+      simp only [Substitution.apply, found, Option.getD_none]
+      exact TypeAdmissible.variableOfResidual binders boundary.invariant.residual _
+    | some type =>
+      simp only [Substitution.apply, found, Option.getD_some]
+      exact range _ type (Substitution.lookup?_eq_some_mem found)
+  have arrayAdmissible : TypeAdmissible target
+      (selected.body.finalized.substitution.apply (Ty.array element)) := by
+    simpa [Ty.array, Substitution.apply] using TypeAdmissible.array elementAdmissible
+  have elementsTyped : ExpressionsHaveTypes selected.body.finalized.typedSource target
+      (elementsResult.map (·.id))
+      (List.replicate (elementsResult.map (·.id)).length
+        (selected.body.finalized.substitution.apply element)) := by
+    rw [List.length_map, ← typesEq]
+    simpa [List.map_map, Function.comp_def] using typed
+  have formType : ExpressionFormHasRawType selected.body.finalized.typedSource target
+      ((ExpressionForm.arrayLiteral element (elementsResult.map (·.id))).applySubstitution
+        selected.body.finalized.substitution)
+      (selected.body.finalized.substitution.apply (Ty.array element)) (.ordinary []) := by
+    simpa [ExpressionForm.applySubstitution, Ty.array, Substitution.apply] using
+      ExpressionFormHasRawType.arrayLiteral elementAdmissible elementsTyped
+  exact recordExpressionWithExpected_success_expressionTypingBase_actual resources
+    boundary.interfaces recorded boundary.extension boundary.requirements
+    boundary.expressionRequirements boundary.coercionPrimaries
+    (boundary.scope.catalog checked) boundary.scope.signatures boundary.invariant formType
+    arrayAdmissible boundary.covered
+
 theorem expressionRetained_index_for
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
@@ -3788,9 +3934,7 @@ theorem expressionRetained_step_for {callProvenance : CallIndex → Prop}
   | field base dot name =>
       exact constructor_field_for checked descend predecessor here form boundary
   | array elements =>
-      have success := boundary.accepted
-      simp only [Detail.inferExprFuel, form] at success
-      cases success
+      exact expressionRetained_arrayLiteral_for checked descend recursive here form boundary
   | newArray keyword type length =>
       exact expressionRetained_newArray_for checked descend predecessor here form boundary
   | slice base brackets start colon stop =>

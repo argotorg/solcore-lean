@@ -338,7 +338,17 @@ wait for the native pipeline's contracts and ABI.
 - **`new T[](n)`** has the type `T[]`. Its length has the type `uint256`, and an open literal length
   defaults to it.
 - **Literals.** The elements take one type `T`, and the literal has the type `T[]`. `[]` needs an
-  expected type. Open literal elements wait as row 1's literals do, then default to `uint256`.
+  expected type. Open literal elements wait as row 1's literals do, then default to `uint256`. As
+  built in step 4b, inference infers the elements with no expected type, as a tuple's, and unifies
+  their types with one fresh element type, as upstream's `infer_array_expr` does, so `[]` takes its
+  element type from the expected type or from the elements beside it, as in `[[a], []]`.
+  Finalization defaults an open literal element to `uint256` (`operatorMentions`) and rejects an
+  element type a memory array cannot hold with `operatorNotSupported "Typedef"`
+  (`validateArrayLiteral`), as upstream's `bool: Typedef<word>` fails. An unannotated `let`
+  generalizes a literal's element type that is still open there, as it generalizes any open type, so
+  in `let m = [];` no use fixes it, and finalization rejects that open type with
+  `operatorNotSupported "Typedef"`, whether the local is used or not; difference 8 names only the
+  unused case.
 - **Reads.** `a[i]` on an array or a slice takes `i` at `word` or one of the twelve types. An open
   literal index defaults to `uint256`, and the read has the element type. On a mapping, or on a base
   whose type is still open, `a[i]` keeps today's mapping rule. As built in step 3b, inference
@@ -533,7 +543,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 3b | Element reads: inference's typing of `a[i]` on a memory array, whose index waits for its type until finalization checks that it is `word` or one of the twelve types | 26–32 files, +800–1,000/−100–180; measured at 28 files, +1,156/−57 | none |
 | 3c | Element reads: the lowering, with `0x32` | 4–6 files, +120–200; measured at 4 files, +73/−13 | defaultZero(n, i), nestedEmpty(n) |
 | 4a | Literals: the typed form of `[e₀, …, eₙ₋₁]` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–500/−5–15; measured at 27 files, +192/−6 | none |
-| 4b | Literals: inference's typing of `[e₀, …, eₙ₋₁]` at one element type, with `[]` taking it from the expected type, open literal elements defaulting to `uint256` and finalization's check of the element type | 26–34 files, +900–1,300/−30–80 | none |
+| 4b | Literals: inference's typing of `[e₀, …, eₙ₋₁]` at one element type, with `[]` taking it from the expected type, open literal elements defaulting to `uint256` and finalization's check of the element type | 26–34 files, +900–1,300/−30–80; measured at 24 files, +1,004/−19 | none |
 | 4c | Literals: the lowering | 4–7 files, +150–300/−5–20 | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
 | 5 | Element writes and compound assignments, with the place checked before the right side | 55–72 files, +1,200–1,700/−300–450 | setGet(n, i, v), fillAndSum(n), compound(v), nestedReplace(n, v), alias(v); ret(n), sum(xs), echo(xs), grid(n) adapted |
 | 6 | Slices and `toArray(s)` | 45–65 files, +1,000–1,400/−200–400 | array-slice's 12 functions; slices(xs) adapted |

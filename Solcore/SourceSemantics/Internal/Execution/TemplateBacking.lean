@@ -246,6 +246,25 @@ theorem expression_tuple
   subst allocated
   exact backed.allocateExpressionId
 
+theorem expression_array_elements
+      {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
+      {elements : Syntax.DelimitedList Syntax.Expr} {expected : Option Ty}
+      {initial allocated final childFinal : State} {id : ExpressionId}
+      {value : InferredExpression} {values : List InferredExpression}
+      (accepted : (CallIndex.expression (fuel + 1) context source expected
+        initial value final).Accepted)
+      (form : source.value = .array elements)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (child : inferExprsFuel fuel context elements.elements allocated =
+        .ok (values, childFinal))
+      (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs)
+      (backed : LiveTemplatesBacked initial) : LiveTemplatesBacked (CallIndex.expressions fuel context elements.elements allocated values childFinal).initial := by
+  have step : ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.expressions fuel context elements.elements allocated values childFinal) := .expression_array_elements accepted form allocation child
+  have childInputs := step.inputs inputs
+  have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+  subst allocated
+  exact backed.allocateExpressionId
+
 theorem expression_unary
       {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
       {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
@@ -1451,6 +1470,7 @@ theorem ChildStep.liveTemplatesBacked {parent child : CallIndex}
   all_goals first
   | solve | apply ActualTemplateBacking.expression_group <;> assumption
   | solve | apply ActualTemplateBacking.expression_tuple <;> assumption
+  | solve | apply ActualTemplateBacking.expression_array_elements <;> assumption
   | solve | apply ActualTemplateBacking.expressions_head <;> assumption
   | solve | apply ActualTemplateBacking.expressions_tail <;> assumption
   | solve | apply ActualTemplateBacking.statements_head <;> assumption

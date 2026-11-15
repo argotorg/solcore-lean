@@ -1560,6 +1560,48 @@ private def testArrayIndex : IO Unit := do
     "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[0] = n; return n; }"
     fun _ => true
 
+/-- `[e₀, …, eₙ₋₁]` has the type `T[]` of its elements' one type `T`, which an
+annotation, an element or the expected type gives, `[]` included, and an open
+literal element defaults to `uint256`; a `bool` element is rejected with
+`Typedef`'s name, and so is an unannotated `let m = [];`, used or not, whose
+element type the `let` generalizes; elements of two types are rejected. -/
+private def testArrayLiteral : IO Unit := do
+  let functions ← check "array literal" (String.intercalate "\n" [
+    "function build(a: uint256, b: int8) returns (uint256[]) {",
+    "  let m: uint8[] = [1, 2];",
+    "  let n = [1, 2, 3];",
+    "  let rows: uint256[][] = [[a], []];",
+    "  let signed = [b, -1];",
+    "  let words: word[] = [];",
+    "  return [a, a];",
+    "}"
+  ])
+  let function ← match functions with
+    | [function] => pure function
+    | _ => throw (IO.userError "array literal fixture lost its checked function")
+  let literals := function.typedBody.nodes.filterMap fun
+    | .expression { form := .arrayLiteral element _, type, .. } => some (element, type)
+    | _ => none
+  let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
+  let uint8 : TypeSystem.Ty := .fixed ⟨false, .w8⟩
+  let int8 : TypeSystem.Ty := .fixed ⟨true, .w8⟩
+  assertTrue (decide (literals = [(uint8, .array uint8), (uint256, .array uint256),
+      (uint256, .array uint256), (uint256, .array uint256),
+      (.array uint256, .array (.array uint256)), (int8, .array int8), (.word, .array .word),
+      (uint256, .array uint256)]))
+    s!"array literals did not take their elements' type: {reprStr literals}"
+  expectInferenceError "a bool element"
+    "function bad() returns (uint256) { let m = [true, false]; return 0; }"
+    fun error => error == .operatorNotSupported "Typedef" .bool
+  expectInferenceError "an unannotated empty literal, used or not"
+    "function bad() returns (uint256) { let m = []; let n: uint256[] = m; return 0; }"
+    fun error => match error with
+      | .operatorNotSupported "Typedef" (.variable _) => true
+      | _ => false
+  expectInferenceError "elements of two types"
+    "function bad(a: uint256, b: int8) returns (uint256) { let m = [a, b]; return 0; }"
+    fun _ => true
+
 /-- Inference rejects the slices until row 4 gives them a meaning. -/
 private def testSliceRejected : IO Unit := do
   expectInferenceError "array slice"
@@ -1577,6 +1619,7 @@ def testSourcePhase7Inference : IO Unit := do
   testNewArray
   testArrayLength
   testArrayIndex
+  testArrayLiteral
   testSliceRejected
   IO.println "phase-7 source inference GREEN"
 

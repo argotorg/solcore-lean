@@ -424,10 +424,10 @@ def forItemMentions (state : State) (typeVar : TypeVarId) : ForItemForm → Bool
 
 /-- Whether a type variable occurs in an operand type of a unary or binary
 operator (a builtin operator deferred on an open literal, or a comparison), in
-the index type of a memory array read, or in the target type of a compound
-assignment that takes its target's type or of an in-place `~`, a statement's or
-a `for` item's: upstream reads `x op= e` as `x = x op e` and `x ~=` as
-`x = ~x`. -/
+the index type of a memory array read or the type of a memory array literal's
+element, or in the target type of a compound assignment that takes its target's
+type or of an in-place `~`, a statement's or a `for` item's: upstream reads
+`x op= e` as `x = x op e` and `x ~=` as `x = ~x`. -/
 def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
   let mentions (operand : ExpressionId) : Bool :=
     match expressionTypeAt? state operand with
@@ -440,6 +440,7 @@ def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
         | .unary _ operand => mentions operand
         | .binary left _ right => mentions left || mentions right
         | .arrayIndex _ index => mentions index
+        | .arrayLiteral _ elements => elements.any mentions
         | _ => false
     | .statement node =>
         match node.form with
@@ -700,12 +701,26 @@ def validateArrayIndex (state : State) (node : ExpressionNode) : Except Error Un
       else .ok ()
   | _ => .ok ()
 
+/-- A memory array literal unifies its elements' types with one element type
+and waits for it (`inferExprFuel`): once the defaults are in, a memory array
+must hold it (`Ty.arrayElementAllowed`), as upstream's array of it needs
+`Typedef<word>`. Another type, such as `bool`, is rejected with
+`operatorNotSupported "Typedef"`, as upstream's `bool: Typedef<word>` fails. -/
+def validateArrayLiteral (state : State) (node : ExpressionNode) : Except Error Unit :=
+  match node.form with
+  | .arrayLiteral element _ =>
+      if (state.resolve element).arrayElementAllowed then .ok ()
+      else throw (.operatorNotSupported "Typedef" (state.resolve element))
+  | _ => .ok ()
+
 /-- The finalization checks of one expression node: an unchecked operator's
-operand type, a shift's operand types and a memory array read's index type. -/
+operand type, a shift's operand types, a memory array read's index type and a
+memory array literal's element type. -/
 def validateExpressionNode (state : State) (node : ExpressionNode) : Except Error Unit := do
   validateUncheckedOperand state node
   validateShiftOperands state node
   validateArrayIndex state node
+  validateArrayLiteral state node
 
 /-- The finalization checks of one node: an assignment statement's value
 assignment or in-place `~`, a `for` loop's header items, an unchecked operator's

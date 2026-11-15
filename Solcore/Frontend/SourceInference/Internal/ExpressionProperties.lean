@@ -914,6 +914,74 @@ theorem inferExprFuel_success_newArray_facts
               exact ⟨arrayType, element, lengthResult, lengthState, rfl, elementResult, rfl,
                 success⟩
 
+/-- Invert successful `[e₀, …, eₙ₋₁]` inference: the elements are inferred
+with no expected type, one fresh element type is unified with each element's
+type, and the literal is recorded at the array of that type. -/
+theorem inferExprFuel_success_arrayLiteral_facts
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {elements : Syntax.DelimitedList Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .array elements)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ values elementsState element elementState unifiedState,
+      inferExprsFuel fuel context elements.elements allocated =
+          .ok (values, elementsState) ∧
+        elementsState.fresh = (element, elementState) ∧
+        unify elementState (Ty.productMany (values.map (·.type)))
+          (Ty.productMany (List.replicate values.length element)) = .ok unifiedState ∧
+        recordExpressionWithExpected context expression id (Ty.array element)
+          (.arrayLiteral element (values.map (·.id))) [] expected unifiedState =
+            .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases elementsSuccess : inferExprsFuel fuel context elements.elements allocated with
+  | error error =>
+      simp [elementsSuccess, bind, Except.bind] at success
+  | ok elementsPair =>
+      rcases elementsPair with ⟨values, elementsState⟩
+      simp only [elementsSuccess, bind, Except.bind] at success
+      generalize elementFresh : elementsState.fresh = elementPair at success
+      rcases elementPair with ⟨element, elementState⟩
+      cases unifySuccess : unify elementState (Ty.productMany (values.map (·.type)))
+          (Ty.productMany (List.replicate values.length element)) with
+      | error error =>
+          simp [unifySuccess, bind, Except.bind] at success
+      | ok unifiedState =>
+          simp only [unifySuccess, bind, Except.bind] at success
+          exact ⟨values, elementsState, element, elementState, unifiedState, rfl,
+            elementFresh, unifySuccess, success⟩
+
+/-- Both sides of `[e₀, …, eₙ₋₁]`'s unification, its elements' types and copies
+of its fresh element type, and that type itself are below the next variable of
+the state that allocated it. -/
+theorem arrayLiteral_unify_operands_variablesBelow
+    {values : List InferredExpression} {elementsState elementState : State} {element : Ty}
+    (elementsBelow : ∀ value ∈ values, value.type.VariablesBelow elementsState.inference.next)
+    (elementFresh : elementsState.fresh = (element, elementState)) :
+    (Ty.productMany (values.map (·.type))).VariablesBelow elementState.inference.next ∧
+      (Ty.productMany (List.replicate values.length element)).VariablesBelow
+        elementState.inference.next ∧
+      element.VariablesBelow elementState.inference.next := by
+  have stateEq : elementsState.fresh.2 = elementState := congrArg Prod.snd elementFresh
+  have elementEq : elementsState.fresh.1 = element := congrArg Prod.fst elementFresh
+  subst stateEq elementEq
+  have elementBelow : elementsState.fresh.1.VariablesBelow
+      elementsState.fresh.2.inference.next := by
+    change Ty.VariablesBelow (elementsState.inference.next + 1)
+      (.variable ⟨elementsState.inference.next⟩)
+    exact (Ty.variablesBelow_variable_iff _ _).2 (Nat.lt_succ_self _)
+  refine ⟨Ty.variablesBelow_productMany ?_, Ty.variablesBelow_productMany ?_, elementBelow⟩
+  · intro type member
+    simp only [List.mem_map] at member
+    obtain ⟨value, valueMember, rfl⟩ := member
+    exact (elementsBelow value valueMember).weaken (Nat.le_succ _)
+  · intro type member
+    rw [List.eq_of_mem_replicate member]
+    exact elementBelow
+
 /-- Invert successful proxy-type expression inference into source-type
 resolution and the exact proxy-recording operation. -/
 theorem inferExprFuel_success_proxy_facts
@@ -4877,6 +4945,26 @@ theorem unify_resolve_eq
       simp [liftUnification, inferenceSuccess, bind, Except.bind] at success
       cases success
       exact TypeSystem.InferState.unify_resolve_eq inferenceSuccess
+
+/-- Once `[e₀, …, eₙ₋₁]`'s unification succeeds, a substitution that extends it
+gives each element the element type. -/
+theorem arrayLiteral_unify_types {values : List InferredExpression} {before after : State}
+    {element : Ty} {substitution : Substitution}
+    (unified : unify before (Ty.productMany (values.map (·.type)))
+      (Ty.productMany (List.replicate values.length element)) = .ok after)
+    (extension : substitution.SemanticallyExtends after.inference.substitution) :
+    values.map (fun value => substitution.apply value.type) =
+      List.replicate values.length (substitution.apply element) := by
+  have resolved := unify_resolve_eq unified
+  have leftEq := extension (Ty.productMany (values.map (·.type)))
+  have rightEq := extension (Ty.productMany (List.replicate values.length element))
+  have applied : substitution.apply (Ty.productMany (values.map (·.type))) =
+      substitution.apply (Ty.productMany (List.replicate values.length element)) := by
+    rw [← leftEq, ← rightEq]
+    exact congrArg substitution.apply resolved
+  rw [Substitution.apply_productMany, Substitution.apply_productMany, List.map_map,
+    List.map_replicate] at applied
+  exact Ty.productMany_inj (by simp) applied
 
 /-- Any type equality already visible through the input inference state
 remains visible after a successful incremental unification. -/
@@ -10689,7 +10777,36 @@ private theorem inferFuel_inferenceProperties_internal :
                 exact ⟨prefixProgress.trans recordedProperties.1,
                   recordedProperties.2⟩
   case case21 =>
-    simp_all [InferExprFuelInferenceProperties, inferExprFuel]
+    intros context expression expected initial fuel id allocated allocationEq
+      elements expressionEq elementsInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    obtain ⟨inferredElements, elementsState, element, elementState, unifiedState,
+        elementsResult, elementFresh, unifyResult, recorded⟩ :=
+      inferExprFuel_success_arrayLiteral_facts expressionEq allocationEq success
+    have elementsProperties := elementsInduction allocationProperties.2
+      validated canonical (inferredElements, elementsState) elementsResult
+    have freshProperties := fresh_eq_inferenceProperties elementsProperties.2.1 elementFresh
+    have operands := arrayLiteral_unify_operands_variablesBelow elementsProperties.2.2
+      elementFresh
+    have unifyProgress := unify_inferenceProgress freshProperties.2.1.solved operands.1
+      operands.2.1 unifyResult
+    have unifiedReady := unify_preserves_inferenceReady freshProperties.2.1 operands.1
+      operands.2.1 unifyResult
+    have prefixProgress := allocationProperties.1.trans
+      (elementsProperties.1.trans (freshProperties.1.trans unifyProgress))
+    have arrayBelow : (Ty.array element).VariablesBelow unifiedState.inference.next :=
+      (Ty.variablesBelow_application_iff _ _ _).2
+        ⟨Ty.variablesBelow_constructor _ _, operands.2.2.weaken unifyProgress.next_le⟩
+    have recordedProperties :=
+      recordExpressionWithExpected_inferenceProperties unifiedReady arrayBelow
+        (by
+          intro expectedType member
+          exact (expectedBelow expectedType member).weaken prefixProgress.next_le)
+        recorded
+    exact ⟨prefixProgress.trans recordedProperties.1, recordedProperties.2⟩
   case case22 =>
     intros context expression expected initial fuel id allocated allocationEq
       keyword sourceType length expressionEq lengthInduction
@@ -13907,6 +14024,24 @@ private theorem inferFuel_preserves_lexicalScope_internal :
         have recordedScope :=
           recordExpressionWithExpected_lexicalScope success
         exact recordedScope.trans (elementsScope.trans allocationScope)
+  case case21 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      elements expressionEq elementsInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    obtain ⟨inferredElements, elementsState, element, elementState, unifiedState,
+        elementsResult, elementFresh, unifyResult, recorded⟩ :=
+      inferExprFuel_success_arrayLiteral_facts expressionEq allocationEq success
+    have elementsScope := elementsInduction (inferredElements, elementsState) elementsResult
+    have allocationScope := allocateExpressionId_success_lexicalScope allocationEq
+    have stateEq : elementsState.fresh.2 = elementState := congrArg Prod.snd elementFresh
+    have freshScope : elementState.lexicalScope = elementsState.lexicalScope := by
+      rw [← stateEq]
+      rfl
+    have unifiedScope := unify_preserves_lexicalScope unifyResult
+    have recordedScope := recordExpressionWithExpected_lexicalScope recorded
+    exact recordedScope.trans (unifiedScope.trans (freshScope.trans
+      (elementsScope.trans allocationScope)))
   case case12 =>
     intros context expression expected initial fuel id allocated allocationEq
       operator operand expressionEq operandInduction

@@ -216,6 +216,15 @@ theorem ChildStep.expression_shapes
       inferExprFuel_success_tuple_facts form allocation accepted
     cases Except.ok.inj (elementsRun.symm.trans childAccepted)
     exact ActualExpressionNodeShapes.recordExpected recorded
+  | expression_array_elements accepted form allocation childAccepted =>
+    obtain ⟨elements, elementsState, element, elementState, unifiedState, elementsRun,
+      elementFresh, unification, recorded⟩ :=
+      inferExprFuel_success_arrayLiteral_facts form allocation accepted
+    have stateEq : elementsState.fresh.2 = elementState := congrArg Prod.snd elementFresh
+    subst stateEq
+    cases Except.ok.inj (elementsRun.symm.trans childAccepted)
+    exact (ActualExpressionNodeShapes.unify unification).trans
+      (ActualExpressionNodeShapes.recordExpected recorded)
   | expression_unary accepted form allocation childAccepted =>
     obtain ⟨operand, operandState, operandRun, dispatch⟩ :=
       inferExprFuel_success_unary_facts form allocation accepted
@@ -1289,6 +1298,8 @@ theorem ChildStep.nonexpression_shapes {parent child : CallIndex}
   | expression_field_length_base accepted form allocation nonconstructor child =>
       exact False.elim nonexpression
   | expression_tuple accepted form allocation child =>
+      exact False.elim nonexpression
+  | expression_array_elements accepted form allocation child =>
       exact False.elim nonexpression
   | expressions_head accepted head =>
       exact ActualNodeShapeSuffix.expressions_head accepted head

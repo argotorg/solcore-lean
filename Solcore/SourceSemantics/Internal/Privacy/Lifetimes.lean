@@ -1946,6 +1946,83 @@ end Solcore.SourceSemantics.SourceInferenceSoundness.ProtectedVariables
 end
 
 section
+/-! A memory array literal's elements keep an event's lifetime through the
+literal's fresh element type, the unification of their types with it and the
+literal's recording. -/
+set_option autoImplicit false
+set_option Elab.async false
+namespace Solcore.SourceSemantics.SourceInferenceSoundness.ProtectedVariables
+open Frontend SourceInference TypeSystem Detail
+
+namespace GeneralizationLifetime
+variable {whole : TypedSource} {finalSubstitution : Substitution}
+    {binder : TypedBinder} {initializer : ExpressionId}
+    {event : RetainedGeneralization whole finalSubstitution binder initializer}
+
+/-- `[e₀, …, eₙ₋₁]`'s elements: the fresh element type, the unification of their
+types with it and the literal's recording keep the event's lifetime. -/
+theorem arrayLiteral
+    {fuel : Nat} {context : SourceInference.Context}
+    {source : Syntax.Expr} {elements : Syntax.DelimitedList Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State} {id : ExpressionId}
+    {child : List InferredExpression × State} {final : InferredExpression × State}
+    (ready : initial.InferenceReady) (catalog : LifetimeInferenceContext context)
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (form : source.value = .array elements)
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (childAccepted : inferExprsFuel fuel context elements.elements allocated = .ok child)
+    (accepted : inferExprFuel (fuel + 1) context source expected initial = .ok final)
+    (lifetime : GeneralizationLifetime event allocated.inference.next child.2
+      (child.1.map (·.type))) :
+    GeneralizationLifetime event initial.inference.next final.2 [final.1.type] := by
+  have allocatedEq : allocated = initial.allocateExpressionId.2 :=
+    (congrArg Prod.snd allocation).symm
+  have sameNext : allocated.inference.next = initial.inference.next := by
+    rw [allocatedEq]; rfl
+  have childProperties := inferExprsFuel_inferenceProperties
+    (allocatedEq ▸ ready.allocateExpressionId) catalog.formation catalog.canonical childAccepted
+  obtain ⟨values, elementsState, element, elementState, unifiedState, elementsRun,
+      elementFresh, unification, recorded⟩ :=
+    inferExprFuel_success_arrayLiteral_facts form allocation accepted
+  cases Except.ok.inj (elementsRun.symm.trans childAccepted)
+  have freshProperties := fresh_eq_inferenceProperties childProperties.2.1 elementFresh
+  have operands := arrayLiteral_unify_operands_variablesBelow childProperties.2.2 elementFresh
+  have stateEq : elementsState.fresh.2 = elementState := congrArg Prod.snd elementFresh
+  have elementEq : elementsState.fresh.1 = element := congrArg Prod.fst elementFresh
+  subst stateEq elementEq
+  have freshLifetime := lifetime.fresh childProperties.2.1
+  have unifiedLifetime := freshLifetime.unify freshProperties.2.1 operands.1 operands.2.1
+    (safe_productMany _ _ _ (fun type member =>
+      freshLifetime.values type (List.mem_append_left _ member)))
+    (safe_productMany _ _ _ (fun type member => by
+      rw [List.eq_of_mem_replicate member]
+      exact freshLifetime.values _ (List.mem_append_right _ (List.mem_singleton_self _))))
+    unification
+  have unifyProgress := unify_inferenceProgress freshProperties.2.1.solved operands.1
+    operands.2.1 unification
+  have unifiedReady := unify_preserves_inferenceReady freshProperties.2.1 operands.1
+    operands.2.1 unification
+  have throughUnified := childProperties.1.trans (freshProperties.1.trans unifyProgress)
+  have arrayBelow : (Ty.array elementsState.fresh.1).VariablesBelow unifiedState.inference.next :=
+    (Ty.variablesBelow_application_iff _ _ _).2
+      ⟨Ty.variablesBelow_constructor _ _, operands.2.2.weaken unifyProgress.next_le⟩
+  have arraySafe : Safe binder.scheme.quantified unifiedState (Ty.array elementsState.fresh.1) :=
+    (safe_application_iff _ _ _ _).2
+      ⟨safe_closed _ _ (Ty.variablesBelow_constructor 0 _),
+        unifiedLifetime.values _ (List.mem_append_right _ (List.mem_singleton_self _))⟩
+  have result := unifiedLifetime.recordExpression catalog.catalog unifiedReady arrayBelow
+    (fun type member => (sameNext ▸ expectedBelow type member).weaken throughUnified.next_le)
+    arraySafe
+    (fun type member => unifiedLifetime.older type (sameNext ▸ expectedBelow type member)) recorded
+  have finalLifetime := result.restrict_outputs (selected := [final.1.type])
+    (by intro type member; exact List.mem_append_right _ member)
+  simpa only [sameNext] using finalLifetime
+
+end GeneralizationLifetime
+end Solcore.SourceSemantics.SourceInferenceSoundness.ProtectedVariables
+end
+
+section
 -- leanmerge: from Solcore.SourceSemantics.SourceInferenceGeneralizationLifetimeMatchCases
 /-! Match-arm events follow the real pattern, scope restoration and remaining arms. -/
 set_option autoImplicit false
