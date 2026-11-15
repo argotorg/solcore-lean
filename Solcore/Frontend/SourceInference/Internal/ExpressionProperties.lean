@@ -1011,6 +1011,122 @@ theorem arrayLiteral_unify_operands_variablesBelow
     rw [List.eq_of_mem_replicate member]
     exact elementBelow
 
+/-- Invert successful slice inference: the base, then the present bounds, are
+inferred with no expected type, the base's type is a memory array or a slice
+there, the bounds' types are unified with `uint256`s, and the slice is recorded
+at the slice of the base's type. -/
+theorem inferExprFuel_success_slice_facts
+    {fuel : Nat} {context : Context} {expression base : Syntax.Expr}
+    {brackets colon : Syntax.SourceSpan} {start stop : Option Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    (expressionEq : expression.value = .slice base brackets start colon stop)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    ∃ baseResult bounds childrenState unifiedState,
+      inferExprsFuel fuel context (base :: (start.toList ++ stop.toList)) allocated =
+          .ok (baseResult :: bounds, childrenState) ∧
+        (childrenState.resolve baseResult.type).arraySliceBaseAllowed = true ∧
+        unify childrenState (Ty.productMany (bounds.map (·.type)))
+          (Ty.productMany (List.replicate bounds.length (.fixed .uint256))) =
+            .ok unifiedState ∧
+        recordExpressionWithExpected context expression id
+          (Ty.arraySlice (unifiedState.resolve baseResult.type))
+          (.arraySlice baseResult.id (sliceBoundIds start stop bounds).1
+            (sliceBoundIds start stop bounds).2) [] expected unifiedState = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases childrenSuccess : inferExprsFuel fuel context (base :: (start.toList ++ stop.toList))
+      allocated with
+  | error error =>
+      simp [childrenSuccess, bind, Except.bind] at success
+  | ok childrenPair =>
+      rcases childrenPair with ⟨values, childrenState⟩
+      simp only [childrenSuccess, bind, Except.bind] at success
+      cases values with
+      | nil => simp [throw, throwThe, MonadExceptOf.throw] at success
+      | cons baseResult bounds =>
+          simp only [List.head?_cons, List.tail_cons] at success
+          cases allowed : (childrenState.resolve baseResult.type).arraySliceBaseAllowed with
+          | false =>
+              simp [allowed, throw, throwThe, MonadExceptOf.throw, bind, Except.bind] at success
+          | true =>
+              simp only [allowed, ↓reduceIte, pure, Except.pure, bind, Except.bind] at success
+              cases unifySuccess : unify childrenState (Ty.productMany (bounds.map (·.type)))
+                  (Ty.productMany (List.replicate bounds.length (.fixed .uint256))) with
+              | error error =>
+                  simp [unifySuccess, bind, Except.bind] at success
+              | ok unifiedState =>
+                  simp only [unifySuccess, bind, Except.bind] at success
+                  exact ⟨baseResult, bounds, childrenState, unifiedState, rfl, allowed,
+                    unifySuccess, success⟩
+
+/-- Both sides of a slice's unification, its bounds' types and copies of
+`uint256`, are below a state's next variable whenever the bounds' types are. -/
+theorem slice_unify_operands_variablesBelow {bounds : List InferredExpression} {next : Nat}
+    (boundsBelow : ∀ bound ∈ bounds, bound.type.VariablesBelow next) :
+    (Ty.productMany (bounds.map (·.type))).VariablesBelow next ∧
+      (Ty.productMany (List.replicate bounds.length (.fixed .uint256))).VariablesBelow next := by
+  refine ⟨Ty.variablesBelow_productMany ?_, Ty.variablesBelow_productMany ?_⟩
+  · intro type member
+    obtain ⟨bound, boundMember, rfl⟩ := List.mem_map.mp member
+    exact boundsBelow bound boundMember
+  · intro type member
+    rw [List.eq_of_mem_replicate member]
+    exact Ty.variablesBelow_constructor _ _
+
+/-- A slice's type, the slice of its base's type resolved by a ready state, is
+below the state's next variable whenever the base's type is. -/
+theorem slice_type_variablesBelow {state : State} {type : Ty}
+    (ready : state.InferenceReady) (below : type.VariablesBelow state.inference.next) :
+    (Ty.arraySlice (state.resolve type)).VariablesBelow state.inference.next :=
+  (Ty.variablesBelow_application_iff _ _ _).2
+    ⟨Ty.variablesBelow_constructor _ _, ready.solved.variablesBelow_apply below⟩
+
+/-- List inference gives one result per expression. -/
+theorem inferExprsFuel_length {fuel : Nat} {context : Context} :
+    ∀ {expressions : List Syntax.Expr} {state final : State} {values : List InferredExpression},
+      inferExprsFuel fuel context expressions state = .ok (values, final) →
+        values.length = expressions.length := by
+  induction fuel with
+  | zero =>
+      intro expressions state final values success
+      unfold inferExprsFuel at success
+      cases success
+  | succ fuel ih =>
+      intro expressions state final values success
+      cases expressions with
+      | nil =>
+          unfold inferExprsFuel at success
+          cases success
+          rfl
+      | cons expression rest =>
+          unfold inferExprsFuel at success
+          simp only [bind, Except.bind] at success
+          cases headSuccess : inferExprFuel fuel context expression none state with
+          | error error => simp [headSuccess] at success
+          | ok headPair =>
+              rcases headPair with ⟨head, headState⟩
+              simp only [headSuccess] at success
+              cases restSuccess : inferExprsFuel fuel context rest headState with
+              | error error => simp [restSuccess] at success
+              | ok restPair =>
+                  rcases restPair with ⟨tail, tailState⟩
+                  simp only [restSuccess, pure, Except.pure, Except.ok.injEq,
+                    Prod.mk.injEq] at success
+                  obtain ⟨rfl, rfl⟩ := success
+                  simp [ih restSuccess]
+
+/-- A slice's start and stop are its present bounds' results, in order. -/
+theorem sliceBoundIds_ids {start stop : Option Syntax.Expr} {bounds : List InferredExpression}
+    (length : bounds.length = (start.toList ++ stop.toList).length) :
+    (sliceBoundIds start stop bounds).1.toList ++ (sliceBoundIds start stop bounds).2.toList =
+      bounds.map (·.id) := by
+  rcases start with _ | start <;> rcases stop with _ | stop <;>
+    rcases bounds with _ | ⟨first, _ | ⟨last, rest⟩⟩ <;>
+    simp_all [sliceBoundIds]
+
 /-- Invert successful proxy-type expression inference into source-type
 resolution and the exact proxy-recording operation. -/
 theorem inferExprFuel_success_proxy_facts
@@ -10867,7 +10983,34 @@ private theorem inferFuel_inferenceProperties_internal :
         lengthProperties.2.1 arrayBelow expectedAtLength recorded
     exact ⟨prefixProgress.trans recordedProperties.1, recordedProperties.2⟩
   case case23 =>
-    simp_all [InferExprFuelInferenceProperties, inferExprFuel]
+    intros context expression expected initial fuel id allocated allocationEq
+      base brackets start colon stop expressionEq childrenInduction
+    unfold InferExprFuelInferenceProperties
+    intro ready validated canonical expectedBelow result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    obtain ⟨baseResult, bounds, childrenState, unifiedState, childrenResult, _,
+        unifyResult, recorded⟩ :=
+      inferExprFuel_success_slice_facts expressionEq allocationEq success
+    have childrenProperties := childrenInduction allocationProperties.2
+      validated canonical (baseResult :: bounds, childrenState) childrenResult
+    have operands := slice_unify_operands_variablesBelow
+      (fun bound member => childrenProperties.2.2 bound (List.mem_cons_of_mem _ member))
+    have unifyProgress := unify_inferenceProgress childrenProperties.2.1.solved operands.1
+      operands.2 unifyResult
+    have unifiedReady := unify_preserves_inferenceReady childrenProperties.2.1 operands.1
+      operands.2 unifyResult
+    have prefixProgress := allocationProperties.1.trans
+      (childrenProperties.1.trans unifyProgress)
+    have sliceBelow := slice_type_variablesBelow unifiedReady
+      ((childrenProperties.2.2 baseResult (by simp)).weaken unifyProgress.next_le)
+    have recordedProperties :=
+      recordExpressionWithExpected_inferenceProperties unifiedReady sliceBelow
+        (by
+          intro expectedType member
+          exact (expectedBelow expectedType member).weaken prefixProgress.next_le)
+        recorded
+    exact ⟨prefixProgress.trans recordedProperties.1, recordedProperties.2⟩
   case case24 =>
     simp_all [InferExprFuelInferenceProperties, inferExprFuel]
   case case17 =>
@@ -14065,6 +14208,19 @@ private theorem inferFuel_preserves_lexicalScope_internal :
     have recordedScope := recordExpressionWithExpected_lexicalScope recorded
     exact recordedScope.trans (unifiedScope.trans (freshScope.trans
       (elementsScope.trans allocationScope)))
+  case case23 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      base brackets start colon stop expressionEq childrenInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    obtain ⟨baseResult, bounds, childrenState, unifiedState, childrenResult, _,
+        unifyResult, recorded⟩ :=
+      inferExprFuel_success_slice_facts expressionEq allocationEq success
+    have childrenScope := childrenInduction (baseResult :: bounds, childrenState) childrenResult
+    have allocationScope := allocateExpressionId_success_lexicalScope allocationEq
+    have unifiedScope := unify_preserves_lexicalScope unifyResult
+    have recordedScope := recordExpressionWithExpected_lexicalScope recorded
+    exact recordedScope.trans (unifiedScope.trans (childrenScope.trans allocationScope))
   case case12 =>
     intros context expression expected initial fuel id allocated allocationEq
       operator operand expressionEq operandInduction

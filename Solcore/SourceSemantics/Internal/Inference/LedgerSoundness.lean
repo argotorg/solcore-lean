@@ -229,7 +229,12 @@ theorem inferExprFuelLedgerPreservation_step
     have freshTracked := (expressionsIH children allocatedTracked).fresh
     rw [elementFresh] at freshTracked
     exact (freshTracked.unify unified).recordExpressionWithExpected recorded
-  | slice _ _ _ _ _ | error =>
+  | slice _ _ _ _ _ =>
+    obtain ⟨_, _, _, _, children, _, unified, recorded⟩ :=
+      Detail.inferExprFuel_success_slice_facts form allocation accepted
+    exact ((expressionsIH children allocatedTracked).unify unified).recordExpressionWithExpected
+      recorded
+  | error =>
     simp [Detail.inferExprFuel, allocation, form] at accepted
 
 end Solcore.SourceSemantics.SourceInferenceSoundness

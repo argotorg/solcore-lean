@@ -57,6 +57,9 @@ theorem ChildStep.lifetime_expression
   | expression_array_elements accepted form allocation childAccepted =>
       exact GeneralizationLifetime.arrayLiteral inputs.ready inputs.catalog inputs.bounds
         form allocation childAccepted accepted life
+  | expression_slice_children accepted form allocation childAccepted =>
+      exact GeneralizationLifetime.slice inputs.ready inputs.catalog inputs.bounds
+        form allocation childAccepted accepted life
   | expression_unary accepted form allocation childAccepted =>
       exact GeneralizationLifetime.unary inputs.ready inputs.catalog inputs.bounds
         form allocation childAccepted accepted life
@@ -602,6 +605,27 @@ theorem ChildStep.progress_expression
           (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken
             throughUnified.next_le)
           recorded).1)
+  | expression_slice_children accepted form allocation childAccepted =>
+      obtain ⟨baseResult, bounds, childrenState, unifiedState, childrenRun, _,
+        unification, recorded⟩ :=
+        inferExprFuel_success_slice_facts form allocation accepted
+      cases Except.ok.inj (childrenRun.symm.trans childAccepted)
+      have operands := slice_unify_operands_variablesBelow
+        (fun bound member => childProperties.2.2 _
+          (List.mem_map.mpr ⟨bound, List.mem_cons_of_mem _ member, rfl⟩))
+      have unifyProgress := unify_inferenceProgress childProperties.2.1.solved operands.1
+        operands.2 unification
+      have unifiedReady := unify_preserves_inferenceReady childProperties.2.1 operands.1
+        operands.2 unification
+      have throughUnified := childProperties.1.trans unifyProgress
+      have sliceBelow := slice_type_variablesBelow unifiedReady
+        ((childProperties.2.2 _ (List.mem_map.mpr ⟨baseResult, by simp, rfl⟩)).weaken
+          unifyProgress.next_le)
+      exact unifyProgress.trans
+        (recordExpressionWithExpected_inferenceProperties unifiedReady sliceBelow
+          (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken
+            throughUnified.next_le)
+          recorded).1
   | expression_unary accepted form allocation childAccepted =>
       obtain ⟨operand, operandState, operandRun, dispatch⟩ :=
         inferExprFuel_success_unary_facts form allocation accepted

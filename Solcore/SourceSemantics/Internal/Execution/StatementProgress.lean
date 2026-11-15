@@ -1429,6 +1429,8 @@ theorem ChildStep.progress_nonexpression {parent child : CallIndex}
       exact False.elim nonexpression
   | expression_array_elements accepted form allocation child =>
       exact False.elim nonexpression
+  | expression_slice_children accepted form allocation child =>
+      exact False.elim nonexpression
   | expressions_head accepted head =>
       exact ActualSuffixProgress.expressions_head accepted head inputs
   | expressions_tail accepted head tail =>

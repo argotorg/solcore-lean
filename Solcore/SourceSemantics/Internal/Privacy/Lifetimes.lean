@@ -2018,6 +2018,66 @@ theorem arrayLiteral
     (by intro type member; exact List.mem_append_right _ member)
   simpa only [sameNext] using finalLifetime
 
+/-- A slice's base and present bounds: the unification of the bounds' types with
+`uint256`s and the slice's recording keep the event's lifetime. -/
+theorem slice
+    {fuel : Nat} {context : SourceInference.Context}
+    {source base : Syntax.Expr} {brackets colon : Syntax.SourceSpan}
+    {start stop : Option Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State} {id : ExpressionId}
+    {child : List InferredExpression × State} {final : InferredExpression × State}
+    (ready : initial.InferenceReady) (catalog : LifetimeInferenceContext context)
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (form : source.value = .slice base brackets start colon stop)
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (childAccepted : inferExprsFuel fuel context (base :: (start.toList ++ stop.toList))
+      allocated = .ok child)
+    (accepted : inferExprFuel (fuel + 1) context source expected initial = .ok final)
+    (lifetime : GeneralizationLifetime event allocated.inference.next child.2
+      (child.1.map (·.type))) :
+    GeneralizationLifetime event initial.inference.next final.2 [final.1.type] := by
+  have allocatedEq : allocated = initial.allocateExpressionId.2 :=
+    (congrArg Prod.snd allocation).symm
+  have sameNext : allocated.inference.next = initial.inference.next := by
+    rw [allocatedEq]; rfl
+  have childProperties := inferExprsFuel_inferenceProperties
+    (allocatedEq ▸ ready.allocateExpressionId) catalog.formation catalog.canonical childAccepted
+  obtain ⟨baseResult, bounds, childrenState, unifiedState, childrenRun, _, unification,
+      recorded⟩ :=
+    inferExprFuel_success_slice_facts form allocation accepted
+  cases Except.ok.inj (childrenRun.symm.trans childAccepted)
+  have operands := slice_unify_operands_variablesBelow
+    (fun bound member => childProperties.2.2 bound (List.mem_cons_of_mem _ member))
+  have unifiedLifetime := lifetime.unify childProperties.2.1 operands.1 operands.2
+    (safe_productMany _ _ _ (fun type member => by
+      obtain ⟨bound, boundMember, rfl⟩ := List.mem_map.mp member
+      exact lifetime.values _
+        (List.mem_map.mpr ⟨bound, List.mem_cons_of_mem _ boundMember, rfl⟩)))
+    (safe_productMany _ _ _ (fun type member => by
+      rw [List.eq_of_mem_replicate member]
+      exact safe_closed _ _ (Ty.variablesBelow_constructor 0 _)))
+    unification
+  have unifyProgress := unify_inferenceProgress childProperties.2.1.solved operands.1
+    operands.2 unification
+  have unifiedReady := unify_preserves_inferenceReady childProperties.2.1 operands.1
+    operands.2 unification
+  have throughUnified := childProperties.1.trans unifyProgress
+  have sliceBelow := slice_type_variablesBelow unifiedReady
+    ((childProperties.2.2 baseResult (by simp)).weaken unifyProgress.next_le)
+  have sliceSafe : Safe binder.scheme.quantified unifiedState
+      (Ty.arraySlice (unifiedState.resolve baseResult.type)) :=
+    (safe_application_iff _ _ _ _).2
+      ⟨safe_closed _ _ (Ty.variablesBelow_constructor 0 _),
+        safe_resolved unifiedReady
+          (unifiedLifetime.values _ (List.mem_map.mpr ⟨baseResult, by simp, rfl⟩))⟩
+  have result := unifiedLifetime.recordExpression catalog.catalog unifiedReady sliceBelow
+    (fun type member => (sameNext ▸ expectedBelow type member).weaken throughUnified.next_le)
+    sliceSafe
+    (fun type member => unifiedLifetime.older type (sameNext ▸ expectedBelow type member)) recorded
+  have finalLifetime := result.restrict_outputs (selected := [final.1.type])
+    (by intro type member; exact List.mem_append_right _ member)
+  simpa only [sameNext] using finalLifetime
+
 end GeneralizationLifetime
 end Solcore.SourceSemantics.SourceInferenceSoundness.ProtectedVariables
 end

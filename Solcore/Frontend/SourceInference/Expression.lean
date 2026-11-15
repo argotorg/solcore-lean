@@ -1768,6 +1768,16 @@ def newArrayElement (type : Ty) : Except Error Ty :=
       else .error (.unsupportedExpression "new")
   | none => .error (.unsupportedExpression "new")
 
+/-- A slice's start and stop in its typed form, from its present bounds' inferred
+results in order, the start first. -/
+def sliceBoundIds (start stop : Option Syntax.Expr) (bounds : List InferredExpression) :
+    Option ExpressionId × Option ExpressionId :=
+  match start, stop, bounds with
+  | some _, some _, first :: last :: _ => (some first.id, some last.id)
+  | some _, none, first :: _ => (some first.id, none)
+  | none, some _, last :: _ => (none, some last.id)
+  | _, _, _ => (none, none)
+
 mutual
 
   def inferExprFuel (fuel : Nat) (context : Context)
@@ -2141,7 +2151,22 @@ mutual
             (some (.fixed .uint256)) state
           recordExpressionWithExpected context expression id (Ty.array element)
             (.newArray element length.id) [] expected state
-      | .slice .. => .error (.unsupportedExpression "slice")
+      -- A slice infers its base, then its present bounds, with no expected type, as
+      -- a tuple's elements, takes its base only when the base's type is a memory array
+      -- or a slice there, as a read decides on its base, and unifies the bounds' types
+      -- with `uint256`s, as a literal's elements' with its element type.
+      | .slice base _ start _ stop => do
+          let (values, state) ← inferExprsFuel fuel context
+            (base :: (start.toList ++ stop.toList)) state
+          let some baseResult := values.head? | throw (.unsupportedExpression "slice")
+          unless (state.resolve baseResult.type).arraySliceBaseAllowed do
+            throw (.unsupportedExpression "slice")
+          let state ← unify state (Ty.productMany (values.tail.map (·.type)))
+            (Ty.productMany (List.replicate values.tail.length (.fixed .uint256)))
+          recordExpressionWithExpected context expression id
+            (Ty.arraySlice (state.resolve baseResult.type))
+            (.arraySlice baseResult.id (sliceBoundIds start stop values.tail).1
+              (sliceBoundIds start stop values.tail).2) [] expected state
       -- The parser's recovery nodes.
       | _ => .error (.unsupportedExpression "parser recovery")
 

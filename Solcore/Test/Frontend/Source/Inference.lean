@@ -1673,11 +1673,41 @@ private def testArrayLiteral : IO Unit := do
     "function bad(a: uint256, b: int8) returns (uint256) { let m = [a, b]; return 0; }"
     fun _ => true
 
-/-- Inference rejects the slices until row 4 gives them a meaning. -/
-private def testSliceRejected : IO Unit := do
-  expectInferenceError "array slice"
+/-- `a[s:e]`, `a[s:]`, `a[:e]` and `a[:]` on a memory array or a slice have the
+slice type of their base's, with `uint256` bounds, open literals included; a
+slice of a word is rejected with `slice`, and so is a bound of another type. -/
+private def testSlices : IO Unit := do
+  let functions ← check "slices" (String.intercalate "\n" [
+    "function views(m: uint256[], i: uint256) returns (uint256) {",
+    "  let r = m[1:3];",
+    "  let s = m[i:];",
+    "  let p = m[:2];",
+    "  let w = m[:];",
+    "  let again = r[0:1];",
+    "  return 0;",
+    "}"
+  ])
+  let function ← match functions with
+    | [function] => pure function
+    | _ => throw (IO.userError "slice fixture lost its checked function")
+  let slices := function.typedBody.nodes.filterMap fun
+    | .expression { form := .arraySlice _ start stop, type, .. } =>
+        some (start.isSome, stop.isSome, type)
+    | _ => none
+  let array : TypeSystem.Ty := .array (.fixed ⟨false, .w256⟩)
+  assertTrue (decide (slices = [(true, true, .arraySlice array), (true, false, .arraySlice array),
+      (false, true, .arraySlice array), (false, false, .arraySlice array),
+      (true, true, .arraySlice (.arraySlice array))]))
+    s!"slices did not take their base's slice type: {reprStr slices}"
+  expectInferenceError "a slice of a word"
     "function bad(n: Word) returns (Word) { let m = n[1:2]; return n; }" fun error =>
       error == .unsupportedExpression "slice"
+  expectInferenceError "a word bound"
+    "function bad(m: uint256[], w: word) returns (uint256) { let s = m[w:]; return 0; }"
+    fun _ => true
+  expectInferenceError "a uint8 bound"
+    "function bad(m: uint256[], b: uint8) returns (uint256) { let s = m[:b]; return 0; }"
+    fun _ => true
 
 /-- Exercise every phase-7 source-inference form before runtime lowering. -/
 def testSourcePhase7Inference : IO Unit := do
@@ -1692,7 +1722,7 @@ def testSourcePhase7Inference : IO Unit := do
   testArrayIndex
   testArrayElementPlace
   testArrayLiteral
-  testSliceRejected
+  testSlices
   IO.println "phase-7 source inference GREEN"
 
 end Tests.SourcePhase7Inference

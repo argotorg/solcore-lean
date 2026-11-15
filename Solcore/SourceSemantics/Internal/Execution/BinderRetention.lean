@@ -275,6 +275,13 @@ theorem ChildStep.expression_binders_retained
     cases Except.ok.inj (elementsRun.symm.trans childAccepted)
     exact (LocalGeneralizationEvents.Progress.unify unification).retained.trans
       (BindersRetained.recordExpressionWithExpected recorded)
+  | expression_slice_children accepted form allocation childAccepted =>
+    obtain ⟨baseResult, bounds, childrenState, unifiedState, childrenRun, _,
+      unification, recorded⟩ :=
+      inferExprFuel_success_slice_facts form allocation accepted
+    cases Except.ok.inj (childrenRun.symm.trans childAccepted)
+    exact (LocalGeneralizationEvents.Progress.unify unification).retained.trans
+      (BindersRetained.recordExpressionWithExpected recorded)
   | expression_unary accepted form allocation childAccepted =>
     obtain ⟨operand, operandState, operandRun, dispatch⟩ :=
       inferExprFuel_success_unary_facts form allocation accepted
@@ -1426,6 +1433,8 @@ theorem ChildStep.nonexpression_binders_retained {parent child : CallIndex}
       exact False.elim nonexpression
   | expression_array_elements accepted form allocation child =>
       exact False.elim nonexpression
+  | expression_slice_children accepted form allocation child =>
+      exact False.elim nonexpression
   | expressions_head accepted head =>
       exact ActualBinderRetention.expressions_head accepted head
   | expressions_tail accepted head tail =>
@@ -1859,6 +1868,9 @@ theorem ChildStep.captureOrigins
     dsimp only [CallIndex.initial] at origins ⊢
     exact origins.allocateExpressionId allocation
   | @expression_array_elements fuel context source elements expected initial allocated final childFinal id value values accepted form allocation child =>
+    dsimp only [CallIndex.initial] at origins ⊢
+    exact origins.allocateExpressionId allocation
+  | @expression_slice_children fuel context source base brackets colon start stop expected initial allocated final childFinal id value values accepted form allocation child =>
     dsimp only [CallIndex.initial] at origins ⊢
     exact origins.allocateExpressionId allocation
   | @expressions_head fuel context source sources initial middle final value values accepted head =>

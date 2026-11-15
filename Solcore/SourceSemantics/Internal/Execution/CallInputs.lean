@@ -228,6 +228,25 @@ theorem expression_array_elements
   subst allocated
   exact ⟨inputs.ready.allocateExpressionId, inputs.wellFormed, inputs.catalog, trivial⟩
 
+theorem expression_slice_children
+      {fuel : Nat} {context : SourceInference.Context} {source base : Syntax.Expr}
+      {brackets colon : Syntax.SourceSpan} {start stop : Option Syntax.Expr}
+      {expected : Option Ty}
+      {initial allocated final childFinal : State} {id : ExpressionId}
+      {value : InferredExpression} {values : List InferredExpression}
+      (_accepted : (CallIndex.expression (fuel + 1) context source expected
+        initial value final).Accepted)
+      (_form : source.value = .slice base brackets start colon stop)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (_child : inferExprsFuel fuel context (base :: (start.toList ++ stop.toList)) allocated =
+        .ok (values, childFinal))
+      (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs) :
+      (CallIndex.expressions fuel context (base :: (start.toList ++ stop.toList)) allocated values
+        childFinal).Inputs := by
+  have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+  subst allocated
+  exact ⟨inputs.ready.allocateExpressionId, inputs.wellFormed, inputs.catalog, trivial⟩
+
 theorem expression_call_arguments
       {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
       {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
@@ -917,6 +936,7 @@ theorem ChildStep.inputs {parent child : CallIndex}
       | solve | apply ActualExpressionInputs.expression_group <;> assumption
       | solve | apply ActualExpressionInputs.expression_tuple <;> assumption
       | solve | apply ActualExpressionInputs.expression_array_elements <;> assumption
+      | solve | apply ActualExpressionInputs.expression_slice_children <;> assumption
       | solve | apply ActualExpressionInputs.expression_call_arguments <;> assumption
       | solve | apply ActualExpressionInputs.expression_unary <;> assumption
       | solve | apply ActualExpressionInputs.expression_binary_left <;> assumption

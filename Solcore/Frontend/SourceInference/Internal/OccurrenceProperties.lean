@@ -3329,6 +3329,46 @@ attribute [local grind →]
   inferUnaryOperator_occurrenceBoundExtends
   inferBinaryOperator_occurrenceBoundExtends
 
+/-- A slice's start and stop are among its present bounds' results. -/
+theorem sliceBoundIds_mem {start stop : Option Syntax.Expr} {bounds : List InferredExpression}
+    {id : ExpressionId}
+    (member : id ∈ (sliceBoundIds start stop bounds).1.toList ++
+      (sliceBoundIds start stop bounds).2.toList) :
+    ∃ bound ∈ bounds, bound.id = id := by
+  rcases start with _ | start <;> rcases stop with _ | stop <;>
+    rcases bounds with _ | ⟨first, _ | ⟨last, rest⟩⟩ <;>
+    simp only [sliceBoundIds, Option.toList_some, Option.toList_none, List.nil_append,
+      List.append_nil, List.cons_append, List.mem_cons, List.not_mem_nil, or_false] at member <;>
+    first
+    | (subst member; exact ⟨_, List.mem_cons_self, rfl⟩)
+    | (rcases member with rfl | rfl
+       · exact ⟨_, List.mem_cons_self, rfl⟩
+       · exact ⟨_, List.mem_cons_of_mem _ List.mem_cons_self, rfl⟩)
+
+/-- The nodes that hold a slice's children, its base and then its present bounds,
+hold the slice's references. -/
+theorem slice_references_present {values : List InferredExpression}
+    {baseResult : InferredExpression} {start stop : Option Syntax.Expr} {nodes : List Node}
+    (present : NodeIdsPresent (List.map (fun expression => NodeId.expression expression.id)
+      values) nodes)
+    (head : values.head? = some baseResult) :
+    NodeIdsPresent (NodeId.expression baseResult.id ::
+      (List.map NodeId.expression (sliceBoundIds start stop values.tail).1.toList ++
+        List.map NodeId.expression (sliceBoundIds start stop values.tail).2.toList)) nodes := by
+  cases values with
+  | nil => cases head
+  | cons first rest =>
+    simp only [List.head?_cons, Option.some.injEq] at head
+    subst head
+    intro reference member
+    apply present
+    rcases List.mem_cons.mp member with rfl | member
+    · exact List.mem_cons_self
+    · rw [← List.map_append] at member
+      obtain ⟨id, idMember, rfl⟩ := List.mem_map.mp member
+      obtain ⟨bound, boundMember, rfl⟩ := sliceBoundIds_mem idMember
+      exact List.mem_cons_of_mem _ (List.mem_map.mpr ⟨bound, boundMember, rfl⟩)
+
 set_option maxHeartbeats 2000000 in
 set_option maxErrors 150 in
 set_option trace.grind.debug false in
@@ -3933,6 +3973,13 @@ private theorem inference_occurrenceBoundExtends :
         List.map_nil, List.append_nil, List.map_map, Function.comp_def]
       all_goals occurrence_graph_ihs
       all_goals occurrence_equal_node_tables
+      all_goals try grind (instances := 10000) (gen := 30) only [
+        → OccurrenceGraphResult.graph, → OccurrenceGraphResult.returned,
+        → NodeGraphProgress.trans, → NodeIdsPresent.transport,
+        NodeIdsPresent.append, NodeIdsPresent.cons, NodeIdsPresent.nil]
+      -- A slice's references are its children's: its base and its present bounds.
+      all_goals try
+        specialize recorder_graph (slice_references_present graph_fact (by assumption))
       all_goals try grind (instances := 10000) (gen := 30) only [
         → OccurrenceGraphResult.graph, → OccurrenceGraphResult.returned,
         → NodeGraphProgress.trans, → NodeIdsPresent.transport,

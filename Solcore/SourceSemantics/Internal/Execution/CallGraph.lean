@@ -203,6 +203,21 @@ inductive ChildStep : CallIndex → CallIndex → Prop where
         .ok (values, childFinal)) :
       ChildStep (.expression (fuel + 1) context source expected initial value final)
         (.expressions fuel context elements.elements allocated values childFinal)
+  | expression_slice_children
+      {fuel : Nat} {context : SourceInference.Context} {source base : Syntax.Expr}
+      {brackets colon : Syntax.SourceSpan} {start stop : Option Syntax.Expr}
+      {expected : Option Ty}
+      {initial allocated final childFinal : State} {id : ExpressionId}
+      {value : InferredExpression} {values : List InferredExpression}
+      (accepted : (CallIndex.expression (fuel + 1) context source expected
+        initial value final).Accepted)
+      (form : source.value = .slice base brackets start colon stop)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (child : inferExprsFuel fuel context (base :: (start.toList ++ stop.toList)) allocated =
+        .ok (values, childFinal)) :
+      ChildStep (.expression (fuel + 1) context source expected initial value final)
+        (.expressions fuel context (base :: (start.toList ++ stop.toList)) allocated values
+          childFinal)
   | expressions_head
       {fuel : Nat} {context : SourceInference.Context}
       {source : Syntax.Expr} {sources : List Syntax.Expr}

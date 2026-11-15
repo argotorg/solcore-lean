@@ -1462,7 +1462,46 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
     exact recordExpressionWithExpected_normalized_state formation childFormation.2 continuation
       arrayFormed expectedFormed recorded
   case case23 =>
-    simp_all [InferExprFuelFormation, inferExprFuel]
+    intros context expression expected initial fuel id allocated allocationEq
+      base brackets start colon stop expressionEq childrenInduction
+    unfold InferExprFuelFormation
+    intro ready nodes formed formation expectedBelow expectedFormed result success continuation captures
+    have allocation := expression_allocation_normalized allocationEq ready nodes formed
+    have expectedAllocated : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
+      simpa only [allocation.2.2.2] using expectedBelow
+    obtain ⟨baseResult, bounds, childrenState, unifiedState, childrenResult, _,
+        unifyResult, recorded⟩ :=
+      Detail.inferExprFuel_success_slice_facts expressionEq allocationEq success
+    have properties := inferExprsFuel_inferenceProperties allocation.1
+      formation.validated formation.functionShapes childrenResult
+    have operands := slice_unify_operands_variablesBelow
+      (fun bound member => properties.2.2 bound (List.mem_cons_of_mem _ member))
+    have unifyProgress := unify_inferenceProgress properties.2.1.solved operands.1
+      operands.2 unifyResult
+    have unifiedReady := unify_preserves_inferenceReady properties.2.1 operands.1
+      operands.2 unifyResult
+    have throughUnified := properties.1.trans unifyProgress
+    have sliceBelow := slice_type_variablesBelow unifiedReady
+      ((properties.2.2 baseResult (by simp)).weaken unifyProgress.next_le)
+    have expectedAfter : ∀ type ∈ expected, type.VariablesBelow unifiedState.inference.next :=
+      fun type member => (expectedAllocated type member).weaken throughUnified.next_le
+    have recording := recordExpressionWithExpected_inferenceProperties unifiedReady
+      sliceBelow expectedAfter recorded
+    have unifiedContinuation := continuation.trans recording.1.substitution_extends
+    have unifiedCaptures :=
+      (captures.before_recordExpressionWithExpected recorded).before_unify unifyResult
+    have childrenCaptures : NoCaptureNodes outer childrenState.nodes := unifiedCaptures
+    have childFormation := childrenInduction allocation.1 allocation.2.1 allocation.2.2.1 formation
+      _ childrenResult (unifiedContinuation.trans unifyProgress.substitution_extends)
+      childrenCaptures
+    have sliceFormed : TypeAdmissible semantic
+        (outer.apply (Ty.arraySlice (unifiedState.resolve baseResult.type))) := by
+      have baseType := childFormation.1 baseResult (by simp)
+      rw [← unifiedContinuation baseResult.type] at baseType
+      change TypeAdmissible semantic (outer.apply (unifiedState.resolve baseResult.type)) at baseType
+      simpa [Ty.arraySlice, Substitution.apply] using TypeAdmissible.arraySlice baseType
+    exact recordExpressionWithExpected_normalized_state formation
+      (childFormation.2.unify unifyResult) continuation sliceFormed expectedFormed recorded
   case case24 =>
     simp_all [InferExprFuelFormation, inferExprFuel]
   case case26 =>

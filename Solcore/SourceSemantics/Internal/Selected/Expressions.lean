@@ -2748,5 +2748,222 @@ theorem actualInferExprFuelRetainedSoundness_arrayLiteral {fuel : Nat}
     recorded resultSubstitutionExtension requirementsSubset retained coercionsRetained
     catalog signaturesEq invariant formType arrayAdmissible covered
 
+
+/-- Once a slice's unification succeeds, a substitution that extends it gives
+each bound `uint256`. -/
+theorem slice_unify_types {bounds : List InferredExpression} {before after : State}
+    {substitution : Substitution}
+    (unified : Detail.unify before (Ty.productMany (bounds.map (·.type)))
+      (Ty.productMany (List.replicate bounds.length (.fixed .uint256))) = .ok after)
+    (extension : substitution.SemanticallyExtends after.inference.substitution) :
+    bounds.map (fun bound => substitution.apply bound.type) =
+      List.replicate bounds.length (.fixed .uint256) := by
+  have resolved := Detail.unify_resolve_eq unified
+  have leftEq := extension (Ty.productMany (bounds.map (·.type)))
+  have rightEq := extension (Ty.productMany (List.replicate bounds.length (.fixed .uint256)))
+  have applied : substitution.apply (Ty.productMany (bounds.map (·.type))) =
+      substitution.apply (Ty.productMany (List.replicate bounds.length (.fixed .uint256))) := by
+    rw [← leftEq, ← rightEq]
+    exact congrArg substitution.apply resolved
+  rw [Substitution.apply_productMany, Substitution.apply_productMany, List.map_map,
+    List.map_replicate] at applied
+  exact Ty.productMany_inj (by simp) applied
+
+/-- An actual slice types its base and its present bounds as a tuple's elements are:
+the base's type is a memory array or a slice, and the bounds' types, unified with
+`uint256`s, are `uint256`s. -/
+theorem actualInferExprFuelRetainedSoundness_slice {fuel : Nat}
+    (recursive : ∀ smaller, smaller < fuel + 1 → ActualInferExprFuelRetainedSoundness smaller) :
+  ∀ {wholeContext inferenceContext : Frontend.SourceInference.Context}
+    {wholeReturn : Ty} {expression base : Syntax.Expr} {brackets colon : Syntax.SourceSpan}
+    {start stop : Option Syntax.Expr} {expected : Option Ty}
+    {initial resultState evidenceState : State}
+    {inferred : InferredExpression} {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    {semanticSource : TypedSource}
+    {frames : List InitializedLetBinding}
+    {semanticContext : SourceSemantics.Context},
+    expression.value = .slice base brackets start colon stop →
+    Detail.inferExprFuel (fuel + 1) inferenceContext expression expected initial =
+        .ok (inferred, resultState) →
+    FinalInferenceResources wholeContext wholeReturn evidenceState roots
+      finalized →
+    ExecutableCoercionInterfaces.SourceInterfaces wholeContext.signatures
+      finalized.solvedRequirements finalized.typedSource →
+    finalized.substitution.SemanticallyExtends
+      resultState.inference.substitution →
+    inferenceContext.signatures = wholeContext.signatures →
+    inferenceContext.scope.genericOwner = wholeContext.scope.genericOwner →
+    inferenceContext.typeParameters = wholeContext.typeParameters →
+    inferenceContext.assumptions = wholeContext.assumptions →
+    ProgramSignatureFormationValidated inferenceContext.signatures →
+    (∀ candidate ∈ inferenceContext.signatures.functions,
+      candidate.scheme.body = .function
+        (Ty.productMany candidate.parameterTypes)
+        (Ty.productMany candidate.returnTypes)) →
+    SignatureCatalogWellFormed inferenceContext.signatures →
+    SignatureParametersWellFormed inferenceContext.scope.genericOwner
+      inferenceContext.typeParameters →
+    RecursiveExpressionInvariant wholeContext finalized initial
+      semanticContext →
+    ActualContext wholeContext finalized frames semanticContext →
+    ActualStateInvariant initial (evidenceState.toTypedSource roots) →
+    (∀ expectedType ∈ expected,
+      expectedType.VariablesBelow initial.inference.next) →
+    (∀ expectedType ∈ expected,
+      TypeAdmissible semanticContext (finalized.substitution.apply expectedType)) →
+    ProperDescendantsPreserved finalized.substitution
+      (resultState.toTypedSource roots) finalized.typedSource
+      (.expression inferred.id) →
+    RawProperDescendantsPreserved (resultState.toTypedSource roots)
+      (evidenceState.toTypedSource roots) (.expression inferred.id) →
+    resultState.integerPatterns ⊆ evidenceState.integerPatterns →
+    resultState.integerLiterals ⊆ evidenceState.integerLiterals →
+    resultState.requirements ⊆ evidenceState.requirements →
+    ExpressionRequirementsRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionCoercionPrimariesRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionOperatorSiteRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionDirectChildrenRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    TemplateScopeCovered finalized.typedSource semanticContext
+      (.expression inferred.id) →
+    ProperDescendantsPreserved finalized.substitution (resultState.toTypedSource roots)
+      semanticSource (.expression inferred.id) →
+    ActualContext.Covers finalized frames (.expression inferred.id) →
+    ExpressionTypingBase (resultState.toTypedSource roots) semanticSource
+      semanticContext finalized.substitution inferred := by
+  intro wholeContext inferenceContext wholeReturn expression base brackets colon start stop expected
+    initial resultState evidenceState inferred roots finalized semanticSource
+    frames semanticContext expressionEq success resources interfaces resultSubstitutionExtension signaturesEq
+    ownerEq typeParametersEq assumptionsEq signatureFormation
+    functionsCanonical catalog canonical invariant actual operational expectedBelow expectedAdmissible
+    finalPreserved rawProper integerPatternsSubset integerLiteralsSubset requirementsSubset
+    retained coercionsRetained _operatorsRetained childrenRetained covered semanticPreserved actualCovered
+  generalize allocationEq : initial.allocateExpressionId = allocatedPair
+  rcases allocatedPair with ⟨id, allocated⟩
+  have allocatedInvariant := invariant.allocateExpressionId allocationEq
+  have allocatedOperational : ActualStateInvariant allocated (evidenceState.toTypedSource roots) := by
+    obtain ⟨pending, ledger⟩ := operational.ledger
+    have stateEq : initial.allocateExpressionId.2 = allocated := congrArg Prod.snd allocationEq
+    refine ⟨⟨pending, ?_⟩, ?_, ?_, operational.sourceMonomorphic⟩
+    · rw [← stateEq]
+      exact ledger.allocateExpressionId
+    · apply operational.origins.congr_localBinders
+      rw [← stateEq]
+      rfl
+    · apply activeQuantifiersBelowNext_transport operational.quantifiersBelow
+      · rw [← stateEq]; rfl
+      · rw [← stateEq]; exact Nat.le_refl _
+  have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
+    rw [allocateExpressionId_inferenceNext_eq allocationEq]
+    exact expectedBelow
+  obtain ⟨baseResult, bounds, childrenState, unifiedState, childrenSuccess, allowed,
+      unifySuccess, recorded⟩ :=
+    Detail.inferExprFuel_success_slice_facts expressionEq allocationEq success
+  have properties := Detail.inferExprsFuel_inferenceProperties allocatedInvariant.ready
+    signatureFormation functionsCanonical childrenSuccess
+  have operands := Detail.slice_unify_operands_variablesBelow
+    (fun bound member => properties.2.2 bound (List.mem_cons_of_mem _ member))
+  have unifyProgress := Detail.unify_inferenceProgress properties.2.1.solved operands.1
+    operands.2 unifySuccess
+  have unifiedReady := Detail.unify_preserves_inferenceReady properties.2.1 operands.1
+    operands.2 unifySuccess
+  have throughUnified := properties.1.trans unifyProgress
+  have unifiedExpected : ∀ type ∈ expected, type.VariablesBelow unifiedState.inference.next :=
+    fun type member => (allocatedExpected type member).weaken throughUnified.next_le
+  have sliceBelow := Detail.slice_type_variablesBelow unifiedReady
+    ((properties.2.2 baseResult (by simp)).weaken unifyProgress.next_le)
+  have recording := Detail.recordExpressionWithExpected_inferenceProperties
+    unifiedReady sliceBelow unifiedExpected recorded
+  have unifiedExtension := resultSubstitutionExtension.trans recording.1.substitution_extends
+  have childrenExtension := unifiedExtension.trans unifyProgress.substitution_extends
+  have unifiedToParent : TypingSourceExtends (unifiedState.toTypedSource roots)
+      (resultState.toTypedSource roots) :=
+    ⟨Detail.recordExpressionWithExpected_preserves_owner recorded,
+      recordExpressionWithExpected_success_nodesPrefix recorded⟩
+  have childrenToParent := TypingSourceExtends.trans
+    (unify_success_typingSourceExtends unifySuccess roots) unifiedToParent
+  obtain ⟨coercions, contains⟩ := recordExpressionWithExpected_success_containsExpression recorded roots
+  have idsEq := Detail.sliceBoundIds_ids (start := start) (stop := stop) (bounds := bounds)
+    (by simpa using Detail.inferExprsFuel_length childrenSuccess)
+  have edge : ∀ value ∈ baseResult :: bounds, DirectChild (resultState.toTypedSource roots)
+      (.expression inferred.id) (.expression value.id) := by
+    intro value member
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    have reference : NodeId.expression value.id ∈
+        NodeId.expression baseResult.id :: (bounds.map (·.id)).map NodeId.expression := by
+      rcases List.mem_cons.mp member with rfl | member
+      · exact List.mem_cons_self
+      · exact List.mem_cons_of_mem _
+          (List.mem_map.mpr ⟨value.id, List.mem_map.mpr ⟨value, member, rfl⟩, rfl⟩)
+    rw [← idsEq] at reference
+    simpa [nodeChildIds, Node.references, ExpressionForm.references] using reference
+  have childPatterns : childrenState.integerPatterns ⊆ evidenceState.integerPatterns := by
+    intro origin member
+    apply integerPatternsSubset
+    rw [recordExpressionWithExpected_integerPatterns_eq recorded,
+      (Detail.unify_integerPatternMetadata_eq unifySuccess).1]
+    exact member
+  have childLiterals : childrenState.integerLiterals ⊆ evidenceState.integerLiterals := by
+    intro origin member
+    apply integerLiteralsSubset
+    rw [Detail.recordExpressionWithExpected_integerLiterals_eq recorded,
+      Detail.unify_integerLiterals unifySuccess]
+    exact member
+  have childRequirements : childrenState.requirements ⊆ evidenceState.requirements := by
+    intro requirement member
+    apply requirementsSubset
+    apply Detail.recordExpressionWithExpected_requirements_subset recorded
+    rw [Detail.unify_requirements_eq unifySuccess]
+    exact member
+  have typed := actualInferExprsFuelFinalSubtreeSoundness fuel
+    (fun smaller less => recursive smaller (Nat.lt_trans less (Nat.lt_succ_self fuel)))
+    childrenSuccess resources interfaces childrenExtension signaturesEq ownerEq typeParametersEq assumptionsEq
+    signatureFormation functionsCanonical catalog canonical allocatedInvariant actual allocatedOperational
+    (fun value member => (semanticPreserved.childSubtree (edge value member)).monoBefore childrenToParent)
+    (fun value member => (finalPreserved.childSubtree (edge value member)).monoBefore childrenToParent)
+    (fun value member => ((rawProper.childSubtree (edge value member)).monoBefore childrenToParent).proper)
+    childPatterns childLiterals childRequirements
+    (fun value member => covered.expressionChild resources.graph_closed (childrenRetained (edge value member)))
+    (fun value member => actualCovered.directChild (childrenRetained (edge value member)))
+  have typesEq := slice_unify_types unifySuccess unifiedExtension
+  simp only [List.map_cons] at typed
+  cases typed with
+  | cons baseTyped boundsTyped =>
+    have boundsTyped' : ExpressionsHaveTypes semanticSource semanticContext
+        ((Detail.sliceBoundIds start stop bounds).1.toList ++
+          (Detail.sliceBoundIds start stop bounds).2.toList)
+        (List.replicate ((Detail.sliceBoundIds start stop bounds).1.toList ++
+          (Detail.sliceBoundIds start stop bounds).2.toList).length (.fixed .uint256)) := by
+      rw [idsEq, List.length_map, ← typesEq]
+      simpa [List.map_map, Function.comp_def] using boundsTyped
+    have allowedApplied :
+        (finalized.substitution.apply baseResult.type).arraySliceBaseAllowed = true := by
+      rw [← childrenExtension baseResult.type]
+      exact Substitution.arraySliceBaseAllowed_apply _ allowed
+    have sliceTypeEq : finalized.substitution.apply
+        (Ty.arraySlice (unifiedState.resolve baseResult.type)) =
+          Ty.arraySlice (finalized.substitution.apply baseResult.type) := by
+      change Ty.arraySlice (finalized.substitution.apply
+        (unifiedState.inference.substitution.apply baseResult.type)) = _
+      rw [unifiedExtension baseResult.type]
+    have formType : ExpressionFormHasRawType semanticSource semanticContext
+        ((ExpressionForm.arraySlice baseResult.id (Detail.sliceBoundIds start stop bounds).1
+          (Detail.sliceBoundIds start stop bounds).2).applySubstitution finalized.substitution)
+        (finalized.substitution.apply (Ty.arraySlice (unifiedState.resolve baseResult.type)))
+        (.ordinary []) := by
+      rw [sliceTypeEq]
+      exact ExpressionFormHasRawType.arraySlice allowedApplied baseTyped boundsTyped'
+    have sliceAdmissible : TypeAdmissible semanticContext
+        (finalized.substitution.apply (Ty.arraySlice (unifiedState.resolve baseResult.type))) := by
+      rw [sliceTypeEq]
+      exact TypeAdmissible.arraySlice baseTyped.type_admissible
+    exact recordExpressionWithExpected_success_expressionTypingBase_actual resources interfaces
+      recorded resultSubstitutionExtension requirementsSubset retained coercionsRetained
+      catalog signaturesEq invariant formType sliceAdmissible covered
+
 end Solcore.SourceSemantics.SourceInferenceSoundness
 end

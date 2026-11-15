@@ -1408,7 +1408,71 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     exact new_requirements_trans lengthPrivacy.2.2.2 recorded.2.2.2 recorded.1 row member
       (by simpa only [allocationPrivacy.2.2] using fresh)
   case case23 =>
-    simp_all [InferExprFuelPrivacy, inferExprFuel]
+    intros context expression expected initial fuel id allocated allocationEq
+      base brackets start colon stop expressionEq childrenInduction
+    unfold InferExprFuelPrivacy
+    intro ready wellFormed bound live catalog validated canonical expectedBelow expectedSafe result success
+    have allocationProperties :=
+      allocateExpressionId_eq_inferenceProperties ready allocationEq
+    have allocationPrivacy := allocateExpressionId_privacy live allocationEq
+    have allocatedEq : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocationEq).symm
+    have boundAllocated : ∀ metavariable ∈ protectedVars, metavariable.index < allocated.inference.next := by
+      intro metavariable member
+      rw [allocatedEq]
+      change metavariable.index < initial.inference.next
+      exact bound metavariable member
+    have wfAllocated : allocated.RequirementsWellFormed := by
+      rw [allocatedEq]
+      change initial.RequirementsWellFormed
+      exact wellFormed
+    obtain ⟨baseResult, bounds, childrenState, unifiedState, childrenResult, _,
+        unifyResult, recordedSuccess⟩ :=
+      Detail.inferExprFuel_success_slice_facts expressionEq allocationEq success
+    have childrenPrivacy := childrenInduction allocationProperties.2 wfAllocated boundAllocated
+      allocationPrivacy.2.1 catalog validated canonical (baseResult :: bounds, childrenState)
+      childrenResult
+    have childrenProperties := inferExprsFuel_inferenceProperties allocationProperties.2
+      validated canonical childrenResult
+    have operands := slice_unify_operands_variablesBelow
+      (fun bound member => childrenProperties.2.2 bound (List.mem_cons_of_mem _ member))
+    have boundsSafe : Safe protectedVars childrenState
+        (Ty.productMany (bounds.map (·.type))) := by
+      apply safe_productMany
+      intro type member
+      obtain ⟨value, valueMember, rfl⟩ := List.mem_map.mp member
+      exact childrenPrivacy.2.1 value (List.mem_cons_of_mem _ valueMember)
+    have replicatedSafe : Safe protectedVars childrenState
+        (Ty.productMany (List.replicate bounds.length (.fixed .uint256))) := by
+      apply safe_productMany
+      intro type member
+      rw [List.eq_of_mem_replicate member]
+      exact safe_closed _ _ (Ty.variablesBelow_constructor 0 _)
+    have unifyProgress := unify_inferenceProgress childrenProperties.2.1.solved operands.1
+      operands.2 unifyResult
+    have unifiedReady := unify_preserves_inferenceReady childrenProperties.2.1 operands.1
+      operands.2 unifyResult
+    have unifiedPrivacy := ProtectedVariables.unify boundsSafe replicatedSafe unifyResult
+    have sliceBelow := slice_type_variablesBelow unifiedReady
+      ((childrenProperties.2.2 baseResult (by simp)).weaken unifyProgress.next_le)
+    have sliceSafe : Safe protectedVars unifiedState
+        (Ty.arraySlice (unifiedState.resolve baseResult.type)) :=
+      (safe_application_iff _ _ _ _).2
+        ⟨safe_closed _ _ (Ty.variablesBelow_constructor 0 _),
+          safe_resolved unifiedReady (unifiedPrivacy _ (childrenPrivacy.2.1 baseResult (by simp)))⟩
+    have prefixProgress := allocationProperties.1.trans
+      (childrenProperties.1.trans unifyProgress)
+    have beforeFit := allocationPrivacy.1.trans (childrenPrivacy.1.trans unifiedPrivacy)
+    have unifiedLive := childrenPrivacy.2.2.1.unify boundsSafe replicatedSafe unifyResult
+    have unifiedRows := new_requirements_trans childrenPrivacy.2.2.2
+      (new_rows_of_eq (show unifiedState.requirements = childrenState.requirements from
+        unify_requirements (state := childrenState) unifyResult)) unifiedPrivacy
+    have recorded := recordExpressionWithExpected_private catalog unifiedReady sliceBelow
+      (fun type member => (expectedBelow type member).weaken prefixProgress.next_le)
+      sliceSafe (fun type member => beforeFit _ (expectedSafe _ member)) unifiedLive recordedSuccess
+    refine ⟨beforeFit.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+    intro row member freshRow
+    exact new_requirements_trans unifiedRows recorded.2.2.2 recorded.1 row member
+      (by simpa only [allocationPrivacy.2.2] using freshRow)
   case case24 =>
     simp_all [InferExprFuelPrivacy, inferExprFuel]
   case case26 =>

@@ -1039,8 +1039,11 @@ theorem actualInferExprFuelRetainedSoundness_step {fuel : Nat}
         operational expectedBelow expectedAdmissible finalPreserved rawProper patterns literals requirements
         retained coercions operators children covered semanticPreserved actualCovered
   | slice base brackets start colon stop =>
-      simp only [Detail.inferExprFuel, expressionEq] at success
-      cases success
+      exact actualInferExprFuelRetainedSoundness_slice recursive expressionEq success resources
+        interfaces extension signaturesEq ownerEq typeParametersEq assumptionsEq formation functions
+        catalog canonical invariant actual operational expectedBelow expectedAdmissible finalPreserved
+        rawProper patterns literals requirements retained coercions operators children covered
+        semanticPreserved actualCovered
   | error =>
       simp only [Detail.inferExprFuel, expressionEq] at success
       cases success

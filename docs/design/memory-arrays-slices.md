@@ -376,7 +376,13 @@ wait for the native pipeline's contracts and ABI.
   (`Ty.arraySliceBaseAllowed`), and `Ty.containsArray` counts it, so a mapping that holds a slice is
   rejected with `unsupportedArrayType`, as is an array of slices, whose element
   `Ty.arrayElementAllowed` does not admit (difference 17). Elaboration and both catalogs reject
-  every slice type until step 6h.
+  every slice type until step 6h. As built in step 6f-ii, inference infers a slice's base, then its
+  present bounds, with no expected type, as a tuple's elements, and takes the base only when its
+  resolved type is a memory array or a slice there, as a read decides on its base; another base is
+  rejected with `unsupportedExpression "slice"` (difference 18). It unifies the bounds' types with
+  `uint256`s, as a literal's elements' with its element type, so an open literal bound takes
+  `uint256` and a bound of another type is rejected, and records the slice at the slice of the
+  base's resolved type (`ExpressionForm.arraySlice`, `sliceBoundIds`).
 - **Lengths.** `a.length`, `a.length()` and `Length.length(a)` on arrays and slices have the type
   `uint256`. `Length.length` is a builtin qualified call when no namespace `Length` exists, as
   `Typedef.abs` is (`typedefCall?`). As built in step 2b-ii-b, `lengthCall` finds the name, and the
@@ -614,12 +620,17 @@ the fixture's `ret(3) -> [0,2,4]` is checked as 0, 2 and 4 at indexes 0 to 2 and
     mapping that holds a slice is rejected as one that holds an array is (difference 5), while the
     pinned driver accepts a contract field of that type
     (`.upstream/lane-d-unit3-memory-arrays/step6/probe`).
+18. **A slice needs its base's type known where the slice is.** `a[s:e]`, `a[s:]`, `a[:e]` and
+    `a[:]` on a base whose type is not a memory array or a slice there are rejected with
+    `unsupportedExpression "slice"`, as a read on such a base takes the mapping rule (difference
+    15). Upstream's `Length` constraint waits for later uses to fix the type. As with differences 14
+    and 15, deferring the choice to finalization could lift this, and nothing schedules it.
 
 Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13, 13 and 14 on
-2026-11-14, and 15 to 17 on 2026-11-15, when 8 was also widened from an unused `let m = [];` to any
-unannotated one. Differences 9 to 13 change only a diagnostic or the room of a resource limit, and 8
-and 14 to 17 only reject some programs that upstream accepts. None of them changes what an accepted
-program means. Difference 1 follows decision 3.
+2026-11-14, 15 and 16 on 2026-11-15, when 8 was also widened from an unused `let m = [];` to any
+unannotated one, and 17 and 18 on 2026-11-16. Differences 9 to 13 change only a diagnostic or the
+room of a resource limit, and 8 and 14 to 18 only reject some programs that upstream accepts. None
+of them changes what an accepted program means. Difference 1 follows decision 3.
 
 ## Steps
 
@@ -657,7 +668,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 6d | Slices: reads and lengths through a slice, as cases of 3a's and 2b-ii-a's rules, with their faults, sized copies, stage and preservation | 28–32 files, +350–550/−5–15; measured at 15 files, +203/−102 | none |
 | 6e | Slices: the typed form of `toArray(s)` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +300–500/−5–15; measured at 26 files, +207/−7 | none |
 | 6f-i | Slices: the slices' own arm in inference, which still rejects them and renumbers the cases of the proofs by functional induction on `inferExprFuel` | 14–15 files, +285–295/−285–295; measured at 15 files, +292/−289 | none |
-| 6f-ii | Slices: inference's typing of the four slice forms on an array or a slice, with `uint256` bounds | 24–30 files, +800–1,100/−20–50 | none |
+| 6f-ii | Slices: inference's typing of the four slice forms on an array or a slice, with `uint256` bounds | 24–30 files, +800–1,100/−20–50; measured at 22 files, +1005/−15 | none |
 | 6g | Slices: inference's typing of reads, lengths and `toArray(s)` on slices | 18–30 files, +600–1,000/−25–55 | none |
 | 6h | Slices: the lowering, a slice as a Core product of its base, its start and its length, and `toArray(s)`'s copy | 4–9 files, +200–400/−10–20 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
