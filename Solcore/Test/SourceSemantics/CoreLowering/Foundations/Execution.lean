@@ -5461,6 +5461,36 @@ private def arrayFixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
   "  return m[k];",
   "}"]
 
+/-- Row 4's step 4c: upstream's array-syntax fixture's `sumAll`, `pair`, `local`,
+`returned`, `nested` and `callResultLength`, as upstream wrote them, with the
+contract's methods as functions. -/
+private def arraySyntaxWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function sumAll(xs: uint256[]) returns (uint256) {",
+  "    let total: uint256 = 0;",
+  "    for (let i: uint256 = 0; i < xs.length; i += 1) {",
+  "        total += xs[i];",
+  "    }",
+  "    return total;",
+  "}",
+  "function pair(a: uint256, b: uint256) returns (uint256[]) {",
+  "    return [a, b];",
+  "}",
+  "function local(a: uint256, b: uint256) returns (uint256) {",
+  "    let m: uint256[] = [a, b, a];",
+  "    return sumAll(m);",
+  "}",
+  "function returned(a: uint256, b: uint256) returns (uint256) {",
+  "    let m: uint256[] = pair(a, b);",
+  "    return m[1];",
+  "}",
+  "function nested() returns (uint256) {",
+  "    let rows: uint256[][] = [[uint256(1), uint256(2)], [uint256(3)]];",
+  "    return rows[0][1] + rows[1][0];",
+  "}",
+  "function callResultLength(n: uint256) returns (uint256) {",
+  "    return pair(n, n).length + new uint256[](n).length - 2;",
+  "}"]
+
 /-- The source semantics and the lowering reject the same first length with `Panic(0x41)`. -/
 example : Solcore.SourceSemantics.Dynamic.newArrayLengthLimit =
     SourceCoreDataExpressions.arrayLengthLimit := rfl
@@ -5469,7 +5499,9 @@ example : Solcore.SourceSemantics.Dynamic.newArrayLengthLimit =
 a new array keeps its length, a length from 2^251 − 1 on panics with `0x41` while one below it
 allocates nothing more, an element nothing wrote reads as zero, a row of `new T[][]` is an empty
 array, and a read from the length on, a negative `int8` index's word included, panics with
-`0x32`. -/
+`0x32`. Then array-syntax's `#[(3, 4) -> 10]`, `#[(3, 4) -> 4]`, `#[() -> 5]` and
+`#[(4) -> 4]`: literals keep their elements in order, a literal returned from a call, a nested
+literal and a call result's length. -/
 def runUpstreamArrayFixtures : IO Unit := do
   let program ← get "array fixture check" (checkProgram arrayFixtureWorkspace)
   let names := ["newLen", "oversized", "nested", "defaultZero", "nestedEmpty", "signedIndex"]
@@ -5495,7 +5527,24 @@ def runUpstreamArrayFixtures : IO Unit := do
     session ← panics session (← key 3) (arguments.map word) SourceCorePanics.outOfBounds
       s!"defaultZero({arguments})"
   let _ ← panics session (← key 5) [word 4] SourceCorePanics.outOfBounds "signedIndex(4)"
-  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths"
+  let syntaxProgram ← get "array-syntax fixture check" (checkProgram arraySyntaxWorkspace)
+  let syntaxNames := ["local", "returned", "nested", "callResultLength"]
+  let syntaxSeeds ← syntaxNames.mapM (seed syntaxProgram)
+  let syntaxCompiled ← get "array-syntax fixture compilation"
+    (compile arraySyntaxWorkspace syntaxSeeds {specializationBudget := 256, compilationFuel := 1000})
+  let syntaxKey (index : Nat) : IO Key := match syntaxCompiled.keys[index]? with
+    | some key => pure key
+    | none => throw (IO.userError "array-syntax fixture root missing")
+  let mut syntaxSession ← boot (← syntaxCompiled.open)
+  let syntaxCases : List (Nat × List Nat × Nat) :=
+    [(0, [3, 4], 10), (0, [1, 2], 4), (1, [3, 4], 4), (1, [5, 9], 9), (2, [], 5), (3, [4], 4),
+      (3, [2], 2)]
+  for (index, arguments, expected) in syntaxCases do
+    let completed ← execute syntaxSession (← syntaxKey index) (arguments.map word)
+    require (completed.value == word expected)
+      s!"{syntaxNames[index]!}({arguments}) gave {reprStr completed.value}"
+    syntaxSession := completed.session
+  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)

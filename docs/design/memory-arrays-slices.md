@@ -433,6 +433,11 @@ wait for the native pipeline's contracts and ABI.
   the cell's mapping, an absent element reading as the cell's default element
   (`SourceCoreDataExpressions.arrayIndex`). The index's Core value is its word, so a negative signed
   index panics, as upstream's `Typedef.rep(j)` gives it a word from 2^255 on.
+- As built in step 4c, that data lowering lowers `[e₀, …, eₙ₋₁]`: it evaluates the elements from
+  left to right, packed as a call's arguments are, and then allocates the cell of the length `n`,
+  the default element and the element at each index below `n`
+  (`SourceCoreDataExpressions.arrayLiteral`), as the source semantics evaluates the elements before
+  it allocates.
 - A slice is a Core product of its base, its start and its length.
 - Arrays stay outside `StaticProfile` and the proved subset, as row 1's conversions did. The
   meaning proofs and their statements do not change.
@@ -543,8 +548,8 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 3b | Element reads: inference's typing of `a[i]` on a memory array, whose index waits for its type until finalization checks that it is `word` or one of the twelve types | 26–32 files, +800–1,000/−100–180; measured at 28 files, +1,156/−57 | none |
 | 3c | Element reads: the lowering, with `0x32` | 4–6 files, +120–200; measured at 4 files, +73/−13 | defaultZero(n, i), nestedEmpty(n) |
 | 4a | Literals: the typed form of `[e₀, …, eₙ₋₁]` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–500/−5–15; measured at 27 files, +192/−6 | none |
-| 4b | Literals: inference's typing of `[e₀, …, eₙ₋₁]` at one element type, with `[]` taking it from the expected type, open literal elements defaulting to `uint256` and finalization's check of the element type | 26–34 files, +900–1,300/−30–80; measured at 24 files, +1,004/−19 | none |
-| 4c | Literals: the lowering | 4–7 files, +150–300/−5–20 | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
+| 4b | Literals: inference's typing of `[e₀, …, eₙ₋₁]` at one element type, with `[]` taking it from the expected type, open literal elements defaulting to `uint256` and finalization's check of the element type | 26–34 files, +900–1,300/−30–80; measured at 24 files, +1,005/−19 | none |
+| 4c | Literals: the lowering | 4–7 files, +150–300/−5–20; measured at 3 files, +91/−3 | pair(a, b), local(a, b), returned(a, b), nested(), callResultLength(n), sumAll(xs) |
 | 5 | Element writes and compound assignments, with the place checked before the right side | 55–72 files, +1,200–1,700/−300–450 | setGet(n, i, v), fillAndSum(n), compound(v), nestedReplace(n, v), alias(v); ret(n), sum(xs), echo(xs), grid(n) adapted |
 | 6 | Slices and `toArray(s)` | 45–65 files, +1,000–1,400/−200–400 | array-slice's 12 functions; slices(xs) adapted |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |

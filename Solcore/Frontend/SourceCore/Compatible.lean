@@ -800,6 +800,22 @@ def lowerWithReasons (fuel : Nat) (context : Context) (lowerChild : ExpressionLo
           let length ← lowerChild fuel source scope length reasonAt
           SourceCoreBasic.ensureType site .word length.type
           pure ⟨type, SourceCoreDataExpressions.newArray layout default length.expression⟩
+      | .arrayLiteral element elements =>
+          let arrayType ← projectType context.checked site (TypeSystem.Ty.array element)
+          SourceCoreBasic.ensureType site arrayType type
+          let (elementType, identity) ← match arrayType with
+            | .cell (.product .word (.product elementType (.namedData identity))) =>
+                pure (elementType, identity)
+            | _ => throw (unsupported node)
+          let layout : Core.OrderedMapping.Layout := ⟨.word, elementType, identity⟩
+          let default ← match arrayDefault context.checked.catalog element with
+            | some default => pure default
+            | none => throw (unsupported node)
+          let values ← elements.mapM fun value => lowerChild fuel source scope value reasonAt
+          values.forM fun value => SourceCoreBasic.ensureType site elementType value.type
+          let packed := SourceCoreCalls.packArguments values
+          pure ⟨type, SourceCoreDataExpressions.arrayLiteral layout default packed.expression
+            values.length⟩
       | .arrayLength base =>
           SourceCoreBasic.ensureType site .word type
           let base ← lowerChild fuel source scope base reasonAt
@@ -828,7 +844,7 @@ def leafLowerer (context : Context) : ExpressionLowerer → ExpressionLowerer :=
     let (node, type) ← readExpression context.checked source id
     match node.form with
     | .constructor .. | .member .. | .proxy .. | .index .. | .newArray .. | .arrayLength ..
-    | .arrayIndex .. =>
+    | .arrayIndex .. | .arrayLiteral .. =>
         lowerWithReasons fuel context child source scope id reasonAt
     | .tuple elements =>
         let children ← elements.mapM fun element => child fuel source scope element reasonAt

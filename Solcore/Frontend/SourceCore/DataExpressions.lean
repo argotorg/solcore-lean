@@ -80,6 +80,29 @@ def newArray (layout : Core.OrderedMapping.Layout) (default length : Core.Expr) 
       (Core.LanguageResult.failure (.cell contents)
         (.word (SourceCorePanics.reason SourceCorePanics.allocation))))
 
+/-- A memory array literal's entries: the packed values of its elements from
+`index` on, each at its own index. -/
+def arrayLiteralEntries (layout : Core.OrderedMapping.Layout) :
+    Nat → Nat → Core.Expr → Core.Expr
+  | _, 0, _ => Core.OrderedMapping.empty layout
+  | index, 1, value =>
+      Core.OrderedMapping.cons layout (.word (Core.Word.ofNatModulo index)) value
+        (Core.OrderedMapping.empty layout)
+  | index, count + 2, value =>
+      Core.OrderedMapping.cons layout (.word (Core.Word.ofNatModulo index)) (.first value)
+        (arrayLiteralEntries layout (index + 1) (count + 1) (.second value))
+
+/-- `[e₀, …, eₙ₋₁]`: the elements' effects from left to right, packed as a call's
+arguments are, then a new cell of the length `n`, the array's default element and
+the element at each index below `n`. -/
+def arrayLiteral (layout : Core.OrderedMapping.Layout) (default elements : Core.Expr)
+    (count : Nat) : Core.Expr :=
+  let contents := Core.Ty.product .word (.product layout.valueType layout.type)
+  Core.LanguageResult.bind (.cell contents) elements
+    (Core.LanguageResult.success
+      (.newCell contents (.pair (.word (Core.Word.ofNatModulo count))
+        (.pair (default.weakenAt 0) (arrayLiteralEntries layout 0 count (.var 0))))))
+
 /-- A memory array's length: the first component of its cell. -/
 def arrayLength (base : Core.Expr) : Core.Expr :=
   Core.LanguageResult.bind .word base (Core.LanguageResult.success (.first (.loadCell (.var 0))))
