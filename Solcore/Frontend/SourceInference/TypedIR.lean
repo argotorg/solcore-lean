@@ -386,6 +386,11 @@ inductive ExpressionForm where
   /-- `lidx(a, i)` on a memory array: a memref to its element `i`, once `i` is
   below its length. -/
   | elementRef (base index : ExpressionId)
+  /-- `CanStore.load(r)`: the element a memref refers to. -/
+  | memrefLoad (reference : ExpressionId)
+  /-- `CanStore.store(r, v)`: the element a memref refers to takes `v`'s value,
+  and the store is `()`. -/
+  | memrefStore (reference value : ExpressionId)
   deriving Repr, BEq, DecidableEq
 
 /-- One typed expression occurrence.  `requirements` contains every obligation
@@ -517,6 +522,8 @@ def references : ExpressionForm → List NodeId
       NodeId.expression base :: (start.toList ++ stop.toList).map NodeId.expression
   | .toArray _ slice => [NodeId.expression slice]
   | .elementRef base key => [NodeId.expression base, NodeId.expression key]
+  | .memrefLoad target => [NodeId.expression target]
+  | .memrefStore target stored => [NodeId.expression target, NodeId.expression stored]
 
 end ExpressionForm
 
@@ -751,6 +758,8 @@ def applySubstitution (substitution : Substitution) : ExpressionForm → Express
     | .arraySlice base start stop => .arraySlice base start stop
     | .toArray element slice => .toArray (substitution.apply element) slice
     | .elementRef base key => .elementRef base key
+    | .memrefLoad target => .memrefLoad target
+    | .memrefStore target stored => .memrefStore target stored
 
 end ExpressionForm
 
@@ -984,7 +993,8 @@ def definedLocalIds : ExpressionForm → List Resolved.LocalId
   | .literal _ | .integerLiteral .. | .reference .. | .group _ | .tuple _ |
       .unary .. | .binary .. | .conditional .. | .call .. | .constructor .. |
       .member .. | .proxy _ | .index .. | .newArray .. | .arrayLength _ | .arrayIndex .. |
-      .arrayLiteral .. | .arraySlice .. | .toArray .. | .elementRef .. => []
+      .arrayLiteral .. | .arraySlice .. | .toArray .. | .elementRef .. | .memrefLoad _ |
+      .memrefStore .. => []
 
 end ExpressionForm
 

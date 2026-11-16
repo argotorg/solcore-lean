@@ -403,6 +403,8 @@ private theorem recover_expression_form (original : ExpressionForm)
         (recover_type leftClosed rightClosed element leftLocal rightLocal
           (ExpressionForm.toArray.inj same).1)
   | elementRef base index => rfl
+  | memrefLoad reference => rfl
+  | memrefStore reference value => rfl
 
 private theorem recover_place (original : PlaceResolution)
     (leftLocal rightLocal : Substitution)

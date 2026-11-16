@@ -696,6 +696,21 @@ mutual
         (index_kind : ArrayIndexType indexType) :
         ExpressionFormHasRawType source context (.elementRef base index)
           (TypeSystem.Ty.memref element) (.ordinary [])
+    /-- `CanStore.load(r)` has the element type of a memref. -/
+    | memrefLoad
+        {context : Context} {reference : ExpressionId} {element : TypeSystem.Ty}
+        (reference_type : ExpressionHasType source context reference
+          (TypeSystem.Ty.memref element)) :
+        ExpressionFormHasRawType source context (.memrefLoad reference) element (.ordinary [])
+    /-- `CanStore.store(r, v)` takes a value of a memref's element type, and has the
+    type `()`. -/
+    | memrefStore
+        {context : Context} {reference value : ExpressionId} {element : TypeSystem.Ty}
+        (reference_type : ExpressionHasType source context reference
+          (TypeSystem.Ty.memref element))
+        (value_type : ExpressionHasType source context value element) :
+        ExpressionFormHasRawType source context (.memrefStore reference value) TypeSystem.Ty.unit
+          (.ordinary [])
 
   /-- Pointwise expression typing in source order. -/
   inductive ExpressionsHaveTypes (source : TypedSource) :
@@ -1359,6 +1374,9 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
     (fun _ view sliceInduction => .toArray sliceInduction view)
     (fun _ _ kind baseInduction indexInduction =>
       .elementRef baseInduction indexInduction kind)
+    (fun _ referenceInduction => .memrefLoad referenceInduction)
+    (fun _ _ referenceInduction valueInduction =>
+      .memrefStore referenceInduction valueInduction)
     (fun _ => .nil _)
     (fun head tail headInduction tailInduction =>
       .cons headInduction tailInduction)

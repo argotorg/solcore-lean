@@ -458,6 +458,32 @@ mutual
         ExpressionFormEvaluates program (stepSize [size_base_evaluates, size_index_evaluates])
           context evidence source environment before (.elementRef base index) requirements
           coercions (.memref element location position.val) after
+    | memrefLoad
+        {size_reference_evaluates : Nat}
+        {context evidence source environment before after reference requirements
+          coercions element location position value}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (reference_evaluates : ExpressionEvaluates program size_reference_evaluates context
+          evidence source environment before reference (.memref element location position) after)
+        (reads : ViewReads after (.arrayRef element location) position value) :
+        ExpressionFormEvaluates program (stepSize [size_reference_evaluates]) context evidence
+          source environment before (.memrefLoad reference) requirements coercions value after
+    | memrefStore
+        {size_reference_evaluates size_value_evaluates : Nat}
+        {context evidence source environment before middle after final reference value
+          requirements coercions element location position stored cell elements updated}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (reference_evaluates : ExpressionEvaluates program size_reference_evaluates context
+          evidence source environment before reference (.memref element location position) middle)
+        (value_evaluates : ExpressionEvaluates program size_value_evaluates context evidence
+          source environment middle value stored after)
+        (read : Heap.Reads after location cell)
+        (current : cell.value = some (.arrayObject element elements))
+        (replace : ValuesReplaceAt elements position stored updated)
+        (write : Heap.Writes after location (some (.arrayObject element updated)) final) :
+        ExpressionFormEvaluates program (stepSize [size_reference_evaluates, size_value_evaluates])
+          context evidence source environment before (.memrefStore reference value) requirements
+          coercions .unit final
 
   inductive ExpressionsEvaluate (program : Program) : Nat →
       Context → EvidenceEnvironment → TypedSource → Dynamic.Environment →
@@ -1322,6 +1348,11 @@ theorem ExpressionFormEvaluates.sound {program : Program} {size : Nat} {a0 : Con
   | .elementRef layout base_evaluates index_evaluates counted within =>
     exact .elementRef layout (ExpressionEvaluates.sound base_evaluates)
       (ExpressionEvaluates.sound index_evaluates) counted within
+  | .memrefLoad layout reference_evaluates reads =>
+    exact .memrefLoad layout (ExpressionEvaluates.sound reference_evaluates) reads
+  | .memrefStore layout reference_evaluates value_evaluates read current replace write =>
+    exact .memrefStore layout (ExpressionEvaluates.sound reference_evaluates)
+      (ExpressionEvaluates.sound value_evaluates) read current replace write
 termination_by structural trace
 
 theorem ExpressionsEvaluate.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
@@ -1667,6 +1698,15 @@ theorem ExpressionFormEvaluates.has_size {program : Program} {a0 : Context} {a1 
     obtain ⟨size_base_evaluates, base_evaluates⟩ := ExpressionEvaluates.has_size base_evaluates
     obtain ⟨size_index_evaluates, index_evaluates⟩ := ExpressionEvaluates.has_size index_evaluates
     exact ⟨_, .elementRef layout base_evaluates index_evaluates counted within⟩
+  | .memrefLoad layout reference_evaluates reads =>
+    obtain ⟨size_reference_evaluates, reference_evaluates⟩ :=
+      ExpressionEvaluates.has_size reference_evaluates
+    exact ⟨_, .memrefLoad layout reference_evaluates reads⟩
+  | .memrefStore layout reference_evaluates value_evaluates read current replace write =>
+    obtain ⟨size_reference_evaluates, reference_evaluates⟩ :=
+      ExpressionEvaluates.has_size reference_evaluates
+    obtain ⟨size_value_evaluates, value_evaluates⟩ := ExpressionEvaluates.has_size value_evaluates
+    exact ⟨_, .memrefStore layout reference_evaluates value_evaluates read current replace write⟩
 termination_by structural trace
 
 theorem ExpressionsEvaluate.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
@@ -2065,6 +2105,11 @@ theorem ExpressionFormEvaluates.children_below {program : Program} {size : Nat} 
     exact ⟨[size_slice_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
   | @elementRef size_base_evaluates size_index_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_base_evaluates, size_index_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
+  | @memrefLoad size_reference_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_reference_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
+  | @memrefStore size_reference_evaluates size_value_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_reference_evaluates, size_value_evaluates], rfl,
+      fun _ member => child_lt_stepSize member⟩
 
 theorem ExpressionsEvaluate.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : List Value} {a7 : Heap}
     (trace : ExpressionsEvaluate program size a0 a1 a2 a3 a4 a5 a6 a7) : 0 < size := by
@@ -3145,6 +3190,36 @@ mutual
         ExpressionFormFaults program (stepSize [size_base_evaluates, size_index_evaluates])
           context evidence source environment before (.elementRef base index) requirements
           coercions (.panic 0x32) after
+    | memrefLoadReference
+        {size_fault : Nat}
+        {context evidence source environment before after reference requirements
+          coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionFaults program size_fault context evidence source environment
+          before reference reason after) :
+        ExpressionFormFaults program (stepSize [size_fault]) context evidence source environment
+          before (.memrefLoad reference) requirements coercions reason after
+    | memrefStoreReference
+        {size_fault : Nat}
+        {context evidence source environment before after reference value requirements
+          coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionFaults program size_fault context evidence source environment
+          before reference reason after) :
+        ExpressionFormFaults program (stepSize [size_fault]) context evidence source environment
+          before (.memrefStore reference value) requirements coercions reason after
+    | memrefStoreValue
+        {size_reference_evaluates size_fault : Nat}
+        {context evidence source environment before middle after reference value
+          requirements coercions referenceValue reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (reference_evaluates : ExpressionEvaluates program size_reference_evaluates context
+          evidence source environment before reference referenceValue middle)
+        (fault : ExpressionFaults program size_fault context evidence source environment
+          middle value reason after) :
+        ExpressionFormFaults program (stepSize [size_reference_evaluates, size_fault]) context
+          evidence source environment before (.memrefStore reference value) requirements
+          coercions reason after
 
   inductive ExpressionsFault (program : Program) : Nat →
       Context → EvidenceEnvironment → TypedSource → Dynamic.Environment →
@@ -4281,6 +4356,13 @@ theorem ExpressionFormFaults.sound {program : Program} {size : Nat} {a0 : Contex
   | .elementRefOutOfBounds layout base_evaluates index_evaluates out_of_bounds =>
     exact .elementRefOutOfBounds layout (ExpressionEvaluates.sound base_evaluates)
       (ExpressionEvaluates.sound index_evaluates) out_of_bounds
+  | .memrefLoadReference layout fault =>
+    exact .memrefLoadReference layout (ExpressionFaults.sound fault)
+  | .memrefStoreReference layout fault =>
+    exact .memrefStoreReference layout (ExpressionFaults.sound fault)
+  | .memrefStoreValue layout reference_evaluates fault =>
+    exact .memrefStoreValue layout (ExpressionEvaluates.sound reference_evaluates)
+      (ExpressionFaults.sound fault)
 termination_by structural trace
 
 theorem ExpressionsFault.sound {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
@@ -4787,6 +4869,17 @@ theorem ExpressionFormFaults.has_size {program : Program} {a0 : Context} {a1 : E
     obtain ⟨size_base_evaluates, base_evaluates⟩ := ExpressionEvaluates.has_size base_evaluates
     obtain ⟨size_index_evaluates, index_evaluates⟩ := ExpressionEvaluates.has_size index_evaluates
     exact ⟨_, .elementRefOutOfBounds layout base_evaluates index_evaluates out_of_bounds⟩
+  | .memrefLoadReference layout fault =>
+    obtain ⟨size_fault, fault⟩ := ExpressionFaults.has_size fault
+    exact ⟨_, .memrefLoadReference layout fault⟩
+  | .memrefStoreReference layout fault =>
+    obtain ⟨size_fault, fault⟩ := ExpressionFaults.has_size fault
+    exact ⟨_, .memrefStoreReference layout fault⟩
+  | .memrefStoreValue layout reference_evaluates fault =>
+    obtain ⟨size_reference_evaluates, reference_evaluates⟩ :=
+      ExpressionEvaluates.has_size reference_evaluates
+    obtain ⟨size_fault, fault⟩ := ExpressionFaults.has_size fault
+    exact ⟨_, .memrefStoreValue layout reference_evaluates fault⟩
 termination_by structural trace
 
 theorem ExpressionsFault.has_size {program : Program} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
@@ -5328,6 +5421,12 @@ theorem ExpressionFormFaults.children_below {program : Program} {size : Nat} {a0
     exact ⟨[size_base_evaluates, size_index_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
   | @elementRefOutOfBounds size_base_evaluates size_index_evaluates _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
     exact ⟨[size_base_evaluates, size_index_evaluates], rfl, fun _ member => child_lt_stepSize member⟩
+  | @memrefLoadReference size_fault _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩
+  | @memrefStoreReference size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_fault], rfl, fun _ member => child_lt_stepSize member⟩
+  | @memrefStoreValue size_reference_evaluates size_fault _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ =>
+    exact ⟨[size_reference_evaluates, size_fault], rfl, fun _ member => child_lt_stepSize member⟩
 
 theorem ExpressionsFault.positive {program : Program} {size : Nat} {a0 : Context} {a1 : EvidenceEnvironment} {a2 : TypedSource} {a3 : Dynamic.Environment} {a4 : Heap} {a5 : List ExpressionId} {a6 : SemanticFault} {a7 : Heap}
     (trace : ExpressionsFault program size a0 a1 a2 a3 a4 a5 a6 a7) : 0 < size := by

@@ -1260,6 +1260,14 @@ position 2 is out of bounds. -/
 example : ViewOutOfBounds arrayHeap (.arrayRef .word ⟨0⟩) 2 :=
   .array (elements := [.word one, .word two]) (.intro .head) rfl (by decide)
 
+/-- A load through a memref to position 1 reads the array's second element. -/
+example : ViewReads arrayHeap (.arrayRef .word ⟨0⟩) 1 (.word two) :=
+  .array (.intro .head) rfl rfl
+
+/-- A store through a memref to position 1 replaces only that element. -/
+example : ValuesReplaceAt [Value.word one, .word two] 1 (.word one) [.word one, .word one] :=
+  .tail .head
+
 end Solcore.Test.SourceSemanticsArrayObjects
 end
 

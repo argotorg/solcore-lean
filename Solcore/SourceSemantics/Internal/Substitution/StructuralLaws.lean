@@ -5233,6 +5233,11 @@ theorem StatementsHaveType.applyParameters
       baseInduction indexInduction catalog contextValid
     exact .elementRef (baseInduction catalog contextValid) (indexInduction catalog contextValid)
       (by cases indexKind <;> constructor)
+  · intro context reference element referenceTypeProof referenceInduction catalog contextValid
+    exact .memrefLoad (referenceInduction catalog contextValid)
+  · intro context reference value element referenceTypeProof valueTypeProof referenceInduction
+      valueInduction catalog contextValid
+    exact .memrefStore (referenceInduction catalog contextValid) (valueInduction catalog contextValid)
   · intro context catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction
@@ -12666,6 +12671,13 @@ theorem StatementsHaveType.applySubstitution
       baseInduction indexInduction targetContext catalog contextValid
     exact .elementRef (baseInduction targetContext catalog contextValid)
       (indexInduction targetContext catalog contextValid) (by cases indexKind <;> constructor)
+  · intro context reference element referenceTypeProof referenceInduction targetContext catalog
+      contextValid
+    exact .memrefLoad (referenceInduction targetContext catalog contextValid)
+  · intro context reference value element referenceTypeProof valueTypeProof referenceInduction
+      valueInduction targetContext catalog contextValid
+    exact .memrefStore (referenceInduction targetContext catalog contextValid)
+      (valueInduction targetContext catalog contextValid)
   · intro context targetContext catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction

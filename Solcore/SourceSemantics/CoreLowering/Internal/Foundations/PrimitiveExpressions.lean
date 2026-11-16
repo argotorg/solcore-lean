@@ -978,7 +978,8 @@ theorem tree_of_lowerExpression
                               exact ⟨max leftDepth rightDepth + 1, by omega,
                                 .pair (same ▸ metadata) form leftTree rightTree⟩
               | literal | reference | integerLiteral | lambda | call | constructor | member | proxy | index
-              | newArray | arrayLength | arrayIndex | arrayLiteral | arraySlice | toArray | elementRef =>
+              | newArray | arrayLength | arrayIndex | arrayLiteral | arraySlice | toArray | elementRef
+          | memrefLoad | memrefStore =>
                   have controlAccepted : SourceCoreControl.lowerExpressionWithReasons (fuel + 1)
                       source scope id reasonAt = .ok lowered := by
                     simpa only [SourceCoreControl.lowerExpressionWithReasons, read, form, bind, Except.bind]

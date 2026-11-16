@@ -322,6 +322,9 @@ local macro "transport_rooted" "(" recursor:term "," before:term ","
     (fun _ view slice refs => .toArray (slice (by rooted_live(refs))) view)
     (fun _ _ kind base index refs =>
       .elementRef (base (by rooted_live(refs))) (index (by rooted_live(refs))) kind)
+    (fun _ reference refs => .memrefLoad (reference (by rooted_live(refs))))
+    (fun _ _ reference stored refs =>
+      .memrefStore (reference (by rooted_live(refs))) (stored (by rooted_live(refs))))
     (fun context _ => .nil context)
     (fun _ _ head tail refs => .cons (head (by rooted_live(refs))) (tail (by rooted_live(refs))))
     (fun type _ => .nil type)
@@ -432,6 +435,7 @@ theorem expression
     ExpressionHasType after context id type :=
   transport_rooted(ExpressionHasType.rec, before, after, reached, transport, typing) live
 
+set_option maxHeartbeats 400000 in
 theorem form
     {before after : TypedSource} {reached : NodeId → Prop}
     (transport : SourceSubgraphTransport before after reached)

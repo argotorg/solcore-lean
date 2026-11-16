@@ -1761,6 +1761,32 @@ mutual
         (out_of_bounds : ViewOutOfBounds after baseValue position.val) :
         ExpressionFormFaults program context evidence source environment before
           (.elementRef base index) requirements coercions (.panic 0x32) after
+    | memrefLoadReference
+        {context evidence source environment before after reference requirements
+          coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionFaults program context evidence source environment
+          before reference reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.memrefLoad reference) requirements coercions reason after
+    | memrefStoreReference
+        {context evidence source environment before after reference value requirements
+          coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionFaults program context evidence source environment
+          before reference reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.memrefStore reference value) requirements coercions reason after
+    | memrefStoreValue
+        {context evidence source environment before middle after reference value
+          requirements coercions referenceValue reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (reference_evaluates : ExpressionEvaluates program context evidence source
+          environment before reference referenceValue middle)
+        (fault : ExpressionFaults program context evidence source environment
+          middle value reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.memrefStore reference value) requirements coercions reason after
 
   /-- First fault in a left-to-right expression vector. -/
   inductive ExpressionsFault (program : Program) :

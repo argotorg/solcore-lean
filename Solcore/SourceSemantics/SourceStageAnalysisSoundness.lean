@@ -1499,6 +1499,45 @@ theorem analyzeExpressionFormWith_sound
                 expressionSound middleState index indexStage nextState
                   middleValid indexResult
               exact ⟨finalValid, .elementRef contains form baseStages indexStages⟩
+  | memrefLoad reference =>
+      simp only [analyzeExpressionFormWith, form] at success
+      cases analyzed : analyzeExpression state reference with
+      | error problem =>
+          rw [analyzed] at success
+          cases success
+      | ok pair =>
+          rcases pair with ⟨baseStage, nextState⟩
+          rw [analyzed] at success
+          obtain ⟨rfl, rfl⟩ := success
+          obtain ⟨finalValid, baseStages⟩ :=
+            expressionSound state reference baseStage nextState valid analyzed
+          exact ⟨finalValid, .memrefLoad contains form baseStages⟩
+  | memrefStore reference value =>
+      simp only [analyzeExpressionFormWith, form] at success
+      cases baseResult : analyzeExpression state reference with
+      | error problem =>
+          rw [baseResult] at success
+          cases success
+      | ok pair =>
+          rcases pair with ⟨baseStage, middleState⟩
+          rw [baseResult] at success
+          obtain ⟨middleValid, baseStages⟩ :=
+            expressionSound state reference baseStage middleState valid baseResult
+          change (analyzeExpression middleState value >>= fun pair =>
+              .ok (Frontend.SourceStageAnalysis.Stage.deferred, pair.2)) =
+            .ok (stage, finalState) at success
+          cases indexResult : analyzeExpression middleState value with
+          | error problem =>
+              rw [indexResult] at success
+              cases success
+          | ok pair =>
+              rcases pair with ⟨indexStage, nextState⟩
+              rw [indexResult] at success
+              obtain ⟨rfl, rfl⟩ := success
+              obtain ⟨finalValid, indexStages⟩ :=
+                expressionSound middleState value indexStage nextState
+                  middleValid indexResult
+              exact ⟨finalValid, .memrefStore contains form baseStages indexStages⟩
 
 theorem analyzeStatementFormWith_sound
     (source : TypedSource) (id : StatementId) (node : StatementNode)

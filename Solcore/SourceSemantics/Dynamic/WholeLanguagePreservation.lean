@@ -866,6 +866,30 @@ mutual
               ⟨_, after_typed, index_extension⟩
             exact ⟨(base_typed.mono index_extension).memref_of_arrayRef,
               after_typed, base_extension.trans index_extension⟩
+    | .memrefLoad layout reference_evaluates reads => by
+        cases typing with
+        | memrefLoad reference_type =>
+            rcases preserveExpressionRec program_well_formed runtime
+                evidence_covers environment_agrees before_typed reference_type
+                reference_evaluates with
+              ⟨reference_typed, after_typed, extension⟩
+            exact ⟨reference_typed.arrayRef_of_memref.viewElement (.array _) after_typed reads,
+              after_typed, extension⟩
+    | .memrefStore layout reference_evaluates value_evaluates read current replace write => by
+        cases typing with
+        | memrefStore reference_type value_type =>
+            rcases preserveExpressionRec program_well_formed runtime
+                evidence_covers environment_agrees before_typed reference_type
+                reference_evaluates with
+              ⟨reference_typed, middle_typed, reference_extension⟩
+            rcases preserveExpressionRec program_well_formed runtime
+                evidence_covers (environment_agrees.mono reference_extension)
+                middle_typed value_type value_evaluates with
+              ⟨stored_typed, after_typed, value_extension⟩
+            exact ⟨.unit,
+              (reference_typed.mono value_extension).arrayRef_of_memref.arrayElementWrite
+                after_typed read current replace stored_typed write,
+              (reference_extension.trans value_extension).trans (HeapTypesExtend.of_write write)⟩
     termination_by structural evaluation
 
   private theorem preserveExpressionsRec

@@ -488,7 +488,14 @@ wait for the native pipeline's contracts and ABI.
     `word` or one of the twelve types (`ArrayIndexType`). It evaluates the array, then the index,
     and below the array's length (`ViewLength`) gives a memref to the element at the index; it
     faults with the base's fault, the index's, an index that is not a word, or `0x32` from the
-    length on (`elementRefOutOfBounds`), as std's `LValueIdxAccess` does.
+    length on (`elementRefOutOfBounds`), as std's `LValueIdxAccess` does. As built in step 7c,
+    `CanStore.load(r)` and `CanStore.store(r, v)` are their own typed forms
+    (`ExpressionForm.memrefLoad`, `ExpressionForm.memrefStore`). The load evaluates the memref and
+    reads the element at its position in its array's cell (`ViewReads`). The store evaluates the
+    memref, then the value, and the element at the memref's position takes the value
+    (`ValuesReplaceAt`), as a plain element write's place does; its value is `()`. Each faults only
+    with its operands' faults, since a memref's position lies within its array's bounds once it is
+    made.
 - **Preservation.** A reference has the type `T[]` when the cell it names has the type
   `arrayObject T`, as Core's runtime typing reads a `cellRef`'s cell in its world, and an object's
   elements each have its element type. A later heap keeps every cell's type, so a reference keeps
@@ -499,7 +506,9 @@ wait for the native pipeline's contracts and ABI.
   checked, and a read through it checks them again, so a later heap keeps its type too. As built in
   step 7b, a memref has the type `memref<T>` when the cell it names has the type `arrayObject T`, as
   a reference does (`ValueHasType.memref`), so `lidx(a, i)`'s memref has its array's element type
-  (`ValueHasType.memref_of_arrayRef`).
+  (`ValueHasType.memref_of_arrayRef`). As built in step 7c, a load has its memref's element type,
+  read through the array's reference (`ValueHasType.arrayRef_of_memref`), and a store keeps the heap
+  well typed: the cell's object keeps its type (`ValueHasType.arrayElementWrite`).
 - **Panics** reuse `SemanticFault.panic`.
 
 ### Lowering
@@ -753,7 +762,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 6h | Slices: the lowering, a slice as a Core product of its base, its start and its length, and `toArray(s)`'s copy | 4–9 files, +200–400/−10–20; measured at 9 files, +286/−12 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
 | 7a | Memrefs: the memref type `memref<T>`, which resolves once aliases are expanded and which type formation admits over a type a memory array holds; no value has it yet, and elaboration and both catalogs reject it | 25–30 files, +350–500/−20–70; measured at 27 files, +385/−57 | none |
 | 7b | Memrefs: the memref value and the typed form of `lidx(a, i)`, with its static rule, evaluation, faults with `0x32`, sized copies, stage and preservation, which no source produces yet | 28–34 files, +400–650/−10–30; measured at 34 files, +409/−19 | none |
-| 7c | Memrefs: the typed forms of `CanStore.load(r)` and `CanStore.store(r, v)`, with their static rules, evaluation, faults, sized copies, stage and preservation, which no source produces yet | 28–34 files, +450–700/−10–30 | none |
+| 7c | Memrefs: the typed forms of `CanStore.load(r)` and `CanStore.store(r, v)`, with their static rules, evaluation, faults, sized copies, stage and preservation, which no source produces yet | 28–34 files, +450–700/−10–30; measured at 26 files, +426/−11 | none |
 | 7d | Memrefs: inference's typing of `lidx(a, i)`, a compiler call whose index waits for finalization as a read's | 22–30 files, +650–950/−10–40 | none |
 | 7e-i | Memrefs: inference's typing of `CanStore.load(r)` | 18–24 files, +450–650/−10–30 | none |
 | 7e-ii | Memrefs: inference's typing of `CanStore.store(r, v)`, whose value's type unifies with the element type | 22–30 files, +700–1,100/−10–40 | none |

@@ -434,6 +434,21 @@ mutual
         (baseStages : HasStage source scope base baseStage)
         (indexStages : HasStage source scope index indexStage) :
         HasStage source scope id .deferred
+    | memrefLoad
+        {scope : StageScope} {id reference : ExpressionId} {node : ExpressionNode}
+        {referenceStage : Stage}
+        (contains : SourceSemantics.ContainsExpression source id node)
+        (form_eq : node.form = .memrefLoad reference)
+        (referenceStages : HasStage source scope reference referenceStage) :
+        HasStage source scope id .deferred
+    | memrefStore
+        {scope : StageScope} {id reference value : ExpressionId}
+        {node : ExpressionNode} {referenceStage valueStage : Stage}
+        (contains : SourceSemantics.ContainsExpression source id node)
+        (form_eq : node.form = .memrefStore reference value)
+        (referenceStages : HasStage source scope reference referenceStage)
+        (valueStages : HasStage source scope value valueStage) :
+        HasStage source scope id .deferred
 
   /-- Pointwise expression classification in source order. -/
   inductive ExpressionsHaveStages (source : TypedSource) :

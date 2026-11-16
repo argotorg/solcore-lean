@@ -757,6 +757,8 @@ def applyExpressionForm (substitution : ParameterSubstitution) :
   | .arraySlice base start stop => .arraySlice base start stop
   | .toArray element slice => .toArray (substitution.apply element) slice
   | .elementRef base index => .elementRef base index
+  | .memrefLoad reference => .memrefLoad reference
+  | .memrefStore reference value => .memrefStore reference value
 
 def applyPlaceResolution (substitution : ParameterSubstitution)
     (place : PlaceResolution) : PlaceResolution := {

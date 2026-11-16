@@ -487,6 +487,8 @@ def actualOperandIds : ExpressionForm → List ExpressionId
   | .arraySlice base start stop => base :: (start.toList ++ stop.toList)
   | .toArray _ slice => [slice]
   | .elementRef base key => [base, key]
+  | .memrefLoad reference => [reference]
+  | .memrefStore reference stored => [reference, stored]
   | .literal _ | .integerLiteral _ _ | .reference _ _ | .lambda _ _ _ | .proxy _ => []
 
 /-- One original typing inversion supplies every actual operand's Source row.
@@ -524,6 +526,8 @@ theorem operand_types {source : TypedSource} {context : Context}
     | arraySlice _ base bounds => exact ⟨_, .cons base bounds⟩
     | toArray slice _ => exact ⟨_, .cons slice (.nil context)⟩
     | elementRef base index _ => exact ⟨_, .cons base (.cons index (.nil context))⟩
+    | memrefLoad reference => exact ⟨_, .cons reference (.nil context)⟩
+    | memrefStore reference stored => exact ⟨_, .cons reference (.cons stored (.nil context))⟩
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedStateExpressionOperandTyping
 end

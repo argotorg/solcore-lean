@@ -1532,6 +1532,12 @@ local macro "transport_static" "(" recursor:term "," before:term "," after:term 
     (fun _ _ kind first second h => by
       simp only [ExpressionForm.references, within_cons, within_nil, and_true] at h
       exact .elementRef (first h.1) (second h.2) kind)
+    (fun _ reference h => by
+      simp only [ExpressionForm.references, within_cons, within_nil, and_true] at h
+      exact .memrefLoad (reference h))
+    (fun _ _ first second h => by
+      simp only [ExpressionForm.references, within_cons, within_nil, and_true] at h
+      exact .memrefStore (first h.1) (second h.2))
     (fun _ _ => .nil _)
     (fun _ _ head tail h => by
       simp only [List.map_cons, within_cons] at h
@@ -1889,6 +1895,8 @@ private def typingChildren : ExpressionForm → List ExpressionId
   | .arraySlice base start stop => base :: (start.toList ++ stop.toList)
   | .toArray _ slice => [slice]
   | .elementRef base key => [base, key]
+  | .memrefLoad reference => [reference]
+  | .memrefStore reference stored => [reference, stored]
   | _ => []
 
 private theorem atomic_free {form : ExpressionForm} (atomic : CompatibleExpressionLiterals.Atomic form) :
@@ -1995,6 +2003,13 @@ private theorem step {id : ExpressionId} {node : ExpressionNode}
       intro children _
       exact .elementRef (children _ (by simp [typingChildren]) _ _ base)
         (children _ (by simp [typingChildren]) _ _ index) kind
+    | memrefLoad reference =>
+      intro children _
+      exact .memrefLoad (children _ (by simp [typingChildren]) _ _ reference)
+    | memrefStore reference stored =>
+      intro children _
+      exact .memrefStore (children _ (by simp [typingChildren]) _ _ reference)
+        (children _ (by simp [typingChildren]) _ _ stored)
 
 
 include edited avoids unique in

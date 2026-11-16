@@ -1665,6 +1665,46 @@ theorem viewElements
   | nil => exact .nil
   | cons reads _ ih => exact .cons (typed.viewElement element_of heap_typed reads) ih
 
+/-- Writing a value of a memory array's element type at a position of the
+array's cell keeps the heap well typed: the cell's object keeps its type, as
+`ProjectionsUpdate`'s element case keeps it. -/
+theorem arrayElementWrite
+    {context : Context} {before after : Heap}
+    {element expected : Ty} {location : Location} {cell : Cell}
+    {elements updated : List Value} {position : Nat} {stored : Value}
+    (reference : ValueHasType context before (.arrayRef element location)
+      (TypeSystem.Ty.array expected))
+    (heap_typed : HeapWellTyped context before)
+    (read : Heap.Reads before location cell)
+    (current : cell.value = some (.arrayObject element elements))
+    (replace : ValuesReplaceAt elements position stored updated)
+    (stored_typed : ValueHasType context before stored expected)
+    (write : Heap.Writes before location (some (.arrayObject element updated)) after) :
+    HeapWellTyped context after := by
+  rcases reference.arrayRef_inv with
+    ⟨type_eq, typedCell, typed_read, cell_type⟩ | ⟨_, impossible, _⟩
+  · have expected_eq : expected = element := by
+      simpa [TypeSystem.Ty.array] using type_eq
+    subst expected_eq
+    have cell_eq := read.functional typed_read
+    subst cell_eq
+    have cell_value := (heap_typed _ read.member).value
+    rw [current, cell_type] at cell_value
+    cases cell_value with
+    | some object_typed =>
+        rcases object_typed.arrayObject_inv with
+          ⟨_, elements_typed⟩ | ⟨_, impossible, _⟩
+        · have bound : position < elements.length := by
+            have within := replace.selects_replacement.lt_length
+            rwa [replace.length_eq] at within
+          have updated_typed :=
+            replace.preserves elements_typed (by simp [bound]) stored_typed
+          exact heap_typed.write read
+            (by rw [cell_type]; exact .some (ValueHasType.arrayObject_of_values updated_typed))
+            write
+        · simp [TypeSystem.Ty.arrayObject] at impossible
+  · simp [TypeSystem.Ty.array] at impossible
+
 /-- Catalog validity rules out confusing a nominal constructor result with a
 staging wrapper, so constructor payload typing can be recovered exactly. -/
 theorem constructedPayloads
@@ -3578,6 +3618,28 @@ theorem preservesWith
             ⟨_, after_typed, index_extension⟩
           exact ⟨(base_typed.mono index_extension).memref_of_arrayRef,
             after_typed, base_extension.trans index_extension⟩
+  | memrefLoad reference_type =>
+      cases evaluation with
+      | memrefLoad layout reference_evaluates reads =>
+          rcases expression_preserves _ _ _ _ _ evidence_covers
+              environment_agrees before_typed reference_type reference_evaluates with
+            ⟨reference_typed, after_typed, extension⟩
+          exact ⟨reference_typed.arrayRef_of_memref.viewElement (.array _) after_typed reads,
+            after_typed, extension⟩
+  | memrefStore reference_type value_type =>
+      cases evaluation with
+      | memrefStore layout reference_evaluates value_evaluates read current replace write =>
+          rcases expression_preserves _ _ _ _ _ evidence_covers
+              environment_agrees before_typed reference_type reference_evaluates with
+            ⟨reference_typed, middle_typed, reference_extension⟩
+          rcases expression_preserves _ _ _ _ _ evidence_covers
+              (environment_agrees.mono reference_extension) middle_typed value_type
+              value_evaluates with
+            ⟨stored_typed, after_typed, value_extension⟩
+          exact ⟨.unit,
+            (reference_typed.mono value_extension).arrayRef_of_memref.arrayElementWrite
+              after_typed read current replace stored_typed write,
+            (reference_extension.trans value_extension).trans (HeapTypesExtend.of_write write)⟩
 
 end ExpressionFormEvaluates
 

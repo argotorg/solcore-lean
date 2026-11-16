@@ -261,6 +261,14 @@ theorem delegated_of_accepted {ordinary : List RequirementId}
     simp only [Delegates, form] at delegates
     simp [rawNode, found, form, ordinaryAccepted, bind, Except.bind, pure, Except.pure, throw, throwThe, MonadExceptOf.throw] at accepted ⊢
     exact accepted
+  | memrefLoad reference =>
+    simp only [Delegates, form] at delegates
+    simp [rawNode, found, form, ordinaryAccepted, bind, Except.bind, pure, Except.pure, throw, throwThe, MonadExceptOf.throw] at accepted ⊢
+    exact accepted
+  | memrefStore reference value =>
+    simp only [Delegates, form] at delegates
+    simp [rawNode, found, form, ordinaryAccepted, bind, Except.bind, pure, Except.pure, throw, throwThe, MonadExceptOf.throw] at accepted ⊢
+    exact accepted
 
 /-- Direct acceptance exposes the real ordered child calls, global slot and raw
 call result before the same outer coercion helper. -/

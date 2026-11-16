@@ -954,6 +954,34 @@ mutual
         ExpressionFormEvaluates program context evidence source environment before
           (.elementRef base index) requirements coercions
           (.memref element location position.val) after
+    /-- `CanStore.load(r)` reads the element a memref refers to, as std's
+    `mload` through the memref does. -/
+    | memrefLoad
+        {context evidence source environment before after reference requirements
+          coercions element location position value}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (reference_evaluates : ExpressionEvaluates program context evidence source
+          environment before reference (.memref element location position) after)
+        (reads : ViewReads after (.arrayRef element location) position value) :
+        ExpressionFormEvaluates program context evidence source environment before
+          (.memrefLoad reference) requirements coercions value after
+    /-- `CanStore.store(r, v)` evaluates the memref, then the value, and the
+    element the memref refers to takes the value, as std's `mstore` through the
+    memref does. -/
+    | memrefStore
+        {context evidence source environment before middle after final reference value
+          requirements coercions element location position stored cell elements updated}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (reference_evaluates : ExpressionEvaluates program context evidence source
+          environment before reference (.memref element location position) middle)
+        (value_evaluates : ExpressionEvaluates program context evidence source
+          environment middle value stored after)
+        (read : Heap.Reads after location cell)
+        (current : cell.value = some (.arrayObject element elements))
+        (replace : ValuesReplaceAt elements position stored updated)
+        (write : Heap.Writes after location (some (.arrayObject element updated)) final) :
+        ExpressionFormEvaluates program context evidence source environment before
+          (.memrefStore reference value) requirements coercions .unit final
 
   /-- Left-to-right evaluation of an expression vector. -/
   inductive ExpressionsEvaluate (program : Program) :
@@ -1949,6 +1977,11 @@ mutual
           (HeapInitializationExtend.of_allocation allocates)
     | .elementRef _ base_evaluates index_evaluates _ _ =>
         (base_evaluates.initialization_extends).trans index_evaluates.initialization_extends
+    | .memrefLoad _ reference_evaluates _ => reference_evaluates.initialization_extends
+    | .memrefStore _ reference_evaluates value_evaluates _ _ _ write =>
+        ((reference_evaluates.initialization_extends).trans
+          value_evaluates.initialization_extends).trans
+          (HeapInitializationExtend.of_write write)
 
   theorem ExpressionsEvaluate.initialization_extends {program : Program}
       {context : Context}
