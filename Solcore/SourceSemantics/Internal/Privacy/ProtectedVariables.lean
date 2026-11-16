@@ -218,6 +218,23 @@ theorem safe_closed (protectedVars : List TypeVarId) (state : State) {type : Ty}
     (by simp [empty])
   simp [Safe, Avoids, State.resolve, InferState.resolve, fixed, empty]
 
+/-- A copy's type, an array of its slice's element, is safe at a ready state
+wherever the copied slice's type is. -/
+theorem safe_sliceCopy {protectedVars : List TypeVarId} {state : State}
+    {arguments : List InferredExpression} {copied : InferredExpression × Ty}
+    (ready : state.InferenceReady)
+    (success : Detail.sliceCopyArgument arguments state = .ok copied)
+    (safe : ∀ argument ∈ arguments, Safe protectedVars state argument.type) :
+    Safe protectedVars state (Ty.array copied.2) := by
+  obtain ⟨argumentsEq, base, resolved, view⟩ := Detail.sliceCopyArgument_ok success
+  have resolvedSafe := safe_resolved ready
+    (safe copied.1 (by rw [argumentsEq]; exact List.mem_singleton_self _))
+  rw [resolved] at resolvedSafe
+  have baseSafe := ((safe_application_iff protectedVars state _ _).1 resolvedSafe).2
+  exact (safe_application_iff protectedVars state _ _).2
+    ⟨safe_closed _ _ (Ty.variablesBelow_constructor 0 _),
+      safe_of_viewElement (ViewElement.of_viewElement? view) baseSafe⟩
+
 /-- A compound assignment's operand type is safe where its target type is:
 the open target's own type, or a closed constructor. -/
 theorem safe_compoundOperandType {protectedVars : List TypeVarId} {state : State}

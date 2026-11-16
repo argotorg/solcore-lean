@@ -999,6 +999,13 @@ theorem call_arguments_suffix
         (uint256Closed.weaken (Nat.zero_le _)) expectedAfter (safe_closed _ _ uint256Closed)
         expectedSafe recorded
       exact completed.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
+  | toArray _ actualArguments copy recorded =>
+      have same := Except.ok.inj (actualArguments.symm.trans childAccepted)
+      cases same
+      have completed := lifetime.recordExpression catalog.catalog properties.2.1
+        (sliceCopy_type_variablesBelow properties.2.1 properties.2.2 copy) expectedAfter
+        (safe_sliceCopy properties.2.1 copy argumentsSafe) expectedSafe recorded
+      exact completed.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
   | @indirect inferredArguments argumentState calleeState inferredCallee application _ actualArguments _ calleeAccepted applicationAccepted recorded =>
       have same := Except.ok.inj (actualArguments.symm.trans childAccepted)
       cases same

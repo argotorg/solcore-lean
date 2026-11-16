@@ -167,6 +167,8 @@ theorem inferExprFuelLedgerPreservation_step
       exact (expressionsIH argumentsAccepted allocatedTracked).recordBuiltinFunctionCall recorded
     | arrayLength argumentsAccepted _ recorded =>
       exact (expressionsIH argumentsAccepted allocatedTracked).recordExpressionWithExpected recorded
+    | toArray argumentsAccepted _ recorded =>
+      exact (expressionsIH argumentsAccepted allocatedTracked).recordExpressionWithExpected recorded
     | indirect argumentsAccepted calleeAccepted application recorded =>
       change RecursiveLedgerInvariant (inferred, final).2 pending
       rw [← recorded]

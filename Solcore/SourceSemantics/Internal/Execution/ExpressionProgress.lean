@@ -329,6 +329,11 @@ theorem call_arguments_suffix_progress
       cases Except.ok.inj (actualArguments.symm.trans childAccepted)
       exact (recordExpressionWithExpected_inferenceProperties properties.2.1
         (Ty.variablesBelow_constructor _ _) expectedAfter recorded).1
+  | toArray _ actualArguments copy recorded =>
+      cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+      exact (recordExpressionWithExpected_inferenceProperties properties.2.1
+        (sliceCopy_type_variablesBelow properties.2.1 properties.2.2 copy) expectedAfter
+        recorded).1
   | @indirect inferredArguments argumentState calleeState inferredCallee application _ actualArguments _ calleeAccepted applicationAccepted recorded =>
       cases Except.ok.inj (actualArguments.symm.trans childAccepted)
       have calleeProperties := inferExprFuel_inferenceProperties properties.2.1

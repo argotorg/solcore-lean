@@ -1381,6 +1381,52 @@ theorem arrayLengthArgument_ok {arguments : List InferredExpression} {state : St
   | [] => simp [arrayLengthArgument] at success
   | _ :: _ :: _ => simp [arrayLengthArgument] at success
 
+/-- `toArray(s)`, std's copy of a slice into a fresh memory array, which Lean
+has as a compiler form rather than a function: the name of a call, found only
+when no source function, local or compiler function is named `toArray`. -/
+def toArrayCall (name : String) : Bool :=
+  name == "toArray"
+
+/-- The slice of `toArray(s)` and the element type of its copy: its one
+argument, once inference has made its type a slice (`Ty.arraySliceBase?`), and
+the element of that slice's base's view (`Ty.viewElement?`). Another row of
+arguments, or a type still open, is rejected: the choice is made here and does
+not wait for later uses, as a length's (`arrayLengthOf`). -/
+def sliceCopyArgument (arguments : List InferredExpression) (state : State) :
+    Except Error (InferredExpression × Ty) :=
+  match arguments with
+  | [slice] =>
+      match (state.resolve slice.type).arraySliceBase? with
+      | some base =>
+          match base.viewElement? with
+          | some element => .ok (slice, element)
+          | none => .error (.operatorNotSupported "toArray" (state.resolve slice.type))
+      | none => .error (.operatorNotSupported "toArray" (state.resolve slice.type))
+  | arguments => .error (.operatorNotSupported "toArray"
+      (state.resolve (Ty.productMany (arguments.map (·.type)))))
+
+/-- `toArray(s)`'s argument row is its one slice, whose type is a slice once
+resolved, of a base whose view's element is the copy's. -/
+theorem sliceCopyArgument_ok {arguments : List InferredExpression} {state : State}
+    {copied : InferredExpression × Ty}
+    (success : sliceCopyArgument arguments state = .ok copied) :
+    arguments = [copied.1] ∧ ∃ base, state.resolve copied.1.type = Ty.arraySlice base ∧
+      base.viewElement? = some copied.2 := by
+  match arguments with
+  | [only] =>
+      unfold sliceCopyArgument at success
+      cases found : (state.resolve only.type).arraySliceBase? with
+      | none => simp [found] at success
+      | some base =>
+          cases view : base.viewElement? with
+          | none => simp [found, view] at success
+          | some element =>
+              simp only [found, view, Except.ok.injEq] at success
+              subst success
+              exact ⟨rfl, base, Ty.arraySliceBase?_eq_some found, view⟩
+  | [] => simp [sliceCopyArgument] at success
+  | _ :: _ :: _ => simp [sliceCopyArgument] at success
+
 /-- Result of checking every explicit case in source order. -/
 structure MatchCasesResult where
   cases : List TypedMatchCase
@@ -2064,7 +2110,14 @@ mutual
                               | some function =>
                                   recordBuiltinFunctionCall expression callee name
                                     function arguments id expected state
-                              | none => throw (.noMatchingOverload name [])
+                              | none =>
+                                  if toArrayCall name then
+                                    let copied ← sliceCopyArgument arguments state
+                                    recordExpressionWithExpected context expression id
+                                      (Ty.array copied.2) (.toArray copied.2 copied.1.id) []
+                                      expected state
+                                  else
+                                    throw (.noMatchingOverload name [])
                           | candidates =>
                               let attempt ← selectFunctionCandidateFrom context name
                                 candidates arguments integerLiterals id expected state

@@ -20,6 +20,26 @@ set_option Elab.async false
 namespace Solcore.SourceSemantics.SourceInferenceNormalizedCoercionFormation
 open Frontend SourceInference TypeSystem Detail SourceInferenceSoundness
 
+/-- A copy's type, an array of its slice's element, is admissible under an outer
+substitution that extends the slice's state, wherever the copied slice's type
+is. -/
+theorem sliceCopy_type_admissible {semantic : SourceSemantics.Context} {outer : Substitution}
+    {arguments : List InferredExpression} {state : State} {copied : InferredExpression × Ty}
+    (continuation : outer.SemanticallyExtends state.inference.substitution)
+    (success : sliceCopyArgument arguments state = .ok copied)
+    (formed : ∀ argument ∈ arguments, TypeAdmissible semantic (outer.apply argument.type)) :
+    TypeAdmissible semantic (outer.apply (Ty.array copied.2)) := by
+  obtain ⟨argumentsEq, base, resolved, view⟩ := sliceCopyArgument_ok success
+  have sliceType := formed copied.1 (by rw [argumentsEq]; exact List.mem_singleton_self _)
+  rw [← continuation copied.1.type] at sliceType
+  change TypeAdmissible semantic (outer.apply (state.resolve copied.1.type)) at sliceType
+  rw [resolved] at sliceType
+  have sliceAt : TypeAdmissible semantic (Ty.arraySlice (outer.apply base)) := by
+    simpa [Ty.arraySlice, Substitution.apply] using sliceType
+  have elementAt := TypeAdmissible.viewElement (TypeAdmissible.arraySlice_base sliceAt)
+    ((ViewElement.of_viewElement? view).applySubstitution outer)
+  simpa [Ty.array, Substitution.apply] using TypeAdmissible.array elementAt
+
 theorem inferExprFuel_call_formation
     {semantic : SourceSemantics.Context} {outer : Substitution} {fuel : Nat} {context : SourceInference.Context}
     {expression callee : Syntax.Expr} {sourceArguments : Syntax.DelimitedList Syntax.Expr}
@@ -370,7 +390,32 @@ theorem inferExprFuel_call_formation
                                 cases builtinEq :
                                     builtinFunctionNamed? name with
                                 | none =>
-                                    simp [builtinEq] at success
+                                    simp only [builtinEq] at success
+                                    cases copyEq : toArrayCall name
+                                    case false =>
+                                      simp [copyEq] at success
+                                    simp only [copyEq, if_true] at success
+                                    cases copyResult : sliceCopyArgument arguments argumentState with
+                                    | error error => simp [copyResult] at success
+                                    | ok copied =>
+                                      simp only [copyResult] at success
+                                      have recording := recordExpressionWithExpected_inferenceProperties
+                                        argumentsProperties.2.1
+                                        (sliceCopy_type_variablesBelow argumentsProperties.2.1 argumentsProperties.2.2 copyResult)
+                                        expectedAtArguments success
+                                      have argumentContinuation := continuation.trans recording.1.substitution_extends
+                                      have argumentCapture : NoCaptureNodes outer argumentState.nodes := by
+                                        obtain ⟨_, fit, _, nodes⟩ := recordExpressionWithExpected_success_nodes success
+                                        rw [nodes, (withExpected_occurrenceState_eq fit).1] at capture
+                                        exact capture.of_prefix (List.prefix_append _ _)
+                                      have argumentFormation := argumentsInduction allocatedReady allocatedNodes allocatedFormed formation
+                                        (arguments,argumentState) argumentsResult argumentContinuation argumentCapture
+                                      have produced := recordExpressionWithExpected_normalized_formation
+                                        (type := Ty.array copied.2) formation.toFormationContext continuation
+                                        (sliceCopy_type_admissible argumentContinuation copyResult argumentFormation.1)
+                                        expectedFormed success
+                                      exact ⟨produced.1, argumentFormation.2.of_new_rows (congrArg LexicalScope.binders
+                                        (localReadScope_recordExpressionWithExpected_lexicalScope success)) produced.2⟩
                                 | some function =>
                                     simp only [builtinEq] at success
                                     have builtinProperties := recordBuiltinFunctionCall_inferenceProperties

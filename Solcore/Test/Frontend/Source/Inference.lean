@@ -1742,6 +1742,48 @@ private def testSliceReads : IO Unit := do
     "function bad(m: uint256[]) returns (uint256) { let r = m[0:1]; r[0] = 1; return 0; }"
     fun _ => true
 
+/-- `toArray(s)` copies a slice into an array of its base's element type, a
+slice of a slice and a slice of nested arrays included, and the copy is an
+array a write may change; it is rejected on an array, on a word, on a slice
+whose type is still open there, and as a value, as `Length.length` is. -/
+private def testSliceCopies : IO Unit := do
+  let functions ← check "slice copies" (String.intercalate "\n" [
+    "function copies(m: uint256[], rows: uint256[][]) returns (uint256) {",
+    "  let c = toArray(m[1:3]);",
+    "  let d: uint256[] = toArray(m[0:3][1:]);",
+    "  let e = toArray(rows[0:1]);",
+    "  c[0] = 1;",
+    "  return c.length + d.length + e.length;",
+    "}"
+  ])
+  let function ← match functions with
+    | [function] => pure function
+    | _ => throw (IO.userError "slice copy fixture lost its checked function")
+  let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
+  let copies := function.typedBody.nodes.filterMap fun
+    | .expression { form := .toArray element _, type, .. } => some (element, type)
+    | _ => none
+  assertTrue (decide (copies = [(uint256, .array uint256), (uint256, .array uint256),
+      (.array uint256, .array (.array uint256))]))
+    s!"copies of slices lost their element type: {reprStr copies}"
+  expectInferenceError "a copy of an array"
+    "function bad(m: uint256[]) returns (uint256) { let c = toArray(m); return 0; }" fun error =>
+      error == .operatorNotSupported "toArray" (.array uint256)
+  expectInferenceError "a copy of a word"
+    "function bad(n: uint256) returns (uint256) { let c = toArray(n); return 0; }" fun error =>
+      error == .operatorNotSupported "toArray" uint256
+  expectInferenceError "a copy of a slice still open"
+    "function bad(m: uint256[]) returns (uint256) { let copy = lam(s) { return toArray(s); }; let c: uint256[] = copy(m[0:2]); return c.length; }"
+    fun error => match error with
+      | .operatorNotSupported "toArray" _ => true
+      | _ => false
+  expectInferenceError "toArray as a value"
+    "function bad(m: uint256[]) returns (uint256) { let copy = toArray; return 0; }" fun error =>
+      error == .unknownVariable "toArray"
+  expectInferenceError "Length.length as a value"
+    "function bad(m: uint256[]) returns (uint256) { let size = Length.length; return 0; }"
+    fun error => error == .unknownVariable "Length"
+
 /-- Exercise every phase-7 source-inference form before runtime lowering. -/
 def testSourcePhase7Inference : IO Unit := do
   testConstructors
@@ -1757,6 +1799,7 @@ def testSourcePhase7Inference : IO Unit := do
   testArrayLiteral
   testSlices
   testSliceReads
+  testSliceCopies
   IO.println "phase-7 source inference GREEN"
 
 end Tests.SourcePhase7Inference

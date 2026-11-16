@@ -1092,6 +1092,22 @@ theorem slice_type_variablesBelow {state : State} {type : Ty}
   (Ty.variablesBelow_application_iff _ _ _).2
     ⟨Ty.variablesBelow_constructor _ _, ready.solved.variablesBelow_apply below⟩
 
+/-- A copy's type, an array of its slice's element, is below a ready state's
+next variable whenever the copied slice's type is. -/
+theorem sliceCopy_type_variablesBelow {arguments : List InferredExpression} {state : State}
+    {copied : InferredExpression × Ty} (ready : state.InferenceReady)
+    (below : ∀ argument ∈ arguments, argument.type.VariablesBelow state.inference.next)
+    (success : sliceCopyArgument arguments state = .ok copied) :
+    (Ty.array copied.2).VariablesBelow state.inference.next := by
+  obtain ⟨argumentsEq, base, resolved, view⟩ := sliceCopyArgument_ok success
+  have resolvedBelow : (state.resolve copied.1.type).VariablesBelow state.inference.next :=
+    ready.solved.variablesBelow_apply
+      (below copied.1 (by rw [argumentsEq]; exact List.mem_singleton_self _))
+  rw [resolved] at resolvedBelow
+  exact (Ty.variablesBelow_application_iff _ _ _).2
+    ⟨Ty.variablesBelow_constructor _ _, Ty.variablesBelow_of_viewElement? view
+      ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2⟩
+
 /-- List inference gives one result per expression. -/
 theorem inferExprsFuel_length {fuel : Nat} {context : Context} :
     ∀ {expressions : List Syntax.Expr} {state final : State} {values : List InferredExpression},
@@ -12457,7 +12473,22 @@ private theorem inferFuel_inferenceProperties_internal :
                                         cases builtinEq :
                                             builtinFunctionNamed? name with
                                         | none =>
-                                            simp [builtinEq] at success
+                                            simp only [builtinEq] at success
+                                            cases copyEq : toArrayCall name
+                                            case false =>
+                                              simp [copyEq] at success
+                                            simp only [copyEq, if_true] at success
+                                            cases copyResult : sliceCopyArgument arguments argumentState with
+                                            | error error => simp [copyResult, bind, Except.bind] at success
+                                            | ok copied =>
+                                              simp only [copyResult, bind, Except.bind] at success
+                                              have copyProperties :=
+                                                recordExpressionWithExpected_inferenceProperties
+                                                  argumentsProperties.2.1
+                                                  (sliceCopy_type_variablesBelow argumentsProperties.2.1
+                                                    argumentsProperties.2.2 copyResult)
+                                                  expectedAtArguments success
+                                              exact ⟨prefixProgress.trans copyProperties.1, copyProperties.2⟩
                                         | some function =>
                                             simp only [builtinEq] at success
                                             have builtinProperties :=
@@ -14729,7 +14760,17 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                         cases builtinEq :
                                             builtinFunctionNamed? name with
                                         | none =>
-                                            simp [builtinEq] at success
+                                            simp only [builtinEq] at success
+                                            cases copyEq : toArrayCall name
+                                            case false =>
+                                              simp [copyEq] at success
+                                            simp only [copyEq, if_true] at success
+                                            cases copyResult : sliceCopyArgument arguments argumentState with
+                                            | error error => simp [copyResult, bind, Except.bind] at success
+                                            | ok copied =>
+                                              simp only [copyResult, bind, Except.bind] at success
+                                              exact (recordExpressionWithExpected_lexicalScope success).trans
+                                                throughArguments
                                         | some function =>
                                             simp only [builtinEq] at success
                                             exact
@@ -15695,7 +15736,7 @@ theorem inferForItemsFuel_preserves_localBindersBelowNextLocal
               subst result
               exact tailBelow
 
-set_option maxHeartbeats 500000 in
+set_option maxHeartbeats 1000000 in
 private theorem inferStatementsFuel_preserves_header_internal :
     (∀ fuel context expression expected state,
       PreservesStateHeader Prod.snd state

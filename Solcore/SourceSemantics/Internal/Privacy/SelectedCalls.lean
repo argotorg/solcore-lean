@@ -1794,7 +1794,25 @@ theorem inferExprFuel_call_private
                                 cases builtinEq :
                                     builtinFunctionNamed? name with
                                 | none =>
-                                    simp [builtinEq] at success
+                                    simp only [builtinEq] at success
+                                    cases copyEq : toArrayCall name
+                                    case false =>
+                                      simp [copyEq] at success
+                                    simp only [copyEq, if_true] at success
+                                    cases copyResult : sliceCopyArgument arguments argumentState with
+                                    | error error => simp [copyResult] at success
+                                    | ok copied =>
+                                      simp only [copyResult] at success
+                                      have recorded := recordExpressionWithExpected_private catalog
+                                        argumentsProperties.2.1
+                                        (sliceCopy_type_variablesBelow argumentsProperties.2.1 argumentsProperties.2.2 copyResult)
+                                        expectedAtArguments
+                                        (safe_sliceCopy argumentsProperties.2.1 copyResult argumentsPrivacy.2.1)
+                                        expectedSafeAtArguments argumentsPrivacy.2.2.1 success
+                                      refine ⟨prefixPrivacy.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+                                      intro row member fresh
+                                      exact new_requirements_trans argumentsPrivacy.2.2.2 recorded.2.2.2
+                                        recorded.1 row member fresh
                                 | some function =>
                                     simp only [builtinEq] at success
                                     have builtinPrivacy := recordBuiltinFunctionCall_private

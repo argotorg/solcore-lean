@@ -586,6 +586,39 @@ theorem arrayLength_formType
   cases argumentsTyped with
   | cons head _ => exact .arrayLength head view
 
+/-- A slice's copy, `.toArray` of the slice at an array of its element, has its
+raw type, which is admissible, once the slice, a slice once resolved, is typed
+in the final source: the one argument of `toArray(s)`. -/
+theorem toArray_formType
+    {semanticSource : TypedSource} {active : SourceSemantics.Context}
+    {substitution : Substitution} {state : State} {slice : InferredExpression}
+    {base element : Ty}
+    (resolved : state.resolve slice.type = Ty.arraySlice base)
+    (found : base.viewElement? = some element)
+    (extension : substitution.SemanticallyExtends state.inference.substitution)
+    (argumentsTyped : ExpressionsHaveTypes semanticSource active ([slice].map (·.id))
+      ([slice].map fun argument => substitution.apply argument.type)) :
+    ExpressionFormHasRawType semanticSource active
+        ((ExpressionForm.toArray element slice.id).applySubstitution substitution)
+        (substitution.apply (Ty.array element)) (.ordinary []) ∧
+      TypeAdmissible active (substitution.apply (Ty.array element)) := by
+  have sliceTypeEq : substitution.apply slice.type =
+      Ty.arraySlice (substitution.apply base) := by
+    rw [← extension slice.type]
+    change substitution.apply (state.resolve slice.type) = _
+    rw [resolved]
+    rfl
+  have view : ViewElement (substitution.apply base) (substitution.apply element) :=
+    (ViewElement.of_viewElement? found).applySubstitution substitution
+  cases argumentsTyped with
+  | cons head _ =>
+    have sliceTyped : ExpressionHasType semanticSource active slice.id
+        (Ty.arraySlice (substitution.apply base)) := by
+      rw [← sliceTypeEq]
+      exact head
+    exact ⟨.toArray sliceTyped view,
+      TypeAdmissible.array (sliceTyped.type_admissible.arraySlice_base.viewElement view)⟩
+
 /-- `a.length` types its base, inferred with no expected type, from the base's
 own retained subtree, and records the length at `uint256`. -/
 theorem actualFieldLength_typing {fuel : Nat}
@@ -1418,6 +1451,125 @@ theorem actualArrayLengthCall_typing {fuel : Nat}
     recording resultSubstitutionExtension requirementsSubset retained coercionsRetained
     catalog signaturesEq invariant formType rawAdmissible covered
 
+/-- `toArray(s)` types its one argument, a slice, in the same final source and
+records its copy at an array of the slice's element. -/
+theorem actualToArrayCall_typing {fuel : Nat}
+    (recursive : ∀ smaller, smaller < fuel → ActualInferExprFuelRetainedSoundness smaller) :
+  ∀ {wholeContext inferenceContext : Frontend.SourceInference.Context}
+    {wholeReturn : Ty} {expression : Syntax.Expr} {expected : Option Ty}
+    {argumentSources : List Syntax.Expr} {arguments : List InferredExpression}
+    {copied : InferredExpression × Ty} {call : ExpressionId}
+    {initial argumentState resultState evidenceState : State}
+    {inferred : InferredExpression} {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    {semanticSource : TypedSource}
+    {frames : List InitializedLetBinding}
+    {semanticContext : SourceSemantics.Context},
+    Detail.inferExprsFuel fuel inferenceContext argumentSources initial = .ok (arguments, argumentState) →
+    Detail.sliceCopyArgument arguments argumentState = .ok copied →
+    Detail.recordExpressionWithExpected inferenceContext expression call (Ty.array copied.2)
+      (.toArray copied.2 copied.1.id) [] expected argumentState = .ok (inferred, resultState) →
+    FinalInferenceResources wholeContext wholeReturn evidenceState roots
+      finalized →
+    ExecutableCoercionInterfaces.SourceInterfaces wholeContext.signatures
+      finalized.solvedRequirements finalized.typedSource →
+    finalized.substitution.SemanticallyExtends
+      resultState.inference.substitution →
+    inferenceContext.signatures = wholeContext.signatures →
+    inferenceContext.scope.genericOwner = wholeContext.scope.genericOwner →
+    inferenceContext.typeParameters = wholeContext.typeParameters →
+    inferenceContext.assumptions = wholeContext.assumptions →
+    ProgramSignatureFormationValidated inferenceContext.signatures →
+    (∀ candidate ∈ inferenceContext.signatures.functions,
+      candidate.scheme.body = .function
+        (Ty.productMany candidate.parameterTypes)
+        (Ty.productMany candidate.returnTypes)) →
+    SignatureCatalogWellFormed inferenceContext.signatures →
+    SignatureParametersWellFormed inferenceContext.scope.genericOwner
+      inferenceContext.typeParameters →
+    RecursiveExpressionInvariant wholeContext finalized initial
+      semanticContext →
+    ActualContext wholeContext finalized frames semanticContext →
+    ActualStateInvariant initial (evidenceState.toTypedSource roots) →
+    (∀ expectedType ∈ expected,
+      expectedType.VariablesBelow initial.inference.next) →
+    (∀ expectedType ∈ expected,
+      TypeAdmissible semanticContext (finalized.substitution.apply expectedType)) →
+    ProperDescendantsPreserved finalized.substitution
+      (resultState.toTypedSource roots) finalized.typedSource
+      (.expression inferred.id) →
+    RawProperDescendantsPreserved (resultState.toTypedSource roots)
+      (evidenceState.toTypedSource roots) (.expression inferred.id) →
+    resultState.integerPatterns ⊆ evidenceState.integerPatterns →
+    resultState.integerLiterals ⊆ evidenceState.integerLiterals →
+    resultState.requirements ⊆ evidenceState.requirements →
+    ExpressionRequirementsRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionCoercionPrimariesRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionOperatorSiteRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    ExpressionDirectChildrenRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id →
+    TemplateScopeCovered finalized.typedSource semanticContext
+      (.expression inferred.id) →
+    ProperDescendantsPreserved finalized.substitution (resultState.toTypedSource roots)
+      semanticSource (.expression inferred.id) →
+    ActualContext.Covers finalized frames (.expression inferred.id) →
+    ExpressionTypingBase (resultState.toTypedSource roots) semanticSource
+      semanticContext finalized.substitution inferred := by
+  intro wholeContext inferenceContext wholeReturn expression expected argumentSources arguments
+    copied call initial argumentState resultState evidenceState
+    inferred roots finalized semanticSource frames semanticContext argumentsSuccess argument
+    recording resources interfaces resultSubstitutionExtension signaturesEq ownerEq
+    typeParametersEq assumptionsEq signatureFormation functionsCanonical catalog canonical invariant
+    actual operational expectedBelow _expectedAdmissible finalPreserved rawProper integerPatternsSubset
+    integerLiteralsSubset requirementsSubset retained coercionsRetained _operatorsRetained childrenRetained covered
+    semanticPreserved actualCovered
+  obtain ⟨argumentsEq, base, resolved, view⟩ := Detail.sliceCopyArgument_ok argument
+  subst argumentsEq
+  have argumentProperties := Detail.inferExprsFuel_inferenceProperties invariant.ready
+    signatureFormation functionsCanonical argumentsSuccess
+  have expectedAtArguments : ∀ type ∈ expected, type.VariablesBelow argumentState.inference.next :=
+    fun type member => (expectedBelow type member).weaken argumentProperties.1.next_le
+  have recordProperties := Detail.recordExpressionWithExpected_inferenceProperties
+    argumentProperties.2.1
+    (Detail.sliceCopy_type_variablesBelow argumentProperties.2.1 argumentProperties.2.2 argument)
+    expectedAtArguments recording
+  have argumentExtension := resultSubstitutionExtension.trans recordProperties.1.substitution_extends
+  have argumentToParent : TypingSourceExtends (argumentState.toTypedSource roots)
+      (resultState.toTypedSource roots) :=
+    ⟨Detail.recordExpressionWithExpected_preserves_owner recording,
+      recordExpressionWithExpected_success_nodesPrefix recording⟩
+  obtain ⟨_, contains⟩ := recordExpressionWithExpected_success_containsExpression recording roots
+  have argumentEdge : ∀ argument ∈ [copied.1],
+      DirectChild (resultState.toTypedSource roots) (.expression inferred.id) (.expression argument.id) := by
+    intro argument member
+    rw [List.mem_singleton.mp member]
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    simp [nodeChildIds, Node.references, ExpressionForm.references]
+  have argumentPatterns : argumentState.integerPatterns ⊆ evidenceState.integerPatterns := by
+    rw [← recordExpressionWithExpected_integerPatterns_eq recording]
+    exact integerPatternsSubset
+  have argumentLiterals : argumentState.integerLiterals ⊆ evidenceState.integerLiterals := by
+    rw [← Detail.recordExpressionWithExpected_integerLiterals_eq recording]
+    exact integerLiteralsSubset
+  have argumentRequirements := List.Subset.trans
+    (Detail.recordExpressionWithExpected_requirements_subset recording) requirementsSubset
+  have argumentsTyped := actualInferExprsFuelFinalSubtreeSoundness fuel recursive
+    argumentsSuccess resources interfaces argumentExtension signaturesEq ownerEq typeParametersEq assumptionsEq
+    signatureFormation functionsCanonical catalog canonical invariant actual operational
+    (fun argument member => (semanticPreserved.childSubtree (argumentEdge argument member)).monoBefore argumentToParent)
+    (fun argument member => (finalPreserved.childSubtree (argumentEdge argument member)).monoBefore argumentToParent)
+    (fun argument member => ((rawProper.childSubtree (argumentEdge argument member)).monoBefore argumentToParent).proper)
+    argumentPatterns argumentLiterals argumentRequirements
+    (fun argument member => covered.expressionChild resources.graph_closed (childrenRetained (argumentEdge argument member)))
+    (fun argument member => actualCovered.directChild (childrenRetained (argumentEdge argument member)))
+  have copyType := toArray_formType resolved view argumentExtension argumentsTyped
+  exact recordExpressionWithExpected_success_expressionTypingBase_actual resources interfaces
+    recording resultSubstitutionExtension requirementsSubset retained coercionsRetained
+    catalog signaturesEq invariant copyType.1 copyType.2 covered
+
 /-- `a.length()`: the call is a group over its callee `a.length`, inferred after
 its empty argument row, and has the callee's type. -/
 theorem actualLengthMethodCall_typing {fuel : Nat}
@@ -1642,6 +1794,14 @@ theorem actualInferExprFuelRetainedSoundness_call_nonConstructor {fuel : Nat}
       childrenRetained covered semanticPreserved actualCovered
   | arrayLength argumentsSuccess argument recording =>
     exact actualArrayLengthCall_typing
+      (fun smaller less => recursive smaller (Nat.lt_trans less (Nat.lt_succ_self fuel)))
+      argumentsSuccess argument recording resources interfaces resultSubstitutionExtension
+      signaturesEq ownerEq typeParametersEq assumptionsEq signatureFormation functionsCanonical catalog canonical
+      allocatedInvariant actual allocatedOperational allocatedExpected expectedAdmissible finalPreserved rawProper
+      integerPatternsSubset integerLiteralsSubset requirementsSubset retained coercionsRetained _operatorsRetained
+      childrenRetained covered semanticPreserved actualCovered
+  | toArray argumentsSuccess argument recording =>
+    exact actualToArrayCall_typing
       (fun smaller less => recursive smaller (Nat.lt_trans less (Nat.lt_succ_self fuel)))
       argumentsSuccess argument recording resources interfaces resultSubstitutionExtension
       signaturesEq ownerEq typeParametersEq assumptionsEq signatureFormation functionsCanonical catalog canonical

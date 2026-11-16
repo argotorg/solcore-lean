@@ -1127,7 +1127,18 @@ theorem inferExprFuel_call_fixes_protected
                                 cases builtinEq :
                                     builtinFunctionNamed? name with
                                 | none =>
-                                    simp [builtinEq] at success
+                                    simp only [builtinEq] at success
+                                    cases copyEq : toArrayCall name
+                                    case false =>
+                                      simp [copyEq] at success
+                                    simp only [copyEq, if_true] at success
+                                    cases copyResult : sliceCopyArgument arguments argumentState with
+                                    | error error => simp [copyResult] at success
+                                    | ok copied =>
+                                      simp only [copyResult] at success
+                                      exact recordExpressionWithExpected_fixes_protected argumentsFixed
+                                        (safe_sliceCopy argumentsProperties.2.1 copyResult argumentsPrivacy.2.1)
+                                        expectedSafeAtArguments success
                                 | some function =>
                                     simp only [builtinEq] at success
                                     exact recordBuiltinFunctionCall_fixes_protected
