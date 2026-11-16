@@ -965,6 +965,15 @@ theorem registered_prefix_with_closed (signatures : ProgramSignatures) (fuel : N
                 obtain ⟨afterEq, _⟩ := accepted
                 subst afterEq
                 exact extension
+          · obtain ⟨registered, child, accepted⟩ := bind_ok accepted
+            have extension := ih.1 _ _ _ _ child
+            cases projected : registered.fst.project (SourceCoreRawMetadata.runtimeType original) with
+            | error error => simp [projected] at accepted
+            | ok projectedType =>
+                simp only [projected, Except.ok.injEq, Prod.mk.injEq] at accepted
+                obtain ⟨afterEq, _⟩ := accepted
+                subst afterEq
+                exact extension
           · split at accepted
             · obtain ⟨signature, selected, accepted⟩ := bind_ok accepted
               split at accepted

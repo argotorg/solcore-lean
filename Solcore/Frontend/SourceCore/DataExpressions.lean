@@ -123,6 +123,123 @@ def arrayIndex (layout : Core.OrderedMapping.Layout) (comparison base index : Co
         (Core.LanguageResult.failure layout.valueType
           (.word (SourceCorePanics.reason SourceCorePanics.outOfBounds)))))
 
+/-- A view's shape, read from its Core type: a memory array's cell, with the layout of its
+present elements, inside `depth` slices, each the product of its base, its start and its
+length. -/
+def viewShape? : Core.Ty → Option (Nat × Core.OrderedMapping.Layout)
+  | .cell (.product .word (.product elementType (.namedData identity))) =>
+      some (0, ⟨.word, elementType, identity⟩)
+  | .product base (.product .word .word) =>
+      (viewShape? base).map fun (depth, layout) => (depth + 1, layout)
+  | _ => none
+
+/-- A pure view's length inside `depth` slices: an array cell's first component, or a slice's
+own, as the source semantics' `ViewLength`. -/
+def viewLength : Nat → Core.Expr → Core.Expr
+  | 0, view => .first (.loadCell view)
+  | _ + 1, view => .second (.second view)
+
+/-- The memory array under a pure view inside `depth` slices: each slice's base in turn. -/
+def viewArray : Nat → Core.Expr → Core.Expr
+  | 0, view => view
+  | depth + 1, view => viewArray depth (.first view)
+
+/-- A slice's length: the last component of the product of its base, its start and its
+length. -/
+def sliceLength (base : Core.Expr) : Core.Expr :=
+  Core.LanguageResult.bind .word base (Core.LanguageResult.success (.second (.second (.var 0))))
+
+/-- The element of a pure view at a pure word position, as the source semantics' `ViewReads`:
+inside a slice, `Panic(0x32)` from the slice's length on, else its base's element at the
+slice's start plus the position, down to the array's cell, which `arrayIndex` reads. -/
+def viewRead (layout : Core.OrderedMapping.Layout) (comparison : Core.Expr) :
+    Nat → Core.Expr → Core.Expr → Core.Expr
+  | 0, view, position =>
+      arrayIndex layout comparison (Core.LanguageResult.success view)
+        (Core.LanguageResult.success position)
+  | depth + 1, view, position =>
+      .ifE (Core.Expr.wordLt position (.second (.second view)))
+        (viewRead layout comparison depth (.first view)
+          (.binary .wordAdd (.first (.second view)) position))
+        (Core.LanguageResult.failure layout.valueType
+          (.word (SourceCorePanics.reason SourceCorePanics.outOfBounds)))
+
+/-- `a[i]` on a view inside `depth` slices: the view's, then the index's effects, then the
+view's element at the index (`viewRead`). An array's read is `arrayIndex`. -/
+def viewIndex (layout : Core.OrderedMapping.Layout) (comparison : Core.Expr) (depth : Nat)
+    (base index : Core.Expr) : Core.Expr :=
+  match depth with
+  | 0 => arrayIndex layout comparison base index
+  | depth + 1 =>
+      Core.LanguageResult.bind layout.valueType base
+        (Core.LanguageResult.bind layout.valueType (index.weakenAt 0)
+          (viewRead layout ((comparison.weakenAt 0).weakenAt 0) (depth + 1) (.var 1) (.var 0)))
+
+/-- `a[s:e]`, `a[s:]`, `a[:e]` and `a[:]` on a view of Core type `baseType` inside `depth`
+slices: the base's, then the present bounds' effects from left to right, an absent start as 0
+and an absent stop as the base's length, as std's `sliceFrom`, `sliceTo` and `sliceAll` fill
+them; then `Panic(0x32)` unless `s ≤ e ≤ length`, else the base, `s` and `e − s`. -/
+def arraySlice (baseType : Core.Ty) (depth : Nat) (base : Core.Expr)
+    (start stop : Option Core.Expr) : Core.Expr :=
+  let sliceType := Core.Ty.product baseType (.product .word .word)
+  let outOfBounds := Core.LanguageResult.failure sliceType
+    (.word (SourceCorePanics.reason SourceCorePanics.outOfBounds))
+  let made (view first last : Core.Expr) : Core.Expr :=
+    .ifE (Core.Expr.wordLe first last)
+      (.ifE (Core.Expr.wordLe last (viewLength depth view))
+        (Core.LanguageResult.success (.pair view (.pair first (.binary .wordSub last first))))
+        outOfBounds)
+      outOfBounds
+  Core.LanguageResult.bind sliceType base <|
+    match start, stop with
+    | some start, some stop =>
+        Core.LanguageResult.bind sliceType (start.weakenAt 0)
+          (Core.LanguageResult.bind sliceType ((stop.weakenAt 0).weakenAt 0)
+            (made (.var 2) (.var 1) (.var 0)))
+    | some start, none =>
+        Core.LanguageResult.bind sliceType (start.weakenAt 0)
+          (made (.var 1) (.var 0) (viewLength depth (.var 1)))
+    | none, some stop =>
+        Core.LanguageResult.bind sliceType (stop.weakenAt 0)
+          (made (.var 1) (.word Core.Word.zero) (.var 0))
+    | none, none => made (.var 0) (.word Core.Word.zero) (viewLength depth (.var 0))
+
+/-- The helper of a slice's copy, at entry its argument, the slice and a position, then its
+self reference: below the slice's length, the slice's element at the position (`viewRead`),
+then the elements from the next position on, each at its own position; from the length on, no
+element. -/
+def sliceCopyBody (layout : Core.OrderedMapping.Layout) (comparison : Core.Expr) (depth : Nat)
+    (sliceType : Core.Ty) : Core.Expr :=
+  .ifE (Core.Expr.wordLt (.second (.var 0)) (viewLength depth (.first (.var 0))))
+    (Core.LanguageResult.bind layout.type
+      (viewRead layout comparison depth (.first (.var 0)) (.second (.var 0)))
+      (Core.LanguageResult.bind layout.type
+        (Core.OrderedMapping.invoke (.product sliceType .word) layout.type (.var 2)
+          (.pair (.first (.var 1))
+            (.binary .wordAdd (.second (.var 1)) (.word (Core.Word.ofNatModulo 1)))))
+        (Core.LanguageResult.success
+          (Core.OrderedMapping.cons layout (.second (.var 2)) (.var 1) (.var 0)))))
+    (Core.LanguageResult.success (Core.OrderedMapping.empty layout))
+
+/-- `toArray(s)` on a slice of Core type `sliceType` inside `depth` slices: the slice's effects,
+then its elements from position 0 on (`sliceCopyBody`), then a new cell of the slice's length,
+the default element of the array under it and those elements, as the source semantics'
+`ViewCopies` and its allocation. -/
+def sliceCopy (layout : Core.OrderedMapping.Layout) (comparison : Core.Expr) (depth : Nat)
+    (sliceType : Core.Ty) (slice : Core.Expr) : Core.Expr :=
+  let contents := Core.Ty.product .word (.product layout.valueType layout.type)
+  -- The helper's body is four binders below the copy: the slice, the helper's argument, its
+  -- self cell and its parameter.
+  let bodyComparison := (((comparison.weakenAt 0).weakenAt 0).weakenAt 0).weakenAt 0
+  Core.LanguageResult.bind (.cell contents) slice
+    (Core.LanguageResult.bind (.cell contents)
+      (Core.OrderedMapping.runHelper (.product sliceType .word) layout.type
+        (sliceCopyBody layout bodyComparison depth sliceType)
+        (.pair (.var 0) (.word Core.Word.zero)))
+      (Core.LanguageResult.success
+        (.newCell contents (.pair (viewLength depth (.var 1))
+          (.pair (.first (.second (.loadCell (viewArray depth (.var 1))))) (.var 0))))))
+
 private def project (checked : Checked) (node : ExpressionNode) (type : TypeSystem.Ty) : Except Error Core.Ty :=
   (checked.project type).mapError (fun _ => .unsupportedExpression node.id node.form) |>.map (·.type)
 

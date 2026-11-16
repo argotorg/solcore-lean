@@ -380,13 +380,15 @@ wait for the native pipeline's contracts and ABI.
   (`Ty.arraySliceBaseAllowed`), and `Ty.containsArray` counts it, so a mapping that holds a slice is
   rejected with `unsupportedArrayType`, as is an array of slices, whose element
   `Ty.arrayElementAllowed` does not admit (difference 17). Elaboration and both catalogs reject
-  every slice type until step 6h. As built in step 6f-ii, inference infers a slice's base, then its
-  present bounds, with no expected type, as a tuple's elements, and takes the base only when its
-  resolved type is a memory array or a slice there, as a read decides on its base; another base is
-  rejected with `unsupportedExpression "slice"` (difference 18). It unifies the bounds' types with
-  `uint256`s, as a literal's elements' with its element type, so an open literal bound takes
-  `uint256` and a bound of another type is rejected, and records the slice at the slice of the
-  base's resolved type (`ExpressionForm.arraySlice`, `sliceBoundIds`).
+  every slice type until step 6h; as built in step 6h, the compatible catalog projects one (see
+  Lowering), and elaboration and the strict catalog still reject it. As built in step 6f-ii,
+  inference infers a slice's base, then its present bounds, with no expected type, as a tuple's
+  elements, and takes the base only when its resolved type is a memory array or a slice there, as a
+  read decides on its base; another base is rejected with `unsupportedExpression "slice"`
+  (difference 18). It unifies the bounds' types with `uint256`s, as a literal's elements' with its
+  element type, so an open literal bound takes `uint256` and a bound of another type is rejected,
+  and records the slice at the slice of the base's resolved type (`ExpressionForm.arraySlice`,
+  `sliceBoundIds`).
 - **Lengths.** `a.length`, `a.length()` and `Length.length(a)` on arrays and slices have the type
   `uint256`. `Length.length` is a builtin qualified call when no namespace `Length` exists, as
   `Typedef.abs` is (`typedefCall?`). As built in step 2b-ii-b, `lengthCall` finds the name, and the
@@ -519,6 +521,19 @@ wait for the native pipeline's contracts and ABI.
   value-assignment cases and the heads that reach the receipt take the place's element-freeness, as
   a field or a hypothesis.
 - A slice is a Core product of its base, its start and its length.
+- As built in step 6h, the compatible catalog projects `arraySlice<B>` to the product of `B`'s Core
+  type and two words, and registers `B`. The data lowering reads a view's shape from its Core type
+  (`SourceCoreDataExpressions.viewShape?`): a memory array's cell inside some slices. A slice
+  evaluates its base, then its present bounds from left to right, fills an absent start with 0 and
+  an absent stop with the base's length, and panics with `0x32` unless `s ≤ e ≤ length`, else holds
+  the base, `s` and `e − s` (`arraySlice`). A slice's length is its own (`sliceLength`). A read
+  through a slice panics with `0x32` from the slice's length on, then reads the base at the slice's
+  start plus the index, down to the array's cell, whose read is 3c's (`viewIndex`, `viewRead`), as
+  the source semantics' `ViewReads` does. `toArray(s)` evaluates the slice, reads its elements from
+  position 0 on with a recursive Core helper, a self closure in a cell as `OrderedMapping`'s lookup
+  is (`sliceCopyBody`), and then allocates the cell of the slice's length, the default element of
+  the array under it and those elements (`sliceCopy`), as the source semantics' `ViewCopies` and its
+  allocation do. Core does not change.
 - Arrays stay outside `StaticProfile` and the proved subset, as row 1's conversions did. The
   meaning proofs and their statements do not change.
 
@@ -537,6 +552,16 @@ of the ABI's decoding, and how one leaves, read back by index or length instead 
 the fixture's `ret(3) -> [0,2,4]` is checked as 0, 2 and 4 at indexes 0 to 2 and length 3,
 `ret(0) -> []` as length 0, `sum([1,2,3,4]) -> 10` and `sum([]) -> 0` as those sums, and
 `grid(2) -> [[],[0]]` as length 2, rows of lengths 0 and 1, and 0 at `[1][0]`.
+
+As built in step 6h, the array fixtures test runs array-slice's `build()` and its 11 public
+functions that need no storage as upstream wrote them: `rangeLen`, `rangeGet`, `fromLen`, `toLen`,
+`allLen`, `reslice`, `bounds`, `materialise`, `aliasing`, `spec` and `ternaryBound`. `build()` and
+`aliasing()` write through step 5a's element writes. It runs memory-array-abi's `slices(xs)` as
+upstream wrote it, behind a word wrapper, `slicesAt(x0, x1, x2, x3, i)`, which returns
+`slices([x0, x1, x2, x3])[i]`. The wrapper changes only how the array arrives, a literal of word
+arguments instead of the ABI's decoding, and how the copy leaves, read back by index instead of
+ABI-encoded, so the fixture's `slices([10,20,30,40]) -> [20,30]` is checked as 20 at index 0, 30 at
+1 and `0x32` at 2. No other function was adapted.
 
 ### Outside row 4's Lean side
 
@@ -696,7 +721,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 6f-ii | Slices: inference's typing of the four slice forms on an array or a slice, with `uint256` bounds | 24–30 files, +800–1,100/−20–50; measured at 22 files, +1005/−15 | none |
 | 6g-i | Slices: inference's typing of reads and lengths through a slice: the read's arm and the lengths take the view of a memory array or of a slice (`Ty.viewElement?`), and the read's and the lengths' proofs take it | 18–25 files, +250–450/−100–200; measured at 23 files, +210/−110 | none |
 | 6g-ii | Slices: inference's typing of `toArray(s)` | 15–25 files, +450–700/−10–30; measured at 19 files, +553/−11 | none |
-| 6h | Slices: the lowering, a slice as a Core product of its base, its start and its length, and `toArray(s)`'s copy | 4–9 files, +200–400/−10–20 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
+| 6h | Slices: the lowering, a slice as a Core product of its base, its start and its length, and `toArray(s)`'s copy | 4–9 files, +200–400/−10–20; measured at 9 files, +286/−12 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
 

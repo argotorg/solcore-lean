@@ -1703,6 +1703,9 @@ theorem nominal_project {catalog : SourceCoreCompatibleCatalog.Catalog} {type : 
     · next head =>
       exfalso
       cases function <;> simp_all [SourceCoreDataCatalog.nominalParts, SourceCoreRawMetadata.runtimeType]
+    · next head =>
+      exfalso
+      cases function <;> simp_all [SourceCoreDataCatalog.nominalParts, SourceCoreRawMetadata.runtimeType]
     · simp [found]
 
 private theorem row_native {checked : SourceCoreCompatibleCatalog.Checked} {site : SourceCoreElaboration.ErrorSite}

@@ -5592,6 +5592,68 @@ private def memArrayWriteWorkspace : Workspace.RawWorkspace := workspaceOf [
   "    return grid(n)[i][j];",
   "}"]
 
+/-- Row 4's step 6h: upstream's array-slice fixture's `build()` and its 11 public functions
+that need no storage, as upstream wrote them, with the contract's methods as functions, and
+memory-array-abi's `slices(xs)` as upstream wrote it. `slices` takes and gives an array, so a
+word wrapper calls it: `slicesAt(x0, x1, x2, x3, i)` returns `slices([x0, x1, x2, x3])[i]`. -/
+private def arraySliceWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function build() returns (uint256[]) {",
+  "    let a: uint256[] = new uint256[](5);",
+  "    for (let i: uint256 = 0; i < a.length; i += 1) {",
+  "        a[i] = i + 10;",
+  "    }",
+  "    return a;",
+  "}",
+  "function rangeLen() returns (uint256) {",
+  "    return build()[1:4].length;",
+  "}",
+  "function rangeGet(i: uint256) returns (uint256) {",
+  "    return build()[1:4][i];",
+  "}",
+  "function fromLen(start: uint256) returns (uint256) {",
+  "    return build()[start:].length;",
+  "}",
+  "function toLen(end: uint256) returns (uint256) {",
+  "    return build()[:end].length;",
+  "}",
+  "function allLen() returns (uint256) {",
+  "    return build()[:].length;",
+  "}",
+  "function reslice(i: uint256) returns (uint256) {",
+  "    return build()[1:4][1:][i];",
+  "}",
+  "function bounds(start: uint256, end: uint256) returns (uint256) {",
+  "    return build()[start:end].length;",
+  "}",
+  "function materialise(i: uint256) returns (uint256) {",
+  "    let b: uint256[] = toArray(build()[1:4]);",
+  "    return b[i];",
+  "}",
+  "function aliasing() returns (uint256) {",
+  "    let a = build();",
+  "    let s = a[2:];",
+  "    a[3] = 99;",
+  "    return s[1];",
+  "}",
+  "function spec() returns (uint256) {",
+  "    let a = build();",
+  "    let full = a[:];",
+  "    let front = a[:2];",
+  "    let back = a[3:];",
+  "    let mid = a[1:4];",
+  "    let inner = mid[1:];",
+  "    return full.length + front.length + back.length + mid.length + inner.length + mid[0] + inner[1];",
+  "}",
+  "function ternaryBound(c: bool) returns (uint256) {",
+  "    return build()[c ? uint256(1) : uint256(2):].length;",
+  "}",
+  "function slices(xs: uint256[]) returns (uint256[]) {",
+  "    return toArray(xs[1:3]);",
+  "}",
+  "function slicesAt(x0: uint256, x1: uint256, x2: uint256, x3: uint256, i: uint256) returns (uint256) {",
+  "    return slices([x0, x1, x2, x3])[i];",
+  "}"]
+
 /-- The source semantics and the lowering reject the same first length with `Panic(0x41)`. -/
 example : Solcore.SourceSemantics.Dynamic.newArrayLengthLimit =
     SourceCoreDataExpressions.arrayLengthLimit := rfl
@@ -5607,7 +5669,11 @@ row, and an element place panics with `0x32` from its array's length on, before 
 runs. Then mem-array's `#[(3, 1, 99) -> 99]`, `#[(3, 0, 7) -> 7]`, `#[(2, 5, 1) -> 0x32]`,
 `#[(4) -> 30]`, `#[(4, 9) -> 9]` and `#[(8) -> 8]`, and memory-array-abi's `ret(3) -> [0,2,4]`,
 `ret(0) -> []`, `sum([1,2,3,4]) -> 10`, `sum([]) -> 0` and `grid(2) -> [[],[0]]` through their
-wrappers. -/
+wrappers. Then array-slice's `#[() -> 3]`, `#[(0) -> 11]`, `#[(2) -> 13]`, `#[(3) -> 0x32]`,
+`#[(2) -> 3]`, `#[(5) -> 0]`, `#[(6) -> 0x32]`, `#[(3) -> 3]`, `#[() -> 5]`, `#[(0) -> 12]`,
+`#[(1) -> 13]`, `#[(4, 2) -> 0x32]`, `#[(0, 6) -> 0x32]`, `#[(2, 2) -> 0]`, `#[() -> 99]`,
+`#[() -> 38]`, `#[(true) -> 4]` and `#[(false) -> 3]`, and memory-array-abi's
+`slices([10,20,30,40]) -> [20,30]` through its wrapper, as 20 at 0, 30 at 1 and `0x32` at 2. -/
 def runUpstreamArrayFixtures : IO Unit := do
   let program ← get "array fixture check" (checkProgram arrayFixtureWorkspace)
   let names := ["newLen", "oversized", "nested", "defaultZero", "nestedEmpty", "signedIndex"]
@@ -5694,7 +5760,35 @@ def runUpstreamArrayFixtures : IO Unit := do
     portSession := completed.session
   let _ ← panics portSession (← portKey 0) [word 2, word 5, word 1] SourceCorePanics.outOfBounds
     "setGet(2, 5, 1)"
-  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths; a nested element write changes only its row, and an element place from the length on panics with 0x32 before its right side; mem-array's setGet, fillAndSum, nestedReplace and alias as upstream wrote them give the fixture's elements and sums, with 0x32 from the length on, and memory-array-abi's ret, sum and grid give the fixture's arrays through word wrappers"
+  let sliceProgram ← get "array-slice fixture check" (checkProgram arraySliceWorkspace)
+  let sliceNames := ["rangeLen", "rangeGet", "fromLen", "toLen", "allLen", "reslice", "bounds",
+    "materialise", "aliasing", "spec", "ternaryBound", "slicesAt"]
+  let sliceSeeds ← sliceNames.mapM (seed sliceProgram)
+  let sliceCompiled ← get "array-slice fixture compilation"
+    (compile arraySliceWorkspace sliceSeeds {specializationBudget := 256, compilationFuel := 1000})
+  let sliceKey (index : Nat) : IO Key := match sliceCompiled.keys[index]? with
+    | some key => pure key
+    | none => throw (IO.userError "array-slice fixture root missing")
+  let mut sliceSession ← boot (← sliceCompiled.open)
+  let sliceCases : List (Nat × List Value × Nat) :=
+    [(0, [], 3), (1, [word 0], 11), (1, [word 2], 13), (2, [word 2], 3), (2, [word 5], 0),
+      (3, [word 3], 3), (4, [], 5), (5, [word 0], 12), (5, [word 1], 13),
+      (6, [word 2, word 2], 0), (7, [word 0], 11), (7, [word 2], 13), (8, [], 99), (9, [], 38),
+      (10, [.bool true], 4), (10, [.bool false], 3),
+      (11, [word 10, word 20, word 30, word 40, word 0], 20),
+      (11, [word 10, word 20, word 30, word 40, word 1], 30)]
+  for (index, arguments, expected) in sliceCases do
+    let completed ← execute sliceSession (← sliceKey index) arguments
+    require (completed.value == word expected)
+      s!"{sliceNames[index]!}({reprStr arguments}) gave {reprStr completed.value}"
+    sliceSession := completed.session
+  let slicePanics : List (Nat × List Value) :=
+    [(1, [word 3]), (2, [word 6]), (3, [word 6]), (5, [word 2]), (6, [word 4, word 2]),
+      (6, [word 0, word 6]), (7, [word 3]), (11, [word 10, word 20, word 30, word 40, word 2])]
+  for (index, arguments) in slicePanics do
+    sliceSession ← panics sliceSession (← sliceKey index) arguments SourceCorePanics.outOfBounds
+      s!"{sliceNames[index]!}({reprStr arguments})"
+  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths; a nested element write changes only its row, and an element place from the length on panics with 0x32 before its right side; mem-array's setGet, fillAndSum, nestedReplace and alias as upstream wrote them give the fixture's elements and sums, with 0x32 from the length on, and memory-array-abi's ret, sum and grid give the fixture's arrays through word wrappers; array-slice's rangeLen, rangeGet, fromLen, toLen, allLen, reslice, bounds, materialise, aliasing, spec and ternaryBound as upstream wrote them give the fixture's lengths and elements, with 0x32 from a bound or an index out of its view, a copy included, and a view reads its base's later writes; and memory-array-abi's slices gives the fixture's copy through slicesAt"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)

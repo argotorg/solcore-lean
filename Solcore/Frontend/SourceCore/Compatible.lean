@@ -822,21 +822,44 @@ def lowerWithReasons (fuel : Nat) (context : Context) (lowerChild : ExpressionLo
           match base.type with
           | .cell (.product .word _) =>
               pure ⟨type, SourceCoreDataExpressions.arrayLength base.expression⟩
+          | .product _ (.product .word .word) =>
+              pure ⟨type, SourceCoreDataExpressions.sliceLength base.expression⟩
           | _ => throw (unsupported node)
       | .arrayIndex base index =>
           let base ← lowerChild fuel source scope base reasonAt
-          let (elementType, identity) ← match base.type with
-            | .cell (.product .word (.product elementType (.namedData identity))) =>
-                pure (elementType, identity)
-            | _ => throw (unsupported node)
-          SourceCoreBasic.ensureType site elementType type
-          let layout : Core.OrderedMapping.Layout := ⟨.word, elementType, identity⟩
+          let (depth, layout) ← match SourceCoreDataExpressions.viewShape? base.type with
+            | some shape => pure shape
+            | none => throw (unsupported node)
+          SourceCoreBasic.ensureType site layout.valueType type
           let index ← lowerChild fuel source scope index reasonAt
           SourceCoreBasic.ensureType site .word index.type
           let comparison ← (SourceCoreCompatibleDataEquality.prepare fuel context.checked
             (.constructor (.builtin .word))).mapError (fun _ => unsupported node)
-          pure ⟨type, SourceCoreDataExpressions.arrayIndex layout comparison.expression
+          pure ⟨type, SourceCoreDataExpressions.viewIndex layout comparison.expression depth
             base.expression index.expression⟩
+      | .arraySlice base start stop =>
+          let base ← lowerChild fuel source scope base reasonAt
+          let (depth, _) ← match SourceCoreDataExpressions.viewShape? base.type with
+            | some shape => pure shape
+            | none => throw (unsupported node)
+          SourceCoreBasic.ensureType site (.product base.type (.product .word .word)) type
+          let start ← start.mapM fun bound => lowerChild fuel source scope bound reasonAt
+          let stop ← stop.mapM fun bound => lowerChild fuel source scope bound reasonAt
+          (start.toList ++ stop.toList).forM fun bound =>
+            SourceCoreBasic.ensureType site .word bound.type
+          pure ⟨type, SourceCoreDataExpressions.arraySlice base.type depth base.expression
+            (start.map (·.expression)) (stop.map (·.expression))⟩
+      | .toArray _ slice =>
+          let slice ← lowerChild fuel source scope slice reasonAt
+          let (depth, layout) ← match SourceCoreDataExpressions.viewShape? slice.type with
+            | some (depth + 1, layout) => pure (depth + 1, layout)
+            | _ => throw (unsupported node)
+          SourceCoreBasic.ensureType site
+            (.cell (.product .word (.product layout.valueType layout.type))) type
+          let comparison ← (SourceCoreCompatibleDataEquality.prepare fuel context.checked
+            (.constructor (.builtin .word))).mapError (fun _ => unsupported node)
+          pure ⟨type, SourceCoreDataExpressions.sliceCopy layout comparison.expression depth
+            slice.type slice.expression⟩
       | _ => throw (unsupported node)
 
 def leafLowerer (context : Context) : ExpressionLowerer → ExpressionLowerer :=
@@ -844,7 +867,7 @@ def leafLowerer (context : Context) : ExpressionLowerer → ExpressionLowerer :=
     let (node, type) ← readExpression context.checked source id
     match node.form with
     | .constructor .. | .member .. | .proxy .. | .index .. | .newArray .. | .arrayLength ..
-    | .arrayIndex .. | .arrayLiteral .. =>
+    | .arrayIndex .. | .arrayLiteral .. | .arraySlice .. | .toArray .. =>
         lowerWithReasons fuel context child source scope id reasonAt
     | .tuple elements =>
         let children ← elements.mapM fun element => child fuel source scope element reasonAt
