@@ -201,10 +201,10 @@ the layout refactor; [Conventions](conventions.md#following-older-notes) says ho
    compound shift's amount is inferred with no expected type, so it waits too (2f616db3a), and
    finalization checks it with `validateShiftAmount`.
    A new form also needs its arm in `inferExprFuel` (`SourceInference/Expression`), except a form
-   that inference only rejects: it shares the last arm, which names it with `rejectedFormName`
-   (df10f3f11), until the step that gives it a meaning adds its own arm. `new T[](n)` took its arm
-   in a commit of its own, which only renumbered the proofs' cases and still rejected it
-   (f1713ae3a), before the commit that typed it (a3407d45f).
+   that inference only rejects: it shares the last arm until the step that gives it a meaning adds
+   its own arm. `new T[](n)` took its arm in a commit of its own, which only renumbered the proofs'
+   cases and still rejected it (f1713ae3a), before the commit that typed it (a3407d45f), and so did
+   the slices (beef0ee00, then 0e733c5af). The last arm now keeps only the parser's recovery nodes.
 4. **Inference proofs**: the new branch's lemmas next to it (`inferBinaryOperator_shift_result` in
    `SourceInference/Expression`), then every case analysis in
    `SourceInference/Internal/ExpressionProperties`. `unchecked` also touched `RequirementProperties`,
@@ -287,8 +287,9 @@ Worked examples: 7aa1d539d (the re-pin to `e2eef194`) and 32b38d908 (larger nest
 - **Inference proofs number their cases.** They do functional induction on `inferExprFuel` and name
   its cases by number, in `SourceInference/Internal` and `SourceSemantics/Internal`. A new arm in
   `inferExprFuel`, or a new syntax constructor it matches on, shifts them: `new T[](n)`'s arm
-  shifted 281 lines in 14 proof files (f1713ae3a), while a constructor that only reaches the last
-  arm, as the slices do, shifts nothing. This is why `unchecked` is a pass around the parser.
+  shifted 281 lines in 14 proof files (f1713ae3a), and the slices' arm the same 281 lines
+  (beef0ee00), while a constructor that only reaches the last arm, as the parser's recovery nodes
+  do, shifts nothing. This is why `unchecked` is a pass around the parser.
   Pattern proofs do the same with `inferMatchPatternFlatFuel.induct`: the arm of `case uint256(p)`
   (8708ef657) shifted its later cases in `ExpressionProperties`, `Privacy/Active`,
   `Privacy/ProtectedFrames`, `Privacy/SelectedCalls`, `Inference/ExpressionLedgers`,

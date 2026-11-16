@@ -211,6 +211,12 @@ depends on the change.
   that the statement meaning proofs assume, so the inversion of the place receipt takes the write's
   plain-ness (`CompatiblePlaceCompilerCertificates.generated_of_lower`), and the value-assignment
   cases of the statement recognizers take the place's element-freeness as a field.
+  A new type takes the catalog's case again: the slice `arraySlice<B>` (809e9bc40) projects to the
+  product of `B`'s Core type and two words, its base, start and length, and the same inductions took
+  its case. Its forms only took cases in `lowerWithReasons` and `leafLowerer`: the slice
+  (`SourceCoreDataExpressions.arraySlice`), reads and lengths through it (`viewIndex`,
+  `sliceLength`), and `toArray(s)` (`sliceCopy`), whose copy runs a recursive Core helper, as
+  `OrderedMapping`'s lookup does (`sliceCopyBody`).
 - **A changed rule** (7ac75aea3, closures by value). Theorems whose statements mention the old
   premise are restated over the new one. Most changes were in `Owned/`, `CellAware/`, `OwnedStaged/`,
   `OwnedPrepared/`, `Callable/`, `Statements/`, `Generalized/`, `Selected/` and `Foundations/`.
@@ -310,9 +316,10 @@ work, under "Remaining work for the second goal". In short:
   reflection direction and the lifting of their Source traces remain.
 - The proof target is a successful selected compilation, not the whole workspace and not checker
   acceptance alone. Each extension ends in a consumer of the real public API.
-- Row 4's memory arrays compile through the compatible profile and stay outside `StaticProfile` and
-  the meaning proofs ([decision 6](../design/memory-arrays-slices.md#6-meaning-proofs)). Relating
-  array objects to their Core cells is a later unit.
+- Row 4's memory arrays and slices compile through the compatible profile and stay outside
+  `StaticProfile` and the meaning proofs
+  ([decision 6](../design/memory-arrays-slices.md#6-meaning-proofs)). Relating array objects to
+  their Core cells, and slices to their Core products, is a later unit.
 
 ## Pitfalls
 
