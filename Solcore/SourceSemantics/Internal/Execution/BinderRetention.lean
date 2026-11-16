@@ -208,6 +208,9 @@ theorem callArguments
   | toArray _ actualArguments _ recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     exact BindersRetained.recordExpressionWithExpected recorded
+  | elementRef _ actualArguments _ recorded =>
+    cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+    exact BindersRetained.recordExpressionWithExpected recorded
   | @indirect inferredArguments argumentState calleeState inferredCallee application _ actualArguments _ calleeAccepted applicationAccepted recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     have after := (LocalGeneralizationEvents.Progress.recordIndirectCall source inferredCallee inferredArguments application).retained

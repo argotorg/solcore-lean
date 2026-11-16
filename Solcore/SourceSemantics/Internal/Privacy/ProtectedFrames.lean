@@ -1130,7 +1130,18 @@ theorem inferExprFuel_call_fixes_protected
                                     simp only [builtinEq] at success
                                     cases copyEq : toArrayCall name
                                     case false =>
-                                      simp [copyEq] at success
+                                      simp only [copyEq, Bool.false_eq_true, ↓reduceIte] at success
+                                      cases refEq : lidxCall name
+                                      case false =>
+                                        simp [refEq] at success
+                                      simp only [refEq, if_true] at success
+                                      cases refResult : elementRefArguments arguments argumentState with
+                                      | error error => simp [refResult] at success
+                                      | ok reference =>
+                                        simp only [refResult] at success
+                                        exact recordExpressionWithExpected_fixes_protected argumentsFixed
+                                          (safe_elementRef argumentsProperties.2.1 refResult argumentsPrivacy.2.1)
+                                          expectedSafeAtArguments success
                                     simp only [copyEq, if_true] at success
                                     cases copyResult : sliceCopyArgument arguments argumentState with
                                     | error error => simp [copyResult] at success

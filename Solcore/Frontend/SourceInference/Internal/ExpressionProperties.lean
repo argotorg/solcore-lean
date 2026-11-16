@@ -1108,6 +1108,22 @@ theorem sliceCopy_type_variablesBelow {arguments : List InferredExpression} {sta
     ⟨Ty.variablesBelow_constructor _ _, Ty.variablesBelow_of_viewElement? view
       ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2⟩
 
+/-- A memref's type, the memref of its array's element, is below a ready state's
+next variable whenever the array's type is. -/
+theorem elementRef_type_variablesBelow {arguments : List InferredExpression} {state : State}
+    {reference : InferredExpression × InferredExpression × Ty} (ready : state.InferenceReady)
+    (below : ∀ argument ∈ arguments, argument.type.VariablesBelow state.inference.next)
+    (success : elementRefArguments arguments state = .ok reference) :
+    (Ty.memref reference.2.2).VariablesBelow state.inference.next := by
+  obtain ⟨argumentsEq, resolved⟩ := elementRefArguments_ok success
+  have resolvedBelow : (state.resolve reference.1.type).VariablesBelow state.inference.next :=
+    ready.solved.variablesBelow_apply
+      (below reference.1 (by rw [argumentsEq]; simp))
+  rw [resolved] at resolvedBelow
+  exact (Ty.variablesBelow_application_iff _ _ _).2
+    ⟨Ty.variablesBelow_constructor _ _,
+      ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2⟩
+
 /-- List inference gives one result per expression. -/
 theorem inferExprsFuel_length {fuel : Nat} {context : Context} :
     ∀ {expressions : List Syntax.Expr} {state final : State} {values : List InferredExpression},
@@ -12476,7 +12492,22 @@ private theorem inferFuel_inferenceProperties_internal :
                                             simp only [builtinEq] at success
                                             cases copyEq : toArrayCall name
                                             case false =>
-                                              simp [copyEq] at success
+                                              simp only [copyEq, Bool.false_eq_true, ↓reduceIte] at success
+                                              cases refEq : lidxCall name
+                                              case false =>
+                                                simp [refEq] at success
+                                              simp only [refEq, if_true] at success
+                                              cases refResult : elementRefArguments arguments argumentState with
+                                              | error error => simp [refResult, bind, Except.bind] at success
+                                              | ok reference =>
+                                                simp only [refResult, bind, Except.bind] at success
+                                                have refProperties :=
+                                                  recordExpressionWithExpected_inferenceProperties
+                                                    argumentsProperties.2.1
+                                                    (elementRef_type_variablesBelow argumentsProperties.2.1
+                                                      argumentsProperties.2.2 refResult)
+                                                    expectedAtArguments success
+                                                exact ⟨prefixProgress.trans refProperties.1, refProperties.2⟩
                                             simp only [copyEq, if_true] at success
                                             cases copyResult : sliceCopyArgument arguments argumentState with
                                             | error error => simp [copyResult, bind, Except.bind] at success
@@ -14763,7 +14794,17 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                             simp only [builtinEq] at success
                                             cases copyEq : toArrayCall name
                                             case false =>
-                                              simp [copyEq] at success
+                                              simp only [copyEq, Bool.false_eq_true, ↓reduceIte] at success
+                                              cases refEq : lidxCall name
+                                              case false =>
+                                                simp [refEq] at success
+                                              simp only [refEq, if_true] at success
+                                              cases refResult : elementRefArguments arguments argumentState with
+                                              | error error => simp [refResult, bind, Except.bind] at success
+                                              | ok reference =>
+                                                simp only [refResult, bind, Except.bind] at success
+                                                exact (recordExpressionWithExpected_lexicalScope success).trans
+                                                  throughArguments
                                             simp only [copyEq, if_true] at success
                                             cases copyResult : sliceCopyArgument arguments argumentState with
                                             | error error => simp [copyResult, bind, Except.bind] at success

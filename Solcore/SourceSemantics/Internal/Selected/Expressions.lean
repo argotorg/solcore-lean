@@ -1382,8 +1382,8 @@ theorem actualArrayIndex_typing {fuel : Nat}
   obtain ⟨indexNode, indexContains, indexNodeType⟩ := indexFinal.stored_type
   have indexFits : Detail.arrayIndexFits (finalized.substitution.apply indexResult.type) = true := by
     have fits := SourceArrayIndexesFit.of_operatorSite
-      (@FinalInferenceResources.array_indexes_fit _ _ _ _ _ resources) operatorsRetained contains rfl
-      (by simp) indexContains
+      (@FinalInferenceResources.array_indexes_fit _ _ _ _ _ resources) operatorsRetained contains
+      (.inl rfl) (by simp) indexContains
     rw [indexNodeType] at fits
     exact fits
   have formType := arrayIndex_formType arrayEq laterBase baseTyped indexTyped indexFits

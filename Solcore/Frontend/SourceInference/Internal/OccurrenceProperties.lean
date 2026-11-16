@@ -3960,6 +3960,7 @@ private theorem inference_occurrenceBoundExtends :
       all_goals occurrence_split_state_pairs
       all_goals try (obtain ⟨argumentsEq, _⟩ := arrayLengthArgument_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
       all_goals try (obtain ⟨argumentsEq, _⟩ := sliceCopyArgument_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
+      all_goals try (obtain ⟨argumentsEq, _⟩ := elementRefArguments_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
       all_goals occurrence_split_conjunctions
       all_goals occurrence_singleton_inputs
       all_goals occurrence_state_facts [freshPair_graph]
@@ -5484,7 +5485,17 @@ private theorem inference_anchoredNodePrefixExtends :
                                             simp only [builtinEq] at success
                                             cases copyEq : toArrayCall name
                                             case false =>
-                                              simp [copyEq] at success
+                                              simp only [copyEq, Bool.false_eq_true, ↓reduceIte] at success
+                                              cases refEq : lidxCall name
+                                              case false =>
+                                                simp [refEq] at success
+                                              simp only [refEq, if_true] at success
+                                              cases refResult : elementRefArguments arguments argumentState with
+                                              | error error => simp [refResult, bind, Except.bind] at success
+                                              | ok reference =>
+                                                simp only [refResult, bind, Except.bind] at success
+                                                exact throughArguments.trans
+                                                  (recordExpressionWithExpected_anchoredNodePrefixExtends success)
                                             simp only [copyEq, if_true] at success
                                             cases copyResult : sliceCopyArgument arguments argumentState with
                                             | error error => simp [copyResult, bind, Except.bind] at success

@@ -159,6 +159,8 @@ def OperatorApplicationForm : ExpressionForm → Prop
   | .binary _ _ _ => True
   -- A memory array read keeps its form too, which finalization's index check reads.
   | .arrayIndex _ _ => True
+  -- So does `lidx(a, i)`, whose index finalization checks as a read's.
+  | .elementRef _ _ => True
   | _ => False
 
 /-- An operator dispatched to a trait method applies an operator. -/
@@ -322,22 +324,27 @@ theorem SourceShiftOperandsFit.of_operatorSite
       (by simp [OperatorApplicationForm, form])
   exact fits finalFound (finalForm.trans form) shift leftContains rightContains
 
-/-- A memory array read keeps its form through later coercion attachment, so
-finalization's check of the finalized occurrence covers its index. -/
+/-- A memory array read, or `lidx(a, i)`, keeps its form through later coercion
+attachment, so finalization's check of the finalized occurrence covers its
+index. -/
 theorem SourceArrayIndexesFit.of_operatorSite
     {before source : TypedSource} {id base index : ExpressionId}
     {node indexNode : ExpressionNode}
     (fits : SourceArrayIndexesFit source)
     (retained : ExpressionOperatorSiteRetainedAt before source id)
     (contains : ContainsExpression before id node)
-    (form : node.form = .arrayIndex base index)
+    (form : node.form = .arrayIndex base index ∨ node.form = .elementRef base index)
     (requirements : node.requirements = Detail.coercionRequirements node.coercions)
     (indexContains : ContainsExpression source index indexNode) :
     Detail.arrayIndexFits indexNode.type = true := by
   obtain ⟨finalNode, finalFound, _, finalForm⟩ :=
     retained contains [] (by simpa [Detail.coercionRequirements] using requirements)
-      (by simp [OperatorApplicationForm, form])
-  exact fits finalFound (finalForm.trans form) indexContains
+      (by rcases form with form | form <;> simp [OperatorApplicationForm, form])
+  have finalShape : finalNode.form = .arrayIndex base index ∨
+      finalNode.form = .elementRef base index := by
+    rw [finalForm]
+    exact form
+  exact fits finalFound finalShape indexContains
 end Solcore.SourceSemantics.SourceInferenceSoundness
 end
 
@@ -427,6 +434,19 @@ inductive CallExpressionDispatchProvenanceFacts
           argumentState = .ok result) :
       CallExpressionDispatchProvenanceFacts context source callee arguments id expected
         fuel allocated result
+  | elementRef
+      {inferredArguments : List InferredExpression}
+      {argumentState : Frontend.SourceInference.State}
+      {reference : InferredExpression × InferredExpression × TypeSystem.Ty}
+      (nonconstructor : Detail.constructorCalleeCandidates context allocated callee = .ok [])
+      (argumentsSuccess : Detail.inferExprsFuel fuel context arguments.elements
+        allocated = .ok (inferredArguments, argumentState))
+      (argument : Detail.elementRefArguments inferredArguments argumentState = .ok reference)
+      (recording : Detail.recordExpressionWithExpected context source id
+        (TypeSystem.Ty.memref reference.2.2) (.elementRef reference.1.id reference.2.1.id) []
+          expected argumentState = .ok result) :
+      CallExpressionDispatchProvenanceFacts context source callee arguments id expected
+        fuel allocated result
   | indirect
       {inferredArguments : List InferredExpression}
       {argumentState calleeState : Frontend.SourceInference.State}
@@ -503,6 +523,7 @@ theorem inferExprFuel_success_call_dispatch_provenance_facts
             | apply CallExpressionDispatchProvenanceFacts.builtin <;> assumption
             | apply CallExpressionDispatchProvenanceFacts.arrayLength <;> assumption
             | apply CallExpressionDispatchProvenanceFacts.toArray <;> assumption
+            | apply CallExpressionDispatchProvenanceFacts.elementRef <;> assumption
             | apply CallExpressionDispatchProvenanceFacts.lengthMethod
               · exact discovery
               · assumption

@@ -40,6 +40,25 @@ theorem sliceCopy_type_admissible {semantic : SourceSemantics.Context} {outer : 
     ((ViewElement.of_viewElement? view).applySubstitution outer)
   simpa [Ty.array, Substitution.apply] using TypeAdmissible.array elementAt
 
+/-- A memref's type, the memref of its array's element, is admissible under an
+outer substitution that extends the arguments' state, wherever the array's type
+is. -/
+theorem elementRef_type_admissible {semantic : SourceSemantics.Context} {outer : Substitution}
+    {arguments : List InferredExpression} {state : State}
+    {reference : InferredExpression × InferredExpression × Ty}
+    (continuation : outer.SemanticallyExtends state.inference.substitution)
+    (success : elementRefArguments arguments state = .ok reference)
+    (formed : ∀ argument ∈ arguments, TypeAdmissible semantic (outer.apply argument.type)) :
+    TypeAdmissible semantic (outer.apply (Ty.memref reference.2.2)) := by
+  obtain ⟨argumentsEq, resolved⟩ := elementRefArguments_ok success
+  have arrayType := formed reference.1 (by rw [argumentsEq]; simp)
+  rw [← continuation reference.1.type] at arrayType
+  change TypeAdmissible semantic (outer.apply (state.resolve reference.1.type)) at arrayType
+  rw [resolved] at arrayType
+  have arrayAt : TypeAdmissible semantic (Ty.array (outer.apply reference.2.2)) := by
+    simpa [Ty.array, Substitution.apply] using arrayType
+  simpa [Ty.memref, Substitution.apply] using TypeAdmissible.memref arrayAt.array_element
+
 theorem inferExprFuel_call_formation
     {semantic : SourceSemantics.Context} {outer : Substitution} {fuel : Nat} {context : SourceInference.Context}
     {expression callee : Syntax.Expr} {sourceArguments : Syntax.DelimitedList Syntax.Expr}
@@ -393,7 +412,32 @@ theorem inferExprFuel_call_formation
                                     simp only [builtinEq] at success
                                     cases copyEq : toArrayCall name
                                     case false =>
-                                      simp [copyEq] at success
+                                      simp only [copyEq, Bool.false_eq_true, ↓reduceIte] at success
+                                      cases refEq : lidxCall name
+                                      case false =>
+                                        simp [refEq] at success
+                                      simp only [refEq, if_true] at success
+                                      cases refResult : elementRefArguments arguments argumentState with
+                                      | error error => simp [refResult] at success
+                                      | ok reference =>
+                                        simp only [refResult] at success
+                                        have recording := recordExpressionWithExpected_inferenceProperties
+                                          argumentsProperties.2.1
+                                          (elementRef_type_variablesBelow argumentsProperties.2.1 argumentsProperties.2.2 refResult)
+                                          expectedAtArguments success
+                                        have argumentContinuation := continuation.trans recording.1.substitution_extends
+                                        have argumentCapture : NoCaptureNodes outer argumentState.nodes := by
+                                          obtain ⟨_, fit, _, nodes⟩ := recordExpressionWithExpected_success_nodes success
+                                          rw [nodes, (withExpected_occurrenceState_eq fit).1] at capture
+                                          exact capture.of_prefix (List.prefix_append _ _)
+                                        have argumentFormation := argumentsInduction allocatedReady allocatedNodes allocatedFormed formation
+                                          (arguments,argumentState) argumentsResult argumentContinuation argumentCapture
+                                        have produced := recordExpressionWithExpected_normalized_formation
+                                          (type := Ty.memref reference.2.2) formation.toFormationContext continuation
+                                          (elementRef_type_admissible argumentContinuation refResult argumentFormation.1)
+                                          expectedFormed success
+                                        exact ⟨produced.1, argumentFormation.2.of_new_rows (congrArg LexicalScope.binders
+                                          (localReadScope_recordExpressionWithExpected_lexicalScope success)) produced.2⟩
                                     simp only [copyEq, if_true] at success
                                     cases copyResult : sliceCopyArgument arguments argumentState with
                                     | error error => simp [copyResult] at success

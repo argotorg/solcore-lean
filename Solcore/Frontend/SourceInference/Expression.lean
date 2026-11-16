@@ -1427,6 +1427,48 @@ theorem sliceCopyArgument_ok {arguments : List InferredExpression} {state : Stat
   | [] => simp [sliceCopyArgument] at success
   | _ :: _ :: _ => simp [sliceCopyArgument] at success
 
+/-- `lidx(a, i)`, std's checked reference to an element of a memory array, which
+Lean has as a compiler form rather than a function: the name of a call, found
+only when no source function, local or compiler function is named `lidx`. -/
+def lidxCall (name : String) : Bool :=
+  name == "lidx"
+
+/-- The array and the index of `lidx(a, i)` and the element type of its memref:
+its two arguments, once inference has made the first's type a memory array
+(`Ty.arrayElement?`). Another row of arguments, or a type still open, is
+rejected: the choice is made here and does not wait for later uses, as a
+length's (`arrayLengthOf`). The index waits for finalization, as a read's does
+(`validateArrayIndex`). -/
+def elementRefArguments (arguments : List InferredExpression) (state : State) :
+    Except Error (InferredExpression × InferredExpression × Ty) :=
+  match arguments with
+  | [array, index] =>
+      match (state.resolve array.type).arrayElement? with
+      | some element => .ok (array, index, element)
+      | none => .error (.operatorNotSupported "lidx" (state.resolve array.type))
+  | arguments => .error (.operatorNotSupported "lidx"
+      (state.resolve (Ty.productMany (arguments.map (·.type)))))
+
+/-- `lidx(a, i)`'s argument row is its array and its index, the array's type a
+memory array of the memref's element once resolved. -/
+theorem elementRefArguments_ok {arguments : List InferredExpression} {state : State}
+    {reference : InferredExpression × InferredExpression × Ty}
+    (success : elementRefArguments arguments state = .ok reference) :
+    arguments = [reference.1, reference.2.1] ∧
+      state.resolve reference.1.type = Ty.array reference.2.2 := by
+  match arguments with
+  | [array, index] =>
+      unfold elementRefArguments at success
+      cases found : (state.resolve array.type).arrayElement? with
+      | none => simp [found] at success
+      | some element =>
+          simp only [found, Except.ok.injEq] at success
+          subst success
+          exact ⟨rfl, Ty.arrayElement?_eq_some found⟩
+  | [] => simp [elementRefArguments] at success
+  | [_] => simp [elementRefArguments] at success
+  | _ :: _ :: _ :: _ => simp [elementRefArguments] at success
+
 /-- Result of checking every explicit case in source order. -/
 structure MatchCasesResult where
   cases : List TypedMatchCase
@@ -2116,6 +2158,12 @@ mutual
                                     recordExpressionWithExpected context expression id
                                       (Ty.array copied.2) (.toArray copied.2 copied.1.id) []
                                       expected state
+                                  else if lidxCall name then
+                                    let reference ← elementRefArguments arguments state
+                                    recordExpressionWithExpected context expression id
+                                      (Ty.memref reference.2.2)
+                                      (.elementRef reference.1.id reference.2.1.id) [] expected
+                                      state
                                   else
                                     throw (.noMatchingOverload name [])
                           | candidates =>

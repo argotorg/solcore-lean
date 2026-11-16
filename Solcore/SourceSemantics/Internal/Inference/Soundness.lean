@@ -26869,40 +26869,44 @@ theorem finalize_shiftOperandsFit
           shiftOperandFits_of_validate check formRaw shift rawLeftMember leftIdRaw
             rawRightMember rightIdRaw
 
-/-- A memory array read's index has a type that its static rule takes: `word`
-or one of the twelve types. Finalization establishes it for the finalized source
+/-- A memory array read's index, and the index of `lidx(a, i)`, has a type that
+its static rule takes: `word` or one of the twelve types. Finalization
+establishes it for the finalized source
 (`FinalInferenceResources.array_indexes_fit`). -/
 def SourceArrayIndexesFit (source : TypedSource) : Prop :=
   ∀ {id base index : ExpressionId} {node indexNode : ExpressionNode},
-    ContainsExpression source id node → node.form = .arrayIndex base index →
+    ContainsExpression source id node →
+    (node.form = .arrayIndex base index ∨ node.form = .elementRef base index) →
     ContainsExpression source index indexNode →
     Detail.arrayIndexFits indexNode.type = true
 
-/-- One successful read check gives its index's fit under the checked state's
-substitution. -/
+/-- One successful check of a read or of `lidx(a, i)` gives its index's fit
+under the checked state's substitution. -/
 theorem arrayIndexFits_of_validate {state : Frontend.SourceInference.State}
     {node indexNode : ExpressionNode} {base index : ExpressionId}
     (success : Detail.validateArrayIndex state node = .ok ())
-    (form : node.form = .arrayIndex base index)
+    (form : node.form = .arrayIndex base index ∨ node.form = .elementRef base index)
     (indexMember : Node.expression indexNode ∈ state.nodes) (indexId : indexNode.id = index) :
     Detail.arrayIndexFits (state.inference.substitution.apply indexNode.type) = true := by
-  simp only [Detail.validateArrayIndex, form] at success
-  split at success
-  · cases success
-  · rename_i fits
-    have indexOk : Detail.operandMisfits state index Detail.arrayIndexFits
-        (.expression indexNode) = false := by
-      cases misfit : Detail.operandMisfits state index Detail.arrayIndexFits
-          (.expression indexNode)
-      · rfl
-      · exact absurd (List.any_eq_true.mpr ⟨_, indexMember, misfit⟩) fits
-    simp only [Detail.operandMisfits, indexId, decide_true, Bool.true_and,
-      Bool.not_eq_eq_eq_not, Bool.not_false, Frontend.SourceInference.State.resolve,
-      TypeSystem.InferState.resolve] at indexOk
-    exact indexOk
+  rcases form with form | form
+  all_goals
+    simp only [Detail.validateArrayIndex, form] at success
+    split at success
+    · cases success
+    · rename_i fits
+      have indexOk : Detail.operandMisfits state index Detail.arrayIndexFits
+          (.expression indexNode) = false := by
+        cases misfit : Detail.operandMisfits state index Detail.arrayIndexFits
+            (.expression indexNode)
+        · rfl
+        · exact absurd (List.any_eq_true.mpr ⟨_, indexMember, misfit⟩) fits
+      simp only [Detail.operandMisfits, indexId, decide_true, Bool.true_and,
+        Bool.not_eq_eq_eq_not, Bool.not_false, Frontend.SourceInference.State.resolve,
+        TypeSystem.InferState.resolve] at indexOk
+      exact indexOk
 
-/-- Finalization checks every memory array read, so its index in the finalized
-source has a type that its static rule takes. -/
+/-- Finalization checks every memory array read and every `lidx(a, i)`, so its
+index in the finalized source has a type that its static rule takes. -/
 theorem finalize_arrayIndexesFit
     {inferenceContext : Frontend.SourceInference.Context}
     {type : TypeSystem.Ty}
@@ -26930,7 +26934,8 @@ theorem finalize_arrayIndexesFit
       subst rawEq rawIndexEq
       have check := (validateExpressionNode_ok
         (validateAssignmentTargets_member witness.assignmentValidation rawMember)).2.2.1
-      have formRaw : rawNode.form = .arrayIndex base index := by
+      have formRaw : rawNode.form = .arrayIndex base index ∨
+          rawNode.form = .elementRef base index := by
         cases rawForm : rawNode.form <;>
           simp_all [ExpressionNode.applySubstitution, ExpressionForm.applySubstitution]
       have indexIdRaw : rawIndexNode.id = index := by

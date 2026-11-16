@@ -1784,6 +1784,59 @@ private def testSliceCopies : IO Unit := do
     "function bad(m: uint256[]) returns (uint256) { let size = Length.length; return 0; }"
     fun error => error == .unknownVariable "Length"
 
+/-- `lidx(a, i)` is a memref to an element of a memory array, at the memref of
+the array's element type, with an index of `uint256`, of another of the twelve
+types or of `word`; it is rejected on a slice or a word, with a `bool` index,
+with an index literal that nothing fixes, which upstream finds ambiguous too, on
+an array whose type is still open there, and as a value. -/
+private def testElementRefs : IO Unit := do
+  let functions ← check "element references" (String.intercalate "\n" [
+    "function refs(m: uint256[], rows: uint256[][], i: uint256) returns (uint256) {",
+    "  let k: int8 = 1;",
+    "  let w: word = 1;",
+    "  let r = lidx(m, i);",
+    "  let s: memref<uint256> = lidx(m, k);",
+    "  let t = lidx(rows, w);",
+    "  return 0;",
+    "}"
+  ])
+  let function ← match functions with
+    | [function] => pure function
+    | _ => throw (IO.userError "element reference fixture lost its checked function")
+  let references := function.typedBody.nodes.filterMap fun
+    | .expression { form := .elementRef _ index, type, .. } =>
+        some (type, function.typedBody.nodes.findSome? fun
+          | .expression node => if node.id == index then some node.type else none
+          | .statement _ => none)
+    | _ => none
+  let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
+  let int8 : TypeSystem.Ty := .fixed ⟨true, .w8⟩
+  assertTrue (decide (references = [(.memref uint256, some uint256), (.memref uint256, some int8),
+      (.memref (.array uint256), some .word)]))
+    s!"lidx did not type its memrefs and their indexes: {reprStr references}"
+  expectInferenceError "a memref into a slice"
+    "function bad(m: uint256[], i: uint256) returns (uint256) { let r = lidx(m[0:1], i); return 0; }"
+    fun error => error == .operatorNotSupported "lidx" (.arraySlice (.array uint256))
+  expectInferenceError "a memref into a word"
+    "function bad(n: uint256, i: uint256) returns (uint256) { let r = lidx(n, i); return 0; }"
+    fun error => error == .operatorNotSupported "lidx" uint256
+  expectInferenceError "a bool memref index"
+    "function bad(m: uint256[]) returns (uint256) { let r = lidx(m, true); return 0; }"
+    fun error => error == .operatorNotSupported "Typedef" .bool
+  expectInferenceError "a memref index literal that nothing fixes"
+    "function bad(m: uint256[]) returns (uint256) { let r = lidx(m, 1); return 0; }"
+    fun error => match error with
+      | .ambiguousIntegerLiteral _ => true
+      | _ => false
+  expectInferenceError "a memref into an array still open"
+    "function bad(m: uint256[]) returns (uint256) { let at = lam(a) { return lidx(a, uint256(1)); }; let r = at(m); return 0; }"
+    fun error => match error with
+      | .operatorNotSupported "lidx" _ => true
+      | _ => false
+  expectInferenceError "lidx as a value"
+    "function bad(m: uint256[]) returns (uint256) { let at = lidx; return 0; }" fun error =>
+      error == .unknownVariable "lidx"
+
 /-- Exercise every phase-7 source-inference form before runtime lowering. -/
 def testSourcePhase7Inference : IO Unit := do
   testConstructors
@@ -1800,6 +1853,7 @@ def testSourcePhase7Inference : IO Unit := do
   testSlices
   testSliceReads
   testSliceCopies
+  testElementRefs
   IO.println "phase-7 source inference GREEN"
 
 end Tests.SourcePhase7Inference

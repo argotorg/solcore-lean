@@ -1468,11 +1468,12 @@ theorem
       solveSuccess solvedEq ledger ownership activeSignaturesEq
       activeRequirementsEq assumptionsMono callCovered
 
-/-- The seven successful executable tails of a source call.  Constructor
+/-- The eight successful executable tails of a source call.  Constructor
 discovery precedes ordinary call dispatch; a non-constructor call first
 traverses its argument row and then records either a selected direct call, a
-builtin call, a memory array's length, a slice's copy, an indirect call through
-a recursively inferred callee, or, for `a.length()`, that callee itself. -/
+builtin call, a memory array's length, a slice's copy, a memref to an array's
+element, an indirect call through a recursively inferred callee, or, for
+`a.length()`, that callee itself. -/
 inductive CallExpressionDispatchFacts
     (context : Frontend.SourceInference.Context)
     (source callee : Syntax.Expr)
@@ -1546,6 +1547,18 @@ inductive CallExpressionDispatchFacts
           argumentState = .ok result) :
       CallExpressionDispatchFacts context source callee arguments id expected
         fuel allocated result
+  | elementRef
+      {inferredArguments : List InferredExpression}
+      {argumentState : Frontend.SourceInference.State}
+      {reference : InferredExpression × InferredExpression × TypeSystem.Ty}
+      (argumentsSuccess : Detail.inferExprsFuel fuel context arguments.elements
+        allocated = .ok (inferredArguments, argumentState))
+      (argument : Detail.elementRefArguments inferredArguments argumentState = .ok reference)
+      (recording : Detail.recordExpressionWithExpected context source id
+        (TypeSystem.Ty.memref reference.2.2) (.elementRef reference.1.id reference.2.1.id) []
+          expected argumentState = .ok result) :
+      CallExpressionDispatchFacts context source callee arguments id expected
+        fuel allocated result
   | indirect
       {inferredArguments : List InferredExpression}
       {argumentState calleeState : Frontend.SourceInference.State}
@@ -1612,6 +1625,7 @@ theorem inferExprFuel_success_call_dispatch_facts
             | apply CallExpressionDispatchFacts.builtin <;> assumption
             | apply CallExpressionDispatchFacts.arrayLength <;> assumption
             | apply CallExpressionDispatchFacts.toArray <;> assumption
+            | apply CallExpressionDispatchFacts.elementRef <;> assumption
             | apply CallExpressionDispatchFacts.lengthMethod <;> assumption
             | apply CallExpressionDispatchFacts.selected
               · assumption

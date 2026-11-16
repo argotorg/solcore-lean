@@ -723,10 +723,13 @@ def validateShiftOperands (state : State) (node : ExpressionNode) : Except Error
 (`inferExprFuel`): once the defaults are in, the index must have `word` or one
 of the twelve types, as upstream's read takes it as `Typedef<word>`. Another
 type, such as `bool` or `integer`, is rejected with `operatorNotSupported
-"Typedef"`, as upstream's `bool: Typedef<word>` fails. -/
+"Typedef"`, as upstream's `bool: Typedef<word>` fails. `lidx(a, i)`'s index is
+checked the same way, as std's `LValueIdxAccess` takes it; no default reaches
+it, since `operatorMentions` does not name it, so an open literal index stays
+ambiguous, as upstream finds it. -/
 def validateArrayIndex (state : State) (node : ExpressionNode) : Except Error Unit :=
   match node.form with
-  | .arrayIndex _ index =>
+  | .arrayIndex _ index | .elementRef _ index =>
       if state.nodes.any (operandMisfits state index arrayIndexFits) then
         throw (.operatorNotSupported "Typedef" ((expressionTypeAt? state index).getD .word))
       else .ok ()

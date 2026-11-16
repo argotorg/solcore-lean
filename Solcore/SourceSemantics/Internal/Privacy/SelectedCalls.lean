@@ -1797,7 +1797,25 @@ theorem inferExprFuel_call_private
                                     simp only [builtinEq] at success
                                     cases copyEq : toArrayCall name
                                     case false =>
-                                      simp [copyEq] at success
+                                      simp only [copyEq, Bool.false_eq_true, ↓reduceIte] at success
+                                      cases refEq : lidxCall name
+                                      case false =>
+                                        simp [refEq] at success
+                                      simp only [refEq, if_true] at success
+                                      cases refResult : elementRefArguments arguments argumentState with
+                                      | error error => simp [refResult] at success
+                                      | ok reference =>
+                                        simp only [refResult] at success
+                                        have recorded := recordExpressionWithExpected_private catalog
+                                          argumentsProperties.2.1
+                                          (elementRef_type_variablesBelow argumentsProperties.2.1 argumentsProperties.2.2 refResult)
+                                          expectedAtArguments
+                                          (safe_elementRef argumentsProperties.2.1 refResult argumentsPrivacy.2.1)
+                                          expectedSafeAtArguments argumentsPrivacy.2.2.1 success
+                                        refine ⟨prefixPrivacy.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+                                        intro row member fresh
+                                        exact new_requirements_trans argumentsPrivacy.2.2.2 recorded.2.2.2
+                                          recorded.1 row member fresh
                                     simp only [copyEq, if_true] at success
                                     cases copyResult : sliceCopyArgument arguments argumentState with
                                     | error error => simp [copyResult] at success

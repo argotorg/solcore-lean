@@ -2605,6 +2605,13 @@ private def testStageErrors : IO Unit := do
   | .error (.linking (.sourceCore { reason := .unsupportedType _, .. })) => pure ()
   | result => throw (IO.userError
       s!"a slice's copy reached a Core representation or failed before linking: {reprStr result}")
+  let elementRef := rawWorkspace "main.solc" [("main.solc",
+    "function referencing(m: uint256[], i: uint256) returns (uint256) { let r = lidx(m, i); return 0; }")]
+  match prepare elementRef (Seed.named moduleId "referencing") generousLimits with
+  | .error (.linking (.sourceCore { reason := .unsupportedExpression .elementRef, .. }))
+  | .error (.linking (.sourceCore { reason := .unsupportedType _, .. })) => pure ()
+  | result => throw (IO.userError
+      s!"a memref reached a Core representation or failed before linking: {reprStr result}")
   let elementWrite := rawWorkspace "main.solc" [("main.solc",
     "function set(n: uint256, i: uint256, v: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[i] = v; return m[i]; }")]
   match prepare elementWrite (Seed.named moduleId "set") generousLimits with
