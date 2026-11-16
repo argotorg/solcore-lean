@@ -61,6 +61,9 @@ inductive UnsupportedExpression where
   /-- A slice's copy into a fresh memory array, which has no Core representation
   yet. -/
   | toArray
+  /-- A memref to a memory array's element, which has no Core representation
+  yet. -/
+  | elementRef
   deriving Repr, BEq, DecidableEq
 
 /-- Statement forms outside the tail-normal executable profile. -/
@@ -1917,6 +1920,8 @@ private def lowerExpressionNodeWith {error : Type} (lift : Error → error)
               (.unsupportedExpression .arraySlice)
           | .toArray _ _ => failWith lift (.occurrence id.occurrence)
               (.unsupportedExpression .toArray)
+          | .elementRef _ _ => failWith lift (.occurrence id.occurrence)
+              (.unsupportedExpression .elementRef)
 
 /-- Decide whether a compile-time-classified expression is closed relative to
 the staged values currently known while building a reusable runtime draft.
@@ -3113,6 +3118,7 @@ private def evaluateStagedValueNodeWith {error : Type}
           | .arrayLiteral _ _ => failWith lift site (.unsupportedExpression .arrayLiteral)
           | .arraySlice _ _ _ => failWith lift site (.unsupportedExpression .arraySlice)
           | .toArray _ _ => failWith lift site (.unsupportedExpression .toArray)
+          | .elementRef _ _ => failWith lift site (.unsupportedExpression .elementRef)
           | .integerLiteral _ _ =>
               failWith lift site .stagedValueStatementNotClosed
 

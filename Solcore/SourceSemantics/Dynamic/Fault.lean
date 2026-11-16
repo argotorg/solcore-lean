@@ -1717,6 +1717,50 @@ mutual
           before slice reason after) :
         ExpressionFormFaults program context evidence source environment before
           (.toArray element slice) requirements coercions reason after
+    | elementRefBase
+        {context evidence source environment before after base index requirements
+          coercions reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (fault : ExpressionFaults program context evidence source environment
+          before base reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.elementRef base index) requirements coercions reason after
+    | elementRefIndex
+        {context evidence source environment before middle after base index
+          requirements coercions baseValue reason}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base baseValue middle)
+        (fault : ExpressionFaults program context evidence source environment
+          middle index reason after) :
+        ExpressionFormFaults program context evidence source environment before
+          (.elementRef base index) requirements coercions reason after
+    | elementRefIndexType
+        {context evidence source environment before middle after base index
+          requirements coercions baseValue value actual}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base baseValue middle)
+        (index_evaluates : ExpressionEvaluates program context evidence source
+          environment middle index value after)
+        (not_word : ¬ WordValue value)
+        (actual_type : ValueRuntimeType value actual) :
+        ExpressionFormFaults program context evidence source environment before
+          (.elementRef base index) requirements coercions
+          (.typeMismatch .word actual) after
+    /-- `lidx(a, i)` from the array's length on panics with `0x32`, as std's
+    `LValueIdxAccess` does. -/
+    | elementRefOutOfBounds
+        {context evidence source environment before middle after base index
+          requirements coercions baseValue position}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base baseValue middle)
+        (index_evaluates : ExpressionEvaluates program context evidence source
+          environment middle index (.word position) after)
+        (out_of_bounds : ViewOutOfBounds after baseValue position.val) :
+        ExpressionFormFaults program context evidence source environment before
+          (.elementRef base index) requirements coercions (.panic 0x32) after
 
   /-- First fault in a left-to-right expression vector. -/
   inductive ExpressionsFault (program : Program) :

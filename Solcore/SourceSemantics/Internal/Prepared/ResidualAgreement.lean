@@ -305,7 +305,8 @@ private def expressionTypes : ExpressionForm → List Ty
   | .index _ _
   | .arrayLength _
   | .arrayIndex _ _
-  | .arraySlice _ _ _ => []
+  | .arraySlice _ _ _
+  | .elementRef _ _ => []
 
 private def expressionBinders : ExpressionForm → List TypedBinder
   | .lambda parameters _ _ => parameters
@@ -507,7 +508,7 @@ private theorem expression_congr {left right : Substitution} {form : ExpressionF
   | toArray _ slice =>
     exact congrArg (fun element => ExpressionForm.toArray element slice) same.head
   | literal | group | tuple | unary | binary | conditional | member | index | arrayLength
-  | arrayIndex | arraySlice => rfl
+  | arrayIndex | arraySlice | elementRef => rfl
 
 private theorem instruction_congr {left right : Substitution} {instruction : MatchPatternInstruction}
     (same : Agree left right (instructionTypes instruction))

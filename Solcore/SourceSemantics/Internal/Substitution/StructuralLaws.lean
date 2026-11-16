@@ -5229,6 +5229,10 @@ theorem StatementsHaveType.applyParameters
       (baseInduction catalog contextValid) bounds
   · intro context element slice baseType sliceTypeProof view sliceInduction catalog contextValid
     exact .toArray (sliceInduction catalog contextValid) (view.applyParameters substitution)
+  · intro context base index element indexType baseTypeProof indexTypeProof indexKind
+      baseInduction indexInduction catalog contextValid
+    exact .elementRef (baseInduction catalog contextValid) (indexInduction catalog contextValid)
+      (by cases indexKind <;> constructor)
   · intro context catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction
@@ -12658,6 +12662,10 @@ theorem StatementsHaveType.applySubstitution
   · intro context element slice baseType sliceTypeProof view sliceInduction targetContext catalog
       contextValid
     exact .toArray (sliceInduction targetContext catalog contextValid) (view.applySubstitution _)
+  · intro context base index element indexType baseTypeProof indexTypeProof indexKind
+      baseInduction indexInduction targetContext catalog contextValid
+    exact .elementRef (baseInduction targetContext catalog contextValid)
+      (indexInduction targetContext catalog contextValid) (by cases indexKind <;> constructor)
   · intro context targetContext catalog contextValid
     exact .nil _
   · intro context expression expressions type types head tail headInduction

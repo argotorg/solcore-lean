@@ -238,6 +238,10 @@ private theorem expression_form_references {context : SourceSemantics.Context}
     · exact .expression base
     · exact expressions_references bounds member
   | toArray slice _ => exact expression_single slice member
+  | elementRef base index _ =>
+    rcases List.mem_cons.mp member with rfl | member
+    · exact .expression base
+    · exact expression_single index member
 
 private theorem statement_form_references {control : ControlContext} {context final : SourceSemantics.Context}
     {form : StatementForm} (typed : Dynamic.StatementHasType.FormTyping source control context form final)

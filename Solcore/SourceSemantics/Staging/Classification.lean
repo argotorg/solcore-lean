@@ -426,6 +426,14 @@ mutual
         (form_eq : node.form = .toArray element slice)
         (sliceStages : HasStage source scope slice sliceStage) :
         HasStage source scope id .deferred
+    | elementRef
+        {scope : StageScope} {id base index : ExpressionId}
+        {node : ExpressionNode} {baseStage indexStage : Stage}
+        (contains : SourceSemantics.ContainsExpression source id node)
+        (form_eq : node.form = .elementRef base index)
+        (baseStages : HasStage source scope base baseStage)
+        (indexStages : HasStage source scope index indexStage) :
+        HasStage source scope id .deferred
 
   /-- Pointwise expression classification in source order. -/
   inductive ExpressionsHaveStages (source : TypedSource) :

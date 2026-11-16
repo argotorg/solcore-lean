@@ -262,6 +262,14 @@ mutual
         (allowed : baseType.arraySliceBaseAllowed = true) :
         ValueHasType context heap (.arraySlice base start length)
           (Ty.arraySlice baseType)
+    /-- A memref is typed by the heap cell it names, as a memory array's
+    reference is. Its position is the memref's maker's to check: arrays never
+    grow or shrink, so the position stays below the length. -/
+    | memref
+        {element : Ty} {location : Location} {position : Nat} {cell : Cell}
+        (read : Heap.Reads heap location cell)
+        (cell_type : cell.type = Ty.arrayObject element) :
+        ValueHasType context heap (.memref element location position) (Ty.memref element)
     | comptime
         {value : Value} {inner : Ty}
         (inner_typed : ValueHasType context heap value inner) :
@@ -325,7 +333,7 @@ mutual
   the type metadata that a value-typing derivation may traverse. -/
   def valueWeight : Value → Nat
     | .unit | .bool _ | .word _ | .integer _ | .proxy _
-    | .closure _ | .global _ | .builtin _ | .arrayRef _ _ => 1
+    | .closure _ | .global _ | .builtin _ | .arrayRef _ _ | .memref _ _ _ => 1
     | .product left right => valueWeight left + valueWeight right + 1
     | .constructed instantiation arguments =>
         valuesWeight arguments + typesWeight instantiation.payloadTypes + 1
@@ -880,6 +888,9 @@ mutual
         exact .arrayObject (ValuesHaveTypes.mono extension elements_typed)
     | arraySlice base_typed allowed =>
         exact .arraySlice (ValueHasType.mono extension base_typed) allowed
+    | memref read cell_type =>
+        rcases extension _ _ read with ⟨updatedCell, updatedRead, updatedType, _⟩
+        exact .memref updatedRead (updatedType.trans cell_type)
     | comptime inner_typed =>
         exact .comptime (ValueHasType.mono extension inner_typed)
     termination_by valueWeight value + typeWeight type
@@ -963,6 +974,7 @@ mutual
         exact .arrayObject (ValuesHaveTypes.transportContext supports elements_typed)
     | arraySlice base_typed allowed =>
         exact .arraySlice (ValueHasType.transportContext supports base_typed) allowed
+    | memref read cell_type => exact .memref read cell_type
     | comptime inner_typed =>
         exact .comptime (ValueHasType.transportContext supports inner_typed)
     termination_by valueWeight value + typeWeight type
@@ -1387,6 +1399,46 @@ theorem arrayObject_inv
   cases typed with
   | arrayObject elements_typed => exact .inl ⟨rfl, elements_typed⟩
   | comptime inner_typed => exact .inr ⟨_, rfl, inner_typed⟩
+
+/-- A memref names a heap cell that holds a memory array's elements. -/
+theorem memref_inv
+    {context : Context} {heap : Heap}
+    {element : Ty} {location : Location} {position : Nat} {type : Ty}
+    (typed : ValueHasType context heap (.memref element location position) type) :
+    (type = Ty.memref element ∧
+      ∃ cell, Heap.Reads heap location cell ∧ cell.type = Ty.arrayObject element) ∨
+    (∃ inner, type = .comptime inner ∧
+      ValueHasType context heap (.memref element location position) inner) := by
+  cases typed with
+  | memref read cell_type => exact .inl ⟨rfl, _, read, cell_type⟩
+  | comptime inner_typed => exact .inr ⟨_, rfl, inner_typed⟩
+
+/-- A memref to an element of a memory array has the memref type of the array's
+element type, as the array's reference names the same cell. -/
+theorem memref_of_arrayRef
+    {context : Context} {heap : Heap}
+    {element arrayElement : Ty} {location : Location} {position : Nat}
+    (typed : ValueHasType context heap (.arrayRef element location) (Ty.array arrayElement)) :
+    ValueHasType context heap (.memref element location position) (Ty.memref arrayElement) := by
+  rcases typed.arrayRef_inv with ⟨equal, cell, read, cell_type⟩ | ⟨_, equal, _⟩
+  · have same : arrayElement = element := by
+      simpa [Ty.array] using equal
+    subst same
+    exact .memref read cell_type
+  · simp [Ty.array] at equal
+
+/-- The memory array a memref names has the memref's element type. -/
+theorem arrayRef_of_memref
+    {context : Context} {heap : Heap}
+    {element referenced : Ty} {location : Location} {position : Nat}
+    (typed : ValueHasType context heap (.memref element location position) (Ty.memref referenced)) :
+    ValueHasType context heap (.arrayRef element location) (Ty.array referenced) := by
+  rcases typed.memref_inv with ⟨equal, cell, read, cell_type⟩ | ⟨_, equal, _⟩
+  · have same : referenced = element := by
+      simpa [Ty.memref] using equal
+    subst same
+    exact .arrayRef read cell_type
+  · simp [Ty.memref] at equal
 
 /-- A slice's base is a memory array or a slice. -/
 theorem arraySlice_inv

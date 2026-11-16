@@ -383,6 +383,9 @@ inductive ExpressionForm where
   /-- `toArray(s)`: a fresh memory array of `element` holding a slice's elements
   in order. -/
   | toArray (element : Ty) (slice : ExpressionId)
+  /-- `lidx(a, i)` on a memory array: a memref to its element `i`, once `i` is
+  below its length. -/
+  | elementRef (base index : ExpressionId)
   deriving Repr, BEq, DecidableEq
 
 /-- One typed expression occurrence.  `requirements` contains every obligation
@@ -513,6 +516,7 @@ def references : ExpressionForm → List NodeId
   | .arraySlice base start stop =>
       NodeId.expression base :: (start.toList ++ stop.toList).map NodeId.expression
   | .toArray _ slice => [NodeId.expression slice]
+  | .elementRef base key => [NodeId.expression base, NodeId.expression key]
 
 end ExpressionForm
 
@@ -746,6 +750,7 @@ def applySubstitution (substitution : Substitution) : ExpressionForm → Express
     | .arrayLiteral element elements => .arrayLiteral (substitution.apply element) elements
     | .arraySlice base start stop => .arraySlice base start stop
     | .toArray element slice => .toArray (substitution.apply element) slice
+    | .elementRef base key => .elementRef base key
 
 end ExpressionForm
 
@@ -979,7 +984,7 @@ def definedLocalIds : ExpressionForm → List Resolved.LocalId
   | .literal _ | .integerLiteral .. | .reference .. | .group _ | .tuple _ |
       .unary .. | .binary .. | .conditional .. | .call .. | .constructor .. |
       .member .. | .proxy _ | .index .. | .newArray .. | .arrayLength _ | .arrayIndex .. |
-      .arrayLiteral .. | .arraySlice .. | .toArray .. => []
+      .arrayLiteral .. | .arraySlice .. | .toArray .. | .elementRef .. => []
 
 end ExpressionForm
 

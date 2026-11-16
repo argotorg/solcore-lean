@@ -938,6 +938,22 @@ mutual
           (some (.arrayObject element values)) location after) :
         ExpressionFormEvaluates program context evidence source environment before
           (.toArray element slice) requirements coercions (.arrayRef element location) after
+    /-- `lidx(a, i)` below the array's length is a memref to its element `i`, as
+    std's `LValueIdxAccess` checks the index once and gives `memref(p + 32 + 32·i)`.
+    The index is a word, as `word` and the twelve types are. -/
+    | elementRef
+        {context evidence source environment before middle after base index
+          requirements coercions element location position count}
+        (layout : OrdinaryRequirementLayout requirements coercions [])
+        (base_evaluates : ExpressionEvaluates program context evidence source
+          environment before base (.arrayRef element location) middle)
+        (index_evaluates : ExpressionEvaluates program context evidence source
+          environment middle index (.word position) after)
+        (counted : ViewLength after (.arrayRef element location) count)
+        (within : position.val < count) :
+        ExpressionFormEvaluates program context evidence source environment before
+          (.elementRef base index) requirements coercions
+          (.memref element location position.val) after
 
   /-- Left-to-right evaluation of an expression vector. -/
   inductive ExpressionsEvaluate (program : Program) :
@@ -1931,6 +1947,8 @@ mutual
     | .toArray _ slice_evaluates _ allocates =>
         (slice_evaluates.initialization_extends).trans
           (HeapInitializationExtend.of_allocation allocates)
+    | .elementRef _ base_evaluates index_evaluates _ _ =>
+        (base_evaluates.initialization_extends).trans index_evaluates.initialization_extends
 
   theorem ExpressionsEvaluate.initialization_extends {program : Program}
       {context : Context}

@@ -686,6 +686,16 @@ mutual
         (slice_view : ViewElement baseType element) :
         ExpressionFormHasRawType source context (.toArray element slice)
           (TypeSystem.Ty.array element) (.ordinary [])
+    /-- `lidx(a, i)` on a memory array is a memref to one of its elements, and
+    takes an index of `word` or one of the twelve types, as a read does. -/
+    | elementRef
+        {context : Context} {base index : ExpressionId}
+        {element indexType : TypeSystem.Ty}
+        (base_type : ExpressionHasType source context base (TypeSystem.Ty.array element))
+        (index_type : ExpressionHasType source context index indexType)
+        (index_kind : ArrayIndexType indexType) :
+        ExpressionFormHasRawType source context (.elementRef base index)
+          (TypeSystem.Ty.memref element) (.ordinary [])
 
   /-- Pointwise expression typing in source order. -/
   inductive ExpressionsHaveTypes (source : TypedSource) :
@@ -1347,6 +1357,8 @@ local macro "weaken_source_static" "(" recursor:term "," before:term ","
     (fun allowed _ _ baseInduction boundsInduction =>
       .arraySlice allowed baseInduction boundsInduction)
     (fun _ view sliceInduction => .toArray sliceInduction view)
+    (fun _ _ kind baseInduction indexInduction =>
+      .elementRef baseInduction indexInduction kind)
     (fun _ => .nil _)
     (fun head tail headInduction tailInduction =>
       .cons headInduction tailInduction)

@@ -246,6 +246,7 @@ def applyExpressionForm (substitution : ParameterSubstitution) :
   | .arrayLiteral element elements => .arrayLiteral (substitution.apply element) elements
   | .arraySlice base start stop => .arraySlice base start stop
   | .toArray element slice => .toArray (substitution.apply element) slice
+  | .elementRef base index => .elementRef base index
 
 def applyPlaceResolution (substitution : ParameterSubstitution)
     (place : PlaceResolution) : PlaceResolution := {
@@ -478,7 +479,8 @@ private def expressionFormTypes : ExpressionForm → List Ty
   | .index _ _
   | .arrayLength _
   | .arrayIndex _ _
-  | .arraySlice _ _ _ => []
+  | .arraySlice _ _ _
+  | .elementRef _ _ => []
 
 private def forItemTypes : ForItemForm → List Ty
   | .letDecl selectedBinder _ => [selectedBinder.scheme.body]
@@ -896,7 +898,8 @@ private def expressionChildTasks (variables : List TypeVarId)
       expressionTasks variables (base :: (start.toList ++ stop.toList))
   | .binary left _ right
   | .index left right
-  | .arrayIndex left right => expressionTasks variables [left, right]
+  | .arrayIndex left right
+  | .elementRef left right => expressionTasks variables [left, right]
   | .conditional condition thenBranch elseBranch =>
       expressionTasks variables [condition, thenBranch, elseBranch]
   | .lambda _ _ body => statementTasks variables body

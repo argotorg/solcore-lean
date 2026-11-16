@@ -1232,6 +1232,34 @@ example (context : Context) (heapTyped : HeapWellTyped context arrayHeap) :
         : ViewCopies arrayHeap (.arraySlice (.arrayRef .word ⟨0⟩) 0 2) 0 2
           [.word one, .word two]))
 
+/-- A memref into the array's cell has the memref type of its element type, as
+does one made from the array's reference. -/
+example (context : Context) :
+    ValueHasType context arrayHeap (.memref .word ⟨0⟩ 1) (Ty.memref .word) :=
+  .memref (.intro .head) rfl
+
+example (context : Context) :
+    ValueHasType context arrayHeap (.memref .word ⟨0⟩ 1) (Ty.memref .word) :=
+  (ValueHasType.arrayRef (.intro .head) rfl :
+    ValueHasType context arrayHeap (.arrayRef .word ⟨0⟩) (Ty.array .word)).memref_of_arrayRef
+
+/-- A memref's runtime type is the memref of its element type. -/
+example : ValueRuntimeType (.memref .word ⟨0⟩ 1) (.memref .word) := .memref _ _ _
+
+/-- A later heap keeps every cell's type, so a memref keeps its type. -/
+example {context : Context} {before after : Heap} {element : Ty} {location : Location}
+    {position : Nat}
+    (extension : HeapTypesExtend before after)
+    (typed : ValueHasType context before (.memref element location position)
+      (Ty.memref element)) :
+    ValueHasType context after (.memref element location position) (Ty.memref element) :=
+  typed.mono extension
+
+/-- `lidx(a, i)` checks its index against the array's cell: of two elements,
+position 2 is out of bounds. -/
+example : ViewOutOfBounds arrayHeap (.arrayRef .word ⟨0⟩) 2 :=
+  .array (elements := [.word one, .word two]) (.intro .head) rfl (by decide)
+
 end Solcore.Test.SourceSemanticsArrayObjects
 end
 

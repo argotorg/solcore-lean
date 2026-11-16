@@ -109,6 +109,9 @@ inductive Value where
   /-- A slice: `length` elements of `base`, a memory array or a slice, from its
   element `start` on, as upstream's `arraySlice(coll, start, length)`. -/
   | arraySlice (base : Value) (start length : Nat)
+  /-- A memref: element `position` of the memory array of `element` whose heap
+  cell is at `location`, as upstream's `memref(p + 32 + 32·i)`. -/
+  | memref (element : Ty) (location : Location) (position : Nat)
   deriving Repr
 
 /-- Semantic failures are observable stuck outcomes of source evaluation.
@@ -270,13 +273,15 @@ inductive ValueRuntimeType : Value → Ty → Prop where
       {base : Value} {baseType : Ty} (start length : Nat)
       (base_type : ValueRuntimeType base baseType) :
       ValueRuntimeType (.arraySlice base start length) (.arraySlice baseType)
+  | memref (element : Ty) (location : Location) (position : Nat) :
+      ValueRuntimeType (.memref element location position) (.memref element)
 
 /-- The retained shallow metadata of a mathematical value is unique. -/
 theorem ValueRuntimeType.functional {value : Value} {first second : Ty}
     (typed : ValueRuntimeType value first) (other : ValueRuntimeType value second) : first = second := by
   induction typed generalizing second with
   | unit | bool | word | integer | proxy | constructed | mapping | closure | global | builtin
-  | arrayRef | arrayObject => cases other; rfl
+  | arrayRef | arrayObject | memref => cases other; rfl
   | product left right first second =>
     cases other with
     | product a b => simp only [first a, second b]

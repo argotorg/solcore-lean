@@ -853,6 +853,19 @@ mutual
               middle_typed.allocate (.some (ValueHasType.arrayObject_of_values
                 (slice_typed.viewElements (.slice view) middle_typed copies))) allocates,
               extension.trans (HeapTypesExtend.of_allocation allocates)⟩
+    | .elementRef layout base_evaluates index_evaluates counted within => by
+        cases typing with
+        | elementRef base_type index_type _ =>
+            rcases preserveExpressionRec program_well_formed runtime
+                evidence_covers environment_agrees before_typed base_type
+                base_evaluates with
+              ⟨base_typed, middle_typed, base_extension⟩
+            rcases preserveExpressionRec program_well_formed runtime
+                evidence_covers (environment_agrees.mono base_extension)
+                middle_typed index_type index_evaluates with
+              ⟨_, after_typed, index_extension⟩
+            exact ⟨(base_typed.mono index_extension).memref_of_arrayRef,
+              after_typed, base_extension.trans index_extension⟩
     termination_by structural evaluation
 
   private theorem preserveExpressionsRec
