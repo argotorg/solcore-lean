@@ -2457,7 +2457,7 @@ theorem inferenceTypeFormationValidated_apply_typeAdmissible
       TypeAdmissible active (substitution.apply current))
     (motive_2 := fun types _ => ∀ current, current ∈ types →
       TypeAdmissible active (substitution.apply current))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ validated
   · intro metavariable _
     cases found : substitution.lookup? metavariable with
     | none =>
@@ -2526,6 +2526,9 @@ theorem inferenceTypeFormationValidated_apply_typeAdmissible
   · intro base _ baseInduction
     simp only [Ty.arraySlice, Substitution.apply]
     exact TypeAdmissible.arraySlice baseInduction
+  · intro referenced _ referencedInduction
+    simp only [Ty.memref, Substitution.apply]
+    exact TypeAdmissible.memref referencedInduction
   · intro current member
     simp at member
   · intro head tail _ _ headInduction tailInduction current member

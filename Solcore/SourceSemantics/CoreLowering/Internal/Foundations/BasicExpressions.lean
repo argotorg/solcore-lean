@@ -789,7 +789,7 @@ theorem typeRepresents_of_lowerType
           | unit => cases lowered; exact .unit
           | bool => cases lowered; exact .bool
           | word => cases lowered; exact .word
-          | integer | fixed _ | memoryArray | arrayObject | arraySlice => cases lowered
+          | integer | fixed _ | memoryArray | arrayObject | arraySlice | memref => cases lowered
   | application function argument =>
       simp only [SourceCoreElaboration.lowerType] at lowered
       split at lowered <;> cases lowered

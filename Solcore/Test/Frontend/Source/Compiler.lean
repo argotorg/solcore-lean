@@ -2536,6 +2536,14 @@ private def testStageErrors : IO Unit := do
         "a slice local's rejection lost its type"
   | result => throw (IO.userError
       s!"a slice local reached a Core representation: {reprStr result}")
+  let memrefLocal := rawWorkspace "main.solc" [("main.solc",
+    "function count() returns (Word) { let r: memref<uint256>; return 0; }")]
+  match prepare memrefLocal (Seed.named moduleId "count") generousLimits with
+  | .error (.linking (.sourceCore { reason := .unsupportedType type, .. })) =>
+      assertTrue (decide (type = .memref (.fixed ⟨false, .w256⟩)))
+        "a memref local's rejection lost its type"
+  | result => throw (IO.userError
+      s!"a memref local reached a Core representation: {reprStr result}")
   let arrayNew := rawWorkspace "main.solc" [("main.solc",
     "function make(n: uint256) returns (Word) { let m: uint256[] = new uint256[](n); return 0; }")]
   match prepare arrayNew (Seed.named moduleId "make") generousLimits with

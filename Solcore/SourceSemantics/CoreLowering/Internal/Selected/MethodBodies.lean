@@ -1845,6 +1845,11 @@ private theorem scoped_arguments {context : Context} {variables : List TypeVarId
     simp [TypeSystem.Ty.arraySlice, applicationArguments] at member
     subst member
     exact baseScoped
+  | memref referencedScoped =>
+    intro argument member
+    simp [TypeSystem.Ty.memref, applicationArguments] at member
+    subst member
+    exact referencedScoped
   | _ => simp [applicationArguments]
 
 private def applicationHead : Ty → Ty
@@ -1919,7 +1924,7 @@ private theorem scoped_at_occurrence {original target : Context} {originalVariab
     (motive_2 := fun types _ => ∀ type ∈ types, ∀ parameter, TypeParameterOccurs parameter type →
       TypeWellScoped target variables (substitution.apply type) →
       TypeWellScoped target variables ((substitution.lookup? parameter).getD (.parameter parameter)))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ originalTyped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ originalTyped
   · intro metavariable bound parameter occurs; cases occurs
   · intro actual bound owned parameter occurs typed
     cases occurs
@@ -1959,6 +1964,10 @@ private theorem scoped_at_occurrence {original target : Context} {originalVariab
     rcases occurs with occurs | occurs
     · cases occurs
     · exact ih parameter occurs (typed.arraySlice_base _ rfl)
+  · intro referenced originalTyped ih parameter occurs typed
+    rcases occurs with occurs | occurs
+    · cases occurs
+    · exact ih parameter occurs (typed.memref_referenced _ rfl)
   · intro type member; cases member
   · intro head tail headTyped tailTyped headIH tailIH type member
     rcases List.mem_cons.mp member with rfl | member

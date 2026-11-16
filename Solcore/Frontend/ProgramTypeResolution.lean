@@ -57,7 +57,8 @@ inductive ProgramTypeResolutionError where
   | nestingLimit
   /-- A memory array whose element is not `word`, one of the twelve types or a
   memory array, as `TypeSystem.Ty.arrayElementAllowed` admits, a slice whose
-  base is not a memory array or a slice, or a mapping that holds either. -/
+  base is not a memory array or a slice, a memref whose element no memory array
+  holds, or a mapping that holds any of them. -/
   | unsupportedArrayType (type : TypeSystem.Ty)
   deriving Repr, DecidableEq
 
@@ -110,9 +111,9 @@ private def uniqueDeclaredType
   | declarations =>
       .error (.ambiguousTypeName components (declarations.map (·.id)))
 
-/-- Resolve the staged integer intrinsic, or the slice type `arraySlice<B>`, which
-upstream's std exports, after the caller has exhausted every user-defined type
-visible at the current lookup boundary. -/
+/-- Resolve the staged integer intrinsic, or std's slice type `arraySlice<B>` or
+element reference `memref<T>`, after the caller has exhausted every user-defined
+type visible at the current lookup boundary. -/
 private def resolveBuiltinFallback
     (components : List String) (name : String)
     (arguments : List TypeSystem.Ty) :
@@ -125,6 +126,10 @@ private def resolveBuiltinFallback
   else if name = "arraySlice" then
     match arguments with
     | [base] => .ok (TypeSystem.Ty.arraySlice base)
+    | _ => .error (.typeArityMismatch components 1 arguments.length)
+  else if name = "memref" then
+    match arguments with
+    | [element] => .ok (TypeSystem.Ty.memref element)
     | _ => .error (.typeArityMismatch components 1 arguments.length)
   else
     .error (.unknownTypeName components)
@@ -683,7 +688,15 @@ private theorem resolveBuiltinFallback_variablesBelow
           simpa [TypeSystem.Ty.arraySlice] using argumentsBelow base (by simp)
       | [], _, success => simp at success
       | _ :: _ :: _, _, success => simp at success
-    · simp at success
+    · split at success
+      · match arguments, argumentsBelow, success with
+        | [element], argumentsBelow, success =>
+            injection success with resolvedEq
+            subst resolved
+            simpa [TypeSystem.Ty.memref] using argumentsBelow element (by simp)
+        | [], _, success => simp at success
+        | _ :: _ :: _, _, success => simp at success
+      · simp at success
 
 private theorem resolveNamedProgramType_variablesBelow
     {next : Nat} {environment : ProgramEnvironment}

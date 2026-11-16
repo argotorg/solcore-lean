@@ -4305,7 +4305,7 @@ theorem ground_is_not_range (owner : Resolved.DeclarationId) (parameter : TypePa
   have scopeProof := (valid parameter (.constructor (.declaration owner)) (by simp)).typeWellScoped
   generalize typeEq : Ty.constructor (TypeConstructorId.declaration owner) = type at scopeProof
   cases scopeProof <;> simp_all [SourceSemantics.Context.ofSignatures, TypeSystem.Ty.array,
-    TypeSystem.Ty.arraySlice]
+    TypeSystem.Ty.arraySlice, TypeSystem.Ty.memref]
 
 private def reorderedWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [

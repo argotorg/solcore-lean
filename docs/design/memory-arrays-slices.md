@@ -389,6 +389,15 @@ wait for the native pipeline's contracts and ABI.
   element type, so an open literal bound takes `uint256` and a bound of another type is rejected,
   and records the slice at the slice of the base's resolved type (`ExpressionForm.arraySlice`,
   `sliceBoundIds`).
+- **Memrefs.** `memref<T>` is std's checked reference to one element of a memory array of `T`:
+  `lidx(a, i)` makes one, and `CanStore.load(r)` and `CanStore.store(r, v)` read and write through
+  it, in step 7. As built in step 7a, `memref<T>` resolves to a memref type once aliases are
+  expanded, as an intrinsic that a user type of the same name hides (`resolveBuiltinFallback`), with
+  one argument (`typeArityMismatch` otherwise). `Ty.arraysWellFormed` admits it when `T` is a type a
+  memory array holds (`Ty.arrayElementAllowed`), and `Ty.containsArray` counts it, so a mapping that
+  holds a memref is rejected with `unsupportedArrayType`, as is an array of memrefs, whose element
+  `Ty.arrayElementAllowed` does not admit (difference 21). Elaboration and both catalogs reject
+  every memref type until step 7f.
 - **Lengths.** `a.length`, `a.length()` and `Length.length(a)` on arrays and slices have the type
   `uint256`. `Length.length` is a builtin qualified call when no namespace `Length` exists, as
   `Typedef.abs` is (`typedefCall?`). As built in step 2b-ii-b, `lengthCall` finds the name, and the
@@ -675,11 +684,20 @@ ABI-encoded, so the fixture's `slices([10,20,30,40]) -> [20,30]` is checked as 2
     `unknownVariable "toArray"`, and `let size = Length.length;` with `unknownVariable "Length"`.
     The pinned driver compiles both, since std's `toArray` and `Length.length` are functions there
     (`.upstream/lane-d-unit3-memory-arrays/step6/probe-6gii`).
+21. **A memref refers to an element a memory array holds, and no array or mapping holds a memref.**
+    `memref<bool>` is rejected where the type is formed, as `bool[]` is (difference 6), and so are a
+    memref of a slice and of a memref; generic `memref<t>` is rejected as generic `t[]` is. The
+    pinned driver accepts the annotation `memref<bool>`, and generic `memref<t>` with
+    `where t: Typedef<word>`. An array of memrefs is rejected where it is formed: the pinned driver
+    accepts the annotation `memref<uint256>[]` and fails `new memref<uint256>[](2)` with SC0207,
+    since a memref has no `Typedef<word>`. A mapping that holds a memref is rejected as one that
+    holds an array is (difference 5), while the pinned driver accepts a contract field of that type
+    (`.upstream/lane-d-unit3-memory-arrays/step7/probe`).
 
 Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13, 13 and 14 on
 2026-11-14, 15 and 16 on 2026-11-15, when 8 was also widened from an unused `let m = [];` to any
-unannotated one, and 17 to 20 on 2026-11-16. Differences 9 to 13 change only a diagnostic or the
-room of a resource limit, and 8 and 14 to 20 only reject some programs that upstream accepts. None
+unannotated one, and 17 to 21 on 2026-11-16. Differences 9 to 13 change only a diagnostic or the
+room of a resource limit, and 8 and 14 to 21 only reject some programs that upstream accepts. None
 of them changes what an accepted program means. Difference 1 follows decision 3.
 
 ## Steps
@@ -722,14 +740,20 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 6g-i | Slices: inference's typing of reads and lengths through a slice: the read's arm and the lengths take the view of a memory array or of a slice (`Ty.viewElement?`), and the read's and the lengths' proofs take it | 18–25 files, +250–450/−100–200; measured at 23 files, +210/−110 | none |
 | 6g-ii | Slices: inference's typing of `toArray(s)` | 15–25 files, +450–700/−10–30; measured at 19 files, +553/−11 | none |
 | 6h | Slices: the lowering, a slice as a Core product of its base, its start and its length, and `toArray(s)`'s copy | 4–9 files, +200–400/−10–20; measured at 9 files, +286/−12 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
-| 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
+| 7a | Memrefs: the memref type `memref<T>`, which resolves once aliases are expanded and which type formation admits over a type a memory array holds; no value has it yet, and elaboration and both catalogs reject it | 25–30 files, +350–500/−20–70; measured at 27 files, +385/−57 | none |
+| 7b | Memrefs: the memref value and the typed form of `lidx(a, i)`, with its static rule, evaluation, faults with `0x32`, sized copies, stage and preservation, which no source produces yet | 28–34 files, +400–650/−10–30 | none |
+| 7c | Memrefs: the typed forms of `CanStore.load(r)` and `CanStore.store(r, v)`, with their static rules, evaluation, faults, sized copies, stage and preservation, which no source produces yet | 28–34 files, +450–700/−10–30 | none |
+| 7d | Memrefs: inference's typing of `lidx(a, i)`, a compiler call whose index waits for finalization as a read's | 22–30 files, +650–950/−10–40 | none |
+| 7e-i | Memrefs: inference's typing of `CanStore.load(r)` | 18–24 files, +450–650/−10–30 | none |
+| 7e-ii | Memrefs: inference's typing of `CanStore.store(r, v)`, whose value's type unifies with the element type | 22–30 files, +700–1,100/−10–40 | none |
+| 7f | Memrefs: the lowering, a memref as a Core product of its array's cell and its index, and the loads and stores through it | 8–12 files, +250–450/−10–30 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
 
-In all, that is about 664 to 930 file changes, +17,885 to 26,795 and −2,035 to 3,860 lines over
-forty commits: about four fifths to one and a fifth times row 1, whose 23 commits added about
-21,700 lines, much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600,
-until its first measure: it adds three AST forms through the proved parser, so it became 1a to 1c.
-1b's first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
+In all, that is about 785 to 1,079 file changes, +20,535 to 30,895 and −2,015 to 3,880 lines over
+forty-six commits: about one to one and a half times row 1, whose 23 commits added about 21,700
+lines, much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600, until
+its first measure: it adds three AST forms through the proved parser, so it became 1a to 1c. 1b's
+first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
 forms: 1c-i's measure and 1c-ii's estimate together pass the cap. 1c-ii's first measure, +1,854,
 split it again as 1b did, into 1c-ii-a and 1c-ii-b.
 
@@ -792,6 +816,17 @@ rejecting arms name it too. 6f-ii then gives the arm its typing. The totals gain
 one commit. 6g split before its code, since its read and lengths change the existing arms' proofs
 while `toArray(s)` takes a new call: 6g-i, the reads and lengths through a slice, and 6g-ii,
 `toArray(s)`; the totals take the two estimates for 6g's and one commit.
+
+Step 7 was one row of 30–45 files, +600–900/−100–250, until its first measure: about 151 to 194 file
+changes, +3,250 to 5,000/−80 to 270. The memref is a new type and a new value, as the slice was in
+6a and 6b, besides its forms: `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` each take
+a typed form with its evaluation, faults and sized rules, and each takes its inference, as in step
+6. `lidx(a, i)` is a compiler call with no qualifier, as `toArray(s)` is, whose index waits for
+finalization, as a read's does. `CanStore.load` and `CanStore.store` are qualified compiler calls,
+as `Length.length` is, and the store unifies its value's type with the element type, as a slice's
+bounds unify with `uint256`. So it splits into 7a to 7f, each within the cap, whose estimates add up
+to that measure. 7e splits before its code into 7e-i, the load, and 7e-ii, the store, since the
+store's unification reaches every proof the load's call does.
 
 ## Generators, corpora and the smoke
 

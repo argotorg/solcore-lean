@@ -1989,6 +1989,46 @@ private def testSliceTypes : IO Unit := do
     | result => throw (IO.userError
         s!"{name} was not rejected for its arity: {reprStr result}")
 
+/-- `memref<T>` resolves to a memref once aliases are expanded, of a type a
+memory array holds. A memref of any other type, a slice included, or of a
+generic type, a memref with no argument or two, and an array or a mapping that
+holds a memref are rejected. -/
+private def testMemrefTypes : IO Unit := do
+  let module ← parsed .main "memrefs.solc" (String.intercalate "\n" [
+    "type Words = word[];",
+    "type Element = memref<uint256>;",
+    "type Row = memref<Words>;",
+    "type OfBool = memref<bool>;",
+    "type OfSlice = memref<arraySlice<word[]>>;",
+    "type Generic(t) = memref<t>;",
+    "type Refs = memref<word>[];",
+    "type Stored = mapping(word => memref<word>);",
+    "type Bare = memref;",
+    "type Pair = memref<word, word>;"
+  ])
+  let environment ← build [module]
+  let element ← resolvedAlias environment "memrefs" "Element"
+  assertTrue (decide (element = TypeSystem.Ty.memref (.fixed ⟨false, .w256⟩)))
+    "`memref<uint256>` did not form a memref of uint256"
+  let row ← resolvedAlias environment "memrefs" "Row"
+  assertTrue (decide (row = .memref (.array .word)))
+    "an alias of `word[]` did not form a memref of a row"
+  for name in ["OfBool", "OfSlice", "Generic", "Refs", "Stored"] do
+    let declaration ← declaration environment "memrefs" name
+    let source ← aliasValue declaration
+    match resolveProgramTypeExpr environment (.ofDeclaration declaration) source with
+    | .error (.unsupportedArrayType _) => pure ()
+    | result => throw (IO.userError
+        s!"{name} was not rejected as a memref type: {reprStr result}")
+  for (name, count) in [("Bare", 0), ("Pair", 2)] do
+    let declaration ← declaration environment "memrefs" name
+    let source ← aliasValue declaration
+    match resolveProgramTypeExpr environment (.ofDeclaration declaration) source with
+    | .error (.typeArityMismatch ["memref"] 1 actual) =>
+        assertTrue (actual == count) s!"{name} counted {actual} arguments"
+    | result => throw (IO.userError
+        s!"{name} was not rejected for its arity: {reprStr result}")
+
 private def testStrictImportVisibility : IO Unit := do
   let provider ← parsed .main "provider.solc"
     "export {*}; enum Hidden { Only }"
@@ -2062,6 +2102,7 @@ def testProgramEnvironmentAndTypeResolution : IO Unit := do
   ProgramEnvironmentAndTypeResolution.testStrictImportVisibility
   ProgramEnvironmentAndTypeResolution.testArrayTypes
   ProgramEnvironmentAndTypeResolution.testSliceTypes
+  ProgramEnvironmentAndTypeResolution.testMemrefTypes
   ProgramEnvironmentAndTypeResolution.expectEnvironmentFailures
 
 end Tests

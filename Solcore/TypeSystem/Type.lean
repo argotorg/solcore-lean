@@ -155,6 +155,9 @@ inductive BuiltinType where
   /-- `arraySlice<B>`, a read-only view of a memory array or of a slice,
   applied to its base's type. -/
   | arraySlice
+  /-- `memref<T>`, a checked reference to one element of a memory array,
+  applied to the element's type. -/
+  | memref
   deriving Repr, DecidableEq
 
 /-- The stable identity at the head of a type application. -/
@@ -267,6 +270,24 @@ theorem arraySliceBase?_eq_some {type base : Ty} (found : type.arraySliceBase? =
     rfl
   · cases found
 
+/-- `memref<T>`, a checked reference to one element of type `element` of a
+memory array, as upstream's `memref(p + 32 + 32·i)`. -/
+def memref (element : Ty) : Ty := .application (.constructor (.builtin .memref)) element
+
+/-- The element type of a memref type. -/
+def memrefElement? : Ty → Option Ty
+  | .application (.constructor (.builtin .memref)) element => some element
+  | _ => none
+
+/-- A type whose memref element is `element` is the memref of it. -/
+theorem memrefElement?_eq_some {type element : Ty} (found : type.memrefElement? = some element) :
+    type = memref element := by
+  unfold memrefElement? at found
+  split at found
+  · cases found
+    rfl
+  · cases found
+
 /-- Whether a slice may view `base`: a memory array or a slice, the bases with
 `Length` and `RValueIdxAccess` upstream that Lean has. -/
 def arraySliceBaseAllowed : Ty → Bool
@@ -283,10 +304,12 @@ def arrayElementAllowed : Ty → Bool
   | .application (.constructor (.builtin .memoryArray)) _ => true
   | _ => false
 
-/-- Whether a memory array, or a slice of one, occurs anywhere in a type. -/
+/-- Whether a memory array, a slice of one or a memref into one occurs anywhere in
+a type. -/
 def containsArray : Ty → Bool
   | .application (.constructor (.builtin .memoryArray)) _ => true
   | .application (.constructor (.builtin .arraySlice)) _ => true
+  | .application (.constructor (.builtin .memref)) _ => true
   | .application leftPart rightPart
   | .function leftPart rightPart
   | .product leftPart rightPart
@@ -299,13 +322,16 @@ def containsArray : Ty → Bool
   | .error => false
 
 /-- Every memory array in a type holds an element `arrayElementAllowed`
-admits, every slice views a memory array or a slice, and no mapping holds
-either, whose meaning upstream is storage. -/
+admits, every slice views a memory array or a slice, every memref refers to an
+element `arrayElementAllowed` admits, and no mapping holds any of them, whose
+meaning upstream is storage. -/
 def arraysWellFormed : Ty → Bool
   | .application (.constructor (.builtin .memoryArray)) element =>
       element.arrayElementAllowed && element.arraysWellFormed
   | .application (.constructor (.builtin .arraySlice)) base =>
       base.arraySliceBaseAllowed && base.arraysWellFormed
+  | .application (.constructor (.builtin .memref)) element =>
+      element.arrayElementAllowed && element.arraysWellFormed
   | .mapping key value =>
       !key.containsArray && !value.containsArray &&
         key.arraysWellFormed && value.arraysWellFormed
@@ -448,6 +474,13 @@ private theorem mem_unionVariables_iff (metavariable : TypeVarId)
     metavariable ∈ (Ty.arraySlice base).freeVariables ↔
       metavariable ∈ base.freeVariables := by
   rw [arraySlice, mem_freeVariables_application_iff]
+  simp [freeVariables]
+
+@[simp] theorem mem_freeVariables_memref_iff
+    (metavariable : TypeVarId) (element : Ty) :
+    metavariable ∈ (Ty.memref element).freeVariables ↔
+      metavariable ∈ element.freeVariables := by
+  rw [memref, mem_freeVariables_application_iff]
   simp [freeVariables]
 
 /-- The element type of a memory array, or of a slice's base: what a read

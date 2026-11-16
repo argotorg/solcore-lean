@@ -454,7 +454,7 @@ private theorem scoped_concrete_at_catalog
     (motive_2 := fun types _ =>
       (∀ type ∈ types, SourceSpecialization.firstNonConcrete type = none) →
         TypesWellScoped (Context.ofSignatures context.signatures) [] types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intro metavariable _ concrete
     cases concrete
   · intro parameter _ _ concrete
@@ -489,6 +489,8 @@ private theorem scoped_concrete_at_catalog
     exact .array (elementIH concrete)
   · intro base _ baseIH concrete
     exact .arraySlice (baseIH concrete)
+  · intro referenced _ referencedIH concrete
+    exact .memref (referencedIH concrete)
   · intro _concrete
     exact .nil
   · intro head tail _ _ headIH tailIH concrete

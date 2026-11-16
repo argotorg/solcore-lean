@@ -96,7 +96,8 @@ def Catalog.project (catalog : Catalog) : Ty → Except Error Core.Ty
   -- A memory array has no Core representation yet.
   | type@(.constructor (.builtin .memoryArray))
   | type@(.constructor (.builtin .arrayObject))
-  | type@(.constructor (.builtin .arraySlice)) => throw (.missingRepresentation type)
+  | type@(.constructor (.builtin .arraySlice))
+  | type@(.constructor (.builtin .memref)) => throw (.missingRepresentation type)
   | .product left right => do pure (.product (← catalog.project left) (← catalog.project right))
   | .function parameter result => do
       pure (catalog.functionType (← catalog.project parameter) (← catalog.project result))

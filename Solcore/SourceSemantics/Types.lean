@@ -100,6 +100,11 @@ inductive TypeWellScoped (context : Context)
       {base : TypeSystem.Ty}
       (baseWellScoped : TypeWellScoped context flexibleVariables base) :
       TypeWellScoped context flexibleVariables (TypeSystem.Ty.arraySlice base)
+  /-- `memref<T>`, a reference to an element of a well-scoped type. -/
+  | memref
+      {referenced : TypeSystem.Ty}
+      (referencedWellScoped : TypeWellScoped context flexibleVariables referenced) :
+      TypeWellScoped context flexibleVariables (TypeSystem.Ty.memref referenced)
 
 /-- Pointwise well-scopedness for nominal type arguments. -/
 inductive TypesWellScoped (context : Context)
@@ -335,7 +340,7 @@ theorem weakenTo
   refine TypeWellScoped.rec
     (motive_1 := fun type _ => TypeWellScoped context larger type)
     (motive_2 := fun types _ => TypesWellScoped context larger types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable (included metavariable bound)
   · intro parameter bound owned
@@ -360,6 +365,8 @@ theorem weakenTo
     exact .array elementInduction
   · intro base _ baseInduction
     exact .arraySlice baseInduction
+  · intro referenced _ referencedInduction
+    exact .memref referencedInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -378,7 +385,7 @@ theorem withLocal
       (context.withLocal id scheme requirements) flexibleVariables type)
     (motive_2 := fun types _ => TypesWellScoped
       (context.withLocal id scheme requirements) flexibleVariables types)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ wellScoped
   · intro metavariable bound
     exact .variable bound
   · intro parameter bound owned
@@ -406,6 +413,8 @@ theorem withLocal
     exact .array elementInduction
   · intro base _ baseInduction
     exact .arraySlice baseInduction
+  · intro referenced _ referencedInduction
+    exact .memref referencedInduction
   · exact .nil
   · intro head tail _ _ headInduction tailInduction
     exact .cons headInduction tailInduction
@@ -513,6 +522,15 @@ private theorem nominal_ne_arraySlice
   rw [applicationHead_nominal] at heads
   cases heads
 
+private theorem nominal_ne_memref
+    (declaration : Resolved.DeclarationId)
+    (arguments : List TypeSystem.Ty) (referenced : TypeSystem.Ty) :
+    TypeSystem.Ty.nominal declaration arguments ≠ TypeSystem.Ty.memref referenced := by
+  intro equal
+  have heads := congrArg applicationHead equal
+  rw [applicationHead_nominal] at heads
+  cases heads
+
 /-- Inversion for flexible variables: every occurrence is explicitly bound by
 the flexible-variable list of the judgment. -/
 theorem variable_mem {context : Context}
@@ -542,6 +560,7 @@ theorem variable_mem {context : Context}
   | .comptime _ => by intro _ equal; cases equal
   | .array _ => by intro _ equal; cases equal
   | .arraySlice _ => by intro _ equal; cases equal
+  | .memref _ => by intro _ equal; cases equal
 
 /-- Inversion for rigid parameters records both binder membership and
 declaration ownership. -/
@@ -573,6 +592,7 @@ theorem parameter_scope {context : Context}
   | .comptime _ => by intro _ equal; cases equal
   | .array _ => by intro _ equal; cases equal
   | .arraySlice _ => by intro _ equal; cases equal
+  | .memref _ => by intro _ equal; cases equal
 
 /-- Recovery types never occur in a well-scoped source type. -/
 theorem ne_error {context : Context}
@@ -595,6 +615,7 @@ theorem ne_error {context : Context}
   | .comptime _ => by intro equal; cases equal
   | .array _ => by intro equal; cases equal
   | .arraySlice _ => by intro equal; cases equal
+  | .memref _ => by intro equal; cases equal
 
 /-- Inversion for function types exposes both structurally scoped
 components. -/
@@ -627,6 +648,7 @@ theorem function_components
   | .comptime _ => by intro _ _ equal; cases equal
   | .array _ => by intro _ _ equal; cases equal
   | .arraySlice _ => by intro _ _ equal; cases equal
+  | .memref _ => by intro _ _ equal; cases equal
 
 /-- Inversion for product types exposes both structurally scoped
 components. -/
@@ -659,6 +681,7 @@ theorem product_components
   | .comptime _ => by intro _ _ equal; cases equal
   | .array _ => by intro _ _ equal; cases equal
   | .arraySlice _ => by intro _ _ equal; cases equal
+  | .memref _ => by intro _ _ equal; cases equal
 
 /-- Inversion for mapping types exposes both structurally scoped
 components. -/
@@ -691,6 +714,7 @@ theorem mapping_components
   | .comptime _ => by intro _ _ equal; cases equal
   | .array _ => by intro _ _ equal; cases equal
   | .arraySlice _ => by intro _ _ equal; cases equal
+  | .memref _ => by intro _ _ equal; cases equal
 
 /-- Inversion for memory array types exposes the scoped element. -/
 theorem array_element
@@ -719,6 +743,7 @@ theorem array_element
       cases equal
       exact elementScoped
   | .arraySlice _ => by intro _ equal; cases equal
+  | .memref _ => by intro _ equal; cases equal
 
 /-- Inversion for slice types exposes the scoped base. -/
 theorem arraySlice_base
@@ -747,6 +772,36 @@ theorem arraySlice_base
       intro _ equal
       cases equal
       exact baseScoped
+  | .memref _ => by intro _ equal; cases equal
+
+/-- Inversion for memref types exposes the scoped element. -/
+theorem memref_referenced
+    {context : Context} {flexibleVariables : List TypeSystem.TypeVarId}
+    {type : TypeSystem.Ty}
+    (wellScoped : TypeWellScoped context flexibleVariables type) :
+    ∀ referenced, type = TypeSystem.Ty.memref referenced →
+      TypeWellScoped context flexibleVariables referenced :=
+  match wellScoped with
+  | .variable _ => by intro _ equal; cases equal
+  | .parameter _ _ => by intro _ equal; cases equal
+  | .builtin _ => by intro _ equal; cases equal
+  | .nominal dataType arguments _ _ _ => by
+      intro referenced equal
+      exact False.elim (nominal_ne_memref dataType.id arguments referenced equal)
+  | .contractNominal contract arguments _ _ _ => by
+      intro referenced equal
+      exact False.elim (nominal_ne_memref contract.id arguments referenced equal)
+  | .function _ _ => by intro _ equal; cases equal
+  | .product _ _ => by intro _ equal; cases equal
+  | .mapping _ _ => by intro _ equal; cases equal
+  | .proxy _ => by intro _ equal; cases equal
+  | .comptime _ => by intro _ equal; cases equal
+  | .array _ => by intro _ equal; cases equal
+  | .arraySlice _ => by intro _ equal; cases equal
+  | .memref referencedScoped => by
+      intro _ equal
+      cases equal
+      exact referencedScoped
 
 theorem variable_iff {context : Context}
     {flexibleVariables : List TypeSystem.TypeVarId}
@@ -967,6 +1022,17 @@ theorem arraySlice
       (TypeSystem.Ty.mem_freeVariables_arraySlice_iff metavariable base).mpr member)
 }
 
+/-- Admissibility is compositional for memrefs. -/
+theorem memref
+    {context : Context} {referenced : TypeSystem.Ty}
+    (referencedAdmissible : TypeAdmissible context referenced) :
+    TypeAdmissible context (TypeSystem.Ty.memref referenced) := {
+  binders := referencedAdmissible.binders
+  typeWellScoped := .memref
+    (referencedAdmissible.typeWellScopedWithin fun metavariable member =>
+      (TypeSystem.Ty.mem_freeVariables_memref_iff metavariable referenced).mpr member)
+}
+
 /-- A source-ordered row of admissible element types has an admissible
 right-associated product. -/
 theorem productMany
@@ -1053,6 +1119,12 @@ theorem TypeWellFormed.arraySlice_base {context : Context} {base : TypeSystem.Ty
     (wellFormed : TypeWellFormed context (TypeSystem.Ty.arraySlice base)) :
     TypeWellFormed context base :=
   ⟨wellFormed.binders, wellFormed.typeWellScoped.arraySlice_base base rfl⟩
+
+/-- A well-formed memref has a well-formed element. -/
+theorem TypeWellFormed.memref_referenced {context : Context} {referenced : TypeSystem.Ty}
+    (wellFormed : TypeWellFormed context (TypeSystem.Ty.memref referenced)) :
+    TypeWellFormed context referenced :=
+  ⟨wellFormed.binders, wellFormed.typeWellScoped.memref_referenced referenced rfl⟩
 
 namespace SchemeWellFormed
 

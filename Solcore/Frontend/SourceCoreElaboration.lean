@@ -499,12 +499,13 @@ def lowerType (site : ErrorSite) : Ty → Except Error Core.Ty
   -- The fixed-width integer types are lowered by the catalog projections only.
   | type@(.constructor (.builtin (.fixed _))) =>
       fail site (.unsupportedType type)
-  -- A memory array and a slice are applications, and the type of the heap cell
-  -- that holds an array's elements is the source semantics' own; no bare
-  -- constructor of the three is a type.
+  -- A memory array, a slice and a memref are applications, and the type of the
+  -- heap cell that holds an array's elements is the source semantics' own; no
+  -- bare constructor of the four is a type.
   | type@(.constructor (.builtin .memoryArray))
   | type@(.constructor (.builtin .arrayObject))
-  | type@(.constructor (.builtin .arraySlice)) =>
+  | type@(.constructor (.builtin .arraySlice))
+  | type@(.constructor (.builtin .memref)) =>
       fail site (.unsupportedType type)
   | .constructor (.declaration id) => fail site (.nominalType id)
   | .product left right => do

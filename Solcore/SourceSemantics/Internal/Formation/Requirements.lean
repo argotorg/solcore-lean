@@ -830,7 +830,7 @@ theorem type_applySubstitution_residual
     (motive_1 := fun current _ => TypeAdmissible context (substitution.apply current))
     (motive_2 := fun types _ => ∀ current ∈ types,
       TypeAdmissible context (substitution.apply current))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ formed.typeWellScoped
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ formed.typeWellScoped
   · intro metavariable _
     cases found : substitution.lookup? metavariable with
     | none =>
@@ -879,6 +879,8 @@ theorem type_applySubstitution_residual
     exact TypeAdmissible.array elementInduction
   · intro base _ baseInduction
     exact TypeAdmissible.arraySlice baseInduction
+  · intro referenced _ referencedInduction
+    exact TypeAdmissible.memref referencedInduction
   · intro current member
     simp at member
   · intro head tail _ _ headInduction tailInduction current member
