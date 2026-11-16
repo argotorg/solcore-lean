@@ -520,7 +520,7 @@ theorem expression_index_key
       (form : source.value = .index base brackets key)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
-      (notArray : (baseState.resolve baseValue.type).arrayElement? = none)
+      (notArray : (baseState.resolve baseValue.type).viewElement? = none)
       (keyFresh : baseState.fresh = (keyType, keyState))
       (valueFresh : keyState.fresh = (valueType, valueState))
       (fitting : unify valueState baseValue.type (.mapping keyType valueType) = .ok fitted)
@@ -550,7 +550,7 @@ theorem expression_index_array
       (form : source.value = .index base brackets key)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
-      (_array : (baseState.resolve baseValue.type).arrayElement? = some element)
+      (_array : (baseState.resolve baseValue.type).viewElement? = some element)
       (_child : inferExprFuel fuel context key none baseState = .ok (keyValue, childFinal))
       (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs)
       (backed : LiveTemplatesBacked initial) : LiveTemplatesBacked (CallIndex.expression fuel context key none baseState keyValue childFinal).initial := by

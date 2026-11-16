@@ -450,6 +450,43 @@ private theorem mem_unionVariables_iff (metavariable : TypeVarId)
   rw [arraySlice, mem_freeVariables_application_iff]
   simp [freeVariables]
 
+/-- The element type of a memory array, or of a slice's base: what a read
+through the view gives. -/
+def viewElement? : Ty → Option Ty
+  | .application head argument =>
+      match head with
+      | .constructor (.builtin .memoryArray) => some argument
+      | .constructor (.builtin .arraySlice) => argument.viewElement?
+      | _ => none
+  | _ => none
+
+/-- Every variable of a view's element type is a variable of the view's type. -/
+theorem mem_freeVariables_of_viewElement? {metavariable : TypeVarId} :
+    ∀ {type element : Ty}, type.viewElement? = some element →
+      metavariable ∈ element.freeVariables → metavariable ∈ type.freeVariables := by
+  intro type
+  induction type with
+  | application head argument _ argumentIH =>
+      intro element found member
+      rw [mem_freeVariables_application_iff]
+      cases head with
+      | constructor constructor =>
+          cases constructor with
+          | builtin builtin =>
+              cases builtin <;> simp only [viewElement?, reduceCtorEq] at found
+              · cases found
+                exact .inr member
+              · exact .inr (argumentIH found member)
+          | declaration _ => simp [viewElement?] at found
+      | _ => simp [viewElement?] at found
+  | _ => intro element found; simp [viewElement?] at found
+
+/-- A view's element type is below every bound its type is. -/
+theorem variablesBelow_of_viewElement? {next : Nat} {type element : Ty}
+    (found : type.viewElement? = some element) (below : type.VariablesBelow next) :
+    element.VariablesBelow next :=
+  fun metavariable member => below metavariable (mem_freeVariables_of_viewElement? found member)
+
 @[simp] theorem mem_freeVariables_function_iff
     (metavariable : TypeVarId) (parameter result : Ty) :
     metavariable ∈ (Ty.function parameter result).freeVariables ↔

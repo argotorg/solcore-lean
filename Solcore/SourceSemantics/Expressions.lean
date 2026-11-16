@@ -1373,6 +1373,26 @@ inductive ViewElement : TypeSystem.Ty → TypeSystem.Ty → Prop where
   | slice {base element : TypeSystem.Ty} (inner : ViewElement base element) :
       ViewElement (TypeSystem.Ty.arraySlice base) element
 
+/-- The element that `Ty.viewElement?` finds is the view's element. -/
+theorem ViewElement.of_viewElement? :
+    ∀ {type element : TypeSystem.Ty}, type.viewElement? = some element →
+      ViewElement type element := by
+  intro type
+  induction type with
+  | application head argument _ argumentIH =>
+      intro element found
+      cases head with
+      | constructor constructor =>
+          cases constructor with
+          | builtin builtin =>
+              cases builtin <;> simp only [TypeSystem.Ty.viewElement?, reduceCtorEq] at found
+              · cases found
+                exact .array _
+              · exact .slice (argumentIH found)
+          | declaration _ => simp [TypeSystem.Ty.viewElement?] at found
+      | _ => simp [TypeSystem.Ty.viewElement?] at found
+  | _ => intro element found; simp [TypeSystem.Ty.viewElement?] at found
+
 /-- A rigid substitution keeps a view's element. -/
 theorem ViewElement.applyParameters (substitution : TypeSystem.ParameterSubstitution)
     {view element : TypeSystem.Ty} (found : ViewElement view element) :

@@ -1194,7 +1194,7 @@ theorem arrayIndex_formType
     {semanticSource : TypedSource} {active : SourceSemantics.Context}
     {substitution : Substitution} {state : State} {array index : InferredExpression}
     {element : Ty}
-    (resolved : state.resolve array.type = Ty.array element)
+    (found : (state.resolve array.type).viewElement? = some element)
     (extension : substitution.SemanticallyExtends state.inference.substitution)
     (arrayTyped : ExpressionHasType semanticSource active array.id
       (substitution.apply array.type))
@@ -1204,17 +1204,10 @@ theorem arrayIndex_formType
     ExpressionFormHasRawType semanticSource active
       ((ExpressionForm.arrayIndex array.id index.id).applySubstitution substitution)
       (substitution.apply element) (.ordinary []) := by
-  have arrayTypeEq : substitution.apply array.type =
-      Ty.array (substitution.apply element) := by
+  have view : ViewElement (substitution.apply array.type) (substitution.apply element) := by
     rw [← extension array.type]
-    change substitution.apply (state.resolve array.type) = _
-    rw [resolved]
-    rfl
-  have arrayType : ExpressionHasType semanticSource active array.id
-      (Ty.array (substitution.apply element)) := by
-    rw [← arrayTypeEq]
-    exact arrayTyped
-  exact .arrayIndex arrayType (.array _) indexTyped (arrayIndexType_of_fits indexFits)
+    exact (ViewElement.of_viewElement? found).applySubstitution substitution
+  exact .arrayIndex arrayTyped view indexTyped (arrayIndexType_of_fits indexFits)
 
 /-- `a[i]` on a memory array types its base and its index, each inferred with
 no expected type, from their own retained subtrees, and records the read at the
@@ -1234,7 +1227,7 @@ theorem actualArrayIndex_typing {fuel : Nat}
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (baseSuccess : Detail.inferExprFuel fuel inferenceContext base none allocated =
       .ok (baseResult, baseState))
-    (arrayEq : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (arrayEq : (baseState.resolve baseResult.type).viewElement? = some element)
     (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression expected initial =
       .ok (inferred, resultState))
     (resources : FinalInferenceResources wholeContext wholeReturn evidenceState roots finalized)
@@ -1287,7 +1280,7 @@ theorem actualArrayIndex_typing {fuel : Nat}
     signatureFormation functionsCanonical (by intro _ member; simp at member) baseSuccess
   have indexProperties := Detail.inferExprFuel_inferenceProperties baseProperties.2.1
     signatureFormation functionsCanonical (by intro _ member; simp at member) indexSuccess
-  have elementBelow := Detail.arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2
+  have elementBelow := Detail.viewElement_variablesBelow baseProperties.2.1 baseProperties.2.2
     arrayEq
   have expectedAtIndex : ∀ type ∈ expected, type.VariablesBelow indexState.inference.next :=
     fun type member => (allocatedExpected type member).weaken
@@ -1393,18 +1386,13 @@ theorem actualArrayIndex_typing {fuel : Nat}
       (by simp) indexContains
     rw [indexNodeType] at fits
     exact fits
-  have arrayTypeEq : finalized.substitution.apply baseResult.type =
-      Ty.array (finalized.substitution.apply element) := by
-    rw [← laterBase baseResult.type]
-    change finalized.substitution.apply (baseState.resolve baseResult.type) = _
-    rw [Ty.arrayElement?_eq_some arrayEq]
-    rfl
-  have formType := arrayIndex_formType (Ty.arrayElement?_eq_some arrayEq) laterBase baseTyped
-    indexTyped indexFits
+  have formType := arrayIndex_formType arrayEq laterBase baseTyped indexTyped indexFits
   have rawAdmissible : TypeAdmissible semanticContext (finalized.substitution.apply element) := by
-    have baseAdmissible := baseTyped.type_admissible
-    rw [arrayTypeEq] at baseAdmissible
-    exact TypeAdmissible.array_element baseAdmissible
+    have view : ViewElement (finalized.substitution.apply baseResult.type)
+        (finalized.substitution.apply element) := by
+      rw [← laterBase baseResult.type]
+      exact (ViewElement.of_viewElement? arrayEq).applySubstitution _
+    exact TypeAdmissible.viewElement baseTyped.type_admissible view
   exact recordExpressionWithExpected_success_expressionTypingBase_actual resources interfaces
     recorded resultSubstitutionExtension requirementsSubset retained coercionsRetained
     catalog signaturesEq invariant formType rawAdmissible covered
@@ -1499,7 +1487,7 @@ theorem actualInferExprFuelRetainedSoundness_index {fuel : Nat}
     exact expectedBelow
   obtain ⟨arrayBase, arrayBaseState, arrayBaseRun⟩ :=
     Detail.inferExprFuel_success_index_base expressionEq allocationEq success
-  cases arrayEq : (arrayBaseState.resolve arrayBase.type).arrayElement?
+  cases arrayEq : (arrayBaseState.resolve arrayBase.type).viewElement?
   case some _ =>
     exact actualArrayIndex_typing recursive expressionEq allocationEq arrayBaseRun arrayEq success
       resources interfaces resultSubstitutionExtension signaturesEq ownerEq typeParametersEq

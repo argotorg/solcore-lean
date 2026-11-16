@@ -342,7 +342,7 @@ theorem ChildStep.expression_binders_retained
       (BindersRetained.recordExpressionWithExpected recorded)
   | @expression_index_base _ _ _ _ _ _ _ _ _ _ _ _ inferred childFinal accepted form allocation
       childAccepted =>
-    cases arrayEq : (childFinal.resolve inferred.type).arrayElement?
+    cases arrayEq : (childFinal.resolve inferred.type).viewElement?
     case some _ =>
       obtain ⟨indexResult, indexState, keyRun, recorded⟩ :=
         inferExprFuel_success_arrayIndex_facts form allocation childAccepted arrayEq accepted

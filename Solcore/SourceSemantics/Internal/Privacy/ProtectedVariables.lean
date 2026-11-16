@@ -130,21 +130,28 @@ theorem fresh_type {protectedVars : List TypeVarId} {state : State}
   simp only [Safe, Avoids, State.resolve, InferState.resolve, Substitution.apply,
     Ty.mem_freeVariables_mapping_iff, or_imp, forall_and]
 
-/-- The element of a memory array type, resolved at an earlier state, is safe
-wherever the array's type is safe. -/
-theorem safe_arrayElement {protectedVars : List TypeVarId} {earlier later : State}
+/-- A view's element is safe wherever the view's type is. -/
+theorem safe_of_viewElement {protectedVars : List TypeVarId} {state : State}
+    {view element : Ty} (found : ViewElement view element)
+    (safe : Safe protectedVars state view) : Safe protectedVars state element := by
+  induction found with
+  | array _ => exact ((safe_application_iff protectedVars state _ _).1 safe).2
+  | slice _ ih => exact ih ((safe_application_iff protectedVars state _ _).1 safe).2
+
+/-- The element of a memory array or slice type, resolved at an earlier state, is
+safe wherever the view's type is safe. -/
+theorem safe_viewElement {protectedVars : List TypeVarId} {earlier later : State}
     {type element : Ty}
     (extension : later.inference.substitution.SemanticallyExtends
       earlier.inference.substitution)
-    (array : (earlier.resolve type).arrayElement? = some element)
+    (array : (earlier.resolve type).viewElement? = some element)
     (safe : Safe protectedVars later type) :
     Safe protectedVars later element := by
   have resolvedSafe : Safe protectedVars later (earlier.resolve type) := by
     simp only [Safe, State.resolve, InferState.resolve] at safe ⊢
     rw [extension type]
     exact safe
-  rw [Ty.arrayElement?_eq_some array] at resolvedSafe
-  exact ((safe_application_iff protectedVars later _ _).1 resolvedSafe).2
+  exact safe_of_viewElement (ViewElement.of_viewElement? array) resolvedSafe
 
 /-- Both sides of an assignable place's index equation are safe at a ready state
 wherever its base, key and value types are. -/

@@ -1968,7 +1968,7 @@ theorem inferExprFuel_success_index_expressionTypingBase_under_ambient_bounded
     (notArray : ∀ {baseResult : InferredExpression} {baseState : Frontend.SourceInference.State},
       Detail.inferExprFuel fuel inferenceContext baseExpression none allocated =
           .ok (baseResult, baseState) →
-        (baseState.resolve baseResult.type).arrayElement? = none)
+        (baseState.resolve baseResult.type).viewElement? = none)
     (initialBelow : initial.NodesBelowNextOccurrence)
     (allocatedReady : allocated.InferenceReady)
     (signatureFormation :

@@ -2986,7 +2986,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         have baseWF := (inferExprFuel_direct_progress baseResult).wellFormed wfAllocated
         have baseBound : ∀ metavariable ∈ protectedVars, metavariable.index < baseState.inference.next :=
           fun metavariable member => Nat.lt_of_lt_of_le (boundAllocated metavariable member) baseProperties.1.next_le
-        cases arrayEq : (baseState.resolve inferredBase.type).arrayElement?
+        cases arrayEq : (baseState.resolve inferredBase.type).viewElement?
         case some element =>
           simp only [arrayEq] at success
           cases arrayIndexResult : inferExprFuel fuel context index none baseState with
@@ -3001,10 +3001,10 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                 basePrivacy.2.2.1 catalog validated canonical (by simp) (by simp) _ arrayIndexResult
               have allRows := new_requirements_trans basePrivacy.2.2.2 indexPrivacy.2.2.2
                 indexPrivacy.1
-              have elementBelow := arrayElement_variablesBelow baseProperties.2.1
+              have elementBelow := viewElement_variablesBelow baseProperties.2.1
                 baseProperties.2.2 arrayEq
               have elementSafe : Safe protectedVars indexState element :=
-                safe_arrayElement indexProperties.1.substitution_extends arrayEq
+                safe_viewElement indexProperties.1.substitution_extends arrayEq
                   (indexPrivacy.1 _ basePrivacy.2.1)
               have prefixProgress := allocationProperties.1.trans
                 (baseProperties.1.trans indexProperties.1)

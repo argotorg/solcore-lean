@@ -355,7 +355,11 @@ wait for the native pipeline's contracts and ABI.
   records `a[i]` on a base whose resolved type is a memory array as the read, at the element type,
   and infers the index on its own. Finalization defaults an open literal index to `uint256` and
   rejects another index type with `operatorNotSupported "Typedef"` (`validateArrayIndex`), as
-  upstream's `bool: Typedef<word>` fails.
+  upstream's `bool: Typedef<word>` fails. As built in step 6g-i, the index arm decides on its base's
+  view, the element type of a memory array or of a slice's base (`Ty.viewElement?`), so `s[i]` on a
+  slice is a read at its base's element type, and the read's proofs take the view. A write through a
+  slice takes the place arm's mapping rule and is rejected, as upstream's slices have no assignable
+  index.
 - **Writes.** `a[i] = v`, the compound assignments, in-place `~` and the unchecked forms take the
   element type, with row 1's rules for each type. A write through a slice is rejected. As built in
   step 5a-ii, inference's place arm takes `a[i]` on a base whose resolved type is a memory array as
@@ -389,9 +393,10 @@ wait for the native pipeline's contracts and ABI.
   call is recorded as the length's own typed form, whose evaluation reads the array's cell, rather
   than as a builtin function, whose evaluation reads no heap. Its one argument's type must be a
   memory array once its arguments are inferred, as `Typedef.rep`'s must be `word` or a fixed-width
-  type. As built in steps 2b-ii-c and 2b-ii-d, `a.length` is a field that names no constructor, whose
-  base, inferred with no expected type, must be a memory array, and `a.length()`, a call of it with
-  no arguments whose callee inference takes it, is recorded as a group over that field.
+  type. As built in steps 2b-ii-c and 2b-ii-d, `a.length` is a field that names no constructor,
+  whose base, inferred with no expected type, must be a memory array, and `a.length()`, a call of it
+  with no arguments whose callee inference takes it, is recorded as a group over that field. As
+  built in step 6g-i, a length's base may be a slice too: `arrayLengthOf` reads `Ty.viewElement?`.
 - **Builtins.** `toArray(s)` is a builtin, and so are `lidx(a, i)`, `CanStore.load(r)` and
   `CanStore.store(r, v)` from step 7.
 - **Rejected.** `Typedef` at an array type, `==` on arrays, `push` and `pop`, and assignment to a
@@ -669,13 +674,14 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 6e | Slices: the typed form of `toArray(s)` with its static rule, evaluation, fault, sized copies, stage and preservation, which no source produces yet | 28–32 files, +300–500/−5–15; measured at 26 files, +207/−7 | none |
 | 6f-i | Slices: the slices' own arm in inference, which still rejects them and renumbers the cases of the proofs by functional induction on `inferExprFuel` | 14–15 files, +285–295/−285–295; measured at 15 files, +292/−289 | none |
 | 6f-ii | Slices: inference's typing of the four slice forms on an array or a slice, with `uint256` bounds | 24–30 files, +800–1,100/−20–50; measured at 22 files, +1005/−15 | none |
-| 6g | Slices: inference's typing of reads, lengths and `toArray(s)` on slices | 18–30 files, +600–1,000/−25–55 | none |
+| 6g-i | Slices: inference's typing of reads and lengths through a slice: the read's arm and the lengths take the view of a memory array or of a slice (`Ty.viewElement?`), and the read's and the lengths' proofs take it | 18–25 files, +250–450/−100–200; measured at 23 files, +210/−110 | none |
+| 6g-ii | Slices: inference's typing of `toArray(s)` | 15–25 files, +450–700/−10–30 | none |
 | 6h | Slices: the lowering, a slice as a Core product of its base, its start and its length, and `toArray(s)`'s copy | 4–9 files, +200–400/−10–20 | array-slice's build() and its 11 portable public functions, build() and aliasing() through 5a's writes; slices(xs) through slicesAt(x0, x1, x2, x3, i) |
 | 7 | `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` | 30–45 files, +600–900/−100–250 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
 
-In all, that is about 649 to 910 file changes, +17,785 to 26,645 and −1,950 to 3,685 lines over
-thirty-nine commits: about four fifths to one and a fifth times row 1, whose 23 commits added about
+In all, that is about 664 to 930 file changes, +17,885 to 26,795 and −2,035 to 3,860 lines over
+forty commits: about four fifths to one and a fifth times row 1, whose 23 commits added about
 21,700 lines, much of them meaning proofs. Step 1 was one row of 35–50 files, +900–1,300/−400–600,
 until its first measure: it adds three AST forms through the proved parser, so it became 1a to 1c.
 1b's first measure, about +1,800, split it again into 1b-i and 1b-ii. 1c split as 1a did, before its
@@ -738,7 +744,9 @@ the cap, whose estimates add up to that measure.
 a commit that only renumbers the cases of the proofs by functional induction on `inferExprFuel`
 (6f-i): the arm is case 23, so every later case moves up by one, and the four proofs that name the
 rejecting arms name it too. 6f-ii then gives the arm its typing. The totals gain 6f-i's estimate and
-one commit.
+one commit. 6g split before its code, since its read and lengths change the existing arms' proofs
+while `toArray(s)` takes a new call: 6g-i, the reads and lengths through a slice, and 6g-ii,
+`toArray(s)`; the totals take the two estimates for 6g's and one commit.
 
 ## Generators, corpora and the smoke
 

@@ -182,7 +182,7 @@ theorem inferExprFuelLedgerPreservation_step
   | index base brackets key =>
     obtain ⟨baseResult, baseState, baseRun⟩ :=
       Detail.inferExprFuel_success_index_base form allocation accepted
-    cases arrayEq : (baseState.resolve baseResult.type).arrayElement?
+    cases arrayEq : (baseState.resolve baseResult.type).viewElement?
     case some _ =>
       obtain ⟨_, _, second, recorded⟩ :=
         Detail.inferExprFuel_success_arrayIndex_facts form allocation baseRun arrayEq accepted

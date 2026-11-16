@@ -1709,6 +1709,39 @@ private def testSlices : IO Unit := do
     "function bad(m: uint256[], b: uint8) returns (uint256) { let s = m[:b]; return 0; }"
     fun _ => true
 
+/-- Reads and lengths through a slice have its base's element type and `uint256`,
+a slice of a slice included; a write through a slice is rejected, as upstream's
+slices have no assignable index. -/
+private def testSliceReads : IO Unit := do
+  let functions ← check "slice reads" (String.intercalate "\n" [
+    "function reads(m: uint256[], i: uint256) returns (uint256) {",
+    "  let r = m[1:3];",
+    "  let a = r[i];",
+    "  let b = r[1:][0];",
+    "  let c = r.length;",
+    "  let d = r.length();",
+    "  let e = Length.length(r);",
+    "  return a + b + c + d + e;",
+    "}"
+  ])
+  let function ← match functions with
+    | [function] => pure function
+    | _ => throw (IO.userError "slice read fixture lost its checked function")
+  let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
+  let reads := function.typedBody.nodes.filterMap fun
+    | .expression { form := .arrayIndex .., type, .. } => some type
+    | _ => none
+  let lengths := function.typedBody.nodes.filterMap fun
+    | .expression { form := .arrayLength _, type, .. } => some type
+    | _ => none
+  assertTrue (decide (reads = [uint256, uint256]))
+    s!"reads through a slice lost their element type: {reprStr reads}"
+  assertTrue (decide (lengths = [uint256, uint256, uint256]))
+    s!"lengths of a slice lost their type: {reprStr lengths}"
+  expectInferenceError "a write through a slice"
+    "function bad(m: uint256[]) returns (uint256) { let r = m[0:1]; r[0] = 1; return 0; }"
+    fun _ => true
+
 /-- Exercise every phase-7 source-inference form before runtime lowering. -/
 def testSourcePhase7Inference : IO Unit := do
   testConstructors
@@ -1723,6 +1756,7 @@ def testSourcePhase7Inference : IO Unit := do
   testArrayElementPlace
   testArrayLiteral
   testSlices
+  testSliceReads
   IO.println "phase-7 source inference GREEN"
 
 end Tests.SourcePhase7Inference

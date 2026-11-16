@@ -1004,7 +1004,7 @@ theorem inferExprFuel_index_formation
   | ok basePair =>
     rcases basePair with ⟨baseValue,baseState⟩
     simp only [baseRun] at accepted
-    cases arrayEq : (baseState.resolve baseValue.type).arrayElement?
+    cases arrayEq : (baseState.resolve baseValue.type).viewElement?
     case some element =>
       simp only [arrayEq] at accepted
       cases keyRun : inferExprFuel fuel context key none baseState with
@@ -1021,7 +1021,7 @@ theorem inferExprFuel_index_formation
         have baseNodes := (inferExprFuel_occurrenceBoundExtends baseRun).nodesBelowNextOccurrence allocatedNodes
         have keyProperties := inferExprFuel_inferenceProperties baseProperties.2.1
           formation.validated formation.functionShapes (by simp) keyRun
-        have elementBelow := arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2 arrayEq
+        have elementBelow := viewElement_variablesBelow baseProperties.2.1 baseProperties.2.2 arrayEq
         have throughKey := allocation.1.trans (baseProperties.1.trans keyProperties.1)
         have expectedAtKey : ∀ type ∈ expected, type.VariablesBelow keyState.inference.next :=
           fun type member => (expectedBelow type member).weaken throughKey.next_le
@@ -1041,8 +1041,8 @@ theorem inferExprFuel_index_formation
           have baseType := baseFormed.1
           rw [← baseContinuation baseValue.type] at baseType
           change TypeAdmissible semantic (outer.apply (baseState.resolve baseValue.type)) at baseType
-          rw [Ty.arrayElement?_eq_some arrayEq] at baseType
-          exact TypeAdmissible.array_element baseType
+          exact TypeAdmissible.viewElement baseType
+            ((ViewElement.of_viewElement? arrayEq).applySubstitution outer)
         have fitted := recordExpressionWithExpected_normalized_formation formation.toFormationContext
           continuation elementFormed expectedFormed accepted
         exact ⟨fitted.1,keyFormed.2.of_new_rows recordFields.1 fitted.2⟩

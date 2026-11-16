@@ -110,7 +110,7 @@ theorem ChildStep.lifetime_expression
         (by simpa only [allocation] using recorded)
   | @expression_index_base _ _ _ _ _ _ _ _ _ _ _ _ inferred childFinal accepted form allocation
       childAccepted =>
-      cases arrayEq : (childFinal.resolve inferred.type).arrayElement?
+      cases arrayEq : (childFinal.resolve inferred.type).viewElement?
       case some _ =>
         obtain ⟨indexResult, indexState, keyRun, _⟩ :=
           inferExprFuel_success_arrayIndex_facts form allocation childAccepted arrayEq accepted
@@ -448,14 +448,14 @@ theorem arrayIndex_suffix_progress
     (ready : baseState.InferenceReady) (catalog : LifetimeInferenceContext context)
     (baseBelow : baseResult.type.VariablesBelow baseState.inference.next)
     (expectedBelow : ∀ type ∈ expected, type.VariablesBelow baseState.inference.next)
-    (array : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (array : (baseState.resolve baseResult.type).viewElement? = some element)
     (keyRun : inferExprFuel fuel context key none baseState = .ok (keyResult, indexState))
     (recorded : recordExpressionWithExpected context source id element
       (.arrayIndex baseResult.id keyResult.id) [] expected indexState = .ok result) :
     baseState.InferenceProgress result.2 ∧ indexState.InferenceProgress result.2 := by
   have indexProperties := inferExprFuel_inferenceProperties ready catalog.formation
     catalog.canonical (by simp) keyRun
-  have elementBelow := arrayElement_variablesBelow ready baseBelow array
+  have elementBelow := viewElement_variablesBelow ready baseBelow array
   have recordedProgress := (recordExpressionWithExpected_inferenceProperties indexProperties.2.1
     (elementBelow.weaken indexProperties.1.next_le)
     (fun type member => (expectedBelow type member).weaken indexProperties.1.next_le)
@@ -707,7 +707,7 @@ theorem ChildStep.progress_expression
         (by simpa only [allocation] using recorded)
   | @expression_index_base _ _ _ _ _ _ _ _ _ _ _ _ inferred childFinal accepted form allocation
       childAccepted =>
-      cases arrayEq : (childFinal.resolve inferred.type).arrayElement?
+      cases arrayEq : (childFinal.resolve inferred.type).viewElement?
       case some _ =>
         obtain ⟨indexResult, indexState, keyRun, recorded⟩ :=
           inferExprFuel_success_arrayIndex_facts form allocation childAccepted arrayEq accepted
@@ -732,7 +732,7 @@ theorem ChildStep.progress_expression
       have baseProperties := inferExprFuel_inferenceProperties
         (allocation_ready inputs.ready allocation)
         inputs.catalog.formation inputs.catalog.canonical (by simp) baseAccepted
-      have elementBelow := arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2 array
+      have elementBelow := viewElement_variablesBelow baseProperties.2.1 baseProperties.2.2 array
       exact (recordExpressionWithExpected_inferenceProperties childProperties.2.1
         (elementBelow.weaken childProperties.1.next_le)
         (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken

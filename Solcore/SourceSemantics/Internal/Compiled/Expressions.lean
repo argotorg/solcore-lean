@@ -2499,7 +2499,7 @@ theorem expressionRetained_arrayIndex_for
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (baseSuccess : Detail.inferExprFuel childFuel inferenceContext baseExpression none allocated =
       .ok (baseResult, baseState))
-    (arrayEq : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (arrayEq : (baseState.resolve baseResult.type).viewElement? = some element)
     (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
       expected initial inferred resultState frames target) :
     ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
@@ -2522,7 +2522,7 @@ theorem expressionRetained_arrayIndex_for
     signatureFormation functionsCanonical (by simp) baseSuccess
   have indexProperties := Detail.inferExprFuel_inferenceProperties baseProperties.2.1
     signatureFormation functionsCanonical (by simp) indexSuccess
-  have elementBelow := Detail.arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2
+  have elementBelow := Detail.viewElement_variablesBelow baseProperties.2.1 baseProperties.2.2
     arrayEq
   have expectedAtIndex : ∀ type ∈ expected, type.VariablesBelow indexState.inference.next :=
     fun type member => (allocatedExpected type member).weaken
@@ -2622,19 +2622,14 @@ theorem expressionRetained_arrayIndex_for
       contains rfl (by simp) indexContains
     rw [indexNodeType] at fits
     exact fits
-  have arrayTypeEq : selected.body.finalized.substitution.apply baseResult.type =
-      Ty.array (selected.body.finalized.substitution.apply element) := by
-    rw [← laterBase baseResult.type]
-    change selected.body.finalized.substitution.apply (baseState.resolve baseResult.type) = _
-    rw [Ty.arrayElement?_eq_some arrayEq]
-    rfl
-  have formType := arrayIndex_formType (Ty.arrayElement?_eq_some arrayEq) laterBase baseTyped
-    indexTyped indexFits
+  have formType := arrayIndex_formType arrayEq laterBase baseTyped indexTyped indexFits
   have rawAdmissible : TypeAdmissible target
       (selected.body.finalized.substitution.apply element) := by
-    have baseAdmissible := baseTyped.type_admissible
-    rw [arrayTypeEq] at baseAdmissible
-    exact TypeAdmissible.array_element baseAdmissible
+    have view : ViewElement (selected.body.finalized.substitution.apply baseResult.type)
+        (selected.body.finalized.substitution.apply element) := by
+      rw [← laterBase baseResult.type]
+      exact (ViewElement.of_viewElement? arrayEq).applySubstitution _
+    exact TypeAdmissible.viewElement baseTyped.type_admissible view
   exact recordExpressionWithExpected_success_expressionTypingBase_actual resources
     boundary.interfaces recorded boundary.extension boundary.requirements
     boundary.expressionRequirements boundary.coercionPrimaries catalog boundary.scope.signatures
@@ -2991,7 +2986,7 @@ theorem expressionRetained_index_for
     exact expectedBelow
   obtain ⟨arrayBase, arrayBaseState, arrayBaseRun⟩ :=
     Detail.inferExprFuel_success_index_base expressionEq allocationEq success
-  cases arrayEq : (arrayBaseState.resolve arrayBase.type).arrayElement?
+  cases arrayEq : (arrayBaseState.resolve arrayBase.type).viewElement?
   case some _ =>
     exact expressionRetained_arrayIndex_for checked descend recursive here expressionEq
       allocationEq arrayBaseRun arrayEq boundary

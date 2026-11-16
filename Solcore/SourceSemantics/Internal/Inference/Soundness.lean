@@ -24494,7 +24494,7 @@ theorem inferExprFuel_success_index_expressionTypingBase_scoped_of_retained
     (notArray : ∀ {baseResult : InferredExpression} {baseState : Frontend.SourceInference.State},
       Detail.inferExprFuel fuel inferenceContext baseExpression none allocated =
           .ok (baseResult, baseState) →
-        (baseState.resolve baseResult.type).arrayElement? = none)
+        (baseState.resolve baseResult.type).viewElement? = none)
     (allocatedReady : allocated.InferenceReady)
     (signatureFormation :
       ProgramSignatureFormationValidated inferenceContext.signatures)

@@ -1735,7 +1735,7 @@ theorem index_base
     (form : source.value = .index base brackets key)
     (allocation : initial.allocateExpressionId = (id, allocated))
     (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseResult, baseState))
-    (notArray : (baseState.resolve baseResult.type).arrayElement? = none)
+    (notArray : (baseState.resolve baseResult.type).viewElement? = none)
     (keyFresh : baseState.fresh = (keyType, keyState))
     (valueFresh : keyState.fresh = (valueType, valueState))
     (mappingAccepted : Detail.unify valueState baseResult.type (.mapping keyType valueType) = .ok mappingState)
@@ -1813,7 +1813,7 @@ theorem index_key
     (form : source.value = .index base brackets key)
     (allocation : initial.allocateExpressionId = (id, allocated))
     (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseResult, baseState))
-    (notArray : (baseState.resolve baseResult.type).arrayElement? = none)
+    (notArray : (baseState.resolve baseResult.type).viewElement? = none)
     (keyFresh : baseState.fresh = (keyType, keyState))
     (valueFresh : keyState.fresh = (valueType, valueState))
     (mappingAccepted : Detail.unify valueState baseResult.type (.mapping keyType valueType) = .ok mappingState)
@@ -1870,7 +1870,7 @@ theorem index_array_base {element : Ty}
     (form : source.value = .index base brackets key)
     (allocation : initial.allocateExpressionId = (id, allocated))
     (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseResult, baseState))
-    (array : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (array : (baseState.resolve baseResult.type).viewElement? = some element)
     (keyAccepted : inferExprFuel fuel context key none baseState = .ok (keyResult, indexState))
     (accepted : inferExprFuel (fuel + 1) context source expected initial = .ok final)
     (lifetime : GeneralizationLifetime event allocated.inference.next baseState [baseResult.type]) :
@@ -1891,7 +1891,7 @@ theorem index_array_base {element : Ty}
     catalog.formation catalog.canonical (by simp) keyAccepted
   have indexLife := lifetime.inferExpr baseProperties.2.1 baseWellFormed catalog
     (by simp) (by simp) keyAccepted
-  have elementBelow := arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2 array
+  have elementBelow := viewElement_variablesBelow baseProperties.2.1 baseProperties.2.2 array
   have prefixProgress := baseProperties.1.trans indexProperties.1
   have recorded : recordExpressionWithExpected context source id element
       (.arrayIndex baseResult.id keyResult.id) [] expected indexState = .ok final := by
@@ -1900,7 +1900,7 @@ theorem index_array_base {element : Ty}
   have finalLife := indexLife.recordExpression catalog.catalog indexProperties.2.1
     (elementBelow.weaken indexProperties.1.next_le)
     (fun type member => (sameNext ▸ expectedBelow type member).weaken prefixProgress.next_le)
-    (safe_arrayElement indexProperties.1.substitution_extends array
+    (safe_viewElement indexProperties.1.substitution_extends array
       (indexLife.values _ (by simp)))
     (fun type member => indexLife.older type (expectedBelow type member)) recorded
   exact finalLife.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
@@ -1913,7 +1913,7 @@ theorem index_array {element : Ty}
     (form : source.value = .index base brackets key)
     (allocation : initial.allocateExpressionId = (id, allocated))
     (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseResult, baseState))
-    (array : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (array : (baseState.resolve baseResult.type).viewElement? = some element)
     (keyAccepted : inferExprFuel fuel context key none baseState = .ok (keyResult, indexState))
     (accepted : inferExprFuel (fuel + 1) context source expected initial = .ok final)
     (lifetime : GeneralizationLifetime event baseState.inference.next indexState [keyResult.type]) :
@@ -1926,7 +1926,7 @@ theorem index_array {element : Ty}
     (allocatedEq ▸ ready.allocateExpressionId) catalog.formation catalog.canonical (by simp) baseAccepted
   have indexProperties := inferExprFuel_inferenceProperties baseProperties.2.1
     catalog.formation catalog.canonical (by simp) keyAccepted
-  have elementBelow := arrayElement_variablesBelow baseProperties.2.1 baseProperties.2.2 array
+  have elementBelow := viewElement_variablesBelow baseProperties.2.1 baseProperties.2.2 array
   have elementSafe := lifetime.older element elementBelow
   have indexLife := lifetime.weaken_entry (sameNext ▸ baseProperties.1.next_le)
   have recorded : recordExpressionWithExpected context source id element

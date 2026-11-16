@@ -678,7 +678,7 @@ inductive ChildStep : CallIndex → CallIndex → Prop where
       (form : source.value = .index base brackets key)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
-      (notArray : (baseState.resolve baseValue.type).arrayElement? = none)
+      (notArray : (baseState.resolve baseValue.type).viewElement? = none)
       (keyFresh : baseState.fresh = (keyType, keyState))
       (valueFresh : keyState.fresh = (valueType, valueState))
       (fitting : unify valueState baseValue.type (.mapping keyType valueType) = .ok fitted)
@@ -694,7 +694,7 @@ inductive ChildStep : CallIndex → CallIndex → Prop where
       (form : source.value = .index base brackets key)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
-      (array : (baseState.resolve baseValue.type).arrayElement? = some element)
+      (array : (baseState.resolve baseValue.type).viewElement? = some element)
       (child : inferExprFuel fuel context key none baseState = .ok (keyValue, childFinal)) :
       ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.expression fuel context key none baseState keyValue childFinal)
   | expression_newArray_length

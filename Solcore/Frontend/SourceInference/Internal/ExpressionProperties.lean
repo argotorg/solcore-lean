@@ -756,10 +756,10 @@ theorem index_notArray_of_run
     {fuel : Nat} {context : Context} {base : Syntax.Expr} {allocated baseState : State}
     {baseValue : InferredExpression}
     (run : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
-    (notArray : (baseState.resolve baseValue.type).arrayElement? = none) :
+    (notArray : (baseState.resolve baseValue.type).viewElement? = none) :
     ∀ {baseResult : InferredExpression} {otherState : State},
       inferExprFuel fuel context base none allocated = .ok (baseResult, otherState) →
-        (otherState.resolve baseResult.type).arrayElement? = none := by
+        (otherState.resolve baseResult.type).viewElement? = none := by
   intro baseResult otherState other
   cases Except.ok.inj (other.symm.trans run)
   exact notArray
@@ -774,6 +774,14 @@ theorem arrayElement_variablesBelow {state : State} {type element : Ty}
     ready.solved.variablesBelow_apply below
   rw [Ty.arrayElement?_eq_some array] at resolvedBelow
   exact ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2
+
+/-- The element of a memory array or slice type that a ready state resolved is
+below the state's next variable whenever the view's type is. -/
+theorem viewElement_variablesBelow {state : State} {type element : Ty}
+    (ready : state.InferenceReady) (below : type.VariablesBelow state.inference.next)
+    (view : (state.resolve type).viewElement? = some element) :
+    element.VariablesBelow state.inference.next :=
+  Ty.variablesBelow_of_viewElement? view (ready.solved.variablesBelow_apply below)
 
 /-- Both sides of an assignable place's index equation are below a ready state's
 next variable whenever its base, key and value types are. -/
@@ -816,7 +824,7 @@ theorem inferExprFuel_success_arrayIndex_facts
     (expressionEq : expression.value = .index base brackets index)
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (baseRun : inferExprFuel fuel context base none allocated = .ok (baseResult, baseState))
-    (array : (baseState.resolve baseResult.type).arrayElement? = some element)
+    (array : (baseState.resolve baseResult.type).viewElement? = some element)
     (success : inferExprFuel (fuel + 1) context expression expected initial =
       .ok result) :
     ∃ indexResult indexState,
@@ -845,7 +853,7 @@ theorem inferExprFuel_success_index_facts
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (notArray : ∀ {baseResult : InferredExpression} {baseState : State},
       inferExprFuel fuel context base none allocated = .ok (baseResult, baseState) →
-        (baseState.resolve baseResult.type).arrayElement? = none)
+        (baseState.resolve baseResult.type).viewElement? = none)
     (success : inferExprFuel (fuel + 1) context expression expected initial =
       .ok result) :
     ∃ baseResult baseState keyType keyState valueType valueState mappingState
@@ -10815,7 +10823,7 @@ private theorem inferFuel_inferenceProperties_internal :
         simp only [baseResult, bind, Except.bind, Prod.eta] at success
         have baseProperties := baseInduction allocationProperties.2
           validated canonical (by simp) (inferredBase, baseState) baseResult
-        cases arrayEq : (baseState.resolve inferredBase.type).arrayElement?
+        cases arrayEq : (baseState.resolve inferredBase.type).viewElement?
         case some element =>
           simp only [arrayEq] at success
           cases arrayIndexResult : inferExprFuel fuel context index none baseState with
@@ -10829,9 +10837,8 @@ private theorem inferFuel_inferenceProperties_internal :
               have resolvedBelow : (baseState.resolve inferredBase.type).VariablesBelow
                   baseState.inference.next :=
                 baseProperties.2.1.solved.variablesBelow_apply baseProperties.2.2
-              rw [Ty.arrayElement?_eq_some arrayEq] at resolvedBelow
               have elementBelow : element.VariablesBelow indexState.inference.next :=
-                ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2.weaken
+                (Ty.variablesBelow_of_viewElement? arrayEq resolvedBelow).weaken
                   indexProperties.1.next_le
               have throughIndex :=
                 allocationProperties.1.trans (baseProperties.1.trans indexProperties.1)
@@ -14766,7 +14773,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
         simp only [baseResult, bind, Except.bind, Prod.eta] at success
         have baseScope := baseInduction
           (inferredBase, baseState) baseResult
-        cases arrayEq : (baseState.resolve inferredBase.type).arrayElement?
+        cases arrayEq : (baseState.resolve inferredBase.type).viewElement?
         case some _ =>
           simp only [arrayEq] at success
           cases arrayIndexResult : inferExprFuel fuel context index none baseState with

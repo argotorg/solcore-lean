@@ -1326,11 +1326,11 @@ def lengthCall : List String → String → Bool
   | ["Length"], "length" => true
   | _, _ => false
 
-/-- Whether inference has made `array`'s type a memory array, as a length needs,
-as `typedefFunction` reads `Typedef.rep`'s argument. A type still open is
-rejected: the choice is made here and does not wait for later uses. -/
+/-- Whether inference has made `array`'s type a memory array or a slice, as a
+length needs, as `typedefFunction` reads `Typedef.rep`'s argument. A type still
+open is rejected: the choice is made here and does not wait for later uses. -/
 def arrayLengthOf (array : InferredExpression) (state : State) : Except Error Unit :=
-  match (state.resolve array.type).arrayElement? with
+  match (state.resolve array.type).viewElement? with
   | some _ => .ok ()
   | none => .error (.operatorNotSupported "Length" (state.resolve array.type))
 
@@ -1353,21 +1353,22 @@ def lengthMethodCall (callee : Syntax.Expr) (arguments : List InferredExpression
   | .field _ _ name, [] => name.value == "length"
   | _, _ => false
 
-/-- An array whose length is taken has a memory array type once resolved. -/
+/-- An array whose length is taken has a memory array or slice type once
+resolved. -/
 theorem arrayLengthOf_ok {array : InferredExpression} {state : State} {checked : Unit}
     (success : arrayLengthOf array state = .ok checked) :
-    ∃ element, state.resolve array.type = Ty.array element := by
+    ∃ element, (state.resolve array.type).viewElement? = some element := by
   unfold arrayLengthOf at success
-  cases found : (state.resolve array.type).arrayElement? with
+  cases found : (state.resolve array.type).viewElement? with
   | none => simp [found] at success
-  | some element => exact ⟨element, Ty.arrayElement?_eq_some found⟩
+  | some element => exact ⟨element, rfl⟩
 
 /-- `Length.length(a)`'s argument row is its one array, whose type is a memory
 array once resolved. -/
 theorem arrayLengthArgument_ok {arguments : List InferredExpression} {state : State}
     {array : InferredExpression}
     (success : arrayLengthArgument arguments state = .ok array) :
-    arguments = [array] ∧ ∃ element, state.resolve array.type = Ty.array element := by
+    arguments = [array] ∧ ∃ element, (state.resolve array.type).viewElement? = some element := by
   match arguments with
   | [only] =>
       unfold arrayLengthArgument at success
@@ -2099,7 +2100,7 @@ mutual
             (.proxy inner) [] expected state
       | .index base _ index => do
           let (base, state) ← inferExprFuel fuel context base none state
-          match (state.resolve base.type).arrayElement? with
+          match (state.resolve base.type).viewElement? with
           | none =>
               let (keyType, state) := state.fresh
               let (valueType, state) := state.fresh
@@ -2108,8 +2109,8 @@ mutual
                 (some (state.resolve keyType)) state
               recordExpressionWithExpected context expression id
                 (state.resolve valueType) (.index base.id index.id) [] expected state
-          -- A memory array's read infers its index on its own, which finalization checks
-          -- (`validateArrayIndex`), and has the element type.
+          -- A read of a memory array or of a slice infers its index on its own, which
+          -- finalization checks (`validateArrayIndex`), and has the element type.
           | some element =>
               let (index, state) ← inferExprFuel fuel context index none state
               recordExpressionWithExpected context expression id element
@@ -2741,7 +2742,7 @@ theorem inferExprFuel_success_fieldLength_facts
       .ok result) :
     ∃ arrayResult arrayState element,
       inferExprFuel fuel context base none allocated = .ok (arrayResult, arrayState) ∧
-        arrayState.resolve arrayResult.type = Ty.array element ∧
+        (arrayState.resolve arrayResult.type).viewElement? = some element ∧
         recordExpressionWithExpected context expression id (.fixed .uint256)
           (.arrayLength arrayResult.id) [] expected arrayState = .ok result := by
   unfold inferExprFuel at success

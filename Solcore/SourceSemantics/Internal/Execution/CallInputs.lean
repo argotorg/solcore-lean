@@ -318,7 +318,7 @@ theorem expression_index_array
       (_form : source.value = .index base brackets key)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
-      (_array : (baseState.resolve baseValue.type).arrayElement? = some element)
+      (_array : (baseState.resolve baseValue.type).viewElement? = some element)
       (_child : inferExprFuel fuel context key none baseState = .ok (keyValue, childFinal))
       (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs) : (CallIndex.expression fuel context key none baseState keyValue childFinal).Inputs := by
   have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
@@ -491,7 +491,7 @@ theorem expression_index_key
       (_form : source.value = .index base brackets key)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (baseAccepted : inferExprFuel fuel context base none allocated = .ok (baseValue, baseState))
-      (_notArray : (baseState.resolve baseValue.type).arrayElement? = none)
+      (_notArray : (baseState.resolve baseValue.type).viewElement? = none)
       (keyFresh : baseState.fresh = (keyType, keyState))
       (valueFresh : keyState.fresh = (valueType, valueState))
       (fitting : unify valueState baseValue.type (.mapping keyType valueType) = .ok fitted)

@@ -573,26 +573,18 @@ theorem arrayLength_formType
     {semanticSource : TypedSource} {active : SourceSemantics.Context}
     {substitution : Substitution} {state : State} {array : InferredExpression}
     {element : Ty}
-    (resolved : state.resolve array.type = Ty.array element)
+    (found : (state.resolve array.type).viewElement? = some element)
     (extension : substitution.SemanticallyExtends state.inference.substitution)
     (argumentsTyped : ExpressionsHaveTypes semanticSource active ([array].map (·.id))
       ([array].map fun argument => substitution.apply argument.type)) :
     ExpressionFormHasRawType semanticSource active
       ((ExpressionForm.arrayLength array.id).applySubstitution substitution)
       (substitution.apply (.fixed .uint256)) (.ordinary []) := by
-  have arrayTypeEq : substitution.apply array.type =
-      Ty.array (substitution.apply element) := by
+  have view : ViewElement (substitution.apply array.type) (substitution.apply element) := by
     rw [← extension array.type]
-    change substitution.apply (state.resolve array.type) = _
-    rw [resolved]
-    rfl
+    exact (ViewElement.of_viewElement? found).applySubstitution substitution
   cases argumentsTyped with
-  | cons head _ =>
-    have arrayType : ExpressionHasType semanticSource active array.id
-        (Ty.array (substitution.apply element)) := by
-      rw [← arrayTypeEq]
-      exact head
-    exact .arrayLength arrayType (.array _)
+  | cons head _ => exact .arrayLength head view
 
 /-- `a.length` types its base, inferred with no expected type, from the base's
 own retained subtree, and records the length at `uint256`. -/

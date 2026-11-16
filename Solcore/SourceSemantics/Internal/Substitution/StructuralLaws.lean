@@ -6207,6 +6207,25 @@ theorem array_element
     admissible.typeWellScoped.array_element element rfl
   exact component admissible componentScoped
 
+/-- The base of an admissible slice type is admissible. -/
+theorem arraySlice_base
+    {context : Context} {base : Ty}
+    (admissible : TypeAdmissible context (Ty.arraySlice base)) :
+    TypeAdmissible context base := by
+  have componentScoped : TypeWellScoped context
+      (admissibleTypeVariables context (Ty.arraySlice base)) base :=
+    admissible.typeWellScoped.arraySlice_base base rfl
+  exact component admissible componentScoped
+
+/-- The element type of an admissible memory array or slice type is admissible. -/
+theorem viewElement
+    {context : Context} {view element : Ty}
+    (admissible : TypeAdmissible context view) (found : ViewElement view element) :
+    TypeAdmissible context element := by
+  induction found with
+  | array _ => exact admissible.array_element
+  | slice _ ih => exact ih admissible.arraySlice_base
+
 end Solcore.SourceSemantics.TypeAdmissible
 
 namespace Solcore.SourceSemantics.DeclarationInstantiation.Admissible
