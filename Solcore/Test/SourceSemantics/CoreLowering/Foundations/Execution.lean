@@ -5431,40 +5431,79 @@ def runUpstreamFixtures : IO Unit := do
     session ← panics session (← key name) arguments SourceCorePanics.divisionByZero s!"{name} on {reprStr arguments}"
   IO.println "SOURCE_CORE_UPSTREAM_INTEGER_FIXTURES_PASS: the cases of upstream's checked-arith, unchecked-scope, shift-operators, int-ops and issue92-checked-defaults fixtures that need no contract storage, with afterBlock, ltSigned, runtimePatterns, narrowAmount, wordShift, mulNeg, divSigned, explicitWord and negI8 … negI256 as upstream wrote them with uint256(w), Typedef.abs and Typedef.rep, so none stays adapted, and basic's bnoteq, give the fixtures' values and panic codes"
 
-/-- Row 4's steps 2b-iii and 3c: upstream's mem-array fixture's `newLen`, `oversized`,
-`defaultZero` and `nestedEmpty`, as upstream wrote them, a nested array with the other two
-spellings of a length, and a read at a negative `int8` index. -/
-private def arrayFixtureWorkspace : Workspace.RawWorkspace := workspaceOf [
+/-- Row 4's step 8: the 34 functions of upstream's `mem-array`, `array-syntax`, `array-slice` and
+`memory-array-abi` fixtures (`tests/e2e/*/main.sol` at e2eef194) that Lean's native pipeline can
+run, as upstream wrote them, with the contracts' methods as functions: mem-array's 11, `bump(r)`
+included; array-syntax's `sumAll`, `pair`, `local`, `returned`, `nested` and `callResultLength`;
+array-slice's `build()` and its 11 public functions that need no storage; and memory-array-abi's
+`ret`, `sum`, `echo`, `grid` and `slices`. Those five take or give arrays, so word wrappers call
+them: `retAt(n, i)` and `retLength(n)` read `ret(n)`, `sumFour(a, b, c, d)` and `sumNone()` pass
+`sum` a literal, `echoAt(x0, x1, i)` and `echoLength(x0, x1)` read `echo([x0, x1])`,
+`gridLength(n)`, `gridRowLength(n, i)` and `gridAt(n, i, j)` read `grid(n)`, and
+`slicesAt(x0, x1, x2, x3, i)` reads `slices([x0, x1, x2, x3])`. The wrappers change only how an
+array arrives, a literal of word arguments instead of the ABI's decoding, and how one leaves, read
+back by index or length instead of ABI-encoded. -/
+private def arrayPortWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function bump(r: memref<uint256>) {",
+  "    let v: uint256 = CanStore.load(r);",
+  "    CanStore.store(r, v + uint256(1));",
+  "}",
   "function newLen(n: uint256) returns (uint256) {",
   "  let m: uint256[] = new uint256[](n);",
   "  return Length.length(m);",
   "}",
-  "function oversized(n: uint256) returns (uint256) {",
-  "  let m: uint256[] = new uint256[](n);",
-  "  return Length.length(m);",
-  "}",
-  "function nested(n: uint256) returns (uint256) {",
-  "  let grid = new int8[][](n);",
-  "  return grid.length + new uint8[](3).length();",
+  "function setGet(n: uint256, i: uint256, v: uint256) returns (uint256) {",
+  "    let m: uint256[] = new uint256[](n);",
+  "    m[i] = v;",
+  "    return m[i];",
   "}",
   "function defaultZero(n: uint256, i: uint256) returns (uint256) {",
   "  let m: uint256[] = new uint256[](n);",
   "  return m[i];",
   "}",
+  "function oversized(n: uint256) returns (uint256) {",
+  "  let m: uint256[] = new uint256[](n);",
+  "  return Length.length(m);",
+  "}",
+  "function fillAndSum(n: uint256) returns (uint256) {",
+  "    let m: uint256[] = new uint256[](n);",
+  "    for (let i: uint256 = 0; i < n; i += 1) {",
+  "        m[i] = i * 5;",
+  "    }",
+  "    let total: uint256 = 0;",
+  "    for (let i: uint256 = 0; i < n; i += 1) {",
+  "        total += m[i];",
+  "    }",
+  "    return total;",
+  "}",
+  "function compound(v: uint256) returns (uint256) {",
+  "    let m: uint256[] = [v, uint256(1)];",
+  "    m[0] += 3;",
+  "    return m[0];",
+  "}",
   "function nestedEmpty(n: uint256) returns (uint256) {",
   "  let rows: uint256[][] = new uint256[][](n);",
   "  return Length.length(rows[n - 1]);",
   "}",
-  "function signedIndex(n: uint256) returns (uint256) {",
-  "  let m: uint256[] = new uint256[](n);",
-  "  let k: int8 = -1;",
-  "  return m[k];",
-  "}"]
-
-/-- Row 4's step 4c: upstream's array-syntax fixture's `sumAll`, `pair`, `local`,
-`returned`, `nested` and `callResultLength`, as upstream wrote them, with the
-contract's methods as functions. -/
-private def arraySyntaxWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function nestedReplace(n: uint256, v: uint256) returns (uint256) {",
+  "    let rows: uint256[][] = new uint256[][](2);",
+  "    let row: uint256[] = new uint256[](n);",
+  "    row[n - 1] = v;",
+  "    rows[1] = row;",
+  "    return rows[1][n - 1] + Length.length(rows[0]);",
+  "}",
+  "function alias(v: uint256) returns (uint256) {",
+  "    let m: uint256[] = [uint256(1), uint256(2)];",
+  "    let n: uint256[] = m;",
+  "    n[1] = v;",
+  "    return m[1];",
+  "}",
+  "function bumpElement(v: uint256) returns (uint256) {",
+  "    let m: uint256[] = new uint256[](2);",
+  "    m[1] = v;",
+  "    bump(lidx(m, uint256(1)));",
+  "    return m[1];",
+  "}",
   "function sumAll(xs: uint256[]) returns (uint256) {",
   "    let total: uint256 = 0;",
   "    for (let i: uint256 = 0; i < xs.length; i += 1) {",
@@ -5489,114 +5528,7 @@ private def arraySyntaxWorkspace : Workspace.RawWorkspace := workspaceOf [
   "}",
   "function callResultLength(n: uint256) returns (uint256) {",
   "    return pair(n, n).length + new uint256[](n).length - 2;",
-  "}"]
-
-/-- Row 4's step 5a-iii-a: plain element writes, not upstream's. `placeFirst(i, v)` checks its
-place before a right side that divides by zero, and `writeBack(i, j, v)` writes an element of one
-row of two and reads both rows back. `throughLocal(v)` writes a call's result through a local, which
-writes the caller's array (difference 16). -/
-private def elementWriteWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "function placeFirst(i: uint256, v: uint256) returns (uint256) {",
-  "    let m: uint256[] = new uint256[](2);",
-  "    m[i] = v / (v - v);",
-  "    return m[0];",
   "}",
-  "function writeBack(i: uint256, j: uint256, v: uint256) returns (uint256) {",
-  "    let rows: uint256[][] = [new uint256[](2), new uint256[](2)];",
-  "    rows[i][j] = v;",
-  "    return rows[i][j] * 10 + rows[1 - i][j];",
-  "}",
-  "function same(xs: uint256[]) returns (uint256[]) {",
-  "    return xs;",
-  "}",
-  "function throughLocal(v: uint256) returns (uint256) {",
-  "    let m: uint256[] = new uint256[](2);",
-  "    let r: uint256[] = same(m);",
-  "    r[1] = v;",
-  "    return m[1];",
-  "}"]
-
-/-- Row 4's step 5a-iii-b: upstream's mem-array fixture's `setGet`, `fillAndSum`, `nestedReplace`
-and `alias`, and memory-array-abi's `ret`, `sum` and `grid`, as upstream wrote them, with the
-contracts' methods as functions. The last three take or give arrays, so word wrappers call them:
-`retAt(n, i)` and `retLength(n)` read `ret(n)`, `sumFour(a, b, c, d)` and `sumNone()` pass `sum`
-a literal, and `gridLength(n)`, `gridRowLength(n, i)` and `gridAt(n, i, j)` read `grid(n)`. -/
-private def memArrayWriteWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "function setGet(n: uint256, i: uint256, v: uint256) returns (uint256) {",
-  "    let m: uint256[] = new uint256[](n);",
-  "    m[i] = v;",
-  "    return m[i];",
-  "}",
-  "function fillAndSum(n: uint256) returns (uint256) {",
-  "    let m: uint256[] = new uint256[](n);",
-  "    for (let i: uint256 = 0; i < n; i += 1) {",
-  "        m[i] = i * 5;",
-  "    }",
-  "    let total: uint256 = 0;",
-  "    for (let i: uint256 = 0; i < n; i += 1) {",
-  "        total += m[i];",
-  "    }",
-  "    return total;",
-  "}",
-  "function nestedReplace(n: uint256, v: uint256) returns (uint256) {",
-  "    let rows: uint256[][] = new uint256[][](2);",
-  "    let row: uint256[] = new uint256[](n);",
-  "    row[n - 1] = v;",
-  "    rows[1] = row;",
-  "    return rows[1][n - 1] + Length.length(rows[0]);",
-  "}",
-  "function alias(v: uint256) returns (uint256) {",
-  "    let m: uint256[] = [uint256(1), uint256(2)];",
-  "    let n: uint256[] = m;",
-  "    n[1] = v;",
-  "    return m[1];",
-  "}",
-  "function ret(n: uint256) returns (uint256[]) {",
-  "    let a = new uint256[](n);",
-  "    for (let i: uint256 = 0; i < n; i += 1) {",
-  "        a[i] = i * 2;",
-  "    }",
-  "    return a;",
-  "}",
-  "function sum(xs: uint256[]) returns (uint256) {",
-  "    let s: uint256 = 0;",
-  "    for (let i: uint256 = 0; i < xs.length; i += 1) {",
-  "        s += xs[i];",
-  "    }",
-  "    return s;",
-  "}",
-  "function grid(n: uint256) returns (uint256[][]) {",
-  "    let g = new uint256[][](n);",
-  "    g[n - 1] = new uint256[](1);",
-  "    return g;",
-  "}",
-  "function retAt(n: uint256, i: uint256) returns (uint256) {",
-  "    return ret(n)[i];",
-  "}",
-  "function retLength(n: uint256) returns (uint256) {",
-  "    return ret(n).length;",
-  "}",
-  "function sumFour(a: uint256, b: uint256, c: uint256, d: uint256) returns (uint256) {",
-  "    return sum([a, b, c, d]);",
-  "}",
-  "function sumNone() returns (uint256) {",
-  "    return sum([]);",
-  "}",
-  "function gridLength(n: uint256) returns (uint256) {",
-  "    return grid(n).length;",
-  "}",
-  "function gridRowLength(n: uint256, i: uint256) returns (uint256) {",
-  "    return grid(n)[i].length;",
-  "}",
-  "function gridAt(n: uint256, i: uint256, j: uint256) returns (uint256) {",
-  "    return grid(n)[i][j];",
-  "}"]
-
-/-- Row 4's step 6h: upstream's array-slice fixture's `build()` and its 11 public functions
-that need no storage, as upstream wrote them, with the contract's methods as functions, and
-memory-array-abi's `slices(xs)` as upstream wrote it. `slices` takes and gives an array, so a
-word wrapper calls it: `slicesAt(x0, x1, x2, x3, i)` returns `slices([x0, x1, x2, x3])[i]`. -/
-private def arraySliceWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function build() returns (uint256[]) {",
   "    let a: uint256[] = new uint256[](5);",
   "    for (let i: uint256 = 0; i < a.length; i += 1) {",
@@ -5647,43 +5579,19 @@ private def arraySliceWorkspace : Workspace.RawWorkspace := workspaceOf [
   "function ternaryBound(c: bool) returns (uint256) {",
   "    return build()[c ? uint256(1) : uint256(2):].length;",
   "}",
-  "function slices(xs: uint256[]) returns (uint256[]) {",
-  "    return toArray(xs[1:3]);",
+  "function ret(n: uint256) returns (uint256[]) {",
+  "    let a = new uint256[](n);",
+  "    for (let i: uint256 = 0; i < n; i += 1) {",
+  "        a[i] = i * 2;",
+  "    }",
+  "    return a;",
   "}",
-  "function slicesAt(x0: uint256, x1: uint256, x2: uint256, x3: uint256, i: uint256) returns (uint256) {",
-  "    return slices([x0, x1, x2, x3])[i];",
-  "}"]
-
-/-- Row 4's step 7f: upstream's mem-array fixture's `bump(r)` and `bumpElement(v)`, as upstream
-wrote them, with the contract's method as a function. -/
-private def memrefWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "function bump(r: memref<uint256>) {",
-  "    let v: uint256 = CanStore.load(r);",
-  "    CanStore.store(r, v + uint256(1));",
-  "}",
-  "function bumpElement(v: uint256) returns (uint256) {",
-  "    let m: uint256[] = new uint256[](2);",
-  "    m[1] = v;",
-  "    bump(lidx(m, uint256(1)));",
-  "    return m[1];",
-  "}"]
-
-/-- Row 4's step 5b: upstream's mem-array fixture's `compound(v)` and memory-array-abi's
-`echo(xs)`, as upstream wrote them, with the contracts' methods as functions. `echo` takes and
-gives an array, so word wrappers call it: `echoAt(x0, x1, i)` returns `echo([x0, x1])[i]` and
-`echoLength(x0, x1)` its length. The rest is Lean's own. The lane's probe's `compoundTwice()`
-runs its place's `next(c)` once (difference 1) and `plainOnce()` writes through it once;
-`snapshotFirst(v)` reads its element before a right side that writes it; `boundsFirst(i, v)`
-panics with `0x32` before a right side that divides by zero; `narrow` and `narrowUnchecked` add
-at a `uint8` element, checked and in an `unchecked` block; `divide` divides an element by zero;
-`shifted` shifts a `uint8` element; `invertedU8`, `invertedU256` and `invertedI8` take `~=` on an
-element; `bits` takes `|= &= ^=`; `nestedAdd(i, j, v)` adds to an element of one row of two; and
-`headerForms()` takes `+=` and `~=` on an element in `for` headers. -/
-private def compoundElementWorkspace : Workspace.RawWorkspace := workspaceOf [
-  "function compound(v: uint256) returns (uint256) {",
-  "    let m: uint256[] = [v, uint256(1)];",
-  "    m[0] += 3;",
-  "    return m[0];",
+  "function sum(xs: uint256[]) returns (uint256) {",
+  "    let s: uint256 = 0;",
+  "    for (let i: uint256 = 0; i < xs.length; i += 1) {",
+  "        s += xs[i];",
+  "    }",
+  "    return s;",
   "}",
   "function echo(xs: uint256[]) returns (uint256[]) {",
   "    for (let i: uint256 = 0; i < xs.length; i += 1) {",
@@ -5691,11 +5599,86 @@ private def compoundElementWorkspace : Workspace.RawWorkspace := workspaceOf [
   "    }",
   "    return xs;",
   "}",
+  "function grid(n: uint256) returns (uint256[][]) {",
+  "    let g = new uint256[][](n);",
+  "    g[n - 1] = new uint256[](1);",
+  "    return g;",
+  "}",
+  "function slices(xs: uint256[]) returns (uint256[]) {",
+  "    return toArray(xs[1:3]);",
+  "}",
+  "function retAt(n: uint256, i: uint256) returns (uint256) {",
+  "    return ret(n)[i];",
+  "}",
+  "function retLength(n: uint256) returns (uint256) {",
+  "    return ret(n).length;",
+  "}",
+  "function sumFour(a: uint256, b: uint256, c: uint256, d: uint256) returns (uint256) {",
+  "    return sum([a, b, c, d]);",
+  "}",
+  "function sumNone() returns (uint256) {",
+  "    return sum([]);",
+  "}",
   "function echoAt(x0: uint256, x1: uint256, i: uint256) returns (uint256) {",
   "    return echo([x0, x1])[i];",
   "}",
   "function echoLength(x0: uint256, x1: uint256) returns (uint256) {",
   "    return echo([x0, x1]).length;",
+  "}",
+  "function gridLength(n: uint256) returns (uint256) {",
+  "    return grid(n).length;",
+  "}",
+  "function gridRowLength(n: uint256, i: uint256) returns (uint256) {",
+  "    return grid(n)[i].length;",
+  "}",
+  "function gridAt(n: uint256, i: uint256, j: uint256) returns (uint256) {",
+  "    return grid(n)[i][j];",
+  "}",
+  "function slicesAt(x0: uint256, x1: uint256, x2: uint256, x3: uint256, i: uint256) returns (uint256) {",
+  "    return slices([x0, x1, x2, x3])[i];",
+  "}"]
+
+/-- Row 4's own array cases, not upstream's. From steps 2b-iii and 3c: `nestedLengths(n)`, a
+nested `new` with the other two spellings of a length, and `signedIndex(n)`, a read at a negative
+`int8` index. From step 5a-iii-a: `placeFirst(i, v)` checks its place before a right side that
+divides by zero, `writeBack(i, j, v)` writes an element of one row of two and reads both rows
+back, and `throughLocal(v)` writes a call's result through a local, which writes the caller's array
+(difference 16). From step 5b: the lane's probe's `compoundTwice()` runs its place's `next(c)` once
+(difference 1) and `plainOnce()` writes through it once; `snapshotFirst(v)` reads its element
+before a right side that writes it; `boundsFirst(i, v)` panics with `0x32` before a right side that
+divides by zero; `narrow` and `narrowUnchecked` add at a `uint8` element, checked and in an
+`unchecked` block; `divide` divides an element by zero; `shifted` shifts a `uint8` element;
+`invertedU8`, `invertedU256` and `invertedI8` take `~=` on an element; `bits` takes `|= &= ^=`;
+`nestedAdd(i, j, v)` adds to an element of one row of two; and `headerForms()` takes `+=` and `~=`
+on an element in `for` headers. -/
+private def arrayCaseWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function nestedLengths(n: uint256) returns (uint256) {",
+  "  let grid = new int8[][](n);",
+  "  return grid.length + new uint8[](3).length();",
+  "}",
+  "function signedIndex(n: uint256) returns (uint256) {",
+  "  let m: uint256[] = new uint256[](n);",
+  "  let k: int8 = -1;",
+  "  return m[k];",
+  "}",
+  "function placeFirst(i: uint256, v: uint256) returns (uint256) {",
+  "    let m: uint256[] = new uint256[](2);",
+  "    m[i] = v / (v - v);",
+  "    return m[0];",
+  "}",
+  "function writeBack(i: uint256, j: uint256, v: uint256) returns (uint256) {",
+  "    let rows: uint256[][] = [new uint256[](2), new uint256[](2)];",
+  "    rows[i][j] = v;",
+  "    return rows[i][j] * 10 + rows[1 - i][j];",
+  "}",
+  "function same(xs: uint256[]) returns (uint256[]) {",
+  "    return xs;",
+  "}",
+  "function throughLocal(v: uint256) returns (uint256) {",
+  "    let m: uint256[] = new uint256[](2);",
+  "    let r: uint256[] = same(m);",
+  "    r[1] = v;",
+  "    return m[1];",
   "}",
   "function next(c: uint256[]) returns (uint256) {",
   "    c[0] += 1;",
@@ -5789,182 +5772,132 @@ private def compoundElementWorkspace : Workspace.RawWorkspace := workspaceOf [
 example : Solcore.SourceSemantics.Dynamic.newArrayLengthLimit =
     SourceCoreDataExpressions.arrayLengthLimit := rfl
 
-/-- The fixture's `#[(5) -> 5]`, `#[(2^251) -> Panic(0x41)]`, `#[(4, 2) -> 0]` and `#[(3) -> 0]`:
-a new array keeps its length, a length from 2^251 − 1 on panics with `0x41` while one below it
-allocates nothing more, an element nothing wrote reads as zero, a row of `new T[][]` is an empty
-array, and a read from the length on, a negative `int8` index's word included, panics with
-`0x32`. Then array-syntax's `#[(3, 4) -> 10]`, `#[(3, 4) -> 4]`, `#[() -> 5]` and
-`#[(4) -> 4]`: literals keep their elements in order, a literal returned from a call, a nested
-literal and a call result's length. Then plain element writes: a nested write changes only its
-row, and an element place panics with `0x32` from its array's length on, before its right side
-runs. Then mem-array's `#[(3, 1, 99) -> 99]`, `#[(3, 0, 7) -> 7]`, `#[(2, 5, 1) -> 0x32]`,
-`#[(4) -> 30]`, `#[(4, 9) -> 9]` and `#[(8) -> 8]`, and memory-array-abi's `ret(3) -> [0,2,4]`,
-`ret(0) -> []`, `sum([1,2,3,4]) -> 10`, `sum([]) -> 0` and `grid(2) -> [[],[0]]` through their
-wrappers. Then array-slice's `#[() -> 3]`, `#[(0) -> 11]`, `#[(2) -> 13]`, `#[(3) -> 0x32]`,
-`#[(2) -> 3]`, `#[(5) -> 0]`, `#[(6) -> 0x32]`, `#[(3) -> 3]`, `#[() -> 5]`, `#[(0) -> 12]`,
-`#[(1) -> 13]`, `#[(4, 2) -> 0x32]`, `#[(0, 6) -> 0x32]`, `#[(2, 2) -> 0]`, `#[() -> 99]`,
-`#[() -> 38]`, `#[(true) -> 4]` and `#[(false) -> 3]`, and memory-array-abi's
-`slices([10,20,30,40]) -> [20,30]` through its wrapper, as 20 at 0, 30 at 1 and `0x32` at 2.
-Then mem-array's `#[(7) -> 8]` through `bumpElement` and `bump`. Then mem-array's
-`#[(10) -> 13]` and memory-array-abi's `echo([7,8]) -> [8,9]` through its wrappers, as 8 at 0, 9 at
-1 and length 2, and step 5b's own cases: a compound assignment evaluates its element place once,
-reading the element before the right side, from the length on panics with `0x32` before it, and
-takes its type's checks, wraps and shifts, as on a local. -/
+private def arrayPortNames : List String := [
+  "newLen", "oversized", "setGet", "defaultZero", "fillAndSum", "compound", "nestedEmpty",
+  "nestedReplace", "alias", "bumpElement", "local", "returned", "nested", "callResultLength",
+  "rangeLen", "rangeGet", "fromLen", "toLen", "allLen", "reslice", "bounds", "materialise",
+  "aliasing", "spec", "ternaryBound", "retAt", "retLength", "sumFour", "sumNone", "echoAt",
+  "echoLength", "gridLength", "gridRowLength", "gridAt", "slicesAt"]
+
+/-- Row 4's step 8, the upstream array fixtures' cases through the public API, as row 1's step 8e
+runs the integer fixtures': each value and each panic code is the fixture's. memory-array-abi's
+arrays are read back through the wrappers: `ret(3) -> [0,2,4]` as 0, 2 and 4 at indexes 0 to 2
+and length 3, `ret(0) -> []` as length 0, `sum([1,2,3,4]) -> 10` and `sum([]) -> 0` as those
+sums, `echo([7,8]) -> [8,9]` as 8 at 0, 9 at 1 and length 2, `grid(2) -> [[],[0]]` as length 2,
+rows of lengths 0 and 1 and 0 at `[1][0]`, and `slices([10,20,30,40]) -> [20,30]` as 20 at 0, 30
+at 1 and `0x32` at 2. The earlier steps' own values on the same functions follow: lengths 0 and
+1, the last index below a length, `0x32` from the length on, a negative index's word included,
+and `0x41` from 2^251 − 1 on while 2^251 − 2 allocates (difference 2). -/
 def runUpstreamArrayFixtures : IO Unit := do
-  let program ← get "array fixture check" (checkProgram arrayFixtureWorkspace)
-  let names := ["newLen", "oversized", "nested", "defaultZero", "nestedEmpty", "signedIndex"]
-  let seeds ← names.mapM (seed program)
-  let compiled ← get "array fixture compilation"
-    (compile arrayFixtureWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
-  let key (index : Nat) : IO Key := match compiled.keys[index]? with
-    | some key => pure key
-    | none => throw (IO.userError "array fixture root missing")
+  let program ← get "upstream array fixture check" (checkProgram arrayPortWorkspace)
+  let seeds ← arrayPortNames.mapM (seed program)
+  let compiled ← get "upstream array fixture compilation"
+    (compile arrayPortWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match arrayPortNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"upstream array fixture root {name} missing")
+    | none => throw (IO.userError s!"upstream array fixture {name} unknown")
   let mut session ← boot (← compiled.open)
-  let cases : List (Nat × List Nat × Nat) :=
-    [(0, [5], 5), (0, [0], 0), (1, [2 ^ 251 - 2], 2 ^ 251 - 2), (2, [4], 7),
-      (3, [4, 2], 0), (3, [4, 3], 0), (4, [3], 0), (4, [1], 0)]
-  for (index, arguments, expected) in cases do
-    let completed ← execute session (← key index) (arguments.map word)
-    require (completed.value == word expected)
-      s!"{names[index]!}({arguments}) gave {reprStr completed.value}"
+  let cases : List (String × List Value × Nat) := [
+    -- mem-array.
+    ("newLen", [word 5], 5), ("setGet", [word 3, word 1, word 99], 99),
+    ("setGet", [word 3, word 0, word 7], 7), ("defaultZero", [word 4, word 2], 0),
+    ("fillAndSum", [word 4], 30), ("compound", [word 10], 13), ("nestedEmpty", [word 3], 0),
+    ("nestedReplace", [word 4, word 9], 9), ("alias", [word 8], 8), ("bumpElement", [word 7], 8),
+    -- array-syntax.
+    ("local", [word 3, word 4], 10), ("returned", [word 3, word 4], 4), ("nested", [], 5),
+    ("callResultLength", [word 4], 4),
+    -- array-slice.
+    ("rangeLen", [], 3), ("rangeGet", [word 0], 11), ("rangeGet", [word 2], 13),
+    ("fromLen", [word 2], 3), ("fromLen", [word 5], 0), ("toLen", [word 3], 3), ("allLen", [], 5),
+    ("reslice", [word 0], 12), ("reslice", [word 1], 13), ("bounds", [word 2, word 2], 0),
+    ("materialise", [word 0], 11), ("materialise", [word 2], 13), ("aliasing", [], 99),
+    ("spec", [], 38), ("ternaryBound", [.bool true], 4), ("ternaryBound", [.bool false], 3),
+    -- memory-array-abi, through the wrappers.
+    ("retAt", [word 3, word 0], 0), ("retAt", [word 3, word 1], 2), ("retAt", [word 3, word 2], 4),
+    ("retLength", [word 3], 3), ("retLength", [word 0], 0),
+    ("sumFour", [word 1, word 2, word 3, word 4], 10), ("sumNone", [], 0),
+    ("echoAt", [word 7, word 8, word 0], 8), ("echoAt", [word 7, word 8, word 1], 9),
+    ("echoLength", [word 7, word 8], 2), ("gridLength", [word 2], 2),
+    ("gridRowLength", [word 2, word 0], 0), ("gridRowLength", [word 2, word 1], 1),
+    ("gridAt", [word 2, word 1, word 0], 0),
+    ("slicesAt", [word 10, word 20, word 30, word 40, word 0], 20),
+    ("slicesAt", [word 10, word 20, word 30, word 40, word 1], 30),
+    -- The earlier steps' own values.
+    ("newLen", [word 0], 0), ("oversized", [word (2 ^ 251 - 2)], 2 ^ 251 - 2),
+    ("defaultZero", [word 4, word 3], 0), ("nestedEmpty", [word 1], 0),
+    ("local", [word 1, word 2], 4), ("returned", [word 5, word 9], 9),
+    ("callResultLength", [word 2], 2)]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) arguments
+    require (completed.value == word expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
     session := completed.session
+  -- `Panic(0x32)`: an index or a bound from its array's or its view's length on, a copy's included.
+  let outOfBounds : List (String × List Value) := [
+    ("setGet", [word 2, word 5, word 1]), ("rangeGet", [word 3]), ("fromLen", [word 6]),
+    ("toLen", [word 6]), ("reslice", [word 2]), ("bounds", [word 4, word 2]),
+    ("bounds", [word 0, word 6]), ("materialise", [word 3]),
+    ("slicesAt", [word 10, word 20, word 30, word 40, word 2]),
+    -- The earlier steps' own.
+    ("defaultZero", [word 4, word 4]), ("defaultZero", [word 0, word 0]),
+    ("defaultZero", [word 4, word (modulus - 1)]), ("echoAt", [word 7, word 8, word 2])]
+  for (name, arguments) in outOfBounds do
+    session ← panics session (← key name) arguments SourceCorePanics.outOfBounds
+      s!"{name} on {reprStr arguments}"
+  -- `Panic(0x41)`: the fixture's `oversized(2^251)`, then 2^251 − 1 and the largest word.
   for argument in [2 ^ 251, 2 ^ 251 - 1, modulus - 1] do
-    session ← panics session (← key 1) [word argument] SourceCorePanics.allocation
+    session ← panics session (← key "oversized") [word argument] SourceCorePanics.allocation
       s!"oversized({argument})"
-  for arguments in [[4, 4], [0, 0], [4, modulus - 1]] do
-    session ← panics session (← key 3) (arguments.map word) SourceCorePanics.outOfBounds
-      s!"defaultZero({arguments})"
-  let _ ← panics session (← key 5) [word 4] SourceCorePanics.outOfBounds "signedIndex(4)"
-  let syntaxProgram ← get "array-syntax fixture check" (checkProgram arraySyntaxWorkspace)
-  let syntaxNames := ["local", "returned", "nested", "callResultLength"]
-  let syntaxSeeds ← syntaxNames.mapM (seed syntaxProgram)
-  let syntaxCompiled ← get "array-syntax fixture compilation"
-    (compile arraySyntaxWorkspace syntaxSeeds {specializationBudget := 256, compilationFuel := 1000})
-  let syntaxKey (index : Nat) : IO Key := match syntaxCompiled.keys[index]? with
-    | some key => pure key
-    | none => throw (IO.userError "array-syntax fixture root missing")
-  let mut syntaxSession ← boot (← syntaxCompiled.open)
-  let syntaxCases : List (Nat × List Nat × Nat) :=
-    [(0, [3, 4], 10), (0, [1, 2], 4), (1, [3, 4], 4), (1, [5, 9], 9), (2, [], 5), (3, [4], 4),
-      (3, [2], 2)]
-  for (index, arguments, expected) in syntaxCases do
-    let completed ← execute syntaxSession (← syntaxKey index) (arguments.map word)
-    require (completed.value == word expected)
-      s!"{syntaxNames[index]!}({arguments}) gave {reprStr completed.value}"
-    syntaxSession := completed.session
-  let writeProgram ← get "element write check" (checkProgram elementWriteWorkspace)
-  let writeNames := ["placeFirst", "writeBack", "throughLocal"]
-  let writeSeeds ← writeNames.mapM (seed writeProgram)
-  let writeCompiled ← get "element write compilation"
-    (compile elementWriteWorkspace writeSeeds {specializationBudget := 256, compilationFuel := 1000})
-  let writeKey (index : Nat) : IO Key := match writeCompiled.keys[index]? with
-    | some key => pure key
-    | none => throw (IO.userError "element write root missing")
-  let mut writeSession ← boot (← writeCompiled.open)
-  for (index, arguments, expected) in [(1, [0, 1, 7], 70), (1, [1, 0, 3], 30), (2, [9], 9)] do
-    let completed ← execute writeSession (← writeKey index) (arguments.map word)
-    require (completed.value == word expected)
-      s!"{writeNames[index]!}({arguments}) gave {reprStr completed.value}"
-    writeSession := completed.session
-  writeSession ← panics writeSession (← writeKey 0) [word 5, word 1] SourceCorePanics.outOfBounds
-    "placeFirst(5, 1)"
-  writeSession ← panics writeSession (← writeKey 0) [word 0, word 1] SourceCorePanics.divisionByZero
-    "placeFirst(0, 1)"
-  for arguments in [[2, 0, 1], [0, 2, 1]] do
-    writeSession ← panics writeSession (← writeKey 1) (arguments.map word) SourceCorePanics.outOfBounds
-      s!"writeBack({arguments})"
-  let portProgram ← get "mem-array write fixture check" (checkProgram memArrayWriteWorkspace)
-  let portNames := ["setGet", "fillAndSum", "nestedReplace", "alias", "retAt", "retLength",
-    "sumFour", "sumNone", "gridLength", "gridRowLength", "gridAt"]
-  let portSeeds ← portNames.mapM (seed portProgram)
-  let portCompiled ← get "mem-array write fixture compilation"
-    (compile memArrayWriteWorkspace portSeeds
-      {specializationBudget := 256, compilationFuel := 1000})
-  let portKey (index : Nat) : IO Key := match portCompiled.keys[index]? with
-    | some key => pure key
-    | none => throw (IO.userError "mem-array write fixture root missing")
-  let mut portSession ← boot (← portCompiled.open)
-  let portCases : List (Nat × List Nat × Nat) :=
-    [(0, [3, 1, 99], 99), (0, [3, 0, 7], 7), (1, [4], 30), (2, [4, 9], 9), (3, [8], 8),
-      (4, [3, 0], 0), (4, [3, 1], 2), (4, [3, 2], 4), (5, [3], 3), (5, [0], 0),
-      (6, [1, 2, 3, 4], 10), (7, [], 0), (8, [2], 2), (9, [2, 0], 0), (9, [2, 1], 1),
-      (10, [2, 1, 0], 0)]
-  for (index, arguments, expected) in portCases do
-    let completed ← execute portSession (← portKey index) (arguments.map word)
-    require (completed.value == word expected)
-      s!"{portNames[index]!}({arguments}) gave {reprStr completed.value}"
-    portSession := completed.session
-  let _ ← panics portSession (← portKey 0) [word 2, word 5, word 1] SourceCorePanics.outOfBounds
-    "setGet(2, 5, 1)"
-  let sliceProgram ← get "array-slice fixture check" (checkProgram arraySliceWorkspace)
-  let sliceNames := ["rangeLen", "rangeGet", "fromLen", "toLen", "allLen", "reslice", "bounds",
-    "materialise", "aliasing", "spec", "ternaryBound", "slicesAt"]
-  let sliceSeeds ← sliceNames.mapM (seed sliceProgram)
-  let sliceCompiled ← get "array-slice fixture compilation"
-    (compile arraySliceWorkspace sliceSeeds {specializationBudget := 256, compilationFuel := 1000})
-  let sliceKey (index : Nat) : IO Key := match sliceCompiled.keys[index]? with
-    | some key => pure key
-    | none => throw (IO.userError "array-slice fixture root missing")
-  let mut sliceSession ← boot (← sliceCompiled.open)
-  let sliceCases : List (Nat × List Value × Nat) :=
-    [(0, [], 3), (1, [word 0], 11), (1, [word 2], 13), (2, [word 2], 3), (2, [word 5], 0),
-      (3, [word 3], 3), (4, [], 5), (5, [word 0], 12), (5, [word 1], 13),
-      (6, [word 2, word 2], 0), (7, [word 0], 11), (7, [word 2], 13), (8, [], 99), (9, [], 38),
-      (10, [.bool true], 4), (10, [.bool false], 3),
-      (11, [word 10, word 20, word 30, word 40, word 0], 20),
-      (11, [word 10, word 20, word 30, word 40, word 1], 30)]
-  for (index, arguments, expected) in sliceCases do
-    let completed ← execute sliceSession (← sliceKey index) arguments
-    require (completed.value == word expected)
-      s!"{sliceNames[index]!}({reprStr arguments}) gave {reprStr completed.value}"
-    sliceSession := completed.session
-  let slicePanics : List (Nat × List Value) :=
-    [(1, [word 3]), (2, [word 6]), (3, [word 6]), (5, [word 2]), (6, [word 4, word 2]),
-      (6, [word 0, word 6]), (7, [word 3]), (11, [word 10, word 20, word 30, word 40, word 2])]
-  for (index, arguments) in slicePanics do
-    sliceSession ← panics sliceSession (← sliceKey index) arguments SourceCorePanics.outOfBounds
-      s!"{sliceNames[index]!}({reprStr arguments})"
-  let memrefProgram ← get "memref fixture check" (checkProgram memrefWorkspace)
-  let memrefSeeds ← ["bumpElement"].mapM (seed memrefProgram)
-  let memrefCompiled ← get "memref fixture compilation"
-    (compile memrefWorkspace memrefSeeds {specializationBudget := 256, compilationFuel := 1000})
-  let memrefKey ← match memrefCompiled.keys[0]? with
-    | some key => pure key
-    | none => throw (IO.userError "memref fixture root missing")
-  let memrefSession ← boot (← memrefCompiled.open)
-  let bumped ← execute memrefSession memrefKey [word 7]
-  require (bumped.value == word 8) s!"bumpElement(7) gave {reprStr bumped.value}"
-  let compoundProgram ← get "compound element check" (checkProgram compoundElementWorkspace)
-  let compoundNames := ["compound", "echoAt", "echoLength", "compoundTwice", "plainOnce",
-    "snapshotFirst", "boundsFirst", "narrow", "narrowUnchecked", "divide", "shifted", "invertedU8",
-    "invertedU256", "invertedI8", "bits", "nestedAdd", "headerForms"]
-  let compoundSeeds ← compoundNames.mapM (seed compoundProgram)
-  let compoundCompiled ← get "compound element compilation"
-    (compile compoundElementWorkspace compoundSeeds {specializationBudget := 256, compilationFuel := 1000})
-  let compoundKey (index : Nat) : IO Key := match compoundCompiled.keys[index]? with
-    | some key => pure key
-    | none => throw (IO.userError "compound element root missing")
-  let mut compoundSession ← boot (← compoundCompiled.open)
-  let compoundCases : List (Nat × List Nat × Nat) :=
-    [(0, [10], 13), (1, [7, 8, 0], 8), (1, [7, 8, 1], 9), (2, [7, 8], 2), (3, [], 105), (4, [], 107),
-      (5, [5], 6), (7, [200, 55], 255), (8, [200, 100], 44), (9, [7, 2], 3),
-      (10, [3, 7], 128), (10, [1, 8], 0), (11, [10], 245), (12, [10], modulus - 11),
-      (13, [modulus - 1], 0), (13, [0], modulus - 1), (14, [8], 3), (15, [0, 1, 5], 704),
-      (15, [1, 0, 5], 108), (16, [], modulus - 3)]
-  for (index, arguments, expected) in compoundCases do
-    let completed ← execute compoundSession (← compoundKey index) (arguments.map word)
-    require (completed.value == word expected)
-      s!"{compoundNames[index]!}({arguments}) gave {reprStr completed.value}"
-    compoundSession := completed.session
-  for (index, arguments) in [(1, [7, 8, 2]), (6, [2, 1]), (15, [2, 0, 5]), (15, [0, 2, 5])] do
-    compoundSession ← panics compoundSession (← compoundKey index) (arguments.map word)
-      SourceCorePanics.outOfBounds s!"{compoundNames[index]!}({arguments})"
-  compoundSession ← panics compoundSession (← compoundKey 7) [word 200, word 100]
-    SourceCorePanics.arithmetic "narrow(200, 100)"
-  for (index, arguments) in [(6, [0, 1]), (9, [7, 0])] do
-    compoundSession ← panics compoundSession (← compoundKey index) (arguments.map word)
-      SourceCorePanics.divisionByZero s!"{compoundNames[index]!}({arguments})"
-  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths; a nested element write changes only its row, and an element place from the length on panics with 0x32 before its right side; mem-array's setGet, fillAndSum, nestedReplace and alias as upstream wrote them give the fixture's elements and sums, with 0x32 from the length on, and memory-array-abi's ret, sum and grid give the fixture's arrays through word wrappers; array-slice's rangeLen, rangeGet, fromLen, toLen, allLen, reslice, bounds, materialise, aliasing, spec and ternaryBound as upstream wrote them give the fixture's lengths and elements, with 0x32 from a bound or an index out of its view, a copy included, and a view reads its base's later writes; memory-array-abi's slices gives the fixture's copy through slicesAt; mem-array's bumpElement as upstream wrote it gives the fixture's 8, bump loading and storing through lidx's memref; and mem-array's compound and memory-array-abi's echo as upstream wrote them give the fixture's 13 and [8,9], echo through word wrappers, while a compound assignment or an in-place ~ on an element evaluates its place once (105 where upstream gives 205), reads the element before its right side, panics with 0x32 before it, and takes its type's checks with 0x11 and 0x12, wraps and shifts"
+  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: the 34 functions of upstream's mem-array, array-syntax, array-slice and memory-array-abi fixtures that need no contract storage and no ABI, as upstream wrote them, give the fixtures' values and panic codes in one test: lengths, zeroed and written elements, sums, aliasing, 0x32 from an index's or a bound's length on, 0x41 for the fixture's oversized length, slices, their copies and a view of a later write, a memref's load and store, and a compound element assignment, with ret, sum, echo, grid and slices read back through word wrappers"
+
+private def arrayCaseNames : List String := [
+  "nestedLengths", "signedIndex", "placeFirst", "writeBack", "throughLocal", "compoundTwice",
+  "plainOnce", "snapshotFirst", "boundsFirst", "narrow", "narrowUnchecked", "divide", "shifted",
+  "invertedU8", "invertedU256", "invertedI8", "bits", "nestedAdd", "headerForms"]
+
+/-- Row 4's own array cases through the public API: a nested `new`'s lengths; a negative `int8`
+index panics with `0x32`; an element place panics with `0x32` from its array's length on, before
+its right side runs, and a nested write or compound assignment changes only its row; a write
+through a local reaches the caller's array; and a compound assignment or an in-place `~` on an
+element evaluates its place once, so the probe's 205 is 105 (difference 1), reads the element
+before its right side, and takes its type's checks with `0x11` and `0x12`, wraps and shifts, as on
+a local. -/
+def runArrayElementCases : IO Unit := do
+  let program ← get "array element case check" (checkProgram arrayCaseWorkspace)
+  let seeds ← arrayCaseNames.mapM (seed program)
+  let compiled ← get "array element case compilation"
+    (compile arrayCaseWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match arrayCaseNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"array element case root {name} missing")
+    | none => throw (IO.userError s!"array element case {name} unknown")
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × List Nat × Nat) := [
+    ("nestedLengths", [4], 7), ("writeBack", [0, 1, 7], 70), ("writeBack", [1, 0, 3], 30),
+    ("throughLocal", [9], 9), ("compoundTwice", [], 105), ("plainOnce", [], 107),
+    ("snapshotFirst", [5], 6), ("narrow", [200, 55], 255), ("narrowUnchecked", [200, 100], 44),
+    ("divide", [7, 2], 3), ("shifted", [3, 7], 128), ("shifted", [1, 8], 0),
+    ("invertedU8", [10], 245), ("invertedU256", [10], modulus - 11), ("invertedI8", [modulus - 1], 0),
+    ("invertedI8", [0], modulus - 1), ("bits", [8], 3), ("nestedAdd", [0, 1, 5], 704),
+    ("nestedAdd", [1, 0, 5], 108), ("headerForms", [], modulus - 3)]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) (arguments.map word)
+    require (completed.value == word expected) s!"{name}({arguments}) gave {reprStr completed.value}"
+    session := completed.session
+  let outOfBounds : List (String × List Nat) := [
+    ("signedIndex", [4]), ("placeFirst", [5, 1]), ("writeBack", [2, 0, 1]), ("writeBack", [0, 2, 1]),
+    ("boundsFirst", [2, 1]), ("nestedAdd", [2, 0, 5]), ("nestedAdd", [0, 2, 5])]
+  for (name, arguments) in outOfBounds do
+    session ← panics session (← key name) (arguments.map word) SourceCorePanics.outOfBounds
+      s!"{name}({arguments})"
+  for (name, arguments) in [("placeFirst", [0, 1]), ("boundsFirst", [0, 1]), ("divide", [7, 0])] do
+    session ← panics session (← key name) (arguments.map word) SourceCorePanics.divisionByZero
+      s!"{name}({arguments})"
+  let _ ← panics session (← key "narrow") [word 200, word 100] SourceCorePanics.arithmetic
+    "narrow(200, 100)"
+  IO.println "SOURCE_CORE_ARRAY_ELEMENT_CASES_PASS: row 4's own array cases give a nested new's lengths, 0x32 at a negative int8 index and from an element place's length on before its right side, a nested write or compound assignment that changes only its row and a write through a local that reaches the caller's array, and a compound assignment or an in-place ~ on an element that evaluates its place once (105 where upstream gives 205), reads the element before its right side, and takes its type's checks with 0x11 and 0x12, wraps and shifts"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)
@@ -6179,6 +6112,7 @@ def run : IO Unit := do
   runUint256Patterns
   runUpstreamFixtures
   runUpstreamArrayFixtures
+  runArrayElementCases
 
 end Tests.SourceCoreFixedIntegerOperators
 end

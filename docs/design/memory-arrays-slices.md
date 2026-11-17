@@ -648,6 +648,12 @@ wrappers, as `ret`, `sum` and `grid` are: `echoAt(x0, x1, i)` returns `echo([x0,
 0, 9 at 1 and length 2. No other function was adapted. The lane's probe's `compoundTwice()` gives
 105, where upstream gives 205 (difference 1), and `plainOnce()` 107, as upstream.
 
+As built in step 8, the 34 functions and the ten wrappers are one workspace, in the fixtures'
+order, and one test runs every case the four fixtures give, with their values and panic codes
+(`runUpstreamArrayFixtures`), as row 1's step 8e runs the integer fixtures'; the earlier steps'
+own values on the same functions follow in it. Lean's own array cases are a test of their own
+(`runArrayElementCases`).
+
 ### Outside row 4's Lean side
 
 - Storage arrays, so no `0x31`; calldata arrays; and `T[]` in the ABI. These need the native
@@ -853,7 +859,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 7e-i | Memrefs: inference's typing of `CanStore.load(r)` | 18–24 files, +450–650/−10–30; measured at 20 files, +518/−5 | none |
 | 7e-ii | Memrefs: inference's typing of `CanStore.store(r, v)`, whose value's type unifies with the element type | 22–30 files, +700–1,100/−10–40; measured at 20 files, +663/−4 | none |
 | 7f | Memrefs: the lowering, a memref as a Core product of its array's cell and its index, and the loads and stores through it | 8–12 files, +250–450/−10–30; measured at 9 files, +151/−5 | bump(r), bumpElement(v) |
-| 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
+| 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450; measured at 1 file, +263/−329 | the 34 functions above |
 
 In all, that is about 785 to 1,079 file changes, +20,535 to 30,895 and −2,015 to 3,880 lines over
 forty-six commits: about one to one and a half times row 1, whose 23 commits added about 21,700
