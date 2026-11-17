@@ -46,11 +46,9 @@ exists to exercise the kernel end to end; the frontend's inference threads an `I
 
 ### Add a builtin type
 
-`integer` was added in 2bf3e5547: the type in `TypeSystem/Type`, its name in the frontend's type
+`integer` was added this way: the type in `TypeSystem/Type`, its name in the frontend's type
 resolution, a literal conversion in `Frontend/WordLiteral`, a case in `SourceCoreElaboration`, and
-tests now in `Test/Frontend/Programs.lean`, `Test/Frontend/WordOperators.lean` and
-`Test/SourceSemantics/CoreLowering/Foundations/Execution.lean`. 0ce7c5f07 and f3d644700 later gave
-it a Core representation.
+tests; its Core representation came later.
 
 1. `TypeSystem/Type`: a `BuiltinType` constructor and an abbreviation such as `Ty.integer`.
 2. Frontend: its source name in `ProgramTypeResolution`. `builtinTypeName?` maps fixed names;
@@ -61,17 +59,17 @@ it a Core representation.
    Search for `.builtin .word` to find them.
 4. A Core type, if the type has a runtime representation
    ([Core](core.md#add-an-expression-form-or-a-value-form)).
-5. The source semantics' rules for its values and literals ([Source semantics](source-semantics.md)).
-   `TypeWellScoped.builtin` already admits every builtin on its own. A builtin applied to a type, as
-   `T[]` is (`Ty.array`, 8f9344bc4), also needs its case in `TypeWellScoped`
-   (`TypeWellScoped.array`) and in the two formation judgments, `SignatureTypeFormationValidated`
-   and `InferenceTypeFormationValidated`, and every induction over types takes it.
+5. The source semantics' rules for its values and literals
+   ([Source semantics](source-semantics.md)). `TypeWellScoped.builtin` already admits every builtin
+   on its own. A builtin applied to a type, as `T[]` is (`Ty.array`), also needs its case in
+   `TypeWellScoped` (`TypeWellScoped.array`) and in the two formation judgments,
+   `SignatureTypeFormationValidated` and `InferenceTypeFormationValidated`, and every induction
+   over types takes it.
 
 ### Extend unification or inference
 
-Examples: a3796d7a5 (solved form through unification), 52bb55f5d (solved inference states),
-1cba496b8 (constraint soundness). Each changed `Unification`, the laws now in `Internal/`, and the
-public-boundary test; a3796d7a5 also changed `Type`, and 52bb55f5d `Scheme`.
+The solved form of unification, solved inference states and constraint soundness each changed
+`Unification`, its laws in `Internal/` and the public-boundary test.
 
 1. Change the algorithm in `Unification`'s private `loop`. Proofs that unfold it must stay in that
    file, since `private` is per file; the same holds for `Scheme`'s private helpers.
@@ -109,11 +107,10 @@ and `Lowers.evaluates_iff`: lowering preserves and reflects typing and evaluatio
 `Resolved.Expr` uses Core's `UnaryOp` and `BinaryOp`, and its rules apply `op.apply` and the type
 functions generically. A new Core operator therefore works here with no change.
 
-**Add an expression form.** Ordered pairs took three commits: a7381280b (`Expr`, `Typing`, `Eval`,
-scopes and renaming), d71740836 (the lowering, typing, evaluation and scope proofs) and f684c0d4d
-(the public-boundary tests, now in `Test/Resolved/Semantics.lean` and
-`Test/Frontend/PublicBoundary.lean`). Keep the lowered form inside Core's `Expr.LocalFragment`, or
-extend that fragment first (03d28bf7f added pairs to it).
+**Add an expression form**, as ordered pairs were: first `Expr`, `Typing`, `Eval`, scopes and
+renaming; then the lowering, typing, evaluation and scope proofs; then the public-boundary tests in
+`Test/Resolved/Semantics.lean` and `Test/Frontend/PublicBoundary.lean`. Keep the lowered form inside
+Core's `Expr.LocalFragment`, or extend that fragment first, as pairs did.
 
 **Pitfall.** `Internal/LocalFragmentLaws` stays apart from `Expr`: importing the local fragment
 there would put `Core/Internal/DerivedForms` and its `simp` lemmas under everything that imports
@@ -161,11 +158,11 @@ then rejects them with `ProgramEnvironmentError.duplicateModule`.
 The frontend calls `Workspace.validate` first, in `Frontend.loadProgram`; `Frontend.checkProgram`
 takes a `RawWorkspace`.
 
-**Add or change a check.** Add the constructor to `ValidationError`, with its `rank` and `arguments`;
-its case in `ValidationError.Applies` (`Judgment`); the executable check in `Validation`; and the
-cases of the proofs in `Properties`. 6a46559af, which accepted `.sol`, changed `Path` and `Syntax`
-and added the test now in `Tests.SourcePathExtensions`. Many proofs in `Path`, `Validation` and
-`Properties` name private helpers, so they stay in those files.
+**Add or change a check.** Add the constructor to `ValidationError`, with its `rank` and
+`arguments`; its case in `ValidationError.Applies` (`Judgment`); the executable check in
+`Validation`; and the cases of the proofs in `Properties`. Accepting `.sol` changed `Path` and
+`Syntax`, with the test `Tests.SourcePathExtensions`. Many proofs in `Path`, `Validation`
+and `Properties` name private helpers, so they stay in those files.
 
 ## Abi
 
@@ -183,7 +180,8 @@ The pieces of `StaticWord`, in order:
   big-endian word, and ignore the rest. `encodeResult` and `decodeResult` use exactly 32 bytes.
 - **Tables.** `MethodTable.validate` rejects an empty table, duplicate signatures and selector
   collisions. Whether it accepts, and the entries it gives, do not depend on the order of the
-  methods (`MethodTable.validate_accepts_iff_of_input_perm`, `MethodTable.entries_eq_of_input_perm`).
+  methods (`MethodTable.validate_accepts_iff_of_input_perm`,
+  `MethodTable.entries_eq_of_input_perm`).
 - **Dispatcher.** `MethodTable.dispatchProgram` is a Core program. It reads the calldata through the
   host functions `inputDataSize` and `inputDataWordBE?`, by their `HostFunction.index`, and reverts
   with `malformedCalldataReason` or `unknownSelectorReason`. `MethodTable.dispatchProgram_checked`
@@ -197,12 +195,10 @@ The pieces of `StaticWord`, in order:
 together and re-prove `dispatchProgram_checked`. `StaticWordContract.callInvocation_inputData_bytes`
 states that a call's input is `encodeCall` of its selector and argument. A new `SupportedType`
 changes the signature text, and so every selector. The end-to-end tests (`AbiStaticWordEndToEnd` in
-`Test/Abi/StaticWord.lean`) run the two together. The codec and dispatcher came in 8761c6530,
-ebf59aeaf and 6226e7ab7.
+`Test/Abi/StaticWord.lean`) run the two together.
 
 **Pitfalls.** About half of `StaticWord`'s proofs name private helpers, so they stay in the file.
-The kernel check visits `Abi` too. It matches words anywhere, comments included, so a name such as
-`admit` or a comment that says "partial" fails it ([Conventions](conventions.md#proof-rules)).
+The kernel check visits `Abi` too, comments included ([Conventions](conventions.md#proof-rules)).
 
 ## Util
 
