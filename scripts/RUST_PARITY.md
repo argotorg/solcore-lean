@@ -101,8 +101,8 @@ This separate gate runs the unchanged upstream E2E test harness on a local Anvil
   `evm-reference-target/bin` and `build.json` to rerun without rebuilding. The upstream harness
   owns and removes its temporary Yul and process logs.
 - The runner recognizes Yul-specific skip messages.
-- Known: Q008 and Q010 record three fixtures that these test entry points accept and the checked
-  public compiler used for Core imports rejects.
+- Q008 and Q010 recorded three fixtures that these test entry points accepted and the checked
+  public compiler used for Core imports rejected. Both are resolved at `e2eef194`.
 
 ## Compare the fixtures across compiled paths
 

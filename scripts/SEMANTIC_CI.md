@@ -3,7 +3,7 @@
 The [workflow](../.github/workflows/semantic.yml) runs the existing differential campaigns of
 [SEMANTIC_DIFFERENTIAL.md](SEMANTIC_DIFFERENTIAL.md). It does not replace their Core reference,
 runtime adapters, reduction or replay rules. The
-[implementation roadmap](../docs/design/next-implementation-roadmap.md) records the scope and the
+[implementation roadmap](../docs/design/next-implementation-roadmap.md) records the status and the
 next priorities.
 
 Run records up to 2026-11-17 are in git history at `049f8ce1f`.
@@ -198,8 +198,8 @@ default.
   time and disk limits and tool paths. Later runs resume after the last recorded run and refuse
   different options; use a new state directory for another configuration.
 - `--size-cycle 1,2` (the default) gives iteration `i` the scale at position `i` modulo the cycle,
-  so every other iteration doubles each profile's default node budget, capped at 512, and
-  generates larger programs.
+  so every other iteration doubles each profile's default node budget, within the caps of
+  `--nodes-scale`, and generates larger programs.
 - `--iterations N` stops after N iterations. A `STOP` file in the state directory stops before the
   next run, and SIGTERM or SIGINT stops the running suite, which records its unfinished work. An
   interrupted run moves to `interrupted/` and reruns from its seed on the next start; its partial
@@ -233,8 +233,8 @@ signature made of the backend, category and stage plus one of:
 - The ledger also records each profile's generator versions, input selections and transaction
   count, and for pure profiles the distinct sources, compilations and reused compilations.
 - Runs that pass are deleted. Other runs keep their suite summary and the summaries and logs of
-  the profiles that did not pass. A profile that did not pass without a finding, or was left
-  unexecuted, is listed as a problem.
+  the profiles that did not pass. `run --keep-runs` keeps complete run directories instead. A
+  profile that did not pass without a finding, or was left unexecuted, is listed as a problem.
 - `label` records a triage note for a signature in `labels.json`. A labelled signature is shown as
   known; it stays counted and listed, and its new occurrences still enter the ledger.
 - `report.md` and `report.json` list the signatures (untriaged first, new ones marked), the run

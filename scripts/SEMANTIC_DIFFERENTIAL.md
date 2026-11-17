@@ -121,8 +121,10 @@ python3 scripts/semantic-differential.py --replay .upstream/semantic-cases/run \
   same imported contract on Core. It exits zero only for `matched`.
 - `--backend sonatina-o2` or `--backend yul --solc PATH` selects the backend. The pure, storage
   and call adapters, their campaigns and the suite take it. The storage adapter and campaign
-  accept Yul for the twenty-seven storage-family profiles; the call adapter rejects it. Use one
-  output directory per backend.
+  accept Yul for the twenty-seven storage-family profiles. The call adapter and campaign accept
+  it for `stateful-call-returns`, `stateful-call-sequences` and `stateful-call-branches`, and
+  reject it for `stateful-calls` and `stateful-forwarded-value`. Use one output directory per
+  backend.
 - Limits: `--direct-fuel`, `--core-fuel`, `--gas`, `--timeout`, `--total-timeout`,
   `--output-limit` and `--artifact-limit`, with defaults in `--help`.
 - `report.json` records tool versions and hashes, compiler and exporter receipts, source and
@@ -511,22 +513,22 @@ boundary results alone, so a kept function can still return a seeded input uncha
 
 ### Raw primitives in aggregate-based step functions
 
-Eleven profiles render their checked aggregate step functions with `AggregateRenderer`:
-`runtime-aggregates`, `runtime-loops`, `runtime-generics`, `runtime-closures`, the steps of
-`runtime-comptime` and `runtime-modules`, and the storage, rollback, parent/child call, keyed
-storage and dynamic-array profiles. Since emitter version 2 these steps also render the fourteen
-raw primitives: leading zeros, unsigned and signed division and remainder, signed greater-than,
-the three shifts, byte selection, exponentiation, sign extension, `addmod` and `mulmod`, which
-were operator exclusions before.
+Since emitter version 2, `AggregateRenderer` renders the fourteen raw primitives of the
+[runtime operation mappings](#runtime-operation-mappings) in checked aggregate step functions:
+leading zeros, unsigned and signed division and remainder, signed greater-than, the three shifts,
+byte selection, exponentiation, sign extension, `addmod` and `mulmod`. They were operator
+exclusions before.
 
-- Each primitive operand is snapshotted into a fresh local in Core evaluation order before the
-  alias is called, as the call-graph renderer does. Shifts print `shl(shift, value)`, and signed
-  comparison converts with `tobool`.
+- Each call follows the mappings, its operands snapshotted into fresh locals as the call-graph
+  renderer does.
 - The original operations (`+ - * & | ^ == > ! ~`) keep their exact text, so a program without a
   raw primitive emits byte-identical source. Aliases such as
   `import { div as sc_div, ... } from std.opcodes;` are imported only when a step uses one.
-- Every affected emitter and profile version moved to `v2`; older saved cases fail with
-  `profileVersion changed` instead of being re-emitted.
+- The eleven profiles that used the renderer then moved their emitter and profile versions to
+  `v2`: `runtime-aggregates`, `runtime-loops`, `runtime-generics`, `runtime-closures`, the steps
+  of `runtime-comptime` and `runtime-modules`, and the storage, rollback, parent/child call, keyed
+  storage and dynamic-array profiles. Older saved cases fail with `profileVersion changed`
+  instead of being re-emitted.
 - Unchanged: `ScalarRenderer`, which the emitter proof unfolds, with its users `closed-g0`,
   `runtime-word`, `runtime-functions` and the comptime and module constants; and
   `MutationRenderer` (`runtime-mutation`).
@@ -683,10 +685,9 @@ names, which are not interchangeable with them.
 ### Compare inline Yul
 
 `runtime-assembly` renders the functions of `runtime-primitives` partly or wholly as inline Yul
-in `assembly { }` blocks. Every other profile's source is Solcore expressions and statements
-only, so this is the profile that reaches the compiler's inline-assembly path: Yul parsing,
-Solcore locals inside `assembly`, builtin resolution and lowering to Hull. The Core reference is
-the primitive profile's function for the same seed, budget and revision.
+in `assembly { }` blocks, which reach the compiler's inline-assembly path: Yul parsing, Solcore
+locals inside `assembly`, builtin resolution and lowering to Hull. The Core reference is the
+primitive profile's function for the same seed, budget and revision.
 
 A plan (`solcore-lean.assembly-plan.v1`) has a `form` drawn from a hash of the seed:
 - `switch`: the whole body is one block assigning `sc_out`, each Core `if` a Yul `switch` whose
@@ -919,8 +920,9 @@ block, reaching the Yul front end's own byte placement for `mload`, `mstore`, `m
 `sum<word, word>`. The wrapper computes `left = step(input)` and `right = step(input + 1)` before
 selecting, odd input selecting left, and every selected value contributes to the result. The Core
 reference contains a monomorphic curried selector closure and the applied step graph; it does not
-import Rust's specialized program. The full program passes the Core checker; the source emitter's
-meaning preservation remains unproved.
+import Rust's specialized program. The full program passes the Core checker, and the theorem
+`Generic.emit_source_meaning` relates the emitted text to this reference
+([scalar emitter meaning](../docs/design/scalar-emitter-meaning.md)).
 
 - A plan (`solcore-lean.generic-plan.v1`) has the step and a `variant`: `word`, `pair` or `sum`.
   The 512-node limit includes the selector and the ABI input.
@@ -1026,8 +1028,7 @@ visible only to original Core.
   usefulness and exhaustiveness by the pattern-matrix algorithm, without the compiler.
 - A Lean test compares the reference with an interpreter of first-match semantics on more than 200
   plans and a fixture against a separate Python model.
-- Budget: default 2,048, minimum 256, at most 4,096 nodes, the only budget above 512 in the case
-  tool, campaign and suite.
+- Budget: default 2,048, minimum 256, at most 4,096 nodes.
 - Fixed corpus: seven seeds, 56 cases, covering constructors, fields, declarations, views, pattern
   forms, wildcard positions and depths 1 to 3.
 
@@ -1095,18 +1096,14 @@ pinned fixtures `concat`, `slices`, `zeroize-memory-range`, `loop-value-copies`,
   never through a copy.
 - An out-of-range access fails with std's revert data: `OutOfBounds()` (`0xb4120f14`) for a
   value's Words and bytes, and `Panic(0x32)` for an array element since solcore-rs `e2eef194`.
-  For this profile alone, `semantic-differential.py` matches three paths that reverted with the
-  same data; every other profile still needs three returned Words.
+  Three paths that reverted with the same data match.
 - Budget: default 1,024, minimum 256, at most 2,048 nodes, without the 2,723-node hash closure.
 - Fixed corpus: 29 seeds, 232 cases, covering values, parts, cuts, writes, observations, indices,
   hazards, loops and hashed lengths. It skips plans whose loop writes a bytes value or slice.
-- Status: the fixed corpus matched on O2 and Yul. On O0 the four loop-running cases of seed 113
-  mismatched: a loop that declares a slice beside a length read returns 588 on O0 where Core and
-  Hull return 32.
-- Known finding: Sonatina O0 returns other Words for loops that write a bytes value or slice
-  through a helper, or inline beside an allocation in the same body, so random campaigns report
-  `semantic-mismatch`. The fuzz driver registers this class, which no longer occurs at `e2eef194`
-  ([continuous fuzzing](SEMANTIC_CI.md#continuous-fuzzing)).
+- Known finding: before `e2eef194`, Sonatina O0 returned other Words than Core and Hull for some
+  loops over bytes values and slices, in four fixed cases and in random campaigns. The class no
+  longer occurs at `e2eef194`, where the fixed corpus matched on every backend; the fuzz driver
+  keeps it registered ([continuous fuzzing](SEMANTIC_CI.md#continuous-fuzzing)).
 
 ### Compare Solcore memory calls
 
@@ -1215,7 +1212,7 @@ in its own scope. Two profiles share `Solcore.Synthesis.Internal.Captures`:
   methods, that return closures, one of which may call the other.
 
 - The pin lowers only closures that are statically one lambda and rejects the rest with `SC0422`,
-  so admission keeps plans to the lowered forms; the roadmap's probe lists the rejected forms.
+  so admission keeps plans to the lowered forms.
 - Every local is assigned where it is declared: Lean faults on reading an unassigned local, while
   the pin reads it as zero.
 - The Core reference holds every local in a cell. A closure snapshots its captures, and each call
@@ -1242,8 +1239,7 @@ Rules shared by the stateful profiles, unless a section says otherwise:
   scenarios have one to three. A generated origin records another count as `transactionCount`.
 - **Streams.** Since the `...-sequence-seed-v2` versions, every stream of a stateful case module
   starts at SplitMix64's finalizer of the block or scenario seed xor its domain. Reason: raw
-  streams made consecutive seeds' first-block choices lose values or step by a fixed residue
-  ([roadmap](../docs/design/next-implementation-roadmap.md)).
+  streams made consecutive seeds' first-block choices lose values or step by a fixed residue.
 - **Protocol.** Most contracts take `flags` and, when the flags are odd, revert after their writes
   with the result Word as a 32-byte payload; otherwise they return it. Generation draws one of
   four completion patterns (all return, or one revert in the first, second or third position),
@@ -1528,11 +1524,10 @@ and returns the sum of the three.
 
 ### Compare malformed calldata
 
-Every other profile sends canonical calldata. `stateful-malformed-calldata` sends the
-dynamic-array contract calldata with one malformation per transaction and compares the paths
-against the pinned std's dispatcher (`std/dispatch.sol`) and decoder (`std/std.sol`). The
-original Core contract `core-malformed-calldata-contract-v1` makes std's checks on the actual
-calldata, in std's order:
+`stateful-malformed-calldata` sends the dynamic-array contract calldata with one malformation per
+transaction and compares the paths against the pinned std's dispatcher (`std/dispatch.sol`) and
+decoder (`std/std.sol`). The original Core contract `core-malformed-calldata-contract-v1` makes
+std's checks on the actual calldata, in std's order:
 
 1. Fewer than 4 bytes or another selector reverts with `0x4924aef0`
    (`NoSelectorMatchedWithoutFallback()`).
@@ -1599,9 +1594,9 @@ decoder (`core-malformed-bytes-contract-v1`):
 ### Compare several methods
 
 `stateful-methods` gives `SynthesizedMethods` two to four external methods over shared slots and
-compares the paths against std's dispatcher. Every other stateful contract has one method,
-`run(...)`. The compiler builds std's method tuple in declaration order, the first matching
-selector runs, and a missing selector reaches the default fallback.
+compares the paths against std's dispatcher. The compiler builds std's method tuple in
+declaration order, the first matching selector runs, and a missing selector reaches the default
+fallback.
 
 - Method `i` is named `m_` and eight hex digits from the seed and takes zero to two `uint256`.
   Selectors are distinct and recorded in `ascending`, `descending` or `mixed` order.
@@ -1619,7 +1614,6 @@ selector runs, and a missing selector reaches the default fallback.
 
 `stateful-storage-loops` runs a bounded `while` loop whose iterations read and write declared
 slots, where store forwarding, loop-invariant motion and O2's memory and storage passes act.
-Every other stateful step is straight-line code over storage.
 
 - `SynthesizedStorageLoops.run(uint256 flags, uint256 input)`: slot 0 is an accumulator, slot 1
   the iteration total and slots 2 to 8 one per iteration.
@@ -1662,8 +1656,7 @@ plan, Core reference, observations and reductions, and adds a `form`.
 ### Compare enum and struct values in storage
 
 `stateful-adt-storage` stores user `enum` and `struct` values in fields and behind mapping keys,
-laid out by `std.StorageGeneric`, and reads them back with `match`. Every other stateful program
-stores Words, std pairs and std sums.
+laid out by `std.StorageGeneric`, and reads them back with `match`.
 
 - `enum ScChoice` has two to four variants of zero to three Word fields or one `struct ScPair`;
   `struct ScRecord { f0; f1; f2; }` holds the enum at a drawn position.
@@ -1684,7 +1677,7 @@ stores Words, std pairs and std sums.
 ### Compare ABI-encoded tuple returns
 
 `stateful-tuple-returns` returns a static ABI tuple of two to four Words and compares the whole
-return data. Every other stateful profile returns one Word.
+return data.
 
 - Convention: `CoreContractEntryProfile.wordTupleOutcomeV1 extraWords` returns the right-nested
   pairs of `extraWords + 2` Words as their concatenated encodings. Revert and trap carry one Word.
@@ -1696,8 +1689,8 @@ return data. Every other stateful profile returns one Word.
   slot 0 and the prior slot 2. The adapter expects `32n` bytes.
 - Fixed corpus: 12 scenarios, requiring each arity with both outcomes.
 - Decision: a dynamic `bytes` return was probed and not built then, because original Core had no
-  variable-length value; the bounded `bytes` return came later. The pinned compiler rejects a
-  `memory<DynArray<uint256>>` return.
+  variable-length value; the bounded `bytes` return came later. A `memory<DynArray<uint256>>`
+  return was rejected before `e2eef194` (Q008) and is accepted since.
 
 ### Compare bounded `bytes` returns
 
@@ -1761,9 +1754,11 @@ second)`. The body reads both indexed elements through std's `abiArrayGet`.
 `stateful-array-returns` returns std's ABI encoding of a memory array of up to three `uint256`,
 `bytes4`, `bytes` or `uint256[]` elements.
 
-- The pinned checked driver refuses a declared array output (Q008, `SC0231`), so the method
-  declares `returns (uint256)`, encodes a `memory<DynArray<t>>` with `abi_encode` and ends with the
-  `return_` opcode, as std's `do_exec` does.
+- The method declares `returns (uint256)`, encodes a `memory<DynArray<t>>` with `abi_encode` and
+  ends with the `return_` opcode, as std's `do_exec` does. Reason: before `e2eef194` the checked
+  driver refused a declared array output (Q008, `SC0231`). The pin accepts canonical memory
+  dynamic-array outputs, which the fixtures `storage-array` and `ufcs-array` and the `T[]` results
+  of `runtime-array-abi` use; this profile keeps its encoding.
 - Original Core returns the encoding's Words through `wordTupleOutcomeV1`. Arrays of user enums
   stay out, because std has no memory array of multi-Word ADTs.
 - The source reads the shape at run time from `length` and `choice`, so that no optimizer folds
@@ -1929,8 +1924,7 @@ python3 scripts/semantic-suite.py --mode fixed --backend yul \
 (`tests/e2e/*/main.sol`) on four compiled paths. No generator reaches most of their language, and
 no original Core exists for them, so the paths are compared with each other and with each
 fixture's recorded upstream expectations, and mutated inputs across the paths only. Agreement is
-never reported as a Core comparison. The [roadmap](../docs/design/next-implementation-roadmap.md)
-fixes the definitions.
+never reported as a Core comparison.
 
 - **Fixtures:** the 182 that `rust-scenario-parity.json` and `rust-method-parity.json` pin by
   source hash: 77 raw scenarios and 105 method-directive fixtures.
@@ -1973,9 +1967,8 @@ python3 scripts/test-semantic-fixtures.py
 - `report.json` (`solcore-lean.semantic-fixtures.v1`) states `coreReference: false`. The command
   returns 1 for any finding, harness error or changed tool.
 
-Status: at `e2eef194` all 182 fixtures compile on every path. The last complete fixed run, before
-the re-pin, agreed on every recorded step of every admitted path and met every recorded
-expectation. Known findings:
+Status: at `e2eef194` all 182 fixtures compile on every path, and in the fixed run there every
+recorded step agreed on all four paths and met its recorded expectation. Known findings:
 - Sonatina O2 crashed on `ignored-builtin-effects` at `2a745e12`; `e2eef194` carries upstream's fix.
 - The first-allocation class `offset-by-first-allocations`: source mutants whose returned words
   differ exactly where the first allocations differ, Hull and solc at `0x80`, Sonatina O2 at
