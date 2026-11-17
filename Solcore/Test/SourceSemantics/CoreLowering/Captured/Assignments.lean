@@ -227,7 +227,7 @@ theorem FactoryShape.statementTyping
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(next: Word) { let previous: Word = seed; seed = next; return previous; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
@@ -2116,7 +2116,7 @@ theorem FactoryShape.statementTyping
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(seed: Word) returns (function() returns (Word)) { return lam() { let copy: Word = seed; return copy; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
@@ -3940,7 +3940,7 @@ theorem FactoryShape.statementTyping
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(x: Word) { return seed; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=

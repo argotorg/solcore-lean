@@ -90,7 +90,7 @@ theorem failed_call [FunctionCalls.FaultTokens faults] {callerContext : SourceSe
 end Proof
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "type F = function(Word) returns (Word);",
     "function make(seed: Word) returns (F) { let unused: Word = 99; return lam(item: Word) -> Word { let converted = item + seed; { let nested = converted + wordFromInteger(0); nested; } if (converted < seed) { return seed; } return converted; }; }",
     "function fail(seed: Word) returns (F) { return lam(item: Word) -> Word { let table: mapping(Bool => Word); let loaded = table[item == seed]; let converted = item + seed; let gap: Word; return gap; }; }",
@@ -288,7 +288,7 @@ theorem completed_after_administrative_allocation
   exact ⟨formed, sameStore, formedSource⟩
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
@@ -487,7 +487,7 @@ theorem accepted_imperative_generation {checked : SourceCoreCompatibleCatalog.Ch
   refine ⟨site, sameId, sameCode, history, sameState, ?_, ?_, ?_⟩ <;> rw [sameState] <;> rfl
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function step(value: Word) returns (Word) { return value + 1; }",
     "function factory(seed: Word) returns (function() returns (Word)) { return lam() -> Word { let value: Word = seed; for (let i: Word = 0; i < 3; i += 1) { if (i == 1) { continue; } value = step(value); } while (value < 12) { value = step(value); } return value; }; }",
     "function pair(seed: Word) returns (function(Word, Bool) returns (Word)) { return lam(delta: Word, choose: Bool) -> Word { let value: Word = seed; if (choose) { for (let i: Word = 0; i < 2; i += 1) { value += delta; } } else { value += 1; } return value; }; }",
@@ -767,7 +767,7 @@ theorem third_projection (definitions : DataEnvironment) (administrative : Core.
   projection_typed (types := [.word, .bool, .integer]) rfl (.var rfl)
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function make(seed: Word) returns (function(Word, Bool) returns (Word)) { let unused: Bool = true; return lam(item: Word, choose: Bool) -> Word { return choose ? seed + item : item; }; }",
     "function single(seed: Word) returns (function(Word) returns (Word)) { return lam(item: Word) -> Word { return seed + item; }; }",
     "function pair(seed: Word) returns (function(Bool, Word) returns ((Bool, Word))) { return lam(flag: Bool, item: Word) -> (Bool, Word) { return (flag, seed + item); }; }",
@@ -1038,7 +1038,7 @@ theorem completed_source {checked : SourceCoreCompatibleCatalog.Checked} {prepar
   exact ⟨formed, (formed.reflects completed).2, formed.source program ordinary coercions⟩
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
@@ -1218,7 +1218,7 @@ theorem failed_call [FunctionCalls.FaultTokens faults] {callerContext : SourceSe
 end Proof
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(item: Word) -> Word { return seed + item; }; }" }] }
 
 /-- The view changes the enclosing expression header, while the actual
@@ -1515,7 +1515,7 @@ theorem runtime_not_ordinary :
 end Boundary
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "type F = function(Word) returns (Word);",
     "function loops(seed: Word) returns(F) { let unused: Word = 99; return lam(item: Word) -> Word { let sum = seed; for(let i: Word = 0; i < item; i += 1) { if(i == 1) { continue; } sum += i; } while(sum < seed + 10) { sum += 1; if(sum > seed + 5) { break; } } return sum; }; }",
     "function selected(seed: Word) returns(F) { return lam(item: Word) -> Word { match((item, seed)) { case (0, chosen) { return chosen; } case (left, right) { return left + right; } default { return 77; } } }; }",
@@ -2405,7 +2405,7 @@ theorem nonempty_globals_unused_suffix (unused : Environment) :
 end Boundaries
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "type F = function(Word) returns (Word);",
     "trait Mark<T> {}", "trait Stamp<T> {}", "impl Mark<Word> {}", "impl Stamp<Word> {}",
     "function keep(value: Word) returns(Word) { return value + 1; }",
@@ -2751,7 +2751,7 @@ abbrev reached_entry := @CallableIndexedLambdaNestedRuntimeBodyMeaning.Body.entr
 end Boundaries
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "type F = function(Word) returns (Word);",
     "type Maker = function(Word) returns(F);",
     "trait Mark<T> {}", "trait Stamp<T> {}", "impl Mark<Word> {}", "impl Stamp<Word> {}",

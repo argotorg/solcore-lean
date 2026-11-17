@@ -33,7 +33,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "enum Pair<A, B> { Pair(A, B) }",
     "enum Tree { Leaf(Word), Branch(Tree, Tree) }",
@@ -173,7 +173,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function marked(comptime item: Word) returns (Word) { return item; }",
@@ -364,7 +364,7 @@ private def word (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function markedEffects(comptime seed: Word) returns (comptime<Word>) {",
     " let total: Word = seed; let table: mapping(Word => Word);",
     " let bump = lam(comptime delta: Word) -> Word { total += delta; table[0] = total; return table[0]; };",

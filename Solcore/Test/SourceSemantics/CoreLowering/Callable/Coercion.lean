@@ -71,7 +71,7 @@ theorem context_and_owner {program : CheckedProgram} {method : ExecutableImplMet
   ⟨receipt.owner, receipt.inputs, receipt.roots⟩
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}", "impl Marker<Word> {}",
     "trait Witness<T> {}", "impl Witness<Word> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
@@ -229,7 +229,7 @@ theorem nonempty_header_profile (seed : SourceSpecialization.SpecializedFunction
   simp [CallerCovered]
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}",
     "impl Marker<Bool> {}",
     "trait Witness<T> {}",
@@ -413,7 +413,7 @@ theorem direct_expression_reflects [FunctionCalls.FaultTokens faults]
 end Meaning
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
     "trait Marker<T> {}", "impl Marker<Word> {}", "impl Marker<Bool> {}", "impl Marker<Box> {}",
     "trait Witness<T> {}", "impl Witness<Word> {}", "impl Witness<Bool> {}", "impl Witness<Box> {}",
@@ -905,7 +905,7 @@ theorem accepted_method_reflects [FunctionCalls.FaultTokens faults] {call : Call
   | fault fails => exact .method selected fails
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}", "impl Marker<Bool> {}",
     "trait Witness<T> {}", "impl Witness<Bool> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
@@ -1121,7 +1121,7 @@ theorem completed_at_two_dictionaries [FunctionCalls.FaultTokens faults]
   exact ⟨⟨_, _, _, _, firstBody, firstResult, firstHeapRep⟩, ⟨_, _, _, _, secondBody, secondResult, secondHeapRep⟩⟩
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}", "impl Marker<Bool> {}",
     "trait Witness<T> {}", "impl Witness<Bool> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
@@ -1345,7 +1345,7 @@ theorem first_fault_skips_second [FunctionCalls.FaultTokens faults]
   exact emitted_preserves functions extension definitions registered faithful observations runtimeViews uninitialized missing emitted chain entry heaps represented operand (.fault failed)
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Bool) }",
     "trait Marker<T> {}", "impl Marker<Word> {}", "impl Marker<Bool> {}",
     "trait Witness<T> {}", "impl Witness<Word> {}", "impl Witness<Bool> {}",
@@ -1539,7 +1539,7 @@ theorem changed_stage_rejected {left right : SourceSpecialization.SpecializedFun
       (CallableSpecializationEquality.eq_of_beq same)))
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}", "impl Marker<Bool> {}",
     "trait Witness<T> {}", "impl Witness<Bool> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
@@ -1676,7 +1676,7 @@ theorem prepared_dictionary {program : CheckedProgram} {before after : SourceSpe
     (covered _ receipt.selected) resolved receipt.materialized⟩
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
     "function isZero(value: Word) returns (Bool) { return value == 0; }",
     "impl Coerce<Word, Bool> { function coerce(value: Word) returns (Bool) { let flag: Bool = isZero(value); let roundtrip: Word = flag; return flag; } }",
@@ -1885,7 +1885,7 @@ theorem accepted_reflects [FunctionCalls.FaultTokens faults]
 end Accepted
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
     "trait Marker<T> {}", "impl Marker<Word> {}", "impl Marker<Bool> {}", "impl Marker<Box> {}",
     "trait Witness<T> {}", "impl Witness<Word> {}", "impl Witness<Bool> {}", "impl Witness<Box> {}",
@@ -2249,7 +2249,7 @@ theorem actual_open_header {checked : CallableAncestryPairedLookup.Checked}
 end OpenScope
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}", "impl Marker<Word> {}",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
     "impl Coerce<Word, Bool> { function coerce(value: Word) returns (Bool) { let seen = value; if (value == 0) { let coercionGap: Bool; return coercionGap; } return value == 1; } }",
@@ -2566,7 +2566,7 @@ end Accepted
 
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}", "impl Marker<Word> {}", "enum Box<T> { Box(T) }",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
     "impl Coerce<Word, integer> { function coerce(value: Word) returns (integer) { let seen = value; if (value == 0) { let coercionGap: integer; return coercionGap; } return wordToInteger(value); } }",
@@ -2991,7 +2991,7 @@ end Accepted
 
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}", "impl Marker<Word> {}",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
     "impl Coerce<Word, Bool> { function coerce(value: Word) returns (Bool) { let seen = value; if (value == 0) { let coercionGap: Bool; return coercionGap; } return value == 1; } }",
@@ -3341,7 +3341,7 @@ theorem accepted_reflects [FunctionCalls.FaultTokens faults]
 end Accepted
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
     "trait Marker<T> {}", "impl Marker<Word> {}", "impl Marker<Bool> {}", "impl Marker<Box> {}",
     "trait Witness<T> {}", "impl Witness<Word> {}", "impl Witness<Bool> {}", "impl Witness<Box> {}",
@@ -3756,7 +3756,7 @@ theorem arbitrary_selection_reflects [FunctionCalls.FaultTokens faults] {selecte
     faithful observations runtimeViews uninitialized missing member entry heaps represented selected completed
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
     "impl<B, A> Coerce<(A, B), Bool> { function coerce(value: (A, B)) returns (Bool) { let visited: Word = 7; return true; } }",
     "impl<B, A> Coerce<(A, B), Word> { function coerce(value: (A, B)) returns (Word) { let visited: Word = 9; let gap: Word; return gap; } }",
@@ -4038,7 +4038,7 @@ theorem repeated_requirement_safe {compiler : CheckedProgram} {caller : SourceSp
   exact CallableCoercionSelectionIdentity.primary_unique ledger accepted
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Bool) }", "enum Final { Final(Box) }", "enum Broken { Broken(Box) }",
     "trait Marker<T> {}", "impl Marker<Word> {}", "impl Marker<Bool> {}", "impl Marker<Box> {}",
     "trait Witness<T> {}", "impl Witness<Word> {}", "impl Witness<Bool> {}", "impl Witness<Box> {}",
@@ -4308,14 +4308,14 @@ theorem ground_is_not_range (owner : Resolved.DeclarationId) (parameter : TypePa
     TypeSystem.Ty.arraySlice, TypeSystem.Ty.memref]
 
 private def reorderedWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
     "impl<B, A> Coerce<(A, B), Bool> { function coerce(value: (A, B)) returns (Bool) { let visited: Word = 7; return true; } }",
     "function converted(left: Word, right: Bool) returns (Bool) { let value: (Word, Bool) = (left, right); return value; }"
   ]}] }
 
 private def coveredWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}", "impl Marker<Bool> {}",
     "trait Witness<T> {}", "impl Witness<Bool> {}",
     "trait Coerce<From, To> where From: Marker { function coerce(value: From) returns (To) where From: Witness; }",
@@ -4502,7 +4502,7 @@ theorem duplicate_call_order (key : Key) :
   · exact .letE (.newCell .word) (.inRight .unit)
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
     "impl Coerce<Bool, Word> { function coerce(value: Bool) returns (Word) { let table: mapping(Word => Word); table[0] = 7; if (value) { table[0] += 2; return table[0]; } let absent: Word; return absent; } }",
     "function converted(flag: Bool) returns (Word) { return flag; }",

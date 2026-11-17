@@ -124,7 +124,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Branch(Tree<T>, Tree<T>) }",
     "function main() returns (Word) { return 7; }"
   ] }] }
@@ -277,7 +277,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Branch(Tree<T>, Tree<T>) }",
     "function main() returns (Word) { return 7; }"
   ]}] }
@@ -483,7 +483,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 private def word (value : Nat) : Word := Word.ofNatModulo value
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Item(Word) }", "function main() returns (Word) { return 0; }"
   ]}] }
 
@@ -642,7 +642,7 @@ private def noFunctions (catalog : SourceCoreCompatibleCatalog.Catalog) : Functi
   source_function := False.elim
   extend := fun impossible _ _ _ => False.elim impossible
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Item(Word) }",
     "function scalar() returns (Word) { let table: mapping(Word => Word); table[1] = 7; return 0; }",
     "function nested() returns (Word) { let table: mapping(Word => mapping(Word => @Word)); let other: mapping(Word => @Word); table[1] = other; return 0; }",

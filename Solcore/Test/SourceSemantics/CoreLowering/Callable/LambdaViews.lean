@@ -231,7 +231,7 @@ private def require := SourceCompilerFeatureSupport.require
 private def get {α ε : Type} [Repr ε] := @SourceCompilerFeatureSupport.get α ε _
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function before() returns (Word) { let f = lam(value: (Word, Word)) -> Word { return 7; }; return f(1, 2); }",
     "function after() returns (comptime<Word>) { let f = lam(value: (Word, Word)) -> Word { return 7; }; return f(1, 2); }",
     "function accepted() returns (Word) { let f = lam(value: (Word, Word)) -> Word { return 7; }; return f((1, 2)); }"
@@ -820,7 +820,7 @@ theorem parent_reference_forbidden {original : TypedSource} {bodyRoots : List No
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make() returns (function() returns (Word)) { return lam() -> Word { let x: Word = 1; { true; } if (true) { false; } else { true; } return 5; }; }"}] }
 
 def run : IO Unit := do
@@ -932,7 +932,7 @@ private def require := SourceCompilerFeatureSupport.require
 /-- Existing integer-result admission is used without changing stage rules.
 The explicit local function type keeps each real emitted lambda monomorphic. -/
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function mixed(seed: Word, branch: Bool) returns (integer) { let f: function() returns (integer) = lam() -> integer { let missing: Word; let x: Word = wordFromInteger(integerAdd(wordToInteger(seed), 2)); { let nested: Word = wordFromInteger(integerSub(wordToInteger(x), 1)); wordToInteger(nested); } if (branch) { let delta: Word = wordFromInteger(integerSub(wordToInteger(x), wordToInteger(seed))); return wordToInteger(delta); } else { integerEq(wordToInteger(x), wordToInteger(seed)); } return wordToInteger(x); }; return f(); }",
     "function returned(seed: Word) returns (integer) { let f: function() returns (integer) = lam() -> integer { wordToInteger(seed); return integerSub(wordToInteger(seed), 1); }; return f(); }",
     "function unit(seed: Word) returns (integer) { let f: function() = lam() { { wordToInteger(seed); } return; }; f(); return wordToInteger(seed); }",
@@ -1201,7 +1201,7 @@ private def require := SourceCompilerFeatureSupport.require
 /-- The enclosing integer result uses the existing staged admission profile.
 Each lambda is explicitly monomorphic and really emitted by the indexed factory. -/
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "function nested(a: Word, b: Word) returns (integer) { let f: function() returns (integer) = lam() -> integer { return integerSub(integerAdd(wordToInteger(a), wordToInteger(b)), wordToInteger(b)); }; return 0; }",
     "function parents(a: Word, b: Word) returns (integer) { let f: function() returns (integer) = lam() -> integer { return integerSub(wordToInteger(a), wordToInteger(b)); }; return 0; }",
@@ -1558,7 +1558,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Row { First(Bool, Bool), Second(Bool, Bool) }",
     "function make(seed: Bool) returns (function() returns (Row)) { return lam() -> Row { return .Second(seed, true); }; }",
     "function fail() returns (function() returns (Row)) { return lam() -> Row { let missing: Bool; return .First(missing, true); }; }"]}] }
@@ -1730,7 +1730,7 @@ theorem accepted_allocation {layouts : SourceCoreAllocationLayouts.Prepared}
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(item: Word) -> Word { return seed + item; }; }",
@@ -2024,7 +2024,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
   SourceCompilerFeatureSupport.get label
 private def require := SourceCompilerFeatureSupport.require
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "function scalar() returns (function() returns (Bool)) { return lam() -> Bool { let m: mapping(Bool => Bool); return !m[true]; }; }",
     "function product() returns (function() returns (Bool)) { return lam() -> Bool { let m: mapping((Bool, Bool) => Bool); return m[(true, false)] || !m[(false, true)]; }; }",
@@ -2245,7 +2245,7 @@ theorem scalar_original {values : SourceCoreCompatibleValues.Context} {context :
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(seed: Word) returns (function() returns (Word)) { return lam() -> Word { let table: mapping(Word => Word); let missing: Word; @Word; false ? missing : table[1]; return ((!false && true) ? (seed + 2) : (seed * 3)); }; }"}] }
 
 def run : IO Unit := do
@@ -2814,7 +2814,7 @@ theorem metadata_alone_insufficient :
   cases output
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function nested() returns (integer) { let f: function() returns (integer) = lam() -> integer { let x: Word = 7; { integerEq(wordToInteger(x), wordToInteger(x)); } if (integerLt(wordToInteger(x), wordToInteger(x))) { return wordToInteger(x); } else { x; } return integerSub(wordToInteger(x), wordToInteger(3)); }; return 0; }",
     "function indexed() returns (integer) { let f: function() returns (Word) = lam() -> Word { let table: mapping((Bool, Bool) => Word); let spare: Word; { @Word; } if (integerEq(wordToInteger(2), wordToInteger(2))) { true; } else { false; } return table[(integerEq(wordToInteger(2), wordToInteger(2)), integerLt(wordToInteger(2), wordToInteger(2)))]; }; return 0; }",
     "function branch() returns (integer) { let f: function() returns (Bool) = lam() -> Bool { let x: Word = 3; if (integerEq(wordToInteger(x), wordToInteger(x))) { let y: Word = 7; y; } else { let y: Word; y; } return integerLt(wordToInteger(x), integerSub(wordToInteger(x), wordToInteger(1))); }; return 0; }"]}] }
@@ -3077,7 +3077,7 @@ theorem indexed_assignment {canonical changedSource : TypedSource} {roots : List
   exact reached
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function identity(value: Word) returns (Word) { return value; }",
     "function mixed() returns (Word) { let fn: function() returns (Word) = lam() -> Word { let nested: function() returns (Word) = lam() -> Word { return identity(7); }; let table: mapping(Bool => Word); let count = 0; while (count < 2) { count += 1; if (count == 1) { continue; } table[false] = count; } for (let i = 0; i < 2; i += 1) { match (i) { case 0 { table[true] = nested(); } default { table[true] += 1; } } } return table[true] + table[false]; }; return fn(); }",
     "function failed() returns (Word) { let fn: function() returns (Word) = lam() -> Word { let seen: mapping(Bool => Word); seen[false]; let missing: Word; return missing; }; return fn(); }"
@@ -3268,7 +3268,7 @@ theorem two_parameter_order (scheme : ConstrainedDeclarationScheme) (first secon
     ConstrainedDeclarationScheme.instantiate_parameterSubstitution_domain_reverse scheme next unique
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function pair<A, B>(a: A, b: B) returns (A) { return a; }",
     "function pairRef() returns (function(Word, Bool) returns (Word)) { return pair; }",
     "function callPair(a: Word, b: Bool) returns (Word) { return pair(a, b); }"]}]}

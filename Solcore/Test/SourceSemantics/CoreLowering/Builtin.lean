@@ -266,7 +266,7 @@ theorem completed_reflects
 end Meaning
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Word) }",
     "function bare(a: Word, b: Word) returns (integer) { let x: Word; x = wordFromInteger(integerAdd(wordToInteger(a), wordToInteger(b))); x += wordFromInteger(wordToInteger(a)); return wordToInteger(x); }",
     "function keys(a: Word, b: Word) returns (integer) { let m: mapping(Bool => Word); let keys: mapping(Bool => Word); m[integerEq(wordToInteger(keys[true]), wordToInteger(keys[false]))] = wordFromInteger(integerAdd(wordToInteger(b), wordToInteger(a))); return wordToInteger(m[true]); }",
@@ -486,7 +486,7 @@ private def checkNative (code : Expr) (result : Value) (after : Store) : IO Unit
     | _ => throw (IO.userError "builtin call became stuck")
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function sub(a: integer, b: integer) returns (integer) { return integerSub(a, b); }",
     "function add(a: integer, b: integer) returns (integer) { return integerAdd(a, b); }",
     "function mul(a: integer, b: integer) returns (integer) { return integerMul(a, b); }",
@@ -645,7 +645,7 @@ theorem FactoryShape.statementTyping
 private def workspace_variant : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function identity(value: Word) returns (Word) { return value; } function make(seed: Word) returns (function() returns (Word)) { return lam() { return seed; }; } function relay(seed: Word) returns (function() returns (Word)) { return make(identity(seed) + wordFromInteger(0)); }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
@@ -3672,7 +3672,7 @@ theorem compiled_post_reflects {value : Value} {finalStore : Store}
 end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function mixed(seed: Word) returns (integer) { let sum = 0; for (let i: Word, i = wordFromInteger(wordToInteger(seed)), let flag: Bool = integerEq(wordToInteger(seed), wordToInteger(seed)); i < 3; let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(copy), 1))) { if (flag) { sum += i; } } return wordToInteger(sum); }",
     "function shadow(seed: Word) returns (integer) { let i = 17; for (let i = wordFromInteger(wordToInteger(seed)); i < 2; let copy = wordFromInteger(wordToInteger(i)), i = copy + 1) { continue; } return wordToInteger(i); }",
     "function falseFirst(seed: Word) returns (integer) { for (let i = wordFromInteger(integerAdd(wordToInteger(seed), 5)); false; let never = wordToInteger(seed)) { return wordToInteger(seed); } return 5; }",
@@ -3683,7 +3683,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function postAbsent(seed: Word) returns (integer) { for (let i = wordFromInteger(wordToInteger(seed)); true; let absent: Word, i = wordFromInteger(wordToInteger(absent))) { continue; } return 1; }"
   ]}] }
 private def escape : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function main(seed: Word) returns (integer) { for (let i = seed; false; let copy = wordToInteger(i)) { } return copy; }"}] }
 private def arguments : List SourceCompilerFeatureSupport.Value := [.word Word.zero]
 private def inputCells : List (TypeSystem.Ty × Option SourceCompilerFeatureSupport.Value) := [(.word, some (.word Word.zero))]
@@ -4022,7 +4022,7 @@ theorem compiled_reflects [FunctionCalls.FaultTokens faults] {value : Value} {fi
 end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Word) }",
     "function nested(seed: Word) returns (integer) { let sum = wordFromInteger(wordToInteger(seed)); let m: mapping(Bool => Word); for (let i: Word, i = wordFromInteger(wordToInteger(seed)); integerLt(wordToInteger(i), 3); let copy = wordFromInteger(wordToInteger(i)), i = wordFromInteger(integerAdd(wordToInteger(copy), 1))) { let j = 0; while (integerLt(wordToInteger(j), 2)) { j = wordFromInteger(integerAdd(wordToInteger(j), 1)); if (integerEq(wordToInteger(j), 1)) { continue; } for (let k = 0; integerLt(wordToInteger(k), 2); k = wordFromInteger(integerAdd(wordToInteger(k), 1))) { m[integerEq(wordToInteger(i), wordToInteger(i))] = wordFromInteger(integerAdd(integerAdd(integerMul(wordToInteger(i), 10), wordToInteger(j)), wordToInteger(k))); sum += k; } } } return integerAdd(wordToInteger(m[true]), wordToInteger(sum)); }",
     "function unary(seed: Word) returns (integer) { let x = seed; for (let i = wordFromInteger(wordToInteger(seed)); integerLt(wordToInteger(i), 2); x ~=, i = wordFromInteger(integerAdd(wordToInteger(i), 1))) { x ~=; } return wordToInteger(x); }",
@@ -4035,7 +4035,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function conditionFault(seed: Word) returns (integer) { let missing: Bool; let seen: mapping(Bool => Bool); for (let ready = wordFromInteger(integerAdd(wordToInteger(seed), 1)); seen[false] || missing; let never: Word = 99) { return 0; } return 1; }"
   ]}] }
 private def escape : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function main() returns (integer) { for (let i = 0; false; let copy = i) { } return copy; }"}] }
 private def arguments : List SourceCompilerFeatureSupport.Value := [.word Word.zero]
 private def inputCells : List (TypeSystem.Ty × Option SourceCompilerFeatureSupport.Value) := [(.word, some (.word Word.zero))]
@@ -4340,14 +4340,14 @@ theorem compiled_reflects [FunctionCalls.FaultTokens faults] {value : Value} {fi
 end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "function emptyDefault(seed: Word) returns (integer) { match (seed) { case 0 {} default {} } return wordToInteger(seed); }",
     "function constructed(seed: Word) returns (integer) { match (Box((seed, 7))) { case .Box((0, x)) { return integerAdd(wordToInteger(x), 1); } case .Box((x, y)) { for (let i = 0; integerLt(wordToInteger(i), 2); i += 1) { match (i) { case 0 { continue; } default { return integerAdd(wordToInteger(x), wordToInteger(y)); } } } } } return 99; }",
     "function scrutineeFault(seed: Word) returns (integer) { let seen: mapping(Bool => Word); let missing: Word; match (wordFromInteger(integerAdd(wordToInteger(seen[false]), wordToInteger(missing)))) { case x { return wordToInteger(x); } default { return 99; } } return 0; }"
   ]}] }
 private def nonExhaustive : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function incomplete(seed: Word) returns (integer) { match (seed) { case 0 {} } return wordToInteger(seed); }"}] }
 private def faultResume (entry : SourceCompilerFeatureSupport.Entry) (arguments : List SourceCompilerFeatureSupport.Value) : IO Unit := do
   let complete ← entry.invoke arguments
@@ -4532,7 +4532,7 @@ theorem continue_finish {type : Ty} {environment : Environment} {store : Store}
       (LocalLoop.continuing_evaluates type environment store))
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "enum Box<T> { Box(T) }",
       "function unitComposite(seed: Word) { let cursor = seed; for (let i: Word = 0; i < 2; i += 1) { match (i) { case 0 { continue; } default { cursor += 1; } } } while (cursor < 2) { cursor += 1; match (cursor) { case 2 { break; } default {} } } match (cursor) { case 0 {} default { let shadow = cursor; shadow; } } }",
       "function returnedComposite(seed: Word) returns (integer) { for (let i = 0; true; i += 1) { match (Box((seed, i))) { case .Box((0, x)) { return integerSub(wordToInteger(x), 3); } case .Box((x, y)) { while (integerLt(wordToInteger(y), 2)) { y += 1; } return integerAdd(wordToInteger(x), wordToInteger(y)); } } } return 99; }",
@@ -4798,7 +4798,7 @@ theorem compiled_reflects (native : SourceCoreGeneralFunctions.CallableContext)
 
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Bool) }",
     "function initialized(a: Word, b: Word) returns (integer) { let sum = integerAdd(wordToInteger(a), wordToInteger(b)); { let sum = integerSub(sum, wordToInteger(a)); sum; } return sum; }",
     "function branches(a: Word, b: Word) returns (integer) { if (integerLt(wordToInteger(a), wordToInteger(b))) { let out = integerAdd(wordToInteger(a), wordToInteger(b)); return out; } else { let out = integerSub(wordToInteger(a), wordToInteger(b)); return out; } return wordToInteger(a); }",

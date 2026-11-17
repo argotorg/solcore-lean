@@ -600,7 +600,7 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def word (n : Nat) : Word := Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function main(seed: Word) returns (Word) { let cache: mapping(Word => Word); cache[0] = seed; return cache[0]; }"}] }
 
 private def complete (code : Expr) (environment : Environment) (store : Store) : IO (Value × Store) := do
@@ -727,7 +727,7 @@ private def w (n : Nat) : Word := Word.ofNatModulo n
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Item(Word) }",
     "function probe(seed: Word) returns (Word) { let f = lam(item: Word) { return item; }; return f(seed); }",
     "enum Holder<T> { Wrap(mapping(Word => T), Word), Other(mapping(Word => T), Word) }",
@@ -1039,7 +1039,7 @@ private def require (condition : Bool) (message : String) : IO Unit := do
 private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO α
   | .ok value => pure value | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function effects(root: mapping(Word => Word)) returns (Word) {",
     " let key = lam(x: Word) { root[1] = 20; return x; };",
     " let rhs = lam(x: Word) { root[1] = 30; root[2] = 40; return x; };",
@@ -1222,7 +1222,7 @@ private def w (n : Nat) : Word := Word.ofNatModulo n
 private def require (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Item(Word) }",
     "function probe(seed: Word) returns (Word) { let f = lam(item: Word) { return item; }; return f(seed); }",
     "function selected(root: mapping(Word => Word), key: Word) returns (Word) { return root[key]; }",
@@ -1393,7 +1393,7 @@ private def require (condition : Bool) (message : String) : IO Unit := do
 private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO α
   | .ok value => pure value | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "type F = function(Word) returns (Word);",
     "function inc(x: Word) returns (Word) { return x + 1; }",
     "function replace(root: mapping(Word => F), seed: Word) returns (mapping(Word => F)) {",
@@ -1639,7 +1639,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "function initializeWord() returns (Word) { let root: Word; let vals: mapping(Bool => Word); root = vals[false] + 2; return root; }",
     "function initializeBool() returns (Bool) { let root: Bool; root = false; return root; }",
@@ -1834,7 +1834,7 @@ private def integerPolicy (checked : SourceCoreCompatibleCatalog.Checked) : IO U
   let rejected : Workspace.RawWorkspace := {
     entry := "main.solc"
     externalLibraries := []
-    mainSources := [{path := "main.solc", content := "function rejected(x: integer, y: integer) returns (integer) { x += y; return x; }"}]}
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ "function rejected(x: integer, y: integer) returns (integer) { x += y; return x; }"}]}
   match checkProgram rejected with
   | .error [.inference _] => pure ()
   | _ => throw (IO.userError "bare Integer compound source admission changed")

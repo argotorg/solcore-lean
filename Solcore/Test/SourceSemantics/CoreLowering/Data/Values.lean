@@ -570,7 +570,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
     "function identity(value: Word) returns (Word) { return value; }"
   ] }]
@@ -934,7 +934,7 @@ private def present (value : Value) : Value := .inRight .unit value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
     "enum Row { First(Word, Bool), Other(Word, Bool) }",
     "function leaf(value: integer) returns (Tree<integer>) { return .Leaf(value); }",
@@ -1761,7 +1761,7 @@ private def present (value : Value) : Value := .inRight .unit value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree { Leaf(Word), Pair(Tree, Tree) }",
     "function choose(tree: Tree) returns (Word) {",
     "  match (tree) {",

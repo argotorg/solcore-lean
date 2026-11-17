@@ -436,7 +436,7 @@ def observeRoot (function : CheckedFunction) (signature generic : ProgramFunctio
   return {first, second, firstRead, secondRead, call, statement, different, parameters, inputTypes, returns, inputs, firstScheme, secondScheme, firstRequirements, secondRequirements, roots, statementFound, statementForm, statementType}
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function choose<A, B>(a: A, b: B) returns (A) { return a; }",
     "function wordRoot(value: Word, flag: Bool) returns (Word) { return choose(value, flag); }",
     "function boolRoot(flag: Bool, value: Word) returns (Bool) { return choose(flag, value); }"]}] }

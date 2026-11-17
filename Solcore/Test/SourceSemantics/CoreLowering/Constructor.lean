@@ -139,7 +139,7 @@ theorem FactoryShape.statementTyping
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "enum Holder { Hold(function() returns (Word), function() returns (Word), function(Word) returns (function() returns (Word)), function(integer) returns (Word)) } function make(seed: Word) returns (function() returns (Word)) { return lam() { return seed; }; } function pack(factory: function(Word) returns (function() returns (Word)), next: Word, prior: function() returns (Word), convert: function(integer) returns (Word)) returns (Holder) { return .Hold(factory(next), prior, factory, convert); }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=

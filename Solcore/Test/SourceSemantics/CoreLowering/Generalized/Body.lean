@@ -27,7 +27,7 @@ namespace Tests.SourceCoreGeneralizedBodyExpression
 open Solcore Frontend SourceInference
 open Tests.SourceCompilerFeatureSupport (get require boot word)
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function duplicate(flag: Bool) returns (((Word, Word), (Bool, Word)), ((Bool, Bool), (Bool, Word))) {",
     "  let f = lam(value) { return ((value, value), (flag, 0)); };",
     "  return (f(11), f(flag));",
@@ -1591,7 +1591,7 @@ namespace Tests.SourceCoreGeneralizedLexicalBody
 open Solcore Frontend SourceInference
 open Tests.SourceCompilerFeatureSupport (get require boot word)
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function duplicate(flag: Bool) returns (((Word, Word), (Bool, Word)), ((Bool, Bool), (Bool, Word))) {",
     "  let f = lam(value) { let unused: Word; let copied = value; { flag; } if (flag) { flag; } return ((value, value), (flag, 0)); };",
     "  return (f(11), f(flag));",

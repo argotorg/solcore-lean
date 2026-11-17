@@ -37,7 +37,7 @@ open SourceSemantics
 open CallableIndexedNamedGeneration
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function accepted() returns (Word) { let f = lam(value: (Word, Word)) -> Word { return 7; }; return f((1, 2)); }"}] }
 
 def effectiveDiagnostics (compiled : SourceCoreUnifiedCompilation.Compiled)

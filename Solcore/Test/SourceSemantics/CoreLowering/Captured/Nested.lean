@@ -142,7 +142,7 @@ theorem FactoryShape.statementTyping
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(seed: Word) returns (function() returns (Word)) { return lam() { return seed; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
@@ -1100,7 +1100,7 @@ theorem FactoryShape.statementTyping
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(seed: Word) returns (function() returns (Word)) { return lam() { return seed; }; } function echo(value: mapping(Word => function() returns (Word))) returns (mapping(Word => function() returns (Word))) { return value; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=

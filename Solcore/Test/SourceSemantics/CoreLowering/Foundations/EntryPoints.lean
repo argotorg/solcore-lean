@@ -34,7 +34,7 @@ private def present (value : Core.Value) : Core.Value := .inRight .unit value
 
 def fixtures : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function operators(value: Word) returns (Word) {",
     " value += 3; value -= 1; value *= 2; value /= 3; value %= 5; value |= 8; value &= 15; value ^= 2; value ~=; return value; }",
     "function forOrder(limit: Word) returns (Word, Word) { let count: Word = 0;",
@@ -266,7 +266,7 @@ private def word (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function sites(value: Word, rhs: Word) returns (Word) {",
     "  value += rhs; value = rhs; value ~=;",
     "  for (value += rhs, rhs += value, value += rhs, value -= rhs; false;",
@@ -438,7 +438,7 @@ private def readReason : Core.Word := word 70
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function add(left: Word, right: Word) returns (Word) { left += right; return left; }",
     "function sub(left: Word, right: Word) returns (Word) { left -= right; return left; }",
     "function mul(left: Word, right: Word) returns (Word) { left *= right; return left; }",
@@ -617,7 +617,7 @@ private def reason : Core.Word := word 77
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function sequence(flag: Bool, initial: Word, replacement: Word) returns (Word, Bool) {",
     "  let value: Word; value = initial; let copied: Word = value;",
     "  value = replacement; copied; return (copied, flag);",
@@ -927,7 +927,7 @@ private def reason : Core.Word := word 93
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function mutate(flag: Bool, first: Word, second: Word) returns (Word, Bool) {",
     "  let value: Word; value = first; value = second; return (value, flag);",
     "}",
@@ -1196,7 +1196,7 @@ private def internalReason : Core.Word := word 99
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function zero() returns (Word) { return 7; }",
     "function increment(value: Word) returns (Word) { return value + 1; }",
     "function combine(a: Word, b: Word, c: Word) returns (Word) { return a + b + c; }",
@@ -1492,7 +1492,7 @@ private def fellThrough : Core.Word := word 88
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function early(flag: Bool, initial: Word, replacement: Word) returns (Word) {",
     "  let value: Word = initial;",
     "  { let inner: Word = replacement; if (flag) { return value; } value = inner; }",
@@ -1700,7 +1700,7 @@ private def rejected {α : Type} : Except SourceCoreDataCatalog.Error α → Boo
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
     "enum Box { Only }",
     "function identity(value: Word) returns (Word) { return value; }"
@@ -1805,7 +1805,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
     "enum Packet<T> { Empty, Only(T), Many(T, Bool, Word) }",
     "function identity(value: Word) returns (Word) { return value; }"
@@ -2047,7 +2047,7 @@ private def present (value : Core.Value) : Core.Value := .inRight .unit value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function inc(value: Word) returns (Word) { return value + 1; }",
     "function consume(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }",
     "function named(value: Word) returns (Word) { let f: function(Word) returns (Word) = inc; return consume(f, value); }",
@@ -2266,7 +2266,7 @@ private def present (value : Core.Value) : Core.Value := .inRight .unit value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function inc(value: Word) returns (Word) { return value + 1; }",
     "function dec(value: Word) returns (Word) { return value - 1; }",
     "function consume(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }",
@@ -2567,7 +2567,7 @@ private def testMetadata (program : CheckedProgram) : IO Unit := do
     | .ok _ => throw (IO.userError "forged indirect metadata was accepted")
   let badRecursiveInitializer : Workspace.RawWorkspace := {
     entry := "bad.solc", externalLibraries := []
-    mainSources := [{ path := "bad.solc", content :=
+    mainSources := [{ path := "bad.solc", content := "pragma solcore;\n" ++
       "function bad() returns (Word) { let f: function() returns (Word) = lam() -> Word { return f(); }; return f(); }" }]
   }
   match checkProgram badRecursiveInitializer with
@@ -2603,7 +2603,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree { Leaf(integer), Pair(Tree, Tree) }",
     "function keepTree(value: Tree) returns (Tree) { return value; }",
     "function keepMap(value: mapping(integer => Tree)) returns (mapping(integer => Tree)) { return value; }",
@@ -3118,7 +3118,7 @@ private def testSourceAdmission : IO Unit := do
     let workspace : Workspace.RawWorkspace := {
       entry := "main.solc"
       externalLibraries := []
-      mainSources := [{ path := "main.solc", content :=
+      mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++
         "function rejected(value: integer, rhs: integer) returns (integer) { value " ++ update ++ "; return value; }" }]
     }
     match checkProgram workspace with
@@ -3333,7 +3333,7 @@ private def present (value : Core.Value) : Core.Value := .inRight .unit value
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function echo(value: integer) returns (integer) { let copied: integer = value; return copied; }",
     "function tree(input: (integer, (Bool, (Word, integer)))) returns (integer, (Bool, (Word, integer))) { return input; }",
     "function replace(input: (integer, (Bool, (Word, integer))), replacement: (integer, (Bool, (Word, integer)))) returns (integer, (Bool, (Word, integer))) {",
@@ -3508,7 +3508,7 @@ private def literal (value : Nat) : Core.Expr := .word (word value)
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function sameInnerType(flag: Bool) returns (Word, Word) {",
@@ -3773,7 +3773,7 @@ private def present (value : Core.Value) : Core.Value := .inRight .unit value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function whileCount(start: Word) returns (Word, Word) {",
     "  let remaining: Word = start; let count: Word = 0;",
     "  while (remaining > 0) { let copy: Word = remaining; remaining = remaining - 1; count = count + 1; }",
@@ -4067,7 +4067,7 @@ private def comparisons : List (String × String) := [
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" (
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" (
     (wordOperators.map fun (name, operator) =>
       s!"function {name}(left: Word, right: Word) returns (Word)" ++ " { return left " ++ operator ++ " right; }") ++
     (comparisons.map fun (name, operator) =>
@@ -4366,7 +4366,7 @@ private def present (value : Core.Value) : Core.Value := .inRight .unit value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function countdown(n: Word) returns (Word) { return n == 0 ? n : countdown(n - 1); }",
     "function even(n: Word) returns (Bool) { return n == 0 ? true : odd(n - 1); }",
     "function odd(n: Word) returns (Bool) { return n == 0 ? false : even(n - 1); }",
@@ -4582,7 +4582,7 @@ private def functionType : TypeSystem.Ty := .function .word .word
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Holder { Put(function(Word) returns (Word)) }",
     "enum Branch { Leaf(function(Word) returns (Word)), Pair(Branch, Branch) }",
     "function inc(value: Word) returns (Word) { return value + 1; }",

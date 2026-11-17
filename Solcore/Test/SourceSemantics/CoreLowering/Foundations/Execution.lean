@@ -326,7 +326,7 @@ def source : String := String.intercalate "\n" [
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content := source }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ source }]
   externalLibraries := []
 }
 
@@ -392,7 +392,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .ok value => pure value
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function identity<T>(value: T) returns (T) { return value; }",
     "function mappingEcho(value: mapping(Word => Word)) returns (mapping(Word => Word)) { return value; }",
     "function capture(seed: Word) returns (function(Word) returns (Word)) { let current = seed; return lam(step: Word) { current += step; return current; }; }"
@@ -538,7 +538,7 @@ private def w (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function plain(left: Word, right: Word) returns (Word) { match ((left, right)) { case (x, y) { return x; } default { return 99; } } }",
     "function grouped(left: Word, right: Word) returns (Word) { match ((left, right)) { case ((x, y)) { return x; } default { return 99; } } }",
     "function deep(left: Word, right: Word) returns (Word) { match ((left, right)) { case ((((x, y)))) { return x; } default { return 99; } } }",
@@ -642,7 +642,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "type F = function(Word) returns (Word);",
     "function maker(value: Word) returns (F) { return lam(delta: Word) -> Word { value = value + delta; return value; }; }",
     "function zero() returns (function() returns (Word)) { return lam() -> Word { return 7; }; }",
@@ -1070,7 +1070,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree<T> { Leaf(T), Pair(Tree<T>, Tree<T>) }",
     "function leaf(value: Word) returns (Tree<Word>) { return .Leaf(value); }",
     "function main(flag: Bool, value: Word) returns (Tree<Word>) { return flag ? leaf(value) : .Pair(leaf(value), leaf(value + 1)); }",
@@ -1199,7 +1199,7 @@ open Solcore Solcore.Frontend SourceInference
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function local(table: mapping(Word => Word)) returns (mapping(Word => Word)) { let f = lam(item) { return item; }; return f(table); }"}]
 }
 
@@ -1285,16 +1285,16 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def require (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def single (content : String) : Workspace.RawWorkspace := {
-  entry := "api.solc", externalLibraries := [], mainSources := [{path := "api.solc", content}] }
+  entry := "api.solc", externalLibraries := [], mainSources := [{path := "api.solc", content := "pragma solcore;\n" ++ content}] }
 private def workspace : Workspace.RawWorkspace := {
   entry := "api.solc", externalLibraries := [], mainSources := [
-    {path := "api.solc", content := String.intercalate "\n" [
+    {path := "api.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "import {twice as doubled, recursive} from provider;",
       "function main() returns (Word) { return 17; }",
       "function local(value: Word) returns (Word) { return value + 1; }",
       "function hidden(value: Word) returns (Word) { return value; }",
       "export {doubled, local, recursive};"]},
-    {path := "provider.solc", content := String.intercalate "\n" [
+    {path := "provider.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "function twice(value: Word) returns (Word) { return value * 2; }",
       "function recursive(value: Word) returns (Word) { return value == 0 ? 31 : recursive(value - 1); }",
       "function providerOnly(value: Word) returns (Word) { return value; }",
@@ -1357,7 +1357,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def word (n : Nat) : Value := .word (Core.Word.ofNatModulo n)
 private def workspaceOf (lines : List String) : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" lines}] }
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" lines}] }
 
 private def maximum : Nat := 2 ^ 256 - 1
 private def high : Nat := 2 ^ 255
@@ -1731,7 +1731,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
-  entry := "main.solc", mainSources := [{ path := "main.solc", content }], externalLibraries := [] }
+  entry := "main.solc", mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }], externalLibraries := [] }
 
 private def sourceText : String := String.intercalate "\n" [
   "function arithmetic() returns (Word) { return wordFromInteger((integerLt(1, 2) ? integerMul(integerAdd(3, 4), integerSub(9, 2)) : wordToInteger(17))); }",
@@ -1852,7 +1852,7 @@ private def w (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function markedEffects(comptime seed: Word) returns (comptime<Word>) { let total: Word = seed; let table: mapping(Word => Word); let bump = lam(comptime delta: Word) -> Word { total += delta; table[0] = total; return table[0]; }; return bump(3); }",
@@ -2170,7 +2170,7 @@ private def reject (function : CheckedFunction) : IO Unit :=
 /-- Real checker fixtures and explicitly modified retained IR are separate.
 IO inspects compiler erasure, not a source/runtime heap equivalence. -/
 def run : IO Unit := do
-  let program ← match checkProgram {entry := "main.solc", mainSources := [{path := "main.solc", content}], externalLibraries := []} with
+  let program ← match checkProgram {entry := "main.solc", mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}], externalLibraries := []} with
     | .ok program => pure program | .error errors => throw (IO.userError s!"Integer let checker: {reprStr errors}")
   for (name, value) in [("basic", 42), ("negative", -3), ("chosen", 5), ("reuse", 3), ("unused", 42), ("shadow", 3), ("runtime", 2)] do
     inspect (← named program name) value
@@ -2331,7 +2331,7 @@ private def inspect (function : CheckedFunction) (native : List Core.Value) (exp
 /-- The IO fixtures exercise the actual default compatibility API. They do not
 stand in for a public unified compilation or physical-cell correspondence. -/
 def run : IO Unit := do
-  let program ← match checkProgram {entry := "main.solc", mainSources := [{path := "main.solc", content}], externalLibraries := []} with
+  let program ← match checkProgram {entry := "main.solc", mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}], externalLibraries := []} with
     | .ok program => pure program | .error errors => throw (IO.userError s!"residual checker: {reprStr errors}")
   for (name, values, expected) in [
       ("scalar", [.bool true, word 77], word 77), ("scalar", [.bool false, word 77], word 42),
@@ -2552,7 +2552,7 @@ private def rejected (function : CheckedFunction) (arguments : List Int) : IO Un
 /-- Actual checker output is tested separately from explicitly modified IR. -/
 def run : IO Unit := do
   let program ← match checkProgram {
-      entry := "main.solc", mainSources := [{ path := "main.solc", content }], externalLibraries := [] } with
+      entry := "main.solc", mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }], externalLibraries := [] } with
     | .ok program => pure program
     | .error errors => throw (IO.userError s!"statement fixture check failed: {reprStr errors}")
   let sequential ← named program "sequential"
@@ -2649,7 +2649,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -3801,7 +3801,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def word (n : Nat) : Value := .word (Core.Word.ofNatModulo n)
 private def workspaceOf (lines : List String) : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" lines}] }
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" lines}] }
 
 private def maximum : Nat := 2 ^ 256 - 1
 private def high : Nat := 2 ^ 255
@@ -3959,7 +3959,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def word (n : Nat) : Value := .word (Core.Word.ofNatModulo n)
 private def workspaceOf (lines : List String) : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" lines}] }
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" lines}] }
 
 private def types : List TypeSystem.FixedInteger := TypeSystem.FixedInteger.all
 private def modulus : Nat := 2 ^ 256
@@ -4088,7 +4088,7 @@ private def word (n : Nat) : Value := .word (Core.Word.ofNatModulo n)
 private def boolean (b : Bool) : Value := .bool b
 private def workspaceOf (lines : List String) : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" lines}] }
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" lines}] }
 private def modulus : Nat := 2 ^ 256
 
 private def workspace : Workspace.RawWorkspace := workspaceOf [
@@ -4440,10 +4440,10 @@ def runDefaulting : IO Unit := do
     ["function bad(x: uint256) returns (Word) { match (x) { case 115792089237316195423570985008687907853269984665640564039457584007913129639936 { return 1; } default { return 0; } } }"]
   rejectedPatternOutOfRange "a defaulted numeric pattern of 2^256" 115792089237316195423570985008687907853269984665640564039457584007913129639936
     ["function bad() returns (Word) { match (7) { case 115792089237316195423570985008687907853269984665640564039457584007913129639936 { return 1; } default { return 0; } } }"]
-  -- Upstream's `crates/uitest/tests/fixtures/solver/poly_int_defaulting`, verbatim. Upstream rejects it
-  -- in inference as ambiguous (SC0299); Lean rejects it earlier, at the signature, because a `where`
-  -- clause cannot name the builtin `Int`.
-  match checkProgram (workspaceOf ["pragma solcore;", "",
+  -- Upstream's `crates/uitest/tests/fixtures/solver/poly_int_defaulting`, verbatim, its leading
+  -- `pragma solcore;` added by `workspaceOf`. Upstream rejects it in inference as ambiguous (SC0299);
+  -- Lean rejects it earlier, at the signature, because a `where` clause cannot name the builtin `Int`.
+  match checkProgram (workspaceOf ["",
       "function poly<a>(x: a) returns (a) where a: Int {", "    return x;", "}", "",
       "function f() returns (word) {", "    let y = poly(7);", "    return 0;", "}"]) with
   | .error [.signature (.unknownTrait _ name)] =>
@@ -6062,7 +6062,7 @@ private def handle : Value → IO Handle
   | .function handle => pure handle
   | _ => throw (IO.userError "public function did not export an owned handle")
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function make(seed: Word) returns (function(Word) returns (Word)) { return lam(step: Word) { seed += step; return seed; }; }",
     "function use(f: function(Word) returns (Word), step: Word) returns (Word) { return f(step); }",
     "function recurse(n: Word) returns (Word) { return n == 0 ? 31 : recurse(n - 1); }",
@@ -6124,7 +6124,7 @@ upstream's `control-flow-capture-identity` fixture without its pragma, std
 wrappers and inline Yul: a closure keeps the values captured at its creation,
 and each call starts again from them. -/
 private def captureWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function issue120First() returns (Word) { let x: Word = 40; let f = lam(step: Word) { return x + step; }; x = 99; return f(2); }",
     "function issue120Second() returns (Word) { let x: Word = 41; let f = lam() { x = 42; return x; }; let result: Word = f(); return result + x; }",
     "function repeated() returns (Word) { let x: Word = 0; let f = lam() { x = x + 1; return x; }; let a: Word = f(); let b: Word = f(); return a * 10 + b + x * 100; }",

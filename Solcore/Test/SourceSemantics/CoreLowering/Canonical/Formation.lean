@@ -256,7 +256,7 @@ def observeFactory (function : CheckedFunction) (signature identity relay : Prog
   return {binder, localBinder, initialRead, initial, read, call, initialized, innerReturn, expression, statement, parameters, inputTypes, returns, inputs, binderRequirements, localScheme, localRequirements, localOwner, localDistinct, localOrdinary, roots, initializedFound, initializedForm, initializedType, innerReturnFound, innerReturnForm, innerReturnType, expressionFound, lambda, expressionRaw, expressionType, requirements, coercions, statementFound, returnStatement, statementType}
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function identity(value: Word) returns (Word) { return value; } function relay(value: Word) returns (Word) { return identity(value); } function make(seed: Word) returns (function() returns (Word)) { let saved: Word = relay(seed); return lam() { return identity(saved); }; }"}] }
 
 structure CheckedFixture where

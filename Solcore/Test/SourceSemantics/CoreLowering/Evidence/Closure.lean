@@ -41,7 +41,7 @@ private def w (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}", "impl Marker<Word> {}",
     "function keep<T>(value: T) returns (T) where T: Marker { return value; }",
     "function relay<T>(value: T) returns (T) where T: Marker { return keep(value); }",
@@ -477,7 +477,7 @@ def observeFactory (function : CheckedFunction) (signature generic : ProgramFunc
   | _ => throw (IO.userError "call ledger")
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
     "function choose<A, B>(a: A, b: B) returns (A) where A: Mark { return a; }",
     "function factory<A, B>(a: A, b: B) returns (function() returns (A)) where A: Mark { return lam() -> A { return choose(a, b); }; }",

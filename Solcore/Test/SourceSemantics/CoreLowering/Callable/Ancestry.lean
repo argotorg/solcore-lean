@@ -25,7 +25,7 @@ private def assertTrue (test : Bool) (message : String) : IO Unit :=
   unless test do throw (IO.userError message)
 private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function unusedViews(seed: Word) returns (Word) {",
@@ -115,7 +115,7 @@ private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
@@ -420,7 +420,7 @@ private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
@@ -649,7 +649,7 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def w (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type WordFunction = function(Word) returns (Word);",
     "function keep<T>(item: T) returns (T) where T: Mark { return item; }",
@@ -793,7 +793,7 @@ private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Holder { Hold(function(Word) returns (Word)) }",
     "trait Marker<T> {}", "impl Marker<Word> {}",
     "function keep<T>(value: T) returns (T) where T: Marker { return value; }",
@@ -978,7 +978,7 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .ok value => pure value
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function sharedHistory(seed: Word) returns (Word) {",
@@ -1314,7 +1314,7 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .ok value => pure value
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type WordFunction = function(Word) returns (Word);",
     "function keep<T>(item: T) returns (T) where T: Mark { return item; }",
@@ -1387,7 +1387,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def w (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function unusedViews(seed: Word) returns (Word) {",
@@ -1489,7 +1489,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "function keep<T>(item: T) returns (T) where T: Mark { return item; }",
     "function main() returns (Word) {",
@@ -1543,7 +1543,7 @@ private def assertTrue (test : Bool) (message : String) : IO Unit :=
   unless test do throw (IO.userError message)
 private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "trait Marker<T> {}", "impl Marker<mapping(Word => Word)> {}",
     "function keep<T>(value: T) returns (T) where T: Marker { return value; }",
@@ -1642,7 +1642,7 @@ private def manyRoots : IO Unit := do
     externalLibraries := []
     mainSources := [{
       path := "main.solc"
-      content := String.intercalate "\n" ((List.range 40).map fun index =>
+      content := "pragma solcore;\n" ++ String.intercalate "\n" ((List.range 40).map fun index =>
         "function root" ++ toString index ++ "() returns (Word) { return 7; }")}] }
   let program ← match checkProgram workspace with
     | .ok program => pure program | .error error => throw (IO.userError s!"many roots rejected: {reprStr error}")
@@ -1815,7 +1815,7 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .ok value => pure value
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
@@ -1890,7 +1890,7 @@ private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
@@ -2235,7 +2235,7 @@ private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",

@@ -117,7 +117,7 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .ok value => pure value
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "type F = function(Word) returns (Word);",
     "function main(seed: Word) returns (Word) {",
     " let cache: mapping(Word => Word); cache[0] = seed;",
@@ -570,7 +570,7 @@ theorem reference_supplies_laws (store : Store) (registry : SourceCoreRawMetadat
 end ActualReference
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function sub(a: integer, b: integer) returns (integer) { return integerSub(a, b); }",
     "function add(a: integer, b: integer) returns (integer) { return integerAdd(a, b); }",
     "function mul(a: integer, b: integer) returns (integer) { return integerMul(a, b); }",
@@ -713,7 +713,7 @@ theorem invalid_installer_rejected (tail : Expr) :
   cases invalid
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function step(value: Word) returns (Word) { return value + 1; }",
     "function recursive(value: Word) returns (Word) { if (value == 0) { return 1; } return step(recursive(value - 1)); }",
     "function even(value: Word) returns (Bool) { if (value == 0) { return true; } return odd(value - 1); }",
@@ -1018,7 +1018,7 @@ theorem runtime_view_from_receipts {checked : SourceCoreCompatibleCatalog.Checke
   runtime_views prepared profile related
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Eq<T> {}", "impl Eq<Word> {}", "trait Mark<T> {}", "impl Mark<Word> {}",
     "function first() returns (Bool) { return true; }",
     "function second() returns (Bool) { return false; }",
@@ -1214,7 +1214,7 @@ private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type F = function(Word) returns (Word);",
     "enum Holder { Hold(Word, F) }",
@@ -2204,7 +2204,7 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function sharedHistory(seed: Word) returns (Word) {",
@@ -2314,7 +2314,7 @@ theorem nil_keeps_raw_argument {layouts : SourceCoreAllocationLayouts.Prepared}
     (scope := []) (index := 0)) (.var rfl)
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function zero() returns (Word) { return 9; }",
     "function single(value: Word) returns (Word) { return value + 1; }",
     "function order(first: Word, flag: Bool, last: Word) returns (Word) { if (flag) { return first; } return last; }",
@@ -2563,7 +2563,7 @@ private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
@@ -2929,7 +2929,7 @@ theorem compare_from_receipts {checked : SourceCoreCompatibleCatalog.Checked} (p
     (observations prepared profile first) (observations prepared profile second) [a, b] store _ _ (.var rfl) (.var rfl)
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function first<A, B>(a: A, b: B) returns (A) { return a; }",
     "function second<A, B>(a: A, b: B) returns (A) { return a; }",
     "function firstRef() returns (function(Word, Bool) returns (Word)) { return first; }",
@@ -3248,7 +3248,7 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .ok value => pure value
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}",
     "type F = function(Word) returns (Word);",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",

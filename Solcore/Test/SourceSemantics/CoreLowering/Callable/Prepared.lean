@@ -684,7 +684,7 @@ private def full_native (cached : SourceCoreUnifiedCompilation.Compiled)
   pure (reprStr final.observation, reprStr execution.completion.result.native.observation, failed)
 
 def run : IO Unit := do
-  let program ← get "actual operator source" (checkProgram {entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content}]})
+  let program ← get "actual operator source" (checkProgram {entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}]})
   let names := ["binary", "unary", "coerced", "firstFault"]
   let roots ← names.mapM (SourceCoreUnifiedCorpusSupport.key program)
   let compiled ← get "actual public operator compile" (SourceCoreCompiler.compileChecked program
@@ -1852,7 +1852,7 @@ private def expected_cells (mode : Nat) : List SourceTypedRuntime.Cell :=
 
 private def audit (mode : Nat) : IO Unit := do
   let program ← get "suffix source" (checkProgram {
-    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := content mode}]})
+    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content mode}]})
   let key ← SourceCoreUnifiedCorpusSupport.key program "root"
   let compiled ← get "suffix public compile" (SourceCoreCompiler.compileChecked program
     [.declaration key.declaration []] {specializationBudget := 512, compilationFuel := 1000})

@@ -244,7 +244,7 @@ private def get {ε α : Type} [Repr ε] (label : String) : Except ε α → IO 
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function allBindings(flag: Bool) returns (Word, Bool) {",
     " let unused = lam(unusedArg) { return unusedArg; };",
     " let f = lam(value) { return value; };",
@@ -1991,7 +1991,7 @@ private def testLoweredExecution : IO Unit := do
 private def testParsedCheckedLocalRead : IO Unit := do
   let workspace : Workspace.RawWorkspace := {
     entry := "main.solc"
-    mainSources := [{ path := "main.solc", content :=
+    mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++
       "function read(value: Word) returns (Word) { return value; }" }]
     externalLibraries := []
   }
@@ -2050,7 +2050,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
     "type WordFunction = function(Word) returns (Word);",
@@ -2273,7 +2273,7 @@ open Solcore Solcore.Frontend SourceCoreExecution
 private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
     "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
     "function qualified(flag: Bool) returns (Word, Bool) { let f = lam(item) { return keep(item); }; return (f(19), f(flag)); }",

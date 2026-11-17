@@ -198,7 +198,7 @@ theorem IdentityShape.statementTyping {function : CheckedFunction} {signature : 
       shape.statementForm readTyped shape.statementType)⟩
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function failed() returns (Word) { let local: Word; return local; } function identity(seed: Word) returns (Word) { return seed; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=

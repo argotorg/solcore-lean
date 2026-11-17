@@ -38,7 +38,7 @@ abbrev DataValue := SourceCoreCompatibleValues.Value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Marker<T> {}", "impl Marker<mapping(Word => Word)> {}",
     "function keep<T>(value: T) returns (T) where T: Marker { return value; }",
     "function local(table: mapping(Word => Word)) returns (mapping(Word => Word)) { let f = lam(item) { return keep(item); }; return f(table); }",
@@ -419,7 +419,7 @@ theorem accepted_index_reflects {code : SourceCoreBasic.LoweredExpr}
 
 
 private def rawWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Key { Key(Bool) }",
     "enum Missing { Missing(Word) }",
     "enum Box { Box(Bool) }",
@@ -772,7 +772,7 @@ theorem accepted_index_reflects {code : SourceCoreBasic.LoweredExpr}
 
 
 private def rawWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Key { Key(Bool) }",
     "enum Missing { Missing(Word) }",
     "function product(m: mapping((Bool, Bool) => Bool)) returns (Bool) { return m[(true, false)]; }",
@@ -1210,7 +1210,7 @@ subtree to Functions lowering. No whole callable compilation is claimed. -/
 private def template_root : IO Unit := do
   let workspace : Workspace.RawWorkspace := {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word, Bool) {",
@@ -1775,7 +1775,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function updates(value: Word) returns (Word) { let next = value; next += 2; return next; }",
     "function lazy() returns (Word) { let table: mapping(Word => Word); table[1] = 7; return 0; }",
     "function alias(value: mapping(@Word => Word)) returns (Word) { let stored = value; return 1; }",
@@ -1917,7 +1917,7 @@ private def assertTrue (test : Bool) (message : String) : IO Unit :=
   unless test do throw (IO.userError message)
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Holder { Hold(function(Word) returns (Word)) }",
     "function inc(value: Word) returns (Word) { return value + 1; }",
     "function consume(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }",
@@ -2288,7 +2288,7 @@ private def assertTrue (test : Bool) (message : String) : IO Unit :=
   unless test do throw (IO.userError message)
 private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "trait Marker<T> {}", "impl Marker<mapping(Word => Word)> {}",
     "function keep<T>(value: T) returns (T) where T: Marker { return value; }",
@@ -2375,7 +2375,7 @@ private def manyRoots : IO Unit := do
     externalLibraries := []
     mainSources := [{
       path := "main.solc"
-      content := String.intercalate "\n" ((List.range 40).map fun index =>
+      content := "pragma solcore;\n" ++ String.intercalate "\n" ((List.range 40).map fun index =>
         "function root" ++ toString index ++ "() returns (Word) { return 7; }")}] }
   let program ← match checkProgram workspace with
     | .ok program => pure program | .error error => throw (IO.userError s!"many roots rejected: {reprStr error}")
@@ -2480,7 +2480,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function success(value: Word) returns (Word) { let next = value + 1; return next; }",
     "function failure(value: Word) returns (Word) { let absent: Word; return absent; }",
     "function forever(value: Word) returns (Word) { let total = value; while (true) { total += 1; } return total; }"
@@ -2794,7 +2794,7 @@ abbrev Key := SourceSpecialization.SpecializationKey
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Holder { Hold(Word, function(Word) returns (Word)) }",
     "function inc(value: Word) returns (Word) { return value + 1; }",
     "function plain() returns (Word, Bool) { return (7, true); }",
@@ -2903,7 +2903,7 @@ private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Holder { Hold(function(Word) returns (Word)) }",
     "trait Marker<T> {}", "impl Marker<Word> {}",
     "function keep<T>(value: T) returns (T) where T: Marker { return value; }",
@@ -3118,7 +3118,7 @@ private def w (n : Nat) : Core.Word := Core.Word.ofNatModulo n
 private def assertTrue (test : Bool) (message : String) : IO Unit :=
   unless test do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "trait Marker<T> {}", "impl Marker<mapping(Word => Word)> {}",
     "function keep<T>(value: T) returns (T) where T: Marker { return value; }",
@@ -3404,7 +3404,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "enum Tree<T> { Leaf(T), Branch(Tree<T>, Tree<T>) }",
     "enum Packet<T> { Empty, Only(T), Many(T, Bool, Word) }",

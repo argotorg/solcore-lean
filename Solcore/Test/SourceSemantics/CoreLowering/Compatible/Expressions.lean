@@ -35,7 +35,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def word (n : Nat) : Word := Word.ofNatModulo n
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function root(value: Bool) returns (Bool) { return value; }",
     "function parent(seed: Word) returns (Word) { let echo = lam(value) { return seed; }; return echo(true); }",
     "function lazy() returns (mapping(Word => Word)) { let table: mapping(Word => Word); return table; }"
@@ -432,7 +432,7 @@ private def sources : List String := [
   "function map_fault() returns ((mapping(Word => Word), Bool)) { let m: mapping(Word => Word); let other: mapping(Word => Word); let missing: Bool; return true ? (m, missing) : (other, false); }",
   "function parent(seed: Word) returns ((Word, Bool)) { let f = lam(flag) { return (true ? ~seed : seed + 3, flag); }; return f(true); }"]
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" sources}] }
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" sources}] }
 
 private def reached : Nat → TypedSource → ExpressionId → List ExpressionNode
   | 0, _, _ => []
@@ -739,7 +739,7 @@ private def sources : List String := [
   "function map_fault() returns (Pair<mapping(Word => Word), Pair<Bool, mapping(Word => Word)>>) { let m: mapping(Word => Word); let other: mapping(Word => Word); let missing: Bool; return .Pair(m, .Pair(missing, other)); }",
   "function parent(seed: Word) returns (Tree<Word>) { let f = lam(item) -> Tree<Word> { return .Leaf(true ? ~seed : seed + 3); }; return f(true); }"]
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" sources}] }
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" sources}] }
 
 private def reached : Nat → TypedSource → ExpressionId → List ExpressionNode
   | 0, _, _ => []
@@ -1074,7 +1074,7 @@ private def sources : List String := [
   "function lazy_skip() returns (Bool) { let m: mapping(Bool => Bool); let missing: Bool; return m[false && missing]; }",
   "function parent(seed: Word) returns (Word) { let f = lam(item) -> Word { let m: mapping(Word => Word); return m[~seed]; }; return f(true); }"]
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" sources}] }
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" sources}] }
 private def reached : Nat → TypedSource → ExpressionId → List ExpressionNode
   | 0, _, _ => []
   | fuel + 1, source, expression => match source.lookupExpression? expression with
@@ -1340,7 +1340,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def huge : Nat := 115792089237316195423570985008687907853269984665640564039457584007913129639937
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function unit() { return (); }",
     "function boolean() returns (Bool) { return true; }",
     "function word() returns (Word) { return 37; }",
@@ -1660,7 +1660,7 @@ private def sources : List String := [
   "function map_fault() returns (Row<mapping(Word => Word)>) { let m: mapping(Word => Word); let missing: Bool; return .First(m, missing); }",
   "function parent(seed: Word) returns (Row<Word>) { let f = lam(item) -> Row<Word> { return .First(~seed, true); }; return f(true); }"]
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" sources}] }
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" sources}] }
 
 private def reached : Nat → TypedSource → ExpressionId → List ExpressionNode
   | 0, _, _ => []
@@ -2101,7 +2101,7 @@ private def extraSources : List String := [
   "function map_skip() returns ((mapping(Word => Word), Bool)) { let m: mapping(Word => Word); let missing: Bool; return (m, false && missing); }",
   "function parent(seed: Word) returns ((Bool, Bool)) { let f = lam(flag) { return (~seed > 3, flag); }; return f(true); }"]
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" (operatorSources ++ extraSources)}] }
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" (operatorSources ++ extraSources)}] }
 
 private def reached : Nat → TypedSource → ExpressionId → List ExpressionNode
   | 0, _, _ => []
@@ -2467,7 +2467,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function constants() returns ((Bool, Bool)) { return ((true), false); }",
     "function inputs(flag: Bool) returns ((Bool, Bool)) { return ((flag), true); }",
     "function lazyFault() returns ((mapping(Word => Word), Bool)) { let m: mapping(Word => Word); let b: Bool; return ((m), b); }",
@@ -2634,7 +2634,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function word() returns (@Word) { return @Word; }",
     "function boolean() returns (@Bool) { return @Bool; }",
     "function integer() returns (@integer) { return @integer; }",
@@ -3132,7 +3132,7 @@ private def checkedSource (checkedProgram : CheckedProgram) (name : String) : IO
 is extracted from the same successful call used to build the native program. -/
 def run : IO Unit := do
   let checkedProgram ← get "source checker" (checkProgram {
-    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "function initialized(value: Bool) returns (Bool) { return value; }",
       "function absent() returns (Bool) { let value: Bool; return value; }",
       "function lazy() returns (mapping(Word => Word)) { let value: mapping(Word => Word); return value; }"
@@ -3380,7 +3380,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Row { First(Bool, Bool), Second(Bool, Bool) }",
     "function nested() returns (Row) { return .Second(true, true); }",
     "function child_fault() returns (Row) { let missing: Bool; return .First(missing, true); }",

@@ -2889,7 +2889,7 @@ private def w (value : Nat) : Core.Value := .word (Core.Word.ofNatModulo value)
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree { Leaf(Word), Pair(Tree, Tree) }",
     "function order() returns (Word) {",
     " let table: mapping(Word => Word); let calls: Word = 0;",

@@ -184,7 +184,7 @@ private def execute {artifact : Artifact} (session : Session artifact) (key : Ke
   | .ok (.succeeded completed) => pure completed
   | _ => throw (IO.userError "snapshot source invocation did not succeed")
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function make(seed: Word) returns (Word) { let f: function(Word) returns (Word) = lam(step: Word) { seed += step; return seed; }; return seed; }",
     "function unused(seed: Word) returns (Word) { let f = lam(value) { return (value, seed); }; return seed; }",
     "function absent() returns (Word) { let missing: Word; return missing; }",

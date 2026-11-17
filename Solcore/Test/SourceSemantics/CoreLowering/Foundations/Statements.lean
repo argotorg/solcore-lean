@@ -103,7 +103,7 @@ private def require (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function header(value: Word, rhs: Word) returns (Word) { for (value += rhs, value += rhs; false; value -= rhs) { } return value; }",
     "function equalOnly(value: Word, rhs: Word) returns (Word) { value = rhs; return value; }"
   ]}]
@@ -282,7 +282,7 @@ end ConcreteEqual
 open Tests.SourceCompilerFeatureSupport in
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function plain() returns (Word) { let root: Word; let vals: mapping(Bool => Word); root = vals[false] + 2; let later: Bool = true; return root; }",
     "function compound() returns (Word) { let root: Word; let vals: mapping(Bool => Word); root += vals[false] + 2; let later: Bool = true; return root; }",
     "function rhsFault() returns (Word) { let root: Word; let vals: mapping(Bool => Word); let missing: Word; root += vals[false] + missing; let later: Bool = true; return root; }"
@@ -2578,7 +2578,7 @@ end Receipt
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function copied(value: Word) returns (Word) { let local = value; return local; }",
     "function bad(value: Word) returns (Word) { let local = value; let gap: Word; return gap; }",
     "function initialEqual(seed: Word) returns (Word) { for (let root: Word, root = copied(seed); false; ) { return 99; } return seed; }",
@@ -3760,7 +3760,7 @@ private def word (value : Nat) : Core.Value := .word (Core.Word.ofNatModulo valu
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree { Leaf(Word), Pair(Tree, Tree) }",
     "function leaf(value: Word) returns (Tree) { return .Leaf(value); }",
     "function branch(left: Tree, right: Tree) returns (Tree) { return .Pair(left, right); }",
@@ -5286,7 +5286,7 @@ private def body : Expr := Core.LanguageResult.bind (.namedData ⟨0⟩)
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
-  mainSources := [{path := "main.solc", content := "function empty() returns () {}"}]
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ "function empty() returns () {}"}]
 }
 
 example {definitions : DataEnvironment} (entry : NativeEntry definitions) (arguments : List Core.Value)

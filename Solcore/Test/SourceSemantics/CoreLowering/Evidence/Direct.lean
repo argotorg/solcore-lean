@@ -473,7 +473,7 @@ def observeRoot (function : CheckedFunction) (signature generic : ProgramFunctio
   | _ => throw (IO.userError "call ledger")
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
     "function choose<A, B>(a: A, b: B) returns (A) where A: Mark { return a; }",
     "function relay<A, B>(a: A, b: B) returns (A) where A: Mark { return choose(a, b); }",

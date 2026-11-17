@@ -346,7 +346,7 @@ theorem FactoryShape.statementTyping
     exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.statementFound) shape.returnStatement expressionTyped shape.statementType)⟩
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(seed: Word) returns (function(Bool, Word, Bool) returns (Word)) { return lam(running: Bool, next: Word, done: Bool) { let previous: Word = seed; for (let flag: Bool = running; flag; flag = done) { seed = next; } return previous; }; }"}] }
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)
@@ -2659,7 +2659,7 @@ theorem FactoryShape.statementTyping
     exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.statementFound) shape.returnStatement expressionTyped shape.statementType)⟩
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(seed: Word) returns (function(Bool, Word, Bool) returns (Word)) { return lam(flag: Bool, next: Word, stop: Bool) { while (flag) { seed = next; flag = stop; } return seed; }; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=

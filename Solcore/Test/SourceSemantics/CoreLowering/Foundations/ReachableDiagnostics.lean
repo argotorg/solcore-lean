@@ -275,7 +275,7 @@ theorem actual_flow_tree : GenericImperativeMatch.Tree layouts specialization ac
 end ActualFlow
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function nested(seed: Word) returns (integer) { let result = seed; for (let i = seed; integerLt(wordToInteger(i), 3); i = wordFromInteger(integerAdd(wordToInteger(i), 1))) { match ((i, 7)) { case (0, x) { continue; } case (1, x) { let inner = x; while (integerLt(wordToInteger(inner), 9)) { inner += 1; match (inner) { case 8 { result += inner; } default { break; } } } } default { result += 1; } } } return wordToInteger(result); }",
     "function defaults(seed: Word) returns (integer) { let result = seed; match (seed) { case 0 {} default { let result = 9; match (result) { case 9 { result += 1; } default {} } } } return wordToInteger(result); }",
     "function failed(seed: Word) returns (integer) { let missing: Word; let seen: mapping(Bool => Word); for (let i = seed; true; let never: Word = 99) { match (i) { case 0 { let first = wordFromInteger(wordToInteger(seen[false])); let dead = wordToInteger(missing); return dead; } default { return wordToInteger(i); } } } return wordToInteger(seed); }" ]}] }
@@ -522,7 +522,7 @@ theorem actual_policy_ledger (solved : List SolvedRequirement)
   exact ⟨rfl, rfl⟩
 
 private def extractionWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Choice { Left(Word), Right(Word) }",
     "function sharedArms(seed: Word) returns (integer) { for (let i = 0; integerLt(wordToInteger(i), 2); i += 1) { match (Choice.Left(seed)) { case .Left(x) {} case .Right(y) {} default {} } } return wordToInteger(seed); }",
     "function scoped(seed: Word) returns (integer) { let total = seed; for (let i = 0; integerLt(wordToInteger(i), 2); i += 1) { match (Choice.Left(i)) { case .Left(0) { let x = 7; total += x; continue; } case .Left(x) { let y = x; total += y; } case .Right(y) {} default {} } } return wordToInteger(total); }"
@@ -1511,7 +1511,7 @@ end Receipt
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function copied(value: Word) returns (Word) { let local = value; return local; }",
     "function bad(value: Word) returns (Word) { let local = value; let gap: Word; return gap; }",
     "function equalLoops(seed: Word) returns (Word) { let result = 0; for (let outer: Word, outer = copied(0); outer < 1; let post: Word, post = copied(outer + 1), outer = post) { let inner: Word = 0; while (inner < 1) { result = copied(seed); inner = inner + 1; if (inner < 1) { continue; } break; } } return result; }",
@@ -1734,7 +1734,7 @@ theorem wrong_callback_rejected :
   cases typed
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(seed: Word) returns (function() returns (Word)) { return lam() -> Word { let value: Word = seed; for (let i: Word = 0; i < 3; i += 1) { value += 1; } while (value < 6) { value += 1; } return value; }; }"}] }
 
 def run : IO Unit := do
@@ -2037,7 +2037,7 @@ end Receipt
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Choice { Left(Word), Right(Word) }",
     "function equalMatch(seed: Word) returns (integer) { let result = 0; for (let i = 0; i < 2; i = i + 1) { match (Choice.Left(i)) { case .Left(0) { result = seed; continue; } case .Left(x) { result = result + x; } case .Right(y) {} default {} } } return wordToInteger(result); }",
     "function sharedArms(seed: Word) returns (integer) { match (Choice.Left(seed)) { case .Left(x) {} case .Right(y) {} default {} } return wordToInteger(seed); }",
@@ -2331,7 +2331,7 @@ end CompilerConsumers
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function compound(seed: Word) returns (Word) { let result = seed; for (result += 1, result += 2; result < 9; result += 1) { if (result == 6) { continue; } if (result == 7) { break; } } return result; }",
     "function next(value: Word) returns (Word) { return value + 1; }",
     "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
@@ -2559,7 +2559,7 @@ end Origins
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function headers(seed: Word) returns (Word) { let out = seed; for (out += 1, out += 2; out < 9; out += 1) { match (out) { case 6 { continue; } default { if (out == 7) { break; } } } } return out; }",
     "function equalHeaders(seed: Word) returns (Word) { let out = seed; for (out = seed; out < seed + 2; out = out + 1) { match(out) { case x {} default {} } } return out; }",
     "function initialFault(seed: Word) returns (Word) { let root: Word; let seen: mapping(Bool => Word); for (root += seen[false]; false; root += seed) {} return root; }",

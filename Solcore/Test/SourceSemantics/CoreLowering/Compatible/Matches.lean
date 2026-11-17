@@ -44,7 +44,7 @@ private def encode (context : SourceCoreCompatibleValues.Context) (type : TypeSy
   | .ok encoded => pure encoded | .error error => throw (IO.userError s!"compatible control encode failed: {reprStr error}")
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "function ordered(table: mapping(@Word => Word), key: @Word) returns (mapping(@Word => Word)) { table[key] += 3; return table; }",
     "function nested(table: mapping(Word => mapping(@Word => Word)), key: @Word) returns (mapping(Word => mapping(@Word => Word))) { table[1][key] += 5; return table; }",
@@ -395,7 +395,7 @@ private def encoded (context : SourceCoreCompatibleValues.Context) (type : TypeS
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "enum Tree<T> { Leaf(T), Branch(Tree<T>, Tree<T>) }",
     "function boxed(value: Word) returns (Box<Word>) { return .Box(value); }",
@@ -731,7 +731,7 @@ theorem accepted_closure_body {layouts : SourceCoreAllocationLayouts.Prepared}
   exact evaluation_deterministic (agreement.unwrap completed) child
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function selected(flag: Word, a: Word, b: Word) returns (Word) { match ((flag, (a, b))) { case (0, (x, y)) { return x + y; } default { return 99; } } }",
     "function ordered(p: Word) returns (Word) { match ((p, (11, 13))) { case (0, (x, y)) { return x + y; } case (v, (_, y)) { return v + y; } } }",
     "function captured(marker: Word) returns (Word) { match ((lam(x: Word) -> Word { marker = marker + x; return marker; }, 2)) { case (f, x) { let ignored: Word = f(x); return marker; } } }"]}] }
@@ -953,7 +953,7 @@ private theorem noBranchCertificate : CompatibleMatchCertificates.Certificate co
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function fallthrough(p: Word) returns (Word) { match (p) { case 0 { return 11; } default {} } return 17; }",
     "function fault(p: Word) returns (Word) { let hole: Word; match (hole) { case v { return v; } default { return 99; } } return p; }",
     "function nested(p: Word) returns (Word) { match ((p, (7, 11))) { case (0, (x, y)) { match ((x, y)) { case (a, b) { return a + b; } } } default { return 99; } } }",
@@ -1177,7 +1177,7 @@ The enclosing qualified lambda/function compilation is not claimed. -/
 private def template_head : IO Unit := do
   let program ← get "runtime head template source" (checkProgram {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word, Bool) {",
@@ -1541,7 +1541,7 @@ execution and whole callable acceptance are not claimed by this fixture. -/
 private def template_root : IO Unit := do
   let program ← get "ordered template source" (checkProgram {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word) {",
@@ -1713,7 +1713,7 @@ theorem selected_closure_body
 
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function captured(marker: Word) returns (integer) { match ((lam(x: Word) -> Word { marker = wordFromInteger(integerAdd(wordToInteger(marker), wordToInteger(x))); return marker; }, 2)) { case (f, x) { let changed = wordToInteger(f(x)); return changed; } } }",
     "function selected(p: Word) returns (integer) { match ((p, 7)) { case (0, x) { let next = wordFromInteger(integerAdd(wordToInteger(x), 4)); return wordToInteger(next); } case (v, x) { let next = wordFromInteger(integerAdd(wordToInteger(v), wordToInteger(x))); return wordToInteger(next); } } }",
     "function failed(p: Word) returns (integer) { let hole: Word; match ((p, 7)) { case (0, x) { return wordToInteger(x); } case (v, x) { let changed = wordFromInteger(integerAdd(wordToInteger(v), wordToInteger(hole))); return wordToInteger(changed); } } }"]}] }
@@ -1762,7 +1762,7 @@ private def w (n : Nat) : Word := Word.ofNatModulo n
 private def assertTrue (condition : Bool) (message : String) : IO Unit := do
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Item(Word) }",
     "enum Holder<T> { Wrap(mapping(Word => T), Word), Other(mapping(Word => T), Word) }",
     "function mixed(root: mapping(Word => Holder<Word>), value: Holder<Word>, key: Word) returns (Word) { root[key] = value; return 0; }",
@@ -2381,7 +2381,7 @@ the lambda or the complete callable body. -/
 private def template_root : IO Unit := do
   let program ← get "pattern checked template source" (checkProgram {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word, Bool) {",
@@ -2591,7 +2591,7 @@ example {left right : DataConstructorInstantiation} (catalogValid : SignatureCat
   CompatiblePatternMetadata.metadata_eq catalogValid leftAuthentic rightAuthentic agrees
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree { Leaf(Word), Pair(Tree, Tree) }",
     "enum Box<T> { Box(T) }",
     "function closure(marker: Word) returns (Word) { match (lam(x: Word) -> Word { marker = marker + x; return marker; }) { case f { let first: Word = f(2); return f(3); } } }",
@@ -2780,7 +2780,7 @@ example {registry : SourceCoreRawMetadata.Registry} {functions : FunctionModel c
   CompatiblePatternValues.unpack (count := 1) rfl represented
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "function nested(marker: Word, m: mapping(Word => Word)) returns (Word) { match ((lam(x: Word) -> Word { marker = marker + x; return marker; }, (0, m))) { case (f, (0, bound)) { let ignored: Word = f(bound[7]); return f(bound[9]); } default { return 99; } } }",
     "function miss(marker: Word, m: mapping(Word => Word)) returns (Word) { match ((lam(x: Word) -> Word { marker = marker + x; return marker; }, (1, m))) { case (f, (0, bound)) { return f(bound[7]); } default { return marker; } } }",
@@ -3004,7 +3004,7 @@ this consumer's scope. -/
 private def template_root : IO Unit := do
   let program ← get "composite template source" (checkProgram {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word, Bool) {",

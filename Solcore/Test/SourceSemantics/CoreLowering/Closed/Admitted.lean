@@ -1036,7 +1036,7 @@ theorem UnitFactoryShape.statementTyping
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make() returns (function() returns ()) { return lam() {}; }"}] }
 
 private def shape (function : CheckedFunction) (signature : ProgramFunctionSignature) :

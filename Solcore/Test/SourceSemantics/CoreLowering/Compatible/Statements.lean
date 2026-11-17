@@ -739,7 +739,7 @@ theorem compiled_reflects [FunctionCalls.FaultTokens faults] (runtimeViews : Fun
 end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Word) }",
     "function bare() returns (Word) { let x: Word; x = 3; x += 4; x *= 2; x -= 1; return x; }",
     "function mapping() returns (Word) { let m: mapping(Bool => Word); m[true] = 3; m[true] += 4; m[false] = m[true] * 2; { let answer = m[false]; return answer; } return 0; }",
@@ -1007,7 +1007,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function success() returns (Word) { let root: mapping(Bool => Word); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); let nextMap: mapping(Bool => Word); root[keys[true]] = vals[false] + 2; return root[false] + nextMap[true]; }",
     "function repeated() returns (Word) { let root: mapping(Bool => mapping(Bool => Word)); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); let nextMap: mapping(Bool => Word); root[keys[true]][keys[true]] = vals[false] + 2; return root[false][false] + nextMap[true]; }",
     "function keyFault() returns (Word) { let root: mapping(Bool => Word); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); let nextMap: mapping(Bool => Word); let missing: Bool; root[missing || keys[true]] = vals[false] + 2; return root[false] + nextMap[true]; }",
@@ -1136,7 +1136,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "function missingDefault() returns (Word) { let root: mapping(Bool => Box<Word>); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); let nextMap: mapping(Bool => Word); root[keys[true]] = .Box(vals[false] + 2); return nextMap[true]; }",
     "function nestedDefault() returns (Word) { let root: mapping(Bool => mapping(Bool => Box<Word>)); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); let nextMap: mapping(Bool => Word); root[keys[true]][keys[true]] = .Box(vals[false] + 2); return nextMap[true]; }",
@@ -1608,7 +1608,7 @@ theorem compiled_reflects {layouts : SourceCoreAllocationLayouts.Prepared} {fram
     reason reason environments heaps .nil agrees typed reference read completed
 
 private def rawWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function ordered() { let first: Word; let second: Bool; return; }",
     "function fail() returns (Bool) { let first: Word; let second: Bool; return second; }",
     "function lazy() returns (Word) { let first: Bool; let second: mapping(Word => Word); return second[8]; }",
@@ -1829,7 +1829,7 @@ theorem compiled_reflects {layouts : SourceCoreAllocationLayouts.Prepared} {fram
     tree reason reason environments heaps locals agrees typed reference read unmapped completed
 
 private def rawWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Bool) }",
     "function ordered() returns (Bool) { let first = true; let second: Word; return first; }",
     "function fail() returns (Bool) { let missing: Bool; let bound = missing; let never: Word; return true; }",
@@ -2135,7 +2135,7 @@ theorem compiled_failure_preserves {layouts : SourceCoreAllocationLayouts.Prepar
     agrees typed reference read unmapped sourceFailure
 
 private def rawWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Bool) }",
     "function mixed() returns (Bool) { let a = true; let b: Word; let c = a; let d: Bool; let e = c; return e; }",
     "function fail() returns (Bool) { let a = true; let missing: Bool; let c = a; let d = missing; let never = false; return a; }",
@@ -2481,7 +2481,7 @@ theorem unit_and_tail_certificates :
     exact ⟨flow, tree⟩
 
 private def rawWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Word) }",
     "function success() returns (Bool, Bool) { true; return (false, true); }",
     "function lazy() returns (Bool) { let m: mapping(Word => Word); m; return true; }",
@@ -2668,7 +2668,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function success() returns (Word) { let root: mapping(Bool => Word); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); let nextMap: mapping(Bool => Word); root[keys[true]] = vals[false] + 2; return root[false] + nextMap[true]; }",
     "function repeated() returns (Word) { let root: mapping(Bool => mapping(Bool => Word)); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); let nextMap: mapping(Bool => Word); root[keys[true]][keys[true]] = vals[false] + 2; return root[false][false] + nextMap[true]; }",
     "function keyFault() returns (Word) { let root: mapping(Bool => Word); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); let nextMap: mapping(Bool => Word); let missing: Bool; root[missing || keys[true]] = vals[false] + 2; return root[false] + nextMap[true]; }",
@@ -2863,7 +2863,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "function missingDefault() returns (Word) { let root: mapping(Bool => Box<Word>); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); let nextMap: mapping(Bool => Word); root[keys[true]] = .Box(vals[false] + 2); return nextMap[true]; }",
     "function nestedDefault() returns (Word) { let root: mapping(Bool => mapping(Bool => Box<Word>)); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); let nextMap: mapping(Bool => Word); root[keys[true]][keys[true]] = .Box(vals[false] + 2); return nextMap[true]; }",
@@ -3030,7 +3030,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function strict() returns (Word) { let m: mapping(Bool => Word); let n: mapping(Bool => Word); return m[true] + n[false]; }",
     "function left_fault() returns (Word) { let missing: Word; let other: mapping(Bool => Word); return missing + other[true]; }",
     "function right_fault() returns (Word) { let m: mapping(Bool => Word); let missing: Word; return m[true] + missing; }",
@@ -3230,7 +3230,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "function build_box() returns (Box<Bool>) { let m: mapping(Bool => Bool); let n: mapping(Bool => Bool); return .Box(!m[true] || n[false]); }",
     "function conditional() returns (Box<Bool>) { let m: mapping(Bool => Bool); let n: mapping(Bool => Bool); return m[true] ? .Box(n[true]) : .Box(!m[false]); }",
@@ -3559,7 +3559,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function success() { let root: mapping(Bool => Word); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); root[keys[true]] = vals[false] + 2; }",
     "function repeated() { let root: mapping(Bool => mapping(Bool => Word)); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); root[keys[true]][keys[true]] = vals[false] + 2; }",
     "function keyFault() { let root: mapping(Bool => Word); let keys: mapping(Bool => Bool); let vals: mapping(Bool => Word); let missing: Bool; root[missing || keys[true]] = vals[false] + 2; }",

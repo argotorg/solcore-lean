@@ -341,7 +341,7 @@ def observeVia (function : CheckedFunction) (signature : ProgramFunctionSignatur
   | _ => throw (IO.userError "operator requirement ledger")
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait BitNot<T> { function bnot(value: T) returns (T); }",
     "impl BitNot<Word> { function bnot(value: Word) returns (Word) { return value; } }",
     "impl BitNot<Bool> { function bnot(value: Bool) returns (Bool) { return value; } }",

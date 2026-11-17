@@ -17,7 +17,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{
     path := "main.solc"
-    content := String.intercalate "\n" [
+    content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Eq<T> {",
       "  function eq(left: T, right: T) returns (Bool);",
       "}",
@@ -104,7 +104,7 @@ private def checkedProgram : IO CheckedProgram := do
 private def checkedProgramOf (content : String) : IO CheckedProgram := do
   let workspace : Workspace.RawWorkspace := {
     entry := "main.solc"
-    mainSources := [{ path := "main.solc", content }]
+    mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
     externalLibraries := []
   }
   match checkProgram workspace with
@@ -1888,7 +1888,7 @@ private def testNamedLogicalNotMismatchDoesNotFallback : IO Unit := do
     entry := "main.solc"
     mainSources := [{
       path := "main.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "function not(value: Word) returns (Bool) { return false; }",
         "function entry(value: Bool) returns (Bool) { return !value; }"
       ]
@@ -1948,7 +1948,7 @@ private def testNamedOperatorMismatchDoesNotFallback : IO Unit := do
     entry := "main.solc"
     mainSources := [{
       path := "main.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "function and(left: Word, right: Word) returns (Bool) { return false; }",
         "function entry(left: Bool, right: Bool) returns (Bool) {",
         "  return left && right;",

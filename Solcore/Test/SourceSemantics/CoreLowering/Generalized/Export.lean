@@ -38,7 +38,7 @@ open Solcore Core Frontend SourceInference SourceSemantics CoreLowering
 open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function make(flag: Bool) returns (function(Word) returns (Word), function(Bool) returns (Bool)) { let f = lam(value) { return value; }; return (f, f); }",
     "function capture(seed: Word) returns (function(Bool) returns (Word)) { let f = lam(value) { return seed; }; return f; }",
     "function tick(flag: Bool) returns (Bool) { return flag; }" ]}] }
@@ -4465,7 +4465,7 @@ namespace Tests.SourceCoreShiftSubset
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function wordByLiteral(w: Word) returns (Word) { return w << 3; }",
     "function wordByWord(w: Word, n: Word) returns (Word) { return w << n; }",
     "function narrowByWide(x: uint8, n: uint256) returns (uint8) { return x << n; }",
@@ -4510,7 +4510,7 @@ namespace Tests.SourceCoreCompoundShiftSubset
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function wordByLiteral(w: Word) returns (Word) { let r: Word = w; r <<= 3; return r; }",
     "function wordByWord(w: Word, n: Word) returns (Word) { let r: Word = w; r <<= n; return r; }",
     "function wordByNarrow(w: Word, n: uint8) returns (Word) { let r: Word = w; r >>= n; return r; }" ]}] }
@@ -4561,7 +4561,7 @@ namespace Tests.SourceCoreBitNotSubset
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function wordBare(w: Word) returns (Word) { let r: Word = w; r ~=; return r; }",
     "function wordElement(m: mapping(Word => Word), k: Word) returns (Word) { m[k] ~=; return m[k]; }",
     "function fixedBare(x: int8) returns (int8) { let r: int8 = x; r ~=; return r; }" ]}] }

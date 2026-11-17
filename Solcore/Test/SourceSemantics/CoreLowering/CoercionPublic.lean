@@ -468,7 +468,7 @@ def content : String := String.intercalate "\n" [
   "function use(f: function() returns (Word)) returns (Word) { return f(); }"]
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc",externalLibraries := [],mainSources := [{path := "main.solc",content}] }
+  entry := "main.solc",externalLibraries := [],mainSources := [{path := "main.solc",content := "pragma solcore;\n" ++ content}] }
 
 structure CheckedFixture where
   program : CheckedProgram
