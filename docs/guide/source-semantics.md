@@ -1,10 +1,10 @@
 # Source semantics
 
-`Solcore/SourceSemantics`, apart from `CoreLowering`, is the independent declarative semantics of the
-source language. It defines static typing, staging and a big-step dynamic semantics with faults,
-proves source type preservation, and connects the executable frontend to these judgments. No judgment
-here defines validity as success of an executable pass. The correspondence with Core is on
-[its own page](core-lowering.md).
+`Solcore/SourceSemantics`, apart from `CoreLowering`, is the independent declarative semantics of
+the source language. It defines static typing, staging and a big-step dynamic semantics with
+faults, proves source type preservation, and connects the executable frontend to these judgments.
+No judgment here defines validity as success of an executable pass. The correspondence with Core is
+on [its own page](core-lowering.md).
 
 - **Input.** The judgments are stated over the frontend's typed source
   (`Frontend.SourceInference.TypedSource`) and its signatures; `Program.ofChecked` turns a checked
@@ -12,16 +12,15 @@ here defines validity as success of an executable pass. The correspondence with 
 - **Builds on.** [Syntax](syntax.md), the type system and resolved syntax
   ([Foundations](foundations.md)), the frontend's typed IR, checker and inference
   ([Frontend](frontend.md)), and Core's primitives ([Core](core.md)).
-- **Built on by.** [Core lowering](core-lowering.md), the tests, and two compiler passes: the native
-  lowering imports [CaptureBinders](../../Solcore/SourceSemantics/CaptureBinders.lean) and the stage
-  analysis imports [Staging/Classification](../../Solcore/SourceSemantics/Staging/Classification.lean).
+- **Built on by.** [Core lowering](core-lowering.md), the tests, and two compiler passes: the
+  native lowering imports [CaptureBinders](../../Solcore/SourceSemantics/CaptureBinders.lean), and
+  the stage analysis imports
+  [Staging/Classification](../../Solcore/SourceSemantics/Staging/Classification.lean).
 
 The umbrella, [SourceSemantics](../../Solcore/SourceSemantics.lean), reaches the specification,
 dynamic preservation, the substitution laws, the checker theorems and part of `Internal/Inference`,
 `Soundness` included. The rest of `Internal/`, `Staging/Preservation` and `CompiledBodies` are
 reached only through the [CoreLowering umbrella](../../Solcore/SourceSemantics/CoreLowering.lean).
-[Conventions](conventions.md) says how to find a section by its namespace, and where new
-declarations go.
 
 ## Where things are
 
@@ -35,7 +34,7 @@ declarations go.
 | [WellFormed](../../Solcore/SourceSemantics/WellFormed.lean), [Graph](../../Solcore/SourceSemantics/Graph.lean) | The occurrence graph: `OccurrenceGraphWellFormed`, `ContainsExpression`, `Reachable`, `OccurrenceGraphClosed` |
 | [Ownership](../../Solcore/SourceSemantics/Ownership.lean), [Instantiation](../../Solcore/SourceSemantics/Instantiation.lean) | `LocalIdentityOwnership`, `RequirementOwnership`; `ExactSubstitution`, `SchemeInstantiates`, `StructuralSubstitution.applyScheme` |
 | [Traits](../../Solcore/SourceSemantics/Traits.lean), [Typing](../../Solcore/SourceSemantics/Typing.lean), [Requirements](../../Solcore/SourceSemantics/Requirements.lean) | Trait evidence (`EvidenceValid`), reference typing (`ReferenceHasRawType`), requirements and coercions (`RequirementValid`, `CoercionPathValid`) |
-| [Expressions](../../Solcore/SourceSemantics/Expressions.lean) | The construct rules: literals (`IntegerLiteralValid`, at `word`, `integer` and the fixed-width integer types, with the `negative` case for a literal folded from a prefix `-`), operators (`BinaryOperatorHasType`, its operator classes, `BinaryTraitDispatch`), calls, patterns, places and assignments (`WordCompoundAssignmentOperator`, and `FixedCompoundAssignmentOperator` at the fixed-width integer types). A new operator's typing goes here |
+| [Expressions](../../Solcore/SourceSemantics/Expressions.lean) | The construct rules: literals (`IntegerLiteralValid`), operators (`BinaryOperatorHasType`, its operator classes, `BinaryTraitDispatch`), calls, patterns, places and assignments (`WordCompoundAssignmentOperator`, `FixedCompoundAssignmentOperator`). A new operator's typing goes here |
 | [Control](../../Solcore/SourceSemantics/Control.lean) | `ControlContext`, `ControlSummary`, `BodyFacts` |
 | [Static](../../Solcore/SourceSemantics/Static.lean) | `ExpressionHasType`, `ExpressionFormHasRawType`, `StatementHasType`, `StatementsHaveType`, `BodyHasType`, `MatchExhaustive`. A new expression or statement form gets its typing rule here |
 | [StaticValidation](../../Solcore/SourceSemantics/StaticValidation.lean) | An executable scope validator and its correctness, `validateTypesWellScopedWith` |
@@ -52,10 +51,10 @@ not the complement of success.
 | [Heap](../../Solcore/SourceSemantics/Dynamic/Heap.lean) | `Dynamic.Heap`, `Dynamic.Heap.Reads`, `Dynamic.Heap.Allocates`, `Dynamic.Heap.AllocatesCopy`, `Dynamic.EnvironmentCopies` |
 | [GeneralizedClosure](../../Solcore/SourceSemantics/Dynamic/GeneralizedClosure.lean), [Evidence](../../Solcore/SourceSemantics/Dynamic/Evidence.lean) | Generalized local closures (`Dynamic.GeneralizedClosure.instantiate`), evidence closure (`Dynamic.EvidenceCloses`) |
 | [Typing](../../Solcore/SourceSemantics/Dynamic/Typing.lean) | `Dynamic.ValueHasType`, `Dynamic.HeapWellTyped`, `Dynamic.EnvironmentAgrees`, with their allocation and copy lemmas |
-| [Primitive](../../Solcore/SourceSemantics/Dynamic/Primitive.lean) | `Dynamic.BinaryPrimitiveApplies`, `Dynamic.StrictBinaryOperator`, coercions, `Dynamic.PatternMatches`, literal values (`Dynamic.ResolvedIntegerLiteralConstructs`, where a literal at a fixed-width integer type needs the type's range, so its word is canonical, and a negative literal wraps at `word` and is exact at `integer`); `Dynamic.BinaryValueApplies` and `Dynamic.UnaryValueApplies`, which choose between the primitive meaning and `Dynamic.FixedBinaryApplies` or `Dynamic.FixedUnaryApplies` by the operand's static type; `Dynamic.BinaryValuePanics`, the primitive panics with the fixed-width overflow and zero divisor (`Dynamic.FixedBinaryPanics`); `Dynamic.BuiltinApplies`, the builtin functions' meaning, under which a conversion keeps a word that is canonical for its type and `Typedef.rep` gives a value's word, and `Dynamic.BuiltinFaults`, a conversion's fault on any other word (`SemanticFault.dirtyHigherBitsForInteger`). A new primitive operation goes here |
+| [Primitive](../../Solcore/SourceSemantics/Dynamic/Primitive.lean) | `Dynamic.BinaryPrimitiveApplies`, `Dynamic.StrictBinaryOperator`, coercions, `Dynamic.PatternMatches`, literal values (`Dynamic.ResolvedIntegerLiteralConstructs`); `Dynamic.BinaryValueApplies` and `Dynamic.UnaryValueApplies`, which choose between the primitive meaning and `Dynamic.FixedBinaryApplies` or `Dynamic.FixedUnaryApplies` by the operand's static type; the panics (`Dynamic.BinaryValuePanics`, `Dynamic.FixedBinaryPanics`); the builtin functions (`Dynamic.BuiltinApplies`, `Dynamic.BuiltinFaults`). A new primitive operation goes here |
 | [Place](../../Solcore/SourceSemantics/Dynamic/Place.lean) | `Dynamic.PlaceResolves`, `Dynamic.ProjectionsUpdate`, `Dynamic.PlaceAssignment` |
-| [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean) | Success: `Dynamic.ExpressionFormEvaluates`, `Dynamic.StatementExecutes`, `Dynamic.CallableApplies`, `Dynamic.AssignmentValueApplies`, which `Dynamic.CompoundAssignmentApplies` applies at the target's static type, and `Dynamic.BitNotAssignmentApplies`, in-place `~` at the target's static type |
-| [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean) | Faults: `Dynamic.ExpressionFormFaults`, `Dynamic.StatementFaults`, `Dynamic.CallableFaults` (`builtinFaults` for a conversion of a word that is not canonical), and the invalid-operand relations (`Dynamic.WordBinaryOperator`, `Dynamic.AssignmentOperatorBinary`) |
+| [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean) | Success: `Dynamic.ExpressionFormEvaluates`, `Dynamic.StatementExecutes`, `Dynamic.CallableApplies`, `Dynamic.AssignmentValueApplies`, and `Dynamic.CompoundAssignmentApplies` and `Dynamic.BitNotAssignmentApplies` at the target's static type |
+| [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean) | Faults: `Dynamic.ExpressionFormFaults`, `Dynamic.StatementFaults`, `Dynamic.CallableFaults`, and the invalid-operand relations (`Dynamic.WordBinaryOperator`, `Dynamic.AssignmentOperatorBinary`) |
 | [Control](../../Solcore/SourceSemantics/Dynamic/Control.lean), [Preservation](../../Solcore/SourceSemantics/Dynamic/Preservation.lean) | Control outcomes against static summaries (`TypingControlShape`); the statement `Dynamic.WholeLanguagePreservation`, `Dynamic.SourceRuntimeValid`, and the cases that need no recursion, such as `Dynamic.BinaryPrimitiveApplies.preserves` |
 | [WholeLanguagePreservation](../../Solcore/SourceSemantics/Dynamic/WholeLanguagePreservation.lean) | One mutual block of private cases (`preserveFormRec`, `preserveBinaryRec`, `preserveStatementRec`, …) and `ProgramWellFormed.wholeLanguagePreservation` |
 | [Program](../../Solcore/SourceSemantics/Dynamic/Program.lean) | `Dynamic.ProgramEvaluates`, `Dynamic.ProgramOutcome`, `Dynamic.ProgramEvaluates.preserves` |
@@ -113,50 +112,46 @@ declarations with `example := @…`, so renaming one breaks it on purpose.
 
 ## Closures capture by value
 
-solcore-rs issue #120 compared Rust and Lean on two closure programs, and its maintainers decided that
-captured variables are passed by value. Lean follows that decision (7ac75aea3). A closure captures the
+solcore-rs issue #120 compared Rust and Lean on two closure programs, and its maintainers decided
+that captured variables are passed by value. Lean follows that decision. A closure captures the
 values its captured variables have when it is created:
 
 1. a later assignment in the enclosing scope does not reach the closure;
 2. an assignment inside the body does not reach the enclosing scope;
-3. each call starts again from the creation-time values, so an assignment in the body does not carry
-   over to the next call of the same closure;
+3. each call starts again from the creation-time values, so an assignment in the body does not
+   carry over to the next call of the same closure;
 4. a closure that captures another closure captures that closure value, which keeps its own
    creation-time values.
 
-Rust passes captured values as ordinary runtime arguments of the lifted lambda (the module comment of
-`crates/specialize/src/evaluate/closures.rs`), which gives rule 3. `Tests.SourceCoreExecution` in
-[Foundations/Execution](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean)
+Rust passes captured values as ordinary runtime arguments of the lifted lambda (the module comment
+of `crates/specialize/src/evaluate/closures.rs`), which gives rule 3. `Tests.SourceCoreExecution`
 runs #120's two programs and a repeated call: they give 42, 83 and 11, where shared cells gave 101,
 84 and 212.
 
 **Uninitialized locals.** Rust reads an uninitialized local as zero, also through a capture. Lean
-faults on such a read, by decision rather than by defining a zero value for every type. The semantics
-faults with `Dynamic.SemanticFault.uninitializedLocation` (`Dynamic.ExpressionFormFaults.localUninitialized`),
-except for a local of mapping type, which reads as the empty mapping; compiled code reports
-`SourceTypedRuntime.RuntimeError.uninitializedLocal`. A copy of an uninitialized cell is uninitialized,
-so the capture never faults, but a read in the body does. Lean and Rust disagree on any program that
-reads a local before assigning it, directly or through a capture, so such a program is not a
-comparison case ([differential testing](differential-testing.md#rules)).
+faults on such a read, by decision rather than by defining a zero value for every type
+(`Dynamic.ExpressionFormFaults.localUninitialized`; compiled code reports
+`SourceTypedRuntime.RuntimeError.uninitializedLocal`). A local of mapping type reads as the empty
+mapping. A copy of an uninitialized cell is uninitialized, so the capture never faults, but a read
+in the body does. Lean and Rust disagree on any program that reads a local before assigning it, so
+such a program is not a comparison case ([differential testing](differential-testing.md#rules)).
 
 **How the semantics does it.** A closure still holds an environment of locations; the copies are
 fresh cells.
-
 - `CaptureBinders.copiedBinder? source id` copies a binding when its identifier has exactly one
-  declaration among the source's inputs, lambda parameters and `let`, `for` and `match` binders, and
-  that declaration is monomorphic. A generalized local holds an immutable principal and a hidden match
-  scrutinee has no declaration, so both are shared. The lowering calls the same function on the same
+  declaration among the source's inputs, lambda parameters and `let`, `for` and `match` binders,
+  and that declaration is monomorphic. A generalized local (an immutable principal) and a hidden
+  match scrutinee (no declaration) are shared. The lowering calls the same function on the same
   source, so no invariant relates the two sides.
-- `Dynamic.EnvironmentCopies` gives each copied binding a fresh cell holding an exact copy of its cell
-  (`Dynamic.Heap.AllocatesCopy`); any other binding keeps its location.
-- At creation, `ExpressionFormEvaluates.lambda` stores the copies of the creation environment;
-  `StatementExecutes.letInitializedGeneralized` and `ForItemExecutes.letInitializedGeneralized` copy
-  once, and every instance shares the copies. At each call, `CallableApplies.closure` and
-  `closureUnit` copy `function.captured` again and bind the parameters on top; `CallableFaults.closureBody`
-  and `closureControlEscape` do the same.
+- `Dynamic.EnvironmentCopies` gives each copied binding a fresh cell holding an exact copy of its
+  cell (`Dynamic.Heap.AllocatesCopy`).
+- `ExpressionFormEvaluates.lambda` copies at creation, and
+  `StatementExecutes.letInitializedGeneralized` and `ForItemExecutes.letInitializedGeneralized`
+  copy once for all instances. `CallableApplies.closure` and `closureUnit` copy again at each call,
+  and so do the fault rules `CallableFaults.closureBody` and `closureControlEscape`.
 - Copying an exact cell keeps heap typing (`Dynamic.HeapWellTyped.copy`) and lexical agreement
-  (`Dynamic.EnvironmentCopies.agrees`), with no further fact about the closure. The body sees only
-  per-call copies, so nothing writes a snapshot cell and a captured closure needs no deeper copy.
+  (`Dynamic.EnvironmentCopies.agrees`). The body sees only per-call copies, so a captured closure
+  needs no deeper copy.
 
 [Core lowering](core-lowering.md#closures-by-value) describes the lowering and its proofs.
 
@@ -167,109 +162,84 @@ this area's steps, in order.
 
 ### Add a primitive operator
 
-As for the shifts (5b8c6e96d) and the unchecked arithmetic (e8d28e957). No preservation statement
-changes; each exhaustive `cases` over operators gains a case, and the build finds them. Since row
-1's step 8d (0e5e82583) the two operands are typed separately, as `leftType` and `rightType` in
-`BinaryOperatorHasType`, `ExpressionFormHasRawType.binary`, `BinaryOperationExecutionPreserves` and
-`preserveBinaryRec`, so an operator whose operands differ in type, as a shift's value and amount
-may, needs no new statement either. A compound form whose operand has its own type, as `<<=` and
-`>>=` since step 8d's second part (2f616db3a), needs an assignment rule of its own, and the private
-`compound_preserves` takes the leaf modification's preservation instead of the compound kind.
+No preservation statement changes: each exhaustive `cases` over operators gains a case, and the
+build finds them. The two operands are typed separately (`leftType` and `rightType` in
+`BinaryOperatorHasType` and its consumers, down to `preserveBinaryRec`), so operands of different
+types, as a shift's value and amount may be, need no new statement either.
 
 1. **Typing**, in [Expressions](../../Solcore/SourceSemantics/Expressions.lean): an operator class
-   (`ShiftBinaryOperator`, `UncheckedBinaryOperator`), a `BinaryOperatorHasType` constructor
-   (`wordShift`, `wordUnchecked`), a `BinaryTraitDispatch` row if the operator dispatches to a
-   trait, and `WordCompoundAssignmentOperator` for the compound form,
-   `FixedCompoundAssignmentOperator` where it takes a fixed-width target's type, or a rule of its
-   own where its operand has its own type: `<<=` and `>>=` are `ShiftCompoundAssignmentOperator`,
-   typed by `SourceAssignmentHasType.shiftCompound` with the target at `word` or one of the twelve
-   types (`ShiftValueType`) and the amount at any `ShiftAmountType`. A shift's amount is typed on
-   its own: `wordShift`, and `fixedShift` on the twelve types, take an amount of any
-   `ShiftAmountType`, `word` or an unsigned type.
+   (such as `ShiftBinaryOperator`), a `BinaryOperatorHasType` constructor (such as `wordShift`),
+   and a `BinaryTraitDispatch` row if the operator dispatches to a trait. A compound form goes into
+   `WordCompoundAssignmentOperator`, or `FixedCompoundAssignmentOperator` where it takes a
+   fixed-width target's type. One whose operand has its own type needs a rule of its own, as
+   `SourceAssignmentHasType.shiftCompound` is for `<<=` and `>>=`; the private `compound_preserves`
+   then takes the leaf modification's preservation instead of the compound kind.
 2. **Evaluation and faults**: `BinaryPrimitiveApplies` and `StrictBinaryOperator` in
-   [Primitive](../../Solcore/SourceSemantics/Dynamic/Primitive.lean), leaving a Word-only operator
-   out of `IntegerStrictBinaryOperator`; `AssignmentValueApplies` in
-   [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean); `WordBinaryOperator` and
-   `AssignmentOperatorBinary` in [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean), so that
-   a wrong operand faults. An operator whose meaning at a fixed-width integer type differs from
-   Word's on canonical words, as the signed orderings', checked `+ - * / %`'s, unchecked
-   `+ - * / %`'s (which wrap to the type's width, `Dynamic.fixedWrap`) and the shifts' (Word's shift
-   read at the type) do, also goes into `FixedBinaryApplies` at that type and into `FixedBinaryOwn`,
-   which `BinaryWordMeaning` excludes; its panics, if it has any, go into `FixedBinaryPanics`. The
-   binary rules read the left operand's static type (`operandType?`) and apply `BinaryValueApplies`,
-   which takes one meaning or the other, and their fault rules apply `BinaryValuePanics` the same
-   way. A unary operator has the same three: `FixedUnaryApplies`, `UnaryWordMeaning` and
-   `UnaryValueApplies`. Compound assignment reads the target's static type:
-   `CompoundAssignmentApplies` takes `FixedBinaryApplies` at a fixed-width target for the operators
-   of `FixedCheckedCompound` (`+= -= *= /= %=`, checked or unchecked, and `<<=` and `>>=`) and
-   `AssignmentValueApplies` elsewhere, and `AssignmentOperandsPanic` applies `BinaryValuePanics` at
-   that type. In-place `~` reads the target's static type too: `BitNotAssignmentApplies` takes
-   `FixedUnaryApplies` at the narrower unsigned types and `BitNotSnapshot`, Word's or Integer's `~`,
-   elsewhere, and `eq_of_plain` gives back `BitNotSnapshot` away from those types.
+   [Primitive](../../Solcore/SourceSemantics/Dynamic/Primitive.lean) (a Word-only operator stays
+   out of `IntegerStrictBinaryOperator`), `AssignmentValueApplies` in
+   [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean), and `WordBinaryOperator`
+   and `AssignmentOperatorBinary` in [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean), so
+   that a wrong operand faults.
+   - An operator whose meaning at a fixed-width integer type differs from Word's also goes into
+     `FixedBinaryApplies` and `FixedBinaryOwn`, which `BinaryWordMeaning` excludes, and its panics
+     into `FixedBinaryPanics`. `BinaryValueApplies` and `BinaryValuePanics` choose by the left
+     operand's static type (`operandType?`). A unary operator has `FixedUnaryApplies`,
+     `UnaryWordMeaning` and `UnaryValueApplies`.
+   - Compound assignment and in-place `~` choose by the target's static type
+     (`CompoundAssignmentApplies`, `AssignmentOperandsPanic`, `BitNotAssignmentApplies`).
 3. **Preservation**: `PrimitiveBinaryHasType` and its cases in
-   `PrimitiveBinaryHasType.sourceTyping`, `BinaryPrimitiveApplies.preserves` and
-   `AssignmentValueApplies.wordCompoundPreserves`, which `CompoundAssignmentApplies.preserves`
-   extends to fixed-width targets, then the binary case of `preserveBinaryRec`; `<<=` and `>>=`,
-   whose amount has another type, take `CompoundAssignmentApplies.shiftPreserves`, and the staging
-   layer's `bare_write_shift` and `projected_write_shift`. Where Word's result would leave a
-   fixed-width type's range, as for checked and unchecked `+ - * / %`, for the shifts on the twelve
-   types and for `~` on the narrower unsigned types, the proof needs the looked-up type to be the
-   operand's typed type (`BinaryValueApplies.preserves_checked`, `preserves_division`,
-   `preserves_unchecked` and `preserves_shift`, `UnaryValueApplies.preserves_narrow`, and
-   `BitNotAssignmentApplies.preserves_target` for in-place `~`); `Dynamic.operandType?_of_typing`
-   gives it from the source's unique node occurrences.
+   `PrimitiveBinaryHasType.sourceTyping`, `BinaryPrimitiveApplies.preserves`,
+   `AssignmentValueApplies.wordCompoundPreserves` and `CompoundAssignmentApplies.preserves`, then
+   the binary case of `preserveBinaryRec`. `<<=` and `>>=` take
+   `CompoundAssignmentApplies.shiftPreserves`, `bare_write_shift` and `projected_write_shift`. Where
+   Word's result would leave a fixed-width type's range, the proof needs the looked-up type to be
+   the operand's typed type (`BinaryValueApplies.preserves_checked` and its siblings), which
+   `Dynamic.operandType?_of_typing` gives.
 4. **Substitution and staging**: `StructuralSubstitution.BinaryOperatorHasType.applyParameters`,
-   `BinaryOperatorHasType.result_type_admissible_of_left`, which gives `result_type_admissible`, and
-   `FlexibleSubstitution.BinaryOperatorHasType.applySubstitution` in `StructuralLaws`; the
-   `operatorTyped` cases of `Staging/Preservation` and `Staging/Internal/SelectedPreservation`. A
-   new assignment rule also needs its case in `StructuralLaws`' two assignment recursions.
+   `BinaryOperatorHasType.result_type_admissible_of_left` and
+   `FlexibleSubstitution.BinaryOperatorHasType.applySubstitution` in `StructuralLaws`, with a new
+   assignment rule's case in its two assignment recursions; the `operatorTyped` cases of
+   `Staging/Preservation` and `Staging/Internal/SelectedPreservation`.
 5. **Inference soundness**: `BinaryOperatorInferenceCase`, `binaryBuiltin_hasType`,
    `binaryInteger_hasType`, `inferBinaryOperator_success_case` and
    `inferAssignedValueFuel_success_sound` in `Internal/Inference/Soundness`; then a case each in
-   `Internal/Inference` (`StatementDispatch`, `ExpressionLedgers`, `LedgerFamilies`,
-   `StatementResources`), `Internal/Formation` (`NormalizedCalls`, `NormalizedCoercions`),
-   `Internal/Privacy` (`ProtectedFrames`, `ProtectedInference`, `SelectedReferences`,
-   `SelectedInference`) and `Internal/Selected` (`Operators`, `OperatorMetadata`, `State`,
-   `Statements`). An open compound target waits for its type until finalization checks it, so
-   `inferAssignedValueFuel_success_sound` takes `AssignmentTargetFits`, which its callers get from
-   `FinalInferenceResources.assignment_targets_fit`. An unchecked operator's open literal operand
-   waits in the same way, so the binary typing theorems take `uncheckedFits`, which their callers
-   get from `FinalInferenceResources.unchecked_operands_fit`, and
-   `BinaryOperatorInferenceCase.uncheckedFallback` is its case. A shift's value and amount wait for
-   their types too, so the same theorems take `shiftFits`, which their callers get from
-   `FinalInferenceResources.shift_operands_fit`, and `BinaryOperatorInferenceCase.shift` is a
-   shift's case. A compound shift's amount waits too, so `inferAssignedValueFuel_success_sound` also
-   takes `AssignmentAmountFits`, which its callers get from
-   `FinalInferenceResources.shift_amounts_fit` (`SourceShiftAmountsFit`; `ForItemAmountFits` for
-   `for` headers). A memory array read's index waits as well, and so does `lidx(a, i)`'s: the two
-   typing routes, the selected and the compiled, take the index's fit at the read or the call from
-   `FinalInferenceResources.array_indexes_fit` (`SourceArrayIndexesFit.of_operatorSite`, through
-   `OperatorApplicationForm`, which admits both).
-6. **Core lowering and tests**: see [Core lowering](core-lowering.md#making-changes). Each commit
-   added a public-API test with the probe's results (`Tests.SourceCoreShiftExecution`,
-   `Tests.SourceCoreUncheckedExecution`), registered in [Tests/Main.lean](../../Tests/Main.lean).
+   files of `Internal/Inference`, `Internal/Formation`, `Internal/Privacy` and `Internal/Selected`,
+   such as `StatementDispatch`, `NormalizedCalls`, `ProtectedFrames` and `Operators`. What waits
+   for its type during inference is checked at finalization, so the typing theorems take its fit as
+   a premise, which their callers get from `FinalInferenceResources`:
+
+   | What waits | Premise, taken by | From `FinalInferenceResources` |
+   | --- | --- | --- |
+   | An open compound target | `AssignmentTargetFits`, `inferAssignedValueFuel_success_sound` | `assignment_targets_fit` |
+   | An unchecked operator's open literal operand | `uncheckedFits`, the binary typing theorems (case `BinaryOperatorInferenceCase.uncheckedFallback`) | `unchecked_operands_fit` |
+   | A shift's value and amount | `shiftFits`, the binary typing theorems (case `BinaryOperatorInferenceCase.shift`) | `shift_operands_fit` |
+   | A compound shift's amount | `AssignmentAmountFits`, `inferAssignedValueFuel_success_sound` | `shift_amounts_fit` (`ForItemAmountFits` for `for` headers) |
+   | A memory array read's index, and `lidx(a, i)`'s | The index's fit, both typing routes | `array_indexes_fit` (`SourceArrayIndexesFit.of_operatorSite`) |
+
+6. **Core lowering and tests**: see [Core lowering](core-lowering.md#making-changes). Add a
+   public-API test with the probe's results, such as `Tests.SourceCoreShiftExecution`, registered
+   in [Tests/Main.lean](../../Tests/Main.lean).
 
 ### Change an evaluation rule
 
-As for closures by value (7ac75aea3):
+As for closures by value:
 
 1. Change the success and the fault rules together, in
    [Heap](../../Solcore/SourceSemantics/Dynamic/Heap.lean),
    [Evaluation](../../Solcore/SourceSemantics/Dynamic/Evaluation.lean) and
    [Fault](../../Solcore/SourceSemantics/Dynamic/Fault.lean): `CallableApplies.closure` and
    `CallableFaults.closureBody` take the same copy premise.
-2. Add the typing facts the new premises need to
-   [Dynamic/Typing](../../Solcore/SourceSemantics/Dynamic/Typing.lean) (`Dynamic.HeapWellTyped.copy`),
+2. Add the typing facts the new premises need to `Dynamic/Typing` (`Dynamic.HeapWellTyped.copy`),
    then repair `Dynamic/Preservation` and `WholeLanguagePreservation`. The statement
    `Dynamic.WholeLanguagePreservation` did not change.
 3. Mirror the rule in staging. `Staging/RecursiveProfile` reuses the dynamic rules for atomic forms
-   (`Staging.Recursive.AtomicForm`, lambdas included), but restates calls, statements and generalized
-   lets. Then repair `Staging/Erasure`, `Staging/Internal/TraceSize` and the staged preservation cases.
-4. Core lowering keeps a sized copy of every dynamic rule in
-   [Internal/Foundations/SourceExecutionSize](../../Solcore/SourceSemantics/CoreLowering/Internal/Foundations/SourceExecutionSize.lean).
-   Change it in the same commit.
-5. Update the hand-built traces of [Semantics](../../Solcore/Test/SourceSemantics/Semantics.lean). Its
-   `Tests.SourceSemanticsCaptureCopies` section computes the copies those traces need.
+   (`Staging.Recursive.AtomicForm`, lambdas included), but restates calls, statements and
+   generalized lets. Then repair `Staging/Erasure`, `Staging/Internal/TraceSize` and the staged
+   preservation cases.
+4. Core lowering keeps a sized copy of every dynamic rule in its
+   `Internal/Foundations/SourceExecutionSize`. Change it in the same commit.
+5. Update the hand-built traces of [Semantics](../../Solcore/Test/SourceSemantics/Semantics.lean).
+   Its `Tests.SourceSemanticsCaptureCopies` section computes the copies those traces need.
 
 ### Add an expression or statement form
 
@@ -277,68 +247,56 @@ Add the typing rule to `Static` (`ExpressionFormHasRawType` or `StatementHasType
 `ExpressionFormEvaluates` and `ExpressionFormFaults` (or `StatementExecutes` and `StatementFaults`);
 then the cases of `WholeLanguagePreservation`, `Dynamic/Control` if the form transfers control,
 `Staging/Classification`, the staged profile, the sized copies and the substitution laws. Inference
-reads `Syntax.Statement` itself, so a statement form reaches its proofs even if no typed program keeps
-it; the [integer note](../design/integer-types-unchecked-shifts.md) explains why `unchecked` blocks
-have none.
+reads `Syntax.Statement` itself, so a statement form reaches its proofs even if no typed program
+keeps it; the [integer note](../design/integer-types-unchecked-shifts.md) explains why `unchecked`
+blocks have none.
 
 ### Work in the two large files
 
-[Internal/Inference/Soundness](../../Solcore/SourceSemantics/Internal/Inference/Soundness.lean) (the
-bridge from finalization to typing, namespace `SourceInferenceSoundness`) and
-[Internal/Substitution/StructuralLaws](../../Solcore/SourceSemantics/Internal/Substitution/StructuralLaws.lean)
-(namespaces `StructuralSubstitution`, then `FlexibleSubstitution`, with short sections per judgment)
-were one module each before the layout refactor. They have no `leanmerge` markers: find a proof by
-its namespace and name.
-
-- They cannot be cut: private helpers declared near the top are used thousands of lines below
-  (`list_eq_singleton_of_length_eq_one` in `Soundness`, `StructuralSubstitution.nominal_injective` in
-  `StructuralLaws`).
-- A change to either file rebuilds most of `Internal/` and of Core lowering. Put a lemma that needs no
-  private helper in a topic file that imports the large one, as `Internal/Inference/StatementResources`
-  imports `Soundness`.
+[Internal/Inference/Soundness](../../Solcore/SourceSemantics/Internal/Inference/Soundness.lean)
+(namespace `SourceInferenceSoundness`) and `Internal/Substitution/StructuralLaws` (namespaces
+`StructuralSubstitution`, then `FlexibleSubstitution`) have no `leanmerge` markers: find a proof by
+its namespace and name. They cannot be cut, since private helpers declared near the top are used
+thousands of lines below. A change to either rebuilds most of `Internal/` and of Core lowering, so
+put a lemma that needs no private helper in a topic file that imports the large one, as
+`Internal/Inference/StatementResources` imports `Soundness`.
 
 ## Pitfalls
 
-- **Validity is never success of a pass.** State a rule as a judgment, and connect a pass to it by a
-  theorem, as `SourceProgramCheckingSoundness` and `InferenceSoundness` do.
+- **Validity is never success of a pass.** State a rule as a judgment, and connect a pass to it by
+  a theorem, as `SourceProgramCheckingSoundness` and `InferenceSoundness` do.
 - **Faults are not derived by negation.** A new success rule whose premises can fail needs its fault
   rules; without them a failing program has no outcome at all.
-- **Two files stay low.** `CaptureBinders` and `Staging/Classification` are imported by the compiler, so
-  an import there that reaches the frontend's lowering or stage analysis makes a cycle.
-- **A bare `Context` depends on imports.** [Context](../../Solcore/SourceSemantics/Context.lean) keeps
-  its own file because lower Core lowering files mean `Core.Context` through `open Core`, and
-  `Internal/Execution/Reads` sits below it because its proofs mean `Frontend.SourceInference.Context`.
-  An import that reaches `Context` changes what the name means in those files.
-- **`private` is per file.** Two files may each declare a private helper with the same namespace
-  and name, and a merge of the two makes them clash: drop one copy if the texts are the same, and
-  rename one if they differ. `scripts/refactor/leanmerge.py merge` refuses such a merge and, when
-  the texts match, names the copy to delete; `leanmerge.py clashes` estimates the clashes of each
-  directory beforehand.
-  - Identical copies are common, such as `recordExpressionWithExpected_success_nodesPrefix` in
-    `Internal/Inference/ExpressionInduction` and `ExpressionDispatch`.
-  - Different texts are mostly in `Internal/Execution` (`CallGraph`, `TemplateBacking`, `Reads`),
-    `Internal/Privacy` (`ProtectedFrames` against `SelectedCalls` and `Active`, and
-    `unify_requirements` in `SelectedReferences`, `SelectedCalls` and `SelectedInference`) and
-    `Internal/Formation` (`unify_fields` in `NormalizedMatches`, `NormalizedDeclarations`,
-    `NormalizedLambdas` and `NormalizedCalls`).
-- **One public theorem, two proofs.** `RecursiveLedgerInvariant.fresh` is proved in `ExpressionLedgers`
-  and in `LedgerFamilies`, `SubtreePreserved.directChild` in `Selected/StatementReferences` and in
-  `Selected/Children`. Lean refuses to declare a visible name again, so neither file of a pair may
-  import the other; a third may import both, as `LedgerSoundness` does.
+- **Two files stay low.** The compiler imports `CaptureBinders` and `Staging/Classification`, so an
+  import there that reaches the frontend's lowering or stage analysis makes a cycle.
+- **A bare `Context` depends on imports.** [Context](../../Solcore/SourceSemantics/Context.lean)
+  keeps its own file because lower Core lowering files mean `Core.Context` through `open Core`, and
+  `Internal/Execution/Reads` sits below it because its proofs mean
+  `Frontend.SourceInference.Context`. An import that reaches `Context` changes what the name means
+  in those files.
+- **`private` is per file.** Two files may each declare a private helper with the same namespace and
+  name, and merging them makes the two clash: drop one copy if the texts are the same, and rename
+  one if they differ. `scripts/refactor/leanmerge.py merge` refuses such a merge and, when the texts
+  match, names the copy to delete; `leanmerge.py clashes` estimates the clashes beforehand. Such
+  pairs are common in `Internal/Inference`, `Internal/Execution`, `Internal/Privacy` and
+  `Internal/Formation`.
+- **One public theorem, two proofs.** `RecursiveLedgerInvariant.fresh` is proved in
+  `ExpressionLedgers` and in `LedgerFamilies`, and `SubtreePreserved.directChild` in
+  `Selected/StatementReferences` and in `Selected/Children`. Lean refuses to declare a visible name
+  again, so neither file of a pair may import the other; a third may import both, as
+  `LedgerSoundness` does.
 - **`@[simp]` reaches every importer.** `Internal/Inference/CoercionFitting` stays alone because the
-  selected coercion plan lemmas it needs are `simp` lemmas; `Internal/Formation/CoercionTargets` stays
-  apart so that a neighbour's `simp` lemmas cannot fire in its proofs; the test `IntegerBitNot` stays
-  apart from `Semantics` for the same reason.
+  selected coercion plan lemmas it needs are `simp` lemmas; `Internal/Formation/CoercionTargets`
+  stays apart so that a neighbour's `simp` lemmas cannot fire in its proofs; the test
+  `IntegerBitNot` stays apart from `Semantics` for the same reason.
 - **The umbrella does not reach most of `Internal/`.** `lake build Solcore.SourceSemantics` can pass
   while `Internal/Selected` or `Staging/Preservation` is broken. Build the CoreLowering umbrella, or
   the whole library, before you commit.
 - **The compiled route sits above part of Core lowering.** `CompiledBodies`, `Internal/Compiled`,
-  `Internal/Prepared` and `Staging/Internal/FaultCalls` import a few `CoreLowering/Internal` files
-  (`Selected/CatalogOrigins`, `Selected/MethodBodies`, `RecursiveNamed/HeadersAndPrograms`, and some
-  of `Generalized` and `Callable`), so a change there can break them.
-- **Front files hold proofs.** The front was not split into definitions and laws. Apart from the
-  files of the main theorems, such as `Dynamic/Preservation`, `Staging/Erasure` and the soundness
-  files, `Dynamic/Control`, `Graph` and `Dynamic/Typing` hold the most proofs.
+  `Internal/Prepared` and `Staging/Internal/FaultCalls` import a few `CoreLowering/Internal` files,
+  so a change there can break them ([Core lowering](core-lowering.md#pitfalls) lists them).
+- **Front files hold proofs.** The front was not split into definitions and laws. Besides the files
+  of the main theorems, `Dynamic/Control`, `Graph` and `Dynamic/Typing` hold the most proofs.
 
 ## Testing
 
@@ -352,9 +310,7 @@ its namespace and name.
 | [IntegerBitNot](../../Solcore/Test/SourceSemantics/IntegerBitNot.lean) | Integer bit-not against its lowering |
 | [Foundations/Execution](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean) | The public API on closures by value (`captureWorkspace`), shifts and unchecked arithmetic |
 
-Lean checks a test file's theorems and examples when it builds the file; `lake test` runs the `IO`
-entry points that [Tests/Main.lean](../../Tests/Main.lean) calls. Focused checks, from fast to
-complete:
+Focused checks, from fast to complete ([Tests](tests.md) says how tests run):
 
 ```sh
 lake build Solcore.SourceSemantics                    # specification, preservation, checker theorems
@@ -363,5 +319,4 @@ lake build Solcore.SourceSemantics.Staging.Preservation
 lake build Solcore.SourceSemantics.CoreLowering       # the rest of Internal/, and every consumer
 ```
 
-Then run the checks of [Workflow](workflow.md#before-you-commit): `lake build`, `lake test` and
-`node scripts/check-kernel.mjs` among them.
+Then run the checks of [Workflow](workflow.md#before-you-commit).
