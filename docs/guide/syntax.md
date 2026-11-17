@@ -181,16 +181,13 @@ These rest on three contracts, which a new construct extends:
 
 ## Making changes
 
-Four language changes have reached Syntax since the parser was built: shifts and row 4's array
-syntax (`T[]`, `new T[](n)` and the slices) went through the grammar and its proofs, `unchecked`
-blocks went around the parser, and unary minus took both routes. The commits for shifts and
-`unchecked` blocks name the paths from before the layout refactor;
-[Conventions](conventions.md#following-older-notes) says how to map them.
+A change goes through the grammar and its proofs, as the shifts and row 4's array syntax did, or
+around the parser, as `unchecked` blocks did; unary minus took both routes.
 [Adding a language feature](adding-a-feature.md) follows a change through every layer.
 
 ### An operator, or a spelling made of existing tokens
 
-Worked example: 5b8c6e96d, the shifts `<<`, `>>`, `<<=` and `>>=`.
+The shifts `<<`, `>>`, `<<=` and `>>=` were added this way.
 
 1. **AST and decoding**, in `Syntax/Operator`. Add the constructors, with their cases in
    `precedence` and `symbol`. A two-token spelling also needs `secondSymbol?` and a case in
@@ -204,35 +201,35 @@ Worked example: 5b8c6e96d, the shifts `<<`, `>>`, `<<=` and `>>=`.
 4. **Grammar**: `BinaryOperatorAtPrecedenceParses` and the ladder `ExpressionLayerParses` in
    `Grammar/Expressions`, and `ValueAssignOperatorParses` in `Grammar/Statements`.
 5. **Grammar proofs**: `Internal/ExpressionOutcomes` and `Internal/StatementOutcomes`.
-6. **Parser proofs**, in `Parser/Internal/`: `OperatorSoundness`, `ExpressionAtomSoundness`,
-   `ExpressionProofs`, `ExpressionTotality`, `PostfixTrace`, `SimpleStatementSoundness` and
-   `TermTotality`. The statements in `Parser/Correctness` did not change.
-7. **Downstream**: every exhaustive match on the operator types. See
+6. **Parser proofs**, in `Parser/Internal/`: the operator, expression, statement and term files,
+   such as `OperatorSoundness` and `ExpressionTotality`. The statements in `Parser/Correctness` did
+   not change.
+7. **Downstream**: every exhaustive match on the operator types; see
    [Frontend](frontend.md#a-new-construct-in-the-native-compiler).
-8. **Tests**: the public-API test `Tests.SourceCoreShiftExecution` in
-   [`Foundations/Execution`](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean),
+8. **Tests**: the public-API test `Tests.SourceCoreShiftExecution` in `Foundations/Execution`,
    called from [`Tests/Main.lean`](../../Tests/Main.lean). It also checks that separated tokens,
    as in `a < < b`, are rejected.
 
 ### A form that a pass around the parser can handle
 
-Worked example: e8d28e957, `unchecked { … }` blocks.
+`unchecked { … }` blocks are the example.
 
 - `Unchecked.prepare` finds each `unchecked` at a statement start followed by `{`, and replaces the
   keyword's bytes with spaces. The parser reads a plain block, and every span stays the same.
 - After parsing, `Unchecked.mark` gives the block's `+ - * / %` and `+= -= *= /= %=` the unchecked
   operators of `Syntax/Operator` (`uncheckedAdd` and the others), which the parser never produces.
+  Lambda bodies start outside any block.
 - The frontend's `parseWorkspaceFile` runs `prepare`, `parse` and `mark` in that order, and reports
-  a pass error as `ProgramLoadError.uncheckedBlock`.
+  a pass error, such as a nested block, as `ProgramLoadError.uncheckedBlock`.
 - No grammar, parser or proof changed: the parser theorems describe the blanked file. In exchange,
   the grammar says nothing about `unchecked`, and `Syntax/Unchecked` has no theorems.
-- A statement form was not used because inference's proofs name the numbered cases of its
-  traversal; see
-  [the integer design note](../design/integer-types-unchecked-shifts.md#unchecked-blocks-as-implemented).
-- Tests: `Tests.SourceCoreUncheckedExecution`, in the same test file, includes programs that the
+- A statement form was not used, because inference's proofs name the numbered cases of its
+  traversal ([design
+  note](../design/integer-types-unchecked-shifts.md#unchecked-blocks-as-implemented)).
+- Tests: `Tests.SourceCoreUncheckedExecution`, beside the shift tests, includes programs that the
   pass rejects while loading.
 
-Row 1's unary minus (53bb5d5a8) took both routes:
+Row 1's unary minus took both routes:
 - The parser reads a prefix `-` as `UnaryOp.negate`, in the grammar's prefix layer with `!` and `~`.
 - `mark` removes every `negate`. One over a numeric literal, through groups and repeated, folds into
   the literal (`CoreLiteralValue.negated`). Any other `-e` becomes `0 - e`, with
@@ -241,22 +238,16 @@ Row 1's unary minus (53bb5d5a8) took both routes:
 
 ### A new expression, statement or declaration form
 
-Three commits since the parser was built have added a form, all for row 4's arrays: 7a76a1fb8 the
-type form `T[]` (`TypeExprValue.array`), df10f3f11 the expression form `new T[](n)`
-(`ExprValue.newArray`, with the contextual keyword `new`) and fd61c0fdc the slices `a[s:e]`,
-`a[s:]`, `a[:e]` and `a[:]` (`ExprValue.slice`, with `a[]` rejected). Each came after commits that
-prepared its grammar and proofs without accepting new syntax: 8e2507095 split the type grammar
-into a base form and its suffixes, 1f3f02fa7 added the head `new T[](` with its lemmas before any
-atom reached it, and 4d6437fe7 gave what a `[` after an expression holds its own layer
-(`BracketContents`), whose optional bound 709281679 added before any bracket read it. Their parser
-proofs are the type, atom and bracket layers' own, in `Parser/Internal`, in place of a
-declaration's lemma family. No statement or declaration form has been added, so for those this
-order follows the structure of the code.
+Row 4's arrays added the only new forms so far: `T[]` (`TypeExprValue.array`), `new T[](n)`
+(`ExprValue.newArray`) and the slices (`ExprValue.slice`, whose bracket layer is
+`BracketContents`). Each came after commits that prepared its grammar and proofs without accepting
+new syntax, and its parser proofs are those of the type, atom and bracket layers. No statement or
+declaration form has been added, so for those the order below follows the structure of the code.
 
 1. **Tokens**, only if no spelling from existing tokens works: a `Symbol`, `HardKeyword` or
-   `ContextualKeyword` in `Token` with its `spelling` (and `ofString?` for a keyword), and a symbol's
-   entry in `multiSymbol?` or `singleSymbol?` in `Lexer/Character`. The lexer's proofs are in
-   `Lexer/ScanProperties` and `Lexer/Properties`.
+   `ContextualKeyword` in `Token` with its `spelling` (and `ofString?` for a keyword), and a
+   symbol's entry in `multiSymbol?` or `singleSymbol?` in `Lexer/Character`. The lexer's proofs are
+   in `Lexer/ScanProperties` and `Lexer/Properties`.
 2. **AST**: a constructor in `Term`, `Type`, `Yul`, `Declaration` or `Module`.
 3. **Validity**: a constructor of the matching judgment in `Validity`, such as `Expr.ValidFor`,
    covering every span of the form.
@@ -267,8 +258,8 @@ order follows the structure of the code.
 7. **Parser proofs**: the lemma family that `enumDecl` has, named after the production:
    `_invariantFreeOnValid` and `_ne_invariant` (totality), `_cursor_lt_onSuccess` and
    `_preservesTokenWindow` (progress), `_ordinaryOutcome_sound` and `_success_sound_and_validFor`
-   (soundness and provenance), `_ordinary_success_iff` and `_ordinary_reject_iff` (completeness), and
-   `_exactOutcomeSpec`. A new kind of top-level declaration also adds a field to
+   (soundness and provenance), `_ordinary_success_iff` and `_ordinary_reject_iff` (completeness),
+   and `_exactOutcomeSpec`. A new kind of top-level declaration also adds a field to
    `PlainTopItemTotalityContract`, and `topItemExactOutcomeSpec` must cover it.
 8. **`Syntax/Unchecked`**: a case in `Unchecked.expression` or `Unchecked.statement` when the form
    holds expressions or statements. Then the downstream matches and the tests, as for an operator.
@@ -283,45 +274,39 @@ order follows the structure of the code.
   and everything that imports it; an edit elsewhere in Syntax rebuilds only Syntax and its tests.
   Keep those three proof files small, and import no other proof file from the front.
 - **Some front files hold proofs.** `private` is per file, so a theorem that names a private helper
-  stays in the helper's file. `Parser/Signatures` (`finishFunctionModifiers`,
-  `emitModifierOutsideContract`) and `Parser/Blocks` keep every theorem that names their private
-  helpers, and what those theorems need. `Parser/SourceFiles` keeps the lemmas of its diagnostic
-  filter, `Parser/State` those of the parser state, and `Syntax/Operator` those of its decoders.
-- **Grammar levels carry their proofs.** A fuel level such as `CoreExpressionLevel` bundles a relation
-  with its `DeterministicOutcomeSpec`. So `Grammar/TermLevels`, `Grammar/StatementLayer`,
-  `Grammar/YulFuel` and `Grammar/YulOrdinary` hold outcome lemmas or import `Internal/` files, and a
-  changed relation there needs its determinism proof at that point.
+  stays in the helper's file, as in `Parser/Signatures`, `Parser/Blocks`, `Parser/SourceFiles`,
+  `Parser/State` and `Syntax/Operator`.
+- **Grammar levels carry their proofs.** A fuel level such as `CoreExpressionLevel` bundles a
+  relation with its `DeterministicOutcomeSpec`, so a changed relation in `Grammar/TermLevels`,
+  `StatementLayer`, `YulFuel` or `YulOrdinary` needs its determinism proof there.
 - **The precedence ladder is written three times**: `BinaryOp.precedence`, `Parser.expressionLayer`
   and `DeclarativeGrammar.ExpressionLayerParses`. Change them together.
 - **The grammar must not call the parser.** Token decoding that both need belongs in the AST layer,
   as `BinaryOp.at?` does in `Syntax/Operator`.
-- **A new token can break old inputs.** A `>>` token would stop `Box<Box<Word>>` from closing, which
-  is why shifts are two tokens. Their decoder requires the two tokens to touch, so `a < < b` is
-  rejected.
+- **A new token can break old inputs.** A `>>` token would stop `Box<Box<Word>>` from closing,
+  which is why shifts are two tokens. Their decoder requires the two tokens to touch, so `a < < b`
+  is rejected.
 - **`Unchecked` skips forms it does not know.** `Unchecked.expression` and `Unchecked.statement` end
   with a catch-all case that returns the form unchanged. A new form that holds expressions or
   statements builds without a case there, but an `unchecked` block does not reach inside it.
-- **Downstream proofs number their cases.** Inference proofs do functional induction on
-  `inferExprFuel` and name its cases by number, in `Frontend/SourceInference/Internal` and
-  `SourceSemantics/Internal`. A new expression or statement constructor shifts them; see
-  [Frontend](frontend.md#pitfalls).
+- **Downstream proofs number their cases**, so a new expression or statement constructor shifts
+  them; see [Frontend](frontend.md#pitfalls).
 - **Three separations are forced.**
-  - `Parser/Internal/LambdaParameterRecovery` and `Parser/Internal/ParameterTotality` both declare
+  - `Parser/Internal/LambdaParameterRecovery` and `ParameterTotality` both declare
     `LambdaParameterInternals.recoverLambdaParameter_ordinary` and
-    `recoverLambdaParameter_ne_invariant`. Lean accepts the same theorem from two imported files, but
-    not in a file that imports the other copy, so neither file may import the other.
-  - `Parser/Internal/AssemblySoundness` stays apart from `ControlSoundness`. It needs the public Yul
-    results, and their `@[simp]` lemma `yulStatement_executableFuel_eq_publicFuel` must stay out of
-    the statement totality proofs.
-  - `Internal/ContractMemberOutcomes` and `Internal/ContractBodyOutcomes` each have a different
-    private `absent_conflicts_token`, and the first also has `absent_conflicts_token_variant`.
-- **Private helper names repeat across files**, as `absent_conflicts_token` does in many `Internal/`
-  files. Moving code between files can make two of them clash; rename one. The layout refactor used
-  a `_variant` suffix.
+    `recoverLambdaParameter_ne_invariant`. Lean accepts the same theorem from two imported files,
+    but not in a file that imports the other copy.
+  - `Parser/Internal/AssemblySoundness` stays apart from `ControlSoundness`: its `@[simp]` lemma
+    `yulStatement_executableFuel_eq_publicFuel` must stay out of the statement totality proofs.
+  - `Internal/ContractMemberOutcomes` and `ContractBodyOutcomes` each have a different private
+    `absent_conflicts_token`.
+- **Private helper names repeat across files**, as `absent_conflicts_token` does. Moving code
+  between files can make two of them clash; rename one, as the layout refactor did with a
+  `_variant` suffix.
 - **Tests name theorems.** The Syntax tests check theorem names with `example := @name`, internal
   ones included. Renaming or deleting a theorem breaks them, so update the tests in the same change.
-- **The kernel check is textual.** Words such as `partial` fail even in comments; see
-  [Conventions](conventions.md#proof-rules).
+- **The kernel check is textual**: words such as `partial` fail even in comments
+  ([Conventions](conventions.md#proof-rules)).
 
 ## Testing
 
@@ -331,9 +316,8 @@ lake build Solcore.Test.Syntax.Statements  # one test file
 lake test                                  # every test, through Tests/Main.lean
 ```
 
-Lean checks a test file's examples and theorems while it builds the file. `Tests/Main.lean`
-imports every Syntax test file, and runs the public-API tests that reach the compiler, such as
-`Tests.SourceCoreShiftExecution` and `Tests.SourceCoreUncheckedExecution`.
+`Tests/Main.lean` imports every Syntax test file, and runs the public-API tests that reach the
+compiler, such as `Tests.SourceCoreShiftExecution` and `Tests.SourceCoreUncheckedExecution`.
 
 | Subject | Test files in `Solcore/Test/Syntax/` |
 | --- | --- |
