@@ -217,6 +217,10 @@ depends on the change.
   (`SourceCoreDataExpressions.arraySlice`), reads and lengths through it (`viewIndex`,
   `sliceLength`), and `toArray(s)` (`sliceCopy`), whose copy runs a recursive Core helper, as
   `OrderedMapping`'s lookup does (`sliceCopyBody`).
+  So did the memref `memref<T>` (115ab99f2), which projects to the product of `T[]`'s Core type
+  and a word, its array and its position, and its forms took cases in the same two functions:
+  `lidx(a, i)` (`SourceCoreDataExpressions.elementRef`), `CanStore.load(r)` (`memrefLoad`) and
+  `CanStore.store(r, v)` (`memrefStore`).
 - **A changed rule** (7ac75aea3, closures by value). Theorems whose statements mention the old
   premise are restated over the new one. Most changes were in `Owned/`, `CellAware/`, `OwnedStaged/`,
   `OwnedPrepared/`, `Callable/`, `Statements/`, `Generalized/`, `Selected/` and `Foundations/`.
@@ -316,10 +320,10 @@ work, under "Remaining work for the second goal". In short:
   reflection direction and the lifting of their Source traces remain.
 - The proof target is a successful selected compilation, not the whole workspace and not checker
   acceptance alone. Each extension ends in a consumer of the real public API.
-- Row 4's memory arrays and slices compile through the compatible profile and stay outside
-  `StaticProfile` and the meaning proofs
+- Row 4's memory arrays, slices and memrefs compile through the compatible profile and stay
+  outside `StaticProfile` and the meaning proofs
   ([decision 6](../design/memory-arrays-slices.md#6-meaning-proofs)). Relating array objects to
-  their Core cells, and slices to their Core products, is a later unit.
+  their Core cells, and slices and memrefs to their Core products, is a later unit.
 
 ## Pitfalls
 

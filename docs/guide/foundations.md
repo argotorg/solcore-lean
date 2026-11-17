@@ -54,8 +54,8 @@ it a Core representation.
 
 1. `TypeSystem/Type`: a `BuiltinType` constructor and an abbreviation such as `Ty.integer`.
 2. Frontend: its source name in `ProgramTypeResolution`. `builtinTypeName?` maps fixed names;
-   `resolveBuiltinFallback` resolves `integer` and the slice type `arraySlice<B>` only after every
-   user type at the lookup boundary.
+   `resolveBuiltinFallback` resolves `integer`, the slice type `arraySlice<B>` and the memref type
+   `memref<T>` only after every user type at the lookup boundary.
 3. Frontend: every projection from source types to Core types, such as
    `SourceCoreElaboration.lowerType` and the `Catalog.project` functions in `Frontend/SourceCore`.
    Search for `.builtin .word` to find them.
