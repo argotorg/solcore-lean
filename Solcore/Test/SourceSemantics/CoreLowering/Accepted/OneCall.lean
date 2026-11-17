@@ -31,6 +31,7 @@ open Tests.SourceCoreAcceptedFixture (observed)
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    "pragma solcore;",
     "function identity(value: Word) returns (Word) { return value; }",
     "function relay(value: Word) returns (Word) { return identity(value); }" ]}] }
 
