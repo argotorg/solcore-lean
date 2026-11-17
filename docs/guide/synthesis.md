@@ -55,11 +55,11 @@ theorem files connect them to the emitters and to Core.
 ### Profiles
 
 `Internal/` has one file per family of profiles; its module doc names them. A file holds its
-sections in dependency order: the plans in `Solcore.Synthesis.Core.*`, each with its Core
-reference, generation and reductions; the emitters; for stateful profiles the transaction models in
-`Solcore.Synthesis.Stateful.*Execution`; and the cases. A profile's cases, and usually its emitter,
-are in its namespace below, under `Solcore.Synthesis.Source`. It holds `generateCases` and
-`emitCase`, and for a stateful profile also `observe`.
+sections in dependency order: the plans (`Solcore.Synthesis.Core.*`, each with its Core reference,
+generation and reductions), the emitters, for stateful profiles the transaction models
+(`Solcore.Synthesis.Stateful.*Execution`), and the cases. A profile's cases, and usually its
+emitter, are in its namespace below, under `Solcore.Synthesis.Source`, with `generateCases`,
+`emitCase` and, for a stateful profile, `observe`.
 
 The pure profiles share `semantic-case-tool`. Each has a generate command and a matching `-emit`
 command; `observe`, `replay` and `shrink` choose the profile by the case's schema.
@@ -152,37 +152,29 @@ generates and compares, and which backends it runs on.
   about a profile without a theorem below.
 - **The case format.** Each profile's `caseSchema`, plan schema and versions (`profileVersion`,
   `generatorVersion`, `emitterVersion`, `wrapperVersion`) are recorded in its cases and corpora.
-  `replayCase` requires the versions to match, re-checks the plan, re-emits the source and
-  compares it; it never trusts a saved result. The case tools print this JSON, the Python adapters
-  validate its shape, and `scripts/semantic-*-corpus.json` stores it.
+  `replayCase` requires the versions to match, re-checks the plan, re-emits the source and compares
+  it; it never trusts a saved result. The case tools print this JSON, and
+  `scripts/semantic-*-corpus.json` stores it.
 - **`Sequence.maxTransactions`** bounds a scenario, here and in `Tests/RustHull*ScenarioRun.lean`.
-- **The emitter theorems.** Each says: if the emitter succeeds, calling `run` on the emitted text
-  under the source semantics, which lexes and parses it, gives what the original Core computes.
-  Pure ones conclude `CoreReturns` or `CoreReturnsWithStore`, over Core's `Program.runStateful`;
-  stateful ones cover one top-level transaction of the installed contract and conclude
-  `CoreCommits`, `CoreSettles` or `CoreLogs`, over ContractRuntime's `TopLevelExecution.run`. A
-  change to either machine can break them. Each `emit_preserves_meaning` is the same result with
-  the parsed file exposed. The [design note](../design/scalar-emitter-meaning.md) states each
-  theorem, its assumptions and the emitters still open; README's Differential testing section cites
-  them. `<Name>.emit_source_meaning`, in `Solcore.Synthesis.Source.ScalarMeaning`, is about
-  `<Name>.emit` in the profile's file; `closed-g0`'s are `emit_source_meaning` and `emit`:
-  - `PureTheorems`: `closed-g0`, `Input` (`runtime-word`), `Function`, `Primitive`, `Mutation`,
-    `CallGraph`, `Aggregate`, `AggregateCallGraph`;
+- **The emitter theorems.** `<Name>.emit_source_meaning`, in
+  `Solcore.Synthesis.Source.ScalarMeaning`, says: if `<Name>.emit` succeeds, running the emitted
+  text under the source semantics, which lexes and parses it, gives what the original Core computes.
+  Pure ones conclude `CoreReturns` or `CoreReturnsWithStore` over Core's `Program.runStateful`;
+  stateful ones cover one top-level transaction and conclude `CoreCommits`, `CoreSettles` or
+  `CoreLogs` over ContractRuntime's `TopLevelExecution.run`, so a change to either machine can
+  break them. Each `emit_preserves_meaning` is the same result with the parsed file exposed. The
+  [design note](../design/scalar-emitter-meaning.md) states each theorem and its assumptions.
+  - `PureTheorems`: `closed-g0` (`emit_source_meaning` about `emit`), `Input` (`runtime-word`),
+    `Function`, `Primitive`, `Mutation`, `CallGraph`, `Aggregate`, `AggregateCallGraph`;
   - `LoopTheorems`: `Loop` (`runtime-loops`), `CallGraphLoop`, `Generic`;
-  - `StatefulTheorems`: `Storage`, `StorageRollback`, `KeyedStorage`, `EventLog`
-    (`stateful-logs`).
+  - `StatefulTheorems`: `Storage`, `StorageRollback`, `KeyedStorage`, `EventLog` (`stateful-logs`).
 
 ## Making changes
 
 ### Add a profile
 
-`6b2f86b99` added two pure profiles (`runtime-checked-arithmetic`, `runtime-shifts`) and
-`a07a8d021` a stateful one (`stateful-call-branches`). Their modules are now sections of
-`Internal/Integers` and `Internal/CallReturns`, and their tests sections of
-`Solcore/Test/Synthesis/Scalars.lean` and `Calls.lean`.
-
 1. **Definitions first.** Record the probe and the profile's definitions in the
-   [roadmap](../design/next-implementation-roadmap.md) before any profile code, as `acadc607a` did.
+   [roadmap](../design/next-implementation-roadmap.md) before any profile code.
 2. **Lean sections** in the family's `Internal/` file, or in a new file for a new family (import a
    new pure family from [`Solcore/Synthesis/Source.lean`](../../Solcore/Synthesis/Source.lean), as
    the others are):
@@ -202,11 +194,10 @@ generates and compares, and which backends it runs on.
      [`lakefile.lean`](../../lakefile.lean), and its entry in `TARGETS` of
      `scripts/prepare-semantic-tools.py`.
 4. **Lean tests,** as sections of the family's file in `Solcore/Test/Synthesis/`, each registered
-   in `Tests/Main.lean` (see [Tests](tests.md)):
-   - pure: a cases test with golden sources and results from an independent model
-     (`Tests.SourceIntegerCases`);
-   - stateful: golden, cases and corpus tests (`Tests.SourceCallBranchGolden`, `…Cases`,
-     `…Corpus`). The corpus test reads the fixed corpus.
+   in `Tests/Main.lean` (see [Tests](tests.md)): for a pure profile a cases test with golden sources
+   and results from an independent model (`Tests.SourceIntegerCases`); for a stateful one golden,
+   cases and corpus tests (`Tests.SourceCallBranchGolden`, `…Cases`, `…Corpus`), the last reading
+   the fixed corpus.
 5. **Runner registration.**
    - Pure: in `scripts/semantic-differential.py`, the schema in `CASE_PROFILES` and
      `CASE_CONTRACTS`, the plan's validation, the plan key in `validate_replayed_case`, and
@@ -224,20 +215,16 @@ generates and compares, and which backends it runs on.
    also needed changes to `test-semantic-yul.py` and `test-semantic-fuzz.py`. Run every
    `scripts/test-semantic-*.py`.
 8. **Docs.** With the results: the profile's section of `scripts/SEMANTIC_DIFFERENTIAL.md` and the
-   roadmap's record (`eab3114ec`), then the shared counts in README's Differential testing,
-   `scripts/SEMANTIC_CI.md` and the roadmap (`57b9c55c3`). Add the profile's row to this page.
+   roadmap's record, then the shared counts in README's Differential testing,
+   `scripts/SEMANTIC_CI.md` and the roadmap. Add the profile's row to this page.
 
 ### Change what an emitter prints
-
-`acbbc4033` made the aggregate renderer print raw primitives, for eleven profiles, and `80c3cf2b5`
-made every emitter print `pragma solcore;` first.
 
 1. Find every profile whose emitter uses what you change. `AggregateRenderer`
    (`Internal/Aggregates`) is used by most families; `git grep AggregateRenderer.` lists them.
 2. Bump each affected profile's `emitterVersion`, so that older saved cases fail their version
    check instead of replaying under the new text. Bump its `profileVersion` too only when the
-   programs it accepts change, as for `acbbc4033`; the pragma moved 63 emitter versions and no
-   profile version.
+   programs it accepts change.
 3. Regenerate the fixed corpora of those profiles, and update the golden sources in their Lean
    tests and corpus validators.
 4. If the emitter has a theorem, update its proof: the `*_render_spec` induction in
@@ -246,7 +233,7 @@ made every emitter print `pragma solcore;` first.
 
 ### Prove an emitter's meaning
 
-`143b0343b` and `cfa7783c1` did this for event logs, and `ce9d19a91` for keyed storage.
+The event-log and keyed-storage emitters were proved this way.
 
 1. If the text uses forms outside the existing fragments, add a fragment: its statements and meaning
    in `FragmentSemantics` (or a file of its own, as `LogSemantics`), its text in the grammar file of
@@ -260,19 +247,17 @@ made every emitter print `pragma solcore;` first.
 ## Pitfalls
 
 - **Saved cases replay exactly.** The fixed corpora regenerate from their seeds, so G0 revision
-  `v1` stays bit for bit; a different draw is a new `GeneratorRevision`. Replay regenerates a
-  generated case from its seed and compares. Bump a profile's versions whenever its generation or
-  its text changes.
-- **The emitted text is the test input.** A renderer change changes the cases of every profile
-  that uses it, and their corpora. Where no theorem covers an emitter, it is trusted: Core typing of
-  a checked plan says nothing about what the emitter prints.
-- **The kernel check visits only `Source/ScalarMeaning/`, and all of it.** Words such as
-  `partial`, `axiom` or `sorry` fail there even in comments; see
-  [Conventions](conventions.md#proof-rules).
-- **Some files stay apart.** Each fragment's `*Semantics` derives `Repr`, whose matcher has the
-  same shape as that of `tokens` in its grammar file; in one file Lean would reuse it, and the
-  `tokens` equation lemmas would take their binder names from `Repr`. `LogSemantics` stays apart
-  from `FragmentSemantics` because `loadMeaning` would lend its matcher to `memoryLoadMeaning`.
+  `v1` stays bit for bit; a different draw is a new `GeneratorRevision`. Bump a profile's versions
+  whenever its generation or its text changes.
+- **The emitted text is the test input.** A renderer change changes the cases and corpora of every
+  profile that uses it. Where no theorem covers an emitter, it is trusted: Core typing of a checked
+  plan says nothing about what the emitter prints.
+- **The kernel check visits only `Source/ScalarMeaning/`, and all of it**: words such as `partial`,
+  `axiom` or `sorry` fail there even in comments ([Conventions](conventions.md#proof-rules)).
+- **Some files stay apart** because Lean reuses a matcher within a file: each fragment's
+  `*Semantics` derives `Repr`, whose matcher would rename the binders of its grammar file's
+  `tokens` equations, and `LogSemantics` stays apart from `FragmentSemantics` because `loadMeaning`
+  would lend its matcher to `memoryLoadMeaning`.
 - **`lake build Solcore.Synthesis` does not build everything.** The umbrella reaches neither
   `Source/ScalarMeaning/` nor `Internal/AbiReturns`, `CallReturns`, `ConstructorArguments`,
   `EnumAbi` and `Malformed`. Build those by module name; `lake build` and `lake test` reach all.
