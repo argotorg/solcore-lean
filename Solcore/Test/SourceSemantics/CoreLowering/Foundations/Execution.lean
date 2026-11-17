@@ -6250,6 +6250,354 @@ private def runCaptures : IO Unit := do
     require (completed.value == word expected) s!"capture identity case {index} gave {reprStr completed.value}"
     session := completed.session
 
+/-- `Panic(code)`: the call fails with the code, which the session decodes. -/
+private def panics {artifact : Artifact} (session : Session artifact) (key : Key) (arguments : List Value)
+    (code : UInt8) (label : String) : IO (Session artifact) := do
+  let executed ← session.runWithReceipt key arguments {executionFuel := 300000}
+  match executed.val with
+  | .ok (.failed reason next) =>
+      require (SourceCorePanics.code? reason == some code) s!"{label} failed with {reprStr reason}"
+      match session.diagnostic key reason with
+      | .ok (some diagnostic) =>
+          require (decide (diagnostic.error = .panic code)) s!"{label} decoded {reprStr diagnostic.error}"
+      | other => throw (IO.userError s!"{label} decoded {reprStr other}")
+      pure next
+  | .ok (.succeeded result) => throw (IO.userError s!"{label} gave {reprStr result.value}")
+  | .ok _ => throw (IO.userError s!"{label} did not fail")
+  | .error error => throw (IO.userError s!"{label}: {reprStr error}")
+
+/-- Upstream's `closure-parameters` fixture (`tests/e2e/closure-parameters/main.sol` at
+e2eef194): its top-level helpers and the 23 public functions that need no contract storage and no
+inline assembly, as upstream wrote them, with the contract's methods as functions. They include
+the storage-free factory cases at this pin, `runtimeFactory`, `computedFactory` and
+`unusedComputedFactory`. The fixture's other 12 calls read or write the contract's `count`,
+`incremented` or `locked`, or run `assemblyCapture`'s inline Yul, which the native pipeline does
+not have. -/
+private def closureParameterWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
+    "function makeAdder(value: uint256) returns (function (uint256) returns (uint256)) {",
+    "    return lam (other: uint256) -> uint256 {",
+    "        return value + other;",
+    "    };",
+    "}",
+    "function makeComputedAdder(value: uint256) returns (function (uint256) returns (uint256)) {",
+    "    let incremented = value + uint256(1);",
+    "    return lam (other: uint256) -> uint256 {",
+    "        return incremented + other;",
+    "    };",
+    "}",
+    "function makeCheckedConstant(value: uint256) returns (function () returns (uint256)) {",
+    "    let unused = value + uint256(1);",
+    "    return lam () -> uint256 {",
+    "        return uint256(7);",
+    "    };",
+    "}",
+    "function twice(f: function (uint256) returns (uint256), x: uint256) returns (uint256) {",
+    "    return f(f(x));",
+    "}",
+    "function forward(f: function (uint256) returns (uint256), x: uint256) returns (uint256) {",
+    "    return twice(f, x);",
+    "}",
+    "function repeat(f: function (uint256) returns (uint256), x: uint256, n: uint256) returns (uint256) {",
+    "    if (n == uint256(0)) {",
+    "        return x;",
+    "    }",
+    "    return repeat(f, f(x), n - uint256(1));",
+    "}",
+    "function increment(x: uint256) returns (uint256) {",
+    "    return x + uint256(1);",
+    "}",
+    "function run(f: function () returns (uint256)) returns (uint256) {",
+    "    return f();",
+    "}",
+    "function apply2(f: function (uint256, uint256) returns (uint256), x: uint256, y: uint256) returns (uint256) {",
+    "    return f(x, y);",
+    "}",
+    "function applyWord(f: function (word) returns (word), x: word) returns (word) {",
+    "    return f(x);",
+    "}",
+    "function applyGeneric<a>(f: function (a) returns (a), x: a) returns (a) {",
+    "    return f(x);",
+    "}",
+    "function forwardValue<a>(value: a) returns (a) {",
+    "    return value;",
+    "}",
+    "function inferred() returns (uint256) {",
+    "    let f = lam (x: word) -> word {",
+    "        return x;",
+    "    };",
+    "    return uint256(applyWord(f, 42));",
+    "}",
+    "function inferredCaptured(amount: uint256, x: uint256) returns (uint256) {",
+    "    let f = lam (v: uint256) -> uint256 {",
+    "        return v + amount;",
+    "    };",
+    "    amount = uint256(99);",
+    "    return forward(f, x);",
+    "}",
+    "function inferredAlias(amount: uint256, x: uint256) returns (uint256) {",
+    "    let f = lam (v: uint256) -> uint256 {",
+    "        return v + amount;",
+    "    };",
+    "    let g = f;",
+    "    return twice(g, x);",
+    "}",
+    "function inferredGeneric(amount: uint256, x: uint256) returns (uint256) {",
+    "    let f = lam (v: uint256) -> uint256 {",
+    "        return v + amount;",
+    "    };",
+    "    return applyGeneric(f, x);",
+    "}",
+    "function inferredGenericResult(x: uint256) returns (uint256) {",
+    "    let f = lam (y: uint256) -> uint256 {",
+    "        return y + x;",
+    "    };",
+    "    let callback: function (uint256) returns (uint256) = forwardValue(f);",
+    "    return callback(uint256(2));",
+    "}",
+    "function inferredIndirectResult(x: uint256) returns (uint256) {",
+    "    let f = lam (y: uint256) -> uint256 {",
+    "        return y + x;",
+    "    };",
+    "    let factory = lam () {",
+    "        return f;",
+    "    };",
+    "    let callback: function (uint256) returns (uint256) = factory();",
+    "    return callback(uint256(2));",
+    "}",
+    "function inferredNullary(x: uint256) returns (uint256) {",
+    "    let f = lam () -> uint256 {",
+    "        return x + uint256(2);",
+    "    };",
+    "    return run(f);",
+    "}",
+    "function inferredMultipleArgs(amount: uint256, x: uint256, y: uint256) returns (uint256) {",
+    "    let f = lam (a: uint256, b: uint256) -> uint256 {",
+    "        return a + b + amount;",
+    "    };",
+    "    return apply2(f, x, y);",
+    "}",
+    "function shifted(x: uint256) returns (uint256) {",
+    "    let f = makeAdder(uint256(10));",
+    "    let base = f(uint256(32));",
+    "    return base + x;",
+    "}",
+    "function fixed() returns (uint256) {",
+    "    return twice(lam (v: uint256) -> uint256 {",
+    "            return v + uint256(10);",
+    "        }, uint256(22));",
+    "}",
+    "function addTwenty(x: uint256) returns (uint256) {",
+    "    return twice(lam (v: uint256) -> uint256 {",
+    "            return v + uint256(10);",
+    "        }, x);",
+    "}",
+    "function factory(x: uint256) returns (uint256) {",
+    "    return twice(makeAdder(uint256(10)), x);",
+    "}",
+    "function runtimeFactory(step: uint256, x: uint256) returns (uint256) {",
+    "    let f = makeAdder(step);",
+    "    return f(x);",
+    "}",
+    "function computedFactory(step: uint256, x: uint256) returns (uint256) {",
+    "    let f = makeComputedAdder(step);",
+    "    return f(x);",
+    "}",
+    "function unusedComputedFactory(step: uint256) returns (uint256) {",
+    "    let unused = makeCheckedConstant(step);",
+    "    return uint256(1);",
+    "}",
+    "function shadowed(x: uint256) returns (uint256) {",
+    "    let v = uint256(99);",
+    "    return twice(lam (v: uint256) -> uint256 {",
+    "            return v + uint256(1);",
+    "        }, x);",
+    "}",
+    "function captured(amount: uint256, x: uint256) returns (uint256) {",
+    "    return forward(lam (v: uint256) -> uint256 {",
+    "            return v + amount;",
+    "        }, x);",
+    "}",
+    "function capturedFieldName(count: uint256, x: uint256) returns (uint256) {",
+    "    return twice(lam (v: uint256) -> uint256 {",
+    "            return v + count;",
+    "        }, x);",
+    "}",
+    "function capturedBeforeAssignment(x: uint256) returns (uint256) {",
+    "    let f: function (uint256) returns (uint256) = lam (v: uint256) -> uint256 {",
+    "        return v + x;",
+    "    };",
+    "    x = uint256(99);",
+    "    return twice(f, uint256(0));",
+    "}",
+    "function named(x: uint256) returns (uint256) {",
+    "    return twice(increment, x);",
+    "}",
+    "function recursive(amount: uint256, x: uint256, n: uint256) returns (uint256) {",
+    "    return repeat(lam (v: uint256) -> uint256 {",
+    "            return v + amount;",
+    "        }, x, n);",
+    "}",
+    "function nullary(x: uint256) returns (uint256) {",
+    "    return run(lam () -> uint256 {",
+    "            return x + uint256(2);",
+    "        });",
+    "}",
+    "function multipleArgs(amount: uint256, x: uint256, y: uint256) returns (uint256) {",
+    "    return apply2(lam (a: uint256, b: uint256) -> uint256 {",
+    "            return a + b + amount;",
+    "        }, x, y);",
+    "}"
+  ]}] }
+
+private def closureParameterNames : List String := [
+  "inferred", "inferredCaptured", "inferredAlias", "inferredGeneric", "inferredGenericResult",
+  "inferredIndirectResult", "inferredNullary", "inferredMultipleArgs", "shifted", "fixed",
+  "addTwenty", "factory", "runtimeFactory", "computedFactory", "unusedComputedFactory",
+  "shadowed", "captured", "capturedFieldName", "capturedBeforeAssignment", "named", "recursive",
+  "nullary", "multipleArgs"]
+
+/-- Lean's own storage-free analogs of the factory cases that upstream's bf7114a8 and ad1f49cf
+added at this pin, which use contract storage. A memory array that the factory writes stands for
+the storage (`factoryEffectOrder`, `unusedFactoryEffects`, `discardedFactoryEffects`,
+`reassignedFactoryEffects`), and a caller's local or an expired block local shadows a name the
+closure uses (`factoryLocalShadows`, `factoryCallerShadows`, `factoryExpiredShadow`). The pinned
+driver gives these values too, on Sonatina O0 and O2 and on Yul. -/
+private def closureFactoryWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
+    "function makeAdder(value: uint256) returns (function (uint256) returns (uint256)) {",
+    "    return lam (other: uint256) -> uint256 {",
+    "        return value + other;",
+    "    };",
+    "}",
+    "function makeComputedAdder(value: uint256) returns (function (uint256) returns (uint256)) {",
+    "    let incremented = value + uint256(1);",
+    "    return lam (other: uint256) -> uint256 {",
+    "        return incremented + other;",
+    "    };",
+    "}",
+    "function increment(x: uint256) returns (uint256) {",
+    "    return x + uint256(1);",
+    "}",
+    "function makeCountedAdder(step: uint256, c: uint256[]) returns (function (uint256) returns (uint256)) {",
+    "    c[0] = c[0] + uint256(1);",
+    "    let first = step + c[0];",
+    "    c[0] = c[0] + uint256(1);",
+    "    let second = step + c[0];",
+    "    return lam (other: uint256) -> uint256 {",
+    "        return first + second + other;",
+    "    };",
+    "}",
+    "function makeAdderWithFunction(step: uint256) returns (function (uint256) returns (uint256)) {",
+    "    let incremented = step + uint256(1);",
+    "    return lam (other: uint256) -> uint256 {",
+    "        return increment(incremented) + other;",
+    "    };",
+    "}",
+    "function makeAdderWithExpiredShadow(step: uint256) returns (function (uint256) returns (uint256)) {",
+    "    {",
+    "        let increment: bool = true;",
+    "    }",
+    "    let incremented = step + uint256(1);",
+    "    return lam (other: uint256) -> uint256 {",
+    "        return increment(incremented) + other;",
+    "    };",
+    "}",
+    "function factoryLocalShadows(step: uint256) returns (uint256) {",
+    "    let incremented = uint256(100);",
+    "    let f = makeComputedAdder(step);",
+    "    return f(uint256(1));",
+    "}",
+    "function factoryCallerShadows(step: uint256) returns (uint256) {",
+    "    let increment = uint256(100);",
+    "    let f = makeAdderWithFunction(step);",
+    "    return f(uint256(1));",
+    "}",
+    "function factoryExpiredShadow(step: uint256) returns (uint256) {",
+    "    let f = makeAdderWithExpiredShadow(step);",
+    "    return f(uint256(1));",
+    "}",
+    "function factoryEffectOrder(step: uint256) returns (uint256) {",
+    "    let c: uint256[] = new uint256[](1);",
+    "    let f = makeCountedAdder(step, c);",
+    "    c[0] = c[0] + uint256(10);",
+    "    return f(uint256(0)) + f(uint256(0)) + c[0];",
+    "}",
+    "function unusedFactoryEffects(step: uint256) returns (uint256) {",
+    "    let c: uint256[] = new uint256[](1);",
+    "    let unused = makeCountedAdder(step, c);",
+    "    return c[0];",
+    "}",
+    "function discardedFactoryEffects(step: uint256) returns (uint256) {",
+    "    let c: uint256[] = new uint256[](1);",
+    "    makeCountedAdder(step, c);",
+    "    return c[0];",
+    "}",
+    "function reassignedFactoryEffects(step: uint256) returns (uint256) {",
+    "    let c: uint256[] = new uint256[](1);",
+    "    let f = makeAdder(step);",
+    "    f = makeCountedAdder(step, c);",
+    "    return f(uint256(0)) + c[0];",
+    "}"
+  ]}] }
+
+/-- Row 7, closure factories: closure-parameters' cases that the native pipeline can run, each
+value and each `Panic(0x11)` the fixture's, among them a factory's checked addition, which panics
+when the factory runs even if its closure is never called; then the analogs, in which a factory's
+writes happen when it runs, in order, whether its closure is used, discarded or replaced, and a
+closure reads the factory's own bindings. -/
+private def runClosureParameterFixtures : IO Unit := do
+  let maximum := 2 ^ 256 - 1
+  let program ← get "closure-parameters check" (checkProgram closureParameterWorkspace)
+  let seeds ← closureParameterNames.mapM (seed program)
+  let compiled ← get "closure-parameters compilation"
+    (compile closureParameterWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match closureParameterNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"closure-parameters root {name} missing")
+    | none => throw (IO.userError s!"closure-parameters {name} unknown")
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × List Value × Nat) := [
+    ("inferred", [], 42), ("inferredCaptured", [word 10, word 22], 42),
+    ("inferredCaptured", [word 7, word 3], 17), ("inferredAlias", [word 10, word 22], 42),
+    ("inferredAlias", [word 7, word 3], 17), ("inferredGeneric", [word 10, word 32], 42),
+    ("inferredGeneric", [word 7, word 3], 10), ("inferredGenericResult", [word 40], 42),
+    ("inferredGenericResult", [word 3], 5), ("inferredIndirectResult", [word 40], 42),
+    ("inferredIndirectResult", [word 3], 5), ("inferredNullary", [word 40], 42),
+    ("inferredNullary", [word 3], 5), ("inferredMultipleArgs", [word 10, word 20, word 12], 42),
+    ("inferredMultipleArgs", [word 3, word 4, word 5], 12), ("shifted", [word 0], 42),
+    ("shifted", [word 8], 50), ("fixed", [], 42), ("addTwenty", [word 0], 20),
+    ("addTwenty", [word 22], 42), ("factory", [word 22], 42),
+    ("runtimeFactory", [word 5, word 37], 42), ("computedFactory", [word 4, word 37], 42),
+    ("unusedComputedFactory", [word 4], 1), ("shadowed", [word 40], 42),
+    ("captured", [word 10, word 22], 42), ("captured", [word 7, word 3], 17),
+    ("capturedFieldName", [word 10, word 22], 42), ("capturedBeforeAssignment", [word 21], 42),
+    ("named", [word 10], 12), ("recursive", [word 3, word 5, word 4], 17),
+    ("recursive", [word 8, word 2, word 0], 2), ("nullary", [word 40], 42),
+    ("multipleArgs", [word 10, word 20, word 12], 42)]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) arguments
+    require (completed.value == word expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  for (name, arguments) in ([("runtimeFactory", [word 1, word maximum]), ("computedFactory", [word maximum, word 0]), ("unusedComputedFactory", [word maximum])] : List (String × List Value)) do
+    session ← panics session (← key name) arguments SourceCorePanics.arithmetic s!"{name} on {reprStr arguments}"
+  let analogNames := ["factoryLocalShadows", "factoryCallerShadows", "factoryExpiredShadow", "factoryEffectOrder", "unusedFactoryEffects", "discardedFactoryEffects", "reassignedFactoryEffects"]
+  let analogProgram ← get "closure factory analog check" (checkProgram closureFactoryWorkspace)
+  let analogSeeds ← analogNames.mapM (seed analogProgram)
+  let analogCompiled ← get "closure factory analog compilation"
+    (compile closureFactoryWorkspace analogSeeds {specializationBudget := 256, compilationFuel := 1000})
+  let mut analogSession ← boot (← analogCompiled.open)
+  for (index, argument, expected) in ([(0, 4, 6), (1, 4, 7), (2, 4, 7), (3, 3, 30), (4, 3, 2), (5, 3, 2), (6, 3, 11)] : List (Nat × Nat × Nat)) do
+    let analogKey ← match analogCompiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError "closure factory analog root missing")
+    let completed ← execute analogSession analogKey [word argument]
+    require (completed.value == word expected)
+      s!"{analogNames[index]!}({argument}) gave {reprStr completed.value}"
+    analogSession := completed.session
+  IO.println "SOURCE_CORE_CLOSURE_PARAMETERS_PASS: upstream's closure-parameters cases that need no contract storage and no inline assembly, as upstream wrote them, give the fixture's values and Panic(0x11), a closure factory's checked addition panicking when the factory runs, and Lean's storage-free analogs of its storage cases give the pinned driver's values: a factory's writes happen when it runs, in order, whether its closure is used, discarded or replaced, and its closure reads the factory's own bindings, not a caller's or an expired local's"
+
 set_option maxRecDepth 2048 in
 def run : IO Unit := do
   let program ← get "public check" (checkProgram workspace)
@@ -6557,6 +6905,7 @@ def run : IO Unit := do
   let abiResult ← execute abiSession abiRoot.root.key [word 3]
   require (abiResult.value == word 31) "public ABI root changed execution"
   runCaptures
+  runClosureParameterFixtures
 
 end Tests.SourceCoreExecution
 end
