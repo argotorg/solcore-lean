@@ -207,12 +207,18 @@ def readReturn (context : Context) : LowerM Lowered := do
   pure (packArguments (slots.map fun index =>
     ⟨.word, Core.OptionalCell.read .word (.var index) (Core.Word.ofNatModulo 1)⟩))
 
-/-- Explicit upstream `usr$` calls refer to Hull functions. Word arguments and
+/-- The inline Yul builtins of upstream's checker (`asm_builtin_sig`): the ones Lean lowers and the
+object builtins it does not. The checker also reserves each as a Hull function name. -/
+def builtinName (name : String) : Bool :=
+  Effects.supports name || RustYulPrimitives.supports name ||
+    name ∈ ["dataoffset", "datasize", "linkersymbol", "loadimmutable", "setimmutable"]
+
+/-- A Yul call of the Hull function `hullName`, written `usr$hullName` or, with no local function of
+that name, plainly, as upstream's checker resolves it and both backends call it. Word arguments and
 Word/Unit results have identical Hull and Yul layouts. Other layouts need a
 separate flattening bridge and are rejected before generating a Core call. -/
-def lowerHullCall (context : Context) (name : YulName)
+def lowerHullCall (context : Context) (name : YulName) (hullName : String)
     (arguments : List Lowered) : LowerM Lowered := do
-  let hullName := (name.name.drop 4).toString
   let signature ← match context.hullFunctions.find? (·.name == hullName) with
     | some signature => pure signature
     | none => fail s!"unknown Hull function in inline Yul: {name.name}" name.span
@@ -259,9 +265,13 @@ def lowerExpr : Nat → Context → YulExpr → LowerM Lowered
               pure ⟨function.signature.result,
                 bindArguments function.signature.result body 0 lowered.reverse⟩
           | none =>
-              if name.name.startsWith "usr$" then lowerHullCall context name lowered
+              if name.name.startsWith "usr$" then
+                lowerHullCall context name (name.name.drop 4).toString lowered
               else if context.hullFunctions.any (·.name == name.name) then
-                fail s!"plain-name Hull call has no defined upstream Yul target: {name.name}; use the explicit usr$ prefix" name.span
+                if builtinName name.name then
+                  fail s!"Hull function {name.name} has a builtin's name, which upstream's checker reserves"
+                    name.span
+                else lowerHullCall context name name.name lowered
               else if Effects.supports name.name then
                 let effectScope := lowered.foldl (fun scope _ => scope.temporary .word) context.scope
                 let effect ← Effects.lowerBuiltin effectScope name.name rawArguments

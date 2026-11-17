@@ -1042,8 +1042,38 @@ private def yulHullBridge : IO Unit := do
      (Core.Word.ofNatModulo 1, Core.Word.ofNatModulo 1)]
   rejects "unknown explicit Hull function" (program [main (yc "usr$missing")])
   rejects "explicit Hull call arity" (program [weighted, main (yc "usr$weighted" [yw 1])])
-  rejects "plain Hull call is not silently renamed" (program [weighted,
-    main (yc "weighted" [yw 1, yw 3, yw 5])])
+  -- Upstream's checker resolves a plain name to the Hull function when no builtin and no local Yul
+  -- function has it, and both backends call that function (#133; Q006).
+  wordResult "plain Yul to Hull call" (program [weighted,
+    main (yc "weighted" [yw 1, yw 3, yw 5])]) 135
+  wordResult "plain Yul to Hull call from a Yul local function" (program [weighted,
+    fn "main" [] [declareLocal "result", stmt (.assembly [
+      ⟨.functionDef (yn "wrapper") [yn "x"] [yn "y"] [
+        ⟨.assign [yn "y"] (yc "weighted" [yw 1, yw 3, ⟨.ident (yn "x"), none⟩]), none⟩], none⟩,
+      ⟨.assign [yn "result"] (yc "wrapper" [yw 5]), none⟩]), ret (v "result")]]) 135
+  wordResult "a Yul local function declared later in its block shadows a plain Hull name"
+    (program [weighted, fn "main" [] [declareLocal "result", stmt (.assembly [
+      ⟨.block [
+        ⟨.assign [yn "result"] (yc "weighted" [yw 1, yw 3, yw 5]), none⟩,
+        ⟨.functionDef (yn "weighted") [yn "a", yn "b", yn "c"] [yn "r"] [
+          ⟨.assign [yn "r"] (yw 7), none⟩], none⟩], none⟩,
+      ⟨.assign [yn "result"] (yc "add" [⟨.ident (yn "result"), none⟩,
+        yc "weighted" [yw 0, yw 0, yw 1]]), none⟩]), ret (v "result")]]) 8
+  wordResult "a legacy opcode name is a plain Hull name" (program [fn "pc" [] [ret (w 11)],
+    main (yc "pc")]) 11
+  rejects "a Hull function with a Yul builtin's name" (program [fn "number" [] [ret (w 7)],
+    main (yc "number")])
+  rejects "unknown plain name" (program [weighted, main (yc "missing")])
+  rejects "plain Hull call arity" (program [weighted, main (yc "weighted" [yw 1])])
+  let plainEffects ← prepare "plain Yul to Hull side effects" {effectSource with objects := [
+    .object "runtime" {functions := [], stmts := [stmt (.assembly [
+      ye "store" [yw 17],
+      ye "mstore" [yw 0, yc "combine" [yc "record" [yw 1], yc "record" [yw 2]]],
+      ye "return" [yw 0, yw 32]])]} [] none]}
+  returned "plain Yul to Hull arguments execute right to left" (Contract.run plainEffects)
+    (List.replicate 31 0 ++ [12])
+    [(Core.Word.ofNatModulo 2, Core.Word.ofNatModulo 17),
+     (Core.Word.ofNatModulo 1, Core.Word.ofNatModulo 1)]
   for ty in [Ty.unit, .bool, .product .word .word, .sum .unit .word] do
     let target : Function := {
       name := "incompatible"
@@ -1052,6 +1082,8 @@ private def yulHullBridge : IO Unit := do
       body := [ret (w 0)]}
     rejects "Yul Hull argument requires layout conversion" (program [target,
       main (yc "usr$incompatible" [yw 0])])
+    rejects "plain Yul Hull argument requires layout conversion" (program [target,
+      main (yc "incompatible" [yw 0])])
   let boolReturn := fn "boolean" [] [ret ⟨.bool, .bool true, none⟩] .bool
   rejects "Yul Hull Bool result requires layout conversion" (program [boolReturn,
     main (yc "usr$boolean")])

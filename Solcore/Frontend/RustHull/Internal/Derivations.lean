@@ -3235,7 +3235,8 @@ theorem expr_call {fuel : Nat} {context : YulLowering.Context} {name : YulName} 
     obtain ⟨loweredArguments, argumentsCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
     obtain ⟨_, checked, compiled⟩ := lower_bind_eq_ok.mp compiled
     split at compiled
-    · cases compiled
+    · rw [if_pos (by simp [YulLowering.builtinName, builtin])] at compiled
+      cases compiled
     obtain ⟨effect, effectCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
     cases compiled
     exact ⟨loweredArguments, effect, argumentsCompiled, words_checked checked, effectCompiled, rfl⟩
@@ -3247,7 +3248,7 @@ theorem expr_primitive {fuel : Nat} {context : YulLowering.Context} {name : YulN
     {span : Option Span} {lowered : Lowered}
     (compiled : YulLowering.lowerExpr (fuel + 1) context ⟨.call name arguments, span⟩ = .ok lowered)
     (noFunctions : context.functions = []) (notUser : name.name.startsWith "usr$" = false)
-    (notEffect : Effects.supports name.name = false) :
+    (notEffect : Effects.supports name.name = false) (primitiveName : RustYulPrimitives.supports name.name = true) :
     ∃ loweredArguments primitive, arguments.mapM (YulLowering.lowerExpr fuel context) = .ok loweredArguments ∧
       (∀ argument ∈ loweredArguments, argument.type = .word) ∧
       RustYulPrimitives.compile name.name ((List.range loweredArguments.length).map Core.Expr.var) =
@@ -3262,7 +3263,8 @@ theorem expr_primitive {fuel : Nat} {context : YulLowering.Context} {name : YulN
     obtain ⟨loweredArguments, argumentsCompiled, compiled⟩ := lower_bind_eq_ok.mp compiled
     obtain ⟨_, checked, compiled⟩ := lower_bind_eq_ok.mp compiled
     split at compiled
-    · cases compiled
+    · rw [if_pos (by simp [YulLowering.builtinName, primitiveName])] at compiled
+      cases compiled
     split at compiled
     · rename_i value primitiveCompiled
       obtain ⟨primitive, chosen, compiled⟩ := lower_bind_eq_ok.mp compiled
@@ -3826,7 +3828,8 @@ pure `RustYulPrimitives` operation. -/
 theorem builtin_named {name : String} (named : name ∈ YulSemantics.builtins) :
     name.startsWith Effects.reservedPrefix = false ∧ name.startsWith "usr$" = false ∧
       ((name ∈ YulSemantics.effectBuiltins ∧ Effects.supports name = true) ∨
-        (name ∈ YulFragment.primitives ∧ Effects.supports name = false)) := by
+        (name ∈ YulFragment.primitives ∧ Effects.supports name = false ∧
+          RustYulPrimitives.supports name = true)) := by
   simp only [YulSemantics.builtins, YulSemantics.effectBuiltins, YulFragment.primitives, List.mem_append,
     List.mem_cons, List.not_mem_nil, or_false] at named
   rcases named with (rfl | rfl | rfl | rfl | rfl | rfl) | (rfl | rfl | rfl | rfl | rfl | rfl) <;> decide +kernel
@@ -4055,7 +4058,7 @@ theorem expression_simulation (step : BuiltinStep model slots) {sourceEnvironmen
     | zero => cases compiled
     | succ fuel =>
         obtain ⟨_, notUser, kind⟩ := builtin_named (Builtin.named computed)
-        rcases kind with ⟨effectNamed, builtin⟩ | ⟨primitiveNamed, notEffect⟩
+        rcases kind with ⟨effectNamed, builtin⟩ | ⟨primitiveNamed, notEffect, primitiveName⟩
         · obtain ⟨loweredArguments, effect, argumentsCompiled, typed, effectCompiled, rfl⟩ :=
             expr_call compiled noFunctions notUser builtin
           obtain ⟨middleStore, lengthEq, middleState, firstFrame, continued⟩ :=
@@ -4072,7 +4075,7 @@ theorem expression_simulation (step : BuiltinStep model slots) {sourceEnvironmen
           rw [sameLength, List.append_nil, ← List.map_reverse]
           exact effectEvaluated
         · obtain ⟨loweredArguments, primitive, argumentsCompiled, typed, primitiveCompiled, rfl⟩ :=
-            expr_primitive compiled noFunctions notUser notEffect
+            expr_primitive compiled noFunctions notUser notEffect primitiveName
           obtain ⟨middleStore, lengthEq, middleState, firstFrame, continued⟩ :=
             argumentsSimulated noFunctions (lowers_of_mapM argumentsCompiled typed).reverse environmentRelated runtime
               stateRelated [] primitive.type (LanguageResult.success primitive.expression)
@@ -4092,7 +4095,7 @@ theorem expression_simulation (step : BuiltinStep model slots) {sourceEnvironmen
     | zero => cases compiled
     | succ fuel =>
         obtain ⟨_, notUser, kind⟩ := builtin_named named
-        rcases kind with ⟨_, builtin⟩ | ⟨_, notEffect⟩
+        rcases kind with ⟨_, builtin⟩ | ⟨_, notEffect, primitiveName⟩
         · obtain ⟨loweredArguments, effect, argumentsCompiled, typed, _, rfl⟩ :=
             expr_call compiled noFunctions notUser builtin
           obtain ⟨reasonWord, finalStore, rfl, finalState, frame, faulted⟩ :=
@@ -4100,7 +4103,7 @@ theorem expression_simulation (step : BuiltinStep model slots) {sourceEnvironmen
               stateRelated [] effect.type effect.expression
           exact ⟨_, finalStore, .language reasonWord, faulted, finalState, frame⟩
         · obtain ⟨loweredArguments, primitive, argumentsCompiled, typed, _, rfl⟩ :=
-            expr_primitive compiled noFunctions notUser notEffect
+            expr_primitive compiled noFunctions notUser notEffect primitiveName
           obtain ⟨reasonWord, finalStore, rfl, finalState, frame, faulted⟩ :=
             argumentsSimulated noFunctions (lowers_of_mapM argumentsCompiled typed).reverse environmentRelated runtime
               stateRelated [] primitive.type (LanguageResult.success primitive.expression)
