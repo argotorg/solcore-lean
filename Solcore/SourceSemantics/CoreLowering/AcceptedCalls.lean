@@ -31,7 +31,10 @@ Main declarations:
 - `CellAwareInvocationAcceptedCallAuthority.ports`, call authority from an inventory;
 - `CellAwareInvocationAcceptedCallEntry.preserves_selected` and
   `CellAwareInvocationAcceptedCallEntry.reflects_selected`, the entry of a
-  call-containing row at the public root.
+  call-containing row at the public root;
+- `CellAwareInvocationAcceptedCallSubsetCheck.nodes?` and
+  `CellAwareInvocationAcceptedCallSubsetCheck.closedCalls`, a finite check of the
+  extended roots on an actually compiled row.
 -/
 
 section
@@ -2731,4 +2734,326 @@ theorem reflects (header : Header whole (Program.ofChecked whole.sourceProgram))
         keyPhysical selected)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedCallFamily
+end
+
+section
+/-! A finite check of the extended expression roots of
+`CellAwareInvocationAcceptedCallTrees.CallSubset`, as
+`CellAwareInvocationAcceptedSubsetCheck` checks the first subset. It reads only
+a row's Source nodes, the prepared local inventory, the row's evidence
+assumptions and the plan's reference edges, so it runs on an actually compiled
+program. Its result is a proof that every expression node of the row is an
+extended root or a declaration reference that the plan records no reference
+edge for (`ReferenceSite`). The compiler cannot lower such a reference on its
+own (`reference_rejected`): it is the callee of a direct call, which the call's
+own lowering selects through the call edge. `closedCalls` therefore turns the
+check into `ClosedCalls` for the row's accepted-body index. An extended root
+depends on its row only through the row's key and its empty assumptions, so
+`transport` moves it to every row with that key and no assumptions. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxRecDepth 4096
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedCallSubsetCheck
+open Core Frontend SourceInference
+open CallableIndexedNamedGeneration (Prepared)
+open CellAwareInvocationAcceptedExpressionTrees (Subset)
+open CellAwareInvocationAcceptedDirectSites (DirectSite)
+open CellAwareInvocationAcceptedCallTrees (CallSubset)
+
+/-- Proof-producing recognition of a direct declaration call of the row. -/
+def directSite? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource) (id : ExpressionId) :
+    Option (Σ' (callee : ExpressionId) (arguments : List ExpressionId) (instantiation : DeclarationInstantiation),
+      DirectSite prepared named source id callee arguments instantiation) :=
+  match found : source.lookupExpression? id with
+  | none => none
+  | some node =>
+    match form : node.form with
+    | .call callee arguments (.declaration instantiation) =>
+      match coercions : node.coercions, requirements : node.requirements with
+      | [], [] =>
+        match initializer : prepared.base.locals.bindings.find? (fun binding =>
+            decide (binding.caller = named.signature.key ∧ binding.initializer = id)) with
+        | some _ => none
+        | none =>
+          match substitution : instantiation.parameterSubstitution, predicates : instantiation.predicates with
+          | [], [] =>
+            match assumptions : named.specialized.assumptions with
+            | [] => some ⟨callee, arguments, instantiation,
+                ⟨node, found, form, coercions, requirements, initializer, ⟨substitution, predicates⟩, assumptions⟩⟩
+            | _ :: _ => none
+          | _, _ => none
+      | _, _ => none
+    | _ => none
+
+/-- A declaration reference of the row with no coercions or requirements, in a
+row without evidence assumptions, that is not a generalized initializer and
+that the plan records no reference edge for. Its compatible read is recorded
+for the inversion of the compiler. -/
+structure ReferenceSite {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource) (id : ExpressionId) where
+  node : ExpressionNode
+  name : String
+  instantiation : DeclarationInstantiation
+  type : Ty
+  found : source.lookupExpression? id = some node
+  form : node.form = .reference name (.declaration instantiation)
+  coercions : node.coercions = []
+  requirements : node.requirements = []
+  notInitializer : prepared.base.locals.bindings.find? (fun binding =>
+    decide (binding.caller = named.signature.key ∧ binding.initializer = id)) = none
+  assumptions : named.specialized.assumptions = []
+  read : SourceCoreCompatibleDataExpressions.readExpression checked source id = .ok (node, type)
+  absent : ∀ target key, SourceCompilationPlan.exactInstantiationKey prepared.base.plan instantiation = .ok target →
+    SourceCompilationPlan.exactReferenceKey prepared.base.plan named.signature.key id target ≠ .ok key
+
+/-- Proof-producing recognition of a reference site. -/
+def referenceSite? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource) (id : ExpressionId) :
+    Option (ReferenceSite prepared named source id) :=
+  match found : source.lookupExpression? id with
+  | none => none
+  | some node =>
+    match form : node.form with
+    | .reference name (.declaration instantiation) =>
+      match coercions : node.coercions, requirements : node.requirements with
+      | [], [] =>
+        match initializer : prepared.base.locals.bindings.find? (fun binding =>
+            decide (binding.caller = named.signature.key ∧ binding.initializer = id)) with
+        | some _ => none
+        | none =>
+          match assumptions : named.specialized.assumptions with
+          | _ :: _ => none
+          | [] =>
+            match read : SourceCoreCompatibleDataExpressions.readExpression checked source id with
+            | .error _ => none
+            | .ok (readNode, type) =>
+              if sameNode : readNode = node then
+                match target : SourceCompilationPlan.exactInstantiationKey prepared.base.plan instantiation with
+                | .error _ => some ⟨node, name, instantiation, type, found, form, coercions, requirements, initializer,
+                    assumptions, sameNode ▸ read, fun _ _ selected => by rw [target] at selected; cases selected⟩
+                | .ok key =>
+                  match edge : SourceCompilationPlan.exactReferenceKey prepared.base.plan named.signature.key id key with
+                  | .ok _ => none
+                  | .error _ => some ⟨node, name, instantiation, type, found, form, coercions, requirements,
+                      initializer, assumptions, sameNode ▸ read, fun other selectedKey selected recorded => by
+                        rw [target] at selected
+                        cases selected
+                        rw [edge] at recorded
+                        cases recorded⟩
+              else none
+      | _, _ => none
+    | _ => none
+
+section Rejection
+variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+  {named : SourceCoreGeneralFunctions.Function} {source : TypedSource} {id : ExpressionId}
+
+private theorem reference_contextual (site : ReferenceSite prepared named source id) :
+    SourceCoreGeneralFunctions.contextualSource prepared.base.sourceProgram
+      (CallableIndexedNamedGeneration.context prepared named).plan prepared.base.locals named.signature.key none
+      source id = .ok source := by
+  simp [SourceCoreGeneralFunctions.contextualSource, site.found, site.form]
+
+private theorem reference_evidence (site : ReferenceSite prepared named source id)
+    (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat) (scope : SourceCoreLocalCell.Scope)
+    (reasonAt : ExpressionId → Word) :
+    SourceCoreEvidence.lowerWithProjector prepared.base.sourceProgram
+      ((CallableIndexedNamedGeneration.representation prepared).atContext named.signature.key []).expressions.projectType
+      named.specialized (CallableIndexedNamedGeneration.context prepared named) child budget source scope id reasonAt
+      (SourceCoreGeneralFunctions.callablePolicy prepared.base.callableContext []) = .ok none := by
+  simp [SourceCoreEvidence.lowerWithProjector, site.found, site.form, site.requirements, site.coercions,
+    site.assumptions]
+
+variable {diagnostics : SourceCoreDataPlaceFaultSites.Program} {code : Expr}
+  (compiled : CallableIndexedNamedGeneration.Compilation prepared named diagnostics code)
+
+/-- The named policy's special callback declines a reference site. -/
+theorem reference_special (site : ReferenceSite prepared named source id) (rootFuel : Nat)
+    (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat) (scope : SourceCoreLocalCell.Scope)
+    (reasonAt : ExpressionId → Word) :
+    CallableIndexedOwnedContextualLambdaPolicyRecipes.special compiled rootFuel
+      (CallableIndexedNamedGeneration.context prepared named) child budget source scope id reasonAt = .ok none := by
+  unfold CallableIndexedOwnedContextualLambdaPolicyRecipes.special
+  have ownerEq : (CallableIndexedNamedGeneration.context prepared named).owner = named.signature.key := rfl
+  simp only [ownerEq, reference_contextual site, bind, Except.bind, pure, Except.pure, site.found,
+    site.notInitializer, Option.filter_none]
+  rw [reference_evidence site child budget scope reasonAt]
+  simp [site.form]
+
+/-- The named compiler cannot lower a reference site on its own: the plan
+records no reference edge for it. -/
+theorem reference_rejected (site : ReferenceSite prepared named source id) (rootFuel : Nat) {fuel : Nat}
+    {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Word} {lowered : SourceCoreBasic.LoweredExpr} :
+    SourceCoreFunctions.lowerExpressionWithPolicy
+      (GeneralizedLocalInitializerCompilation.namedPolicy compiled rootFuel)
+      (GeneralizedLocalInitializerCompilation.namedLowerBody compiled) fuel
+      (CallableIndexedNamedGeneration.context prepared named) source scope id reasonAt ≠ .ok lowered := by
+  intro accepted
+  cases fuel with
+  | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+  | succ fuel =>
+    by_cases owner : id.occurrence.owner = source.owner
+    · have read : (GeneralizedLocalInitializerCompilation.namedPolicy compiled rootFuel).readExpression source id =
+          .ok (site.node, site.type) := by
+        simp only [GeneralizedLocalInitializerCompilation.namedPolicy, reference_contextual site, bind, Except.bind]
+        exact site.read
+      obtain ⟨_index, signature, _identity, selection, _⟩ := NamedCalls.reference_of_accepted owner site.found read
+        site.form (reference_special compiled site rootFuel _ _ scope reasonAt) accepted
+      obtain ⟨_caller, target, _specialized, _, _, _, instantiationKey, referenceKey, _⟩ :=
+        NamedCalls.selected_signature_facts selection
+      have idEq : site.node.id = id := (lookupExpression?_sound site.found).2
+      simp only [↓reduceIte, idEq] at referenceKey
+      exact site.absent target signature.key instantiationKey referenceKey
+    · unfold SourceCoreFunctions.lowerExpressionWithPolicy at accepted
+      simp [owner, throw, throwThe, MonadExceptOf.throw, bind, Except.bind] at accepted
+end Rejection
+
+private def arguments? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource) (fuel : Nat) :
+    (ids : List ExpressionId) → Option (PLift (∀ argument ∈ ids, Subset prepared named source argument))
+  | [] => some ⟨by intro argument member; cases member⟩
+  | id :: rest => do
+    let ⟨head⟩ ← CellAwareInvocationAcceptedSubsetCheck.subset? prepared named source fuel id
+    let ⟨tail⟩ ← arguments? prepared named source fuel rest
+    pure ⟨by
+      intro argument member
+      rcases List.mem_cons.mp member with same | member
+      · subst same
+        exact head
+      · exact tail argument member⟩
+
+/-- Proof-producing recognition of one extended root: a first-subset site, or
+a direct call whose arguments are first-subset sites and whose instantiation
+the family admits. -/
+def callSubset? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
+    (called : DeclarationInstantiation → Prop) [DecidablePred called] (fuel : Nat) (id : ExpressionId) :
+    Option (PLift (CallSubset prepared named source called id)) :=
+  match CellAwareInvocationAcceptedSubsetCheck.subset? prepared named source fuel id with
+  | some ⟨subset⟩ => some ⟨.subset subset⟩
+  | none =>
+    match directSite? prepared named source id with
+    | none => none
+    | some ⟨_callee, ids, instantiation, site⟩ =>
+      if selected : called instantiation then
+        match arguments? prepared named source fuel ids with
+        | some ⟨arguments⟩ => some ⟨.call site selected arguments⟩
+        | none => none
+      else none
+
+/-- An expression node of the check: an extended root, or a reference site. -/
+def Checked {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource) (called : DeclarationInstantiation → Prop)
+    (id : ExpressionId) : Prop :=
+  CallSubset prepared named source called id ∨ Nonempty (ReferenceSite prepared named source id)
+
+private def checkedNode? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
+    (called : DeclarationInstantiation → Prop) [DecidablePred called] (fuel : Nat) (id : ExpressionId) :
+    Option (PLift (Checked prepared named source called id)) :=
+  match callSubset? prepared named source called fuel id with
+  | some ⟨root⟩ => some ⟨.inl root⟩
+  | none =>
+    match referenceSite? prepared named source id with
+    | some site => some ⟨.inr ⟨site⟩⟩
+    | none => none
+
+private def sweep? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
+    (called : DeclarationInstantiation → Prop) [DecidablePred called] (fuel : Nat) :
+    (nodes : List Node) →
+      Option (PLift (∀ node, Node.expression node ∈ nodes → Checked prepared named source called node.id))
+  | [] => some ⟨by intro node member; cases member⟩
+  | .expression node :: rest => do
+    let ⟨head⟩ ← checkedNode? prepared named source called fuel node.id
+    let ⟨tail⟩ ← sweep? prepared named source called fuel rest
+    pure ⟨by
+      intro other member
+      rcases List.mem_cons.mp member with same | member
+      · cases same
+        exact head
+      · exact tail other member⟩
+  | .statement _ :: rest => do
+    let ⟨tail⟩ ← sweep? prepared named source called fuel rest
+    pure ⟨by
+      intro other member
+      rcases List.mem_cons.mp member with same | member
+      · cases same
+      · exact tail other member⟩
+
+/-- Every expression node of the Source is an extended root or a reference
+site. The fuel bounds the depth of the expression graph, which the node count
+bounds. -/
+def nodes? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource)
+    (called : DeclarationInstantiation → Prop) [DecidablePred called] :
+    Option (PLift (∀ id node, source.lookupExpression? id = some node →
+      Checked prepared named source called id)) := do
+  let ⟨all⟩ ← sweep? prepared named source called (source.nodes.length + 1) source.nodes
+  pure ⟨by
+    intro id node found
+    obtain ⟨member, same⟩ := lookupExpression?_sound found
+    exact same ▸ all node member⟩
+
+section Transport
+variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked} {source : TypedSource}
+  {first second : SourceCoreGeneralFunctions.Function}
+
+/-- A direct site retains its node and changes only the key of its
+local-inventory lookup and the row's assumptions. -/
+def transportDirect (keyEq : first.signature.key = second.signature.key)
+    (assumptions : second.specialized.assumptions = []) {id callee : ExpressionId} {ids : List ExpressionId}
+    {instantiation : DeclarationInstantiation}
+    (site : DirectSite prepared first source id callee ids instantiation) :
+    DirectSite prepared second source id callee ids instantiation where
+  node := site.node
+  found := site.found
+  form := site.form
+  coercions := site.coercions
+  requirements := site.requirements
+  notInitializer := keyEq ▸ site.notInitializer
+  monomorphic := site.monomorphic
+  assumptions := assumptions
+
+/-- `CallSubset` depends on its row only through the row's key and its empty
+assumptions. -/
+theorem transport (keyEq : first.signature.key = second.signature.key)
+    (assumptions : second.specialized.assumptions = []) {called : DeclarationInstantiation → Prop}
+    {id : ExpressionId} (subset : CallSubset prepared first source called id) :
+    CallSubset prepared second source called id := by
+  cases subset with
+  | subset subset => exact .subset (CellAwareInvocationAcceptedSubsetCheck.transport keyEq subset)
+  | call site selected arguments =>
+    exact .call (transportDirect keyEq assumptions site) selected
+      (fun argument member => CellAwareInvocationAcceptedSubsetCheck.transport keyEq (arguments argument member))
+end Transport
+
+/-- A named row whose every expression node is an extended root or a reference
+site has every accepted expression an extended root. -/
+theorem closedCalls {whole : SourceCoreUnifiedCompilation.Compiled} {named : SourceCoreGeneralFunctions.Function}
+    {diagnostics : SourceCoreDataPlaceFaultSites.Program} {code : Expr}
+    (generation : CallableIndexedNamedGeneration.Compilation whole.indexed named diagnostics code)
+    (record : SourceCompilationPlan.exactSpecialization whole.indexed.base.plan named.signature.key =
+      .ok named.specialized)
+    {called : DeclarationInstantiation → Prop}
+    (nodes : ∀ id node, (CallableIndexedNamedGeneration.source named).lookupExpression? id = some node →
+      Checked whole.indexed named (CallableIndexedNamedGeneration.source named) called id) :
+    CellAwareInvocationAcceptedCallExpressions.ClosedCalls generation record called := by
+  intro fuel scope expression lowered generated
+  obtain ⟨node, found⟩ := CellAwareInvocationAcceptedExpressions.found_of_children
+    (ActualBodyInvocation.Index.named generation record :
+      ActualBodyInvocation.Index whole ActualBodyInvocation.ReachedView) generated
+  rcases nodes expression node found with root | rejected
+  · exact root
+  · obtain ⟨site⟩ := rejected
+    exfalso
+    change SourceCoreGeneralFunctions.lowerContextualExpression _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ = _ at generated
+    cases fuel with
+    | zero => simp [SourceCoreGeneralFunctions.lowerContextualExpression.eq_def] at generated
+    | succ rootFuel =>
+      rw [GeneralizedLocalInitializerCompilation.named_contextual generation record] at generated
+      exact reference_rejected generation site rootFuel generated
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedCallSubsetCheck
 end

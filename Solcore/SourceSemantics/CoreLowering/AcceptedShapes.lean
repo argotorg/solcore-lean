@@ -26,8 +26,9 @@ value and unit returns, monomorphic declarations, bare assignments the
 compiler refines, expression statements, blocks and conditionals, each with
 its expressions in a given predicate. `Shape` recognizes these lists on the
 Source; `covered` shows that every refined accepted tree of such a list is
-covered by the statement closure, and `shape?` recognizes them on an actually
-compiled row with subset-site expressions. -/
+covered by the statement closure, and `shapeWith?` recognizes them on an
+actually compiled row with the expressions a given check admits; `shape?` is
+its instance at subset sites. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -93,13 +94,13 @@ def assignable? (source : TypedSource) (assignment : AssignmentResolution) (oper
     | _ :: _ => none
   else none
 
-/-- Proof-producing recognition of a supported statement list whose expressions
-are subset sites of the row. The fuel bounds the nesting of statement lists. -/
-def shape? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : CallableIndexedNamedGeneration.Prepared checked)
-    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource) (expected : TypeSystem.Ty) :
+/-- Proof-producing recognition of a supported statement list whose
+expressions satisfy `child`, which `child?` checks. The fuel bounds the nesting
+of statement lists. -/
+def shapeWith? (source : TypedSource) (expected : TypeSystem.Ty) (child : ExpressionId → Prop)
+    (child? : (id : ExpressionId) → Option (PLift (child id))) :
     (fuel : Nat) → (mode : Bool) → (statements : List StatementId) →
-      Option (PLift (Shape source expected
-        (CellAwareInvocationAcceptedExpressionTrees.Subset prepared named source) mode statements))
+      Option (PLift (Shape source expected child mode statements))
   | _, mode, [] => if allowed : mode = false ∨ expected = .unit then some ⟨.nil allowed⟩ else none
   | 0, _, _ :: _ => none
   | fuel + 1, mode, id :: rest =>
@@ -108,47 +109,52 @@ def shape? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : CallableI
     | some node =>
       match form : node.form with
       | .returnStmt (some expression) => do
-        let ⟨value⟩ ← CellAwareInvocationAcceptedSubsetCheck.subset? prepared named source
-          (source.nodes.length + 1) expression
+        let ⟨value⟩ ← child? expression
         pure ⟨.returned found form value⟩
       | .returnStmt none => pure ⟨.returnUnit found form⟩
       | .letDecl binder (some expression) =>
         match monomorphic : binder.scheme.quantified with
         | [] => do
-          let ⟨value⟩ ← CellAwareInvocationAcceptedSubsetCheck.subset? prepared named source
-            (source.nodes.length + 1) expression
-          let ⟨tail⟩ ← shape? prepared named source expected fuel mode rest
+          let ⟨value⟩ ← child? expression
+          let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
           pure ⟨.declared found form monomorphic value tail⟩
         | _ :: _ => none
       | .letDecl binder none =>
         match monomorphic : binder.scheme.quantified with
         | [] => do
-          let ⟨tail⟩ ← shape? prepared named source expected fuel mode rest
+          let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
           pure ⟨.uninitialized found form monomorphic tail⟩
         | _ :: _ => none
       | .assignValue assignment operator expression => do
         let ⟨assignable⟩ ← assignable? source assignment operator
-        let ⟨value⟩ ← CellAwareInvocationAcceptedSubsetCheck.subset? prepared named source
-          (source.nodes.length + 1) expression
-        let ⟨tail⟩ ← shape? prepared named source expected fuel mode rest
+        let ⟨value⟩ ← child? expression
+        let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
         pure ⟨.assigned found form assignable value tail⟩
       | .expression expression true => do
-        let ⟨value⟩ ← CellAwareInvocationAcceptedSubsetCheck.subset? prepared named source
-          (source.nodes.length + 1) expression
-        let ⟨tail⟩ ← shape? prepared named source expected fuel mode rest
+        let ⟨value⟩ ← child? expression
+        let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
         pure ⟨.discarded found form value tail⟩
       | .block statements => do
-        let ⟨inner⟩ ← shape? prepared named source expected fuel false statements
-        let ⟨tail⟩ ← shape? prepared named source expected fuel mode rest
+        let ⟨inner⟩ ← shapeWith? source expected child child? fuel false statements
+        let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
         pure ⟨.block found form inner tail⟩
       | .ifThen condition thenBody elseBody => do
-        let ⟨test⟩ ← CellAwareInvocationAcceptedSubsetCheck.subset? prepared named source
-          (source.nodes.length + 1) condition
-        let ⟨left⟩ ← shape? prepared named source expected fuel false thenBody
-        let ⟨right⟩ ← shape? prepared named source expected fuel false (elseBody.getD [])
-        let ⟨tail⟩ ← shape? prepared named source expected fuel mode rest
+        let ⟨test⟩ ← child? condition
+        let ⟨left⟩ ← shapeWith? source expected child child? fuel false thenBody
+        let ⟨right⟩ ← shapeWith? source expected child child? fuel false (elseBody.getD [])
+        let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
         pure ⟨.conditional found form test left right tail⟩
       | _ => none
+
+/-- Proof-producing recognition of a supported statement list whose expressions
+are subset sites of the row. The fuel bounds the nesting of statement lists. -/
+def shape? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : CallableIndexedNamedGeneration.Prepared checked)
+    (named : SourceCoreGeneralFunctions.Function) (source : TypedSource) (expected : TypeSystem.Ty) :
+    (fuel : Nat) → (mode : Bool) → (statements : List StatementId) →
+      Option (PLift (Shape source expected
+        (CellAwareInvocationAcceptedExpressionTrees.Subset prepared named source) mode statements)) :=
+  shapeWith? source expected _
+    (CellAwareInvocationAcceptedSubsetCheck.subset? prepared named source (source.nodes.length + 1))
 
 private theorem read_found {checked : SourceCoreCompatibleCatalog.Checked} {source : TypedSource}
     {id : StatementId} {node : StatementNode} {type : Ty}
