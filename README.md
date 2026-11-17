@@ -38,6 +38,8 @@ import Solcore.Frontend.SourceCompiler
 A small source program:
 
 ```text
+pragma solcore;
+
 function main() returns (Word) {
   return 55;
 }
@@ -50,7 +52,8 @@ compile a workspace, open a session, call an entry point, and resume when the fu
 handles, snapshots and execution options.
 
 The language follows the pinned solcore-rs for its checked integer types, `unchecked` blocks,
-shifts, memory arrays and slices, and closures that capture by value. The
+shifts, memory arrays and slices, closures that capture by value, and the `pragma solcore;` that
+begins every source file. The
 [source semantics guide](docs/guide/source-semantics.md) describes the semantics. The
 [roadmap](docs/design/next-implementation-roadmap.md) says what is still missing and links the
 design notes that record the differences from upstream.

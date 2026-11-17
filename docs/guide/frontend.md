@@ -183,7 +183,8 @@ more of inline Yul, and object linking.
 compiler's steps:
 
 1. **Syntax**, as [Syntax](syntax.md#making-changes) describes. A pass around the parser also needs
-   `parseWorkspaceFile` in `ProgramInterfaces`, and a `ProgramLoadError` for its failures.
+   `parseWorkspaceFile` in `ProgramInterfaces`, and a `ProgramLoadError` for its failures, as the
+   `pragma solcore;` check after the parse has (`pragmaSolcoreProblems`).
 2. **Typed IR.** A new operator needs none: `ExpressionForm` carries `Syntax.BinaryOp` and
    `Syntax.ValueAssignOp`. A new form needs a constructor in `SourceInference/TypedIR`.
 3. **Inference**, in `SourceInference/Resolution`: the dispatch (`binaryOperatorDispatch`) and the

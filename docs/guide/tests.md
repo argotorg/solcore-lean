@@ -44,6 +44,7 @@ A merged test file is a sequence of sections. Each starts at a line
 | Subdirectory | Files |
 | --- | --- |
 | (top level) | `Builtin`, `ClosureDirect`, `CoercionPublic`, `Constructor`, `GenericDirect`, `LexicalFailure`, `LexicalFailureForward`, `NestedFormation`, `OperatorCalls`, `Protected`, `TypedStatements`, `UnifiedCorpus`, `UnifiedCorpusSupport` (a shared fixture), `UnifiedOperatorCorpus` |
+| `Accepted/` | `Fixture` (a shared fixture), `OneCall` |
 | `Callable/` | `Ancestry`, `Coercion`, `Indexed`, `IndexedLambda`, `LambdaViews`, `Paired`, `Prepared` |
 | `Canonical/` | `Formation`, `Scoped` |
 | `Captured/` | `Assignments`, `Branches`, `Locals`, `Loops`, `Mappings`, `Nested` |

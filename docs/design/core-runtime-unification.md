@@ -260,8 +260,10 @@ adds them to the first subset (`CallSubset`) when four conditions hold:
 At such a call the receipt tree (`CallTree`) keeps the compiler's direct-call
 receipt, the authority (`Port`) of the selected header and the subset receipt
 trees of the arguments. `of_call_subset` extracts it from the compiler's
-acceptance; the call authority of the body's receipts is an input (`Ports`),
-as in the older direct families.
+acceptance; on a compiled row
+`CellAwareInvocationAcceptedCallSubsetCheck.nodes?` checks the extended roots
+and `closedCalls` turns the check into `ClosedCalls`. The call authority of the
+body's receipts is an input (`Ports`), as in the older direct families.
 [CellAwareInvocationAcceptedCallBounds](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean)
 closes the tree: subset roots use the existing bounds, and calls use the
 direct-call head, with evidence from the call's empty requirements.
@@ -280,15 +282,17 @@ derives `Ports` from a complete inventory. A call receipt's global slot names
 an indexed function, because the indexed globals are the functions'
 signatures, and the inventory's header for that index gives the `Port`.
 [CellAwareInvocationAcceptedCallEntry](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean)
-is the body-trace counterpart of the row lemma, packaged as the root's
+is the body-trace counterpart of the row lemma in both directions
+(`preserves_selected`, `reflects_selected`), packaged as the root's
 `NamedResultAt` with the restored caller's post-admission.
 [CellAwarePublicAcceptedCallRoot](../../Solcore/SourceSemantics/CoreLowering/AcceptedPublicRoots.lean)
-gives the preservation theorem of the unchanged public root for a
-call-containing row. The root call runs as before, and the body runs on the
-slot-retaining protocol from the root's physical cache and capture, with the
-body's expression meaning from the family induction. The reflection direction
-at the root, the lifting of original traces of call-containing bodies and a
-one-call instance remain.
+relates a call-containing row to the unchanged public root in both directions
+(`checkpoint_has_sufficient_fuel_selected`, `checkpoint_reflects_selected`), and
+`CellAwarePublicAcceptedCallForward.first_value_selected` takes a returning
+trace to a successful public resumption. The body runs on the slot-retaining
+protocol from the root's physical cache and capture. Its expression meaning is
+an input, which `expressions_of_family` gives at every grade from the row's
+extended roots, its call authority and a family of callee rows.
 
 The public connection of this subset starts at
 [CellAwareInvocationAcceptedNamedInvocation](../../Solcore/SourceSemantics/CoreLowering/AcceptedExpressions.lean).
@@ -373,6 +377,14 @@ restore their entry bindings while keeping their heap. Every control outcome is
 carried unchanged, with the context, environment and heap of the original
 execution, and `body` gives the sized staged trace of a function body. Fault
 executions are not lifted.
+[CellAwareInvocationAcceptedCallLifting](../../Solcore/SourceSemantics/CoreLowering/AcceptedCallLifting.lean)
+lifts original executions of bodies whose expressions are extended roots
+(`CallSubset`). `CellAwareInvocationAcceptedSizedLifting.statements` is the
+statement lifting over sized derivations. At a direct call the callee body's
+derivation is smaller than the call's, so `bodies` lifts every admitted
+callee's body by one strong induction on the size, and `body` gives the sized
+staged trace of a call-containing function body. The admitted callees' static
+receipts are a premise (`Callees`), and fault executions are not lifted.
 
 The test
 [SourceCoreGeneralizedExportAcceptedTick](../../Solcore/Test/SourceSemantics/CoreLowering/Generalized/Export.lean)
@@ -390,6 +402,22 @@ runtime harness checks the subset and the shape, builds this kernel-checked
 plan for both inputs and resumes the actual call. The instance exercises one
 ordinary local read under a returning first statement; the theorems it uses are
 general over the subset and the shape.
+
+The test
+[Accepted/OneCall](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/OneCall.lean)
+compiles a two-function program at runtime: `identity` returns its `Word`
+parameter, and `relay` returns `identity(value)`. Its `accepted_call` meets
+every premise of `CellAwarePublicAcceptedCallForward.first_value_selected`,
+`CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected` and
+`checkpoint_reflects_selected` at `relay`'s first public call. The fixture
+[Accepted/Fixture](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/Fixture.lean)
+builds the family rows and the callees' receipts from runtime checks of every
+cache row and a complete inventory (`WholeInventory.family_row`,
+`WholeInventory.callees`), and the staged trace is lifted from `relay`'s
+original execution. A call's callee is an expression node of its own: the
+check admits it as a declaration reference with no plan reference edge, which
+the named compiler cannot lower on its own
+(`CellAwareInvocationAcceptedCallSubsetCheck.reference_rejected`).
 
 ## Remaining work for the second goal
 
@@ -411,11 +439,10 @@ On the accepted-body route above, the next connected steps are:
   the header certificate's `BodyCompletes` fact is the available Source input.
 - Extend the expression closure beyond its first subset over the same actual
   accepted expression compiler. Direct calls at expression roots are closed
-  over families of rows, with call authority from a complete inventory. Allow
-  them inside other expressions and as arguments. At the public root the
-  preservation direction is connected. The reflection direction remains, as
-  does the lifting of original traces of call-containing bodies, by the same
-  induction on the original semantics, and a one-call instance.
+  over families of rows, with call authority from a complete inventory. They
+  are connected at the public root in both directions, original traces of
+  call-containing bodies are lifted, and a one-call program instantiates both
+  directions. Allow them inside other expressions and as arguments.
   After direct calls come indirect and builtin calls,
   methods, indices, tuples, constructors, generalized reads, closures and
   coercions. Expressions of contextual closures need the relation between the

@@ -151,6 +151,7 @@ or `Basics` file holds what was mixed with one parser's definitions before the l
 | Definition | Reading | Used by |
 | --- | --- | --- |
 | `Parser.parse`, `ParseOutput` | The total parse of one file, with its diagnostics | `parseWorkspaceFile` in `Frontend/ProgramInterfaces` |
+| `ParsedFile.items` | The top items in source order, pragmas among them | `pragmaSolcoreProblems` in `Frontend/ProgramInterfaces`, which checks the leading `pragma solcore;` after a clean parse; its problems become `ProgramLoadError.pragmaSolcore` |
 | `Unchecked.prepare`, `Unchecked.mark`, `Unchecked.Error` | The pass around `parse` for `unchecked` blocks and the prefix `-` | The same function; its errors become `ProgramLoadError.uncheckedBlock` |
 | The AST: `ParsedFile`, `TopItem`, `FunctionDecl`, `TypeExpr`, `Expr`, `Statement`, `Block`, `Pattern`, `ForItem` | What the parser produces | The frontend's loading, signatures and inference; the source semantics and core lowering through the typed IR |
 | `UnaryOp`, `BinaryOp`, `ValueAssignOp`, `BinaryOp.precedence`, `ValueAssignOp.wordOnly` | The operators; `wordOnly` marks the compound assignments that take Words only | The typed IR, `SourceInference.Detail.binaryOperatorDispatch`, the lowering, the source semantics, and the assignment premises of core lowering theorems |

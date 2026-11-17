@@ -6,8 +6,9 @@ Row 4 of the roadmap table "Following upstream's semantics: the next units" brin
 to Lean's source language: memory arrays `T[]`, `new T[](n)`, element reads and writes, `a.length`,
 read-only slices, and Solidity's panic codes `0x32`, `0x31` and `0x41`. #145 is the pin itself:
 `e2eef194` is its merge. Lane E's generator side already compares the compiled paths with Core
-references for this row (the `runtime-memory-arrays` and `runtime-array-abi` profiles, roadmap
-"Memory arrays, slices and their panics: probe and definitions"). This note covers the Lean side:
+references for this row (the `runtime-memory-arrays` and `runtime-array-abi` profiles,
+[their definitions](../../scripts/SEMANTIC_DIFFERENTIAL.md#compare-solcore-memory-arrays-and-their-abi)).
+This note covers the Lean side:
 the parser, typing, the source semantics and the lowering to Core.
 
 It records:
@@ -1012,7 +1013,7 @@ user on 2026-11-17, as recommended.
 
 ### 2. How the lowering stores arrays, and when `new` panics with `0x41`
 
-- **Decided: (a)**, on 2026-11-13. The roadmap's "Lowering: std's layout" changes with it.
+- **Decided: (a)**, on 2026-11-13.
 - **(a) Recommended: one Core cell per array.** The cell holds the length, the default element and
   an `OrderedMapping` of elements, and is referenced by `cellRef`. `0x41` comes exactly when
   `n ≥ 2^251 − 1`. There is no free pointer.
