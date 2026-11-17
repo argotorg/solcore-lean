@@ -266,6 +266,22 @@ theorem safe_memrefLoad {protectedVars : List TypeVarId} {state : State}
   rw [resolved] at resolvedSafe
   exact ((safe_application_iff protectedVars state _ _).1 resolvedSafe).2
 
+/-- A store's operands, its value's type and its memref's element, are safe at a
+ready state wherever its arguments' types are. -/
+theorem safe_memrefStore_operands {protectedVars : List TypeVarId} {state : State}
+    {arguments : List InferredExpression}
+    {stored : InferredExpression × InferredExpression × Ty}
+    (ready : state.InferenceReady)
+    (success : Detail.memrefStoreArguments arguments state = .ok stored)
+    (safe : ∀ argument ∈ arguments, Safe protectedVars state argument.type) :
+    Safe protectedVars state stored.2.1.type ∧ Safe protectedVars state stored.2.2 := by
+  obtain ⟨argumentsEq, resolved⟩ := Detail.memrefStoreArguments_ok success
+  have resolvedSafe := safe_resolved ready
+    (safe stored.1 (by rw [argumentsEq]; simp))
+  rw [resolved] at resolvedSafe
+  exact ⟨safe stored.2.1 (by rw [argumentsEq]; simp),
+    ((safe_application_iff protectedVars state _ _).1 resolvedSafe).2⟩
+
 /-- A compound assignment's operand type is safe where its target type is:
 the open target's own type, or a closed constructor. -/
 theorem safe_compoundOperandType {protectedVars : List TypeVarId} {state : State}

@@ -161,6 +161,10 @@ theorem callArguments
   | memrefLoad _ actualArguments _ recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     exact ActualExpressionNodeShapes.recordExpected recorded
+  | memrefStore _ actualArguments _ unification recorded =>
+    cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+    exact (ActualExpressionNodeShapes.unify unification).trans
+      (ActualExpressionNodeShapes.recordExpected recorded)
   | elementRef _ actualArguments _ recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     exact ActualExpressionNodeShapes.recordExpected recorded

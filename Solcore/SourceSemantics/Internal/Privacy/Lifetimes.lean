@@ -1013,6 +1013,23 @@ theorem call_arguments_suffix
         (memrefLoad_type_variablesBelow properties.2.1 properties.2.2 loaded) expectedAfter
         (safe_memrefLoad properties.2.1 loaded argumentsSafe) expectedSafe recorded
       exact completed.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
+  | memrefStore _ actualArguments stored unification recorded =>
+      have same := Except.ok.inj (actualArguments.symm.trans childAccepted)
+      cases same
+      have operands := memrefStore_operands_variablesBelow properties.2.1 properties.2.2 stored
+      have operandsSafe := safe_memrefStore_operands properties.2.1 stored argumentsSafe
+      have unifiedLifetime := lifetime.unify properties.2.1 operands.1 operands.2
+        operandsSafe.1 operandsSafe.2 unification
+      have unifyProgress := unify_inferenceProgress properties.2.1.solved operands.1 operands.2
+        unification
+      have unifiedReady := unify_preserves_inferenceReady properties.2.1 operands.1 operands.2
+        unification
+      have completed := unifiedLifetime.recordExpression catalog.catalog unifiedReady
+        (Ty.variablesBelow_constructor _ _)
+        (fun type member => (expectedAfter type member).weaken unifyProgress.next_le)
+        (safe_closed _ _ (Ty.variablesBelow_constructor 0 _))
+        (fun type member => unifiedLifetime.older _ (expectedBelow type member)) recorded
+      exact completed.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
   | elementRef _ actualArguments reference recorded =>
       have same := Except.ok.inj (actualArguments.symm.trans childAccepted)
       cases same

@@ -459,6 +459,20 @@ inductive CallExpressionDispatchProvenanceFacts
         loaded.2 (.memrefLoad loaded.1.id) [] expected argumentState = .ok result) :
       CallExpressionDispatchProvenanceFacts context source callee arguments id expected
         fuel allocated result
+  | memrefStore
+      {inferredArguments : List InferredExpression}
+      {argumentState unifiedState : Frontend.SourceInference.State}
+      {stored : InferredExpression × InferredExpression × TypeSystem.Ty}
+      (nonconstructor : Detail.constructorCalleeCandidates context allocated callee = .ok [])
+      (argumentsSuccess : Detail.inferExprsFuel fuel context arguments.elements
+        allocated = .ok (inferredArguments, argumentState))
+      (argument : Detail.memrefStoreArguments inferredArguments argumentState = .ok stored)
+      (unification : Detail.unify argumentState stored.2.1.type stored.2.2 = .ok unifiedState)
+      (recording : Detail.recordExpressionWithExpected context source id
+        TypeSystem.Ty.unit (.memrefStore stored.1.id stored.2.1.id) [] expected unifiedState =
+          .ok result) :
+      CallExpressionDispatchProvenanceFacts context source callee arguments id expected
+        fuel allocated result
   | indirect
       {inferredArguments : List InferredExpression}
       {argumentState calleeState : Frontend.SourceInference.State}
@@ -537,6 +551,7 @@ theorem inferExprFuel_success_call_dispatch_provenance_facts
             | apply CallExpressionDispatchProvenanceFacts.toArray <;> assumption
             | apply CallExpressionDispatchProvenanceFacts.elementRef <;> assumption
             | apply CallExpressionDispatchProvenanceFacts.memrefLoad <;> assumption
+            | apply CallExpressionDispatchProvenanceFacts.memrefStore <;> assumption
             | apply CallExpressionDispatchProvenanceFacts.lengthMethod
               · exact discovery
               · assumption

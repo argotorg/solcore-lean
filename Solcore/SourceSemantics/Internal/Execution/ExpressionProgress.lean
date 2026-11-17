@@ -339,6 +339,16 @@ theorem call_arguments_suffix_progress
       exact (recordExpressionWithExpected_inferenceProperties properties.2.1
         (memrefLoad_type_variablesBelow properties.2.1 properties.2.2 loaded) expectedAfter
         recorded).1
+  | memrefStore _ actualArguments stored unification recorded =>
+      cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+      have operands := memrefStore_operands_variablesBelow properties.2.1 properties.2.2 stored
+      have unifyProgress := unify_inferenceProgress properties.2.1.solved operands.1 operands.2
+        unification
+      have unifiedReady := unify_preserves_inferenceReady properties.2.1 operands.1 operands.2
+        unification
+      exact unifyProgress.trans (recordExpressionWithExpected_inferenceProperties unifiedReady
+        (Ty.variablesBelow_constructor _ _)
+        (fun type member => (expectedAfter type member).weaken unifyProgress.next_le) recorded).1
   | elementRef _ actualArguments reference recorded =>
       cases Except.ok.inj (actualArguments.symm.trans childAccepted)
       exact (recordExpressionWithExpected_inferenceProperties properties.2.1

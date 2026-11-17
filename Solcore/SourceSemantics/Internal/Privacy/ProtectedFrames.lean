@@ -1044,6 +1044,26 @@ theorem inferExprFuel_call_fixes_protected
                                   (safe_memrefLoad argumentsProperties.2.1 loadResult argumentsPrivacy.2.1)
                                   expectedSafeAtArguments success
                             simp only [loadEq, Bool.false_eq_true, if_false] at success
+                            cases storeEq : storeCall namespacePath name
+                            case true =>
+                              simp only [storeEq, if_true] at success
+                              cases storeResult : memrefStoreArguments arguments argumentState with
+                              | error error => simp [storeResult] at success
+                              | ok stored =>
+                                simp only [storeResult] at success
+                                cases unifyResult : Detail.unify argumentState stored.2.1.type stored.2.2 with
+                                | error error => simp [unifyResult] at success
+                                | ok unifiedState =>
+                                  simp only [unifyResult] at success
+                                  have operandsSafe := safe_memrefStore_operands argumentsProperties.2.1 storeResult
+                                    argumentsPrivacy.2.1
+                                  have unifiedFixed := unify_fixes_protected argumentsFixed operandsSafe.1 operandsSafe.2
+                                    unifyResult
+                                  have toUnified := ProtectedVariables.unify operandsSafe.1 operandsSafe.2 unifyResult
+                                  exact recordExpressionWithExpected_fixes_protected unifiedFixed
+                                    (safe_closed _ _ (Ty.variablesBelow_constructor 0 _))
+                                    (fun type member => toUnified _ (expectedSafeAtArguments type member)) success
+                            simp only [storeEq, Bool.false_eq_true, if_false] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

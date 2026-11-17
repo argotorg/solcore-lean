@@ -1138,6 +1138,21 @@ theorem memrefLoad_type_variablesBelow {arguments : List InferredExpression} {st
   rw [resolved] at resolvedBelow
   exact ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2
 
+/-- A store's operands, its value's type and its memref's element, are below a
+ready state's next variable whenever its arguments' types are. -/
+theorem memrefStore_operands_variablesBelow {arguments : List InferredExpression} {state : State}
+    {stored : InferredExpression × InferredExpression × Ty} (ready : state.InferenceReady)
+    (below : ∀ argument ∈ arguments, argument.type.VariablesBelow state.inference.next)
+    (success : memrefStoreArguments arguments state = .ok stored) :
+    stored.2.1.type.VariablesBelow state.inference.next ∧
+      stored.2.2.VariablesBelow state.inference.next := by
+  obtain ⟨argumentsEq, resolved⟩ := memrefStoreArguments_ok success
+  have resolvedBelow : (state.resolve stored.1.type).VariablesBelow state.inference.next :=
+    ready.solved.variablesBelow_apply (below stored.1 (by rw [argumentsEq]; simp))
+  rw [resolved] at resolvedBelow
+  exact ⟨below stored.2.1 (by rw [argumentsEq]; simp),
+    ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2⟩
+
 /-- List inference gives one result per expression. -/
 theorem inferExprsFuel_length {fuel : Nat} {context : Context} :
     ∀ {expressions : List Syntax.Expr} {state final : State} {values : List InferredExpression},
@@ -12415,6 +12430,30 @@ private theorem inferFuel_inferenceProperties_internal :
                                             expectedAtArguments success
                                         exact ⟨prefixProgress.trans loadProperties.1, loadProperties.2⟩
                                     simp only [loadEq, Bool.false_eq_true, if_false] at success
+                                    cases storeEq : storeCall namespacePath name
+                                    case true =>
+                                      simp only [storeEq, if_true] at success
+                                      cases storeResult : memrefStoreArguments arguments argumentState with
+                                      | error error => simp [storeResult, bind, Except.bind] at success
+                                      | ok stored =>
+                                        simp only [storeResult, bind, Except.bind] at success
+                                        cases unifyResult : unify argumentState stored.2.1.type stored.2.2 with
+                                        | error error => simp [unifyResult, bind, Except.bind] at success
+                                        | ok unifiedState =>
+                                          simp only [unifyResult, bind, Except.bind] at success
+                                          have operands := memrefStore_operands_variablesBelow argumentsProperties.2.1
+                                            argumentsProperties.2.2 storeResult
+                                          have unifyProgress := unify_inferenceProgress argumentsProperties.2.1.solved operands.1
+                                            operands.2 unifyResult
+                                          have unifiedReady := unify_preserves_inferenceReady argumentsProperties.2.1 operands.1
+                                            operands.2 unifyResult
+                                          have storeProperties :=
+                                            recordExpressionWithExpected_inferenceProperties unifiedReady
+                                              (Ty.variablesBelow_constructor _ _)
+                                              (fun type member => (expectedAtArguments type member).weaken unifyProgress.next_le)
+                                              success
+                                          exact ⟨prefixProgress.trans (unifyProgress.trans storeProperties.1), storeProperties.2⟩
+                                    simp only [storeEq, Bool.false_eq_true, if_false] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>
@@ -14727,6 +14766,20 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                         exact (recordExpressionWithExpected_lexicalScope success).trans
                                           throughArguments
                                     simp only [loadEq, Bool.false_eq_true, if_false] at success
+                                    cases storeEq : storeCall namespacePath name
+                                    case true =>
+                                      simp only [storeEq, if_true] at success
+                                      cases storeResult : memrefStoreArguments arguments argumentState with
+                                      | error error => simp [storeResult, bind, Except.bind] at success
+                                      | ok stored =>
+                                        simp only [storeResult, bind, Except.bind] at success
+                                        cases unifyResult : unify argumentState stored.2.1.type stored.2.2 with
+                                        | error error => simp [unifyResult, bind, Except.bind] at success
+                                        | ok unifiedState =>
+                                          simp only [unifyResult, bind, Except.bind] at success
+                                          exact (recordExpressionWithExpected_lexicalScope success).trans
+                                            ((unify_preserves_lexicalScope unifyResult).trans throughArguments)
+                                    simp only [storeEq, Bool.false_eq_true, if_false] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>

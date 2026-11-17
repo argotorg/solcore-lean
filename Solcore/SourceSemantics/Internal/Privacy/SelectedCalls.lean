@@ -1718,6 +1718,39 @@ theorem inferExprFuel_call_private
                                 exact new_requirements_trans argumentsPrivacy.2.2.2 recorded.2.2.2
                                   recorded.1 row member fresh
                             simp only [loadEq, Bool.false_eq_true, if_false] at success
+                            cases storeEq : storeCall namespacePath name
+                            case true =>
+                              simp only [storeEq, if_true] at success
+                              cases storeResult : memrefStoreArguments arguments argumentState with
+                              | error error => simp [storeResult] at success
+                              | ok stored =>
+                                simp only [storeResult] at success
+                                cases unifyResult : Detail.unify argumentState stored.2.1.type stored.2.2 with
+                                | error error => simp [unifyResult] at success
+                                | ok unifiedState =>
+                                  simp only [unifyResult] at success
+                                  have operands := memrefStore_operands_variablesBelow argumentsProperties.2.1
+                                    argumentsProperties.2.2 storeResult
+                                  have operandsSafe := safe_memrefStore_operands argumentsProperties.2.1 storeResult
+                                    argumentsPrivacy.2.1
+                                  have unifyProgress := unify_inferenceProgress argumentsProperties.2.1.solved operands.1
+                                    operands.2 unifyResult
+                                  have unifiedReady := unify_preserves_inferenceReady argumentsProperties.2.1 operands.1
+                                    operands.2 unifyResult
+                                  have toUnified := ProtectedVariables.unify operandsSafe.1 operandsSafe.2 unifyResult
+                                  have unifiedLive := argumentsPrivacy.2.2.1.unify operandsSafe.1 operandsSafe.2 unifyResult
+                                  have unifiedRows := new_requirements_trans argumentsPrivacy.2.2.2
+                                    (fun row member fresh => False.elim (fresh ((unify_requirements unifyResult) ▸ member)))
+                                    toUnified
+                                  have recorded := recordExpressionWithExpected_private catalog unifiedReady
+                                    (Ty.variablesBelow_constructor _ _)
+                                    (fun type member => (expectedAtArguments type member).weaken unifyProgress.next_le)
+                                    (safe_closed _ _ (Ty.variablesBelow_constructor 0 _))
+                                    (fun type member => toUnified _ (expectedSafeAtArguments type member)) unifiedLive success
+                                  refine ⟨(prefixPrivacy.trans toUnified).trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+                                  intro row member fresh
+                                  exact new_requirements_trans unifiedRows recorded.2.2.2 recorded.1 row member fresh
+                            simp only [storeEq, Bool.false_eq_true, if_false] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

@@ -3960,6 +3960,7 @@ private theorem inference_occurrenceBoundExtends :
       all_goals occurrence_split_state_pairs
       all_goals try (obtain ⟨argumentsEq, _⟩ := arrayLengthArgument_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
       all_goals try (obtain ⟨argumentsEq, _⟩ := sliceCopyArgument_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
+      all_goals try (obtain ⟨argumentsEq, _⟩ := memrefStoreArguments_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
       all_goals try (obtain ⟨argumentsEq, _⟩ := memrefLoadArgument_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
       all_goals try (obtain ⟨argumentsEq, _⟩ := elementRefArguments_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
       all_goals occurrence_split_conjunctions
@@ -5389,6 +5390,20 @@ private theorem inference_anchoredNodePrefixExtends :
                                         exact throughArguments.trans
                                           (recordExpressionWithExpected_anchoredNodePrefixExtends success)
                                     simp only [loadEq, Bool.false_eq_true, if_false] at success
+                                    cases storeEq : storeCall namespacePath name
+                                    case true =>
+                                      simp only [storeEq, if_true] at success
+                                      cases storeResult : memrefStoreArguments arguments argumentState with
+                                      | error error => simp [storeResult, bind, Except.bind] at success
+                                      | ok stored =>
+                                        simp only [storeResult, bind, Except.bind] at success
+                                        cases unifyResult : unify argumentState stored.2.1.type stored.2.2 with
+                                        | error error => simp [unifyResult, bind, Except.bind] at success
+                                        | ok unifiedState =>
+                                          simp only [unifyResult, bind, Except.bind] at success
+                                          exact throughArguments.trans ((unify_anchoredNodePrefixExtends unifyResult).trans
+                                            (recordExpressionWithExpected_anchoredNodePrefixExtends success))
+                                    simp only [storeEq, Bool.false_eq_true, if_false] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>

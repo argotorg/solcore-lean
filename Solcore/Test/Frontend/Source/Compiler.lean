@@ -2620,6 +2620,14 @@ private def testStageErrors : IO Unit := do
   | .error (.linking (.sourceCore { reason := .unsupportedType _, .. })) => pure ()
   | result => throw (IO.userError
       s!"a load reached a Core representation or failed before linking: {reprStr result}")
+  let memrefStore := rawWorkspace "main.solc" [("main.solc",
+    "function storing(m: uint256[], i: uint256) returns (uint256) { CanStore.store(lidx(m, i), uint256(1)); return 0; }")]
+  match prepare memrefStore (Seed.named moduleId "storing") generousLimits with
+  | .error (.linking (.sourceCore { reason := .unsupportedExpression .memrefStore, .. }))
+  | .error (.linking (.sourceCore { reason := .unsupportedExpression .elementRef, .. }))
+  | .error (.linking (.sourceCore { reason := .unsupportedType _, .. })) => pure ()
+  | result => throw (IO.userError
+      s!"a store reached a Core representation or failed before linking: {reprStr result}")
   let elementWrite := rawWorkspace "main.solc" [("main.solc",
     "function set(n: uint256, i: uint256, v: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[i] = v; return m[i]; }")]
   match prepare elementWrite (Seed.named moduleId "set") generousLimits with

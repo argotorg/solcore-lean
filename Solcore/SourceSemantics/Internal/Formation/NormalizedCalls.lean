@@ -357,6 +357,44 @@ theorem inferExprFuel_call_formation
                                 exact ⟨produced.1, argumentFormation.2.of_new_rows (congrArg LexicalScope.binders
                                   (localReadScope_recordExpressionWithExpected_lexicalScope success)) produced.2⟩
                             simp only [loadEq, Bool.false_eq_true, if_false] at success
+                            cases storeEq : storeCall namespacePath name
+                            case true =>
+                              simp only [storeEq, if_true] at success
+                              cases storeResult : memrefStoreArguments arguments argumentState with
+                              | error error => simp [storeResult] at success
+                              | ok stored =>
+                                simp only [storeResult] at success
+                                cases unifyResult : Detail.unify argumentState stored.2.1.type stored.2.2 with
+                                | error error => simp [unifyResult] at success
+                                | ok unifiedState =>
+                                  simp only [unifyResult] at success
+                                  have operands := memrefStore_operands_variablesBelow argumentsProperties.2.1
+                                    argumentsProperties.2.2 storeResult
+                                  have unifyProgress := unify_inferenceProgress argumentsProperties.2.1.solved operands.1
+                                    operands.2 unifyResult
+                                  have unifiedReady := unify_preserves_inferenceReady argumentsProperties.2.1 operands.1
+                                    operands.2 unifyResult
+                                  have recording := recordExpressionWithExpected_inferenceProperties unifiedReady
+                                    (Ty.variablesBelow_constructor _ _)
+                                    (fun type member => (expectedAtArguments type member).weaken unifyProgress.next_le) success
+                                  have unifiedContinuation := continuation.trans recording.1.substitution_extends
+                                  have argumentContinuation := unifiedContinuation.trans unifyProgress.substitution_extends
+                                  have argumentCapture : NoCaptureNodes outer argumentState.nodes := by
+                                    obtain ⟨_, fit, _, nodes⟩ := recordExpressionWithExpected_success_nodes success
+                                    rw [nodes, (withExpected_occurrenceState_eq fit).1, (unify_occurrenceState_eq unifyResult).1]
+                                      at capture
+                                    exact capture.of_prefix (List.prefix_append _ _)
+                                  have argumentFormation := argumentsInduction allocatedReady allocatedNodes allocatedFormed formation
+                                    (arguments,argumentState) argumentsResult argumentContinuation argumentCapture
+                                  have produced := recordExpressionWithExpected_normalized_formation
+                                    (type := Ty.unit) formation.toFormationContext continuation
+                                    (TypeAdmissible.builtin formation.scope.binders .unit) expectedFormed success
+                                  have unifiedFormation := argumentFormation.2.congr
+                                    (congrArg LexicalScope.binders (unify_preserves_lexicalScope unifyResult))
+                                    (unify_requirements_eq unifyResult)
+                                  exact ⟨produced.1, unifiedFormation.of_new_rows (congrArg LexicalScope.binders
+                                    (localReadScope_recordExpressionWithExpected_lexicalScope success)) produced.2⟩
+                            simp only [storeEq, Bool.false_eq_true, if_false] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

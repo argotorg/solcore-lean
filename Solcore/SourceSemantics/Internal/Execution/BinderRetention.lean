@@ -211,6 +211,10 @@ theorem callArguments
   | memrefLoad _ actualArguments _ recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     exact BindersRetained.recordExpressionWithExpected recorded
+  | memrefStore _ actualArguments _ unification recorded =>
+    cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+    exact (LocalGeneralizationEvents.Progress.unify unification).retained.trans
+      (BindersRetained.recordExpressionWithExpected recorded)
   | elementRef _ actualArguments _ recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     exact BindersRetained.recordExpressionWithExpected recorded

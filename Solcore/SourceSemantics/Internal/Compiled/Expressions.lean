@@ -1986,6 +1986,111 @@ theorem memrefLoadCall_typing_for {callProvenance : CallIndex → Prop}
     (boundary.scope.catalog checked) boundary.scope.signatures boundary.invariant loadType.1 loadType.2
     boundary.covered
 
+/-- The actual `CanStore.store(r, v)` types its two arguments, a memref and a
+value, in the same selected final source, the value at the memref's element
+once their types unify, and records its store at `()`. -/
+theorem memrefStoreCall_typing_for {callProvenance : CallIndex → Prop}
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel parentFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed callProvenance)
+    (recursive : ∀ smaller, smaller < childFuel → ExpressionRetainedSoundnessFor callProvenance selected smaller)
+    {inferenceContext : SourceInference.Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {parentInitial initial argumentState unifiedState resultState : State}
+    {inferred : InferredExpression} {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    {argumentSources : List Syntax.Expr} {arguments : List InferredExpression}
+    {stored : InferredExpression × InferredExpression × Ty} {call : ExpressionId}
+    (boundary : RetainedExpressionBoundary selected parentFuel inferenceContext expression expected
+      parentInitial inferred resultState frames target)
+    (invariant : RecursiveExpressionInvariant (checkingContext selected) selected.body.finalized initial target)
+    (operational : GeneralizedActualStateInvariant initial (evidenceSource selected))
+    (expectedBelow : ∀ type ∈ expected, type.VariablesBelow initial.inference.next)
+    (argumentsHere : callProvenance (.expressions childFuel inferenceContext argumentSources initial arguments argumentState))
+    (argumentsSuccess : Detail.inferExprsFuel childFuel inferenceContext argumentSources initial =
+      .ok (arguments, argumentState))
+    (argument : Detail.memrefStoreArguments arguments argumentState = .ok stored)
+    (unification : Detail.unify argumentState stored.2.1.type stored.2.2 = .ok unifiedState)
+    (recording : Detail.recordExpressionWithExpected inferenceContext expression call
+      Ty.unit (.memrefStore stored.1.id stored.2.1.id) [] expected unifiedState =
+        .ok (inferred, resultState)) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  let roots := bodyRoots selected
+  let evidenceState := selected.body.returned
+  have resources := selected.body.resources
+  obtain ⟨argumentsEq, resolved⟩ := Detail.memrefStoreArguments_ok argument
+  subst argumentsEq
+  have argumentProperties := Detail.inferExprsFuel_inferenceProperties invariant.ready
+    (boundary.scope.formation checked) (boundary.scope.functionsCanonical checked) argumentsSuccess
+  have operands := Detail.memrefStore_operands_variablesBelow argumentProperties.2.1
+    argumentProperties.2.2 argument
+  have unifyProgress := Detail.unify_inferenceProgress argumentProperties.2.1.solved operands.1
+    operands.2 unification
+  have unifiedReady := Detail.unify_preserves_inferenceReady argumentProperties.2.1 operands.1
+    operands.2 unification
+  have unifiedExpected : ∀ type ∈ expected, type.VariablesBelow unifiedState.inference.next :=
+    fun type member => (expectedBelow type member).weaken
+      (argumentProperties.1.trans unifyProgress).next_le
+  have recordProperties := Detail.recordExpressionWithExpected_inferenceProperties
+    unifiedReady (Ty.variablesBelow_constructor _ _) unifiedExpected recording
+  have unifiedExtension := boundary.extension.trans recordProperties.1.substitution_extends
+  have argumentExtension := unifiedExtension.trans unifyProgress.substitution_extends
+  have unifiedToParent : TypingSourceExtends (unifiedState.toTypedSource roots)
+      (resultState.toTypedSource roots) :=
+    ⟨Detail.recordExpressionWithExpected_preserves_owner recording,
+      recordExpressionWithExpected_success_nodesPrefix recording⟩
+  have argumentToUnified : TypingSourceExtends (argumentState.toTypedSource roots)
+      (unifiedState.toTypedSource roots) := by
+    constructor
+    · change unifiedState.owner = argumentState.owner
+      have headerEq := Detail.unify_state_header unification
+      simpa [Frontend.SourceInference.State.header] using
+        congrArg Frontend.SourceInference.State.Header.owner headerEq
+    · change argumentState.nodes <+: unifiedState.nodes
+      rw [(Detail.unify_occurrenceState_eq unification).1]
+      exact List.prefix_rfl
+  have argumentToParent := TypingSourceExtends.trans argumentToUnified unifiedToParent
+  obtain ⟨_, contains⟩ := recordExpressionWithExpected_success_containsExpression recording roots
+  have argumentEdge : ∀ argument ∈ [stored.1, stored.2.1],
+      DirectChild (resultState.toTypedSource roots) (.expression inferred.id) (.expression argument.id) := by
+    intro argument member
+    refine ⟨.expression _, ⟨contains.1, rfl⟩, ?_⟩
+    simp at member
+    rcases member with rfl | rfl <;> simp [nodeChildIds, Node.references, ExpressionForm.references]
+  have argumentPatterns : argumentState.integerPatterns ⊆ evidenceState.integerPatterns := by
+    intro origin member
+    apply boundary.integerPatterns
+    rw [recordExpressionWithExpected_integerPatterns_eq recording,
+      (Detail.unify_integerPatternMetadata_eq unification).1]
+    exact member
+  have argumentLiterals : argumentState.integerLiterals ⊆ evidenceState.integerLiterals := by
+    intro origin member
+    apply boundary.integerLiterals
+    rw [Detail.recordExpressionWithExpected_integerLiterals_eq recording,
+      Detail.unify_integerLiterals unification]
+    exact member
+  have argumentRequirements : argumentState.requirements ⊆ evidenceState.requirements := by
+    intro requirement member
+    apply boundary.requirements
+    apply Detail.recordExpressionWithExpected_requirements_subset recording
+    rw [Detail.unify_requirements_eq unification]
+    exact member
+  have argumentsTyped := expressionsRooted_for checked descend childFuel recursive
+    argumentsHere argumentsSuccess boundary.interfaces argumentExtension boundary.scope invariant
+    boundary.actual operational
+    (fun argument member => (boundary.rawProper.childSubtree (argumentEdge argument member)).monoBefore argumentToParent)
+    argumentPatterns argumentLiterals argumentRequirements
+    (fun argument member => boundary.covered.expressionChild resources.graph_closed
+      (boundary.directChildren (argumentEdge argument member)))
+    (fun argument member => boundary.actualCovered.directChild (boundary.directChildren (argumentEdge argument member)))
+  have storeType := memrefStore_formType resolved argumentExtension unification unifiedExtension
+    argumentsTyped
+  exact recordExpressionWithExpected_success_expressionTypingBase_actual resources boundary.interfaces
+    recording boundary.extension boundary.requirements boundary.expressionRequirements boundary.coercionPrimaries
+    (boundary.scope.catalog checked) boundary.scope.signatures boundary.invariant storeType.1
+    storeType.2 boundary.covered
+
 theorem expressionRetained_call_for {callProvenance : CallIndex → Prop}
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
@@ -2041,6 +2146,11 @@ theorem expressionRetained_call_for {callProvenance : CallIndex → Prop}
     exact memrefLoadCall_typing_for checked descend
       (fun smaller less => recursive smaller (Nat.lt_trans less (Nat.lt_succ_self _)))
       boundary invariant operational expectedBelow argumentsHere argumentsSuccess argument recording
+  | memrefStore nonconstructor argumentsSuccess argument unification recording =>
+    have argumentsHere := descend here (.expression_call_arguments boundary.accepted form allocation nonconstructor argumentsSuccess)
+    exact memrefStoreCall_typing_for checked descend
+      (fun smaller less => recursive smaller (Nat.lt_trans less (Nat.lt_succ_self _)))
+      boundary invariant operational expectedBelow argumentsHere argumentsSuccess argument unification recording
   | elementRef nonconstructor argumentsSuccess argument recording =>
     have argumentsHere := descend here (.expression_call_arguments boundary.accepted form allocation nonconstructor argumentsSuccess)
     exact elementRefCall_typing_for checked descend

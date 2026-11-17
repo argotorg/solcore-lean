@@ -1873,6 +1873,46 @@ private def testMemrefLoads : IO Unit := do
     "function bad(m: uint256[]) returns (uint256) { let get = CanStore.load; return 0; }"
     fun error => error == .unsupportedExpression "field"
 
+/-- `CanStore.store(r, v)` stores a value of its memref's element type at `()`,
+an open literal taking that type; it is rejected on an array, with a value of
+another type, on a memref whose type is still open there, and as a value. -/
+private def testMemrefStores : IO Unit := do
+  let functions ← check "memref stores" (String.intercalate "\n" [
+    "function stores(m: uint8[], i: uint256, v: uint8) returns (uint256) {",
+    "  CanStore.store(lidx(m, i), v);",
+    "  let r = lidx(m, i);",
+    "  CanStore.store(r, 7);",
+    "  return 0;",
+    "}"
+  ])
+  let function ← match functions with
+    | [function] => pure function
+    | _ => throw (IO.userError "memref store fixture lost its checked function")
+  let stores := function.typedBody.nodes.filterMap fun
+    | .expression { form := .memrefStore _ value, type, .. } =>
+        some (type, function.typedBody.nodes.findSome? fun
+          | .expression node => if node.id == value then some node.type else none
+          | .statement _ => none)
+    | _ => none
+  let uint8 : TypeSystem.Ty := .fixed ⟨false, .w8⟩
+  let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
+  assertTrue (decide (stores = [(.unit, some uint8), (.unit, some uint8)]))
+    s!"CanStore.store did not type its stores and their values: {reprStr stores}"
+  expectInferenceError "a store into an array"
+    "function bad(m: uint256[]) returns (uint256) { CanStore.store(m, uint256(1)); return 0; }"
+    fun error => error == .operatorNotSupported "CanStore" (.array uint256)
+  expectInferenceError "a store of a value of another type"
+    "function bad(m: uint256[]) returns (uint256) { CanStore.store(lidx(m, uint256(1)), true); return 0; }"
+    fun _ => true
+  expectInferenceError "a store through a memref still open"
+    "function bad(m: uint256[]) returns (uint256) { let put = lam(r) { CanStore.store(r, uint256(5)); }; put(lidx(m, uint256(1))); return m[1]; }"
+    fun error => match error with
+      | .operatorNotSupported "CanStore" _ => true
+      | _ => false
+  expectInferenceError "CanStore.store as a value"
+    "function bad(m: uint256[]) returns (uint256) { let put = CanStore.store; return 0; }"
+    fun error => error == .unsupportedExpression "field"
+
 /-- Exercise every phase-7 source-inference form before runtime lowering. -/
 def testSourcePhase7Inference : IO Unit := do
   testConstructors
@@ -1891,6 +1931,7 @@ def testSourcePhase7Inference : IO Unit := do
   testSliceCopies
   testElementRefs
   testMemrefLoads
+  testMemrefStores
   IO.println "phase-7 source inference GREEN"
 
 end Tests.SourcePhase7Inference
