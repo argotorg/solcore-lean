@@ -119,8 +119,10 @@ python3 scripts/semantic-differential.py --replay .upstream/semantic-cases/run \
 - The output directory must be new. A run rechecks and re-emits the case, computes the original
   Core result, compiles checked Hull and exact images, deploys the bytes on Anvil and runs the
   same imported contract on Core. It exits zero only for `matched`.
-- `--backend sonatina-o2` or `--backend yul --solc PATH` selects the backend; every runner,
-  campaign and the suite take it. Use one output directory per backend.
+- `--backend sonatina-o2` or `--backend yul --solc PATH` selects the backend. The pure, storage
+  and call adapters, their campaigns and the suite take it. The storage adapter and campaign
+  accept Yul for the twenty-seven storage-family profiles; the call adapter rejects it. Use one
+  output directory per backend.
 - Limits: `--direct-fuel`, `--core-fuel`, `--gas`, `--timeout`, `--total-timeout`,
   `--output-limit` and `--artifact-limit`, with defaults in `--help`.
 - `report.json` records tool versions and hashes, compiler and exporter receipts, source and
@@ -628,8 +630,9 @@ takes it through `SynthesizedInput.run(uint256)`, so a new input never changes t
 - Boundary inputs: zero, one, the maximum Word and the high bit. Generation fuel failures appear
   in `generationResourceExclusions`, a subset of `excluded`.
 - Fixed corpus `scripts/semantic-input-corpus.json`: identity, unsigned boundary branches, nested
-  local scopes and generated bodies. `requiredInputs` is met only by inputs whose three executions
-  agree; `requiredWordLiterals` measures literals in the Core AST and is no input coverage.
+  local scopes and generated bodies, with no claim of the richer M4 features or measured EVM
+  opcode coverage. `requiredInputs` is met only by inputs whose three executions agree;
+  `requiredWordLiterals` measures literals in the Core AST and is no input coverage.
 - `python3 scripts/test-source-input-rust.py` runs two source functions at the four inputs and
   replays a saved run.
 
@@ -921,7 +924,8 @@ expression inside `sc_constant`, which returns `comptime<word>`, and passes it t
   campaigns default to 512 attempts. Constants render only the scalar operations.
 - `requiredConstantFeatures` tracks the constant apart from the step.
 - Passing a runtime value to a comptime parameter is out of scope; Rust rejects it with `SC0409`.
-  The comptime emitter is tested, not formally proved.
+  The comptime emitter is tested, not formally proved. The profile neither unifies the native
+  Lean frontend's own staging evaluator nor claims unrestricted cross-stage persistence.
 - Fixed corpus: 40 cases with both variants.
 - Known finding: the recorded plan of seed `13439332813997308049` crashes O2 code-image export on
   all eight of its inputs, under revisions three and four.
@@ -949,7 +953,9 @@ contributes to the result.
   order. Hull's span-derived source inventory may omit a provider, so the adapter hashes all four
   files before and after both exports; `sourceBundleReceipt` lets a moved archive replay.
 - Scope: this fixed four-file graph with Word captures and results; not arbitrary or cyclic module
-  graphs or dynamic ABI.
+  graphs, dynamic ABI or equivalence with the native Lean frontend. M6 is complete for its bounded
+  generic, closure, comptime and module profiles; these results prove neither source-emitter
+  preservation nor language-wide compiler correctness.
 - Fixed corpus: 44 cases, requiring both selection branches.
   `scripts/test-semantic-source-bundle.py` tests the bundle rules.
 
@@ -1492,10 +1498,11 @@ and returns the sum of the three.
 
 ### Compare malformed calldata
 
-`stateful-malformed-calldata` sends the dynamic-array contract calldata with one malformation per
-transaction and compares the paths against the pinned std's dispatcher (`std/dispatch.sol`) and
-decoder (`std/std.sol`). The original Core contract `core-malformed-calldata-contract-v1` makes
-std's checks on the actual calldata, in std's order:
+Every other profile sends canonical calldata. `stateful-malformed-calldata` sends the
+dynamic-array contract calldata with one malformation per transaction and compares the paths
+against the pinned std's dispatcher (`std/dispatch.sol`) and decoder (`std/std.sol`). The
+original Core contract `core-malformed-calldata-contract-v1` makes std's checks on the actual
+calldata, in std's order:
 
 1. Fewer than 4 bytes or another selector reverts with `0x4924aef0`
    (`NoSelectorMatchedWithoutFallback()`).
