@@ -20,8 +20,7 @@ The [umbrella](../../Solcore/Frontend.lean) imports the pipeline (through
   also imports two files of the source semantics: `SourceSemantics/CaptureBinders` and
   `SourceSemantics/Staging/Classification`.
 - **What builds on it.** The [source semantics](source-semantics.md) is stated over the typed IR of
-  `SourceInference/TypedIR`. [Core lowering](core-lowering.md) proves, for part of the language,
-  that the native lowering preserves meaning, with theorems stated over the actual compiler
+  `SourceInference/TypedIR`, and [core lowering](core-lowering.md) over the actual compiler
   functions. The generators of [Synthesis](synthesis.md) import `RustHull/Precompiles` for Keccak.
   The tests and README use the public APIs.
 
@@ -51,9 +50,9 @@ artifact. `SourceCoreExecution.prepare` turns that artifact into the recipe that
 | [`TraitResolution`](../../Solcore/Frontend/TraitResolution.lean) | The tabled trait search and its typed instance: `TraitResolution.Evidence`, `TypedTraitResolution.Evidence` |
 | [`SourceInference/TypedIR`](../../Solcore/Frontend/SourceInference/TypedIR.lean) | The typed IR: `TypedSource`, `ExpressionNode`, `ExpressionForm`, `TypedBinder` |
 | [`SourceInference/Types`](../../Solcore/Frontend/SourceInference/Types.lean) | `State`, `Context`, `CheckedFunction`, `SolvedRequirement`, `Error` |
-| [`SourceInference/Resolution`](../../Solcore/Frontend/SourceInference/Resolution.lean) | Operator, overload and trait selection: `binaryOperatorDispatch`, `inferBinaryOperator`, `withExpected`; `fixedBinaryOperator`, the builtin operators at the twelve fixed-width types, unchecked `+ - * / %` among them; the shifts, which `inferBinaryOperator` types before any dispatch without unifying, so the result takes the value's type and an open literal value or amount waits; `binaryDefers`, under which an operator with an open literal operand waits for the literal's type, an unchecked one too unless its operand is already `integer`; `compoundOperandType`, which gives an open compound target's own type to its operand for `compoundTakesTargetType`; for `<<=` and `>>=`, which are in it, that type is the shift's value, and the amount is typed on its own with no expected type (`isShiftAssign`; `inferAssignedValueFuel` in `SourceInference/Expression`); `bitNotTargetType`, the type an in-place `~` unifies its target with, its own when open or fixed-width and `word` otherwise, and `bitNotTargetFits`, the target types with a builtin `~`: `word` and the twelve |
+| [`SourceInference/Resolution`](../../Solcore/Frontend/SourceInference/Resolution.lean) | Operator, overload and trait selection: `binaryOperatorDispatch`, `inferBinaryOperator`, `withExpected`; the builtin operators at the twelve fixed-width types (`fixedBinaryOperator`); operands that wait for their type (`binaryDefers`); the types of compound and in-place `~` targets (`compoundOperandType`, `bitNotTargetType`, `bitNotTargetFits`) |
 | [`SourceInference/Expression`](../../Solcore/Frontend/SourceInference/Expression.lean) | The traversal `inferExprFuel`, `inferStatementFuel`, `inferStatementsFuel`, with the shift and unchecked branches, a qualified call's `Typedef` branch (`typedefCall?`, `typedefFunction`) and a constructor pattern's `uint256(p)` branch (`uint256PatternArgument?`) |
-| [`SourceInference/Program`](../../Solcore/Frontend/SourceInference/Program.lean) | `checkFunctionBody`, `finalize`, which defaults an open numeric pattern to `uint256`, defaults an open literal to `uint256` where an operator, a compound assignment, an in-place `~` (`Detail.bitNotMentions`), a comparison, a requirement, a minus sign, a memory array read's index, a memory array literal's element or a memory array element place's index uses it and rejects it as ambiguous otherwise (`Detail.literalDefaultsToUint256`), and rejects a literal outside its fixed-width integer type's range, checked with the literal's sign (`Detail.signedLiteralFitsTarget`), and a `uint256` pattern above `uint256`'s greatest value, and rejects a compound assignment whose target type, known only then, does not take its operator, such as `integer` or a lambda parameter that local generalization quantified (`Detail.validateAssignmentTargets`, `Detail.compoundTargetFits`, which admits `word` and the twelve types as `<<=` and `>>=` targets), a compound shift whose amount is not `word` or an unsigned type, with `operatorNotSupported "shl"` or `"shr"` (`Detail.validateShiftAmount`, which `Detail.validateAssignmentTarget` runs once the target fits), an in-place `~` whose target type, known only then, has no builtin `~`, such as `integer` or a lambda parameter that local generalization quantified, with `operatorNotSupported "BitNot"` (`Detail.validateBitNotTarget`, which `Detail.validateAssignmentTargets` runs), a memory array element place whose index is not `word` or one of the twelve types, with `operatorNotSupported "Typedef"`, a compound assignment to an element, with `compoundTargetNotSupported`, and an in-place `~` on one, with `operatorNotSupported "BitNot"` (`Detail.validatePlaceElements`, which `finalize` runs after `Detail.validateAssignmentTargets`), an unchecked operator that waited on a literal that became `integer`, with `operatorNotSupported` (`Detail.validateUncheckedOperand`), a shift whose value is not `word` or one of the twelve types or whose amount is not `word` or an unsigned type, with `operatorNotSupported "shl"` or `"shr"` (`Detail.validateShiftOperands`, which `Detail.validateExpressionNode` runs after `validateUncheckedOperand`), a memory array read whose index is not `word` or one of the twelve types, with `operatorNotSupported "Typedef"` (`Detail.validateArrayIndex`, which `Detail.validateExpressionNode` runs after `Detail.validateShiftOperands`), and a memory array literal whose element type a memory array cannot hold, such as `bool` or an element type still open then, with `operatorNotSupported "Typedef"` (`Detail.validateArrayLiteral`, which `Detail.validateExpressionNode` runs last); `inferExpression`, whose own type stays open, leaves a lone open literal ambiguous where upstream's root rule gives it `uint256` |
+| [`SourceInference/Program`](../../Solcore/Frontend/SourceInference/Program.lean) | `checkFunctionBody` and `finalize`. `finalize` defaults an open numeric pattern to `uint256`, and an open literal where one of the uses that `Detail.literalDefaultsToUint256` lists takes it, rejecting it as ambiguous elsewhere. It checks literal ranges (`Detail.signedLiteralFitsTarget`), and runs the checks that wait for final types: assignment targets, unchecked, shift and array operands, array literals and element places (`Detail.validateAssignmentTargets`, `Detail.validateUncheckedOperand`, `Detail.validateShiftOperands`, `Detail.validateArrayIndex`, `Detail.validateArrayLiteral`, `Detail.validatePlaceElements`). `inferExpression`, whose own type stays open, leaves a lone open literal ambiguous where upstream's root rule gives it `uint256` |
 | [`SourceInference`](../../Solcore/Frontend/SourceInference.lean) | The inference umbrella, which also imports five of its proof files |
 | [`ProgramChecking`](../../Solcore/Frontend/ProgramChecking.lean) | `checkProgram`, `CheckedProgram`, `ProgramCheckError` |
 | **Staging and specialization** | |
@@ -63,7 +62,7 @@ artifact. `SourceCoreExecution.prepare` turns that artifact into the recipe that
 | [`ExecutableImplMethods`](../../Solcore/Frontend/ExecutableImplMethods.lean) | `ExecutableImplMethods.CheckedMethod` |
 | [`SourceCompilationPlan`](../../Solcore/Frontend/SourceCompilationPlan.lean) | `exactSpecialization`, `exactInstantiationKey`, `validateExecutablePlanEvidence` |
 | **Elaboration and lowering** | |
-| [`SourceCoreElaboration`](../../Solcore/Frontend/SourceCoreElaboration.lean) | Literal evidence, with the range checked again at a fixed-width integer type (`validateFixedIntegerLiteral`, and `validateNegativeFixedIntegerLiteral` for a negative literal), closed types, elaboration errors; Core operators for source operators |
+| [`SourceCoreElaboration`](../../Solcore/Frontend/SourceCoreElaboration.lean) | Literal evidence, with the range checked again at a fixed-width integer type (`validateFixedIntegerLiteral`, `validateNegativeFixedIntegerLiteral`), closed types, elaboration errors; Core operators for source operators |
 | [`SourceCore/Lowering`](../../Solcore/Frontend/SourceCore/Lowering.lean) | Scalars, locals, control, loops, assignments, calls and function values, by section: `SourceCorePrimitive`, `SourceCoreAssignments`, `SourceCoreSourceCells`, `SourceCoreFunctions` and others |
 | [`SourceCore/Data`](../../Solcore/Frontend/SourceCore/Data.lean) | `SourceCoreDataCatalog.Catalog`: closed data, equality and defaults |
 | [`SourceCore/DataExpressions`](../../Solcore/Frontend/SourceCore/DataExpressions.lean), [`DataPlaces`](../../Solcore/Frontend/SourceCore/DataPlaces.lean) | Data leaves, and places as Core getters and updaters (`SourceCoreDataPlaces.lower`) |
@@ -101,7 +100,7 @@ The proofs are in three `Internal/` directories. A new lemma goes in the file of
 | [`SourceCore/Internal/CallableOutputs`](../../Solcore/Frontend/SourceCore/Internal/CallableOutputs.lean) | Reverse values, heap exports and the public output codec |
 | [`SourceCore/Internal/DirectLinking`](../../Solcore/Frontend/SourceCore/Internal/DirectLinking.lean) | Closed direct-call linking, and `SourceCoreDirectLinking.validatePlan` |
 | [`SourceCore/Internal/Entries`](../../Solcore/Frontend/SourceCore/Internal/Entries.lean) | Prepared entries, public values, the assignment policy |
-| [`SourceCore/Internal/FaultSites`](../../Solcore/Frontend/SourceCore/Internal/FaultSites.lean) | Source diagnostics for Core language failures; an assignment's operands have a site at a Word, Integer or fixed-width integer target (`SourceCoreAssignmentFaultSites.operandTarget`) |
+| [`SourceCore/Internal/FaultSites`](../../Solcore/Frontend/SourceCore/Internal/FaultSites.lean) | Source diagnostics for Core language failures, such as the sites of an assignment's operands (`SourceCoreAssignmentFaultSites.operandTarget`) |
 
 ### Rust Hull
 
@@ -172,70 +171,57 @@ with the pipeline, but their matches on the syntax operators need a case for eac
 | The `prepare_resumes_exact` and `compileObject_resumes_exact` theorems of `ContractMemoryCorrespondence`, `ContractCallModeCorrespondence` and the other layers | The same for contracts, one effect layer at a time, from actual compilation to public receipts | The Hull note, tests |
 
 The source semantics and core lowering use none of the other results, such as
-`checkProgram_success_unique_fuel`, `checkProgram_success_declarations_nodup`,
-`Bootstrap.ready_indexed` and `SourceCoreUnifiedPreparationCertificates.run_done_specialization`.
-The Hull note says what each meaning theorem assumes and what remains: the elliptic-curve
-precompiles, creation with init frames, more of inline Yul, and object linking.
+`checkProgram_success_unique_fuel` or `Bootstrap.ready_indexed`. The Hull note says what each
+meaning theorem assumes and what remains: the elliptic-curve precompiles, creation with init frames,
+more of inline Yul, and object linking.
 
 ## Making changes
 
 ### A new construct in the native compiler
 
-Worked examples: 5b8c6e96d (shifts) and e8d28e957 (`unchecked` blocks). Their paths are from before
-the layout refactor; [Conventions](conventions.md#following-older-notes) says how to map them.
-[Adding a language feature](adding-a-feature.md) covers the other layers.
+[Adding a language feature](adding-a-feature.md) follows the shifts through every layer. The
+compiler's steps:
 
-1. **Syntax**, as [Syntax](syntax.md#making-changes) describes. A pass around the parser also
-   needs `parseWorkspaceFile` in `ProgramInterfaces`, and a `ProgramLoadError` for its failures.
+1. **Syntax**, as [Syntax](syntax.md#making-changes) describes. A pass around the parser also needs
+   `parseWorkspaceFile` in `ProgramInterfaces`, and a `ProgramLoadError` for its failures.
 2. **Typed IR.** A new operator needs none: `ExpressionForm` carries `Syntax.BinaryOp` and
    `Syntax.ValueAssignOp`. A new form needs a constructor in `SourceInference/TypedIR`.
 3. **Inference**, in `SourceInference/Resolution`: the dispatch (`binaryOperatorDispatch`) and the
-   typing rule (`inferBinaryOperator`, whose shift branch runs before any dispatch). A compound form
-   that takes a fixed-width target's type also needs its case in `compoundOperandConstructor` and
-   `compoundTakesTargetType`, as the unchecked `+= -= *= /= %=` took theirs (eab637af1) and `<<=`
-   and `>>=` theirs (2f616db3a); finalization checks the target's final type with
-   `compoundTargetFits`. An unchecked operator's open literal operand waits as a checked one's does
-   (`binaryDefers`), and finalization rejects one that became `integer` with
-   `validateUncheckedOperand`. A shift's branch unifies nothing, so its value and amount wait for
-   their own types (0e5e82583), and finalization checks them with `validateShiftOperands`. A
-   compound shift's amount is inferred with no expected type, so it waits too (2f616db3a), and
-   finalization checks it with `validateShiftAmount`.
-   A new form also needs its arm in `inferExprFuel` (`SourceInference/Expression`), except a form
-   that inference only rejects: it shares the last arm until the step that gives it a meaning adds
-   its own arm. `new T[](n)` took its arm in a commit of its own, which only renumbered the proofs'
-   cases and still rejected it (f1713ae3a), before the commit that typed it (a3407d45f), and so did
-   the slices (beef0ee00, then 0e733c5af). The last arm now keeps only the parser's recovery nodes.
-4. **Inference proofs**: the new branch's lemmas next to it (`inferBinaryOperator_shift_result` in
-   `SourceInference/Expression`), then every case analysis in
-   `SourceInference/Internal/ExpressionProperties`. `unchecked` also touched `RequirementProperties`,
-   `OccurrenceProperties`, `DirectCallOrigins` and `LocalReadOrigins`.
-5. **Elaboration and lowering**: the Core operator in `SourceCoreElaboration` (`directBinary`,
-   `stagedCoreBinary?`); in `SourceCore/Lowering`, `SourceCorePrimitive.strictBinaryBody` and
-   `binaryOperandType`, `SourceCoreAssignments.operator?` and `wordOnly?`, and
-   `SourceCoreInteger.strictBinaryBody`; the operator table and guard of
-   `SourceCoreDataPlaces.lower` and of `SourceCore/Compatible`.
-6. **Fragments and frontend tests**: their exhaustive matches, in `Fragments/Internal/Foundations`,
-   `LocalExpressions`, `LocalFunctionApplication` and `RecursiveComputation`, and in the tests
-   `ClosedStrictWords` and `ExpectedDataImages`.
-7. **Semantics and proofs**: the [source semantics](source-semantics.md) and
+   typing rule (`inferBinaryOperator`, whose shift branch runs before any dispatch). A compound
+   form that takes a fixed-width target's type also needs its case in `compoundOperandConstructor`
+   and `compoundTakesTargetType`. What is still open waits for its type (a compound target, a
+   literal operand, a shift's value and amount, a compound shift's amount), and finalization checks
+   it in `SourceInference/Program` (`compoundTargetFits`, `validateUncheckedOperand`,
+   `validateShiftOperands`, `validateShiftAmount`).
+4. **Its arm.** A new form needs its arm in `inferExprFuel` (`SourceInference/Expression`). A form
+   that inference only rejects shares the last arm until a later step gives it a meaning; the last
+   arm now keeps only the parser's recovery nodes. `new T[](n)` and the slices each took their arm
+   in a commit of its own, which only renumbered the proofs' cases, before the commit that typed
+   them.
+5. **Inference proofs**: the new branch's lemmas next to it, as `inferBinaryOperator_shift_result`
+   is, then every case analysis in `SourceInference/Internal/ExpressionProperties`.
+6. **Elaboration and lowering**: the Core operator in `SourceCoreElaboration` (`directBinary`), and
+   the operator's cases in `SourceCore/Lowering` (`SourceCorePrimitive.strictBinaryBody`,
+   `SourceCoreAssignments.operator?`), and in the operator tables and guards of
+   `SourceCoreDataPlaces.lower` and `SourceCore/Compatible`.
+7. **Fragments and frontend tests**: their exhaustive matches, in `Fragments/Internal/` and in tests
+   such as `ClosedStrictWords`.
+8. **Semantics and proofs**: the [source semantics](source-semantics.md) and
    [core lowering](core-lowering.md). A new guard in the lowering becomes a premise there: since the
    data-place lowering refuses Word-only operators at `integer` leaves, the shared assignment
    premise reads `operator.wordOnly = false`.
-8. **Tests**: a public-API test with a `run`, called from `Tests/Main.lean`, such as
-   `Tests.SourceCoreShiftExecution` and `Tests.SourceCoreUncheckedExecution` in
-   [`Foundations/Execution`](../../Solcore/Test/SourceSemantics/CoreLowering/Foundations/Execution.lean).
-   Give the expected values of the pinned Rust paths, and the programs that must be rejected.
+9. **Tests**: a public-API test with a `run`, called from `Tests/Main.lean`, such as
+   `Tests.SourceCoreShiftExecution`, with the expected values of the pinned Rust paths and the
+   programs that must be rejected.
 
 ### A change to what an existing construct compiles to
 
-Worked example: 7ac75aea3, closures that capture by value.
-- Put a decision that the semantics and the lowering both make in one function, low in the imports:
-  `CaptureBinders.copiedBinder?` in `SourceSemantics/CaptureBinders`, which imports only
-  `SourceInference/TypedIR`.
-- Change the lowering (here the sections `SourceCoreSourceCells`, `SourceCoreFunctions` and
-  `SourceCoreLoops` of `SourceCore/Lowering`) and the semantics together.
-- Expect to restate the core lowering theorems that describe the old code; that commit restated
-  every theorem about closure formation and calls, and updated the tests' expected results.
+Closures by value are the example ([Core lowering](core-lowering.md#closures-by-value)). Put a
+decision that the semantics and the lowering both make in one function, low in the imports:
+`CaptureBinders.copiedBinder?` in `SourceSemantics/CaptureBinders` imports only
+`SourceInference/TypedIR`. Change the lowering (here `SourceCoreSourceCells`, `SourceCoreFunctions`
+and `SourceCoreLoops` in `SourceCore/Lowering`) and the semantics together, and expect to restate
+the core lowering theorems that describe the old code and the tests' expected results.
 
 ### A new public entry point
 
@@ -245,24 +231,22 @@ Define it in `SourceCoreExecution` and add it to the `export` lists of `SourceCo
 
 ### Rust Hull: executable support for a builtin or construct
 
-Worked examples: 1ad29dadc (all opcode wrappers) and baacd0fb9 (account state operations).
 1. A new node in the export: `RustHull/Syntax` and `RustHull/Decode`. The decoder rejects unknown
    fields, another schema and another upstream revision.
 2. The compiler: `RustHull/Lowering` and `LoweringSupport`, the effect builtins in
    `RustHull/Effects`, frames in `AccountRuntime`, code images in `CodeImage`, and the boundaries in
    `Contract` and `LinkedContract`.
 3. `RustHull/Safety` must still prove the safety theorems for the new code.
-4. Tests in `Solcore/Test/Frontend/RustHull/`, with fixtures under `Tests/Fixtures/` and a runner
+4. Tests in `Solcore/Test/Frontend/RustHull/`, with fixtures under `Tests/Fixtures/`, and a runner
    or script when Rust output is compared, as `Tests/RustHullOpcodeWrappersRun.lean` and
-   `scripts/test-rust-opcode-wrappers.py` are.
+   `scripts/test-rust-opcode-wrappers.py` are for the opcode wrappers.
 
 ### Rust Hull: connecting a feature to the meaning theorems
 
-Worked examples: c60b25309 (Yul word operations) and 0b178e54c (RIPEMD-160).
-1. The independent rule: for Yul, `YulSemantics` in `Semantics/Frames`; for the precompile, its
+1. The independent rule: for Yul, `YulSemantics` in `Semantics/Frames`; for a precompile, its
    digest in `Semantics/Digests` and its dispatch in `Semantics/Accounts`.
 2. The simulation in `RustHull/Internal/`: `Derivations` and `CallBuiltins` for Yul; `Digests` and
-   `CallTransport` for the precompile.
+   `CallTransport` for a precompile.
 3. The public theorem of the layer, and a consumer of it in the tests, such as those in
    `Solcore/Test/Frontend/RustHull/Effects`.
 4. The status tables of the Hull note. Its completion rule: a feature is connected only when its
@@ -270,7 +254,6 @@ Worked examples: c60b25309 (Yul word operations) and 0b178e54c (RIPEMD-160).
 
 ### Rust Hull: an exporter change or a new pin
 
-Worked examples: 7aa1d539d (the re-pin to `e2eef194`) and 32b38d908 (larger nested artifacts).
 - In Lean: `RustHull.upstreamCommit`, `CodeImage.backendRevision` when the backend moves, the
   revision named in `RustHull/Lowering`'s inline-Yul section, and the sample export in
   `Solcore/Test/Frontend/RustHull/Effects`. Grep for the old revision. Raise `DecodeLimits` if
@@ -282,49 +265,43 @@ Worked examples: 7aa1d539d (the re-pin to `e2eef194`) and 32b38d908 (larger nest
 ## Pitfalls
 
 - **Core lowering reads the compiler's code.** Its proofs unfold compiler definitions and state
-  premises in their terms. A change to a compiler function is a change to those proofs; plan it with
-  the [core lowering](core-lowering.md) work.
+  premises in their terms, so a change to a compiler function is a change to those proofs. Plan it
+  with the [core lowering](core-lowering.md) work.
 - **Inference proofs number their cases.** They do functional induction on `inferExprFuel` and name
-  its cases by number, in `SourceInference/Internal` and `SourceSemantics/Internal`. A new arm in
-  `inferExprFuel`, or a new syntax constructor it matches on, shifts them: `new T[](n)`'s arm
-  shifted 281 lines in 14 proof files (f1713ae3a), and the slices' arm the same 281 lines
-  (beef0ee00), while a constructor that only reaches the last arm, as the parser's recovery nodes
-  do, shifts nothing. This is why `unchecked` is a pass around the parser.
-  Pattern proofs do the same with `inferMatchPatternFlatFuel.induct`: the arm of `case uint256(p)`
-  (8708ef657) shifted its later cases in `ExpressionProperties`, `Privacy/Active`,
-  `Privacy/ProtectedFrames`, `Privacy/SelectedCalls`, `Inference/ExpressionLedgers`,
-  `Formation/NormalizedMatches` and `Selected/PatternMonomorphism`.
+  its cases by number, in `SourceInference/Internal` and `SourceSemantics/Internal`. A new arm, or a
+  new syntax constructor it matches on, shifts them; a constructor that only reaches the last arm,
+  as the parser's recovery nodes do, shifts nothing. This is why `unchecked` is a pass around the
+  parser. Pattern proofs do the same with `inferMatchPatternFlatFuel.induct`.
 - **The compiler imports the inference proofs.** `ProgramChecking` imports the `SourceInference`
   umbrella, which imports five proof files, so a broken inference proof stops the compiler build.
-- **Files kept apart on purpose.** The layout refactor kept these apart, for these reasons:
+- **Files kept apart on purpose:**
   - `SourceCore/Internal/CallablePrincipals` stands alone: its private instances, which
-    `CallableViews` also declares, must stay outside the closure of `Callable/CoercionSpine` in core
-    lowering.
-  - `SourceCore/Internal/Carriers` imports no source semantics, so that `CallableViewWrappers` in
-    core lowering stays outside `Solcore.SourceSemantics.Context`.
-  - `SourceCore/Data` stays below the lowering: core lowering imports it, and a wider closure changes
-    its `simp` calls.
-  - `Internal/SignatureProperties` stays out of reach of `SourceInference/Internal/ExpressionProperties`,
-    whose proofs break once `ProgramFunctionSignature.parameterTypes_length` is a `simp` lemma there.
-  - `DirectCallInference` and `DirectCallOrigins` each have a private `exceptPure_eq_ok` with its own
-    proof.
-  - `ProgramSignatures` and `ProgramSignatureFormation`, `Internal/RuntimeValues` and
-    `RuntimeValidation`, `DataExpressions` and `DataPlaces`, and `Compatible` and
-    `CompatibleFunctions` would share matchers in one file, which renames the variables of their
-    equation lemmas.
+    `CallableViews` also declares, must stay outside the closure of core lowering's
+    `Callable/CoercionSpine`.
+  - `SourceCore/Internal/Carriers` imports no source semantics, so that core lowering's
+    `CallableViewWrappers` stays outside `Solcore.SourceSemantics.Context`.
+  - `SourceCore/Data` stays below the lowering: core lowering imports it, and a wider closure
+    changes its `simp` calls.
+  - `Internal/SignatureProperties` stays out of reach of `ExpressionProperties`, whose proofs break
+    once `ProgramFunctionSignature.parameterTypes_length` is a `simp` lemma there.
+  - `DirectCallInference` and `DirectCallOrigins` each have a private `exceptPure_eq_ok` with its
+    own proof.
+  - These pairs would share matchers in one file, which renames the variables of their equation
+    lemmas: `ProgramSignatures` and `ProgramSignatureFormation`, `Internal/RuntimeValues` and
+    `RuntimeValidation`, `DataExpressions` and `DataPlaces`, `Compatible` and
+    `CompatibleFunctions`.
 - **Tests assert imports.** `#check_failure` probes keep `SourceCore/CompatibleCatalog` below the
   value encoder of `SourceCore/Compatible` (`Compatible/Payloads`) and `SourceCoreLegacyHeapImport`
   out of the public API (`UnifiedCorpus`). A new import can break them.
-- **Hull files kept apart on purpose.**
-  - `RustHull/Memory`, which holds `Logs`, and `RustHull/Precompiles` import no Hull syntax. The
+- **Hull files kept apart on purpose:**
+  - `RustHull/Memory`, which holds `Logs`, and `RustHull/Precompiles` import no Hull syntax: the
     generators import `Precompiles`, and under `open Core` their `Expr` means `Core.Expr`, which
     `RustHull.Expr` would make ambiguous. The test file `RustHull/YulPrimitives` stays apart from
     `RustHull/Runtime` for the same reason.
   - `CreationRuntime` stays in `RustHull/Effects`, below `Lowering`: it uses `CodeBuilder.boolean`,
     and `Lowering` declares a `boolean` of its own.
   - `Internal/CallLayout` stays apart from `Internal/CallStates`: `call_fixed_separation` unfolds
-    `Layout` millions of times, which costs a quarter more heartbeats, past the limit, when `Layout`
-    is in the same file.
+    `Layout` so often that it passes the heartbeat limit when `Layout` is in the same file.
 - **The Hull specification shares some compiler definitions.** `Semantics/World` uses
   `AccountState.Account` from `RustHull/Effects` and `Memory.packBytes` from `RustHull/Memory`, and
   `YulSemantics` uses `YulFragment.primitives` from `RustHull/Lowering`. Changing one of these
@@ -351,8 +328,7 @@ lake test                                            # every test, through Tests
 | Rust Hull | [`Solcore/Test/Frontend/RustHull/`](../../Solcore/Test/Frontend/RustHull), the runners `Tests/RustHull*Run.lean`, the fixtures in `Tests/Fixtures/` |
 | Fragments | The other files in [`Solcore/Test/Frontend/`](../../Solcore/Test/Frontend) |
 
-`Tests/Main.lean` imports the test files and calls their `run` entry points. Some Hull runners are
-executables of their own, such as
-`rustHullScenario` (`lake build rustHullScenario`), and others run as scripts, such as
+Some Hull runners are executables of their own, such as `rustHullScenario`
+(`lake build rustHullScenario`); others run as scripts, such as
 `lake env lean --run Tests/RustHullWorldRun.lean`. [Tests](tests.md) says how the tests are
 organized.
