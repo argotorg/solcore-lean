@@ -59,7 +59,7 @@ def observe (compiled : Compiled) (owner : Key) (arguments : List Value := [])
 
 def prepare (label content : String) (names : List String) : IO Compiled := do
   let program ← get s!"{label} checked source" (checkProgram {
-    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content}] })
+    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}] })
   let roots ← names.mapM (key program)
   let plan ← match SourceSpecializationWorklist.run program (roots.map fun root => ⟨root.declaration, []⟩) 512 with
     | .ok (.complete plan) => pure plan

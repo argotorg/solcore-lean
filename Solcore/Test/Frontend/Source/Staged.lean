@@ -25,7 +25,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -384,7 +384,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -855,7 +855,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -987,7 +987,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -1280,7 +1280,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -1415,7 +1415,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -1611,7 +1611,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -2097,7 +2097,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -2392,7 +2392,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 

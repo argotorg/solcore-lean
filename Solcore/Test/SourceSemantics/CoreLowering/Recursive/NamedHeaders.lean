@@ -940,7 +940,7 @@ no full runtime compilation or Header is inferred for this fixture. -/
 private def template_boundary : IO Unit := do
   let workspace : Workspace.RawWorkspace := {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word, Bool) {",
@@ -1371,7 +1371,7 @@ private def finish (compiled : SourceCoreUnifiedCompilation.Compiled) (root : So
 
 def run : IO Unit := do
   let program ← get "formation actual checker" (checkProgram {
-    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content}] })
+    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}] })
   let names := ["maker", "caller", "stored", "pair", "branch", "zero", "firstFault", "laterFault"]
   let roots ← names.mapM (SourceCoreUnifiedCorpusSupport.key program)
   let compiled ← get "formation actual public Core compiler" (SourceCoreCompiler.compileChecked program
@@ -3043,7 +3043,7 @@ private def get {α ε : Type} [Repr ε] := @SourceCoreUnifiedCorpusSupport.get 
 
 def run : IO Unit := do
   let program ← get "specialization stages checked program" (Frontend.checkProgram {
-    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content}] })
+    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}] })
   let mut rows := 0
   let mut genericRows := 0
   let mut stagedInputs := 0

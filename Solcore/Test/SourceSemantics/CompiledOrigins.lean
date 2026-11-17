@@ -41,7 +41,7 @@ open SourceSemantics.CoreLowering
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
@@ -243,7 +243,7 @@ private theorem catalog_scope {raw : Workspace.RawWorkspace} {fuel : Nat}
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
@@ -607,7 +607,7 @@ open Solcore Frontend SourceInference SourceSemantics TypeSystem CatalogedDirect
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
@@ -704,7 +704,7 @@ open Solcore Frontend SourceInference SourceSemantics TypeSystem DirectCallEvent
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
@@ -779,7 +779,7 @@ open Solcore Frontend SourceInference SourceSemantics TypeSystem DirectCallPredi
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
@@ -884,7 +884,7 @@ open Solcore Frontend SourceInference SourceSemantics TypeSystem
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
@@ -948,7 +948,7 @@ open Solcore Frontend SourceInference SourceSemantics TypeSystem DirectCallEvent
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
@@ -1045,7 +1045,7 @@ open Solcore Frontend SourceInference SourceSemantics TypeSystem CatalogedDirect
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
@@ -1202,7 +1202,7 @@ open Solcore Frontend SourceInference SourceSemantics
 
 private def workspace (body : List String) : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" ([
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" ([
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }"
@@ -1296,7 +1296,7 @@ open Solcore Frontend SourceInference SourceSemantics SourceSpecializationWorkli
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
@@ -1832,7 +1832,7 @@ private def checked_boundaries : IO Unit := do
   let mut literals := 0
   for source in sources do
     let checked ← get "checked integer/method operator boundaries" (checkProgram {
-      entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := source}] })
+      entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ source}] })
     for function in checked.functions do
       for entry in function.typedBody.nodes do
         match entry with
@@ -2238,7 +2238,7 @@ open Solcore Frontend SourceInference SourceSemantics TypeSystem CatalogedDirect
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",

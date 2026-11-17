@@ -133,7 +133,7 @@ end Static
 open Tests.SourceCompilerFeatureSupport in
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function first(value: Word) returns (Word) { let copied = value; return copied; }",
     "function bad(value: Word) returns (Word) { let copied = value; let gap: Word; return gap; }",
     "function equalNamed(seed: Word) returns (Word) { let root: Word; root = first(seed); return first(root); }",

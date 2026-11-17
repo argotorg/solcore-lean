@@ -206,7 +206,7 @@ end CompilerConsumers
 
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "function next(value: Word) returns (Word) { return value + 1; }",
       "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
       "function bad() returns (Word) { let gap: Word; return gap; }",
@@ -435,7 +435,7 @@ end CompilerConsumers
 
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "function next(value: Word) returns (Word) { return value + 1; }",
       "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
       "function bad() returns (Word) { let gap: Word; return gap; }",
@@ -668,7 +668,7 @@ theorem FactoryShape.statementTyping
         exact ⟨lexical, .cons loopTyped (.singleton returned)⟩
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function choose(flag: Bool, value: Word, stop: Bool) returns (Word) { while (flag) { flag = stop; } return value; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
@@ -957,7 +957,7 @@ theorem FactoryShape.statementTyping
           exact ⟨lexical, .cons loopTyped (.singleton returned)⟩
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function update(value: Word, next: Word, running: Bool, done: Bool) returns (Word) { for (let flag: Bool = running; flag; flag = done) { value = next; } return value; }"}] }
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=
   if witness : p then pure ⟨witness⟩ else throw (IO.userError message)

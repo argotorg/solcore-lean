@@ -315,7 +315,7 @@ namespace Tests.SourceCoreSelectedFaultingLocal
 open Solcore Core Frontend SourceInference SourceSemantics
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function local(flag: Bool) returns (Word, Bool) { let f = lam(value) { return value; }; let y: Word = f(11); let absent: Word; return (absent, f(flag)); }"}] }
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -2071,7 +2071,7 @@ open RecursiveNamedPublicPhysicalSessionState (PlainValue)
 /-- The complete original probe program is retained, with every function seeded. -/
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Key { Key(Bool) }",
     "function pairRead(table: mapping((Bool, Bool) => Word)) returns (Word) { return table[(true, false)]; }",
     "function pairWrite(table: mapping((Bool, Bool) => Word)) returns (mapping((Bool, Bool) => Word)) { table[(true, false)] += 3; return table; }",

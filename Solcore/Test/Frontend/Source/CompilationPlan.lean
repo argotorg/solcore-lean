@@ -28,7 +28,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{
     path := "main.solc"
-    content := String.intercalate "\n" [
+    content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Coerce<From, To> {",
       "  function coerce(value: From) returns (To);",
       "}",
@@ -131,7 +131,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{
     path := "main.solc"
-    content := String.intercalate "\n" [
+    content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}",
       "impl Mark<Word> {}",
       "impl Mark<Bool> {}",

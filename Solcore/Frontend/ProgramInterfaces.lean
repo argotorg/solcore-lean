@@ -1503,6 +1503,57 @@ structure LoadedProgram where
   environment : ProgramEnvironment
   deriving Repr
 
+/-- The pragma that marks a Solcore source file. -/
+def solcorePragmaName : String := "solcore"
+
+/-- One violation of the leading `pragma solcore;` that every source file declares, once and
+with no arguments, before every other declaration, as upstream's `SC0002` requires. -/
+inductive PragmaSolcoreProblem where
+  /-- No `pragma solcore;`: an empty span at the first declaration, or at the file's start when
+  it declares nothing. -/
+  | missing (span : Syntax.SourceSpan)
+  /-- The first declaration is `pragma solcore` with arguments, spanning them. -/
+  | arguments (span : Syntax.SourceSpan)
+  /-- `pragma solcore;` after another declaration, which is the file's first. -/
+  | misplaced (span : Syntax.SourceSpan)
+  /-- A `pragma solcore;` after the one that counts. -/
+  | duplicate (span : Syntax.SourceSpan)
+  deriving Repr, BEq, DecidableEq
+
+/-- Whether a top item is `pragma solcore`, with arguments or not. -/
+def isSolcorePragma (item : Syntax.TopItem) : Bool :=
+  match item.value with
+  | .pragmaDecl declaration => declaration.value.name.value == solcorePragmaName
+  | _ => false
+
+/-- The span of a pragma's arguments, from the first to the last, if it has any. -/
+def pragmaArgumentsSpan? (item : Syntax.TopItem) : Option Syntax.SourceSpan :=
+  match item.value with
+  | .pragmaDecl declaration => do
+      let first ← declaration.value.items.head?
+      let last ← declaration.value.items.getLast?
+      pure { first.span with endByte := last.span.endByte }
+  | _ => none
+
+/-- The violations of the leading `pragma solcore;` in a file that parsed with no diagnostic, as
+upstream's `pragma_solcore_problems` finds them: the first declaration must be `pragma solcore`
+with no arguments, and no other may follow it. With another declaration first, the first later
+`pragma solcore;` is misplaced and the rest are duplicates. -/
+def pragmaSolcoreProblems (file : Syntax.ParsedFile) : List PragmaSolcoreProblem :=
+  let declarations := file.items.filter isSolcorePragma
+  match file.items with
+  | [] => [.missing { file.span with endByte := file.span.startByte }]
+  | first :: _ =>
+      if first.value matches .error then []
+      else if isSolcorePragma first then
+        (pragmaArgumentsSpan? first).toList.map PragmaSolcoreProblem.arguments ++
+          (declarations.drop 1).map fun item => .duplicate item.span
+      else
+        match declarations with
+        | [] => [.missing { first.span with endByte := first.span.startByte }]
+        | misplaced :: rest =>
+            .misplaced misplaced.span :: rest.map fun item => .duplicate item.span
+
 /-- Failures before source type checking begins. -/
 inductive ProgramLoadError where
   | workspace (error : Workspace.ValidationError)
@@ -1513,6 +1564,10 @@ inductive ProgramLoadError where
       (source : Workspace.SourceId)
       (lexical : List Syntax.LexicalDiagnostic)
       (parsing : List Syntax.ParseDiagnostic)
+  /-- A source that parsed with no diagnostic violates its leading `pragma solcore;`. -/
+  | pragmaSolcore
+      (source : Workspace.SourceId)
+      (problems : List PragmaSolcoreProblem)
   | uncheckedBlock
       (source : Workspace.SourceId)
       (error : Syntax.Unchecked.Error)
@@ -1552,8 +1607,11 @@ private def parseWorkspaceFile
   | .ok output =>
       if output.lexicalDiagnostics.isEmpty &&
           output.parseDiagnostics.isEmpty then
-        (Syntax.Unchecked.mark (4 * source.content.utf8ByteSize + 4) blocks output.parsed).mapError
-          (.uncheckedBlock file.id)
+        match pragmaSolcoreProblems output.parsed with
+        | [] =>
+            (Syntax.Unchecked.mark (4 * source.content.utf8ByteSize + 4) blocks
+              output.parsed).mapError (.uncheckedBlock file.id)
+        | problems => .error (.pragmaSolcore file.id problems)
       else
         .error (.sourceDiagnostics file.id output.lexicalDiagnostics
           output.parseDiagnostics)

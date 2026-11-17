@@ -34,7 +34,7 @@ open Solcore Frontend SourceInference
 open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function conditionalPair(flag: Bool) returns (Bool, function(Word) returns (integer)) {",
     "  let f = lam(value) { return value; };",
     "  return (flag ? f(true) : f(false), wordToInteger);",
@@ -309,7 +309,7 @@ open Solcore Frontend SourceInference
 open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function mixed(flag: Bool) returns (Word, Bool) {",
     "  let f = lam(value) { return value; };",
     "  {",

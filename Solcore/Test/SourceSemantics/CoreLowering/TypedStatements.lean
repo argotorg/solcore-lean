@@ -153,7 +153,7 @@ theorem accepted_reflects (native : SourceCoreGeneralFunctions.CallableContext)
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function choose(m: mapping((Bool, Bool) => Word)) returns (integer) { return wordToInteger(m[(true, false)]); }",
     "function lazy() returns (integer) { let m: mapping((Bool, Bool) => Word); return wordToInteger(m[(true, false)]); }",
     "function paired(a: integer, b: integer) returns (integer) { return integerSub(true ? a : b, false ? a : b); }",
@@ -312,7 +312,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
 private def assertTrue (condition : Bool) (message : String) : IO Unit :=
   unless condition do throw (IO.userError message)
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function twice() returns ((Bool, Bool)) { let m: mapping(Bool => Bool); return (m[true], m[false]); }",
     "function fault() returns ((Bool, Bool, Bool)) { let m: mapping(Bool => Bool); let missing: Bool; let other: mapping(Bool => Bool); return (m[true], missing, other[false]); }",
     "function payload() returns ((mapping(Bool => Bool), Bool)) { let m: mapping(Bool => mapping(Bool => Bool)); let n: mapping(Bool => Bool); return (m[true], n[false]); }",
@@ -883,7 +883,7 @@ theorem compiled_post_shape [FunctionCalls.FaultTokens faults] (runtimeViews : F
 end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function mixed() returns (Word) { let sum = 0; for (let i: Word, i = 0, let flag: Bool = true; i < 3; let copy = i, i = copy + 1) { if (flag) { sum += i; } } return sum; }",
     "function shadow() returns (Word) { let i = 17; for (let i: Word = 0; i < 2; let copy = i, i = copy + 1) { continue; } return i; }",
     "function falseFirst() returns (Word) { for (let i: Word = 5; false; let never: Word = 99) { return 0; } return 5; }",
@@ -894,7 +894,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function postAbsent() returns (Word) { for (let i = 0; true; let absent: Word, i = absent) { continue; } return 1; }"
   ]}] }
 private def escape : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function main() returns (Word) { for (let i = 0; false; let copy = i) { } return copy; }"}] }
 private def failureResume (entry : SourceCompilerFeatureSupport.Entry) : IO Unit := do
   let complete ← entry.invoke []
@@ -1140,7 +1140,7 @@ theorem compiled_reflects [FunctionCalls.FaultTokens faults] (runtimeViews : Fun
 end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Word) }",
     "function repeated() returns (Word) { let i = 0; let sum: Word; sum = 0; while (i < 5) { i += 1; if (i == 2) { continue; } { let shadow = i; sum += shadow; } if (i == 4) { break; } } return sum; }",
     "function nested() returns (Word) { let i = 0; let m: mapping(Bool => Word); while (i < 3) { let j = 0; while (j < 2) { j += 1; m[true] = i * 10 + j; } i += 1; } return m[true]; }",
@@ -1399,7 +1399,7 @@ theorem compiled_reflects [FunctionCalls.FaultTokens faults] (runtimeViews : Fun
 end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Word) }",
     "function nested() returns (Word) { let sum = 0; let m: mapping(Bool => Word); for (let i: Word, i = 0; i < 3; let copy = i, i = copy + 1) { let j = 0; while (j < 2) { j += 1; if (j == 1) { continue; } for (let k = 0; k < 2; k += 1) { m[true] = i * 10 + j + k; sum += k; } } } return m[true] + sum; }",
     "function transfers() returns (Word) { let sum = 0; for (let i = 0; i < 5; let copy = i, i = copy + 1) { if (i == 1) { continue; } { let copy = i; sum += copy; } if (i == 3) { break; } } return sum; }",
@@ -1411,7 +1411,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function conditionFault() returns (Word) { let missing: Bool; let seen: mapping(Bool => Bool); for (let ready: Word = 1; seen[false] || missing; let never: Word = 99) { return 0; } return 1; }"
   ]}] }
 private def escape : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function main() returns (Word) { for (let i = 0; false; let copy = i) { } return copy; }"}] }
 private def failureResume (entry : SourceCompilerFeatureSupport.Entry) : IO Unit := do
   let complete ← entry.invoke []
@@ -1654,7 +1654,7 @@ theorem compiled_reflects [FunctionCalls.FaultTokens faults] (runtimeViews : Fun
 end CompilerBridge
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function nested() returns (Word) { let x = 7; for (x ~=, let i = 0; i < 2; x ~=, i += 1) { { x ~=; } let j = 0; while (j < 2) { x ~=; j += 1; } } return x; }",
     "function transfer() returns (Word) { let x = 5; for (x ~=, let i = 0; true; x ~=, i += 1) { if (i == 0) { continue; } { x ~=; break; } } return x; }",
     "function early() returns (Word) { let x = 9; for (x ~=; true; x ~=) { x ~=; return x; } return 0; }",
@@ -1664,7 +1664,7 @@ private def workspace : Workspace.RawWorkspace := {
     "function bodyFault() returns (Word) { let missing: Word; let seen: Word = 0; for (seen = 6; true; seen = 7) { { missing ~=; } seen = 8; } return 1; }"
   ]}] }
 private def rejected : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function rejected(value: integer) returns (integer) { for (value ~=; false; ) { } return value; }"}] }
 private def failureResume (entry : SourceCompilerFeatureSupport.Entry) : IO Unit := do
   let complete ← entry.invoke []
@@ -2044,7 +2044,7 @@ theorem compiled_failure_preserves {layouts : SourceCoreAllocationLayouts.Prepar
     agrees typed reference read unmapped (sourceFailure mode)
 
 private def rawWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Bool) }",
     "function nested(take: Bool) returns (Bool) { let x = true; let m: mapping(Bool => Bool); if (take) { let x = m[true]; { let y = !x; y; } } else { let x = !m[false]; { let y: Bool; x; } } let out = x; return out; }",
     "function shadow() returns (Bool) { let x = true; { let x = false; { let x = true; x; } x; } return x; }",
@@ -2558,7 +2558,7 @@ theorem compiled_reflects {layouts : SourceCoreAllocationLayouts.Prepared} {fram
     (fun _ _ => trivial) (fun _ _ _ _ _ => trivial) (certified layouts frame globals _ _ accepted) valid unique environments heaps locals agrees typed reference read unmapped completed
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function falseLoop() returns (Word) { let x: Word = 7; while (false) { let skip: Word = 8; } return x; }",
     "function nestedBreak(flag: Bool) returns (Word) { let x: Word = 7; while (true) { let x: Word = 8; { let z: Word; if (flag) { break; } else { break; } } let skipped: Word = 9; } return x; }",
     "function earlyReturn() returns (Word) { while (true) { let x: Word = 11; return x; } let skipped: Word = 13; return skipped; }",
@@ -2784,7 +2784,7 @@ theorem concrete_finished (layouts : SourceCoreAllocationLayouts.Prepared) (fram
       (LocalLoop.toControl_hasType reason .unit codeTyped) (LanguageResult.success_hasType .unit))
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function nested(flag: Bool) returns (Word) { let outer: Word = 17; { let unused: Bool; if (flag) { let inner: Word = 19; while (true) { let shadow: Word = 23; { while (true) { let stopped: Word; break; } } break; } } else { while (false) { let skipped: Word; } } } return outer; }",
     "function early() returns (Word) { let root: Word; { while (true) { let answer: Word = 31; if (true) { return answer; } continue; } } return 1; }"
   ]}] }
@@ -3410,7 +3410,7 @@ theorem accepted_reflects {mode : Bool} {code : Expr}
     (certified accepted) initial.2 initial.1 locals agrees actualTyped completed
 
 private def rawWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Item { Item(Word) }",
     "function blocks() returns (Bool) { let m: mapping(Bool => Bool); { m[true]; } return !m[false]; }",
     "function absent() returns (Bool) { let m: mapping(Bool => Bool); if (m[true]) { return m[false]; } return !m[false]; }",
@@ -3693,7 +3693,7 @@ private theorem scoped_bool_nil (code : Expr)
       childSyntax found typed generated) (.nil (.inl rfl)) rfl accepted
 
 private def rawWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Item { Item(Word) }",
     "function blocks() returns (Bool) { let m: mapping(Bool => Bool); { m[true]; } return !m[false]; }",
     "function absent() returns (Bool) { let m: mapping(Bool => Bool); if (m[true]) { return m[false]; } return !m[false]; }",
@@ -4065,7 +4065,7 @@ theorem compiled_failure_preserves {layouts : SourceCoreAllocationLayouts.Prepar
     agrees typed reference read unmapped sourceFailure
 
 private def rawWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Bool) }",
     "function mixed() returns (Bool) { let m: mapping(Bool => Bool); let a = m[true]; let unused: Word; let b = !m[false]; let c: Bool; let d = a ? m[false] : b; m[true]; return d; }",
     "function fail() returns (Bool) { let m: mapping(Bool => Bool); let a = m[true]; let missing: Bool; let c = m[false]; let d = (m[true], missing); let never = false; return a; }",
@@ -4342,7 +4342,7 @@ theorem accepted_reflects {code : Expr}
     tree reason reason initial.2 initial.1 locals agrees actualTyped completed
 
 private def rawWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Item { Item(Word) }",
     "function repeated(m: mapping(Bool => Bool)) returns (Bool) { m[true]; return m[false]; }",
     "function lazy() returns (Bool) { let m: mapping(Bool => Bool); m[true]; return !m[false]; }",

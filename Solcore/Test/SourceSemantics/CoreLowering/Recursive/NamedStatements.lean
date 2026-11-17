@@ -1736,7 +1736,7 @@ claimed to compile. Post executions retain the actual six loop temporaries. -/
 private def template_headers : IO Unit := do
   let program ← get "runtime header template source" (checkProgram {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word, Bool) {",
@@ -2192,7 +2192,7 @@ This audit does not claim compilation of the enclosing qualified body. -/
 private def template_while : IO Unit := do
   let workspace : Workspace.RawWorkspace := {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word, Bool) {",
@@ -2413,7 +2413,7 @@ compilation is claimed. Exact phase code and every native cell are checked. -/
 private def template_for : IO Unit := do
   let program ← get "runtime for template source" (checkProgram {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word, Bool) {",
@@ -2669,7 +2669,7 @@ both actual scoped children and the issued empty continuation. -/
 private def template_lexical : IO Unit := do
   let workspace : Workspace.RawWorkspace := {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word, Bool) {",
@@ -2888,7 +2888,7 @@ match callbacks. Their enclosing qualified lambda remains outside this family. -
 private def template_blocks : IO Unit := do
   let program ← get "upper template source" (checkProgram {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+    mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Mark<T> {}", "impl Mark<Word> {}", "impl Mark<Bool> {}",
       "function keep<T>(value: T) returns (T) where T: Mark { return value; }",
       "function qualified(flag: Bool) returns (Word, Bool) {",

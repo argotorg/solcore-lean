@@ -605,7 +605,7 @@ def content : String := String.intercalate "\n" [
   "function useBool(f: function() returns (Bool)) returns (Bool) { return f(); }"]
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content}] }
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}] }
 
 /-- Original checked declarations and their independent Source statement typing.
 Method bodies retain genuine implementation signatures. -/

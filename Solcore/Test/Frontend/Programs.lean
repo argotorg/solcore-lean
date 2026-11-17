@@ -31,7 +31,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def singleSourceWorkspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -1217,7 +1217,7 @@ private def successfulWorkspace : Workspace.RawWorkspace := {
   mainSources := [
     {
       path := "traits.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "export {Eq};",
         "trait Eq<T> {}",
         "impl Eq<Word> {}"
@@ -1225,7 +1225,7 @@ private def successfulWorkspace : Workspace.RawWorkspace := {
     },
     {
       path := "functions.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "import {Eq} from traits;",
         "export {keep, choose};",
         "function keep<T>(value: T) returns (T) where T: Eq { return value; }",
@@ -1235,7 +1235,7 @@ private def successfulWorkspace : Workspace.RawWorkspace := {
     },
     {
       path := "main.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "import {keep, choose} from functions;",
         "function run() returns (Word) { return choose(keep(41)); }"
       ]
@@ -1320,11 +1320,11 @@ private def importedTypeWorkspace : Workspace.RawWorkspace := {
   mainSources := [
     {
       path := "models.solc"
-      content := "export {*}; enum Box { Only }"
+      content := "pragma solcore;\n" ++ "export {*}; enum Box { Only }"
     },
     {
       path := "main.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "import * from models;",
         "function echo(value: Box) returns (Box) { return value; }"
       ]
@@ -1348,7 +1348,7 @@ private def unsolvedTraitWorkspace : Workspace.RawWorkspace := {
   entry := "broken.solc"
   mainSources := [{
     path := "broken.solc"
-    content := String.intercalate "\n" [
+    content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Add<T> {",
       "  function add(left: T, right: T) returns (T);",
       "}",
@@ -1372,7 +1372,7 @@ private def inconclusiveTraitWorkspace : Workspace.RawWorkspace := {
   entry := "ambiguous.solc"
   mainSources := [{
     path := "ambiguous.solc"
-    content := String.intercalate "\n" [
+    content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Add<T> {",
       "  function add(left: T, right: T) returns (T);",
       "}",
@@ -1400,7 +1400,7 @@ private def defaultImplementationWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{
     path := "main.solc"
-    content := String.intercalate "\n" [
+    content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Ready<T> {}",
       "trait Select<T> {}",
       "default impl<T> Select<T> {}",
@@ -1460,7 +1460,7 @@ private def testDefaultImplementationPriority : IO Unit := do
 
 private def singleSourceWorkspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -1515,8 +1515,8 @@ private def testMissingImplementationTraitPredicateRejection : IO Unit := do
       match predicate.trait with
       | .declaration trait =>
           assertTrue (decide (
-              implementation.declarationIndex = 2 ∧
-              trait.declarationIndex = 0 ∧
+              implementation.declarationIndex = 3 ∧
+              trait.declarationIndex = 1 ∧
               trait.moduleId = implementation.moduleId ∧
               predicate.subject = .word ∧ predicate.arguments = []))
             "missing trait predicate lost its instantiated stable identities"
@@ -1625,8 +1625,8 @@ private def testFunctionAndMethodErrorsAccumulate : IO Unit := do
       .methodInference firstId (.unknownVariable "missingFirst"),
       .methodInference secondId (.unknownVariable "missingSecond")
     ] =>
-      assertTrue (decide (functionId.declarationIndex = 2 ∧
-          firstId.implementation.declarationIndex = 1 ∧
+      assertTrue (decide (functionId.declarationIndex = 3 ∧
+          firstId.implementation.declarationIndex = 2 ∧
           secondId.implementation = firstId.implementation ∧
           firstId.methodIndex = 0 ∧ secondId.methodIndex = 1))
         "combined body errors lost function-first or method source order"
@@ -1653,8 +1653,8 @@ private def testMethodNoSolution : IO Unit := do
   | .error [.methodNoSolution method predicate] =>
       match predicate.trait with
       | .declaration trait =>
-          assertTrue (decide (method.implementation.declarationIndex = 3 ∧
-              method.methodIndex = 0 ∧ trait.declarationIndex = 0 ∧
+          assertTrue (decide (method.implementation.declarationIndex = 4 ∧
+              method.methodIndex = 0 ∧ trait.declarationIndex = 1 ∧
               predicate.arguments.isEmpty))
             "method no-solution lost its stable method or trait goal"
       | .builtin _ => throw (IO.userError
@@ -1686,7 +1686,7 @@ private def testMethodInconclusive : IO Unit := do
       "}"
     ])) with
   | .error [.methodInconclusive method (.ambiguous _ _ _)] =>
-      assertTrue (decide (method.implementation.declarationIndex = 5 ∧
+      assertTrue (decide (method.implementation.declarationIndex = 6 ∧
           method.methodIndex = 0))
         "inconclusive method search lost the selected method identity"
   | .error errors => throw (IO.userError
@@ -2849,8 +2849,8 @@ private def assertTrue (condition : Bool) (label : String) : IO Unit := do
 private def validWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [
-    { path := "main.solc", content := "type Main = lib.Remote;" },
-    { path := "lib.solc", content := "enum Remote { Only }" }
+    { path := "main.solc", content := "pragma solcore;\n" ++ "type Main = lib.Remote;" },
+    { path := "lib.solc", content := "pragma solcore;\n" ++ "enum Remote { Only }" }
   ]
   externalLibraries := []
 }
@@ -2882,7 +2882,7 @@ private def testWorkspaceFailure : IO Unit := do
 private def testSourceDiagnostics : IO Unit := do
   let malformed := {
     validWorkspace with
-    mainSources := [{ path := "main.solc", content := "type = ;" }]
+    mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ "type = ;" }]
   }
   match loadProgram malformed with
   | .error errors =>
@@ -2891,11 +2891,85 @@ private def testSourceDiagnostics : IO Unit := do
         | _ => false) "ordinary source diagnostics were not retained"
   | .ok _ => throw (IO.userError "diagnostic source was loaded")
 
+/-- A workspace of sources written as given, with no pragma added. -/
+private def verbatimWorkspace (sources : List (String × List String)) : Workspace.RawWorkspace := {
+  entry := "main.solc"
+  mainSources := sources.map fun (path, lines) =>
+    ({ path, content := String.intercalate "\n" lines } : Workspace.RawSourceFile)
+  externalLibraries := []
+}
+
+/-- The pragma problems that loading reports for one source, or a failure. -/
+private def pragmaProblems (label : String) (workspace : Workspace.RawWorkspace) :
+    IO (Workspace.SourceId × List PragmaSolcoreProblem) :=
+  match loadProgram workspace with
+  | .error [.pragmaSolcore source problems] => pure (source, problems)
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+  | .ok _ => throw (IO.userError s!"{label} was loaded")
+
+/-- A span of `main.solc`, or of another main source. -/
+private def sourceSpan (startByte endByte : Nat) (path : String := "main.solc") :
+    Syntax.SourceSpan :=
+  { source := { origin := .main, path }, startByte, endByte }
+
+/-- A source with a syntax error reports it, and no pragma problem. -/
+private def expectParseDiagnostics (label : String) (workspace : Workspace.RawWorkspace) :
+    IO Unit :=
+  match loadProgram workspace with
+  | .error [.sourceDiagnostics _ [] parsing] =>
+      assertTrue (!parsing.isEmpty) s!"{label} lost its parse diagnostics"
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+  | .ok _ => throw (IO.userError s!"{label} was loaded")
+
+/-- Upstream's parse fixtures for the leading `pragma solcore;`, as upstream wrote them
+(`crates/uitest/tests/fixtures/parse`): a source that misses it, comments only included, declares
+it after another declaration, declares it twice or gives it arguments is rejected while loading,
+at the span upstream reports, while `pragma ;` and a pragma with no `;` are syntax errors with no
+pragma problem, the file starting with `pragma solcore`. Each source of a workspace needs it, and
+with another declaration first, a second later pragma is a duplicate. -/
+private def testSolcorePragma : IO Unit := do
+  let mainSource : String := "function main() returns (word) {"
+  let (_, missing) ← pragmaProblems "pragma_solcore_missing" (verbatimWorkspace [("main.solc",
+    ["import * from std;", "", mainSource, "    return 0;", "}", ""])])
+  assertTrue (missing == [.missing (sourceSpan 0 0)])
+    s!"pragma_solcore_missing reported {reprStr missing}"
+  let (_, misplaced) ← pragmaProblems "pragma_solcore_misplaced" (verbatimWorkspace [("main.solc",
+    ["import * from std;", "pragma solcore;", "", mainSource, "    return 0;", "}", ""])])
+  assertTrue (misplaced == [.misplaced (sourceSpan 19 34)])
+    s!"pragma_solcore_misplaced reported {reprStr misplaced}"
+  let (_, duplicate) ← pragmaProblems "pragma_solcore_duplicate" (verbatimWorkspace [("main.solc",
+    ["pragma solcore;", "", mainSource, "    return 0;", "}", "", "pragma solcore;", ""])])
+  assertTrue (duplicate == [.duplicate (sourceSpan 67 82)])
+    s!"pragma_solcore_duplicate reported {reprStr duplicate}"
+  let (_, arguments) ← pragmaProblems "pragma_solcore_arguments" (verbatimWorkspace [("main.solc",
+    ["pragma solcore strict;", "", mainSource, "    return 0;", "}", ""])])
+  assertTrue (arguments == [.arguments (sourceSpan 15 21)])
+    s!"pragma_solcore_arguments reported {reprStr arguments}"
+  let (_, commentOnly) ← pragmaProblems "pragma_solcore_comment_only" (verbatimWorkspace
+    [("main.solc", ["// A file that declares nothing still needs the pragma.", ""])])
+  assertTrue (commentOnly == [.missing (sourceSpan 0 0)])
+    s!"pragma_solcore_comment_only reported {reprStr commentOnly}"
+  expectParseDiagnostics "pragma_missing_name" (verbatimWorkspace [("main.solc",
+    ["pragma solcore;", "", "pragma ;", ""])])
+  expectParseDiagnostics "ergo_pragma_missing_semi" (verbatimWorkspace [("main.solc",
+    ["pragma solcore;", "", "pragma no-coverage-condition", "", "function f() returns (word) {",
+      "    return 1;", "}", ""])])
+  let (library, imported) ← pragmaProblems "an imported source with no pragma" (verbatimWorkspace
+    [("main.solc", ["pragma solcore;", "function main() returns (word) { return 0; }"]),
+      ("lib.solc", ["function helper() returns (word) { return 1; }"])])
+  assertTrue (library.path.render == "lib.solc" && imported == [.missing (sourceSpan 0 0 "lib.solc")])
+    s!"an imported source with no pragma reported {reprStr imported}"
+  let (_, twice) ← pragmaProblems "two later pragmas" (verbatimWorkspace [("main.solc",
+    ["function main() returns (word) { return 0; }", "pragma solcore;", "pragma solcore;"])])
+  assertTrue (twice == [.misplaced (sourceSpan 45 60), .duplicate (sourceSpan 61 76)])
+    s!"two later pragmas reported {reprStr twice}"
+
 /-- Exercise validation, parsing and declaration collection as one API. -/
 def testProgramLoading : IO Unit := do
   testSuccessfulLoad
   testWorkspaceFailure
   testSourceDiagnostics
+  testSolcorePragma
 
 end Tests
 end

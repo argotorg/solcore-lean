@@ -999,7 +999,7 @@ def content : String := String.intercalate "\n" [
 
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content}] }
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}] }
 
 structure IdentityShape (function : CheckedFunction) (signature : ProgramFunctionSignature) (type : TypeSystem.Ty) where
   binder : TypedBinder

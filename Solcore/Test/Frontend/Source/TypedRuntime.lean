@@ -67,7 +67,7 @@ private def word (value : Nat) : Core.Word :=
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -1891,7 +1891,7 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{
     path := "main.solc"
-    content := String.intercalate "\n" [
+    content := "pragma solcore;\n" ++ String.intercalate "\n" [
       "trait Eq<T> {}",
       "impl Eq<Word> {}",
       "trait Mark<T> {}",
@@ -2104,7 +2104,7 @@ private def word (value : Nat) : Core.Word :=
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -2586,7 +2586,7 @@ private def word (value : Nat) : Core.Word :=
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 

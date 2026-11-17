@@ -26,7 +26,7 @@ open Solcore Solcore.Frontend SourceInference
 open SourceCoreUnifiedCorpusSupport
 
 private def workspace (text : String) : Workspace.RawWorkspace :=
-  { entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := text}] }
+  { entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ text}] }
 
 private def checkTrustedRetained (value : Int) : IO Unit := do
   let program ← get "retained baseline checked source" (checkProgram (workspace

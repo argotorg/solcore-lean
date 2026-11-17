@@ -168,7 +168,7 @@ theorem accepted_reflects (native : SourceCoreGeneralFunctions.CallableContext) 
     (by intros; trivial) (by intros; trivial) (certified native accepted) (by cbv) (.nil .nil) .empty .nil (by intro _ _ absent; cases absent) typed completed
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box { Box(Bool) }",
     "function nested(a: Word, b: Word) returns (integer) { return wordToInteger(wordFromInteger(integerAdd(wordToInteger(a), wordToInteger(b)))); }",
     "function binary(a: integer, b: integer) returns (Bool) { return integerEq(a, b) && !integerLt(a, b); }",
@@ -342,7 +342,7 @@ theorem actual_contextual_builtins_native
     syntaxTree found sourceTyped readPolicy lowerPolicy leafPolicy accepted extension
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function roundtrip(a: Word) returns (integer) { return wordToInteger(wordFromInteger(wordToInteger(a))); }"}] }
 
 def run : IO Unit := do

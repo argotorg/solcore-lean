@@ -178,7 +178,7 @@ open SelectedCompilationCertifiedPublicSession (Profiled Initial)
 open RecursiveNamedPublicPhysicalSessionState (StartedCall PlainValue SourceCall)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function stop(value: Word) returns (Word) { for (let copy: Word = value; true; ) { break; } return value; }"}] }
 
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -516,7 +516,7 @@ private def failure {artifact : SourceCoreExecution.Artifact}
 
 def originalWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function whileCount(start: Word) returns (Word, Word) {",
     "  let remaining: Word = start; let count: Word = 0;",
     "  while (remaining > 0) { let copy: Word = remaining; remaining = remaining - 1; count = count + 1; }",
@@ -805,7 +805,7 @@ open SelectedCompilationCertifiedPublicSession (Profiled Initial)
 open RecursiveNamedPublicPhysicalSessionState (StartedCall PlainValue SourceCall)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function update(value: Word, next: Word) returns (Word) { match (next) { case copy { value = copy; } } return value; }"}] }
 
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -1097,7 +1097,7 @@ private def failure {artifact : SourceCoreExecution.Artifact}
 
 def casesWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function select(value: Word) returns (Word) { let result: Word = 99; match (value) { case 0 { result = 5; } case 1 { result = 6; } default { result = 7; } } return result; }",
     "function early(value: Word) returns (Word) { match (value) { case 0 { return 5; } default { return 6; } } return 9; }",
     "function tuple(value: (Word, Word)) returns (Word) { let result: Word = 0; match (value) { case (left, right) { result = left + right; } } return result; }",
@@ -1109,7 +1109,7 @@ def casesWorkspace : Workspace.RawWorkspace := {
 
 def factoryWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(value: Word) returns (function(Word) returns (Word)) { return lam(next: Word) -> Word { match (next) { case copy { value = copy; } } return value; }; }"}]
 }
 
@@ -1210,7 +1210,7 @@ def comparisons : List (String × String) := [
 
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" (
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" (
     (wordOperators.map fun (name, operator) =>
       s!"function {name}(left: Word, right: Word) returns (Word)" ++ " { return left " ++ operator ++ " right; }") ++
     (comparisons.map fun (name, operator) =>

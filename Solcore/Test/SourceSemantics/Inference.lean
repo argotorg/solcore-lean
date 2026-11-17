@@ -34,7 +34,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -3049,13 +3049,13 @@ private def testAmbiguousCoercionTrait : IO Unit := do
   let raw : Workspace.RawWorkspace := {
     entry := "main.solc"
     mainSources := [
-      { path := "left.solc", content :=
+      { path := "left.solc", content := "pragma solcore;\n" ++
           "export {Coerce}; trait Coerce<From, To> {}" },
-      { path := "right.solc", content :=
+      { path := "right.solc", content := "pragma solcore;\n" ++
           "export {Coerce}; trait Coerce<From, To> {}" },
       {
         path := "main.solc"
-        content := String.intercalate "\n" [
+        content := "pragma solcore;\n" ++ String.intercalate "\n" [
           "import * from left;",
           "import * from right;",
           "function accept(value: Bool) returns (Bool) { return value; }",
@@ -3476,7 +3476,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function make(value: Word) returns (function() returns (Word)) {",
     "  return lam() -> Word { return value; };",
     "}",

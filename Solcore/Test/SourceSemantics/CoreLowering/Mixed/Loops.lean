@@ -30,7 +30,7 @@ open Solcore Frontend SourceInference
 open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function mixedFor(flag: Bool) returns (Word, Bool) {",
     "  let f = lam(value) { return value; };",
     "  let first = true;",
@@ -1523,7 +1523,7 @@ open Solcore Frontend SourceInference
 open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function mixedWhile(flag: Bool) returns (Word, Bool) {",
     "  let f = lam(value) { return value; };",
     "  let active = flag;",

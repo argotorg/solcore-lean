@@ -486,7 +486,7 @@ theorem profile_record_roundtrip
   rfl
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function next(value: Word) returns (Word) { return value + 1; }",
     "function less(value: Word, bound: Word) returns (Bool) { return value < bound; }",
     "function bad() returns (Word) { let absent: Word; return absent; }",
@@ -1159,7 +1159,7 @@ theorem FactoryShape.statementTyping
     exact ⟨lexical, .cons loopTyped (.singleton returned)⟩
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function drain(n: Word) returns (Word) { while (n > 0) { n = n - 1; } return n; }"}] }
 
 private def observed (p : Prop) [Decidable p] (message : String) : IO (PLift p) :=

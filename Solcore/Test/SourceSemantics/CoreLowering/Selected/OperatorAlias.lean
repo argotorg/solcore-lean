@@ -27,8 +27,8 @@ private def consumer : String := String.intercalate "\n" [
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "consumer.solc"
-  mainSources := [{path := "provider.solc", content := provider},
-    {path := "consumer.solc", content := consumer}]
+  mainSources := [{path := "provider.solc", content := "pragma solcore;\n" ++ provider},
+    {path := "consumer.solc", content := "pragma solcore;\n" ++ consumer}]
   externalLibraries := []
 }
 

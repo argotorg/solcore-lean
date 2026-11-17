@@ -334,7 +334,7 @@ open SelectedCompilationCertifiedPublicSession (Profiled Initial)
 open RecursiveNamedPublicPhysicalSessionState (StartedCall PlainValue SourceCall)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(seed: Word) returns (function() returns (Word)) { return lam() { return seed; }; }"}] }
 
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -3623,7 +3623,7 @@ open Solcore Core Frontend SourceInference SourceSemantics CoreLowering
 def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
   externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function stagedFactory() returns (function(Word) returns (Word)) { return lam(comptime item: Word) -> Word { return item; }; }",
     "function ordinaryFactory() returns (function(Word) returns (Word)) { return lam(item: Word) -> Word { return item; }; }",
     "function touch(value: Word) returns (Word) { let copy = value; return copy; }",

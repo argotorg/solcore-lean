@@ -314,7 +314,7 @@ def observeSelect (function : CheckedFunction) (signature : ProgramFunctionSigna
   return { callable, flag, argument, flagRead, negation, negationForm, leftArgument, leftFunction, leftCall, leftValue, sum, sumForm, rightArgument, rightFunction, rightCall, rightValue, difference, differenceForm, expression, expressionForm, statement, callableScheme, callableRequirements, callableOrdinary, flagScheme, flagRequirements, flagOrdinary, argumentScheme, argumentRequirements, argumentOrdinary, flagCallable, argumentCallable, argumentFlag, parameters, inputTypes, returns, inputs, roots, statementFound, statementForm, statementType }
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function identity(value: Word) returns (Word) { return value; } function select(f: function(Word) returns (Word), flag: Bool, value: Word) returns (Word) { return !flag ? f(value) + value : f(value) - value; }"}] }
 
 structure CheckedFixture where

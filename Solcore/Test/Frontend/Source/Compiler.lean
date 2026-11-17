@@ -152,7 +152,7 @@ open Solcore Solcore.Frontend Tests.SourceCompilerFeatureSupport
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function mutate(flag: Bool, first: Word, second: Word) returns (Word, Bool) {",
     "  let value: Word; value = first; value = second; return (value, flag);",
     "}",
@@ -301,7 +301,7 @@ private def testPrimitivesAndCalls (program : CheckedProgram) : IO Unit := do
 private def testFallthroughChecking : IO Unit := do
   let incomplete : Workspace.RawWorkspace := {
     entry := "main.solc", externalLibraries := []
-    mainSources := [{ path := "main.solc", content :=
+    mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++
       "function incomplete(flag: Bool, input: Word) returns (Word) { if (flag) { return input; } }" }]
   }
   match checkProgram incomplete with
@@ -341,7 +341,7 @@ open Solcore Solcore.Frontend Tests.SourceCompilerFeatureSupport
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Tree { Leaf(Word), Pair(Tree, Tree) }",
     "enum Command { Create(Word), Invoke(function(Word) returns (Word), Word) }",
     "enum Reply { Made(function(Word) returns (Word)), Result(Word) }",
@@ -489,7 +489,7 @@ open Solcore Solcore.Frontend Tests.SourceCompilerFeatureSupport
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function inc(value: Word) returns (Word) { return value + 1; }",
     "function consume(f: function(Word) returns (Word), value: Word) returns (Word) { return f(value); }",
     "function named(value: Word) returns (Word) { return consume(inc, value); }",
@@ -614,7 +614,7 @@ private def workspaceText : String := String.intercalate "\n"
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := workspaceText }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ workspaceText }]
 }
 
 
@@ -680,7 +680,7 @@ open Solcore Solcore.Frontend Tests.SourceCompilerFeatureSupport
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function whileCount(start: Word) returns (Word, Word) {",
     "  let remaining: Word = start; let count: Word = 0;",
     "  while (remaining > 0) { remaining = remaining - 1; count = count + 1; }",
@@ -927,7 +927,7 @@ private def workspace : Workspace.RawWorkspace := {
   mainSources := [
     {
       path := "main.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "import {Ticket, WordTicket} from provider;",
         "function direct(value: Word) returns (Word) { return value * 2; }",
         "function recurse(value: Word) returns (Word) { return value == 0 ? 31 : recurse(value - 1); }",
@@ -1011,7 +1011,7 @@ private def workspace : Workspace.RawWorkspace := {
     },
     {
       path := "provider.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "enum Ticket<T> { Open(T), Closed }",
         "type WordTicket = Ticket<Word>;",
         "export {Ticket(Open), WordTicket};"
@@ -1019,7 +1019,7 @@ private def workspace : Workspace.RawWorkspace := {
     },
     {
       path := "blocked.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "trait Coerce<From, To> {}",
         "enum Box { Only }",
         "impl Coerce<Word, Box> {}",
@@ -1072,7 +1072,7 @@ private def orchestrationWorkspace : Workspace.RawWorkspace := {
   mainSources := [
     {
       path := "api.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "import {twice as doubled, recursive} from provider;",
         "function main() returns (Word) { return 17; }",
         "function local(value: Word) returns (Word) { return value + 1; }",
@@ -1082,7 +1082,7 @@ private def orchestrationWorkspace : Workspace.RawWorkspace := {
     },
     {
       path := "provider.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "function twice(value: Word) returns (Word) { return value * 2; }",
         "function recursive(value: Word) returns (Word) {",
         "  return value == 0 ? 31 : recursive(value - 1);",
@@ -1253,7 +1253,7 @@ private def testCompilationErrors (checked : CheckedProgram) : IO Unit := do
   | _ => throw (IO.userError "dependent staged Integer escaped plan validation")
   let invalid : Workspace.RawWorkspace := {
     entry := "broken.solc", externalLibraries := [],
-    mainSources := [{path := "broken.solc", content := "function broken(value: Word returns (Word) { return value; }"}] }
+    mainSources := [{path := "broken.solc", content := "pragma solcore;\n" ++ "function broken(value: Word returns (Word) { return value; }"}] }
   match compile invalid [SourceCoreCompiler.Seed.named (← moduleId "broken.solc") "broken"] compilerOptions with
   | .error (.compilation (.checking (_ :: _))) => pure ()
   | _ => throw (IO.userError "malformed source escaped checking precedence")
@@ -1327,7 +1327,7 @@ private def testProgramOrchestration : IO Unit := do
     entry := "missing.solc"
     mainSources := [{
       path := "missing.solc"
-      content := "function helper() returns (Word) { return 0; }"
+      content := "pragma solcore;\n" ++ "function helper() returns (Word) { return 0; }"
     }]
     externalLibraries := []
   }
@@ -1344,7 +1344,7 @@ private def testProgramOrchestration : IO Unit := do
     entry := "bad.solc"
     mainSources := [{
       path := "bad.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "function bad(value: Bool) returns (Word) { return value ? 1 : 0; }",
         "export {bad};"
       ]
@@ -1363,7 +1363,7 @@ private def testProgramOrchestration : IO Unit := do
     entry := "duplicate.solc"
     mainSources := [{
       path := "duplicate.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "function same(value: Word) returns (Word) { return value; }",
         "function same(value: Word) returns (Word) { return value + 1; }",
         "export {same};"
@@ -1383,7 +1383,7 @@ private def testProgramOrchestration : IO Unit := do
     entry := "collision.solc"
     mainSources := [{
       path := "collision.solc"
-      content := String.intercalate "\n" [
+      content := "pragma solcore;\n" ++ String.intercalate "\n" [
         "function f116643(value: Word) returns (Word) { return value; }",
         "function f38491(value: Word) returns (Word) { return value; }",
         "export {f38491, f116643};"
@@ -1471,7 +1471,7 @@ private def functionType : TypeSystem.Ty := .function .word .word
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Holder { Put(function(Word) returns (Word)) }",
     "function inc(value: Word) returns (Word) { return value + 1; }",
     "function makeAdder(value: Word) returns (function(Word) returns (Word)) {",
@@ -1615,7 +1615,7 @@ def run : IO Unit := do
   | .error {code := .missingEntry key, ..} => assertTrue (key == maker.key) "missing cached entry key changed"
   | _ => throw (IO.userError "empty artifact ran an uncompiled root")
   let invalid : Workspace.RawWorkspace := { workspace with
-    mainSources := [{ path := "main.solc", content := "function broken() returns (Word) { return absent; }" }] }
+    mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ "function broken() returns (Word) { return absent; }" }] }
   match compile invalid [] options with
   | .error (.compilation (.checking _)) => pure ()
   | _ => throw (IO.userError "raw facade bypassed source checking for an empty root list")
@@ -1643,7 +1643,7 @@ private def word (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "function proxyEcho(value: @Word) returns (@Word) { return value; }",
     "function proxyLookup(table: mapping(@Word => Word)) returns (Word) { return table[@Word]; }",
@@ -1841,7 +1841,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function scalar(value: Word) returns (Word) { return value; }",
     "function mappingEcho(value: mapping(Word => Word)) returns (mapping(Word => Word)) { return value; }",
     "function apply(f: function(Word) returns (Word), value: Word) returns (Word) { let retained: function(Word) returns (Word) = scalar; return f(value); }",
@@ -1965,7 +1965,7 @@ private def workspace (entry : String)
   entry
   mainSources := sources.map fun source => {
     path := source.1
-    content := source.2
+    content := "pragma solcore;\n" ++ source.2
   }
   externalLibraries := []
 }
@@ -1976,13 +1976,13 @@ private def workspaceWithExternal (entry : String)
   entry
   mainSources := sources.map fun source => {
     path := source.1
-    content := source.2
+    content := "pragma solcore;\n" ++ source.2
   }
   externalLibraries := [{
     name := externalName
     sources := externalSources.map fun source => {
       path := source.1
-      content := source.2
+      content := "pragma solcore;\n" ++ source.2
     }
   }]
 }
@@ -2259,7 +2259,7 @@ private def rawWorkspace (entry : String)
   entry
   mainSources := sources.map fun source => {
     path := source.1
-    content := source.2
+    content := "pragma solcore;\n" ++ source.2
   }
   externalLibraries := []
 }
@@ -2288,7 +2288,7 @@ private def testNamedSeedAndPreparedRun : IO Unit := do
     | .error error => throw (IO.userError
         s!"named root preparation failed: {reprStr error}")
   assertTrue (decide (prepared.key.declaration.moduleId = moduleId ∧
-      prepared.key.declaration.declarationIndex = 1 ∧
+      prepared.key.declaration.declarationIndex = 2 ∧
       prepared.key.arguments = [] ∧
       prepared.inputTypes = [.word, .bool]))
     "named root did not retain its explicit module, declaration, or inputs"
@@ -2306,7 +2306,7 @@ private def testDeclarationSeedAndStore : IO Unit := do
   let moduleId ← mainModule "main.solc"
   let declaration : Resolved.DeclarationId := {
     moduleId
-    declarationIndex := 0
+    declarationIndex := 1
   }
   let seed := Seed.declaration declaration [.word]
   let input : Core.Value := .word (word 19)
@@ -2425,7 +2425,7 @@ private def testSeedErrors : IO Unit := do
       s!"unknown root name was accepted: {reprStr result}")
   let identity : Resolved.DeclarationId := {
     moduleId
-    declarationIndex := 0
+    declarationIndex := 1
   }
   match prepare basicWorkspace (Seed.declaration identity) with
   | .error (.seed (.typeArgumentArityMismatch actual expected supplied)) =>
@@ -2463,7 +2463,7 @@ private def testAmbiguousAndNonFunctionSeeds : IO Unit := do
   match prepare overloaded (Seed.named moduleId "choose") with
   | .error (.seed (.ambiguousName actual name candidates)) =>
       assertTrue (decide (actual = moduleId ∧ name = "choose" ∧
-          candidates.map (·.declarationIndex) = [0, 1]))
+          candidates.map (·.declarationIndex) = [1, 2]))
         "ambiguous name did not retain its ordered overload declarations"
   | result => throw (IO.userError
       s!"ambiguous root name was accepted: {reprStr result}")
@@ -2474,7 +2474,7 @@ private def testAmbiguousAndNonFunctionSeeds : IO Unit := do
     ])]
   let traitId : Resolved.DeclarationId := {
     moduleId
-    declarationIndex := 0
+    declarationIndex := 1
   }
   match prepare traitWorkspace (Seed.declaration traitId [.word]) with
   | .error (.seed (.declarationNotFunction actual .trait)) =>
@@ -2508,7 +2508,7 @@ private def testStageErrors : IO Unit := do
   match prepare basicWorkspace (Seed.named moduleId "entry") tight with
   | .error (.specializationBudgetExhausted next pendingCount) =>
       assertTrue (decide (next.declaration.moduleId = moduleId ∧
-          next.declaration.declarationIndex = 0 ∧
+          next.declaration.declarationIndex = 1 ∧
           next.arguments = [.word] ∧ pendingCount = 1))
         "specialization frontier lost its exact next key or queue size"
   | result => throw (IO.userError
@@ -2639,7 +2639,7 @@ private def testStageErrors : IO Unit := do
   match prepare recursive (Seed.named moduleId "loop") generousLimits with
   | .error (.linking (.recursiveCallCycle key)) =>
       assertTrue (decide (key.declaration.moduleId = moduleId ∧
-          key.declaration.declarationIndex = 0 ∧ key.arguments = []))
+          key.declaration.declarationIndex = 1 ∧ key.arguments = []))
         "recursive direct-linking rejection lost its specialization key"
   | result => throw (IO.userError
       s!"recursive source root did not retain its direct-linking rejection: {reprStr result}")

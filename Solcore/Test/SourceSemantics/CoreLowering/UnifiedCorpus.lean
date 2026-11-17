@@ -471,7 +471,7 @@ private def key (program : CheckedProgram) (name : String) : IO Key :=
   | [signature] => pure ⟨signature.id, []⟩
   | _ => throw (IO.userError s!"unified fixture missing {name}")
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "type F = function(Word) returns (Word);",
     "enum Holder { Hold(F) }",
     "function inc(value: Word) returns (Word) { return value + 1; }",
@@ -665,7 +665,7 @@ private def word (value : Nat) : Core.Word := Core.Word.ofNatModulo value
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "function proxyEcho(value: @Word) returns (@Word) { return value; }",
     "function proxyLookup(table: mapping(@Word => Word)) returns (Word) { return table[@Word]; }",
@@ -861,7 +861,7 @@ private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO 
   | .error error => throw (IO.userError s!"{label}: {reprStr error}")
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "trait Marker<T> {}", "impl Marker<mapping(Word => Word)> {}",
     "function keep<T>(value: T) returns (T) where T: Marker { return value; }",

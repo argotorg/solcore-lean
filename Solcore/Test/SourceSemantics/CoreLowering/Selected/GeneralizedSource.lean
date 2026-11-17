@@ -20,7 +20,7 @@ namespace Tests.SourceCoreSelectedGeneralizedLocal
 open Solcore Core Frontend SourceInference SourceSemantics
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function local(flag: Bool) returns (Word, Bool) { let f = lam(value) { return value; }; return (f(11), f(flag)); }"}] }
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}

@@ -21,7 +21,7 @@ namespace Tests.SourceCoreSelectedProjectedAssignment
 open Solcore Frontend
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function replace(table: mapping(Word => Word), key: Word, right: Word) returns (mapping(Word => Word)) { table[key] = right; return table; }",
     "function add(table: mapping(Word => Word), key: Word, right: Word) returns (mapping(Word => Word)) { table[key] += right; return table; }",
     "function divide(table: mapping(Word => Word), key: Word, right: Word) returns (mapping(Word => Word)) { table[key] /= right; return table; }",
@@ -1661,7 +1661,7 @@ open Solcore Frontend
 /-- One unchanged original program for two explicit compilation scopes. The
 complete runtime companion configures every declaration as a seed. -/
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function key(value: Word) returns (Word) { let copy: Word = value; return copy; }",
     "function failedKey(value: Word) returns (Word) { let copy: Word = value; let absent: Word; return absent; }",
     "function invert(table: mapping(Word => Word), index: Word) returns (mapping(Word => Word)) { table[index] ~=; return table; }",
@@ -4198,7 +4198,7 @@ open RecursiveNamedPublicPhysicalSessionState (PlainValue)
 /-- All declarations are configured before compilation; raw proxy identity is
 kept distinct even though every proxy has the same native unit payload. -/
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function proxyWord() returns (@Word) { return @Word; }",
     "function proxyBool() returns (@Bool) { return @Bool; }",
     "function echoWord(value: @Word) returns (@Word) { return value; }"

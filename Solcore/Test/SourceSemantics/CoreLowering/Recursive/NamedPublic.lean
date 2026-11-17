@@ -1497,7 +1497,7 @@ private def full_native (cached : SourceCoreUnifiedCompilation.Compiled)
 
 def run : IO Unit := do
   let program ← get "public generic checked source" (checkProgram {
-    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content}] })
+    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}] })
   let names := ["wordRoot", "boolRoot", "constrained", "recurRoot", "faultRoot"]
   let roots ← names.mapM (SourceCoreUnifiedCorpusSupport.key program)
   let seeds := roots.map fun key => SourceCoreCompiler.Seed.declaration key.declaration
@@ -1974,7 +1974,7 @@ theorem unrelated_global_not_covered {index : Nat} {signature : SourceCoreCalls.
 end Boundaries
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "enum Box<T> { Box(T) }",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
     "impl Coerce<Word, integer> { function coerce(value: Word) returns (integer) { let seen = value; if (value == 0) { let coercionGap: integer; return coercionGap; } return wordToInteger(value); } }",

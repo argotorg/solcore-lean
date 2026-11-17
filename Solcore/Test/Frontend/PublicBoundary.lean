@@ -3218,7 +3218,7 @@ private def raw (sources : List (String × String)) (entry : String) :
   entry
   mainSources := sources.map fun source => {
     path := source.1
-    content := source.2
+    content := "pragma solcore;\n" ++ source.2
   }
   externalLibraries := []
 }

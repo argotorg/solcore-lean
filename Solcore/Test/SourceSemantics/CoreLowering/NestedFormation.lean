@@ -231,7 +231,7 @@ def observeFactory (function : CheckedFunction) (signature identity : ProgramFun
   return {binder, localBinder, initialRead, initial, read, call, initialized, innerReturn, expression, outerReturn, outerExpression, statement, parameters, inputTypes, returns, inputs, binderRequirements, localScheme, localRequirements, localOwner, localDistinct, localOrdinary, roots, initializedFound, initializedForm, initializedType, innerReturnFound, innerReturnForm, innerReturnType, expressionFound, lambda, expressionRaw, expressionType, requirements, coercions, outerReturnFound, outerReturnForm, outerReturnType, outerExpressionFound, outerLambda, outerExpressionRaw, outerExpressionType, outerRequirements, outerCoercions, statementFound, returnStatement, statementType}
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function identity(value: Word) returns (Word) { return value; } function make(seed: Word) returns (function() returns (function() returns (Word))) { return lam() { let saved: Word = identity(seed); return lam() { return identity(saved); }; }; }"}] }
 
 structure CheckedFixture where

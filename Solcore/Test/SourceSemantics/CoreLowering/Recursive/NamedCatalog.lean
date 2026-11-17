@@ -1116,7 +1116,7 @@ theorem used_suffix_cannot_disappear : ¬ HasType [.word] (.var 1) .bool [] := b
 theorem bound_under_lambda : supported (.lambda .word .word (.var 0)) 0 = true := rfl
 
 private def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function step(value: Word) returns (Word) { return value + 1; }",
     "function loop(flag: Bool, seed: Word) returns (Word) { let result = seed; for (let i = 0; i < 3; i = step(i)) { let j = 0; while (j < 2) { result = step(result); j = step(j); } } if (flag) { return step(result); } return result; }",
     "function recursive(value: Word) returns (Word) { if (value == 0) { return 1; } return step(recursive(value - 1)); }",
@@ -2921,7 +2921,7 @@ private def audit (cached : SourceCoreUnifiedCompilation.Compiled) : IO Unit := 
 
 def run : IO Unit := do
   let program ← get "stage actual checked program" (checkProgram {
-    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content}] })
+    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}] })
   let names := ["namedFault", "lambdaFault", "ordinary", "tupleParameter", "effectfulTuple", "builtin"]
   let roots ← names.mapM (SourceCoreUnifiedCorpusSupport.key program)
   let seeds := roots.map fun key => SourceCoreCompiler.Seed.declaration key.declaration

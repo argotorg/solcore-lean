@@ -29,7 +29,7 @@ open Solcore Frontend SourceInference
 open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function mixedIndexRead(flag: Bool) returns (Word, Bool) {",
     "  let f = lam(value) { return value; };",
     "  let table: mapping(Word => Word);",
@@ -1654,7 +1654,7 @@ open Solcore Frontend SourceInference
 open Tests.SourceCompilerFeatureSupport (get require boot word)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function mixedProjected(flag: Bool) returns (mapping(Word => Word), Bool) {",
     "  let f = lam(value) { return value; };",
     "  let table: mapping(Word => Word);",

@@ -1175,17 +1175,17 @@ def run : IO Unit := do
       "parser-boundary provenance rewrote a canonical source path"
   for suffix in ["sol", "solc"] do
     let path := "main." ++ suffix
-    match loadProgram (raw path [{path, content := source}]) with
+    match loadProgram (raw path [{path, content := "pragma solcore;\n" ++ source}]) with
     | .error errors => throw (IO.userError s!"source loading failed: {reprStr errors}")
     | .ok loaded =>
       require (loaded.sources.map (·.source.path) == [path])
         "loaded program lost source suffix provenance"
       require (loaded.environment.modules.length == 1) "source loading lost its module"
   match loadProgram (raw "main.sol" [
-      {path := "main.sol", content := source}, {path := "main.solc", content := source}]) with
+      {path := "main.sol", content := "pragma solcore;\n" ++ source}, {path := "main.solc", content := "pragma solcore;\n" ++ source}]) with
   | .error [.environment (.duplicateModule _)] => pure ()
   | result => throw (IO.userError s!"mixed suffix module collision was not rejected: {reprStr result}")
-  match loadProgram (raw "main.sol" [{path := "main.solc", content := source}]) with
+  match loadProgram (raw "main.sol" [{path := "main.solc", content := "pragma solcore;\n" ++ source}]) with
   | .error _ => pure ()
   | .ok _ => throw (IO.userError "entry matching silently substituted the legacy source path")
   for path in [".sol", "a/.sol", "a.SOL", "a.sol.sol", "a.solc.sol", "a.sol.solc", "../a.sol", "a//b.sol"] do
@@ -1216,7 +1216,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -1953,7 +1953,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 
@@ -2152,7 +2152,7 @@ private def assertTrue (condition : Bool) (message : String) : IO Unit := do
 
 private def workspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content }]
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ content }]
   externalLibraries := []
 }
 

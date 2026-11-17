@@ -249,7 +249,7 @@ open SelectedCompilationCertifiedPublicSession (Profiled Initial)
 open RecursiveNamedPublicPhysicalSessionState (StartedCall)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function invert(value: Word) returns (Word) { value ~=; return value; }",
     "function initialize(value: Word) returns (Word) { for (value ~=; false; value ~=) { } return value; }",
     "function post(value: Word) returns (Word) { for (let i: Word = 0; i < 1; value ~=, i += 1) { continue; } return value; }",
@@ -888,7 +888,7 @@ open SelectedCompilationCertifiedPublicSession (Profiled Initial)
 open RecursiveNamedPublicPhysicalSessionState (StartedCall PlainValue SourceCall)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function discard(value: Word) returns (Word) { value; return value; }"}] }
 
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -1296,7 +1296,7 @@ open SelectedCompilationCertifiedPublicSession (Profiled Initial)
 open RecursiveNamedPublicPhysicalSessionState (StartedCall PlainValue SourceCall)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "enum Box { Wrap(Word) } function box(value: Word) returns (Box) { return .Wrap(value); }"}] }
 
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -1999,7 +1999,7 @@ inductive Example where
   deriving DecidableEq, Repr
 
 def Example.workspace (spec : Example) : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     match spec with
     | .branch _ => "function choose(flag: Bool, value: Word) returns (Word) { if (flag) { let copy: Word = value; return copy; } else { return value; } }"
     | .tail => "function identity(value: Word) returns (Word) { value }"
@@ -2422,7 +2422,7 @@ private def failure {artifact : SourceCoreExecution.Artifact}
 
 def casesWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function letUnit() { let value: Word = 37; }",
     "function missing() returns (Word) { let value: Word; value }",
     "function reuse(value: Word) returns (Word) { value }",
@@ -2435,7 +2435,7 @@ def casesWorkspace : Workspace.RawWorkspace := {
 
 def factoryWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := []
-  mainSources := [{path := "main.solc", content :=
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function make(value: Word) returns (function(Word) returns ()) { return lam(next: Word) -> Unit { value = next; }; }"}]
 }
 
@@ -2491,7 +2491,7 @@ private def parserBoundaries : IO Unit := do
       "function bad(value: Word) returns (Word) { { value } return 41; }",
       "function bad() returns (function(Word) returns (Word)) { return lam(value: Word) -> Word { value }; }"] do
     let workspace : Workspace.RawWorkspace := {
-      entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := content}]}
+      entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}]}
     match checkProgram workspace options.checkingFuel with
     | .error errors =>
       require (errors.any fun
@@ -2508,7 +2508,7 @@ private def completionSuffixGuards : IO Unit := do
       ("function suffix(flag: Bool, value: Word) returns (Word) { if (flag) { return value; } else { return value; } value }", true),
       ("function suffix(value: Word) returns (Word) { return value; value }", false)] do
     let workspace : Workspace.RawWorkspace := {
-      entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := content}]}
+      entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}]}
     let .ok checked := checkProgram workspace options.checkingFuel
       | throw (IO.userError "completion suffix guard checking failed")
     let [function] := checked.functions
@@ -2580,7 +2580,7 @@ open Solcore Core Frontend SourceInference SourceSemantics CoreLowering
 
 def entryWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function mutate(flag: Bool, first: Word, second: Word) returns (Word, Bool) {",
     "  let value: Word; value = first; value = second; return (value, flag);",
     "}",
@@ -2610,7 +2610,7 @@ def entryWorkspace : Workspace.RawWorkspace := {
 
 def basicWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc"
-  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+  mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function sequence(flag: Bool, initial: Word, replacement: Word) returns (Word, Bool) {",
     "  let value: Word; value = initial; let copied: Word = value;",
     "  value = replacement; copied; return (copied, flag);",
@@ -2655,7 +2655,7 @@ def tupleContent : String := String.intercalate "\n" [
 
 def tupleWorkspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [],
-  mainSources := [{path := "main.solc", content := tupleContent}]
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ tupleContent}]
 }
 
 def options : SourceCompiler.Options := {
@@ -2850,7 +2850,7 @@ private def failure {artifact : SourceCoreExecution.Artifact}
   pure after
 
 private def controlWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function blockReturn(first: Word, second: Word) returns (Word) {",
     "  { return first; } let later: Word = second; return later;",
     "}",
@@ -2864,7 +2864,7 @@ private def controlWorkspace : Workspace.RawWorkspace := {
 
 private def checkConditionalBoundary : IO Unit := do
   let workspace : Workspace.RawWorkspace := {
-    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
       "function both(flag: Bool, first: Word, second: Word) returns (Word) { if (flag) { return first; } else { return second; } return first; }"}] }
   match checked : checkProgram workspace options.checkingFuel with
   | .error errors => throw (IO.userError s!"body control boundary checking: {reprStr errors}")
@@ -3228,7 +3228,7 @@ open SelectedCompilationCertifiedPublicSession (Profiled Initial)
 open RecursiveNamedPublicPhysicalSessionState (StartedCall)
 
 def workspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content :=
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++
     "function add(left: Word, right: Word) returns (Word) { left += right; return left; } function divide(left: Word, right: Word) returns (Word) { left /= right; return left; } function missing(right: Word) returns (Word) { let value: Word; value /= right; return value; }"}] }
 def options : SourceCompiler.Options := {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
 def runOptions : SourceCoreExecution.RunOptions := {executionFuel := 100000, outputValidationFuel := 1000}
@@ -3769,7 +3769,7 @@ private def sourceFirst : IO Unit := do
   IO.println s!"COMPOUND_SOURCE_HEAPS: {[started.session.heapSize, first.session.heapSize, second.heapSize, third.heapSize, fourth.heapSize]}"
 
 def headerWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function post(limit: Word) returns (Word) { let count: Word = 0; for (let i: Word = 0; limit > i; i += 1) { count += 1; continue; } return count; }",
     "function stop() returns (Word) { let missing: Word; for (let i: Word = 0; true; missing += 1) { break; } return 7; }",
     "function failedPost() returns (Word) { let missing: Word; for (let i: Word = 0; true; missing += 1) { continue; } return 7; }",
@@ -3780,7 +3780,7 @@ def headerWorkspace : Workspace.RawWorkspace := {
 it captured at creation: neither a successful call nor the indirect RHS call
 before an operand fault carries its captured assignment over to a later call. -/
 def captureWorkspace : Workspace.RawWorkspace := {
-  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function make(value: Word) returns (function(Word) returns (Word)) { return lam(next: Word) -> Word { value += next; return value; }; }",
     "function missingRhs(action: function(Word) returns (Word)) returns (Word) { let missing: Word; missing += action(9); return missing; }"
   ]}] }

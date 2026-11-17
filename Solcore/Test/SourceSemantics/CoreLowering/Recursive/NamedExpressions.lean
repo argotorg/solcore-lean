@@ -3247,7 +3247,7 @@ private def cells (initial final : SourceTypedRuntime.RuntimeState)
 def run : IO Unit := do
   let names := ["triple", "quadruple", "nested", "firstFault", "laterFault", "singleton"]
   let program ← get "tuple actual checked source" (checkProgram {
-    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content}] })
+    entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}] })
   let keys ← names.mapM (SourceCoreUnifiedCorpusSupport.key program)
   let publicCompilation ← get "tuple actual public Core compilation" (SourceCoreCompiler.compileChecked program
     (keys.map (fun key => SourceCoreCompiler.Seed.declaration key.declaration))
