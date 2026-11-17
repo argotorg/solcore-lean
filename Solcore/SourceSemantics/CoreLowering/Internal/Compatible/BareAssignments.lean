@@ -57,7 +57,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments []) value.expression next outputType
         (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand
         (SourceCoreDataPlaces.placeWrap assignment.target.type operator false) := by
-  cases generated_of_lower (elementWrite?_of_free _ _ (fun _ member => by simp [bare] at member))
+  cases generated_of_lower (takesElement_of_free (fun _ member => by simp [bare] at member))
       accepted with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
     cases rhsGenerated with
@@ -854,7 +854,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
       Layout prepared ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit) next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) true invalidOperand := by
-  cases generated_of_lower (elementWrite?_bitNot _ _) accepted with
+  cases generated_of_lower (takesElement_of_free (fun _ member => by simp [bare] at member)) accepted with
   | intro route prepared index codes value described lookup preparedBy generated _ rhsGenerated =>
     cases rhsGenerated with
     | absent =>

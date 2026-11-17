@@ -682,7 +682,7 @@ theorem GenericForHeader.PreparedSyntax.bareUnary {source : TypedSource} {approv
   | bitNot writable bare profile remaining ih =>
     intro shape
     exact .bitNot writable bare profile (ih shape.tail)
-  | bitNotProjected _ _ projected _ _ _ _ =>
+  | bitNotProjected _ _ projected _ _ _ _ _ =>
     intro shape
     exact False.elim (projected (shape _ List.mem_cons_self))
 
@@ -740,13 +740,13 @@ theorem GenericImperativeMatch.PreparedSyntax.bareUnary {source : TypedSource} {
   | bitNot found form writable bare profile remaining ih =>
     intro shape
     exact .bitNot found form writable bare profile (ih shape.tail)
-  | bitNotProjected found form _ _ projected _ _ _ _ =>
+  | bitNotProjected found form _ _ projected _ _ _ _ _ =>
     intro shape
     exact False.elim (projected (shape.unary found form))
   | initializerBitNot writable bare profile remaining ih =>
     intro shape
     exact .initializerBitNot writable bare profile (ih ⟨shape.1.tail, shape.2⟩)
-  | initializerBitNotProjected _ _ projected _ _ _ _ =>
+  | initializerBitNotProjected _ _ projected _ _ _ _ _ =>
     intro shape
     exact False.elim (projected (shape.1 _ List.mem_cons_self))
   | matchWith found form sourceType scrutineeFound scrutineeTyped scrutineeSyntax casesTyped defaultTyped hidden arms children remaining childrenIH restIH =>
@@ -804,7 +804,7 @@ theorem GenericForHeader.PreparedSyntax.legacy {source : TypedSource} {approved 
   | bitNot writable bare profile remaining ih =>
     intro shape
     exact .bitNot writable bare profile (ih shape.bitNot_tail.2.2)
-  | bitNotProjected _ _ projected _ _ _ _ =>
+  | bitNotProjected _ _ projected _ _ _ _ _ =>
     intro shape
     exact False.elim (projected shape.bitNot_tail.2.1)
 
@@ -862,13 +862,13 @@ theorem GenericImperativeMatch.PreparedSyntax.legacy {source : TypedSource} {app
   | bitNot found form writable bare profile remaining ih =>
     intro shape
     exact .bitNot found form writable bare profile (ih (shape.bitNot_tail found form).2.2)
-  | bitNotProjected found form _ _ projected _ _ _ _ =>
+  | bitNotProjected found form _ _ projected _ _ _ _ _ =>
     intro shape
     exact False.elim (projected (shape.bitNot_tail found form).2.1)
   | initializerBitNot writable bare profile remaining ih =>
     intro shape
     exact .initializerBitNot writable bare profile (ih ⟨shape.1.bitNot_tail.2.2, shape.2⟩)
-  | initializerBitNotProjected _ _ projected _ _ _ _ =>
+  | initializerBitNotProjected _ _ projected _ _ _ _ _ =>
     intro shape
     exact False.elim (projected shape.1.bitNot_tail.2.1)
   | matchWith found form sourceType scrutineeFound scrutineeTyped scrutineeSyntax casesTyped defaultTyped hidden arms children remaining childrenIH restIH =>

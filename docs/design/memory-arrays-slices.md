@@ -16,11 +16,10 @@ It records:
 - what Lean has and lacks in each layer;
 - a design, the differences from upstream it keeps, and the steps in order with their sizes;
 - the effect on the generators, the gate's corpus runs and the smoke;
-- the decisions still open.
+- the decisions it needed, with their answers.
 
-Decisions 1, 2, 4, 5 and 6 were made on 2026-11-13, each as recommended. Decision 3 is with the
-user, and step 5b, compound assignments to an element, waits for its answer
-([open decisions](#open-decisions)); 5a, plain element writes, does not.
+Decisions 1, 2, 4, 5 and 6 were made on 2026-11-13, each as recommended, and decision 3 on
+2026-11-17, by the user, as recommended ([open decisions](#open-decisions)).
 
 ## Upstream at `e2eef194`
 
@@ -305,8 +304,7 @@ importer needs nothing either.
 
 ## Design
 
-The design follows the [decisions](#open-decisions): 1, 2, 4, 5 and 6 as decided, and decision 3's
-recommended answer, which is still with the user.
+The design follows the [decisions](#open-decisions), each as decided.
 
 Memory arrays become builtins, as the twelve integer types did in row 1. They take upstream's typing
 and std's checks. The source semantics holds arrays as objects in its heap, and an array value is a
@@ -367,11 +365,14 @@ wait for the native pipeline's contracts and ABI.
   index is inferred on its own (`placeIndexEquation`, `placeIndexExpected`, `placeIndexProjection`),
   so `a[i][j] = v` takes two element projections, and on any other base the place keeps the mapping
   rule. Finalization defaults an open literal index to `uint256` (`placeIndexMentions`) and rejects
-  another index type with `operatorNotSupported "Typedef"`, as a read's, and until decision 3 it
-  rejects a compound assignment to an element with `compoundTargetNotSupported` and an in-place `~`
-  on one with `operatorNotSupported "BitNot"` (`validatePlaceElements`). A write's base is a place
-  rooted at a local (difference 16). The element place's static rule takes no index kind: its run
-  faults on an index that is not a word, and finalization admits a read's index types.
+  another index type with `operatorNotSupported "Typedef"`, as a read's (`validatePlaceElements`).
+  As built in step 5b, a compound assignment, its unchecked forms and an in-place `~` take an
+  element place too, and finalization checks its indexes as a plain write's; the element's type
+  takes the operator's rules, so `rows[0] += xs` or `rows[0] ~=;` on a row is rejected by
+  unifying the row with `word`, as a compound assignment or an in-place `~` on any array is. A
+  write's base is a place rooted at a local (difference 16), a compound one's too. The element place's static
+  rule takes no index kind: its run faults on an index that is not a word, and finalization admits
+  a read's index types.
 - **Slices** take `uint256` bounds and a base that is an array or a slice, and have the type
   `arraySlice<B>`. As built in step 6a, `arraySlice<B>` resolves to a slice type once aliases are
   expanded, as an intrinsic that a user type of the same name hides, as `integer` is
@@ -570,6 +571,19 @@ wait for the native pipeline's contracts and ABI.
   an in-place `~` and a mapping route give (`Route.elementFree`), and the statement recognizers'
   value-assignment cases and the heads that reach the receipt take the place's element-freeness, as
   a field or a hypothesis.
+- As built in step 5b, the place lowering sends every write to an element there, plain, compound,
+  unchecked or an in-place `~` (`SourceCoreCompatibleDataPlaces.lower` on `takesElement`). After
+  the last index's `0x32` check, a compound assignment or an in-place `~` reads the element present
+  at the index or the array's default element, as a read does, then evaluates the right side, and
+  the last array's cell takes `modified`'s leaf after `guard`'s check (`elementStore`), with the
+  route's modifier, wrap and checks (`placeModifier`, `placeWrap`), as its `execute` gives a local
+  or a mapping. So the place is evaluated once, its element is read before the right side, and
+  `Panic(0x11)` and `Panic(0x12)` come after it, as in the source semantics, whose element place
+  already resolved once (`SourcePlaceResolves.element`) and whose compound rules take any place.
+  The place receipt takes the place's element-freeness (`takesElement_of_free`) instead of the
+  write's plain-ness, which an in-place `~` no longer gives: the projected in-place `~` receipts,
+  heads and certificates and the recognizers' projected in-place `~` cases take it as a field or a
+  hypothesis, from their mapping route (`Route.elementFree`).
 - A slice is a Core product of its base, its start and its length.
 - As built in step 6h, the compatible catalog projects `arraySlice<B>` to the product of `B`'s Core
   type and two words, and registers `B`. The data lowering reads a view's shape from its Core type
@@ -627,6 +641,13 @@ upstream wrote them, with the contract's method as a function, so the fixture's
 `bumpElement(7) -> 8` is checked through `bump`, which loads and stores through `lidx`'s memref. No
 other function was adapted.
 
+As built in step 5b, the array fixtures test runs mem-array's `compound(v)` as upstream wrote it,
+so `#[(10) -> 13]` holds, and memory-array-abi's `echo(xs)` as upstream wrote it, behind word
+wrappers, as `ret`, `sum` and `grid` are: `echoAt(x0, x1, i)` returns `echo([x0, x1])[i]` and
+`echoLength(x0, x1)` its length, so the fixture's `echo([7,8]) -> [8,9]` is checked as 8 at index
+0, 9 at 1 and length 2. No other function was adapted. The lane's probe's `compoundTwice()` gives
+105, where upstream gives 205 (difference 1), and `plainOnce()` 107, as upstream.
+
 ### Outside row 4's Lean side
 
 - Storage arrays, so no `0x31`; calldata arrays; and `T[]` in the ABI. These need the native
@@ -639,9 +660,9 @@ other function was adapted.
 
 ## Differences from upstream that Lean would keep
 
-1. **One evaluation of an element place in a compound assignment**, if decision 3 keeps its
-   recommendation. `m[next(c)] += 5` runs `next` once, so the probe's 205 is 105 in Lean. This is
-   row 1's choice for compound assignments ([row 1's compound assignments](integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs)).
+1. **One evaluation of an element place in a compound assignment** (decision 3).
+   `m[next(c)] += 5` runs `next` once, so the probe's 205 is 105 in Lean. This is row 1's choice for
+   compound assignments ([row 1's compound assignments](integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs)).
 2. **`0x41` only from the length check** (decision 2).
    - For lengths just below 2^251 − 1, the pinned backends disagree with each other. Each panics
      where its own free pointer makes the end wrap, and halts otherwise. Lean allocates.
@@ -782,8 +803,8 @@ Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13
 2026-11-14, 15 and 16 on 2026-11-15, when 8 was also widened from an unused `let m = [];` to any
 unannotated one, 17 to 22 on 2026-11-16, and 23 and 24 on 2026-11-17. Differences 9 to 13 change
 only a diagnostic or the room of a resource limit, and 8 and 14 to 24 only reject some programs that
-upstream accepts. None of them changes what an accepted program means. Difference 1 follows
-decision 3.
+upstream accepts. None of them changes what an accepted program means. Difference 1 does, and was
+accepted with decision 3 on 2026-11-17.
 
 ## Steps
 
@@ -814,7 +835,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 5a-ii | Plain element writes: inference's typing of `a[i] = v` on a memory array, a nested place such as `a[i][j] = v` included, whose index finalization checks as a read's; a compound assignment or an in-place `~` to an element stays rejected | 40–60 files, +1,300–2,200/−150–400; measured at 36 files, +1,129/−647 | none |
 | 5a-iii-a | Plain element writes: the lowering, with `0x32` before the right side, the fault-site pass's case and the element-freeness that the statement meaning proofs take | 4–8 files, +200–400/−5–30 at first; measured at 55 files, +706/−261 | none |
 | 5a-iii-b | Plain element writes: the ports | 1–2 files, +100–200; measured at 1 file, +104/−2 | setGet(n, i, v), fillAndSum(n), nestedReplace(n, v), alias(v); ret(n), sum(xs), grid(n) adapted |
-| 5b | Compound assignments to an element, with in-place `~` and the unchecked forms, after decision 3 | 25–40 files, +600–1,100/−50–150 | compound(v); echo(xs) adapted |
+| 5b | Compound assignments to an element, with in-place `~` and the unchecked forms, after decision 3, which evaluate the place once | 25–40 files, +600–1,100/−50–150; measured at 20 files, +381/−152 | compound(v); echo(xs) adapted |
 | 6a | Slices: the slice type `arraySlice<B>`, which resolves once aliases are expanded, over a memory array or a slice; type formation admits it, an array or a mapping that holds one is rejected, and elaboration rejects every slice type | 25–30 files, +300–500/−20–60; measured at 27 files, +386/−62 | none |
 | 6b | Slices: the slice value, which holds its base value, its start and its length, and its typing in a heap, with the typing's laws; no expression makes one yet | 15–20 files, +200–400/−10–20; measured at 9 files, +101/−10 | none |
 | 6c | Slices: the typed form of `a[s:e]`, `a[s:]`, `a[:e]` and `a[:]` with its static rule, evaluation, faults with `0x32` from its bounds, sized copies, stage and preservation, which no source produces yet | 28–32 files, +350–550/−5–15; measured at 27 files, +361/−9 | none |
@@ -863,6 +884,13 @@ row many times over once begun: an element place satisfies the place typing that
 meaning proofs assume, so once the lowering accepts a write to one, every proof that inverts the
 place lowering's receipt must rule it out, and the fault-site pass must reserve the write's fault
 word. So it split into 5a-iii-a, the lowering with those proofs, and 5a-iii-b, the ports.
+
+Step 5b stayed one commit after decision 3's answer (2026-11-17). The source semantics needed
+nothing, since its element place already resolves once and its compound rules take any place, and
+inference only its finalization check. The lowering took the element path's last write, and an
+in-place `~` stopped giving a write's plain-ness, so the projected in-place `~` receipts and the
+recognizers' projected in-place `~` cases took the place's element-freeness, as 5a-iii-a's value
+assignments had.
 
 Step 2 was one row of 60–72 files, +1,300–1,700/−300–450, until its first measure: about 110 to 150
 files, +3,000 to 4,500/−400 to 800. `new` and the lengths each take a typed form with its
@@ -945,8 +973,8 @@ changes. The statements are README and its Proof status, the names the guides ci
 core-lowering's table of [definitions and theorems you build on](../guide/core-lowering.md#definitions-and-theorems-you-build-on).
 
 On 2026-11-13, decisions 1, 2, 4, 5 and 6 were made as recommended, under the delegation. Decision
-3 is with the user: it is the one choice that changes a result upstream gives for a program it
-accepts.
+3, the one choice that changes a result upstream gives for a program it accepts, was made by the
+user on 2026-11-17, as recommended.
 
 ### 1. How the source semantics holds arrays
 
@@ -996,13 +1024,14 @@ accepts.
 
 ### 3. Compound assignment to an element
 
-- **Open, with the user.** Until the answer comes, step 5b does not start. Step 5a, plain element
-  writes, does not wait for it.
+- **Decided: (a)**, on 2026-11-17, by the user: "一回だけ評価する。" ("evaluate it once"). Step 5b
+  follows it; step 5a, plain element writes, did not wait for it.
   - Under either answer, the place is resolved and its current value read before the right side,
     then the write, as Lean's places do today. Under (a), only the second evaluation of the base
     and the index differs from upstream.
-  - The main checkout's `questions.md` records the double evaluation (2026-11-13). It cites the
-    comment in `crates/parser/src/parse/stmt.rs:49-80`, which says the rewrite is deliberate.
+  - The main checkout's `questions.md` records the double evaluation (2026-11-13), and since
+    2026-11-17 as the upstream bug candidate Q015, with this decision. It cites the comment in
+    `crates/parser/src/parse/stmt.rs:49-80`, which says the rewrite is deliberate.
 - **(a) Recommended: one evaluation of the place**, as row 1's compound assignments do.
 - **(b) Upstream's rewrite** to `a[i] = a[i] op v`.
 - **Upstream.** `crates/parser/src/parse/stmt.rs:49-80`, and the probe's 205 against 107.

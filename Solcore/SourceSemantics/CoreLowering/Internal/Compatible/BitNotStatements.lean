@@ -614,6 +614,7 @@ theorem of_lower {site : SourceCoreElaboration.ErrorSite} {expression : Expressi
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (nonempty : assignment.target.projections ≠ [])
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
     (extract : ∀ id lowered, expression fuel source scope id reasonAt = .ok lowered → ∃ node,
@@ -624,7 +625,7 @@ theorem of_lower {site : SourceCoreElaboration.ErrorSite} {expression : Expressi
     ∃ head : Head values source context certificate scope administrative definitions assignment,
       code = head.emit next output ∧ head.invalid = invalidOperand := by
   obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, _, binding, rootEq, view, slot, layout, ordinary, _, emitted⟩ :=
-    CompatiblePlaceBitNotCertificates.of_lower unique signatures sourceTyped nonempty profile extract
+    CompatiblePlaceBitNotCertificates.of_lower unique signatures sourceTyped nonempty free profile extract
       accepted typed
   exact ⟨⟨prepared, index, codes, leaf, sourceTypes, site, invalidOperand, layout, ordinary, slot,
     rootEq ▸ writable binder binding, view ▸ profile, CompatiblePlaceModifier.bitNotPlain_of_runtime profile⟩,

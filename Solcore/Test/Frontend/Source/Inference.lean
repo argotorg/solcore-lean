@@ -1559,10 +1559,12 @@ private def testArrayIndex : IO Unit := do
 
 /-- `a[i] = v` on a memory array writes an element: the place takes an element
 projection at an index of `word` or one of the twelve types, an open literal
-defaulting to `uint256`, and `rows[i][j] = v` takes two; a `bool` index is
-rejected with `Typedef`'s name, and a compound assignment or an in-place `~` on
-an element, which wait for decision 3, are rejected, as is a write through a call's result,
-which is no place (difference 16). -/
+defaulting to `uint256`, and `rows[i][j] = v` takes two. So do a compound
+assignment, its unchecked forms and an in-place `~` on an element, in a `for`
+header too (step 5b). A `bool` index is rejected with `Typedef`'s name, a
+compound assignment or an in-place `~` on a row by unifying the row with `word`,
+as on any array, a compound shift by a signed amount with `shl`'s, and a write
+through a call's result, which is no place (difference 16). -/
 private def testArrayElementPlace : IO Unit := do
   let functions ← check "array element place" (String.intercalate "\n" [
     "function write(n: uint256, i: uint256, v: uint256) returns (uint256) {",
@@ -1577,6 +1579,12 @@ private def testArrayElementPlace : IO Unit := do
     "  rows[i] = m;",
     "  rows[i][0] = v;",
     "  for (let j: uint256 = 0; j < n; m[j] = j) { j += 1; }",
+    "  m[i] += v;",
+    "  rows[i][1] -= 1;",
+    "  m[0] <<= 2;",
+    "  unchecked { m[k] *= v; }",
+    "  m[1] ~=;",
+    "  for (let j: uint256 = 0; j < n; m[j] ~=) { j += 1; }",
     "  return m[i];",
     "}"
   ])
@@ -1607,26 +1615,63 @@ private def testArrayElementPlace : IO Unit := do
   assertTrue (decide (indexTypes = [uint256, int8, .word, uint256, uint256, uint256, uint256,
       uint256]))
     s!"element writes did not type their indexes: {reprStr indexTypes}"
+  let compound := function.typedBody.nodes.filterMap fun
+    | .statement { form := .assignValue assignment operator _, .. } =>
+        if operator == .equal then none else some (operator, assignment.target)
+    | _ => none
+  let bitNots := function.typedBody.nodes.filterMap fun
+    | .statement { form := .assignBitNot assignment, .. } => some assignment.target
+    | .statement { form := .forLoop _ _ post _, .. } => post.findSome? fun
+        | .assignBitNot assignment => some assignment.target
+        | _ => none
+    | _ => none
+  let operatorName : Syntax.ValueAssignOp → String
+    | .add => "add"
+    | .subtract => "subtract"
+    | .shiftLeft => "shiftLeft"
+    | .uncheckedMultiply => "uncheckedMultiply"
+    | _ => "other"
+  let updated := (compound.filter fun (_, place) => !place.projections.isEmpty).map fun (operator, place) =>
+    (operatorName operator, place.projections.map projectionName)
+  assertTrue (decide (updated = [("add", ["element"]), ("subtract", ["element", "element"]),
+      ("shiftLeft", ["element"]), ("uncheckedMultiply", ["element"])]))
+    s!"compound element assignments did not take their places' elements: {reprStr updated}"
+  let bitNotShapes := bitNots.map fun place => place.projections.map projectionName
+  assertTrue (decide (bitNotShapes = [["element"], ["element"]]))
+    s!"in-place ~ on elements did not take their places' elements: {reprStr bitNotShapes}"
+  let updatedIndexTypes := ((compound.map (·.2)) ++ bitNots).flatMap (fun place => place.projections.filterMap fun
+      | .element index => some index
+      | _ => none) |>.filterMap fun index => function.typedBody.nodes.findSome? fun
+        | .expression node => if node.id == index then some node.type else none
+        | .statement _ => none
+  assertTrue (decide (updatedIndexTypes = [uint256, uint256, uint256, uint256, int8, uint256, uint256]))
+    s!"compound element assignments and in-place ~ did not type their indexes: {reprStr updatedIndexTypes}"
   expectInferenceError "a bool element index"
     "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[true] = n; return n; }"
     fun error => error == .operatorNotSupported "Typedef" .bool
-  expectInferenceError "a compound assignment to an element"
-    "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[0] += n; return n; }"
-    fun error => match error with
-      | .compoundTargetNotSupported _ .add type => type == uint256
-      | _ => false
-  expectInferenceError "a compound assignment to a nested element"
-    "function bad(n: uint256) returns (uint256) { let rows: uint256[][] = new uint256[][](n); rows[0][1] -= n; return n; }"
-    fun error => match error with
-      | .compoundTargetNotSupported _ .subtract type => type == uint256
-      | _ => false
-  expectInferenceError "an in-place ~ on an element"
-    "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[0] ~=; return n; }"
-    fun error => error == .operatorNotSupported "BitNot" uint256
+  expectInferenceError "a bool index in a compound assignment"
+    "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); m[true] += n; return n; }"
+    fun error => error == .operatorNotSupported "Typedef" .bool
+  expectInferenceError "a compound assignment to a row"
+    "function bad(n: uint256) returns (uint256) { let rows: uint256[][] = new uint256[][](n); rows[0] += rows[1]; return n; }"
+    fun error => error == .unification (.mismatch (.array uint256) .word)
+  expectInferenceError "an in-place ~ on a row"
+    "function bad(n: uint256) returns (uint256) { let rows: uint256[][] = new uint256[][](n); rows[0] ~=; return n; }"
+    fun error => error == .unification (.mismatch (.array uint256) .word)
+  expectInferenceError "a compound shift of an element by a signed amount"
+    "function bad(n: uint256) returns (uint256) { let m: uint256[] = new uint256[](n); let k: int8 = 1; m[0] <<= k; return n; }"
+    fun error => error == .operatorNotSupported "shl" (.fixed ⟨true, .w8⟩)
   expectInferenceError "an element write through a call's result"
     (String.intercalate "\n" [
       "function same(xs: uint256[]) returns (uint256[]) { return xs; }",
       "function bad(v: uint256) returns (uint256) { let m: uint256[] = new uint256[](2); same(m)[1] = v; return m[1]; }"])
+    fun error => match error with
+      | .invalidAssignmentTarget _ => true
+      | _ => false
+  expectInferenceError "a compound assignment through a call's result"
+    (String.intercalate "\n" [
+      "function same(xs: uint256[]) returns (uint256[]) { return xs; }",
+      "function bad(v: uint256) returns (uint256) { let m: uint256[] = new uint256[](2); same(m)[1] += v; return m[1]; }"])
     fun error => match error with
       | .invalidAssignmentTarget _ => true
       | _ => false

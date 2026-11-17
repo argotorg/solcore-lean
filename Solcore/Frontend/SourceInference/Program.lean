@@ -640,10 +640,6 @@ def validatePlaceIndexes (state : State) (place : PlaceResolution) : Except Erro
       throw (.operatorNotSupported "Typedef" ((expressionTypeAt? state index).getD .word))
   | none => .ok ()
 
-/-- Whether a place takes an element of a memory array. -/
-def placeHasElement (place : PlaceResolution) : Bool :=
-  !(placeElementIndexes place).isEmpty
-
 /-- Check one value assignment's target type once the defaults are in
 (`compoundTargetFits`), naming the assigned value, and a compound shift's amount
 (`validateShiftAmount`). -/
@@ -782,31 +778,16 @@ def validateAssignmentTargets (state : State) : List Node → Except Error Unit
       validateAssignmentTargetNode state node
       validateAssignmentTargets state rest
 
-/-- One value assignment's element places: a compound assignment to an element of
-a memory array waits for decision 3 and is rejected, naming the assigned value,
-and an element place's indexes are checked as a read's (`validatePlaceIndexes`). -/
-def validateElementAssignment (state : State) (assignment : AssignmentResolution)
-    (operator : Syntax.ValueAssignOp) (value : ExpressionId) : Except Error Unit :=
-  if operator != .equal && placeHasElement assignment.target then
-    throw (.compoundTargetNotSupported value operator (state.resolve assignment.target.type))
-  else validatePlaceIndexes state assignment.target
-
-/-- An in-place `~` takes no element of a memory array: it waits for decision 3,
-as a compound assignment to one does. -/
-def validateElementBitNot (state : State) (assignment : AssignmentResolution) :
-    Except Error Unit :=
-  if placeHasElement assignment.target then
-    throw (.operatorNotSupported "BitNot" (state.resolve assignment.target.type))
-  else .ok ()
-
-/-- The element places among a `for` header's items. -/
+/-- The element places among a `for` header's items: an element place's indexes are
+checked as a read's (`validatePlaceIndexes`), whether a plain write, a compound
+assignment, one of its unchecked forms or an in-place `~` takes it. -/
 def validateForItemElements (state : State) : List ForItemForm → Except Error Unit
   | [] => .ok ()
-  | .assignValue assignment operator value :: rest => do
-      validateElementAssignment state assignment operator value
+  | .assignValue assignment _ _ :: rest => do
+      validatePlaceIndexes state assignment.target
       validateForItemElements state rest
   | .assignBitNot assignment :: rest => do
-      validateElementBitNot state assignment
+      validatePlaceIndexes state assignment.target
       validateForItemElements state rest
   | _ :: rest => validateForItemElements state rest
 
@@ -815,9 +796,8 @@ and a `for` header's items. -/
 def validatePlaceElementNode (state : State) : Node → Except Error Unit
   | .statement node =>
       match node.form with
-      | .assignValue assignment operator value =>
-          validateElementAssignment state assignment operator value
-      | .assignBitNot assignment => validateElementBitNot state assignment
+      | .assignValue assignment _ _ => validatePlaceIndexes state assignment.target
+      | .assignBitNot assignment => validatePlaceIndexes state assignment.target
       | .forLoop initializer _ post _ => do
           validateForItemElements state initializer
           validateForItemElements state post

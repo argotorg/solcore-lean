@@ -248,7 +248,7 @@ theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSour
         obtain ⟨node, found, tree, _⟩ := extract rhs lowered (by simp) generated
         exact ⟨node, found, tree⟩) accepted
     exact ⟨head, emitted, token, .bare bare⟩
-  · cases generated_of_lower (elementWrite?_of_free _ _ free) accepted with
+  · cases generated_of_lower (takesElement_of_free free) accepted with
     | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
       cases rhsGenerated with
       | @present id right rhsGenerated rhsType =>

@@ -178,8 +178,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
       (missing site assignment.target.root) = .ok code := by
     cases operator <;> simpa only [SourceCoreLoops.assignValue, matched.equal, matched.value] using accepted
   obtain ⟨binder, found⟩ := SourceCoreCompatibleDataPlaces.rootBinder_of_lower lowered
-  have plain := SourceCoreCompatibleDataPlaces.elementWrite?_of_free operator (some rhs)
-    (routed binder found).elementFree
+  have plain := SourceCoreCompatibleDataPlaces.takesElement_of_free (routed binder found).elementFree
   cases CompatiblePlaceCompilerCertificates.generated_of_lower plain lowered with
   | intro route place index keys value described slot prepared keysGenerated operatorValid rhsGenerated =>
     cases rhsGenerated with
@@ -349,6 +348,9 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
     (matched : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missing)
     (sourceProfile : assignment.target.type = .word)
     (projected : assignment.target.projections ≠ [])
+    (routed : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
+      AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections
+        assignment.target.type)
     (callbackSelected : policy.assignBitNotWithExpression = some callback)
     (accepted : callback policy.lowerExpression fuel source scope site assignment output next reasonAt = .ok code) :
     Nonempty (Receipt policy fuel source scope site assignment output next reasonAt code) := by
@@ -358,8 +360,10 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
       (missing site assignment.target.root) = .ok code := by
     have same := Option.some.inj (callbackSelected.symm.trans matched)
     simpa only [same] using accepted
+  obtain ⟨declared, declaredFound⟩ := SourceCoreCompatibleDataPlaces.rootBinder_of_lower lowered
   cases CompatiblePlaceCompilerCertificates.generated_of_lower
-      (SourceCoreCompatibleDataPlaces.elementWrite?_bitNot _ _) lowered with
+      (SourceCoreCompatibleDataPlaces.takesElement_of_free (routed declared declaredFound).elementFree)
+      lowered with
   | intro route place index keys value described slot prepared keysGenerated operatorValid rhsGenerated =>
     cases rhsGenerated with
     | absent =>
@@ -726,7 +730,7 @@ theorem refine {values : SourceCoreCompatibleValues.Context}
     · by_cases projected : ProjectedBitNotAssignable source assignment
       · have lowered := assigned
         simp only [SourceCoreLoops.lowerForItems, unary, remaining.accepted, bind, Except.bind] at lowered
-        obtain ⟨receipt⟩ := AcceptedProjectedBitNotReceipt.of_accepted unary projected.1 projected.2.1 unary lowered
+        obtain ⟨receipt⟩ := AcceptedProjectedBitNotReceipt.of_accepted unary projected.1 projected.2.1 projected.2.2 unary lowered
         exact ⟨.projectedBitNotted refined receipt (projected.2.2 receipt.binder receipt.description.binding), ready⟩
       · exact ⟨.bitNotting refined assigned, (fun eligible => eligible.elim supported projected), ready⟩
   | bitNotted remaining receipt targetType ih =>
@@ -1588,7 +1592,7 @@ theorem Tree.refine {values : SourceCoreCompatibleValues.Context}
           · have lowered := assigned
             simp only [SourceCoreLoops.lowerFlowStatementsWithPolicy, read, form, statementType,
               unary, remaining.accepted, bind, Except.bind] at lowered
-            obtain ⟨receipt⟩ := AcceptedProjectedBitNotReceipt.of_accepted unary projected.1 projected.2.1 unary lowered
+            obtain ⟨receipt⟩ := AcceptedProjectedBitNotReceipt.of_accepted unary projected.1 projected.2.1 projected.2.2 unary lowered
             exact ⟨.projectedBitNotted read form statementType tail receipt
               (projected.2.2 receipt.binder receipt.description.binding), ready⟩
           · exact ⟨.bitNotting read form statementType tail assigned,

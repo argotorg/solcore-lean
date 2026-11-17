@@ -605,7 +605,7 @@ theorem projected_bitNot_head (index : ActualBodyInvocation.Index compiled bodyR
   obtain ⟨sourceTyped, writable⟩ :=
     ScopedSourceForItemsAdmission.projected_bitNot_facts unique receipt.description.binding route typed
   exact CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
-    unique signatures sourceTyped writable receipt.projected
+    unique signatures sourceTyped writable receipt.projected route.elementFree
     (.inl (by rw [receipt.sourceProfile]; rfl))
     (fun id _ member generated _ => by
       obtain ⟨node, found, _⟩ := route.key_typed unique (sourceTyped _ receipt.description.binding) member

@@ -362,7 +362,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
         subst lowered
         exact extract rhs value (by simp) generated ⟨_, rhsNative⟩) accepted
     exact ⟨head, emitted, token, .bare bare⟩
-  · cases generated_of_lower (elementWrite?_of_free _ _ free) accepted with
+  · cases generated_of_lower (takesElement_of_free free) accepted with
     | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
       cases rhsGenerated with
       | @present id right rhsGenerated rhsType =>
@@ -1603,6 +1603,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (projected : assignment.target.projections ≠ [])
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
     (extract : ∀ id lowered, id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections →
@@ -1615,7 +1616,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
     ∃ head : Head values source context certificate scope administrative definitions assignment,
       code = head.emit next output ∧ head.invalid = invalidUnary ∧
         head.PreparedAt site fuel invalidProjection missing := by
-  cases generated_of_lower (elementWrite?_bitNot _ _) accepted with
+  cases generated_of_lower (takesElement_of_free free) accepted with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
     cases rhsGenerated with
     | absent =>
@@ -1928,7 +1929,7 @@ theorem collected
       refine ⟨.bitNot head tail, fun registry => .bitNot (tailSites registry) ?_⟩
       simpa only [CompatibleBitNotStatements.Head.Errors, token] using unary List.mem_cons_self rawWord
 
-  | @bitNotProjected context assignment rest sourceTyped writable projected profile childSyntax remaining ih =>
+  | @bitNotProjected context assignment rest sourceTyped writable projected free profile childSyntax remaining ih =>
     obtain ⟨_rawWord, restShape⟩ := shape.unary_tail
     cases fuel with
     | zero => cases accepted
@@ -1946,7 +1947,7 @@ theorem collected
         (fun child member => expression_lookup edited avoids (accessible child member))).trans compiled
       obtain ⟨head, emitted, _sameToken, preparedAt⟩ :=
         CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
-          unique sourceSignatures sourceTyped writable projected profile
+          unique sourceSignatures sourceTyped writable projected free profile
           (certificate := TypedCertificate source certificates context)
           (fun child lowered member generated raw => by
             obtain ⟨approved, node, found, typed⟩ := childSyntax child member
@@ -2753,7 +2754,7 @@ theorem collected_at
           (fun child member => reached child (List.mem_cons_of_mem id member)) projection generatedBody
           (TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)))
         (by simpa only [CompatibleBitNotStatements.Head.Errors, token] using unary (.statement found form) rawWord)
-  | @bitNotProjected context mode id node assignment rest expected found form sourceTyped writable projected profile childSyntax remaining ih =>
+  | @bitNotProjected context mode id node assignment rest expected found form sourceTyped writable projected free profile childSyntax remaining ih =>
     obtain ⟨_rawWord, restShape⟩ := shape.unary_tail found form
     cases fuel with
     | zero => cases accepted
@@ -2778,7 +2779,7 @@ theorem collected_at
         (fun child member => expression_lookup edited avoids (accessible child member))).trans compiled
       obtain ⟨head, emitted, _sameToken, preparedAt⟩ :=
         CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
-          unique sourceSignatures sourceTyped writable projected profile
+          unique sourceSignatures sourceTyped writable projected free profile
           (certificate := TypedCertificate source certificates context)
           (fun child lowered member generated raw => by
             obtain ⟨approved, childNode, childFound, typed⟩ := childSyntax child member
@@ -2993,7 +2994,7 @@ theorem collected_at
           (AssignmentDiagnosticOrigins.HeaderOriginFor.unary (tracked := true)
             (AssignmentDiagnosticOrigins.ForOriginFor.header (tracked := true) origin)) rawWord))
 
-  | @initializerBitNotProjected context assignment rest condition post statements expected sourceTyped writable projected profile childSyntax remaining ih =>
+  | @initializerBitNotProjected context assignment rest condition post statements expected sourceTyped writable projected free profile childSyntax remaining ih =>
     obtain ⟨_rawWord, restShape⟩ := shape.1.unary_tail
     obtain ⟨headerFuel, parentSite, next, origin, accepted, nextReceipt⟩ := accepted
     cases headerFuel with
@@ -3013,7 +3014,7 @@ theorem collected_at
         (fun child member => expression_lookup edited avoids (accessible child member))).trans compiled
       obtain ⟨head, emitted, _sameToken, preparedAt⟩ :=
         CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
-          unique sourceSignatures sourceTyped writable projected profile
+          unique sourceSignatures sourceTyped writable projected free profile
           (certificate := TypedCertificate source certificates context)
           (fun child lowered member generated raw => by
             obtain ⟨approved, childNode, childFound, typed⟩ := childSyntax child member

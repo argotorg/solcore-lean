@@ -2073,8 +2073,8 @@ structure FinalizeSuccessWitness
   the literal targets (kept last, so positional patterns keep their fields). -/
   assignmentValidation :
     validateAssignmentTargets finalState finalState.nodes = .ok ()
-  /-- Every element place of a memory array is a plain assignment's, with indexes
-  that a read takes, checked after the assignment targets. -/
+  /-- Every element place of a memory array has indexes that a read takes,
+  checked after the assignment targets. -/
   placeElementValidation :
     validatePlaceElements finalState finalState.nodes = .ok ()
 

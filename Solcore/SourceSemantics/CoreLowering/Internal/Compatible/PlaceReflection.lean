@@ -592,7 +592,7 @@ theorem generated_of_lower {compilation : SourceCoreCompatibleDataPlaces.Context
     {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : Option ExpressionId}
     {outputType : Ty} {next : Expr} {reasonAt : ExpressionId → Word}
     {invalidProjection invalidOperand : Word} {missing : TypeSystem.Ty → Word} {lowered : Expr}
-    (plain : elementWrite? assignment operator rhs = none)
+    (plain : takesElement assignment.target.projections = false)
     (accepted : lower compilation signatures expression fuel source scope site assignment operator rhs outputType next
       reasonAt invalidProjection invalidOperand missing = .ok lowered) :
     Generated compilation signatures expression fuel source scope site assignment operator rhs outputType next
@@ -918,7 +918,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
         (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand
         (SourceCoreDataPlaces.placeWrap assignment.target.type operator false) := by
   have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower
-    (elementWrite?_of_free _ _ free) accepted
+    (takesElement_of_free free) accepted
   cases receipt with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
     cases rhsGenerated with

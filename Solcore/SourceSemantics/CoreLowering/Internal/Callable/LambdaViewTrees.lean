@@ -3428,9 +3428,9 @@ theorem lower {source view : TypedSource} (metadata : LambdaMetadataViews.Metada
   have route : describe values signatures source site assignment = describe values signatures view site assignment := by
     simp only [describe, rootEq, routes metadata keys]
   unfold SourceCoreCompatibleDataPlaces.lower
-  cases SourceCoreCompatibleDataPlaces.elementWrite? assignment operator rhs with
-  | some value => simp only [SourceCoreCompatibleDataPlaces.lowerElements, rootEq]
-  | none => simp only [SourceCoreCompatibleDataPlaces.lowerRoute, route]
+  cases SourceCoreCompatibleDataPlaces.takesElement assignment.target.projections with
+  | true => simp only [SourceCoreCompatibleDataPlaces.lowerElements, rootEq]
+  | false => simp only [SourceCoreCompatibleDataPlaces.lowerRoute, route]
 
 end Solcore.SourceSemantics.CoreLowering.CallableLambdaViewPlaceLowering
 end

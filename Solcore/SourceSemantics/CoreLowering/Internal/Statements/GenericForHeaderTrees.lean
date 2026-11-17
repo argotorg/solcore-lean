@@ -116,6 +116,7 @@ inductive PreparedSyntax (source : TypedSource) (expressionSyntax : ExpressionId
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (projected : assignment.target.projections ≠ [])
+      (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
         SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
       (children : ∀ id, id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections →

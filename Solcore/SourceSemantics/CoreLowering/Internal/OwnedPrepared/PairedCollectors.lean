@@ -449,7 +449,7 @@ private theorem fixed_assignment_occurrence
       (prepared := prepared) (reference := .var index) (keys := SourceCoreCalls.packArguments [])
       (rhs := value.expression) (next := next) (output := output) (target := assignment.target.type)
       (operator := operator) (codeEq ▸ typed)⟩
-  · cases generated_of_lower (SourceCoreCompatibleDataPlaces.elementWrite?_of_free _ _ free) accepted with
+  · cases generated_of_lower (SourceCoreCompatibleDataPlaces.takesElement_of_free free) accepted with
     | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
       cases rhsGenerated with
       | @present actualId right rightGenerated rhsType =>

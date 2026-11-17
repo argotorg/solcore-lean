@@ -948,7 +948,8 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
         cases head with
         | assignBitNot assignment =>
           obtain ⟨sourceTyped, writable⟩ := projected_bitNot_facts unique declaration route assignment
-          apply GenericForHeader.PreparedSyntax.bitNotProjected sourceTyped writable projected (.inl (by rw [profile]; rfl))
+          apply GenericForHeader.PreparedSyntax.bitNotProjected sourceTyped writable projected route.elementFree
+            (.inl (by rw [profile]; rfl))
           · intro child member
             obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
             exact ⟨keys child member, node, found, typed⟩
@@ -1008,11 +1009,11 @@ theorem initializers {source : TypedSource} {approved : ExpressionId → Prop}
       | cons head tail =>
         cases head
         exact .initializerAssign sourceTyped writable free rightTyped profile children (ih tail next)
-  | bitNotProjected sourceTyped writable projected profile children remaining ih =>
+  | bitNotProjected sourceTyped writable projected free profile children remaining ih =>
       cases typed with
       | cons head tail =>
         cases head
-        exact .initializerBitNotProjected sourceTyped writable projected profile children (ih tail next)
+        exact .initializerBitNotProjected sourceTyped writable projected free profile children (ih tail next)
   | bitNot writable bare profile remaining ih =>
       cases typed with
       | cons head tail =>
@@ -1363,7 +1364,8 @@ theorem Scan.syntax {source approved expected mode statements}
       cases original with
       | assignBitNot assignment =>
         obtain ⟨sourceTyped, writable⟩ := ScopedSourceForItemsAdmission.projected_bitNot_facts unique declaration route assignment
-        apply GenericImperativeMatch.PreparedSyntax.bitNotProjected found form sourceTyped writable projected (.inl (by rw [profile]; rfl))
+        apply GenericImperativeMatch.PreparedSyntax.bitNotProjected found form sourceTyped writable projected
+          route.elementFree (.inl (by rw [profile]; rfl))
         · intro child member
           obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
           exact ⟨keys child member, node, found, typed⟩

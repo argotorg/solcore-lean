@@ -621,6 +621,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (nonempty : assignment.target.projections ≠ [])
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (targetProfile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
       SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
@@ -641,7 +642,7 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments codes) (LanguageResult.success .unit) next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) true invalidOperand := by
   have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower
-    (elementWrite?_bitNot _ _) accepted
+    (takesElement_of_free free) accepted
   cases receipt with
   | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
     cases rhsGenerated with
@@ -996,6 +997,7 @@ theorem reflects_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
     (rootTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (nonempty : assignment.target.projections ≠ [])
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id code)
     (accepted : lower compilation compilation.checked.signatures expression fuel source scope site assignment operator none outputType
@@ -1023,7 +1025,7 @@ theorem reflects_numeric {compilation : SourceCoreCompatibleDataPlaces.Context}
       environment coreEnvironment before store mapping world next outputType result finalStore := by
   obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, actualPreparation, binding, rootEq, leafView, slot, layout, ordinary,
       _, lowering⟩ :=
-    CompatiblePlaceBitNotCertificates.of_lower unique signatures sourceTyped nonempty operatorProfile extract
+    CompatiblePlaceBitNotCertificates.of_lower unique signatures sourceTyped nonempty free operatorProfile extract
       accepted typed
   have profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer := by
     simpa only [leafView] using operatorProfile
@@ -1050,6 +1052,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (rootTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (nonempty : assignment.target.projections ≠ [])
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id code)
     (accepted : lower compilation compilation.checked.signatures expression fuel source scope site assignment operator none outputType
@@ -1074,7 +1077,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (completed : Evaluates coreEnvironment store lowered result finalStore) :
     CompatiblePlaceBitNotMeaning.Result compilation.checked registry functions program context evidence source faults assignment.target
       environment coreEnvironment before store mapping world next outputType result finalStore :=
-  reflects_numeric unique signatures sourceTyped rootTyped nonempty extract accepted typed registryExtension meaning
+  reflects_numeric unique signatures sourceTyped rootTyped nonempty free extract accepted typed registryExtension meaning
     functionTypes faithful observations missingTokens invalidTokens (.inl operatorProfile) environments heaps locals completed
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotLowerReflection

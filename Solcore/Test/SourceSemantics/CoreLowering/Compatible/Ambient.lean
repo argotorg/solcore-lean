@@ -94,6 +94,7 @@ theorem checked_path_run_reflects {compilation : SourceCoreCompatibleDataPlaces.
     (rootTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (nonempty : assignment.target.projections ≠ [])
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id code)
     {certified : Certified artifact.layouts.definitions (SourceCoreLocalCell.coreContext scope ++ administrativeContext) .unit}
@@ -125,7 +126,7 @@ theorem checked_path_run_reflects {compilation : SourceCoreCompatibleDataPlaces.
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
   apply terminal
-  exact CompatiblePlaceBitNotLowerReflection.reflects_numeric unique signatures sourceTyped rootTyped nonempty extract
+  exact CompatiblePlaceBitNotLowerReflection.reflects_numeric unique signatures sourceTyped rootTyped nonempty free extract
     (CompatiblePlaceCompilerCertificates.lower_of_lowerChecked accepted) certified.typed registryExtension meaning functionTypes
     faithful observations missingTokens invalidTokens profile environments heaps locals (runStateful_evaluation_sound completed)
 
@@ -2153,7 +2154,7 @@ theorem actual_lower_reflects {code : Expr}
     (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (certificate := Child)
     unique rfl (fun actual found => by cases binding actual found; exact .index keyTyped (.nil _))
     (fun actual found => by cases binding actual found; exact rootWritable) (by simp [assignment])
-    (fun id code accepted => let ⟨node, found, child, _⟩ := childReceipt id code accepted; ⟨node, found, child⟩) accepted typed
+    (by simp [assignment]) (fun id code accepted => let ⟨node, found, child, _⟩ := childReceipt id code accepted; ⟨node, found, child⟩) accepted typed
     registryExtension (childReflects registry (fun _ _ => True)) functionViews faithful observations
     (fun _ _ => True.intro) (fun _ => True.intro) rfl environments heaps (localAgrees initial) completed
   cases reflected with
@@ -2379,7 +2380,7 @@ theorem actual_lower_reflects {code : Expr}
     (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (certificate := Child)
     unique rfl (fun actual found => by cases binding actual found; exact .index keyTyped (.nil _))
     (fun actual found => by cases binding actual found; exact rootWritable) (by simp [assignment])
-    (fun id code accepted => let ⟨node, found, child, _⟩ := childReceipt id code accepted; ⟨node, found, child⟩) accepted typed
+    (by simp [assignment]) (fun id code accepted => let ⟨node, found, child, _⟩ := childReceipt id code accepted; ⟨node, found, child⟩) accepted typed
     registryExtension (childReflects registry (fun _ _ => True)) functionViews faithful observations
     (fun _ _ => True.intro) (fun _ => True.intro) (.inr rfl) environments heaps (localAgrees initial) completed
   cases reflected with

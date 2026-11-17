@@ -1418,58 +1418,81 @@ def takesElement (projections : List PlaceProjection) : Bool :=
     | .element _ => true
     | .index _ | .member _ _ => false
 
-/-- The right side of a plain write `p[i] = v` to an element of a memory array. Inference
-rejects a compound assignment or an in-place `~` on an element until decision 3, and every
-other place keeps its route. -/
-def elementWrite? (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp)
-    (rhs : Option ExpressionId) : Option ExpressionId :=
-  match operator, rhs with
-  | .equal, some rhs => if takesElement assignment.target.projections then some rhs else none
-  | _, _ => none
-
-/-- An in-place `~` writes no element. -/
-theorem elementWrite?_bitNot (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) :
-    elementWrite? assignment operator none = none := by
-  cases operator <;> rfl
-
 /-- A place that takes no element keeps its route. -/
-theorem elementWrite?_of_free {assignment : AssignmentResolution} (operator : Syntax.ValueAssignOp)
-    (rhs : Option ExpressionId)
-    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections) :
-    elementWrite? assignment operator rhs = none := by
-  have none : takesElement assignment.target.projections = false := by
-    unfold takesElement
-    rw [List.any_eq_false]
-    intro projection member
-    cases projection with
-    | element index => exact absurd member (free index)
-    | index _ => simp
-    | member _ _ => simp
-  unfold elementWrite?
-  split
-  · simp [none]
-  · rfl
+theorem takesElement_of_free {projections : List PlaceProjection}
+    (free : ∀ index, PlaceProjection.element index ∉ projections) :
+    takesElement projections = false := by
+  unfold takesElement
+  rw [List.any_eq_false]
+  intro projection member
+  cases projection with
+  | element index => exact absurd member (free index)
+  | index _ => simp
+  | member _ _ => simp
 
-/-- `p[i₀]⋯[iₖ] = v` from the root array bound at `var 0`, `depth` binders above the
-statement's scope: each index's effects, then `Panic(0x32)` from its array's length on, then
-the next array, the element present at the index or the array's default element, as a read's;
-after the last index the right side's effects, then the last array's cell takes the value at
-that index, keeping its length and default element, and `next` runs. Each element names its
-array's mapping layout and its index. -/
-def arrayElementWrite (outputType : Core.Ty) (comparison rhs next : Core.Expr) :
+/-- How a compound assignment or an in-place `~` changes an element: the leaf's Core type,
+the modifier, whether it is `~`, the operand's reason and the wrap, as a route's `execute`
+takes them. -/
+structure ElementModifier where
+  leafType : Core.Ty
+  operator : Option SourceCoreDataPlaces.Modifier
+  bitNot : Bool
+  invalidOperand : Core.Word
+  wrap : Option TypeSystem.FixedInteger
+
+/-- The last element's write, under its index at `var 0` and its array at `var 1`, `depth + 1`
+binders above the statement's scope, once the index is below the array's length. A plain write
+evaluates the right side, and the array's cell takes it at the index. A compound assignment or an
+in-place `~` first reads the element present at the index or the array's default element, as a
+read does, then evaluates the right side, and the cell takes `modified`'s leaf after `guard`'s
+check, as a route's `execute` does, so the place is evaluated once. The cell keeps its length and
+default element, and `next` runs. -/
+def elementStore (outputType : Core.Ty) (comparison rhs next : Core.Expr)
+    (modifier : Option ElementModifier) (depth : Nat) (layout : Core.OrderedMapping.Layout) :
+    Core.Expr :=
+  match modifier with
+  | none =>
+      Core.LanguageResult.bind outputType (shift (depth + 1) rhs)
+        (Core.LanguageResult.bind outputType
+          (Core.OrderedMapping.insert layout (shift (depth + 2) comparison)
+            (.second (.second (.loadCell (.var 2)))) (.var 1) (.var 0))
+          (.letE (.storeCell (.var 3) (.pair (.first (.loadCell (.var 3)))
+              (.pair (.first (.second (.loadCell (.var 3)))) (.var 0))))
+            (shift (depth + 4) next)))
+  | some modifier =>
+      Core.LanguageResult.bind outputType
+        (Core.OrderedMapping.lookup layout (shift (depth + 1) comparison)
+          (.second (.second (.loadCell (.var 1)))) (.var 0))
+        (Core.LanguageResult.bind outputType
+          (.caseE (.var 0)
+            (Core.LanguageResult.success (.inRight .unit (.first (.second (.loadCell (.var 3))))))
+            (Core.LanguageResult.success (.inRight .unit (.var 0))))
+          (Core.LanguageResult.bind outputType (shift (depth + 3) rhs)
+            (Core.LanguageResult.bind outputType
+              (modified modifier.leafType modifier.operator modifier.bitNot (.var 1) (.var 0)
+                modifier.invalidOperand modifier.wrap)
+              (Core.LanguageResult.bind outputType
+                (Core.OrderedMapping.insert layout (shift (depth + 5) comparison)
+                  (.second (.second (.loadCell (.var 5)))) (.var 4) (.var 0))
+                (SourceCoreDataPlaces.guard outputType modifier.operator
+                  (.letE (.storeCell (.var 6) (.pair (.first (.loadCell (.var 6)))
+                      (.pair (.first (.second (.loadCell (.var 6)))) (.var 0))))
+                    (shift (depth + 7) next)))))))
+
+/-- `p[i₀]⋯[iₖ] = v`, `p[i₀]⋯[iₖ] op= v` or `p[i₀]⋯[iₖ] ~=` from the root array bound at
+`var 0`, `depth` binders above the statement's scope: each index's effects, then `Panic(0x32)`
+from its array's length on, then the next array, the element present at the index or the array's
+default element, as a read's; after the last index its write (`elementStore`), whose right side
+runs only then. Each element names its array's mapping layout and its index. -/
+def arrayElementWrite (outputType : Core.Ty) (comparison rhs next : Core.Expr)
+    (modifier : Option ElementModifier) :
     Nat → List (Core.OrderedMapping.Layout × Core.Expr) → Core.Expr
   | _, [] => Core.LanguageResult.failure outputType
       (.word (SourceCorePanics.reason SourceCorePanics.outOfBounds))
   | depth, [(layout, index)] =>
       Core.LanguageResult.bind outputType (shift depth index)
         (.ifE (Core.Expr.wordLt (.var 0) (.first (.loadCell (.var 1))))
-          (Core.LanguageResult.bind outputType (shift (depth + 1) rhs)
-            (Core.LanguageResult.bind outputType
-              (Core.OrderedMapping.insert layout (shift (depth + 2) comparison)
-                (.second (.second (.loadCell (.var 2)))) (.var 1) (.var 0))
-              (.letE (.storeCell (.var 3) (.pair (.first (.loadCell (.var 3)))
-                  (.pair (.first (.second (.loadCell (.var 3)))) (.var 0))))
-                (shift (depth + 4) next))))
+          (elementStore outputType comparison rhs next modifier depth layout)
           (Core.LanguageResult.failure outputType
             (.word (SourceCorePanics.reason SourceCorePanics.outOfBounds))))
   | depth, (layout, index) :: rest =>
@@ -1482,18 +1505,21 @@ def arrayElementWrite (outputType : Core.Ty) (comparison rhs next : Core.Expr) :
               (.caseE (.var 0)
                 (Core.LanguageResult.success (.first (.second (.loadCell (.var 3)))))
                 (Core.LanguageResult.success (.var 0)))
-              (arrayElementWrite outputType comparison rhs next (depth + 3) rest)))
+              (arrayElementWrite outputType comparison rhs next modifier (depth + 3) rest)))
           (Core.LanguageResult.failure outputType
             (.word (SourceCorePanics.reason SourceCorePanics.outOfBounds))))
 
-/-- `p[i₀]⋯[iₖ] = v` on memory arrays, a root local followed by elements only: the root's
-array, or the place's reason when the root is not yet initialized, as the route's getter
-fails, then `arrayElementWrite`. Each element's mapping layout is read off its array's Core
-cell type, as a read's, and its index is a word. -/
+/-- A write to an element of memory arrays, `p[i₀]⋯[iₖ] = v`, a compound assignment or an
+in-place `~`, on a root local followed by elements only: the root's array, or the place's reason
+when the root is not yet initialized, as the route's getter fails, then `arrayElementWrite`. Each
+element's mapping layout is read off its array's Core cell type, as a read's, and its index is a
+word. A compound assignment and an in-place `~` take the route's modifier, check and wrap, at a
+Word or Integer leaf only, as the route does. -/
 def lowerElements (context : Context) (expression : ExpressionLowerer) (fuel : Nat)
     (source : TypedSource) (scope : Scope) (site : SourceCoreElaboration.ErrorSite)
-    (assignment : AssignmentResolution) (rhs : ExpressionId) (outputType : Core.Ty)
-    (next : Core.Expr) (reasonAt : ExpressionId → Core.Word) (invalidProjection : Core.Word) :
+    (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) (rhs : Option ExpressionId)
+    (outputType : Core.Ty) (next : Core.Expr) (reasonAt : ExpressionId → Core.Word)
+    (invalidProjection invalidOperand : Core.Word) :
     Except Error Core.Expr := do
   let root := assignment.target.root
   unless assignment.requirements.isEmpty do throw (.assignmentRequirementsPresent root)
@@ -1519,12 +1545,24 @@ def lowerElements (context : Context) (expression : ExpressionLowerer) (fuel : N
       pure (steps ++ [((⟨.word, elementType, identity⟩ : Core.OrderedMapping.Layout),
         key.expression)], elementType)
   SourceCoreBasic.ensureType site (← project context.checked site assignment.target.type) leafType
-  let value ← expression fuel source scope rhs reasonAt
-  SourceCoreBasic.ensureType site leafType value.type
+  let bitNot := rhs.isNone
+  if operator ≠ .equal || bitNot then
+    unless leafType = .word || (leafType = .integer && !operator.wordOnly) do
+      throw (.unsupportedAssignmentOperator operator)
+  let value ← match rhs with
+    | none => pure (Core.LanguageResult.success .unit)
+    | some id => do
+        let value ← expression fuel source scope id reasonAt
+        SourceCoreBasic.ensureType site leafType value.type
+        pure value.expression
+  let modifier : Option ElementModifier :=
+    if operator = .equal ∧ !bitNot then none
+    else some ⟨leafType, placeModifier assignment.target.type (leafType = .integer) operator bitNot,
+      bitNot, invalidOperand, SourceCoreDataPlaces.placeWrap assignment.target.type operator bitNot⟩
   pure (Core.LanguageResult.bind outputType
     (.caseE (.loadCell (.var index)) (Core.LanguageResult.failure storedType (.word invalidProjection))
       (Core.LanguageResult.success (.var 0)))
-    (arrayElementWrite outputType comparison.expression value.expression next 1 steps))
+    (arrayElementWrite outputType comparison.expression value next modifier 1 steps))
 
 /-- The route of a place's write: keys, getter, right side, modifier, setter and guard, then
 the root's store (`execute`). -/
@@ -1557,17 +1595,17 @@ def lowerRoute (context : Context) (signatures : ProgramSignatures) (expression 
     (placeModifier assignment.target.type (route.leafType = .integer) operator bitNot) bitNot invalidOperand
     (SourceCoreDataPlaces.placeWrap assignment.target.type operator bitNot))
 
-/-- A place's write: a plain write to an element of a memory array by `lowerElements`, every
-other place by its route. -/
+/-- A place's write: a write to an element of a memory array, plain, compound or an in-place
+`~`, by `lowerElements`, every other place by its route. -/
 def lower (context : Context) (signatures : ProgramSignatures) (expression : ExpressionLowerer)
     (fuel : Nat) (source : TypedSource) (scope : Scope) (site : SourceCoreElaboration.ErrorSite)
     (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) (rhs : Option ExpressionId)
     (outputType : Core.Ty) (next : Core.Expr) (reasonAt : ExpressionId → Core.Word)
     (invalidProjection invalidOperand : Core.Word) (missing : TypeSystem.Ty → Core.Word) : Except Error Core.Expr :=
-  match elementWrite? assignment operator rhs with
-  | some value => lowerElements context expression fuel source scope site assignment value outputType next
-      reasonAt invalidProjection
-  | none => lowerRoute context signatures expression fuel source scope site assignment operator rhs outputType
+  match takesElement assignment.target.projections with
+  | true => lowerElements context expression fuel source scope site assignment operator rhs outputType next
+      reasonAt invalidProjection invalidOperand
+  | false => lowerRoute context signatures expression fuel source scope site assignment operator rhs outputType
       next reasonAt invalidProjection invalidOperand missing
 
 /-- A place that writes no element is lowered by its route. -/
@@ -1576,7 +1614,7 @@ theorem lower_of_plain {context : Context} {signatures : ProgramSignatures} {exp
     {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : Option ExpressionId}
     {outputType : Core.Ty} {next : Core.Expr} {reasonAt : ExpressionId → Core.Word}
     {invalidProjection invalidOperand : Core.Word} {missing : TypeSystem.Ty → Core.Word}
-    (plain : elementWrite? assignment operator rhs = none) :
+    (plain : takesElement assignment.target.projections = false) :
     lower context signatures expression fuel source scope site assignment operator rhs outputType next reasonAt
         invalidProjection invalidOperand missing =
       lowerRoute context signatures expression fuel source scope site assignment operator rhs outputType next
@@ -1839,7 +1877,7 @@ def prepare (context : Context) (plan : Plan) (root : Key)
             let concrete := SourceCoreDataCatalog.closed assignment.target.type &&
               declared.any (fun binder => SourceCoreDataCatalog.closed binder.scheme.body)
             if concrete then
-              -- A plain write to an element of a memory array has no route: its one fault word is
+              -- A write to an element of a memory array has no route: its one fault word is
               -- its place's, for a root not yet initialized, as a projected route's is.
               if SourceCoreCompatibleDataPlaces.takesElement assignment.target.projections then
                 unless places.any (fun previous => decide

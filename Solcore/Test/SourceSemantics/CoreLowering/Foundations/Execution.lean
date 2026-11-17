@@ -5668,6 +5668,123 @@ private def memrefWorkspace : Workspace.RawWorkspace := workspaceOf [
   "    return m[1];",
   "}"]
 
+/-- Row 4's step 5b: upstream's mem-array fixture's `compound(v)` and memory-array-abi's
+`echo(xs)`, as upstream wrote them, with the contracts' methods as functions. `echo` takes and
+gives an array, so word wrappers call it: `echoAt(x0, x1, i)` returns `echo([x0, x1])[i]` and
+`echoLength(x0, x1)` its length. The rest is Lean's own. The lane's probe's `compoundTwice()`
+runs its place's `next(c)` once (difference 1) and `plainOnce()` writes through it once;
+`snapshotFirst(v)` reads its element before a right side that writes it; `boundsFirst(i, v)`
+panics with `0x32` before a right side that divides by zero; `narrow` and `narrowUnchecked` add
+at a `uint8` element, checked and in an `unchecked` block; `divide` divides an element by zero;
+`shifted` shifts a `uint8` element; `invertedU8`, `invertedU256` and `invertedI8` take `~=` on an
+element; `bits` takes `|= &= ^=`; `nestedAdd(i, j, v)` adds to an element of one row of two; and
+`headerForms()` takes `+=` and `~=` on an element in `for` headers. -/
+private def compoundElementWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function compound(v: uint256) returns (uint256) {",
+  "    let m: uint256[] = [v, uint256(1)];",
+  "    m[0] += 3;",
+  "    return m[0];",
+  "}",
+  "function echo(xs: uint256[]) returns (uint256[]) {",
+  "    for (let i: uint256 = 0; i < xs.length; i += 1) {",
+  "        xs[i] += 1;",
+  "    }",
+  "    return xs;",
+  "}",
+  "function echoAt(x0: uint256, x1: uint256, i: uint256) returns (uint256) {",
+  "    return echo([x0, x1])[i];",
+  "}",
+  "function echoLength(x0: uint256, x1: uint256) returns (uint256) {",
+  "    return echo([x0, x1]).length;",
+  "}",
+  "function next(c: uint256[]) returns (uint256) {",
+  "    c[0] += 1;",
+  "    return 0;",
+  "}",
+  "function compoundTwice() returns (uint256) {",
+  "    let c: uint256[] = new uint256[](1);",
+  "    let m: uint256[] = new uint256[](1);",
+  "    m[next(c)] += 5;",
+  "    return c[0] * 100 + m[0];",
+  "}",
+  "function plainOnce() returns (uint256) {",
+  "    let c: uint256[] = new uint256[](1);",
+  "    let m: uint256[] = new uint256[](1);",
+  "    m[next(c)] = 7;",
+  "    return c[0] * 100 + m[0];",
+  "}",
+  "function overwrite(m: uint256[]) returns (uint256) {",
+  "    m[0] = 100;",
+  "    return 1;",
+  "}",
+  "function snapshotFirst(v: uint256) returns (uint256) {",
+  "    let m: uint256[] = [v];",
+  "    m[0] += overwrite(m);",
+  "    return m[0];",
+  "}",
+  "function boundsFirst(i: uint256, v: uint256) returns (uint256) {",
+  "    let m: uint256[] = new uint256[](2);",
+  "    m[i] += v / (v - v);",
+  "    return m[0];",
+  "}",
+  "function narrow(a: uint8, b: uint8) returns (uint8) {",
+  "    let m: uint8[] = [a];",
+  "    m[0] += b;",
+  "    return m[0];",
+  "}",
+  "function narrowUnchecked(a: uint8, b: uint8) returns (uint8) {",
+  "    let m: uint8[] = [a];",
+  "    unchecked { m[0] += b; }",
+  "    return m[0];",
+  "}",
+  "function divide(a: uint256, b: uint256) returns (uint256) {",
+  "    let m: uint256[] = [a];",
+  "    m[0] /= b;",
+  "    return m[0];",
+  "}",
+  "function shifted(a: uint8, s: uint256) returns (uint8) {",
+  "    let m: uint8[] = [a];",
+  "    m[0] <<= s;",
+  "    return m[0];",
+  "}",
+  "function invertedU8(a: uint8) returns (uint8) {",
+  "    let m: uint8[] = [a];",
+  "    m[0] ~=;",
+  "    return m[0];",
+  "}",
+  "function invertedU256(a: uint256) returns (uint256) {",
+  "    let m: uint256[] = [a];",
+  "    m[0] ~=;",
+  "    return m[0];",
+  "}",
+  "function invertedI8(a: int8) returns (int8) {",
+  "    let m: int8[] = [a];",
+  "    m[0] ~=;",
+  "    return m[0];",
+  "}",
+  "function bits(a: uint256) returns (uint256) {",
+  "    let m: uint256[] = [a];",
+  "    m[0] |= 6;",
+  "    m[0] &= 3;",
+  "    m[0] ^= 1;",
+  "    return m[0];",
+  "}",
+  "function nestedAdd(i: uint256, j: uint256, v: uint256) returns (uint256) {",
+  "    let rows: uint256[][] = [[uint256(1), uint256(2)], [uint256(3), uint256(4)]];",
+  "    rows[i][j] += v;",
+  "    return rows[0][j] * 100 + rows[1][j];",
+  "}",
+  "function headerForms() returns (uint256) {",
+  "    let m: uint256[] = new uint256[](1);",
+  "    for (let i: uint256 = 0; i < 2; m[0] += 1) {",
+  "        i += 1;",
+  "    }",
+  "    for (let i: uint256 = 0; i < 1; m[0] ~=) {",
+  "        i += 1;",
+  "    }",
+  "    return m[0];",
+  "}"]
+
 /-- The source semantics and the lowering reject the same first length with `Panic(0x41)`. -/
 example : Solcore.SourceSemantics.Dynamic.newArrayLengthLimit =
     SourceCoreDataExpressions.arrayLengthLimit := rfl
@@ -5688,7 +5805,11 @@ wrappers. Then array-slice's `#[() -> 3]`, `#[(0) -> 11]`, `#[(2) -> 13]`, `#[(3
 `#[(1) -> 13]`, `#[(4, 2) -> 0x32]`, `#[(0, 6) -> 0x32]`, `#[(2, 2) -> 0]`, `#[() -> 99]`,
 `#[() -> 38]`, `#[(true) -> 4]` and `#[(false) -> 3]`, and memory-array-abi's
 `slices([10,20,30,40]) -> [20,30]` through its wrapper, as 20 at 0, 30 at 1 and `0x32` at 2.
-Then mem-array's `#[(7) -> 8]` through `bumpElement` and `bump`. -/
+Then mem-array's `#[(7) -> 8]` through `bumpElement` and `bump`. Then mem-array's
+`#[(10) -> 13]` and memory-array-abi's `echo([7,8]) -> [8,9]` through its wrappers, as 8 at 0, 9 at
+1 and length 2, and step 5b's own cases: a compound assignment evaluates its element place once,
+reading the element before the right side, from the length on panics with `0x32` before it, and
+takes its type's checks, wraps and shifts, as on a local. -/
 def runUpstreamArrayFixtures : IO Unit := do
   let program ← get "array fixture check" (checkProgram arrayFixtureWorkspace)
   let names := ["newLen", "oversized", "nested", "defaultZero", "nestedEmpty", "signedIndex"]
@@ -5813,7 +5934,37 @@ def runUpstreamArrayFixtures : IO Unit := do
   let memrefSession ← boot (← memrefCompiled.open)
   let bumped ← execute memrefSession memrefKey [word 7]
   require (bumped.value == word 8) s!"bumpElement(7) gave {reprStr bumped.value}"
-  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths; a nested element write changes only its row, and an element place from the length on panics with 0x32 before its right side; mem-array's setGet, fillAndSum, nestedReplace and alias as upstream wrote them give the fixture's elements and sums, with 0x32 from the length on, and memory-array-abi's ret, sum and grid give the fixture's arrays through word wrappers; array-slice's rangeLen, rangeGet, fromLen, toLen, allLen, reslice, bounds, materialise, aliasing, spec and ternaryBound as upstream wrote them give the fixture's lengths and elements, with 0x32 from a bound or an index out of its view, a copy included, and a view reads its base's later writes; memory-array-abi's slices gives the fixture's copy through slicesAt; and mem-array's bumpElement as upstream wrote it gives the fixture's 8, bump loading and storing through lidx's memref"
+  let compoundProgram ← get "compound element check" (checkProgram compoundElementWorkspace)
+  let compoundNames := ["compound", "echoAt", "echoLength", "compoundTwice", "plainOnce",
+    "snapshotFirst", "boundsFirst", "narrow", "narrowUnchecked", "divide", "shifted", "invertedU8",
+    "invertedU256", "invertedI8", "bits", "nestedAdd", "headerForms"]
+  let compoundSeeds ← compoundNames.mapM (seed compoundProgram)
+  let compoundCompiled ← get "compound element compilation"
+    (compile compoundElementWorkspace compoundSeeds {specializationBudget := 256, compilationFuel := 1000})
+  let compoundKey (index : Nat) : IO Key := match compoundCompiled.keys[index]? with
+    | some key => pure key
+    | none => throw (IO.userError "compound element root missing")
+  let mut compoundSession ← boot (← compoundCompiled.open)
+  let compoundCases : List (Nat × List Nat × Nat) :=
+    [(0, [10], 13), (1, [7, 8, 0], 8), (1, [7, 8, 1], 9), (2, [7, 8], 2), (3, [], 105), (4, [], 107),
+      (5, [5], 6), (7, [200, 55], 255), (8, [200, 100], 44), (9, [7, 2], 3),
+      (10, [3, 7], 128), (10, [1, 8], 0), (11, [10], 245), (12, [10], modulus - 11),
+      (13, [modulus - 1], 0), (13, [0], modulus - 1), (14, [8], 3), (15, [0, 1, 5], 704),
+      (15, [1, 0, 5], 108), (16, [], modulus - 3)]
+  for (index, arguments, expected) in compoundCases do
+    let completed ← execute compoundSession (← compoundKey index) (arguments.map word)
+    require (completed.value == word expected)
+      s!"{compoundNames[index]!}({arguments}) gave {reprStr completed.value}"
+    compoundSession := completed.session
+  for (index, arguments) in [(1, [7, 8, 2]), (6, [2, 1]), (15, [2, 0, 5]), (15, [0, 2, 5])] do
+    compoundSession ← panics compoundSession (← compoundKey index) (arguments.map word)
+      SourceCorePanics.outOfBounds s!"{compoundNames[index]!}({arguments})"
+  compoundSession ← panics compoundSession (← compoundKey 7) [word 200, word 100]
+    SourceCorePanics.arithmetic "narrow(200, 100)"
+  for (index, arguments) in [(6, [0, 1]), (9, [7, 0])] do
+    compoundSession ← panics compoundSession (← compoundKey index) (arguments.map word)
+      SourceCorePanics.divisionByZero s!"{compoundNames[index]!}({arguments})"
+  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths; a nested element write changes only its row, and an element place from the length on panics with 0x32 before its right side; mem-array's setGet, fillAndSum, nestedReplace and alias as upstream wrote them give the fixture's elements and sums, with 0x32 from the length on, and memory-array-abi's ret, sum and grid give the fixture's arrays through word wrappers; array-slice's rangeLen, rangeGet, fromLen, toLen, allLen, reslice, bounds, materialise, aliasing, spec and ternaryBound as upstream wrote them give the fixture's lengths and elements, with 0x32 from a bound or an index out of its view, a copy included, and a view reads its base's later writes; memory-array-abi's slices gives the fixture's copy through slicesAt; mem-array's bumpElement as upstream wrote it gives the fixture's 8, bump loading and storing through lidx's memref; and mem-array's compound and memory-array-abi's echo as upstream wrote them give the fixture's 13 and [8,9], echo through word wrappers, while a compound assignment or an in-place ~ on an element evaluates its place once (105 where upstream gives 205), reads the element before its right side, panics with 0x32 before it, and takes its type's checks with 0x11 and 0x12, wraps and shifts"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)
