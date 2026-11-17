@@ -30,7 +30,7 @@ values. The pinned checkouts live under `.upstream/`, which Git ignores; [Workfl
 says how to prepare them.
 
 **Write the design note.** Commit the design before any code, with a roadmap entry, as the
-[integer note](../design/integer-types-unchecked-shifts.md) was. Its main sections:
+[integer note](../design/integer-types-unchecked-shifts.md) was. A new note's main sections:
 
 | Section | Contents |
 | --- | --- |
@@ -62,8 +62,8 @@ A new constructor reaches every match on its type, including the paths that must
 
 - **Core conventions.** Core's compound assignment, `Core.LocalAssignment.compound`, has no shift
   operator. Rather than extend it and its laws, `wordOnlyCompound` copies its shape in the
-  frontend. The roadmap plans no Core change for the whole integer unit: checks, panics and
-  wrapping are ordinary Core over words.
+  frontend. The integer unit needed no Core change: checks, panics and wrapping are ordinary Core
+  over words.
 - **The public API** changes when callers see new values, errors or behaviour: `unchecked` blocks
   added the load error `ProgramLoadError.uncheckedBlock`, panics the diagnostic
   `RuntimeError.panic`, the conversions the diagnostic `RuntimeError.dirtyHigherBitsForInteger`
@@ -88,8 +88,8 @@ did: `runtime-checked-arithmetic` and `runtime-shifts`, in
 
 **Docs.** With the feature, update the design note's "as implemented" section (as in
 [shifts as implemented](../design/integer-types-unchecked-shifts.md#shifts-as-implemented)), and in
-the roadmap the row's status in the table "Following upstream's semantics: the next units" and the
-unit's status paragraph. Update README when public behaviour changes: the closure work rewrote
+the roadmap the row's status in the table "Following upstream's semantics: the next units", in a
+sentence or two. Update README when public behaviour changes: the closure work rewrote
 README's account of closures, and shifts needed no README change. Update the guide pages and module
 docs of what you touched ([Conventions](conventions.md#documentation)). When the unit is done, move
 what stays true into this guide or the module docs, and delete the note.

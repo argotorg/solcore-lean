@@ -173,8 +173,10 @@ generates and compares, and which backends it runs on.
 
 ### Add a profile
 
-1. **Definitions first.** Record the probe and the profile's definitions in the
-   [roadmap](../design/next-implementation-roadmap.md) before any profile code.
+1. **Definitions first.** Write the profile's definitions, what it generates and how its Core
+   reference models it, in its section of
+   [`scripts/SEMANTIC_DIFFERENTIAL.md`](../../scripts/SEMANTIC_DIFFERENTIAL.md) before any
+   profile code. Keep the probe's outputs under `.upstream/`.
 2. **Lean sections** in the family's `Internal/` file, or in a new file for a new family (import a
    new pure family from [`Solcore/Synthesis/Source.lean`](../../Solcore/Synthesis/Source.lean), as
    the others are):
@@ -214,8 +216,9 @@ generates and compares, and which backends it runs on.
    and `scripts/test-export-rust-yul.py` pin profile and case counts, and stateful profiles have
    also needed changes to `test-semantic-yul.py` and `test-semantic-fuzz.py`. Run every
    `scripts/test-semantic-*.py`.
-8. **Docs.** With the results: the profile's section of `scripts/SEMANTIC_DIFFERENTIAL.md` and the
-   roadmap's record, then the shared counts in README's Differential testing,
+8. **Docs.** The profile's section and its row in the
+   [profile table](../../scripts/SEMANTIC_DIFFERENTIAL.md#profiles) of
+   `scripts/SEMANTIC_DIFFERENTIAL.md`, then the shared counts in README's Differential testing,
    `scripts/SEMANTIC_CI.md` and the roadmap. Add the profile's row to this page.
 
 ### Change what an emitter prints
