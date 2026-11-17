@@ -117,8 +117,8 @@ execution in both directions, including failures, control transfers and the reac
 These theorems keep explicit premises:
 
 - **`Expressions`** supplies meaning for exactly the expressions the compiler accepted, at every
-  compiler fuel. The expression closure below discharges it only for a first subset of named-row
-  bodies.
+  compiler fuel. The expression closure below discharges it for named-row bodies of a first subset
+  with direct calls at any expression position.
 - **`Covered`** admits returns, final values, discards, `break`/`continue`, blocks, conditionals,
   `while` and `for` loops, monomorphic initialized or uninitialized declarations, and bare and
   projected assignments and bit-not updates when the compiler view is the original Source, as for
@@ -236,8 +236,10 @@ Direct calls are in [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/A
 - **Families.** `CellAwareInvocationAcceptedCallFamily` closes a family. If every catalog header
   with an admitted instantiation has the receipts of such a row (`Row`), one strong induction on
   the grade gives `Expressions` for every family body, and its `preserves` and `reflects` give the
-  application of every admitted header at every grade. A call nested inside another expression is
-  not yet covered.
+  application of every admitted header at every grade.
+  `CellAwareInvocationAcceptedNestedTrees.Nested` closes the subset's forms and direct calls under
+  one another, so a call may also be an operand, a branch, a pair element or another call's
+  argument; the family takes rows whose accepted expressions are nested sites (`ClosedNested`).
 - **Authority.** `CellAwareInvocationAcceptedCallAuthority` derives `Ports` from a complete
   inventory: a call receipt's global slot names an indexed function, and the inventory's header for
   that index gives the `Port`.
@@ -345,11 +347,13 @@ program.
   uses are general over the subset and the shape.
 - **One call.** The test
   [Accepted/OneCall](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/OneCall.lean) compiles
-  a two-function program at runtime: `identity` returns its `Word` parameter, and `relay` returns
-  `identity(value)`. Its `accepted_call` meets every premise of
+  a three-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
+  `identity(value)` and `twice` returns `identity(identity(value))`. Its `accepted_call` meets
+  every premise of
   `CellAwarePublicAcceptedCallForward.first_value_selected`,
   `CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected` and
-  `checkpoint_reflects_selected` at `relay`'s first public call. The fixture
+  `checkpoint_reflects_selected` at `relay`'s first public call, and at `twice`'s, where the inner
+  call's result is the outer call's argument. The fixture
   [Accepted/Fixture](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/Fixture.lean) builds
   the family rows and the callees' receipts from runtime checks of every cache row and a complete
   inventory (`WholeInventory.family_row`, `WholeInventory.callees`), and the staged trace is lifted
@@ -378,10 +382,10 @@ On the accepted-body route above, the next connected steps are:
     available Source input.
 - **Extend the expression closure beyond its first subset**, over the same actual accepted
   expression compiler.
-  - Direct calls at expression roots are closed over families of rows, with call authority from a
-    complete inventory. They are connected at the public root in both directions, original traces
-    of call-containing bodies are lifted, and a one-call program instantiates both directions.
-  - Allow them inside other expressions and as arguments.
+  - Direct calls at any expression position are closed over families of rows, with call authority
+    from a complete inventory. They are connected at the public root in both directions, original
+    traces of call-containing bodies are lifted, and a program with a call and a nested call
+    instantiates both directions.
   - After direct calls come indirect and builtin calls, methods, indices, tuples, constructors,
     generalized reads, closures and coercions.
   - Expressions of contextual closures need the relation between the compiler view and the Source

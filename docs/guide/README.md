@@ -59,7 +59,7 @@ module docs. Git history keeps it.
 | --- | --- |
 | [Next implementation roadmap](../design/next-implementation-roadmap.md) | Where the work stands, and the order of the next work |
 | [Integer types, `unchecked` blocks and shifts](../design/integer-types-unchecked-shifts.md) | Rows 1 to 3, done: upstream's semantics, Lean's as built, the decisions, the differences and what the meaning proofs still lack |
-| [Memory arrays and slices](../design/memory-arrays-slices.md) | Row 4: the design, the steps, the decisions and the differences from upstream |
+| [Memory arrays and slices](../design/memory-arrays-slices.md) | Row 4: upstream's semantics, Lean's as built, the decisions and the differences from upstream |
 | [Core runtime unification](../design/core-runtime-unification.md) | The public runtime API, and what remains of the source-to-Core preservation theorem |
 | [Hull meaning preservation](../design/hull-meaning-preservation.md) | The Hull import's meaning theorems and the remaining public connections |
 | [Source emitter meaning](../design/scalar-emitter-meaning.md) | The emitters' meaning proofs, their assumptions, and the emitters still open |

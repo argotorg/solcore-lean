@@ -440,9 +440,9 @@ as row 1's fixture ports do.
 Each decision gives its options, the one taken, upstream's code and the statements each option
 changes. The statements are README and its Proof status, the names the guides cite, and
 core-lowering's [build-on table](../guide/core-lowering.md#definitions-and-theorems-you-build-on).
-Decisions 1, 2, 4, 5 and 6 were made under the delegation, each as recommended. Decision 3, the one
-choice that changes a result upstream gives for a program it accepts, was made by the user, as
-recommended.
+Decisions 1, 2, 4, 5 and 6 were made under the delegation, each as recommended. Decision 3, which
+changes what programs that upstream accepts compute, was made by the user, as recommended.
+Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 2).
 
 ### 1. How the source semantics holds arrays
 
