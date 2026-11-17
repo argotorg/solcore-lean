@@ -208,6 +208,9 @@ theorem callArguments
   | toArray _ actualArguments _ recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     exact BindersRetained.recordExpressionWithExpected recorded
+  | memrefLoad _ actualArguments _ recorded =>
+    cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+    exact BindersRetained.recordExpressionWithExpected recorded
   | elementRef _ actualArguments _ recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     exact BindersRetained.recordExpressionWithExpected recorded

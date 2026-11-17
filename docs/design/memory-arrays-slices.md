@@ -424,7 +424,12 @@ wait for the native pipeline's contracts and ABI.
   as a read's does, and must have `word` or one of the twelve types (`validateArrayIndex`). Unlike a
   read's, an open literal index takes no default, so `lidx(m, 1)` is rejected as ambiguous, as the
   pinned driver rejects it. An array still open there is rejected, and only a call names `lidx`
-  (difference 22).
+  (difference 22). As built in step 7e-i, `loadCall` finds `CanStore.load` when no namespace or
+  local is named `CanStore`, as `lengthCall` finds `Length.length`. The call's one argument must be
+  a memref once its arguments are inferred (`memrefLoadArgument`), and the call is recorded as the
+  load's own typed form at the memref's element (`ExpressionForm.memrefLoad`), so
+  `CanStore.load(lidx(m, i))` has the type `uint256` where `m` has the type `uint256[]`. A memref
+  still open there is rejected, and only a call names `CanStore.load` (difference 23).
 - **Rejected.** `Typedef` at an array type, `==` on arrays, `push` and `pop`, and assignment to a
   length. A mapping key or value of an array type is rejected too: upstream's meaning there is a
   storage array. A contract field of an array type parses and, like every contract member, is not
@@ -730,11 +735,21 @@ ABI-encoded, so the fixture's `slices([10,20,30,40]) -> [20,30]` is checked as 2
     (`.upstream/lane-d-unit3-memory-arrays/step7/probe`). Only the array must be known, not its
     element. As with differences 14, 15, 18 and 19, deferring the choice to finalization could lift
     the first, and nothing schedules it.
+23. **`CanStore.load` needs its memref known where the call is, and is only called.**
+    `CanStore.load(r)` is rejected with `operatorNotSupported "CanStore"` when `r`'s type is not a
+    memref there, as a memref is on an array still open (difference 22), and
+    `let get = CanStore.load;` with `unsupportedExpression "field"`, as `Length.length` is only
+    called (difference 20). The pinned driver compiles `lam(r) { return CanStore.load(r); }` applied
+    to `lidx(m, uint256(1))`, and `let get = CanStore.load;` applied to the same memref, since std's
+    `CanStore` instance resolves once later uses fix the type
+    (`.upstream/lane-d-unit3-memory-arrays/step7/probe`). Only the memref must be known, not its
+    element. As with differences 14, 15, 18, 19 and 22, deferring the choice to finalization could
+    lift the first, and nothing schedules it.
 
 Differences 2 and 4 to 8 were accepted with the decisions, 9 to 12 on 2026-11-13, 13 and 14 on
 2026-11-14, 15 and 16 on 2026-11-15, when 8 was also widened from an unused `let m = [];` to any
-unannotated one, and 17 to 22 on 2026-11-16. Differences 9 to 13 change only a diagnostic or the
-room of a resource limit, and 8 and 14 to 22 only reject some programs that upstream accepts. None
+unannotated one, and 17 to 23 on 2026-11-16. Differences 9 to 13 change only a diagnostic or the
+room of a resource limit, and 8 and 14 to 23 only reject some programs that upstream accepts. None
 of them changes what an accepted program means. Difference 1 follows decision 3.
 
 ## Steps
@@ -781,7 +796,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 7b | Memrefs: the memref value and the typed form of `lidx(a, i)`, with its static rule, evaluation, faults with `0x32`, sized copies, stage and preservation, which no source produces yet | 28–34 files, +400–650/−10–30; measured at 34 files, +409/−19 | none |
 | 7c | Memrefs: the typed forms of `CanStore.load(r)` and `CanStore.store(r, v)`, with their static rules, evaluation, faults, sized copies, stage and preservation, which no source produces yet | 28–34 files, +450–700/−10–30; measured at 26 files, +426/−11 | none |
 | 7d | Memrefs: inference's typing of `lidx(a, i)`, a compiler call whose index waits for finalization as a read's | 22–30 files, +650–950/−10–40; measured at 22 files, +641/−42 | none |
-| 7e-i | Memrefs: inference's typing of `CanStore.load(r)` | 18–24 files, +450–650/−10–30 | none |
+| 7e-i | Memrefs: inference's typing of `CanStore.load(r)` | 18–24 files, +450–650/−10–30; measured at 20 files, +518/−5 | none |
 | 7e-ii | Memrefs: inference's typing of `CanStore.store(r, v)`, whose value's type unifies with the element type | 22–30 files, +700–1,100/−10–40 | none |
 | 7f | Memrefs: the lowering, a memref as a Core product of its array's cell and its index, and the loads and stores through it | 8–12 files, +250–450/−10–30 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |

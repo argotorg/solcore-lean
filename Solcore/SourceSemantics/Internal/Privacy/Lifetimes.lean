@@ -1006,6 +1006,13 @@ theorem call_arguments_suffix
         (sliceCopy_type_variablesBelow properties.2.1 properties.2.2 copy) expectedAfter
         (safe_sliceCopy properties.2.1 copy argumentsSafe) expectedSafe recorded
       exact completed.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
+  | memrefLoad _ actualArguments loaded recorded =>
+      have same := Except.ok.inj (actualArguments.symm.trans childAccepted)
+      cases same
+      have completed := lifetime.recordExpression catalog.catalog properties.2.1
+        (memrefLoad_type_variablesBelow properties.2.1 properties.2.2 loaded) expectedAfter
+        (safe_memrefLoad properties.2.1 loaded argumentsSafe) expectedSafe recorded
+      exact completed.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
   | elementRef _ actualArguments reference recorded =>
       have same := Except.ok.inj (actualArguments.symm.trans childAccepted)
       cases same

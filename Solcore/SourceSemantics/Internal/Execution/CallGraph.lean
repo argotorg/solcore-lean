@@ -144,7 +144,8 @@ def IndirectCalleeAt (context : SourceInference.Context) (callee : Syntax.Expr)
         (state.lookupBinder? namespacePath.head! = none ∧
           qualifiedFunctionsNamed context namespacePath name = .ok none ∧
           typedefCall? namespacePath name = none ∧
-          lengthCall namespacePath name = false)
+          lengthCall namespacePath name = false ∧
+          loadCall namespacePath name = false)
   | none =>
       match calleeIdentifier? callee with
       | some name => state.lookupBinder? name ≠ none

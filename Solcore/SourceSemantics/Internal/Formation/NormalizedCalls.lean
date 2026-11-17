@@ -59,6 +59,23 @@ theorem elementRef_type_admissible {semantic : SourceSemantics.Context} {outer :
     simpa [Ty.array, Substitution.apply] using arrayType
   simpa [Ty.memref, Substitution.apply] using TypeAdmissible.memref arrayAt.array_element
 
+/-- A load's type, its memref's element, is admissible under an outer
+substitution that extends the memref's state, wherever the memref's type is. -/
+theorem memrefLoad_type_admissible {semantic : SourceSemantics.Context} {outer : Substitution}
+    {arguments : List InferredExpression} {state : State} {loaded : InferredExpression × Ty}
+    (continuation : outer.SemanticallyExtends state.inference.substitution)
+    (success : memrefLoadArgument arguments state = .ok loaded)
+    (formed : ∀ argument ∈ arguments, TypeAdmissible semantic (outer.apply argument.type)) :
+    TypeAdmissible semantic (outer.apply loaded.2) := by
+  obtain ⟨argumentsEq, resolved⟩ := memrefLoadArgument_ok success
+  have referenceType := formed loaded.1 (by rw [argumentsEq]; exact List.mem_singleton_self _)
+  rw [← continuation loaded.1.type] at referenceType
+  change TypeAdmissible semantic (outer.apply (state.resolve loaded.1.type)) at referenceType
+  rw [resolved] at referenceType
+  have referenceAt : TypeAdmissible semantic (Ty.memref (outer.apply loaded.2)) := by
+    simpa [Ty.memref, Substitution.apply] using referenceType
+  exact referenceAt.memref_referenced
+
 theorem inferExprFuel_call_formation
     {semantic : SourceSemantics.Context} {outer : Substitution} {fuel : Nat} {context : SourceInference.Context}
     {expression callee : Syntax.Expr} {sourceArguments : Syntax.DelimitedList Syntax.Expr}
@@ -315,6 +332,31 @@ theorem inferExprFuel_call_formation
                                 exact ⟨produced.1, argumentFormation.2.of_new_rows (congrArg LexicalScope.binders
                                   (localReadScope_recordExpressionWithExpected_lexicalScope success)) produced.2⟩
                             simp only [lengthEq, Bool.false_eq_true, if_false] at success
+                            cases loadEq : loadCall namespacePath name
+                            case true =>
+                              simp only [loadEq, if_true] at success
+                              cases loadResult : memrefLoadArgument arguments argumentState with
+                              | error error => simp [loadResult] at success
+                              | ok loaded =>
+                                simp only [loadResult] at success
+                                have recording := recordExpressionWithExpected_inferenceProperties
+                                  argumentsProperties.2.1
+                                  (memrefLoad_type_variablesBelow argumentsProperties.2.1 argumentsProperties.2.2 loadResult)
+                                  expectedAtArguments success
+                                have argumentContinuation := continuation.trans recording.1.substitution_extends
+                                have argumentCapture : NoCaptureNodes outer argumentState.nodes := by
+                                  obtain ⟨_, fit, _, nodes⟩ := recordExpressionWithExpected_success_nodes success
+                                  rw [nodes, (withExpected_occurrenceState_eq fit).1] at capture
+                                  exact capture.of_prefix (List.prefix_append _ _)
+                                have argumentFormation := argumentsInduction allocatedReady allocatedNodes allocatedFormed formation
+                                  (arguments,argumentState) argumentsResult argumentContinuation argumentCapture
+                                have produced := recordExpressionWithExpected_normalized_formation
+                                  (type := loaded.2) formation.toFormationContext continuation
+                                  (memrefLoad_type_admissible argumentContinuation loadResult argumentFormation.1)
+                                  expectedFormed success
+                                exact ⟨produced.1, argumentFormation.2.of_new_rows (congrArg LexicalScope.binders
+                                  (localReadScope_recordExpressionWithExpected_lexicalScope success)) produced.2⟩
+                            simp only [loadEq, Bool.false_eq_true, if_false] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

@@ -1124,6 +1124,20 @@ theorem elementRef_type_variablesBelow {arguments : List InferredExpression} {st
     ⟨Ty.variablesBelow_constructor _ _,
       ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2⟩
 
+/-- A load's type, its memref's element, is below a ready state's next variable
+whenever the memref's type is. -/
+theorem memrefLoad_type_variablesBelow {arguments : List InferredExpression} {state : State}
+    {loaded : InferredExpression × Ty} (ready : state.InferenceReady)
+    (below : ∀ argument ∈ arguments, argument.type.VariablesBelow state.inference.next)
+    (success : memrefLoadArgument arguments state = .ok loaded) :
+    loaded.2.VariablesBelow state.inference.next := by
+  obtain ⟨argumentsEq, resolved⟩ := memrefLoadArgument_ok success
+  have resolvedBelow : (state.resolve loaded.1.type).VariablesBelow state.inference.next :=
+    ready.solved.variablesBelow_apply
+      (below loaded.1 (by rw [argumentsEq]; exact List.mem_singleton_self _))
+  rw [resolved] at resolvedBelow
+  exact ((Ty.variablesBelow_application_iff _ _ _).1 resolvedBelow).2
+
 /-- List inference gives one result per expression. -/
 theorem inferExprsFuel_length {fuel : Nat} {context : Context} :
     ∀ {expressions : List Syntax.Expr} {state final : State} {values : List InferredExpression},
@@ -12386,6 +12400,21 @@ private theorem inferFuel_inferenceProperties_internal :
                                         exact ⟨prefixProgress.trans recordedProperties.1,
                                           recordedProperties.2⟩
                                     simp only [lengthEq, Bool.false_eq_true, if_false] at success
+                                    cases loadEq : loadCall namespacePath name
+                                    case true =>
+                                      simp only [loadEq, if_true] at success
+                                      cases loadResult : memrefLoadArgument arguments argumentState with
+                                      | error error => simp [loadResult, bind, Except.bind] at success
+                                      | ok loaded =>
+                                        simp only [loadResult, bind, Except.bind] at success
+                                        have loadProperties :=
+                                          recordExpressionWithExpected_inferenceProperties
+                                            argumentsProperties.2.1
+                                            (memrefLoad_type_variablesBelow argumentsProperties.2.1
+                                              argumentsProperties.2.2 loadResult)
+                                            expectedAtArguments success
+                                        exact ⟨prefixProgress.trans loadProperties.1, loadProperties.2⟩
+                                    simp only [loadEq, Bool.false_eq_true, if_false] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>
@@ -14688,6 +14717,16 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                         exact (recordExpressionWithExpected_lexicalScope success).trans
                                           throughArguments
                                     simp only [lengthEq, Bool.false_eq_true, if_false] at success
+                                    cases loadEq : loadCall namespacePath name
+                                    case true =>
+                                      simp only [loadEq, if_true] at success
+                                      cases loadResult : memrefLoadArgument arguments argumentState with
+                                      | error error => simp [loadResult, bind, Except.bind] at success
+                                      | ok loaded =>
+                                        simp only [loadResult, bind, Except.bind] at success
+                                        exact (recordExpressionWithExpected_lexicalScope success).trans
+                                          throughArguments
+                                    simp only [loadEq, Bool.false_eq_true, if_false] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>

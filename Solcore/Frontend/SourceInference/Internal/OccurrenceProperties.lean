@@ -3369,7 +3369,7 @@ theorem slice_references_present {values : List InferredExpression}
       obtain ⟨bound, boundMember, rfl⟩ := sliceBoundIds_mem idMember
       exact List.mem_cons_of_mem _ (List.mem_map.mpr ⟨bound, boundMember, rfl⟩)
 
-set_option maxHeartbeats 2000000 in
+set_option maxHeartbeats 4000000 in
 set_option maxErrors 150 in
 set_option trace.grind.debug false in
 private theorem inference_occurrenceBoundExtends :
@@ -3960,6 +3960,7 @@ private theorem inference_occurrenceBoundExtends :
       all_goals occurrence_split_state_pairs
       all_goals try (obtain ⟨argumentsEq, _⟩ := arrayLengthArgument_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
       all_goals try (obtain ⟨argumentsEq, _⟩ := sliceCopyArgument_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
+      all_goals try (obtain ⟨argumentsEq, _⟩ := memrefLoadArgument_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
       all_goals try (obtain ⟨argumentsEq, _⟩ := elementRefArguments_ok (by assumption); subst argumentsEq; try simp only [List.map_cons, List.map_nil] at *)
       all_goals occurrence_split_conjunctions
       all_goals occurrence_singleton_inputs
@@ -5378,6 +5379,16 @@ private theorem inference_anchoredNodePrefixExtends :
                                         exact throughArguments.trans
                                           (recordExpressionWithExpected_anchoredNodePrefixExtends success)
                                     simp only [lengthEq, Bool.false_eq_true, if_false] at success
+                                    cases loadEq : loadCall namespacePath name
+                                    case true =>
+                                      simp only [loadEq, if_true] at success
+                                      cases loadResult : memrefLoadArgument arguments argumentState with
+                                      | error error => simp [loadResult, bind, Except.bind] at success
+                                      | ok loaded =>
+                                        simp only [loadResult, bind, Except.bind] at success
+                                        exact throughArguments.trans
+                                          (recordExpressionWithExpected_anchoredNodePrefixExtends success)
+                                    simp only [loadEq, Bool.false_eq_true, if_false] at success
                                     cases calleeResult : inferExprFuel fuel
                                         context callee none argumentState with
                                     | error error =>

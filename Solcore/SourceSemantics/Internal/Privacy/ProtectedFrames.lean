@@ -1033,6 +1033,17 @@ theorem inferExprFuel_call_fixes_protected
                                   (safe_closed _ _ (Ty.variablesBelow_constructor 0 _))
                                   expectedSafeAtArguments success
                             simp only [lengthEq, Bool.false_eq_true, if_false] at success
+                            cases loadEq : loadCall namespacePath name
+                            case true =>
+                              simp only [loadEq, if_true] at success
+                              cases loadResult : memrefLoadArgument arguments argumentState with
+                              | error error => simp [loadResult] at success
+                              | ok loaded =>
+                                simp only [loadResult] at success
+                                exact recordExpressionWithExpected_fixes_protected argumentsFixed
+                                  (safe_memrefLoad argumentsProperties.2.1 loadResult argumentsPrivacy.2.1)
+                                  expectedSafeAtArguments success
+                            simp only [loadEq, Bool.false_eq_true, if_false] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

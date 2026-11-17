@@ -334,6 +334,11 @@ theorem call_arguments_suffix_progress
       exact (recordExpressionWithExpected_inferenceProperties properties.2.1
         (sliceCopy_type_variablesBelow properties.2.1 properties.2.2 copy) expectedAfter
         recorded).1
+  | memrefLoad _ actualArguments loaded recorded =>
+      cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+      exact (recordExpressionWithExpected_inferenceProperties properties.2.1
+        (memrefLoad_type_variablesBelow properties.2.1 properties.2.2 loaded) expectedAfter
+        recorded).1
   | elementRef _ actualArguments reference recorded =>
       cases Except.ok.inj (actualArguments.symm.trans childAccepted)
       exact (recordExpressionWithExpected_inferenceProperties properties.2.1

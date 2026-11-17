@@ -169,6 +169,8 @@ theorem inferExprFuelLedgerPreservation_step
       exact (expressionsIH argumentsAccepted allocatedTracked).recordExpressionWithExpected recorded
     | toArray argumentsAccepted _ recorded =>
       exact (expressionsIH argumentsAccepted allocatedTracked).recordExpressionWithExpected recorded
+    | memrefLoad argumentsAccepted _ recorded =>
+      exact (expressionsIH argumentsAccepted allocatedTracked).recordExpressionWithExpected recorded
     | elementRef argumentsAccepted _ recorded =>
       exact (expressionsIH argumentsAccepted allocatedTracked).recordExpressionWithExpected recorded
     | indirect argumentsAccepted calleeAccepted application recorded =>

@@ -158,6 +158,9 @@ theorem callArguments
   | toArray _ actualArguments _ recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     exact ActualExpressionNodeShapes.recordExpected recorded
+  | memrefLoad _ actualArguments _ recorded =>
+    cases Except.ok.inj (actualArguments.symm.trans childAccepted)
+    exact ActualExpressionNodeShapes.recordExpected recorded
   | elementRef _ actualArguments _ recorded =>
     cases Except.ok.inj (actualArguments.symm.trans childAccepted)
     exact ActualExpressionNodeShapes.recordExpected recorded

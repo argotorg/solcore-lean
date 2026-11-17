@@ -1700,6 +1700,24 @@ theorem inferExprFuel_call_private
                                 exact new_requirements_trans argumentsPrivacy.2.2.2 recorded.2.2.2
                                   recorded.1 row member fresh
                             simp only [lengthEq, Bool.false_eq_true, if_false] at success
+                            cases loadEq : loadCall namespacePath name
+                            case true =>
+                              simp only [loadEq, if_true] at success
+                              cases loadResult : memrefLoadArgument arguments argumentState with
+                              | error error => simp [loadResult] at success
+                              | ok loaded =>
+                                simp only [loadResult] at success
+                                have recorded := recordExpressionWithExpected_private catalog
+                                  argumentsProperties.2.1
+                                  (memrefLoad_type_variablesBelow argumentsProperties.2.1 argumentsProperties.2.2 loadResult)
+                                  expectedAtArguments
+                                  (safe_memrefLoad argumentsProperties.2.1 loadResult argumentsPrivacy.2.1)
+                                  expectedSafeAtArguments argumentsPrivacy.2.2.1 success
+                                refine ⟨prefixPrivacy.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+                                intro row member fresh
+                                exact new_requirements_trans argumentsPrivacy.2.2.2 recorded.2.2.2
+                                  recorded.1 row member fresh
+                            simp only [loadEq, Bool.false_eq_true, if_false] at success
                             cases calleeResult : inferExprFuel fuel
                                 context callee none argumentState with
                             | error error =>

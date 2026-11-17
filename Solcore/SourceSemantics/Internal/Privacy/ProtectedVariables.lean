@@ -252,6 +252,20 @@ theorem safe_elementRef {protectedVars : List TypeVarId} {state : State}
     ⟨safe_closed _ _ (Ty.variablesBelow_constructor 0 _),
       ((safe_application_iff protectedVars state _ _).1 resolvedSafe).2⟩
 
+/-- A load's type, its memref's element, is safe at a ready state wherever the
+memref's type is. -/
+theorem safe_memrefLoad {protectedVars : List TypeVarId} {state : State}
+    {arguments : List InferredExpression} {loaded : InferredExpression × Ty}
+    (ready : state.InferenceReady)
+    (success : Detail.memrefLoadArgument arguments state = .ok loaded)
+    (safe : ∀ argument ∈ arguments, Safe protectedVars state argument.type) :
+    Safe protectedVars state loaded.2 := by
+  obtain ⟨argumentsEq, resolved⟩ := Detail.memrefLoadArgument_ok success
+  have resolvedSafe := safe_resolved ready
+    (safe loaded.1 (by rw [argumentsEq]; exact List.mem_singleton_self _))
+  rw [resolved] at resolvedSafe
+  exact ((safe_application_iff protectedVars state _ _).1 resolvedSafe).2
+
 /-- A compound assignment's operand type is safe where its target type is:
 the open target's own type, or a closed constructor. -/
 theorem safe_compoundOperandType {protectedVars : List TypeVarId} {state : State}

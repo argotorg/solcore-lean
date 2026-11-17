@@ -599,6 +599,12 @@ private theorem inferFuel_origins_progress_internal :
       exact allocationProgress.trans (argumentsProgress.trans
         (RelativeReadProgress.recordExpressionWithExpected (root := root) recording
           (by intro _ _ impossible; cases impossible)))
+    | memrefLoad nonconstructor argumentsAccepted _ recording =>
+      have argumentsProgress := argumentsIH _ argumentsAccepted
+        (here.child (.expression_call_arguments accepted form allocation nonconstructor argumentsAccepted))
+      exact allocationProgress.trans (argumentsProgress.trans
+        (RelativeReadProgress.recordExpressionWithExpected (root := root) recording
+          (by intro _ _ impossible; cases impossible)))
     | elementRef nonconstructor argumentsAccepted _ recording =>
       have argumentsProgress := argumentsIH _ argumentsAccepted
         (here.child (.expression_call_arguments accepted form allocation nonconstructor argumentsAccepted))

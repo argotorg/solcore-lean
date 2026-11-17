@@ -1381,6 +1381,47 @@ theorem arrayLengthArgument_ok {arguments : List InferredExpression} {state : St
   | [] => simp [arrayLengthArgument] at success
   | _ :: _ :: _ => simp [arrayLengthArgument] at success
 
+/-- `CanStore.load`, the load of std's `CanStore` trait through a memref, which
+Lean has as a compiler form rather than a trait: the qualified name of a call,
+found only when no source namespace or local is named `CanStore`, as `Length`'s
+is. -/
+def loadCall : List String → String → Bool
+  | ["CanStore"], "load" => true
+  | _, _ => false
+
+/-- The memref of `CanStore.load(r)` and the type it loads: its one argument,
+once inference has made its type a memref (`Ty.memrefElement?`), and that
+memref's element. Another row of arguments, or a type still open, is rejected:
+the choice is made here and does not wait for later uses, as a length's
+(`arrayLengthOf`). -/
+def memrefLoadArgument (arguments : List InferredExpression) (state : State) :
+    Except Error (InferredExpression × Ty) :=
+  match arguments with
+  | [reference] =>
+      match (state.resolve reference.type).memrefElement? with
+      | some element => .ok (reference, element)
+      | none => .error (.operatorNotSupported "CanStore" (state.resolve reference.type))
+  | arguments => .error (.operatorNotSupported "CanStore"
+      (state.resolve (Ty.productMany (arguments.map (·.type)))))
+
+/-- `CanStore.load(r)`'s argument row is its one memref, whose type is a memref
+of the loaded type once resolved. -/
+theorem memrefLoadArgument_ok {arguments : List InferredExpression} {state : State}
+    {loaded : InferredExpression × Ty}
+    (success : memrefLoadArgument arguments state = .ok loaded) :
+    arguments = [loaded.1] ∧ state.resolve loaded.1.type = Ty.memref loaded.2 := by
+  match arguments with
+  | [only] =>
+      unfold memrefLoadArgument at success
+      cases found : (state.resolve only.type).memrefElement? with
+      | none => simp [found] at success
+      | some element =>
+          simp only [found, Except.ok.injEq] at success
+          subst success
+          exact ⟨rfl, Ty.memrefElement?_eq_some found⟩
+  | [] => simp [memrefLoadArgument] at success
+  | _ :: _ :: _ => simp [memrefLoadArgument] at success
+
 /-- `toArray(s)`, std's copy of a slice into a fresh memory array, which Lean
 has as a compiler form rather than a function: the name of a call, found only
 when no source function, local or compiler function is named `toArray`. -/
@@ -2133,6 +2174,10 @@ mutual
                                 recordExpressionWithExpected context expression id
                                   (.fixed .uint256) (.arrayLength array.id) []
                                   expected state
+                              else if loadCall namespacePath name then
+                                let loaded ← memrefLoadArgument arguments state
+                                recordExpressionWithExpected context expression id
+                                  loaded.2 (.memrefLoad loaded.1.id) [] expected state
                               else
                                 let (calleeResult, state) ←
                                   inferExprFuel fuel context callee none state

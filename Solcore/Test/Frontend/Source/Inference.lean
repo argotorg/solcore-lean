@@ -1837,6 +1837,42 @@ private def testElementRefs : IO Unit := do
     "function bad(m: uint256[]) returns (uint256) { let at = lidx; return 0; }" fun error =>
       error == .unknownVariable "lidx"
 
+/-- `CanStore.load(r)` loads the element a memref refers to, at the memref's
+element type, an array included; it is rejected on an array, on a word, on a
+memref whose type is still open there, and as a value. -/
+private def testMemrefLoads : IO Unit := do
+  let functions ← check "memref loads" (String.intercalate "\n" [
+    "function loads(m: uint256[], rows: uint256[][], i: uint256) returns (uint256) {",
+    "  let v = CanStore.load(lidx(m, i));",
+    "  let r: memref<uint256[]> = lidx(rows, i);",
+    "  let row = CanStore.load(r);",
+    "  return v + row.length;",
+    "}"
+  ])
+  let function ← match functions with
+    | [function] => pure function
+    | _ => throw (IO.userError "memref load fixture lost its checked function")
+  let loads := function.typedBody.nodes.filterMap fun
+    | .expression { form := .memrefLoad _, type, .. } => some type
+    | _ => none
+  let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
+  assertTrue (decide (loads = [uint256, .array uint256]))
+    s!"CanStore.load did not type its loads at their memrefs' elements: {reprStr loads}"
+  expectInferenceError "a load of an array"
+    "function bad(m: uint256[]) returns (uint256) { let v = CanStore.load(m); return 0; }"
+    fun error => error == .operatorNotSupported "CanStore" (.array uint256)
+  expectInferenceError "a load of a word"
+    "function bad(n: uint256) returns (uint256) { let v = CanStore.load(n); return 0; }"
+    fun error => error == .operatorNotSupported "CanStore" uint256
+  expectInferenceError "a load of a memref still open"
+    "function bad(m: uint256[]) returns (uint256) { let get = lam(r) { return CanStore.load(r); }; let v: uint256 = get(lidx(m, uint256(1))); return v; }"
+    fun error => match error with
+      | .operatorNotSupported "CanStore" _ => true
+      | _ => false
+  expectInferenceError "CanStore.load as a value"
+    "function bad(m: uint256[]) returns (uint256) { let get = CanStore.load; return 0; }"
+    fun error => error == .unsupportedExpression "field"
+
 /-- Exercise every phase-7 source-inference form before runtime lowering. -/
 def testSourcePhase7Inference : IO Unit := do
   testConstructors
@@ -1854,6 +1890,7 @@ def testSourcePhase7Inference : IO Unit := do
   testSliceReads
   testSliceCopies
   testElementRefs
+  testMemrefLoads
   IO.println "phase-7 source inference GREEN"
 
 end Tests.SourcePhase7Inference
