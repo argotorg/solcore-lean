@@ -22,7 +22,8 @@ This page says how to build, test and check a change, and when to run what. READ
   - A full build takes about half an hour on a ten-core machine.
   - Batch such changes, and build the whole library at the end.
 - **Run the tests.**
-  - `lake test` builds and runs the test driver `solcore-tests` ([`Tests/Main.lean`](../../Tests/Main.lean)).
+  - `lake test` builds and runs the test driver `solcore-tests`
+    ([`Tests/Main.lean`](../../Tests/Main.lean)).
   - [Tests](tests.md) says how the tests are organized.
 - **Executables.**
   - Each case tool and runner of the differential tests is a `lean_exe` in
@@ -36,7 +37,8 @@ These are the checks of CI's `checks` job, in
 
 ```sh
 node scripts/check-kernel.mjs
-for test in scripts/test-semantic-*.py scripts/test-prepare-semantic-tools.py scripts/test-export-rust-*.py; do
+for test in scripts/test-semantic-*.py scripts/test-prepare-semantic-tools.py \
+    scripts/test-export-rust-*.py; do
   python3 "$test"
 done
 git diff --check
@@ -57,7 +59,8 @@ into a change to the differential harness.
 - **Validate the corpora you changed.**
   - `Tests/scripts/test-semantic-*-corpus.py` check fixed corpora with the native tools, without an
     EVM.
-  - For example: `python3 Tests/scripts/test-semantic-corpus.py --manifest scripts/semantic-loop-corpus.json`.
+  - For example, for the loop corpus:
+    `python3 Tests/scripts/test-semantic-corpus.py --manifest scripts/semantic-loop-corpus.json`.
 - **Check the fixtures** with `python3 scripts/semantic-fixtures.py --check`.
 - **Run the other harnesses.** Some `scripts/test-*.py` files are not in CI's list. They include the
   source-to-Rust harnesses (`test-source-*-rust.py`), which run Lean's source semantics against the

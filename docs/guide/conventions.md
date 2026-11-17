@@ -123,9 +123,11 @@ f820cc25f) name modules that no longer exist.
 - **Moves.** Each merged section starts with the marker `-- leanmerge: from <old module>`. Search
   for it, as in `git grep -n "leanmerge: from Solcore.Core.Store"`, to find the file and section
   that hold an old module now.
-- **Splits.** 110 old modules were split before they were merged, nearly all into definitions for
+- **Splits.** Many old modules were split before they were merged, nearly all into definitions for
   the area's front and laws for `Internal/`. The marker that names the old module finds one part;
   search for the name of a declaration in the other part to find it.
+- **Earlier merges.** Some sections carry a heading `## Consolidated module: …` from an earlier
+  merge, which the moves map does not list.
 - **Names.** Declarations kept their names, so a search for a name from an older note finds it.
   The exceptions are private helpers: the refactor renamed some to avoid clashes, most with a
   `_variant` suffix, and removed identical private copies.
