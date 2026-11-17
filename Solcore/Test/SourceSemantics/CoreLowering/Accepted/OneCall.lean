@@ -2,26 +2,30 @@ import Solcore.Test.SourceSemantics.CoreLowering.Accepted.Fixture
 import Solcore.Test.SourceSemantics.CoreLowering.Direct.Calls
 
 /-!
-# One direct call at the accepted-body public root
+# Direct calls at the accepted-body public root
 
-`relay` returns `identity(value)`, a direct call of the program's other
-function, at a `Word` parameter. Runtime checks place every expression node of
-both rows among the extended roots that call `identity`'s instantiation, and
-each statement list in the supported shape. With the complete inventory the
-rows make a family and give the admitted callee's static receipts. `relay`'s
-original Source execution, which runs `identity`'s body instance, is lifted to
-a staged trace, and the call root's theorems apply at `relay`'s first public
-call in both directions: the actual resumption succeeds, and actual native
-completion reconstructs a staged Source execution.
+`relay` returns `identity(value)`, a direct call of the program's first
+function, and `twice` returns `identity(identity(value))`, a direct call whose
+argument is another direct call, both at a `Word` parameter. Runtime checks
+place every expression node of the three rows among the nested sites that call
+`identity`'s instantiation, and each statement list in the supported shape.
+With the complete inventory the rows make a family and give the admitted
+callee's static receipts. The original Source executions of `relay` and
+`twice`, whose calls run `identity`'s body instance, are lifted to staged
+traces, and the call root's theorems apply at the first public call of each in
+both directions: the actual resumption succeeds, and actual native completion
+reconstructs a staged Source execution.
 
 Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
-`Tests.SourceCoreAcceptedOneCall.accepted_call` and the runtime check
-`Tests.SourceCoreAcceptedOneCall.AcceptedCallRuntime.run`.
+`Tests.SourceCoreAcceptedOneCall.twice_source`,
+`Tests.SourceCoreAcceptedOneCall.accepted_call` and the runtime checks
+`Tests.SourceCoreAcceptedOneCall.AcceptedCallRuntime.run` and
+`Tests.SourceCoreAcceptedOneCall.AcceptedNestedCallRuntime.run`.
 -/
 
 section
-/-! The program and the declarative typing of both functions, constructed from
-checked source observations. -/
+/-! The program and the declarative typing of its three functions, constructed
+from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 2000000
@@ -33,7 +37,8 @@ def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := String.intercalate "\n" [
     "pragma solcore;",
     "function identity(value: Word) returns (Word) { return value; }",
-    "function relay(value: Word) returns (Word) { return identity(value); }" ]}] }
+    "function relay(value: Word) returns (Word) { return identity(value); }",
+    "function twice(value: Word) returns (Word) { return identity(identity(value)); }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -70,6 +75,27 @@ structure RelayShape (function : CheckedFunction) (signature identity : ProgramF
   statementForm : statement.form = .returnStmt (some call.value.node.id)
   statementType : statement.type = .word
 
+/-- `twice`'s body: the read of its parameter, the direct call of `identity`
+with it, the direct call of `identity` with that call and the return of the
+outer call. -/
+structure TwiceShape (function : CheckedFunction) (signature identity : ProgramFunctionSignature) where
+  binder : TypedBinder
+  read : Tests.SourceCoreNamedBranch.Read function.typedBody binder .word
+  inner : Tests.SourceCoreDirectCalls.DirectCall function.typedBody identity read.node.id .word
+  outer : Tests.SourceCoreDirectCalls.DirectCall function.typedBody identity inner.value.node.id .word
+  statement : StatementNode
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  inputs : function.typedBody.inputs = [binder]
+  binderScheme : binder.scheme = .mono .word
+  binderRequirements : binder.schemeRequirements = []
+  binderOrdinary : binder.comptime = false
+  roots : function.typedBody.roots = [.statement statement.id]
+  statementFound : function.typedBody.lookupStatement? statement.id = some statement
+  statementForm : statement.form = .returnStmt (some outer.value.node.id)
+  statementType : statement.type = .word
+
 theorem RelayShape.statementTyping {function : CheckedFunction} {signature identity : ProgramFunctionSignature}
     (shape : RelayShape function signature identity) (signatures : ProgramSignatures)
     (identityMember : identity ∈ signatures.functions) :
@@ -98,6 +124,35 @@ theorem RelayShape.statementTyping {function : CheckedFunction} {signature ident
     exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.statementFound)
       shape.statementForm called shape.statementType)⟩
 
+theorem TwiceShape.statementTyping {function : CheckedFunction} {signature identity : ProgramFunctionSignature}
+    (shape : TwiceShape function signature identity) (signatures : ProgramSignatures)
+    (identityMember : identity ∈ signatures.functions) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.statement.id] := statementRoots_injective (roots.symm.trans shape.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := true, control := .returned}
+  refine ⟨BodyFacts.singleton facts, rfl, ?_⟩
+  intro lexical extension
+  rw [shape.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have fields : lexical.signatures = signatures := by
+      rw [head.context_fields.1]
+      rfl
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have read := shape.read.typed scheme shape.binderRequirements word head.local_self head.local_scheme_requirements_self
+    have inner := shape.inner.typed (fields ▸ identityMember) word read
+    have outer := shape.outer.typed (fields ▸ identityMember) word inner
+    exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.statementFound)
+      shape.statementForm outer shape.statementType)⟩
+
 def observeRelay (function : CheckedFunction) (signature identity : ProgramFunctionSignature) :
     IO (RelayShape function signature identity) := do
   let [binder] := function.typedBody.inputs | throw (IO.userError "relay input")
@@ -120,41 +175,100 @@ def observeRelay (function : CheckedFunction) (signature identity : ProgramFunct
   return ⟨binder, read, call, statement, parameters, inputTypes, returns, inputs, binderScheme, binderRequirements,
     binderOrdinary, roots, statementFound, statementForm, statementType⟩
 
+/-- The nodes of a body that returns `identity(identity(value))`, found by
+following the return statement's expression graph. -/
+structure TwiceParts (source : TypedSource) (identity : ProgramFunctionSignature) where
+  binder : TypedBinder
+  read : Tests.SourceCoreNamedBranch.Read source binder .word
+  inner : Tests.SourceCoreDirectCalls.DirectCall source identity read.node.id .word
+  outer : Tests.SourceCoreDirectCalls.DirectCall source identity inner.value.node.id .word
+  statement : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement statement.id]
+  statementFound : source.lookupStatement? statement.id = some statement
+  statementForm : statement.form = .returnStmt (some outer.value.node.id)
+
+def observeTwiceParts (source : TypedSource) (identity : ProgramFunctionSignature) :
+    IO (TwiceParts source identity) := do
+  let [binder] := source.inputs | throw (IO.userError "twice input")
+  let [.statement statementId] := source.roots | throw (IO.userError "twice roots")
+  let some statement := source.lookupStatement? statementId | throw (IO.userError "twice statement")
+  let .returnStmt (some outerId) := statement.form | throw (IO.userError "twice return")
+  let some outerNode := source.lookupExpression? outerId | throw (IO.userError "twice outer call")
+  let .call outerCalleeId [innerId] _ := outerNode.form | throw (IO.userError "twice outer form")
+  let some outerCallee := source.lookupExpression? outerCalleeId | throw (IO.userError "twice outer callee")
+  let some innerNode := source.lookupExpression? innerId | throw (IO.userError "twice inner call")
+  let .call innerCalleeId [readId] _ := innerNode.form | throw (IO.userError "twice inner form")
+  let some innerCallee := source.lookupExpression? innerCalleeId | throw (IO.userError "twice inner callee")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "twice read")
+  let read ← Tests.SourceCoreNamedBranch.observeRead source binder readNode .word
+  let inner ← Tests.SourceCoreDirectCalls.observeDirect source identity read.node.id innerCallee innerNode .word
+  let outer ← Tests.SourceCoreDirectCalls.observeDirect source identity inner.value.node.id outerCallee outerNode .word
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "twice inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "twice roots shape"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement) "twice statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some outer.value.node.id)) "twice statementForm"
+  return ⟨binder, read, inner, outer, statement, inputs, roots, statementFound, statementForm⟩
+
+def observeTwice (function : CheckedFunction) (signature identity : ProgramFunctionSignature) :
+    IO (TwiceShape function signature identity) := do
+  let parts ← observeTwiceParts function.typedBody identity
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "twice parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "twice inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "twice returns"
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "twice binderScheme"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "twice binderRequirements"
+  let ⟨binderOrdinary⟩ ← observed (parts.binder.comptime = false) "twice binderOrdinary"
+  let ⟨statementType⟩ ← observed (parts.statement.type = .word) "twice statementType"
+  return ⟨parts.binder, parts.read, parts.inner, parts.outer, parts.statement, parameters, inputTypes, returns,
+    parts.inputs, binderScheme, binderRequirements, binderOrdinary, parts.roots, parts.statementFound,
+    parts.statementForm, statementType⟩
+
 /-- The declarative typing of the complete checked program. -/
 def observeWellFormed {program : CheckedProgram}
     (checked : checkProgram workspace options.checkingFuel = .ok program) :
     IO (PLift (ProgramWellFormed (Program.ofChecked program))) := do
   match functions : program.functions, signatures : program.signatures.functions with
-  | [identityFunction, relayFunction], [identitySignature, relaySignature] =>
+  | [identityFunction, relayFunction, twiceFunction], [identitySignature, relaySignature, twiceSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
-    let ⟨methods⟩ ← observed (program.methods = []) "one call methods"
+    let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
+    let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
-      "one call identityDeclaration"
-    let ⟨relayDeclaration⟩ ← observed (relayFunction.declaration = relaySignature.id) "one call relayDeclaration"
-    let ⟨identityRelay⟩ ← observed (identitySignature.id ≠ relaySignature.id) "one call identityRelay"
+      "calls identityDeclaration"
+    let ⟨relayDeclaration⟩ ← observed (relayFunction.declaration = relaySignature.id) "calls relayDeclaration"
+    let ⟨twiceDeclaration⟩ ← observed (twiceFunction.declaration = twiceSignature.id) "calls twiceDeclaration"
+    let ⟨identityRelay⟩ ← observed (identitySignature.id ≠ relaySignature.id) "calls identityRelay"
+    let ⟨identityTwice⟩ ← observed (identitySignature.id ≠ twiceSignature.id) "calls identityTwice"
+    let ⟨relayTwice⟩ ← observed (relaySignature.id ≠ twiceSignature.id) "calls relayTwice"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
         intro actual member candidate candidateMember accepted
-        have identity := checkFunctionBody_success_declaration accepted
+        have declared := checkFunctionBody_success_declaration accepted
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
         simp only [signatures, List.mem_cons, List.not_mem_nil, or_false] at candidateMember
-        rcases member with rfl | rfl <;> rcases candidateMember with rfl | rfl
+        rcases member with rfl | rfl | rfl <;> rcases candidateMember with rfl | rfl | rfl
         · exact identityShape.statementTyping program.signatures
-        · exact False.elim (identityRelay (identityDeclaration.symm.trans identity))
-        · exact False.elim (identityRelay (identity.symm.trans relayDeclaration))
+        · exact False.elim (identityRelay (identityDeclaration.symm.trans declared))
+        · exact False.elim (identityTwice (identityDeclaration.symm.trans declared))
+        · exact False.elim (identityRelay (declared.symm.trans relayDeclaration))
         · exact relayShape.statementTyping program.signatures (by simp [signatures])
+        · exact False.elim (relayTwice (relayDeclaration.symm.trans declared))
+        · exact False.elim (identityTwice (declared.symm.trans twiceDeclaration))
+        · exact False.elim (relayTwice (declared.symm.trans twiceDeclaration))
+        · exact twiceShape.statementTyping program.signatures (by simp [signatures])
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
-  | _, _ => throw (IO.userError "one call declaration count")
+  | _, _ => throw (IO.userError "calls declaration count")
 
 end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of both functions and their original Source executions:
-`identity` returns its parameter, and `relay` returns the direct call of
-`identity` with its parameter, whose global application runs a given body
+/-! The cache rows of the three functions and their original Source
+executions: `identity` returns its parameter, `relay` returns the direct call
+of `identity` with its parameter, and `twice` returns the direct call of
+`identity` with that call. Each call's global application is a given body
 invocation. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -212,27 +326,51 @@ structure RelayBody (fixture : CompiledFixture workspace options) (target : Decl
   statementFound : source.lookupStatement? statement.id = some statement
   statementForm : statement.form = .returnStmt (some call.value.node.id)
 
-def observeRelayBody (fixture : CompiledFixture workspace options) (target : DeclarationInstantiation)
-    (source : TypedSource) : IO (RelayBody fixture target source) := do
+/-- `twice`'s cache row: the nodes of `identity(identity(value))`, both calls
+at the instantiation `target`. -/
+structure TwiceBody (fixture : CompiledFixture workspace options) (target : DeclarationInstantiation)
+    (source : TypedSource) where
+  identity : ProgramFunctionSignature
+  member : identity ∈ fixture.recipe.compiled.sourceProgram.signatures.functions
+  parts : TwiceParts source identity
+  binderScheme : parts.binder.scheme = .mono .word
+  innerSelects : parts.inner.instantiation = target
+  outerSelects : parts.outer.instantiation = target
+
+private def identitySignature (fixture : CompiledFixture workspace options) :
+    IO {identity : ProgramFunctionSignature // identity ∈ fixture.recipe.compiled.sourceProgram.signatures.functions} := do
   match found : fixture.recipe.compiled.sourceProgram.signatures.functions.find?
       (fun signature => signature.name == "identity") with
-  | none => throw (IO.userError "relay row callee signature")
-  | some identity =>
-    let [binder] := source.inputs | throw (IO.userError "relay row input")
-    let [.expression read, .expression callee, .expression value, .statement statement] := source.nodes
-      | throw (IO.userError "relay row nodes")
-    let read ← Tests.SourceCoreNamedBranch.observeRead source binder read .word
-    let call ← Tests.SourceCoreDirectCalls.observeDirect source identity read.node.id callee value .word
-    let ⟨selects⟩ ← observed (call.instantiation = target) "relay row call target"
-    let ⟨inputs⟩ ← observed (source.inputs = [binder]) "relay row inputs"
-    let ⟨binderScheme⟩ ← observed (binder.scheme = .mono .word) "relay row binderScheme"
-    let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "relay row roots"
-    let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement)
-      "relay row statementFound"
-    let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some call.value.node.id))
-      "relay row statementForm"
-    return ⟨identity, List.mem_of_find?_eq_some found, binder, read, call, selects, statement, inputs,
-      binderScheme, roots, statementFound, statementForm⟩
+  | none => throw (IO.userError "calls callee signature")
+  | some identity => return ⟨identity, List.mem_of_find?_eq_some found⟩
+
+def observeRelayBody (fixture : CompiledFixture workspace options) (target : DeclarationInstantiation)
+    (source : TypedSource) : IO (RelayBody fixture target source) := do
+  let ⟨identity, member⟩ ← identitySignature fixture
+  let [binder] := source.inputs | throw (IO.userError "relay row input")
+  let [.expression read, .expression callee, .expression value, .statement statement] := source.nodes
+    | throw (IO.userError "relay row nodes")
+  let read ← Tests.SourceCoreNamedBranch.observeRead source binder read .word
+  let call ← Tests.SourceCoreDirectCalls.observeDirect source identity read.node.id callee value .word
+  let ⟨selects⟩ ← observed (call.instantiation = target) "relay row call target"
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "relay row inputs"
+  let ⟨binderScheme⟩ ← observed (binder.scheme = .mono .word) "relay row binderScheme"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "relay row roots"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement)
+    "relay row statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some call.value.node.id))
+    "relay row statementForm"
+  return ⟨identity, member, binder, read, call, selects, statement, inputs, binderScheme, roots, statementFound,
+    statementForm⟩
+
+def observeTwiceBody (fixture : CompiledFixture workspace options) (target : DeclarationInstantiation)
+    (source : TypedSource) : IO (TwiceBody fixture target source) := do
+  let ⟨identity, member⟩ ← identitySignature fixture
+  let parts ← observeTwiceParts source identity
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "twice row binderScheme"
+  let ⟨innerSelects⟩ ← observed (parts.inner.instantiation = target) "twice row inner target"
+  let ⟨outerSelects⟩ ← observed (parts.outer.instantiation = target) "twice row outer target"
+  return ⟨identity, member, parts, binderScheme, innerSelects, outerSelects⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
 theorem read_value {source : TypedSource} {binder : TypedBinder}
@@ -249,6 +387,45 @@ theorem read_value {source : TypedSource} {binder : TypedBinder}
       allocation.reads_new rfl rfl
   · rw [read.coercions]
     exact .nil
+
+/-- A direct call of a monomorphic declaration with one argument evaluates to
+its global application's result, given the argument's execution and the
+call's validity. -/
+theorem call_value {source : TypedSource} {identity : ProgramFunctionSignature} {argument : ExpressionId}
+    (call : Tests.SourceCoreDirectCalls.DirectCall source identity argument .word)
+    {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {environment : Dynamic.Environment} {before middle after : Dynamic.Heap} {input output : Dynamic.Value}
+    (argumentTrace : Dynamic.ExpressionEvaluates program context evidence source environment before argument input
+      middle)
+    (valid : SourceSemantics.DeclarationInstantiation.Valid context call.instantiation)
+    (applies : Dynamic.CallableApplies program context evidence [] middle (.global ⟨call.instantiation, []⟩)
+      [input] output after) :
+    Dynamic.ExpressionEvaluates program context evidence source environment before call.value.node.id output after := by
+  have predicates : call.instantiation.predicates = [] := by
+    simp [call.exact]
+  apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound call.value.found)
+  · rw [call.form, call.value.requirements, call.value.coercions]
+    exact .directCall (lookupExpression?_sound call.callee.found) call.calleeForm call.callee.requirements
+      call.callee.coercions valid (.cons argumentTrace .nil)
+      (by
+        rw [predicates]
+        exact .intro (selected := []) (contextual := []) (signatureRequirements := []) rfl rfl .nil)
+      applies
+  · rw [call.value.coercions]
+    exact .nil
+
+/-- A direct call's validity at any context whose signatures have the callee. -/
+theorem call_valid {source : TypedSource} {identity : ProgramFunctionSignature} {argument : ExpressionId}
+    (call : Tests.SourceCoreDirectCalls.DirectCall source identity argument .word)
+    {context : SourceSemantics.Context} (member : identity ∈ context.signatures.functions) :
+    SourceSemantics.DeclarationInstantiation.Valid context call.instantiation := by
+  rw [call.exact]
+  refine .intro identity member rfl ?_ ?_ ?_ ?_ rfl rfl
+  · simpa only [call.scheme] using SourceSemantics.ParameterSubstitution.exact_empty
+  · intro name value found
+    cases found
+  · simp [call.scheme]
+  · simp [call.scheme]
 
 /-- `identity`'s body returns its parameter's value. -/
 theorem IdentityBody.trace {source : TypedSource} (body : IdentityBody source) {program : SourceSemantics.Program}
@@ -274,53 +451,49 @@ theorem RelayBody.trace {fixture : CompiledFixture workspace options} {target : 
       (.global ⟨body.call.instantiation, []⟩) [.word word] (.word word) after) :
     Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.binder before)
       (wordHeap before word) [body.statement.id] context (.returned (.word word)) after := by
-  have predicates : body.call.instantiation.predicates = [] := by
-    simp [body.call.exact]
-  have called : Dynamic.ExpressionEvaluates program context evidence source (wordEnvironment body.binder before)
-      (wordHeap before word) body.call.value.node.id (.word word) after := by
-    apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound body.call.value.found)
-    · rw [body.call.form, body.call.value.requirements, body.call.value.coercions]
-      exact .directCall (lookupExpression?_sound body.call.callee.found) body.call.calleeForm
-        body.call.callee.requirements body.call.callee.coercions valid
-        (.cons (read_value body.read evidence before word) .nil)
-        (by
-          rw [predicates]
-          exact .intro (selected := []) (contextual := []) (signatureRequirements := []) rfl rfl .nil)
-        applies
-    · rw [body.call.value.coercions]
-      exact .nil
   apply Dynamic.FunctionStatementsExecute.singleton (lookupStatement?_sound body.statementFound)
   · intro expression impossible
     rw [body.statementForm] at impossible
     cases impossible
-  · exact .returnValue (lookupStatement?_sound body.statementFound) body.statementForm called
+  · exact .returnValue (lookupStatement?_sound body.statementFound) body.statementForm
+      (call_value body.call (read_value body.read evidence before word) valid applies)
 
-/-- The call's validity at any context with the program's signatures. -/
-theorem RelayBody.valid {fixture : CompiledFixture workspace options} {target : DeclarationInstantiation}
-    {source : TypedSource} (body : RelayBody fixture target source) {context : SourceSemantics.Context}
-    (signatures : context.signatures = fixture.recipe.compiled.sourceProgram.signatures) :
-    SourceSemantics.DeclarationInstantiation.Valid context body.call.instantiation := by
-  rw [body.call.exact]
-  refine .intro body.identity ?_ rfl ?_ ?_ ?_ ?_ rfl rfl
-  · rw [signatures]
-    exact body.member
-  · simpa only [body.call.scheme] using SourceSemantics.ParameterSubstitution.exact_empty
-  · intro name value found
-    cases found
-  · simp [body.call.scheme]
-  · simp [body.call.scheme]
+/-- `twice`'s body returns the value of its outer call, given both calls'
+validity and global applications. -/
+theorem TwiceBody.trace {fixture : CompiledFixture workspace options} {target : DeclarationInstantiation}
+    {source : TypedSource} (body : TwiceBody fixture target source) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (word : Core.Word)
+    (innerValid : SourceSemantics.DeclarationInstantiation.Valid context body.parts.inner.instantiation)
+    (outerValid : SourceSemantics.DeclarationInstantiation.Valid context body.parts.outer.instantiation)
+    {middle after : Dynamic.Heap}
+    (innerApplies : Dynamic.CallableApplies program context evidence [] (wordHeap before word)
+      (.global ⟨body.parts.inner.instantiation, []⟩) [.word word] (.word word) middle)
+    (outerApplies : Dynamic.CallableApplies program context evidence [] middle
+      (.global ⟨body.parts.outer.instantiation, []⟩) [.word word] (.word word) after) :
+    Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.statement.id] context (.returned (.word word)) after := by
+  apply Dynamic.FunctionStatementsExecute.singleton (lookupStatement?_sound body.parts.statementFound)
+  · intro expression impossible
+    rw [body.parts.statementForm] at impossible
+    cases impossible
+  · exact .returnValue (lookupStatement?_sound body.parts.statementFound) body.parts.statementForm
+      (call_value body.parts.outer
+        (call_value body.parts.inner (read_value body.parts.read evidence before word) innerValid innerApplies)
+        outerValid outerApplies)
 
 end Tests.SourceCoreAcceptedOneCall
 end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of both rows among the extended roots and each statement
-list in the supported shape; the complete inventory turns them into the rows
-of a family and gives the admitted callee's static receipts. `relay`'s
-original Source execution, which runs `identity`'s body instance, is lifted
-through the checked shape, and with the existing start receipts the call root's
-theorems apply at `relay`'s first public call in both directions. -/
+every expression node of the three rows among the nested sites and each
+statement list in the supported shape; the complete inventory turns them into
+the rows of a family and gives the admitted callee's static receipts. The
+original Source executions of `relay` and `twice`, whose calls run
+`identity`'s body instance, are lifted through the checked shapes, and with the
+existing start receipts the call root's theorems apply at the first public call
+of each in both directions. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -350,50 +523,38 @@ theorem header_signatures
     rw [contextEq]
     rfl
 
-theorem word_types (selected : SelectedInventory whole row) {target : DeclarationInstantiation}
-    (body : RelayBody fixture target row.original.function.typedBody) :
-    selected.packet.header.types = [.word] := by
-  have sourceInputs : selected.packet.header.function.source.inputs = [body.binder] := by
+/-- A row whose only parameter is a `Word` has the header parameter types
+`[.word]`, and its header allocates that parameter in the next cell. -/
+theorem word_parameter (selected : SelectedInventory whole row) {binder : TypedBinder}
+    (inputs : row.original.function.typedBody.inputs = [binder]) (scheme : binder.scheme = .mono .word)
+    (before : Dynamic.Heap) (word : Core.Word) :
+    selected.packet.header.types = [.word] ∧
+    Dynamic.BindersAllocate [] before selected.packet.header.function.parameters [.word word]
+      (wordEnvironment binder before) (wordHeap before word) := by
+  have sourceInputs : selected.packet.header.function.source.inputs = [binder] := by
     rw [selected.source_eq]
-    exact body.inputs
-  have parameters : selected.packet.header.function.parameters = [body.binder] :=
+    exact inputs
+  have parameters : selected.packet.header.function.parameters = [binder] :=
     selected.packet.header.parameters.trans (selected.packet.header.inputs.symm.trans sourceInputs)
   have types := Dynamic.MonoBindersExtend.bodyTypes_eq selected.packet.header.extended
-  simpa only [parameters, List.map_cons, List.map_nil, body.binderScheme, TypeSystem.Scheme.mono] using types.symm
+  have allocation : Dynamic.Heap.Allocates before .word (some (.word word)) ⟨before.cells.length⟩
+      (wordHeap before word) := .append
+  refine ⟨?_, ?_⟩
+  · simpa only [parameters, List.map_cons, List.map_nil, scheme, TypeSystem.Scheme.mono] using types.symm
+  · rw [parameters]
+    exact .cons (by simpa only [scheme, TypeSystem.Scheme.mono] using allocation) (.nil _ _)
 
-/-- The original Source execution of `relay`'s body at its header, after the
-allocation of its parameter: the direct call's global application runs
-`identity`'s body instance, its header's Source body, at the empty
-dictionary. -/
-theorem relay_source (selected : SelectedInventory whole row) {identity : Row fixture}
-    (identitySelected : SelectedInventory whole identity) {called : DeclarationInstantiation → Prop}
+/-- `identity`'s global application at the empty dictionary, at any heap: its
+header's Source body runs on its parameter in the next cell and returns it. -/
+theorem identity_applies {identity : Row fixture} (identitySelected : SelectedInventory whole identity)
+    {called : DeclarationInstantiation → Prop}
     (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
-    (identityBody : IdentityBody identity.original.function.typedBody)
-    (relayBody : RelayBody fixture (CallableNamedCanonicalOrder.retainedInstantiation identity.original)
-      row.original.function.typedBody)
-    (word : Word) :
-    Dynamic.BindersAllocate [] ⟨[]⟩ selected.packet.header.function.parameters [.word word]
-      (wordEnvironment relayBody.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) ∧
-    Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
-      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
-      (wordEnvironment relayBody.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
-      selected.packet.header.context (.returned (.word word)) (wordHeap (wordHeap ⟨[]⟩ word) word) := by
-  have parameters : selected.packet.header.function.parameters = [relayBody.binder] := by
-    have sourceInputs : selected.packet.header.function.source.inputs = [relayBody.binder] := by
-      rw [selected.source_eq]
-      exact relayBody.inputs
-    exact selected.packet.header.parameters.trans (selected.packet.header.inputs.symm.trans sourceInputs)
-  have allocation : Dynamic.Heap.Allocates ⟨[]⟩ .word (some (.word word))
-      ⟨(⟨[]⟩ : Dynamic.Heap).cells.length⟩ (wordHeap ⟨[]⟩ word) := .append
-  have allocated : Dynamic.BindersAllocate [] ⟨[]⟩ selected.packet.header.function.parameters [.word word]
-      (wordEnvironment relayBody.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) := by
-    rw [parameters]
-    exact .cons (by simpa only [relayBody.binderScheme, TypeSystem.Scheme.mono] using allocation) (.nil _ _)
-  have bodyEq : selected.packet.header.function.body = [relayBody.statement.id] := by
-    have roots : selected.packet.header.function.source.roots = [relayBody.statement.id].map NodeId.statement := by
-      rw [selected.source_eq]
-      exact relayBody.roots
-    exact statementRoots_injective (selected.packet.header.agreement.roots.symm.trans roots)
+    (identityBody : IdentityBody identity.original.function.typedBody) {instantiation : DeclarationInstantiation}
+    (selects : instantiation = CallableNamedCanonicalOrder.retainedInstantiation identity.original)
+    (context : SourceSemantics.Context) (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (word : Core.Word) :
+    Dynamic.CallableApplies (Program.ofChecked fixture.recipe.compiled.sourceProgram) context evidence [] before
+      (.global ⟨instantiation, []⟩) [.word word] (.word word) (wordHeap before word) := by
   have calleeSource : identitySelected.packet.header.sourceBody.source = identity.original.function.typedBody :=
     identitySelected.packet.header.frame.source.symm.trans identitySelected.source_eq
   have covers : Dynamic.EvidenceEnvironment.Covers identitySelected.packet.header.sourceBody.context [] := by
@@ -407,34 +568,80 @@ theorem relay_source (selected : SelectedInventory whole row) {identity : Row fi
       [identityBody.statement.id] := by
     rw [calleeSource, identityBody.roots]
     exact .cons .nil
-  have calleeAllocation : Dynamic.Heap.Allocates (wordHeap ⟨[]⟩ word) .word (some (.word word))
-      ⟨(wordHeap ⟨[]⟩ word).cells.length⟩ (wordHeap (wordHeap ⟨[]⟩ word) word) := .append
-  have calleeAllocated : Dynamic.BindersAllocate [] (wordHeap ⟨[]⟩ word)
-      identitySelected.packet.header.sourceBody.source.inputs [.word word]
-      (wordEnvironment identityBody.binder (wordHeap ⟨[]⟩ word)) (wordHeap (wordHeap ⟨[]⟩ word) word) := by
+  have allocation : Dynamic.Heap.Allocates before .word (some (.word word)) ⟨before.cells.length⟩
+      (wordHeap before word) := .append
+  have allocated : Dynamic.BindersAllocate [] before identitySelected.packet.header.sourceBody.source.inputs
+      [.word word] (wordEnvironment identityBody.binder before) (wordHeap before word) := by
     rw [calleeSource, identityBody.inputs]
-    exact .cons (by simpa only [identityBody.binderScheme, TypeSystem.Scheme.mono] using calleeAllocation)
-      (.nil _ _)
+    exact .cons (by simpa only [identityBody.binderScheme, TypeSystem.Scheme.mono] using allocation) (.nil _ _)
   have execute : Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
       identitySelected.packet.header.context [] identitySelected.packet.header.sourceBody.source
-      (wordEnvironment identityBody.binder (wordHeap ⟨[]⟩ word)) (wordHeap (wordHeap ⟨[]⟩ word) word)
-      [identityBody.statement.id] identitySelected.packet.header.context (.returned (.word word))
-      (wordHeap (wordHeap ⟨[]⟩ word) word) := by
+      (wordEnvironment identityBody.binder before) (wordHeap before word) [identityBody.statement.id]
+      identitySelected.packet.header.context (.returned (.word word)) (wordHeap before word) := by
     rw [calleeSource]
-    exact identityBody.trace [] (wordHeap ⟨[]⟩ word) word
+    exact identityBody.trace [] before word
   have instantiates := identitySelected.packet.header.frame.instantiated
-  rw [identitySelected.packet.aligned.metadata, identitySelected.original, ← relayBody.selects] at instantiates
-  have applies : Dynamic.CallableApplies (Program.ofChecked fixture.recipe.compiled.sourceProgram)
-      selected.packet.header.context selected.packet.header.function.evidence [] (wordHeap ⟨[]⟩ word)
-      (.global ⟨relayBody.call.instantiation, []⟩) [.word word] (.word word)
-      (wordHeap (wordHeap ⟨[]⟩ word) word) :=
-    .global instantiates rfl covers (.returned covers rootsEq extended calleeAllocated execute rfl)
-  refine ⟨allocated, ?_⟩
-  rw [bodyEq, selected.source_eq]
-  exact relayBody.trace selected.packet.header.function.evidence ⟨[]⟩ word
-    (relayBody.valid (header_signatures selected.packet.header)) applies
+  rw [identitySelected.packet.aligned.metadata, identitySelected.original, ← selects] at instantiates
+  exact .global instantiates rfl covers (.returned covers rootsEq extended allocated execute rfl)
 
-/-- The first public call of the row, with the conclusions of the call root's
+/-- The statement roots of a header whose row's body is one statement. -/
+private theorem single_body (selected : SelectedInventory whole row) {statement : StatementId}
+    (roots : row.original.function.typedBody.roots = [.statement statement]) :
+    selected.packet.header.function.body = [statement] := by
+  have headerRoots : selected.packet.header.function.source.roots = [statement].map NodeId.statement := by
+    rw [selected.source_eq]
+    exact roots
+  exact statementRoots_injective (selected.packet.header.agreement.roots.symm.trans headerRoots)
+
+/-- The original Source execution of `relay`'s body at its header: the direct
+call's global application runs `identity`'s body instance, its header's Source
+body, at the empty dictionary. -/
+theorem relay_source (selected : SelectedInventory whole row) {identity : Row fixture}
+    (identitySelected : SelectedInventory whole identity) {called : DeclarationInstantiation → Prop}
+    (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
+    (identityBody : IdentityBody identity.original.function.typedBody)
+    (relayBody : RelayBody fixture (CallableNamedCanonicalOrder.retainedInstantiation identity.original)
+      row.original.function.typedBody)
+    (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment relayBody.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.word word)) (wordHeap (wordHeap ⟨[]⟩ word) word) := by
+  have member : relayBody.identity ∈ selected.packet.header.context.signatures.functions := by
+    rw [header_signatures selected.packet.header]
+    exact relayBody.member
+  rw [single_body selected relayBody.roots, selected.source_eq]
+  exact relayBody.trace selected.packet.header.function.evidence ⟨[]⟩ word
+    (call_valid relayBody.call member)
+    (identity_applies identitySelected calls identityBody relayBody.selects selected.packet.header.context
+      selected.packet.header.function.evidence (wordHeap ⟨[]⟩ word) word)
+
+/-- The original Source execution of `twice`'s body at its header: the inner
+call's result is the outer call's argument, and each call's global application
+runs `identity`'s body instance at the empty dictionary. -/
+theorem twice_source (selected : SelectedInventory whole row) {identity : Row fixture}
+    (identitySelected : SelectedInventory whole identity) {called : DeclarationInstantiation → Prop}
+    (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
+    (identityBody : IdentityBody identity.original.function.typedBody)
+    (twiceBody : TwiceBody fixture (CallableNamedCanonicalOrder.retainedInstantiation identity.original)
+      row.original.function.typedBody)
+    (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment twiceBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.word word)) (wordHeap (wordHeap (wordHeap ⟨[]⟩ word) word) word) := by
+  have member : twiceBody.identity ∈ selected.packet.header.context.signatures.functions := by
+    rw [header_signatures selected.packet.header]
+    exact twiceBody.member
+  rw [single_body selected twiceBody.parts.roots, selected.source_eq]
+  exact twiceBody.trace selected.packet.header.function.evidence ⟨[]⟩ word
+    (call_valid twiceBody.parts.inner member) (call_valid twiceBody.parts.outer member)
+    (identity_applies identitySelected calls identityBody twiceBody.innerSelects selected.packet.header.context
+      selected.packet.header.function.evidence (wordHeap ⟨[]⟩ word) word)
+    (identity_applies identitySelected calls identityBody twiceBody.outerSelects selected.packet.header.context
+      selected.packet.header.function.evidence (wordHeap (wordHeap ⟨[]⟩ word) word) word)
+
+/-- The first public call of a row, with the conclusions of the call root's
 output theorem, its checkpoint sufficiency theorem and its checkpoint
 reflection theorem. -/
 structure AcceptedCall (selected : SelectedInventory whole row) (word : Word)
@@ -465,23 +672,27 @@ structure AcceptedCall (selected : SelectedInventory whole row) (word : Word)
         (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome)
 
 /-- Every premise is an original checked or static observation, a runtime check
-of the program's rows, or an actual public start. The body's
+of the program's rows, an actual public start, or the row's original Source
+execution after the allocation of its `Word` parameter. The body's
 accepted-expression meaning comes from the family of the checked rows, and the
-staged Source trace is lifted from `relay`'s original execution through the
-checked shape, with the admitted callee's static receipts from the inventory. -/
-theorem accepted_call (selected : SelectedInventory whole row) {identity : Row fixture}
-    (identitySelected : SelectedInventory whole identity) {called : DeclarationInstantiation → Prop}
+staged Source trace is lifted from the original execution through the checked
+shape, with the admitted callees' static receipts from the inventory. -/
+theorem accepted_call (selected : SelectedInventory whole row) {called : DeclarationInstantiation → Prop}
     (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
     (admitted : ∀ {instantiation}, called instantiation →
       ∃ callee : Row fixture, instantiation = CallableNamedCanonicalOrder.retainedInstantiation callee.original)
-    (identityBody : IdentityBody identity.original.function.typedBody)
-    (relayBody : RelayBody fixture (CallableNamedCanonicalOrder.retainedInstantiation identity.original)
-      row.original.function.typedBody)
     (word : Word)
     (wellFormed : ProgramWellFormed (Program.ofChecked fixture.recipe.compiled.sourceProgram))
     (started : Started fixture row.original.key [.word word])
-    (callableProfile : fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true) :
+    (callableProfile : fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true)
+    {binder : TypedBinder} (inputs : row.original.function.typedBody.inputs = [binder])
+    (scheme : binder.scheme = .mono .word) {result : Word} {after : Dynamic.Heap}
+    (sourceTrace : Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.word result)) after) :
     Nonempty (AcceptedCall selected word started) := by
+  obtain ⟨types, allocated⟩ := word_parameter selected inputs scheme ⟨[]⟩ word
   have support := SelectedCompilationNamedSupport.Support.of_program wellFormed
   obtain ⟨start⟩ := CellAwarePublicInitialSelectedStart.from_selected_call
     (rows := whole.rows) (prepared := fixture.ready) (header := selected.packet.header) (call := started.call)
@@ -489,7 +700,7 @@ theorem accepted_call (selected : SelectedInventory whole row) {identity : Row f
     started.authority (.single started.ready) (fun _ member key => selected.root_selection member key)
   have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
       selected.packet.header.function.context [.word word] selected.packet.header.types := by
-    rw [word_types selected relayBody]
+    rw [types]
     exact .cons ⟨.word word, by simp [SourceCoreIndexedSession.DataInput.publicValue], .word word⟩ .nil
   have inputMeanings : RecursiveNamedPublicDataInputs.Meanings [.word word] [.word word] :=
     .cons ⟨.word word, by simp [SourceCoreIndexedSession.DataInput.publicValue], .word word⟩ .nil
@@ -508,7 +719,6 @@ theorem accepted_call (selected : SelectedInventory whole row) {identity : Row f
   let rows : ∀ header, header ∈ headers whole.rows → called header.instantiation →
       CellAwareInvocationAcceptedCallFamily.Row (headers := headers whole.rows) called header :=
     fun _header member _ => Classical.choice (whole.family_row calls support entryMember member)
-  obtain ⟨allocated, sourceTrace⟩ := relay_source selected identitySelected calls identityBody relayBody word
   obtain ⟨size, trace⟩ := CellAwareInvocationAcceptedCallLifting.body fixture.recipe.compiled.indexed
     (registry := SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled)
     ((SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled).source bodySelected)
@@ -549,34 +759,53 @@ theorem accepted_call (selected : SelectedInventory whole row) {identity : Row f
           selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows)
     exact ⟨sidecar, size, environment, bound, finalContext, outcome, after, allocated, staged, result⟩
 
+/-- The receipts that both runtime checks observe: the compiled program, its
+cache, `identity`'s row and body, the checked rows of the family that admits
+`identity`'s retained instantiation, the program typing and the callable
+profile. -/
+structure Observed where
+  fixture : CompiledFixture workspace options
+  cache : ObservedCache fixture fixture.recipe.compiled.indexed.base.functions
+  identity : Row fixture
+  identityBody : IdentityBody identity.original.function.typedBody
+  calls : CallRows fixture (fun instantiation => instantiation =
+    CallableNamedCanonicalOrder.retainedInstantiation identity.original) fixture.recipe.compiled.indexed.base.functions
+  wellFormed : ProgramWellFormed (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+  callableProfile : fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true
+
+def observe : IO Observed := do
+  let fixture ← compileFixture workspace options
+  let cache ← observeCache fixture fixture.recipe.compiled.indexed.base.functions
+  let identity ← observeRow fixture "identity"
+  let identityBody ← observeIdentityBody identity.original.function.typedBody
+  let calls ← observeCallRows fixture
+    (fun instantiation => instantiation = CallableNamedCanonicalOrder.retainedInstantiation identity.original)
+    fixture.recipe.compiled.indexed.base.functions
+  let ⟨wellFormed⟩ ← observeWellFormed fixture.checked
+  let ⟨callableProfile⟩ ← observed (fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true)
+    "calls actual callable profile"
+  return ⟨fixture, cache, identity, identityBody, calls, wellFormed, callableProfile⟩
+
 namespace AcceptedCallRuntime
 
 /-- Each call starts a fresh actual session. The plan is kernel-checked against
 whatever the observed compile, check, row and start receipts are; the resume
 runs the real compiled code. -/
 def run : IO Unit := do
-  let fixture ← compileFixture workspace options
-  let cache ← observeCache fixture fixture.recipe.compiled.indexed.base.functions
-  let identity ← observeRow fixture "identity"
-  let calls ← observeCallRows fixture
-    (fun instantiation => instantiation = CallableNamedCanonicalOrder.retainedInstantiation identity.original)
-    fixture.recipe.compiled.indexed.base.functions
-  let ⟨wellFormed⟩ ← observeWellFormed fixture.checked
-  let relay ← observeRow fixture "relay"
-  let identityBody ← observeIdentityBody identity.original.function.typedBody
-  let relayBody ← observeRelayBody fixture (CallableNamedCanonicalOrder.retainedInstantiation identity.original)
-    relay.original.function.typedBody
-  let ⟨callableProfile⟩ ← observed (fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true)
-    "one call actual callable profile"
+  let observed ← observe
+  let relay ← observeRow observed.fixture "relay"
+  let relayBody ← observeRelayBody observed.fixture
+    (CallableNamedCanonicalOrder.retainedInstantiation observed.identity.original) relay.original.function.typedBody
   for word in [Word.zero, Word.ofNatModulo 7] do
-    let started ← observeStarted fixture relay.original.key [.word word]
-    have _plan : ∃ (whole : WholeInventory fixture) (selected : SelectedInventory whole relay),
+    let started ← observeStarted observed.fixture relay.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole relay),
         Nonempty (AcceptedCall selected word started) := by
-      obtain ⟨whole⟩ := fixture.inventory cache wellFormed
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
       obtain ⟨selected⟩ := whole.select relay
-      obtain ⟨identitySelected⟩ := whole.select identity
-      exact ⟨whole, selected, accepted_call selected identitySelected calls (fun admits => ⟨identity, admits⟩)
-        identityBody relayBody word wellFormed started callableProfile⟩
+      obtain ⟨identitySelected⟩ := whole.select observed.identity
+      exact ⟨whole, selected, accepted_call selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile relayBody.inputs relayBody.binderScheme
+        (relay_source selected identitySelected observed.calls observed.identityBody relayBody word)⟩
     let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
     match result.val with
     | .succeeded returned =>
@@ -585,6 +814,34 @@ def run : IO Unit := do
   IO.println "ACCEPTED_CALL_PUBLIC_PASS"
 
 end AcceptedCallRuntime
+
+namespace AcceptedNestedCallRuntime
+
+/-- As `AcceptedCallRuntime.run`, at `twice`, whose call has a call as its
+argument. -/
+def run : IO Unit := do
+  let observed ← observe
+  let twice ← observeRow observed.fixture "twice"
+  let twiceBody ← observeTwiceBody observed.fixture
+    (CallableNamedCanonicalOrder.retainedInstantiation observed.identity.original) twice.original.function.typedBody
+  for word in [Word.zero, Word.ofNatModulo 7] do
+    let started ← observeStarted observed.fixture twice.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole twice),
+        Nonempty (AcceptedCall selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select twice
+      obtain ⟨identitySelected⟩ := whole.select observed.identity
+      exact ⟨whole, selected, accepted_call selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile twiceBody.parts.inputs twiceBody.binderScheme
+        (twice_source selected identitySelected observed.calls observed.identityBody twiceBody word)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .succeeded returned =>
+      unless returned.value == .word word do throw (IO.userError "accepted nested call output changed")
+    | _ => throw (IO.userError "accepted nested call did not succeed")
+  IO.println "ACCEPTED_NESTED_CALL_PUBLIC_PASS"
+
+end AcceptedNestedCallRuntime
 
 end Tests.SourceCoreAcceptedOneCall
 end
