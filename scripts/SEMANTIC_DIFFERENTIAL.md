@@ -8650,6 +8650,9 @@ directive tools, solc, Anvil and cast frozen.
   - A fuzz-driver iteration with base seed `20392780` ran 16 source mutants
     in eight fixtures. It found one new mismatch of the O0 class, and the
     known Hull failure.
+- **At `e2eef194`:** Sonatina O2 also places its first allocation away from
+  `0x80`, at `0x140`. A fuzz-driver iteration over eight fixtures matched all
+  603 steps of its 147 input, 27 sequence and 12 source mutants.
 
 ## Compare generic selection
 
