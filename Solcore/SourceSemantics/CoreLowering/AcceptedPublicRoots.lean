@@ -5,6 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.AcceptedCalls
+import Solcore.SourceSemantics.CoreLowering.AcceptedNestedCalls
 
 /-!
 # Accepted bodies at the public root
@@ -474,7 +475,7 @@ directions. The root executes its actual argument packing and stored named
 closure; the body runs on the slot-retaining protocol from the root's physical
 cache and capture (`CellAwareInvocationAcceptedCallEntry`). The body's
 accepted-expression meaning is an input. `expressions_of_family` supplies it at
-every grade from the row's own extended roots and call authority and a family
+every grade from the row's own nested sites and call authority and a family
 of callee rows, through the family induction
 (`CellAwareInvocationAcceptedCallFamily`). -/
 set_option autoImplicit false
@@ -674,12 +675,12 @@ theorem reflects_root_selected
 
 include callableProfile receiver aligned diagnostic support artifact checked in
 /-- The accepted-expression input of the theorems of this section at every
-grade, for a row whose accepted expressions are extended roots that call only
+grade, for a row whose accepted expressions are nested sites that call only
 the admitted instantiations of a family: each admitted callee's application
 comes from the family closure, at every grade. The row itself need not be
 admitted. -/
 theorem expressions_of_family {called : DeclarationInstantiation → Prop}
-    (closed : CellAwareInvocationAcceptedCallExpressions.ClosedCalls prepared.compilation
+    (closed : CellAwareInvocationAcceptedNestedExpressions.ClosedNested prepared.compilation
       (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned) called)
     (ports : CellAwareInvocationAcceptedCallExpressions.Ports (headers := headers) prepared.compilation
       (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned))
@@ -709,7 +710,7 @@ theorem expressions_of_family {called : DeclarationInstantiation → Prop}
     show child.source = CallableIndexedNamedGeneration.source prepared.named
     rw [← aligned.named]
     exact ((SelectedCompilationPhysicalProgramSupport.stages whole).source selectedChild).trans header.agreement.source
-  exact CellAwareInvocationAcceptedCallExpressions.expressions prepared.compilation
+  exact CellAwareInvocationAcceptedNestedExpressions.expressions prepared.compilation
     (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned) called owner keyPhysical stages child faults
     closed size sourceEq completion.result.extension
     (CellAwareInvocationAcceptedNamedInvocation.reads prepared.compilation

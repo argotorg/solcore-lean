@@ -369,10 +369,10 @@ end
 
 section
 /-! Every cache row of a program is checked: its expression nodes are
-extended roots that call only the instantiations a family admits, its
+nested sites that call only the instantiations a family admits, its
 statement list has a supported shape with those roots, and it has no evidence
 assumptions. With a complete inventory the checks give each issued header its
-accepted body, coverage, extended roots and call authority, and so a row of
+accepted body, coverage, nested sites and call authority, and so a row of
 the family. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -380,33 +380,33 @@ set_option maxHeartbeats 4000000
 namespace Tests.SourceCoreAcceptedFixture
 open Solcore Core Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Issued Inventory headers)
-open CellAwareInvocationAcceptedCallTrees (CallSubset)
+open CellAwareInvocationAcceptedNestedTrees (Nested)
 open CellAwareInvocationAcceptedBodyShape (Shape)
 open CellAwareInvocationAcceptedNamedHeaders (index)
 
 variable {workspace : Workspace.RawWorkspace} {options : SourceCoreCompiler.Options}
 
-/-- The checks of one cache row: its expression nodes are extended roots that
+/-- The checks of one cache row: its expression nodes are nested sites that
 call only instantiations `called` admits, or declaration references the plan
 records no reference edge for. -/
 structure CallRow (fixture : CompiledFixture workspace options) (called : DeclarationInstantiation → Prop)
     (named : SourceCoreGeneralFunctions.Function) where
   nodes : ∀ id node, (CallableIndexedNamedGeneration.source named).lookupExpression? id = some node →
-    CellAwareInvocationAcceptedCallSubsetCheck.Checked fixture.recipe.compiled.indexed named
+    CellAwareInvocationAcceptedNestedCheck.Checked fixture.recipe.compiled.indexed named
       (CallableIndexedNamedGeneration.source named) called id
   statements : List StatementId
   roots : (CallableIndexedNamedGeneration.source named).roots = statements.map NodeId.statement
   shape : Shape (CallableIndexedNamedGeneration.source named) named.specialized.function.inferredBodyType
-    (CallSubset fixture.recipe.compiled.indexed named (CallableIndexedNamedGeneration.source named) called) true
+    (Nested fixture.recipe.compiled.indexed named (CallableIndexedNamedGeneration.source named) called) true
     statements
   assumptions : named.specialized.assumptions = []
 
 def observeCallRow (fixture : CompiledFixture workspace options) (called : DeclarationInstantiation → Prop)
     [DecidablePred called] (named : SourceCoreGeneralFunctions.Function) : IO (CallRow fixture called named) := do
   let source := CallableIndexedNamedGeneration.source named
-  let some ⟨nodes⟩ := CellAwareInvocationAcceptedCallSubsetCheck.nodes? fixture.recipe.compiled.indexed named source
+  let some ⟨nodes⟩ := CellAwareInvocationAcceptedNestedCheck.nodes? fixture.recipe.compiled.indexed named source
       called
-    | throw (IO.userError "accepted fixture row outside the extended roots")
+    | throw (IO.userError "accepted fixture row outside the nested sites")
   let statements := source.roots.filterMap fun root =>
     match root with
     | .statement id => some id
@@ -414,7 +414,7 @@ def observeCallRow (fixture : CompiledFixture workspace options) (called : Decla
   let ⟨roots⟩ ← observed (source.roots = statements.map NodeId.statement) "accepted fixture statement roots"
   let some ⟨shape⟩ := CellAwareInvocationAcceptedBodyShape.shapeWith? source
       named.specialized.function.inferredBodyType _
-      (CellAwareInvocationAcceptedCallSubsetCheck.callSubset? fixture.recipe.compiled.indexed named source called
+      (CellAwareInvocationAcceptedNestedCheck.nested? fixture.recipe.compiled.indexed named source called
         (source.nodes.length + 1))
       (source.nodes.length + 1) true statements
     | throw (IO.userError "accepted fixture statement shape")
@@ -457,7 +457,7 @@ private theorem statement_roots {left right : List StatementId}
       cases same.1
       exact congrArg (List.cons head) (ih same.2)
 
-/-- The accepted body, its coverage, its extended roots and its call
+/-- The accepted body, its coverage, its nested sites and its call
 authority at the header of an issued packet, from the checks of the packet's
 cache row. -/
 theorem WholeInventory.call_inputs {fixture : CompiledFixture workspace options} (whole : WholeInventory fixture)
@@ -494,7 +494,7 @@ theorem WholeInventory.call_inputs {fixture : CompiledFixture workspace options}
         (CellAwareInvocationAcceptedInputs.Generalized (attachment := fun _ _ _ => True)
           (index (CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued input.prepared packet.selected)
             packet.aligned)) body.tree ∧
-      CellAwareInvocationAcceptedCallExpressions.ClosedCalls
+      CellAwareInvocationAcceptedNestedExpressions.ClosedNested
         (CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued input.prepared packet.selected).compilation
         (CellAwareInvocationAcceptedNamedHeaders.record
           (CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued input.prepared packet.selected) packet.aligned)
@@ -523,7 +523,7 @@ theorem WholeInventory.call_inputs {fixture : CompiledFixture workspace options}
     rw [packet.header.agreement.result, packet.aligned.named]
     rfl
   have indexShape : Shape (index prepared packet.aligned).compilerSource packet.header.function.resultType
-      (CallSubset fixture.recipe.compiled.indexed input.prepared.named
+      (Nested fixture.recipe.compiled.indexed input.prepared.named
         (CallableIndexedNamedGeneration.source input.prepared.named) called) true
       (index prepared packet.aligned).statements := by
     rw [indexStatements, resultEq]
@@ -536,7 +536,7 @@ theorem WholeInventory.call_inputs {fixture : CompiledFixture workspace options}
       (index prepared packet.aligned))
     ready indexShape
   exact ⟨body, covered,
-    CellAwareInvocationAcceptedCallSubsetCheck.closedCalls prepared.compilation
+    CellAwareInvocationAcceptedNestedCheck.closedNested prepared.compilation
       (CellAwareInvocationAcceptedNamedHeaders.record prepared packet.aligned) call.nodes,
     CellAwareInvocationAcceptedCallAuthority.ports whole.rows whole.complete prepared.compilation
       (CellAwareInvocationAcceptedNamedHeaders.record prepared packet.aligned)⟩
@@ -604,7 +604,7 @@ set_option maxHeartbeats 4000000
 namespace Tests.SourceCoreAcceptedFixture
 open Solcore Core Frontend SourceInference SourceSemantics CoreLowering
 open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Issued Inventory headers)
-open CellAwareInvocationAcceptedCallTrees (CallSubset)
+open CellAwareInvocationAcceptedNestedTrees (Nested)
 open CellAwareInvocationAcceptedBodyShape (Shape)
 
 variable {workspace : Workspace.RawWorkspace} {options : SourceCoreCompiler.Options}
@@ -614,7 +614,7 @@ variable {workspace : Workspace.RawWorkspace} {options : SourceCoreCompiler.Opti
 theorem CallRows.header_shape (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
     {input : Input fixture.recipe.compiled} (packet : Issued input) :
     Shape packet.header.function.source packet.header.function.resultType
-      (CallSubset fixture.recipe.compiled.indexed input.prepared.named packet.header.function.source called) true
+      (Nested fixture.recipe.compiled.indexed input.prepared.named packet.header.function.source called) true
       packet.header.function.body := by
   obtain ⟨call⟩ := calls.at_slot input.prepared.selected
   have sourceEq : packet.header.function.source = CallableIndexedNamedGeneration.source input.prepared.named := by

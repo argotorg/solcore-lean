@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedShapes
-import Solcore.SourceSemantics.CoreLowering.AcceptedCalls
+import Solcore.SourceSemantics.CoreLowering.AcceptedNestedCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceExecutionSize
 
 /-!
@@ -13,9 +13,9 @@ the call's, is lifted by one strong induction on the size across bodies.
 Main declarations:
 - `CellAwareInvocationAcceptedSizedLifting.statements`, the sized lifting of a
   supported statement list given the lifting of its expressions below the size;
-- `CellAwareInvocationAcceptedCallLifting.call_value` and
-  `CellAwareInvocationAcceptedCallLifting.extended_roots`, a direct call's value
-  execution and every extended root's value execution;
+- `CellAwareInvocationAcceptedCallLifting.nested_value` and
+  `CellAwareInvocationAcceptedCallLifting.nested_roots`, the value execution of
+  every nested site;
 - `CellAwareInvocationAcceptedCallLifting.bodies` and
   `CellAwareInvocationAcceptedCallLifting.body`, the induction across bodies and
   the staged trace of a call-containing body, given the static receipts of the
@@ -461,35 +461,59 @@ end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedSizedLifting
 end
 
 section
-/-! Original executions of call-containing bodies are staged executions. A
-direct call's original rule runs the callee body, so the lifting is one strong
-induction on the size of the original derivation across bodies: at a call of a
-given size, the callee body's derivation is smaller, and its lifting below that
-size gives the staged global application. The admitted callees are static
-inputs (`Callees`): the registry scope of each callee's global view at the
-empty dictionary and the shape of its body, whose expressions are extended
-roots of its own cache row. Fault executions are not lifted here. -/
+/-! Original executions of bodies whose expressions are nested sites are
+staged executions. A direct call's original rule runs the callee body, so the
+lifting is one strong induction on the size of the original derivation across
+bodies: at a call of a given size, the callee body's derivation is smaller, and
+its lifting below that size gives the staged global application. Inside one
+body, a nested site is lifted by induction on the site, over the sized
+derivations of its operands, branches, elements and arguments. The admitted
+callees are static inputs (`Callees`): the registry scope of each callee's
+global view at the empty dictionary and the shape of its body, whose
+expressions are nested sites of its own cache row. Fault executions are not
+lifted here. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedCallLifting
 open Core Frontend SourceInference
 open CallableIndexedNamedGeneration (Prepared)
-open CellAwareInvocationAcceptedExpressionTrees (Subset)
-open CellAwareInvocationAcceptedDirectSites (DirectSite)
-open CellAwareInvocationAcceptedCallTrees (CallSubset)
+open CellAwareNamedExpressionSyntax (Site)
+open CellAwareInvocationAcceptedNestedTrees (Nested)
 open CellAwareInvocationAcceptedBodyShape (Shape)
 open CellAwareInvocationAcceptedStatementLifting (control)
 open CellAwareInvocationAcceptedSizedLifting (ChildLifts)
 open CellAwareInvocationAcceptedSourceLifting (expression_value)
+
+section Sites
+variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+  {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope} {id : ExpressionId}
+
+private theorem requirements_of (site : Site prepared named scope.source id)
+    {form : ExpressionForm} (same : site.node.form = form)
+    (notInteger : ∀ literal resolution, form ≠ .integerLiteral literal resolution) :
+    site.node.requirements = [] := by
+  have requirements := site.requirements
+  split at requirements
+  · rename_i literal resolution integer
+    exact absurd (same.symm.trans integer) (notInteger literal resolution)
+  · exact requirements
+
+private theorem occurrence (site : Site prepared named scope.source id)
+    {form : ExpressionForm} (same : site.node.form = form)
+    (notInteger : ∀ literal resolution, form ≠ .integerLiteral literal resolution) :
+    Staging.Recursive.Occurrence scope id form :=
+  ⟨site.node, lookupExpression?_sound site.found, same, requirements_of site same notInteger, site.coercions⟩
+
+end Sites
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
   (program : Program) (registry : Staging.Recursive.Registry) (called : DeclarationInstantiation → Prop)
 
 /-- The static receipts of every admitted callee: the registry scope of the
 global view of its body instance at the empty dictionary, the uniqueness of its
-nodes, and a supported shape of its body whose expressions are extended roots
-of its own cache row. -/
+nodes, and a supported shape of its body whose expressions are nested sites of
+its own cache row. -/
 def Callees : Prop :=
   ∀ {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance} {roots : List StatementId},
     called instantiation → Dynamic.FunctionInstantiates program instantiation bodyInstance →
@@ -497,7 +521,7 @@ def Callees : Prop :=
     ∃ (child : Staging.Recursive.Scope) (named : SourceCoreGeneralFunctions.Function) (expected : TypeSystem.Ty),
       registry.Closure (Staging.Recursive.globalView bodyInstance [] roots) child ∧
       NodeOccurrencesUnique bodyInstance.source ∧
-      Shape bodyInstance.source expected (CallSubset prepared named bodyInstance.source called) true roots
+      Shape bodyInstance.source expected (Nested prepared named bodyInstance.source called) true roots
 
 /-- Every admitted callee's original body derivation below a size is a staged
 execution in the registry scope of its global view. -/
@@ -538,87 +562,221 @@ private theorem node_unique {scope : Staging.Recursive.Scope} (unique : NodeOccu
     (second : ContainsExpression scope.source id right) : left = right :=
   Option.some.inj ((lookupExpression?_complete unique first).symm.trans (lookupExpression?_complete unique second))
 
-/-- The value executions of first-subset arguments are staged executions. -/
-private theorem arguments_value {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
-    (unique : NodeOccurrencesUnique scope.source) :
-    ∀ {ids : List ExpressionId}, (∀ argument ∈ ids, Subset prepared named scope.source argument) →
-    ∀ {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
-      {values : List Dynamic.Value},
-      Dynamic.ExpressionsEvaluate program context scope.evidence scope.source environment before ids values after →
+/-- A sized value execution at a node without coercions that is not a local
+read runs the node's form below the same size. -/
+private theorem form_below {scope : Staging.Recursive.Scope} (unique : NodeOccurrencesUnique scope.source)
+    {id : ExpressionId} {node : ExpressionNode} (found : scope.source.lookupExpression? id = some node)
+    (coercions : node.coercions = []) (notLocal : ∀ name binder, node.form ≠ .reference name (.local binder))
+    {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {value : Dynamic.Value}
+    (trace : SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
+      before id value after) :
+    ∃ formSize, formSize < size ∧ SourceExecutionSize.ExpressionFormEvaluates program formSize context
+      scope.evidence scope.source environment before node.form node.requirements [] value after := by
+  have contains := lookupExpression?_sound found
+  cases trace with
+  | intro traceFound form path =>
+    cases node_unique unique traceFound contains
+    rw [coercions] at path form
+    cases path
+    exact ⟨_, SourceExecutionSize.child_lt_stepSize (by simp), form⟩
+  | generalizedLocal traceFound formEq =>
+    cases node_unique unique traceFound contains
+    exact absurd formEq (notLocal _ _)
+
+/-- The value executions of nested arguments are staged executions. -/
+private theorem arguments_value {scope : Staging.Recursive.Scope} {bound : Nat} :
+    ∀ {ids : List ExpressionId},
+    (∀ argument ∈ ids, ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+      SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
+        argument value after →
+      Staging.Recursive.Expression program registry scope context environment before argument (.value value) after) →
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {values : List Dynamic.Value}, size ≤ bound →
+      SourceExecutionSize.ExpressionsEvaluate program size context scope.evidence scope.source environment before ids
+        values after →
       Staging.Recursive.Expressions program registry scope context environment before ids (.values values) after := by
   intro ids
   induction ids with
   | nil =>
-    intro _ context environment before after values evaluated
+    intro _ size context environment before after values _ evaluated
     cases evaluated
     exact .nil
   | cons head rest ih =>
-    intro arguments context environment before after values evaluated
+    intro lifts size context environment before after values within evaluated
     cases evaluated with
     | cons first tail =>
-      exact .cons (expression_value unique (arguments head List.mem_cons_self) first)
-        (ih (fun argument member => arguments argument (List.mem_cons_of_mem _ member)) tail)
+      exact .cons
+        (lifts head List.mem_cons_self (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+          omega) first)
+        (ih (fun argument member => lifts argument (List.mem_cons_of_mem _ member)) (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+          omega) tail)
 
-/-- A sized value execution of a direct call at an extended root is a staged
-execution, given the lifting of the callee bodies below its size. -/
-theorem call_value {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
-    (unique : NodeOccurrencesUnique scope.source) {bound : Nat}
-    (bodies : BodiesLift program registry called bound)
-    {id callee : ExpressionId} {ids : List ExpressionId} {instantiation : DeclarationInstantiation}
-    (site : DirectSite prepared named scope.source id callee ids instantiation) (selected : called instantiation)
-    (arguments : ∀ argument ∈ ids, Subset prepared named scope.source argument)
-    {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
-    {before after : Dynamic.Heap} {value : Dynamic.Value} (below : size ≤ bound)
-    (trace : SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
-      before id value after) :
-    Staging.Recursive.Expression program registry scope context environment before id (.value value) after := by
-  have contains := lookupExpression?_sound site.found
-  cases trace with
-  | intro found form coercions =>
-    cases node_unique unique found contains
-    rw [site.coercions] at coercions
-    cases coercions
-    rw [site.form, site.requirements, site.coercions] at form
-    cases form with
-    | directCall calleeContains calleeForm calleeRequirements calleeCoercions valid evaluated produced applies =>
-      have stagedArguments := arguments_value (registry := registry) prepared unique arguments evaluated.sound
-      have nilEvidence := evidence_nil (site.monomorphic.predicates ▸ produced)
-      subst nilEvidence
+/-- A sized value execution of a nested site is a staged execution with the
+same value and heap, given the lifting of the admitted callee bodies below a
+bound of its size. -/
+theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
+    (unique : NodeOccurrencesUnique scope.source) {bound : Nat} (bodies : BodiesLift program registry called bound)
+    {id : ExpressionId} (nested : Nested prepared named scope.source called id) :
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+      SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before id
+        value after →
+      Staging.Recursive.Expression program registry scope context environment before id (.value value) after := by
+  induction nested with
+  | literal site atomic =>
+    intro size context environment before after value _ trace
+    exact expression_value unique (.literal site atomic) trace.sound
+  | read site form =>
+    intro size context environment before after value _ trace
+    exact expression_value unique (.read site form) trace.sound
+  | unary site form _ child =>
+    intro size context environment before after value within trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | unary layout operand applies =>
+      have empty := CompatibleExpressionPrimitives.no_owned layout
+      subst empty
       cases applies with
-      | global instantiates invocationEq covers invokes =>
-        cases invokes with
-        | returned _ rootsEq parameters allocate execute returned =>
-          obtain ⟨child, closure, lifts⟩ := bodies selected instantiates rootsEq
-          have staged := lifts (by
-            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below ⊢
-            omega) execute
-          subst returned
-          exact .directApplied ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
-            ⟨_, calleeContains, calleeForm, calleeRequirements, calleeCoercions⟩ valid stagedArguments produced
-            (.global instantiates covers rootsEq closure parameters allocate staged .returned)
-        | unit _ resultUnit rootsEq parameters allocate execute fellThrough =>
-          obtain ⟨child, closure, lifts⟩ := bodies selected instantiates rootsEq
-          have staged := lifts (by
-            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below ⊢
-            omega) execute
-          obtain ⟨finalEnvironment, rfl⟩ := fellThrough
-          exact .directApplied ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
-            ⟨_, calleeContains, calleeForm, calleeRequirements, calleeCoercions⟩ valid stagedArguments produced
-            (.global instantiates covers rootsEq closure parameters allocate staged (by rw [resultUnit]; exact .unit))
-  | generalizedLocal found formEq =>
-    cases node_unique unique found contains
-    rw [site.form] at formEq
-    cases formEq
+      | primitive applied =>
+        exact .unary (occurrence site form (fun _ _ same => by cases same))
+          (child (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+            omega) operand) applied
+      | method _ selected _ => cases selected
+  | binary site form _ _ left right =>
+    intro size context environment before after value within trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | binaryShortCircuit _ first circuit _ =>
+      exact .binaryShortCircuit (occurrence site form (fun _ _ same => by cases same))
+        (left (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first) circuit
+    | binaryEvaluateRight layout first continues second applies =>
+      have empty := CompatibleExpressionPrimitives.no_owned layout
+      subst empty
+      cases applies with
+      | primitive applied =>
+        exact .binary (occurrence site form (fun _ _ same => by cases same))
+          (left (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+            omega) first) continues
+          (right (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+            omega) second) applied
+      | method _ selected _ => cases selected
+  | conditional site form _ _ _ test yes no =>
+    intro size context environment before after value within trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | conditionalTrue _ first second =>
+      exact .conditional (occurrence site form (fun _ _ same => by cases same))
+        (test (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first)
+        (yes (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) second)
+    | conditionalFalse _ first second =>
+      exact .conditional (occurrence site form (fun _ _ same => by cases same))
+        (test (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first)
+        (no (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) second)
+  | group site form _ child =>
+    intro size context environment before after value within trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | group _ inner =>
+      exact .group (occurrence site form (fun _ _ same => by cases same))
+        (child (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) inner)
+  | pair site form _ _ left right =>
+    intro size context environment before after value within trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | tuple _ elements pack =>
+      cases elements with
+      | cons first rest =>
+        cases rest with
+        | cons second tail =>
+          cases tail
+          cases pack with
+          | cons tail =>
+            cases tail
+            exact .pair (occurrence site form (fun _ _ same => by cases same))
+              (left (by
+                simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+                omega) first)
+              (right (by
+                simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+                omega) second)
+  | @call id callee ids instantiation site selected _ arguments =>
+    intro size context environment before after value within trace
+    have contains := lookupExpression?_sound site.found
+    cases trace with
+    | intro found form coercions =>
+      cases node_unique unique found contains
+      rw [site.coercions] at coercions
+      cases coercions
+      rw [site.form, site.requirements, site.coercions] at form
+      cases form with
+      | directCall calleeContains calleeForm calleeRequirements calleeCoercions valid evaluated produced applies =>
+        have stagedArguments := arguments_value (registry := registry) arguments (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+          omega) evaluated
+        have nilEvidence := evidence_nil (site.monomorphic.predicates ▸ produced)
+        subst nilEvidence
+        cases applies with
+        | global instantiates invocationEq covers invokes =>
+          cases invokes with
+          | returned _ rootsEq parameters allocate execute returned =>
+            obtain ⟨child, closure, lifts⟩ := bodies selected instantiates rootsEq
+            have staged := lifts (by
+              simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within ⊢
+              omega) execute
+            subst returned
+            exact .directApplied ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
+              ⟨_, calleeContains, calleeForm, calleeRequirements, calleeCoercions⟩ valid stagedArguments produced
+              (.global instantiates covers rootsEq closure parameters allocate staged .returned)
+          | unit _ resultUnit rootsEq parameters allocate execute fellThrough =>
+            obtain ⟨child, closure, lifts⟩ := bodies selected instantiates rootsEq
+            have staged := lifts (by
+              simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within ⊢
+              omega) execute
+            obtain ⟨finalEnvironment, rfl⟩ := fellThrough
+            exact .directApplied ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
+              ⟨_, calleeContains, calleeForm, calleeRequirements, calleeCoercions⟩ valid stagedArguments produced
+              (.global instantiates covers rootsEq closure parameters allocate staged (by rw [resultUnit]; exact .unit))
+    | generalizedLocal found formEq =>
+      cases node_unique unique found contains
+      rw [site.form] at formEq
+      cases formEq
 
-/-- The value lifting of every extended root below a size, given the lifting
-of the callee bodies below it. -/
-theorem extended_roots {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
+/-- The value lifting of every nested site below a size, given the lifting of
+the callee bodies below it. -/
+theorem nested_roots {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
     (unique : NodeOccurrencesUnique scope.source) {bound : Nat} (bodies : BodiesLift program registry called bound) :
-    ChildLifts program registry scope (CallSubset prepared named scope.source called) bound := by
-  intro id root size context environment before after value below trace
-  cases root with
-  | subset subset => exact expression_value unique subset trace.sound
-  | call site selected arguments => exact call_value prepared unique bodies site selected arguments (Nat.le_of_lt below) trace
+    ChildLifts program registry scope (Nested prepared named scope.source called) bound := by
+  intro id nested size context environment before after value below trace
+  exact nested_value prepared unique bodies nested (Nat.le_of_lt below) trace
 
 /-- Every admitted callee's original body derivation is a staged execution at
 every size: one strong induction on the size across bodies. -/
@@ -633,11 +791,11 @@ theorem bodies (callees : Callees prepared program registry called) (bound : Nat
     have sourceEq : child.source = bodyInstance.source := registry.source closure
     have evidenceEq : child.evidence = [] := registry.evidence closure
     have childUnique : NodeOccurrencesUnique child.source := sourceEq ▸ unique
-    have childShape : Shape child.source expected (CallSubset prepared named child.source called) true statements := by
+    have childShape : Shape child.source expected (Nested prepared named child.source called) true statements := by
       rw [sourceEq]
       exact shape
-    have lift : ChildLifts program registry child (CallSubset prepared named child.source called) size :=
-      extended_roots prepared childUnique (ih size below)
+    have lift : ChildLifts program registry child (Nested prepared named child.source called) size :=
+      nested_roots prepared childUnique (ih size below)
     refine CellAwareInvocationAcceptedSizedLifting.statements childUnique lift childShape (Nat.le_refl size) ?_
     show SourceExecutionSize.FunctionStatementsExecute program size context child.evidence child.source environment
       before statements finalContext outcome after
@@ -645,14 +803,14 @@ theorem bodies (callees : Callees prepared program registry called) (bound : Nat
     exact trace
 
 /-- An ordinary function-body execution of a supported list whose expressions
-are extended roots is a staged execution with the same context, outcome and
+are nested sites is a staged execution with the same context, outcome and
 heap, at any scope with the execution's Source and evidence, given the static
 receipts of the admitted callees. -/
 theorem body {scope : Staging.Recursive.Scope} {source : TypedSource} {evidence : Dynamic.EvidenceEnvironment}
     (sourceEq : scope.source = source) (evidenceEq : scope.evidence = evidence)
     (unique : NodeOccurrencesUnique source) (callees : Callees prepared program registry called)
     {named : SourceCoreGeneralFunctions.Function} {expected : TypeSystem.Ty} {statements : List StatementId}
-    (shape : Shape source expected (CallSubset prepared named source called) true statements)
+    (shape : Shape source expected (Nested prepared named source called) true statements)
     {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
     {finalContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
     (trace : Dynamic.FunctionStatementsExecute program context evidence source environment before statements
@@ -661,8 +819,8 @@ theorem body {scope : Staging.Recursive.Scope} {source : TypedSource} {evidence 
       finalContext (control outcome) after := by
   subst sourceEq evidenceEq
   obtain ⟨size, sized⟩ := SourceExecutionSize.FunctionStatementsExecute.has_size trace
-  have lift : ChildLifts program registry scope (CallSubset prepared named scope.source called) size :=
-    extended_roots prepared unique (bodies prepared callees size)
+  have lift : ChildLifts program registry scope (Nested prepared named scope.source called) size :=
+    nested_roots prepared unique (bodies prepared callees size)
   exact Staging.Recursive.Size.Statements.of_trace
     (CellAwareInvocationAcceptedSizedLifting.statements unique lift shape (Nat.le_refl size) sized)
 
