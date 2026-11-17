@@ -42,7 +42,7 @@ obligations. None follows from agreement in a test corpus.
 - **Source emitter proofs** for fifteen emitters
   ([source emitter meaning](scalar-emitter-meaning.md)).
 - **The re-pin to `e2eef194`** (`4da119798`). It found no new upstream defect.
-- **Upstream rows 1 to 5** in Lean, row 4 for memory arrays in functions: see
+- **Upstream rows 1 to 5 and 7** in Lean, row 4 for memory arrays in functions: see
   [the upstream table](#following-upstreams-semantics-the-next-units).
 - **Closures capture by value** (solcore-rs #120), in Lean and in the closure capture and closure
   factory profiles ([source semantics](../guide/source-semantics.md#closures-capture-by-value)).
@@ -70,12 +70,11 @@ obligations. None follows from agreement in a test corpus.
   - Remaining: further state operations, ECRECOVER and P256VERIFY, init frames and public
     deployment, the rest of inline Yul, object linking, and then divergence and reverse
     correspondence.
-- **Upstream row 7**: closure factories
+- **Upstream row 6**: Q006 in the importer and `SC0420` in typing, the survey first
   ([the upstream table](#following-upstreams-semantics-the-next-units)).
 
 ### Open
 
-- **Upstream row 6** ([the upstream table](#following-upstreams-semantics-the-next-units)).
 - **Emitter proofs** for the other emitters. The unproved ones that render with `AggregateRenderer`
   are the closure, comptime, module, storage mapping, sender-keyed ledger, dynamic array, dynamic
   bytes, long bytes, call value, contract call and forwarded value emitters.
@@ -109,9 +108,8 @@ The last two are recorded without investigation, and the generators avoid them.
 
 ### Now
 
-1. **Rows 7 and 6 of the upstream table, in that order.** Row 5 and row 4's last steps are done.
-   - Row 7: the source semantics and lowering of closure factories' captures.
-   - Row 6: a survey of Q006 in the importer and of `SC0420` in typing.
+1. **Row 6 of the upstream table**: a survey of Q006 in the importer and of `SC0420` in typing.
+   Rows 5 and 7 and row 4's last steps are done.
 2. **Meaning proofs.** Calls nested in other expressions, the next step of native Source goal
    two. Then row 1's leftovers: the conversions, then compound assignments and in-place `~` at the
    twelve types ([what remains](integer-types-unchecked-shifts.md#what-remains)).
@@ -161,8 +159,8 @@ code.
 | 3 | Shift operators (#129): `<<` and `>>` with `Shl`, `Shr` and `ShiftAmount`, arithmetic `>>` for signed types, no revert, amounts of at least the width giving 0 or -1 | **Done** for `word` and the twelve types: `<<`, `>>`, `<<=` and `>>=` by a `word` or unsigned amount ([shifts](integer-types-unchecked-shifts.md#shifts-as-implemented)). | `shift-operators` |
 | 4 | Memory arrays, slices and panic codes (#145): `T[]`, `new T[](n)` zeroed, `a.length` and methods on any receiver, `a[i]` through a checked `memref`, read-only slices `a[s:e]`, memory arrays in the public ABI, `Panic(0x32)` for indices and slice bounds, `Panic(0x31)` for an empty pop, `Panic(0x41)` for allocation overflow | **Done for memory arrays in functions.** `T[]`, `new`, literals, reads, element writes and compound assignments, lengths, slices, `toArray(s)`, `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` are typed, have their source semantics and compile through the compatible profile, outside the meaning proofs. A compound assignment evaluates its element place once, by the user's decision, where upstream evaluates it twice. Storage and calldata arrays and `T[]` in the ABI wait for native contract storage and a calldata ABI ([memory arrays note](memory-arrays-slices.md), [differences](memory-arrays-slices.md#differences-from-upstream-that-lean-would-keep)). | `array-syntax`, `mem-array`, `array-slice`, `calldata-slice`, `memory-array-abi`, `user-collection-index`, `memory-allocation-bounds`, `allocator-bounds`, `abi-sum-padding`, `array-ops` |
 | 5 | `pragma solcore;` (#141): required first in every file, once, without arguments | **Done.** Every emitter prints the pragma. Lean's loader rejects a file without it, with it after another declaration, twice, or with arguments, as upstream's `SC0002` does; the parser reads it as an ordinary pragma. | every fixture |
-| 6 | Compiler fixes #130 to #133: recursive layouts rejected with `SC0420`, canonical ABI outputs of memory dynamic arrays, frontend diagnostics before specialization, inline Yul calls to Hull functions qualified with `usr$` | **Open.** The recursive-layout gate and the records of the three fixtures that Q008 and Q010 admitted already follow upstream. Two questions remain: whether the importer accepts a plain-name Hull call from inline Yul, which the Yul emitter now qualifies, rather than diagnosing it (Q006), and whether Lean's typing refuses the recursive layouts that `SC0420` refuses. | `storage-array`, `ufcs-array`, `module-local-function-evidence`, `storage-adt-recursive-ok`, `asm-substitution` |
-| 7 | Closure factories (`bf7114a8`, `ad1f49cf`): captures resolved in the factory's own scope, a factory's runtime effects kept | **In progress.** Lean captures by value (#120), its public API runs factories, and the closure factory profile models them. The source semantics and lowering of these captures remain ([closures](../guide/source-semantics.md#closures-capture-by-value)). | `closure-parameters` (36 → 49 calls) |
+| 6 | Compiler fixes #130 to #133: recursive layouts rejected with `SC0420`, canonical ABI outputs of memory dynamic arrays, frontend diagnostics before specialization, inline Yul calls to Hull functions qualified with `usr$` | **In progress.** The recursive-layout gate and the records of the three fixtures that Q008 and Q010 admitted already follow upstream. Two questions remain: whether the importer accepts a plain-name Hull call from inline Yul, which the Yul emitter now qualifies, rather than diagnosing it (Q006), and whether Lean's typing refuses the recursive layouts that `SC0420` refuses. | `storage-array`, `ufcs-array`, `module-local-function-evidence`, `storage-adt-recursive-ok`, `asm-substitution` |
+| 7 | Closure factories (`bf7114a8`, `ad1f49cf`): captures resolved in the factory's own scope, a factory's runtime effects kept | **Done where the native pipeline runs the fixture.** Captures resolve in the factory's own scope, and a factory's body runs when it is called, as upstream now does; Lean's typing, source semantics and lowering needed no change. Calls that use contract storage or inline assembly wait for them ([closures](../guide/source-semantics.md#closures-capture-by-value)). | `closure-parameters` (36 → 49 calls) |
 | — | `msgSender` (#142) and contract-declared struct state (#138) | **Nothing to do.** #142 uses std's existing `msgSender` in examples, and #138 changes only examples. | `msg-context` |
 
 The new `evm-word-boundaries` fixture checks the `word` operations at their extremes, which the

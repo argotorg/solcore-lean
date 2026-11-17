@@ -209,10 +209,11 @@ generalized `let` (`CellAwareNamedGeneralizedPrefix.complete`) record or follow 
 protected protocols are rebound to them (`ProtectedStateTransition.Rebinds`).
 
 **Tests.** `Tests.SourceCoreExecution` in `Foundations/Execution` runs #120's programs, a repeated
-call, a loop-carried capture and an adaptation of upstream's `control-flow-capture-identity`
-fixture. Tests written for shared cells expect by-value results: in `Callable/Ancestry`, a closure
-that reaches itself through a local assigned after its creation copies that local uninitialized, so
-its recursive call faults.
+call, a loop-carried capture, an adaptation of upstream's `control-flow-capture-identity` fixture
+and upstream's `closure-parameters` fixture where it needs no contract storage or inline assembly.
+Tests written for shared cells expect by-value results: in `Callable/Ancestry`, a closure that
+reaches itself through a local assigned after its creation copies that local uninitialized, so its
+recursive call faults.
 
 ## What remains
 

@@ -547,8 +547,8 @@ section
 `uint256`. After the protocol's writes it builds a `memory<DynArray<t>>` of
 `length % 4` elements, encodes it with std's `abi_encode` and ends with the
 `return_` opcode over the encoding, which is what std's dispatcher does after a
-method returns (`do_exec`). The checked driver accepts this as written; it
-refuses a declared array output (Q008).
+method returns (`do_exec`). The checked driver accepts this as written; before
+`e2eef194` it refused a declared array output (Q008).
 
 The count and the inner lengths are read at run time, from `length` and from
 the digits of `choice`, so that no optimizer can fold std's encoder loops; the
