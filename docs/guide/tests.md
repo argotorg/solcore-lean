@@ -106,9 +106,8 @@ one, search for its namespace or for the marker `-- leanmerge: from Solcore.Test
 5. **Build the file, then run the driver:** `lake build Solcore.Test.<Dir>.<File>`, then
    `lake test`.
 
-In `6b2f86b99`, for example, a cases test of two synthesis profiles took one import and one call
-in the driver; since the layout refactor it is the section `Tests.SourceIntegerCases` of
-`Solcore/Test/Synthesis/Scalars.lean`.
+For example, the cases test of two synthesis profiles, the section `Tests.SourceIntegerCases` of
+`Solcore/Test/Synthesis/Scalars.lean`, took one import and one call in the driver.
 
 ## Running tests
 
@@ -122,10 +121,9 @@ python3 Tests/scripts/test-semantic-shift-corpus.py # one corpus validator
 
 - `lake build` builds every test file, because the library's glob is `Solcore.*`. `lake test`
   builds only what the driver imports.
-- A full `lake test` takes about half an hour: the gates recorded in the
-  [roadmap](../design/next-implementation-roadmap.md) give 28 to 40 minutes.
+- A full `lake test` takes about half an hour.
 - There is no option to run part of the driver. To run one group, use a focused runner of the shape
-  above. `lake env` builds nothing, so build the test module it imports first: for
+  above, after building the test module it imports (`lake env` builds nothing): for
   `RustHullWorldRun.lean`, `lake build Solcore.Test.Frontend.RustHull.Accounts`.
 - The corpus validators run the tools in `.lake/build/bin/` by default, `semantic-case-tool` for
   the pure profiles; build them first, for example with `lake build semanticCaseTool`.
@@ -158,8 +156,7 @@ tests do.
 
 ## Pitfalls
 
-- **Warnings are errors.** The package sets `warningAsError`, so an unused variable fails the test
-  file's build.
+- **Warnings are errors** in test files too ([Conventions](conventions.md#proof-rules)).
 - **A built test is not a run test.** A new file is compiled by `lake build` whether or not the
   driver imports it, but its IO tests run only once `Tests/Main.lean` calls them.
 - **`private` is per file.** Two sections that declare a private helper of the same name in the
@@ -168,26 +165,22 @@ tests do.
   `SourceSemantics/CoreLowering/UnifiedCorpusSupport` are imported by many test files, and other
   test files import each other. Check the importers before you change a helper.
 - **Isolation probes.** A `#check_failure` that names a constant of a module outside the file's
-  imports asserts that the file does not reach that module; `Frontend/Source/CompilationPlan`
-  checks that compilation preparation imports neither evaluator. A new import that reaches the
-  module makes the probe succeed, and the build fails.
+  imports, as in `Frontend/Source/CompilationPlan`, asserts that the file does not reach that
+  module. A new import that reaches it makes the probe succeed, and the build fails.
 - **Some files must stay apart,** because merging them would change a declaration:
   - **Recursive helpers.** A definition by well-founded recursion has a compiled twin,
-    `f._unsafe_rec`, that names itself, so renaming a differing private copy changes the twin. Each
-    feature of typed let trees has its own `certify`, so the features are separate files in
-    `Frontend/TypedLetTrees`; so are `TypedLetBodyRunner`, `TypedLetBodyStore`,
-    `TerminalTreeInvariance`, `TerminalTreeRunner`, `RecursiveRuntimeEntries` and
-    `RecursiveTypedLetEntries`.
-  - **Matchers.** Within a file Lean reuses a matcher even when its bound names differ, and the
-    equations `f.eq_i` take their variable names from it. This keeps `RecursiveFunctions`,
-    `RecursiveConditionals`, `RecursiveLazy`, `RecursiveUnary` and `SymbolicDepth` apart.
-  - **Binder annotations.** Lean also reuses an auxiliary whose binders differ only in
-    annotations. This keeps `ExpectedPairedBridges` apart from `ExpectedDataImages`, and
+    `f._unsafe_rec`, that names itself, so renaming a differing private copy changes the twin. So
+    each feature of typed let trees, with its own `certify`, is a file in `Frontend/TypedLetTrees`,
+    and `TypedLetBodyRunner`, `TypedLetBodyStore`, `TerminalTreeInvariance`, `TerminalTreeRunner`,
+    `RecursiveRuntimeEntries` and `RecursiveTypedLetEntries` stay apart.
+  - **Matchers and binder annotations.** Within a file Lean reuses a matcher even when its bound
+    names differ, and an auxiliary whose binders differ only in annotations. This keeps
+    `RecursiveFunctions`, `RecursiveConditionals`, `RecursiveLazy`, `RecursiveUnary` and
+    `SymbolicDepth` apart, `ExpectedPairedBridges` apart from `ExpectedDataImages`, and
     `Selected/OperatorAlias`, `Selected/GeneralizedSource`, `Foundations/Snapshots` and
-    `Chosen/OuterBodies` in files of their own.
-  - **Names in reach.** `LexicalFailureForward` keeps the names it adds to the namespace
-    `Tests.SourceCoreInitialLexicalFailure` out of `Selected/Faulting`, which opens that namespace.
-    `UnifiedOperatorCorpus` keeps the public `Compiled` of the unified compilation tests from
+    `Chosen/OuterBodies` alone.
+  - **Names in reach.** `LexicalFailureForward` keeps its names out of `Selected/Faulting`, which
+    opens their namespace, and `UnifiedOperatorCorpus` keeps a public `Compiled` from
     `Callable/Prepared`.
 - **`SourceCallReturnGolden.lean` stays where it is.** `scripts/test-semantic-call-differential.py`
   reads it by path and takes its golden rows with a regular expression, so keep each row in the form
