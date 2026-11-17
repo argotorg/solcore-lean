@@ -28,7 +28,8 @@ obligations. None follows from agreement in a test corpus.
   paths are compared. The comparison runs only locally, standalone or as the fuzz driver's opt-in
   run kind.
 - **Runtime operations.** The fourteen raw `std.opcodes` operations of the
-  [mapping table](#runtime-operation-mappings) render in the generated sources.
+  [mapping table](../../scripts/SEMANTIC_DIFFERENTIAL.md#runtime-operation-mappings) render in
+  the generated sources.
 - **Generated grammar.** Call graphs, bounded loops and recursion, loop closures, recursive loops,
   aggregates, generics, inline Yul with loops and memory, enums, traits and trait hierarchies,
   memory values and calls, revert data, halts, checked arithmetic, shifts, memory arrays and their
@@ -166,38 +167,6 @@ code.
 
 The new `evm-word-boundaries` fixture checks the `word` operations at their extremes, which the
 scalar meaning already covers.
-
-<a id="3-missing-runtime-operation-mappings"></a>
-
-## Runtime operation mappings
-
-The `runtime-primitives` profile imports these raw functions from `std.opcodes` as explicit
-aliases. The profiles whose step functions use `AggregateRenderer` import them only when they use
-them. The table describes the raw functions, not the public convenience wrappers of similar names.
-
-| Core operation | Raw source call | Boundary rule |
-| --- | --- | --- |
-| `wordDiv(a,b)` | `div(a,b)` | Zero divisor returns zero. |
-| `wordMod(a,b)` | `mod(a,b)` | Zero divisor returns zero. |
-| `wordSdiv(a,b)` | `sdiv(a,b)` | Signed two's-complement division, including minimum / -1. |
-| `wordSmod(a,b)` | `smod(a,b)` | Signed remainder follows the dividend; zero divisor returns zero. |
-| `wordSgt(a,b)` | `tobool(sgt(a,b))` | Convert raw Word 0/1 to the Core Boolean result. |
-| `wordShl(v,n)` | `shl(n,v)` | Reverse only the captured arguments; shifts at least 256 return zero. |
-| `wordShr(v,n)` | `shr(n,v)` | Same argument reversal and large-shift rule. |
-| `wordSar(v,n)` | `sar(n,v)` | Same reversal; large shifts fill with the sign bit. |
-| `wordAddMod(a,b,m)` | `addmod(a,b,m)` | Do not truncate the intermediate addition; modulus zero returns zero. |
-| `wordMulMod(a,b,m)` | `mulmod(a,b,m)` | Do not truncate the intermediate product; modulus zero returns zero. |
-| `wordClz(v)` | `clz(v)` | Zero returns 256. |
-| `wordByte(i,v)` | `byte(i,v)` | Index-first on both sides; indices at least 32 return zero. |
-| `wordSignExtend(i,v)` | `signextend(i,v)` | Index-first on both sides; indices at least 32 preserve the value. |
-| `wordPow(b,e)` | `exp(b,e)` | Modular exponentiation; zero exponent returns one, including 0^0. |
-
-- Each operand is evaluated into a fresh temporary, in original Core order, before the call.
-- Public `std.addmod` and `std.mulmod` reject a zero modulus, so they cannot replace the raw
-  aliases.
-- Byte selection and sign extension take the index first on both sides and are not reversed.
-- Core's exponent uses repeated modular squaring, so a Word exponent never builds the unbounded
-  power.
 
 ## Handoff rules
 

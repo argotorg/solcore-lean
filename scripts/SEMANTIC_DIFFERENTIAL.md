@@ -638,17 +638,47 @@ takes it through `SynthesizedInput.run(uint256)`, so a new input never changes t
 
 ### Compare the extended Word primitives
 
-`runtime-primitives` keeps the checked Word-to-Word function and imports raw `std.opcodes`
-functions: unsigned and signed division and remainder, signed greater-than, shifts, byte
-selection, sign extension, exponentiation, leading-zero count and modular addition and
-multiplication. The
-[mapping table](../docs/design/next-implementation-roadmap.md#3-missing-runtime-operation-mappings)
-records operand order and boundary behavior. Raw division and modular operations return zero for
-a zero divisor or modulus; the public convenience wrappers are not interchangeable with them.
+`runtime-primitives` keeps the checked Word-to-Word function and imports fourteen raw
+`std.opcodes` functions as explicit aliases: unsigned and signed division and remainder, signed
+greater-than, shifts, byte selection, sign extension, exponentiation, leading-zero count and
+modular addition and multiplication. The mappings below give each one's operand order and
+boundary rule.
 
 - Boundary inputs: 0, 1, 2, 255, 256, the maximum Word, the high bit and the high bit minus one.
 - Default budget 96 nodes and 512 attempts, admitted range 8 to 512.
 - Fixed corpus: 81 hand-specified cases, requiring all fourteen new AST operators.
+
+<a id="3-missing-runtime-operation-mappings"></a>
+
+#### Runtime operation mappings
+
+The profiles whose step functions use `AggregateRenderer` import the same aliases, only when they
+use them. The table describes the raw functions, not the public convenience wrappers of similar
+names, which are not interchangeable with them.
+
+| Core operation | Raw source call | Boundary rule |
+| --- | --- | --- |
+| `wordDiv(a,b)` | `div(a,b)` | Zero divisor returns zero. |
+| `wordMod(a,b)` | `mod(a,b)` | Zero divisor returns zero. |
+| `wordSdiv(a,b)` | `sdiv(a,b)` | Signed two's-complement division, including minimum / -1. |
+| `wordSmod(a,b)` | `smod(a,b)` | Signed remainder follows the dividend; zero divisor returns zero. |
+| `wordSgt(a,b)` | `tobool(sgt(a,b))` | Convert raw Word 0/1 to the Core Boolean result. |
+| `wordShl(v,n)` | `shl(n,v)` | Reverse only the captured arguments; shifts at least 256 return zero. |
+| `wordShr(v,n)` | `shr(n,v)` | Same argument reversal and large-shift rule. |
+| `wordSar(v,n)` | `sar(n,v)` | Same reversal; large shifts fill with the sign bit. |
+| `wordAddMod(a,b,m)` | `addmod(a,b,m)` | Do not truncate the intermediate addition; modulus zero returns zero. |
+| `wordMulMod(a,b,m)` | `mulmod(a,b,m)` | Do not truncate the intermediate product; modulus zero returns zero. |
+| `wordClz(v)` | `clz(v)` | Zero returns 256. |
+| `wordByte(i,v)` | `byte(i,v)` | Index-first on both sides; indices at least 32 return zero. |
+| `wordSignExtend(i,v)` | `signextend(i,v)` | Index-first on both sides; indices at least 32 preserve the value. |
+| `wordPow(b,e)` | `exp(b,e)` | Modular exponentiation; zero exponent returns one, including 0^0. |
+
+- Each operand is evaluated into a fresh temporary, in original Core order, before the call.
+- Public `std.addmod` and `std.mulmod` reject a zero modulus, so they cannot replace the raw
+  aliases.
+- Byte selection and sign extension take the index first on both sides and are not reversed.
+- Core's exponent uses repeated modular squaring, so a Word exponent never builds the unbounded
+  power.
 
 ### Compare inline Yul
 
