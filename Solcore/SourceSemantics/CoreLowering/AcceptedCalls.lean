@@ -28,7 +28,10 @@ Main declarations:
 - `CellAwareInvocationAcceptedCallFamily.Row`,
   `CellAwareInvocationAcceptedCallFamily.preserves` and
   `CellAwareInvocationAcceptedCallFamily.reflects`, the family closure;
-- `CellAwareInvocationAcceptedCallAuthority.ports`, call authority from an inventory.
+- `CellAwareInvocationAcceptedCallAuthority.ports`, call authority from an inventory;
+- `CellAwareInvocationAcceptedCallEntry.preserves_selected` and
+  `CellAwareInvocationAcceptedCallEntry.reflects_selected`, the entry of a
+  call-containing row at the public root.
 -/
 
 section
@@ -2132,7 +2135,9 @@ named entry over the caller's accepted cells, the body on the slot-retaining
 protocol with the body's accepted-expression meaning as input, and the restored
 caller with its post-admission, packaged as the root's `NamedResultAt`, as
 `CellAwareInvocationAcceptedNamedInvocation.preserves_selected` does for
-first-subset rows on the plain caller protocol. -/
+first-subset rows on the plain caller protocol. `reflects_selected` is the
+native direction: a sized completion of the closure body gives the allocation,
+a staged body trace and the same `NamedResultAt`. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -2385,6 +2390,168 @@ theorem preserves_selected {scope : SourceCoreLocalCell.Scope} {mapping : Locati
     caller bodyState.base.val owner.position stable (post_base owner capture.keyPhysical bodyPost) supports restoredFrame
   exact ⟨value, _, finalMap, finalWorld, wrap evaluatedHeader, result, restoredHeaps,
     prefixEffect.maps.trans bodyMaps, worlds, restoredFrame, prefixEffect.metadata.trans bodyMetadata,
+    CallableIndexedOwnedBodyRestoration.returned caller bodyState.base.val owner.position, restoredRelated, post⟩
+
+include profile receiver record sameNamed sameLayouts sameGlobals sameBindings sameBody sameSolved projection support
+  issued assignments artifact checked covered native in
+/-- A sized native completion of a call-containing row's closure body, from a
+reached caller pool with its physical cache and capture, reconstructs the
+Source allocation, a staged body trace and its result, and the root's
+`NamedResultAt` over accepted cells. The body runs on the slot-retaining
+protocol with the body's accepted-expression meaning at the native grade. -/
+theorem reflects_selected {scope : SourceCoreLocalCell.Scope} {mapping : LocationMap} {world : StoreTyping}
+    {before : Dynamic.Heap} {store : Store} {canonical : Environment} (owner : OwnedKey keys)
+    (caller : State headers keys ⟨scope, mapping, world, before, store, canonical⟩)
+    (capture : CallableIndexedOwnedNamedPhysicalCaptures.Capture headers owner.key header mapping world store)
+    (cache : CallableIndexedOwnedPhysicalGlobals.Authority whole mapping store)
+    (stable : StableRows caller) {arguments : List Dynamic.Value} {payloads : List Value}
+    (heapTyped : Dynamic.HeapWellTyped header.function.context before)
+    (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
+    (represented : CallableIndexedParameterMeaning.Arguments model mapping world header.bindings arguments payloads)
+    (heaps : GenericHeap.CellHeapRepresents accepted mapping world before store)
+    {child : Staging.Recursive.Scope} (selected : (stages).Closure header.function child)
+    {size : Nat} {value : Value} {finalStore : Store}
+    (completed : EvaluationSize size (DataPatternValues.packValues payloads :: capture.named.captured) store
+      (header.code.rename capture.named.embedding.lift) value finalStore)
+    (expressions : ∀ (owner : OwnedKey keys)
+      (keyPhysical : CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
+      {child : Staging.Recursive.Scope}, (stages).Closure header.function child →
+      CellAwareInvocationAcceptedInputs.Expressions (attachment := fun _ _ _ => True)
+        (receiving := completion.result.context.registry) (functions := rootFunctions)
+        (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots
+        (rowIndex generation record) stages child faults size) :
+    ∃ sourceSize environment bound finalContext bodyOutcome after finalMap finalWorld,
+      Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound ∧
+      Staging.Recursive.Size.Statements (Program.ofChecked whole.sourceProgram) stages sourceSize child
+        header.context environment bound header.function.body finalContext bodyOutcome after ∧
+      Staging.Recursive.BodyResult header.function.resultType bodyOutcome
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result bodyOutcome) ∧
+      CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+        rootFunctions accepted owner caller header capture.named payloads header.context
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result bodyOutcome) after value finalStore finalMap finalWorld
+        faults := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
+  subst sameNamed
+  have certified := support.certified header
+  obtain ⟨entryEnvironment, entryHeap, entryCanonical, entryActual, entryContext, entryStore, entryMap, entryWorld,
+      entryEmbedding, entryAllocated, environments, entryHeaps, sourceReceipt, agrees, actualTyped, spine,
+      prefixFrame, prefixEffect, _lexical, reached, related, rows, physical, frameEq, _wrap, unwrap⟩ :=
+    CellAwareInvocationAcceptedNamedEntry.prepare owner caller header capture.named sameLayouts sameGlobals record
+      certified heapTyped argumentsTyped represented heaps stable
+  obtain ⟨bodySize, reachedStore, bodyLess, bodyEvaluation, finalEq⟩ := unwrap completed
+  have compiledEvaluation : EvaluationSize bodySize entryActual entryStore (generation.body.rename entryEmbedding)
+      value reachedStore := by
+    rw [← sameBody]
+    exact bodyEvaluation
+  have sourceEq : child.source = CallableIndexedNamedGeneration.source header.named :=
+    ((SelectedCompilationPhysicalProgramSupport.stages whole).source selected).trans header.agreement.source
+  have runtime : Dynamic.SourceRuntimeValid (Program.ofChecked whole.sourceProgram) header.context
+      (CallableIndexedNamedGeneration.source header.named) := by
+    simpa only [CallableIndexedNamedGeneration.source, header.agreement.source] using sourceReceipt.runtime
+  have covers : child.evidence.Covers header.context := by
+    simpa only [(SelectedCompilationPhysicalProgramSupport.stages whole).evidence selected] using sourceReceipt.covers
+  have sameLedger : header.context.solvedRequirements =
+      (CallableIndexedNamedGeneration.context whole.indexed header.named).solvedRequirements :=
+    header.valid.ledger.trans sameSolved
+  obtain ⟨typingFinal, typingFacts, originalTyped, _completes⟩ := sourceReceipt.bodyTyped
+  have functionTyped : StatementsHaveType (CallableIndexedNamedGeneration.source header.named)
+      {returnType := header.function.resultType} header.context generation.statements typingFinal typingFacts := by
+    simpa only [statements header generation, CallableIndexedNamedGeneration.source, header.agreement.source]
+      using originalTyped
+  have typed : ProtectedStateImperativeTypedSourceSites.Statements
+      (CallableIndexedNamedGeneration.source header.named) header.context generation.statements :=
+    ⟨_, typingFinal, typingFacts, functionTyped⟩
+  have unique : NodeOccurrencesUnique child.source := sourceEq ▸ runtime.graph.nodeOccurrencesUnique
+  obtain ⟨_facts, certificate⟩ := certified
+  have empty : header.function.context.locals = [] := by
+    rw [header.frame.context]
+    exact certificate.locals_empty
+  have monomorphic := monomorphic_context header.extended
+    (by intro id scheme member; rw [empty] at member; cases member)
+  have prefixEq : RecursiveNamedLambdaFormationHeads.nativePrefix (values := .initial whole.compatible.checked) header =
+      SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: capture.named.administrative := by
+    simp only [RecursiveNamedLambdaFormationHeads.nativePrefix, CellAwareNamedPreparedReceipt.administrative capture,
+      header.parameterType, List.cons_append]
+  rw [prefixEq] at native
+  obtain ⟨added, addedLength, canonicalEq⟩ := spine
+  have rowLocation : (caller.rows owner.position).authority.frameLocation = owner.key.frameLocation :=
+    (caller.rows owner.position).frame_eq
+  have frameRead : store.read? owner.key.frameLocation = some (SourceCoreCallableIndexedFrames.encode
+      whole.indexed.ancestry.layout.frame (caller.rows owner.position).authority.current) := by
+    simpa only [rowLocation] using (caller.rows owner.position).authority.frame.read
+  have scopeLength : added.length = (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2))).length := by
+    simpa only [List.length_map, List.length_reverse] using addedLength
+  let initial := CallableIndexedOwnedPhysicalCanonicalState.of_parameter_spine cache frameRead _ prefixFrame reached
+    capture.slots (DataPatternValues.packValues payloads) scopeLength canonicalEq
+  let producer := CellAwareInvocationAcceptedGlobalSlots.producer
+    (catalog := CompatibleEquality.storageCatalog whole.compatible.checked.catalog) (headers := headers) (keys := keys)
+    1 accepted
+  have ready : ProtectedStateTransition.CellAllocation.ReadyAt producer physical.location physical.native := by
+    intro index state read
+    have result := CallableIndexedOwnedAllocationProducer.ready_of_stable_read state.base.val owner.position
+      (by simpa only [frameEq, OwnedKey.key] using read) physical.carried
+    simpa only [producer, CellAwareInvocationAcceptedGlobalSlots.producer,
+      CellAwareInvocationAcceptedGlobalSlots.slotsProducer, CallableIndexedOwnedCellAllocationProducer.producer,
+      frameEq, OwnedKey.key] using result
+  let frame : ActualBodyInvocation.Frame (rowIndex generation record) :=
+    ⟨physical.native, .named physical.id, CallableIndexedNamedGeneration.state header.named, physical.carried,
+      .named (CallableIndexedNamedGeneration.seed whole.indexed physical.selected record), rfl, rfl⟩
+  let bodyPhysical : CellAwareInvocationPhysical.Physical (attachment := fun _ _ _ => True) whole
+      (rowIndex generation record)
+      header.context (header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)))
+      entryCanonical entryMap entryWorld entryHeap entryStore entryEnvironment :=
+    CellAwareInvocationPhysical.Physical.of_monomorphic (attachment := fun _ _ _ => True) frame physical.declarations
+    physical.ownership physical.sourceDeclarations physical.location physical.reference physical.read physical.unmapped
+    sourceReceipt.locals sourceReceipt.heapTyped monomorphic
+  have scopeEq : (rowIndex generation record).scope =
+      header.bindings.reverse.map (fun binding => (binding.1.id, binding.2)) := by
+    rw [sameBindings]
+    rfl
+  have meaning := CellAwareInvocationAcceptedFlow.body_reflects (attachment := fun _ _ _ => True)
+    (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 capture.keyPhysical.locations).forgetSlots
+    (CallableIndexedOwnedPhysicalCanonicalState.bindings 1)
+    (CallableIndexedOwnedPhysicalCanonicalState.administrativeTransport 1) (rowIndex generation record) producer
+    (CallableIndexedAmbient.frame_registered whole.indexed) stages child faults
+    (SourceCoreCompatibleCatalog.packTypes (header.bindings.map Prod.snd) :: capture.named.administrative) size
+    (expressions owner capture.keyPhysical selected)
+    (CellAwareInvocationAcceptedNamedInvocation.writes profile generation record issued assignments receiver
+      (protocol := CallableIndexedOwnedPhysicalCanonicalState.protocol headers keys 1) sourceEq
+      runtime.graph.nodeOccurrencesUnique)
+    artifact checked sourceEq unique (control := {returnType := header.function.resultType})
+    (expected := header.function.resultType) rfl rfl
+    (RecursiveNamedPreparedHeaderPolicies.Prepared.header_signatures (header := header))
+    functionTyped projection body covered native (Nat.le_of_lt bodyLess)
+    (mapping := entryMap) (world := entryWorld) (actualContext := entryContext)
+    (environment := entryEnvironment) (canonical := entryCanonical) (actual := entryActual)
+    (before := entryHeap) (store := entryStore) (embedding := entryEmbedding)
+  rw [scopeEq] at meaning
+  obtain ⟨sourceSize, bodyContext, bodyOutcome, after, finalMap, finalWorld, trace, matched, result, bodyHeaps,
+      bodyMaps, bodyWorlds, bodyFrame, bodyMetadata, _bodyEffect, bodyState, bodyRelated, bodyPost⟩ :=
+    meaning environments entryHeaps sourceReceipt.locals agrees actualTyped runtime covers sameLedger typed initial
+      ⟨sourceReceipt.heapTyped, rows⟩
+      (CellAwareScopeAuthority.At.of_monomorphic sourceReceipt.locals sourceReceipt.heapTyped monomorphic)
+      bodyPhysical owner frameEq.symm ready compiledEvaluation
+  have bodyTrace : Staging.Recursive.Size.Statements (Program.ofChecked whole.sourceProgram) stages sourceSize
+      child header.context entryEnvironment entryHeap header.function.body bodyContext bodyOutcome after := by
+    rw [← statements header generation]
+    exact trace
+  have resultEq : (rowIndex generation record).result = header.output :=
+    header.resultType
+  rw [resultEq] at result
+  have worlds := prefixEffect.worlds.trans bodyWorlds
+  obtain ⟨restoredHeaps, restoredFrame, _cell, restoredRelated⟩ :=
+    CellAwareOwnedBodyRestoration.restore_return caller bodyState.base.val owner.position bodyHeaps worlds
+      (prefixFrame.trans bodyFrame) (related.trans bodyRelated)
+  have supports := Dynamic.TypeContextSupports.ofClosed rfl sourceReceipt.runtime.closed sourceReceipt.runtime.closed
+    sourceReceipt.runtime.variables_closed sourceReceipt.runtime.residual_variables_open
+  have post := CallableIndexedOwnedPreparedStagedBodyRestorationAdmission.restore_post
+    caller bodyState.base.val owner.position stable (post_base owner capture.keyPhysical bodyPost) supports restoredFrame
+  refine ⟨sourceSize, entryEnvironment, entryHeap, bodyContext, bodyOutcome, after, finalMap, finalWorld,
+    entryAllocated, bodyTrace, matched, completed.sound, ?_⟩
+  rw [finalEq]
+  exact ⟨result, restoredHeaps, prefixEffect.maps.trans bodyMaps, worlds, restoredFrame,
+    prefixEffect.metadata.trans bodyMetadata,
     CallableIndexedOwnedBodyRestoration.returned caller bodyState.base.val owner.position, restoredRelated, post⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedCallEntry

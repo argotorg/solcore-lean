@@ -17,8 +17,10 @@ Main declarations:
   `CellAwarePublicAcceptedNamedRoot.checkpoint_reflects_selected`, both directions;
 - `CellAwarePublicAcceptedNamedForward.first_value_selected`, from a staged trace that
   returns a value to a successful public resumption;
-- `CellAwarePublicAcceptedCallRoot.preserves_root_selected`, the same preservation for a
-  row whose body contains direct calls;
+- `CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected` and
+  `CellAwarePublicAcceptedCallRoot.checkpoint_reflects_selected`, both directions for a row
+  whose body contains direct calls, with `CellAwarePublicAcceptedCallRoot.expressions_of_family`
+  for their expression input, and `CellAwarePublicAcceptedCallForward.first_value_selected`;
 - `CellAwarePublicAcceptedNamedRoot.compilation_receipts` and
   `CellAwarePublicAcceptedNamedRoot.refined_body`, which derive the static receipts.
 -/
@@ -467,12 +469,14 @@ end
 
 section
 -- leanmerge: from Solcore.SourceSemantics.CoreLowering.CellAwarePublicAcceptedCallRoot
-/-! The unchanged public root of a call-containing named row. The root
-executes its actual argument packing and stored named closure; the body runs on
-the slot-retaining protocol from the root's physical cache and capture
-(`CellAwareInvocationAcceptedCallEntry`). The body's accepted-expression meaning
-is the input that the family induction
-(`CellAwareInvocationAcceptedCallFamily.expressions`) supplies. -/
+/-! The unchanged public root of a call-containing named row, in both
+directions. The root executes its actual argument packing and stored named
+closure; the body runs on the slot-retaining protocol from the root's physical
+cache and capture (`CellAwareInvocationAcceptedCallEntry`). The body's
+accepted-expression meaning is an input. `expressions_of_family` supplies it at
+every grade from the row's own extended roots and call authority and a family
+of callee rows, through the family induction
+(`CellAwareInvocationAcceptedCallFamily`). -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 2000000
@@ -611,5 +615,333 @@ theorem preserves_root_selected
   obtain ⟨required, run⟩ := evaluation_runStateful_complete_with_sufficient_fuel rootEvaluation
   exact ⟨capture.named, value, finalStore, finalMap, finalWorld, required, run, result⟩
 
+include callableProfile receiver aligned ready diagnostic support selected globalReference keyPhysical physical
+  stable heapTyped argumentsTyped bodySelected artifact checked covered represented heaps in
+/-- Actual completion of the root reconstructs an independent Source execution
+of a call-containing body with the restored caller, given the body's
+accepted-expression meaning on the slot-retaining protocol at every grade. -/
+theorem reflects_root_selected
+    {fuel : Nat} {value : Value} {finalStore : Store}
+    (completed : runStateful fuel
+      (.initial root.body (payloads.reverse ++ SourceCoreCallableIndexedTemplates.globalEnvironment whole.indexed) store) =
+      .done value finalStore)
+    (expressions : ∀ (size : Nat) (owner : OwnedKey keys)
+      (keyPhysical : CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
+      {child : Staging.Recursive.Scope}, (stages).Closure header.function child →
+      CellAwareInvocationAcceptedInputs.Expressions (attachment := fun _ _ _ => True)
+        (receiving := completion.result.context.registry) (functions := rootFunctions)
+        (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots
+        (index prepared aligned) stages child faults size) :
+    ∃ capture : NamedCapture headers owner.key header mapping world,
+    ∃ size environment bound finalContext outcome after finalMap finalWorld,
+      Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound ∧
+      Staging.Recursive.Size.Statements (Program.ofChecked whole.sourceProgram) stages size
+        (RecursiveStageRegistry.scope sidecar [] header.function) header.context environment bound
+        header.function.body finalContext outcome after ∧
+      Staging.Recursive.BodyResult header.function.resultType outcome
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) ∧
+      CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+        rootFunctions accepted owner caller header capture payloads header.context
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) after value finalStore finalMap finalWorld faults := by
+  obtain ⟨capture⟩ := CallableIndexedOwnedNamedPhysicalCaptures.of_headerAt prepared aligned selected.member
+    keyPhysical physical heaps.runtime_hasTypes
+  obtain ⟨entry, entryMember, _shape, _first⟩ := selected.2
+  obtain ⟨_source, _signatures, _typing, projection, native⟩ :=
+    CellAwareInvocationAcceptedNamedHeaders.static_inputs prepared aligned ready entryMember (support.certified header)
+  have argumentsEvaluated := selected.arguments_evaluate represented store
+  have actualReference :
+      (payloads.reverse ++ SourceCoreCallableIndexedTemplates.globalEnvironment whole.indexed)[header.slot + root.types.length]? =
+      some (.cellRef (OptionalCell.cellType header.named.signature.functionType) (owner.key.locations header)) := by
+    simpa only [selected.argument_length represented, RecursiveGlobalInitializationMeaning.shift] using
+      RecursiveNamedPublicRootMeaning.globals_agree payloads
+        (SourceCoreCallableIndexedTemplates.globalEnvironment whole.indexed) globalReference
+  obtain ⟨nativeSize, measured⟩ := evaluation_has_size (runStateful_evaluation_sound completed)
+  rw [selected.shape.2] at measured
+  obtain ⟨bodySize, _smaller, bodyEvaluation⟩ := RecursiveNamedCallBounds.call_body
+    argumentsEvaluated actualReference capture.read measured
+  obtain ⟨size, environment, bound, finalContext, outcome, after, finalMap, finalWorld,
+      allocated, trace, matched, result⟩ :=
+    CellAwareInvocationAcceptedCallEntry.reflects_selected callableProfile receiver header prepared.compilation
+      (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned) aligned.named aligned.layouts
+      aligned.globals aligned.bindings aligned.body aligned.solved projection support
+      (CallableIndexedOwnedIssuedAssignmentRecipes.of_prepared prepared diagnostic)
+      (CallableIndexedOwnedPublicDiagnosticReceipts.assignments_prepared prepared diagnostic)
+      artifact checked body covered native owner caller capture physical stable heapTyped argumentsTyped represented
+      (heaps.includes CellAwareInvocationAcceptedNamedInvocation.cell_of_profiled) bodySelected bodyEvaluation
+      (expressions bodySize)
+  exact ⟨capture.named, size, environment, bound, finalContext, outcome, after, finalMap, finalWorld,
+    allocated, trace, matched, result⟩
+
+include callableProfile receiver aligned diagnostic support artifact checked in
+/-- The accepted-expression input of the theorems of this section at every
+grade, for a row whose accepted expressions are extended roots that call only
+the admitted instantiations of a family: each admitted callee's application
+comes from the family closure, at every grade. The row itself need not be
+admitted. -/
+theorem expressions_of_family {called : DeclarationInstantiation → Prop}
+    (closed : CellAwareInvocationAcceptedCallExpressions.ClosedCalls prepared.compilation
+      (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned) called)
+    (ports : CellAwareInvocationAcceptedCallExpressions.Ports (headers := headers) prepared.compilation
+      (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned))
+    (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
+    (rows : ∀ callee, callee ∈ headers → called callee.instantiation →
+      CellAwareInvocationAcceptedCallFamily.Row (headers := headers) called callee) :
+    ∀ (size : Nat) (owner : OwnedKey keys)
+      (keyPhysical : CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
+      {child : Staging.Recursive.Scope}, (stages).Closure header.function child →
+      CellAwareInvocationAcceptedInputs.Expressions (attachment := fun _ _ _ => True)
+        (receiving := completion.result.context.registry) (functions := rootFunctions)
+        (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots
+        (index prepared aligned) stages child faults size := by
+  haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
+  intro size owner keyPhysical child selectedChild
+  have issuer := CellAwareNamedDiagnosticIssuer.of_prepared prepared diagnostic aligned
+  rw [aligned.reasonAt, aligned.named] at issuer
+  obtain ⟨_facts, certificate⟩ := support.certified header
+  have functionUnique : NodeOccurrencesUnique header.function.source := by
+    rw [header.frame.source]
+    exact certificate.graph_closed.wellFormed.nodeOccurrencesUnique
+  have unique : NodeOccurrencesUnique (CallableIndexedNamedGeneration.source prepared.named) := by
+    rw [← aligned.named]
+    simpa only [CallableIndexedNamedGeneration.source, header.agreement.source] using functionUnique
+  have sourceEq : child.source = (index prepared aligned).source := by
+    show child.source = CallableIndexedNamedGeneration.source prepared.named
+    rw [← aligned.named]
+    exact ((SelectedCompilationPhysicalProgramSupport.stages whole).source selectedChild).trans header.agreement.source
+  exact CellAwareInvocationAcceptedCallExpressions.expressions prepared.compilation
+    (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned) called owner keyPhysical stages child faults
+    closed size sourceEq completion.result.extension
+    (CellAwareInvocationAcceptedNamedInvocation.reads prepared.compilation
+      (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned) issuer receiver unique)
+    support.registryBodies wellFormed ports
+    (fun callee member admitted =>
+      ⟨fun smaller _ => CellAwareInvocationAcceptedCallFamily.preserves callableProfile receiver support artifact
+          checked wellFormed rows callee member admitted smaller,
+        fun smaller _ => CellAwareInvocationAcceptedCallFamily.reflects callableProfile receiver support artifact
+          checked wellFormed rows callee member admitted smaller⟩)
+
+variable {nativeArtifact : SourceCoreIndexedSession.Artifact}
+  {nativeSession : SourceCoreIndexedSession.Session nativeArtifact}
+  {nativeCheckpoint : SourceCoreIndexedSession.Checkpoint nativeArtifact}
+  {key : SourceCoreIndexedSession.Key} {publicArguments : List SourceCorePublicValues.Value}
+  {encodedValues : SourceCoreCompatibleValues.Context} {inputFuel : Nat}
+  (sameCompiled : recipe.compiled = whole)
+  (started : RecursiveNamedPublicStartMeaning.StartAt nativeSession key publicArguments inputFuel
+    nativeCheckpoint recipe (sameCompiled.symm ▸ root) world store payloads encodedValues)
+
+include callableProfile receiver aligned ready diagnostic support selected globalReference keyPhysical physical
+  stable heapTyped argumentsTyped bodySelected artifact checked covered represented heaps
+  sameCompiled started in
+/-- The actual public start uses the same root and captured cache. Sufficient
+execution fuel follows the independent Source derivation of a call-containing
+body. -/
+theorem checkpoint_has_sufficient_fuel_selected
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
+    {finalContext : SourceSemantics.Context} {outcome : Staging.Recursive.BodyOutcome}
+    (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
+    (trace : Staging.Recursive.Size.Statements (Program.ofChecked whole.sourceProgram) stages size
+      (RecursiveStageRegistry.scope sidecar [] header.function) header.context environment bound
+      header.function.body finalContext outcome after)
+    (expressions : ∀ (owner : OwnedKey keys)
+      (keyPhysical : CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
+      {child : Staging.Recursive.Scope}, (stages).Closure header.function child →
+      CellAwareInvocationAcceptedInputs.Expressions (attachment := fun _ _ _ => True)
+        (receiving := completion.result.context.registry) (functions := rootFunctions)
+        (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots
+        (index prepared aligned) stages child faults size) :
+    ∃ capture : NamedCapture headers owner.key header mapping world,
+    ∃ value finalStore finalMap finalWorld required,
+      (∀ fuel, required ≤ fuel → nativeCheckpoint.NativeDone fuel value finalStore) ∧
+      CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+        rootFunctions accepted owner caller header capture payloads header.context
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) after value finalStore finalMap finalWorld faults := by
+  cases sameCompiled
+  obtain ⟨capture, value, finalStore, finalMap, finalWorld, required, run, result⟩ :=
+    preserves_root_selected callableProfile receiver prepared aligned ready diagnostic support selected owner caller
+      globalReference keyPhysical physical stable heapTyped argumentsTyped bodySelected
+      artifact checked body covered represented heaps allocated trace expressions
+  exact ⟨capture, value, finalStore, finalMap, finalWorld, required,
+    fun fuel enough => started.initial.native_done_iff.mpr (run fuel enough), result⟩
+
+include callableProfile receiver aligned ready diagnostic support selected globalReference keyPhysical physical
+  stable heapTyped argumentsTyped bodySelected artifact checked covered represented heaps
+  sameCompiled started in
+/-- Actual native completion at the public checkpoint reconstructs an
+independent Source execution of a call-containing body. -/
+theorem checkpoint_reflects_selected
+    {fuel : Nat} {value : Value} {finalStore : Store}
+    (completed : nativeCheckpoint.NativeDone fuel value finalStore)
+    (expressions : ∀ (size : Nat) (owner : OwnedKey keys)
+      (keyPhysical : CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
+      {child : Staging.Recursive.Scope}, (stages).Closure header.function child →
+      CellAwareInvocationAcceptedInputs.Expressions (attachment := fun _ _ _ => True)
+        (receiving := completion.result.context.registry) (functions := rootFunctions)
+        (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots
+        (index prepared aligned) stages child faults size) :
+    ∃ capture : NamedCapture headers owner.key header mapping world,
+    ∃ size environment bound finalContext outcome after finalMap finalWorld,
+      Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound ∧
+      Staging.Recursive.Size.Statements (Program.ofChecked whole.sourceProgram) stages size
+        (RecursiveStageRegistry.scope sidecar [] header.function) header.context environment bound
+        header.function.body finalContext outcome after ∧
+      Staging.Recursive.BodyResult header.function.resultType outcome
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) ∧
+      CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+        rootFunctions accepted owner caller header capture payloads header.context
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome) after value finalStore finalMap finalWorld faults := by
+  cases sameCompiled
+  exact reflects_root_selected callableProfile receiver prepared aligned ready diagnostic support selected owner caller
+    globalReference keyPhysical physical stable heapTyped argumentsTyped bodySelected
+    artifact checked body covered represented heaps (started.initial.native_done_iff.mp completed) expressions
+
 end Solcore.SourceSemantics.CoreLowering.CellAwarePublicAcceptedCallRoot
+end
+
+section
+/-! A returning call-containing body reaches actual public output from an
+independent staged Source trace, as `CellAwarePublicAcceptedNamedForward` has
+it for first-subset rows. The body's accepted-expression meaning is the input
+that `CellAwarePublicAcceptedCallRoot.expressions_of_family` supplies. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxHeartbeats 2000000
+namespace Solcore.SourceSemantics.CoreLowering.CellAwarePublicAcceptedCallForward
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open CallableIndexedOwnedFunctionState
+open CallableIndexedOwnedIndirectExpressionHeads (StableRows)
+open CallableIndexedOwnedFunctionValues (Header NamedCapture OwnedKey)
+open CellAwareInvocationAcceptedNamedHeaders (index)
+
+variable {whole : SourceCoreUnifiedCompilation.Compiled}
+  {headers : List (Header whole (Program.ofChecked whole.sourceProgram))}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key whole (Program.ofChecked whole.sourceProgram))}
+  {bodyRegistry : SourceCoreRawMetadata.Registry} {semanticFaults : FunctionCalls.FaultRep}
+  (callableProfile : whole.compatible.checked.catalog.callableContracts = true)
+  {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver whole.indexed}
+  (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt whole.indexed completion.entry
+    completion.result.context.registry completion.result.extension completion.result.diagnostics)
+  {row : SourceSpecialization.SpecializedFunction}
+  (prepared : RecursiveNamedPublicSpecializationMeaning.Prepared whole row)
+  {instantiation : DeclarationInstantiation}
+  {header : Header whole (Program.ofChecked whole.sourceProgram)}
+  (aligned : RecursiveNamedPreparedHeaders.Prepared.HeaderAt prepared instantiation header)
+  {recipe : SourceCoreIndexedSession.Recipe}
+  (ready : SourceCoreIndexedSession.Recipe.prepare whole = .ok recipe)
+  (diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared)
+  (support : SelectedCompilationNamedSupport.Support whole)
+  {root : SourceCoreIndexedSession.Root whole}
+  (selected : RecursiveNamedPublicRootMeaning.RootSelection
+    (values := .initial whole.compatible.checked)
+    (ambient := CallableIndexedAmbient.ambientDefinitions whole.indexed)
+    (program := Program.ofChecked whole.sourceProgram) headers root header)
+  {mapping : LocationMap} {world : StoreTyping} {before : Dynamic.Heap} {store : Store}
+  (owner : OwnedKey keys)
+  (caller : State headers keys ⟨[], mapping, world, before, store,
+    SourceCoreCallableIndexedTemplates.globalEnvironment whole.indexed⟩)
+  (globalReference : (SourceCoreCallableIndexedTemplates.globalEnvironment whole.indexed)[header.slot]? =
+    some (.cellRef (OptionalCell.cellType header.named.signature.functionType) (owner.key.locations header)))
+  (keyPhysical : CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
+  (physical : CallableIndexedOwnedPhysicalGlobals.Authority whole mapping store)
+  (stable : StableRows caller)
+  (heapTyped : Dynamic.HeapWellTyped header.function.context before)
+  {arguments : List Dynamic.Value} {payloads : List Value}
+  (argumentsTyped : Dynamic.ValuesHaveTypes header.function.context before arguments header.types)
+  {sidecar : SourceCoreStageContracts.Sidecar}
+  (bodySelected : (SelectedCompilationPhysicalProgramSupport.stages whole).Closure header.function
+    (RecursiveStageRegistry.scope sidecar [] header.function))
+
+variable
+  {workspace : Workspace.RawWorkspace} {checkFuel : Nat} {sourceCompiled : SourceCoreCompiler.Compiled}
+  (artifact : sourceCompiled.artifact? = some whole)
+  (checked : checkProgram workspace checkFuel = .ok sourceCompiled.program)
+  (body : AcceptedNamedBodyFlow.Body (index prepared aligned).policy (index prepared aligned).fuel
+    (index prepared aligned).compilerSource (index prepared aligned).scope (index prepared aligned).statements
+    (index prepared aligned).result (index prepared aligned).reasonAt (index prepared aligned).fellThrough
+    (index prepared aligned).escaped (index prepared aligned).body)
+  (covered : CellAwareInvocationAcceptedFlow.Covered (index prepared aligned).source header.function.resultType
+    (CellAwareInvocationAcceptedMatches.Admitted (index prepared aligned))
+    (CellAwareInvocationAcceptedInputs.Generalized (index prepared aligned)) body.tree)
+  (represented : CallableIndexedParameterMeaning.Arguments
+    (CompatibleAmbientHeap.payloadModel whole.compatible.checked completion.result.context.registry
+      (CellAwarePhysicalFunctionOrigins.functions headers keys bodyRegistry semanticFaults callableProfile))
+    mapping world header.bindings arguments payloads)
+  (heaps : GenericHeap.CellHeapRepresents
+    (GeneralizedLocalDescriptorHeap.cellModel
+      (CompatibleAmbientHeap.payloadModel whole.compatible.checked completion.result.context.registry
+        (CellAwarePhysicalFunctionOrigins.functions headers keys bodyRegistry semanticFaults callableProfile))
+      (GeneralizedLocalInstanceValues.model whole.indexed)) mapping world before store)
+  {nativeArtifact : SourceCoreIndexedSession.Artifact}
+  {nativeSession : SourceCoreIndexedSession.Session nativeArtifact}
+  {nativeCheckpoint : SourceCoreIndexedSession.Checkpoint nativeArtifact}
+  {key : SourceCoreIndexedSession.Key} {publicArguments : List SourceCorePublicValues.Value}
+  {encodedValues : SourceCoreCompatibleValues.Context} {inputFuel : Nat}
+  (sameCompiled : recipe.compiled = whole)
+  (started : RecursiveNamedPublicStartMeaning.StartAt nativeSession key publicArguments inputFuel
+    nativeCheckpoint recipe (sameCompiled.symm ▸ root) world store payloads encodedValues)
+  {publicArtifact : SourceCoreExecution.Artifact}
+  {publicCheckpoint : SourceCoreExecution.Checkpoint publicArtifact}
+  (atCheckpoint : publicCheckpoint.IndexedAt nativeCheckpoint)
+  (exactRegistry : completion.result.context.registry = encodedValues.registry)
+  (exportsReady : nativeSession.ExportsReady)
+
+local notation "rootFunctions" =>
+  CellAwarePhysicalFunctionOrigins.functions headers keys bodyRegistry semanticFaults callableProfile
+local notation "accepted" => GeneralizedLocalDescriptorHeap.cellModel
+  (CompatibleAmbientHeap.payloadModel whole.compatible.checked completion.result.context.registry rootFunctions)
+  (GeneralizedLocalAcceptedInstances.modelWith whole.indexed (fun _ _ _ => True))
+local notation "stages" => SelectedCompilationPhysicalProgramSupport.stages whole
+local notation "faults" => CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics
+
+include callableProfile receiver aligned ready diagnostic support selected globalReference keyPhysical physical
+  stable heapTyped argumentsTyped bodySelected artifact checked covered represented heaps
+  sameCompiled started atCheckpoint exactRegistry exportsReady in
+/-- A staged Source trace of a call-containing body that returns a value
+determines the actual public resumption: it succeeds with the exported value,
+and the returned session has a physical history in the accepted cell model. -/
+theorem first_value_selected
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
+    {finalContext : SourceSemantics.Context} {source : Dynamic.Value}
+    (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
+    (trace : Staging.Recursive.Size.Statements (Program.ofChecked whole.sourceProgram) stages size
+      (RecursiveStageRegistry.scope sidecar [] header.function) header.context environment bound
+      header.function.body finalContext (.returned source) after)
+    (expressions : ∀ (owner : OwnedKey keys)
+      (keyPhysical : CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
+      {child : Staging.Recursive.Scope}, (stages).Closure header.function child →
+      CellAwareInvocationAcceptedInputs.Expressions (attachment := fun _ _ _ => True)
+        (receiving := completion.result.context.registry) (functions := rootFunctions)
+        (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots
+        (index prepared aligned) stages child faults size) :
+    ∃ capture : NamedCapture headers owner.key header mapping world,
+      ∃ value finalStore finalMap finalWorld requiredExecution requiredOutput,
+        CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+          rootFunctions accepted owner caller header capture payloads header.context
+          (.value source) after value finalStore finalMap finalWorld faults ∧
+        ∀ executionFuel outputFuel (outcome : SourceCoreExecution.Outcome publicArtifact),
+          requiredExecution ≤ executionFuel → requiredOutput ≤ outputFuel →
+          publicCheckpoint.ResumeAt executionFuel outputFuel outcome →
+          ∃ (returned : SourceCoreExecution.Completion publicArtifact)
+            (actual : SourceCoreIndexedSession.Completion nativeArtifact)
+            (generation : SourceCorePublicValues.ExportGeneration)
+            (reached : RecursiveNamedPublicFunctionHistory.Caller headers keys finalMap finalWorld after finalStore),
+            outcome = .succeeded returned ∧
+            nativeCheckpoint.SucceededResultAt executionFuel outputFuel generation value finalStore actual ∧
+            returned.IndexedAt actual ∧ CallableIndexedOwnedFunctionState.Relates caller reached ∧
+            CellAwarePublicPhysicalHistory.History (functions := rootFunctions) (cells := accepted)
+              (receiving := completion.result.context.registry) (anchor := header)
+              actual.session finalMap finalWorld after finalStore reached [] ∧
+            actual.session.RegistryAt completion.result.context.registry ∧ actual.session.ExportsReady := by
+  cases sameCompiled
+  obtain ⟨capture, value, finalStore, finalMap, finalWorld, required, run, result⟩ :=
+    CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected callableProfile receiver prepared aligned
+      ready diagnostic support selected owner caller globalReference keyPhysical physical stable heapTyped argumentsTyped
+      bodySelected artifact checked body covered represented heaps rfl started allocated trace expressions
+  have publicResult := result.context
+    (SelectedCompilationPublicReturnedValues.header_context_supports header header support.bodyTyping).2
+  obtain ⟨requiredOutput, output⟩ := CellAwarePublicNamedOutput.first_success _ _ selected started
+    exactRegistry exportsReady atCheckpoint publicResult run physical
+  exact ⟨capture, value, finalStore, finalMap, finalWorld, required, requiredOutput, result, output⟩
+
+end Solcore.SourceSemantics.CoreLowering.CellAwarePublicAcceptedCallForward
 end
