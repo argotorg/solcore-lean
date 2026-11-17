@@ -4,6 +4,7 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedStatements
 import Solcore.SourceSemantics.CoreLowering.AcceptedExpressions
 import Solcore.SourceSemantics.CoreLowering.AcceptedShapes
 import Solcore.SourceSemantics.CoreLowering.AcceptedCalls
+import Solcore.SourceSemantics.CoreLowering.AcceptedCallLifting
 import Solcore.SourceSemantics.CoreLowering.AcceptedPublicRoots
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicRoots
 import Solcore.SourceSemantics.CoreLowering.CellAwarePublicForward

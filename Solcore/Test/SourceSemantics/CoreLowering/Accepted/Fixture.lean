@@ -14,7 +14,9 @@ Main declarations:
 - `Tests.SourceCoreAcceptedFixture.WholeInventory` and its `complete`;
 - `Tests.SourceCoreAcceptedFixture.SelectedInventory` and its `root_selection`;
 - `Tests.SourceCoreAcceptedFixture.CallRows` and `WholeInventory.family_row`, the
-  rows of a family of direct calls.
+  rows of a family of direct calls;
+- `Tests.SourceCoreAcceptedFixture.WholeInventory.callees`, the static receipts
+  of the family's admitted callees.
 -/
 
 section
@@ -586,6 +588,106 @@ theorem WholeInventory.family_row {fixture : CompiledFixture workspace options} 
     ports := ports
     bodyScope := _
     bodySelected := bodySelected }⟩
+
+end Tests.SourceCoreAcceptedFixture
+end
+
+section
+/-! The checks of every cache row give each issued header its statement shape
+and its empty dictionary, and the static receipts of the admitted callees of a
+family whose instantiations are retained instantiations of cache rows: a
+callee's body instance is its header's Source body, and its global view is its
+header's function. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxHeartbeats 4000000
+namespace Tests.SourceCoreAcceptedFixture
+open Solcore Core Frontend SourceInference SourceSemantics CoreLowering
+open CallableIndexedOwnedPreparedFiniteNamedInventories (Input Issued Inventory headers)
+open CellAwareInvocationAcceptedCallTrees (CallSubset)
+open CellAwareInvocationAcceptedBodyShape (Shape)
+
+variable {workspace : Workspace.RawWorkspace} {options : SourceCoreCompiler.Options}
+  {fixture : CompiledFixture workspace options} {called : DeclarationInstantiation → Prop}
+
+/-- A checked cache row's statement shape at the header of an issued packet. -/
+theorem CallRows.header_shape (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
+    {input : Input fixture.recipe.compiled} (packet : Issued input) :
+    Shape packet.header.function.source packet.header.function.resultType
+      (CallSubset fixture.recipe.compiled.indexed input.prepared.named packet.header.function.source called) true
+      packet.header.function.body := by
+  obtain ⟨call⟩ := calls.at_slot input.prepared.selected
+  have sourceEq : packet.header.function.source = CallableIndexedNamedGeneration.source input.prepared.named := by
+    rw [packet.header.agreement.source, packet.aligned.named]
+    rfl
+  have bodyEq : packet.header.function.body = call.statements := by
+    have roots : packet.header.function.source.roots = call.statements.map NodeId.statement := by
+      rw [sourceEq]
+      exact call.roots
+    exact statement_roots (packet.header.agreement.roots.symm.trans roots)
+  have resultEq : packet.header.function.resultType =
+      input.prepared.named.specialized.function.inferredBodyType := by
+    rw [packet.header.agreement.result, packet.aligned.named]
+    rfl
+  rw [bodyEq, resultEq, sourceEq]
+  exact call.shape
+
+/-- A checked cache row has no evidence assumptions, so the dictionary of its
+issued header is empty. -/
+theorem CallRows.header_evidence (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
+    {input : Input fixture.recipe.compiled} (packet : Issued input) : packet.header.function.evidence = [] := by
+  obtain ⟨call⟩ := calls.at_slot input.prepared.selected
+  have closed : input.row.assumptions = [] := by
+    rw [← input.prepared.same]
+    exact call.assumptions
+  rw [packet.function]
+  exact RecursiveNamedPreparedHeaders.Prepared.evidence_empty input.prepared closed
+
+private theorem statementRoots_functional {roots : List NodeId} {left right : List StatementId}
+    (first : Dynamic.StatementRoots roots left) (second : Dynamic.StatementRoots roots right) : left = right := by
+  induction first generalizing right with
+  | nil =>
+    cases second
+    rfl
+  | cons _ ih =>
+    cases second with
+    | cons tail => rw [ih tail]
+
+/-- The static receipts of the admitted callees, when every instantiation the
+family admits is the retained instantiation of a cache row and every cache row
+is checked. -/
+theorem WholeInventory.callees (whole : WholeInventory fixture)
+    (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
+    (wellFormed : ProgramWellFormed (Program.ofChecked fixture.recipe.compiled.sourceProgram))
+    (admitted : ∀ {instantiation}, called instantiation →
+      ∃ callee : Row fixture, instantiation = CallableNamedCanonicalOrder.retainedInstantiation callee.original) :
+    CellAwareInvocationAcceptedCallLifting.Callees fixture.recipe.compiled.indexed
+      (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      (SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled) called := by
+  intro instantiation bodyInstance roots admits instantiates rootsEq
+  obtain ⟨callee, same⟩ := admitted admits
+  subst same
+  obtain ⟨selected⟩ := whole.select callee
+  have frameInstantiated := selected.packet.header.frame.instantiated
+  rw [selected.packet.aligned.metadata, selected.original] at frameInstantiated
+  have bodySame := BuiltinNamedCalls.instantiation_unique_of_wellFormed wellFormed instantiates frameInstantiated
+  subst bodySame
+  have rootsSame := statementRoots_functional rootsEq selected.packet.header.frame.roots
+  subst rootsSame
+  have view : Staging.Recursive.globalView selected.packet.header.sourceBody [] selected.packet.header.function.body =
+      selected.packet.header.function := by
+    have same := CallableIndexedOwnedPreparedStagedNamedSourceScopeReceipts.global_view selected.packet.sourceAt
+    rw [← selected.packet.sourceAt.dictionary, calls.header_evidence selected.packet] at same
+    exact same
+  obtain ⟨sidecar, _issued, closure⟩ := whole.invocation selected.packet selected.retained
+  refine ⟨RecursiveStageRegistry.scope sidecar [] selected.packet.header.function, selected.input.prepared.named,
+    selected.packet.header.function.resultType, ?_, ?_, ?_⟩
+  · rw [view]
+    exact closure
+  · rw [← selected.packet.header.frame.source]
+    exact selected.packet.header.unique
+  · rw [← selected.packet.header.frame.source]
+    exact calls.header_shape selected.packet
 
 end Tests.SourceCoreAcceptedFixture
 end
