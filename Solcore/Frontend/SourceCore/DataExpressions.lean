@@ -240,6 +240,47 @@ def sliceCopy (layout : Core.OrderedMapping.Layout) (comparison : Core.Expr) (de
         (.newCell contents (.pair (viewLength depth (.var 1))
           (.pair (.first (.second (.loadCell (viewArray depth (.var 1))))) (.var 0))))))
 
+/-- A memref's layout, read from its Core type: the product of a memory array's cell, with
+the layout of its present elements, and a word position. -/
+def memrefLayout? : Core.Ty → Option Core.OrderedMapping.Layout
+  | .product (.cell (.product .word (.product elementType (.namedData identity)))) .word =>
+      some ⟨.word, elementType, identity⟩
+  | _ => none
+
+/-- `lidx(a, i)` on an array whose present elements have `layout`: the array's, then the
+index's effects, then `Panic(0x32)` from the array's length on, else the memref, the pair of
+the array and the index, as std's `LValueIdxAccess`. -/
+def elementRef (layout : Core.OrderedMapping.Layout) (base index : Core.Expr) : Core.Expr :=
+  let referenceType := Core.Ty.product (.cell (.product .word (.product layout.valueType layout.type))) .word
+  Core.LanguageResult.bind referenceType base
+    (Core.LanguageResult.bind referenceType (index.weakenAt 0)
+      (.ifE (Core.Expr.wordLt (.var 0) (.first (.loadCell (.var 1))))
+        (Core.LanguageResult.success (.pair (.var 1) (.var 0)))
+        (Core.LanguageResult.failure referenceType
+          (.word (SourceCorePanics.reason SourceCorePanics.outOfBounds)))))
+
+/-- `CanStore.load(r)`: the memref's effects, then the element at its position in its array,
+as a read's (`viewRead`). The position is below the array's length, which no write changes, so
+the read's check passes. -/
+def memrefLoad (layout : Core.OrderedMapping.Layout) (comparison reference : Core.Expr) :
+    Core.Expr :=
+  Core.LanguageResult.bind layout.valueType reference
+    (viewRead layout (comparison.weakenAt 0) 0 (.first (.var 0)) (.second (.var 0)))
+
+/-- `CanStore.store(r, v)`: the memref's, then the value's effects, then its array's cell takes
+the value at its position, keeping its length and default element, as an element write's last
+array does (`arrayElementWrite`), and the store gives `()`. -/
+def memrefStore (layout : Core.OrderedMapping.Layout) (comparison reference value : Core.Expr) :
+    Core.Expr :=
+  Core.LanguageResult.bind .unit reference
+    (Core.LanguageResult.bind .unit (value.weakenAt 0)
+      (Core.LanguageResult.bind .unit
+        (Core.OrderedMapping.insert layout ((comparison.weakenAt 0).weakenAt 0)
+          (.second (.second (.loadCell (.first (.var 1))))) (.second (.var 1)) (.var 0))
+        (.letE (.storeCell (.first (.var 2)) (.pair (.first (.loadCell (.first (.var 2))))
+            (.pair (.first (.second (.loadCell (.first (.var 2))))) (.var 0))))
+          (Core.LanguageResult.success .unit))))
+
 private def project (checked : Checked) (node : ExpressionNode) (type : TypeSystem.Ty) : Except Error Core.Ty :=
   (checked.project type).mapError (fun _ => .unsupportedExpression node.id node.form) |>.map (·.type)
 

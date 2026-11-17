@@ -2935,6 +2935,14 @@ theorem project_wellFormed {catalog : SourceCoreCompatibleCatalog.Catalog}
       simp only [pure, Except.pure, Except.ok.injEq] at rest
       subst rest
       exact .product (second baseEq) (.product .word .word)
+    · obtain ⟨elementType, elementEq, rest⟩ := CompatibleEncoding.bind_ok projected
+      cases found : catalog.identity? (.mapping (.constructor (.builtin .word)) right) with
+      | none => simp [found] at rest
+      | some identity =>
+        simp only [found, pure, Except.pure, Except.ok.injEq] at rest
+        subst rest
+        exact .product (.cell (.product .word (.product (second elementEq) (identity_wellFormed found))))
+          .word
     · split at projected
       · cases projected; exact identity_wellFormed (by assumption)
       · cases projected

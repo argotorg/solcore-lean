@@ -860,6 +860,37 @@ def lowerWithReasons (fuel : Nat) (context : Context) (lowerChild : ExpressionLo
             (.constructor (.builtin .word))).mapError (fun _ => unsupported node)
           pure ⟨type, SourceCoreDataExpressions.sliceCopy layout comparison.expression depth
             slice.type slice.expression⟩
+      | .elementRef base index =>
+          let base ← lowerChild fuel source scope base reasonAt
+          let layout ← match SourceCoreDataExpressions.viewShape? base.type with
+            | some (0, layout) => pure layout
+            | _ => throw (unsupported node)
+          SourceCoreBasic.ensureType site (.product base.type .word) type
+          let index ← lowerChild fuel source scope index reasonAt
+          SourceCoreBasic.ensureType site .word index.type
+          pure ⟨type, SourceCoreDataExpressions.elementRef layout base.expression index.expression⟩
+      | .memrefLoad reference =>
+          let reference ← lowerChild fuel source scope reference reasonAt
+          let layout ← match SourceCoreDataExpressions.memrefLayout? reference.type with
+            | some layout => pure layout
+            | none => throw (unsupported node)
+          SourceCoreBasic.ensureType site layout.valueType type
+          let comparison ← (SourceCoreCompatibleDataEquality.prepare fuel context.checked
+            (.constructor (.builtin .word))).mapError (fun _ => unsupported node)
+          pure ⟨type, SourceCoreDataExpressions.memrefLoad layout comparison.expression
+            reference.expression⟩
+      | .memrefStore reference value =>
+          let reference ← lowerChild fuel source scope reference reasonAt
+          let layout ← match SourceCoreDataExpressions.memrefLayout? reference.type with
+            | some layout => pure layout
+            | none => throw (unsupported node)
+          SourceCoreBasic.ensureType site .unit type
+          let value ← lowerChild fuel source scope value reasonAt
+          SourceCoreBasic.ensureType site layout.valueType value.type
+          let comparison ← (SourceCoreCompatibleDataEquality.prepare fuel context.checked
+            (.constructor (.builtin .word))).mapError (fun _ => unsupported node)
+          pure ⟨type, SourceCoreDataExpressions.memrefStore layout comparison.expression
+            reference.expression value.expression⟩
       | _ => throw (unsupported node)
 
 def leafLowerer (context : Context) : ExpressionLowerer → ExpressionLowerer :=
@@ -867,7 +898,8 @@ def leafLowerer (context : Context) : ExpressionLowerer → ExpressionLowerer :=
     let (node, type) ← readExpression context.checked source id
     match node.form with
     | .constructor .. | .member .. | .proxy .. | .index .. | .newArray .. | .arrayLength ..
-    | .arrayIndex .. | .arrayLiteral .. | .arraySlice .. | .toArray .. =>
+    | .arrayIndex .. | .arrayLiteral .. | .arraySlice .. | .toArray .. | .elementRef ..
+    | .memrefLoad .. | .memrefStore .. =>
         lowerWithReasons fuel context child source scope id reasonAt
     | .tuple elements =>
         let children ← elements.mapM fun element => child fuel source scope element reasonAt

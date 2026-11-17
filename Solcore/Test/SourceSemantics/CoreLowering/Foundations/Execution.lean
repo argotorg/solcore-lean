@@ -5654,6 +5654,20 @@ private def arraySliceWorkspace : Workspace.RawWorkspace := workspaceOf [
   "    return slices([x0, x1, x2, x3])[i];",
   "}"]
 
+/-- Row 4's step 7f: upstream's mem-array fixture's `bump(r)` and `bumpElement(v)`, as upstream
+wrote them, with the contract's method as a function. -/
+private def memrefWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function bump(r: memref<uint256>) {",
+  "    let v: uint256 = CanStore.load(r);",
+  "    CanStore.store(r, v + uint256(1));",
+  "}",
+  "function bumpElement(v: uint256) returns (uint256) {",
+  "    let m: uint256[] = new uint256[](2);",
+  "    m[1] = v;",
+  "    bump(lidx(m, uint256(1)));",
+  "    return m[1];",
+  "}"]
+
 /-- The source semantics and the lowering reject the same first length with `Panic(0x41)`. -/
 example : Solcore.SourceSemantics.Dynamic.newArrayLengthLimit =
     SourceCoreDataExpressions.arrayLengthLimit := rfl
@@ -5673,7 +5687,8 @@ wrappers. Then array-slice's `#[() -> 3]`, `#[(0) -> 11]`, `#[(2) -> 13]`, `#[(3
 `#[(2) -> 3]`, `#[(5) -> 0]`, `#[(6) -> 0x32]`, `#[(3) -> 3]`, `#[() -> 5]`, `#[(0) -> 12]`,
 `#[(1) -> 13]`, `#[(4, 2) -> 0x32]`, `#[(0, 6) -> 0x32]`, `#[(2, 2) -> 0]`, `#[() -> 99]`,
 `#[() -> 38]`, `#[(true) -> 4]` and `#[(false) -> 3]`, and memory-array-abi's
-`slices([10,20,30,40]) -> [20,30]` through its wrapper, as 20 at 0, 30 at 1 and `0x32` at 2. -/
+`slices([10,20,30,40]) -> [20,30]` through its wrapper, as 20 at 0, 30 at 1 and `0x32` at 2.
+Then mem-array's `#[(7) -> 8]` through `bumpElement` and `bump`. -/
 def runUpstreamArrayFixtures : IO Unit := do
   let program ← get "array fixture check" (checkProgram arrayFixtureWorkspace)
   let names := ["newLen", "oversized", "nested", "defaultZero", "nestedEmpty", "signedIndex"]
@@ -5788,7 +5803,17 @@ def runUpstreamArrayFixtures : IO Unit := do
   for (index, arguments) in slicePanics do
     sliceSession ← panics sliceSession (← sliceKey index) arguments SourceCorePanics.outOfBounds
       s!"{sliceNames[index]!}({reprStr arguments})"
-  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths; a nested element write changes only its row, and an element place from the length on panics with 0x32 before its right side; mem-array's setGet, fillAndSum, nestedReplace and alias as upstream wrote them give the fixture's elements and sums, with 0x32 from the length on, and memory-array-abi's ret, sum and grid give the fixture's arrays through word wrappers; array-slice's rangeLen, rangeGet, fromLen, toLen, allLen, reslice, bounds, materialise, aliasing, spec and ternaryBound as upstream wrote them give the fixture's lengths and elements, with 0x32 from a bound or an index out of its view, a copy included, and a view reads its base's later writes; and memory-array-abi's slices gives the fixture's copy through slicesAt"
+  let memrefProgram ← get "memref fixture check" (checkProgram memrefWorkspace)
+  let memrefSeeds ← ["bumpElement"].mapM (seed memrefProgram)
+  let memrefCompiled ← get "memref fixture compilation"
+    (compile memrefWorkspace memrefSeeds {specializationBudget := 256, compilationFuel := 1000})
+  let memrefKey ← match memrefCompiled.keys[0]? with
+    | some key => pure key
+    | none => throw (IO.userError "memref fixture root missing")
+  let memrefSession ← boot (← memrefCompiled.open)
+  let bumped ← execute memrefSession memrefKey [word 7]
+  require (bumped.value == word 8) s!"bumpElement(7) gave {reprStr bumped.value}"
+  IO.println "SOURCE_CORE_UPSTREAM_ARRAY_FIXTURES_PASS: mem-array's newLen, oversized, defaultZero and nestedEmpty as upstream wrote them give the fixture's length, Panic(0x41) from 2^251 − 1 on, an unwritten zero and an empty row, a read from the length on and a negative int8 index panic with 0x32, and a nested new with a.length and a.length() gives its lengths; array-syntax's sumAll, pair, local, returned, nested and callResultLength as upstream wrote them give the fixture's sums, elements and lengths; a nested element write changes only its row, and an element place from the length on panics with 0x32 before its right side; mem-array's setGet, fillAndSum, nestedReplace and alias as upstream wrote them give the fixture's elements and sums, with 0x32 from the length on, and memory-array-abi's ret, sum and grid give the fixture's arrays through word wrappers; array-slice's rangeLen, rangeGet, fromLen, toLen, allLen, reslice, bounds, materialise, aliasing, spec and ternaryBound as upstream wrote them give the fixture's lengths and elements, with 0x32 from a bound or an index out of its view, a copy included, and a view reads its base's later writes; memory-array-abi's slices gives the fixture's copy through slicesAt; and mem-array's bumpElement as upstream wrote it gives the fixture's 8, bump loading and storing through lidx's memref"
 
 def run : IO Unit := do
   let program ← get "fixed-width operator check" (checkProgram workspace)

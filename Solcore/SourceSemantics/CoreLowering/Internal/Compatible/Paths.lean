@@ -1872,6 +1872,11 @@ theorem project_closed {catalog : Catalog} (closed : ClosedSources catalog)
       change (SourceCoreDataCatalog.closed left && SourceCoreDataCatalog.closed right) = true
       rw [← runtime_closed left, head, rightIH baseAccepted]
       rfl
+    · rename_i head
+      obtain ⟨elementType, elementAccepted, _⟩ := bind_ok accepted
+      change (SourceCoreDataCatalog.closed left && SourceCoreDataCatalog.closed right) = true
+      rw [← runtime_closed left, head, rightIH elementAccepted]
+      rfl
     · split at accepted
       · exact identity_closed closed (by assumption)
       · cases accepted

@@ -397,7 +397,8 @@ wait for the native pipeline's contracts and ABI.
   memory array holds (`Ty.arrayElementAllowed`), and `Ty.containsArray` counts it, so a mapping that
   holds a memref is rejected with `unsupportedArrayType`, as is an array of memrefs, whose element
   `Ty.arrayElementAllowed` does not admit (difference 21). Elaboration and both catalogs reject
-  every memref type until step 7f.
+  every memref type until step 7f; as built in step 7f, the compatible catalog projects one (see
+  Lowering), and elaboration and the strict catalog still reject it.
 - **Lengths.** `a.length`, `a.length()` and `Length.length(a)` on arrays and slices have the type
   `uint256`. `Length.length` is a builtin qualified call when no namespace `Length` exists, as
   `Typedef.abs` is (`typedefCall?`). As built in step 2b-ii-b, `lengthCall` finds the name, and the
@@ -583,6 +584,15 @@ wait for the native pipeline's contracts and ABI.
   is (`sliceCopyBody`), and then allocates the cell of the slice's length, the default element of
   the array under it and those elements (`sliceCopy`), as the source semantics' `ViewCopies` and its
   allocation do. Core does not change.
+- As built in step 7f, the compatible catalog projects `memref<T>` to the product of `T[]`'s Core
+  type and a word, its array and its position, and registers `T[]`'s mapping. `lidx(a, i)` evaluates
+  the array, then the index, panics with `0x32` from the array's length on, and otherwise holds the
+  array and the index (`SourceCoreDataExpressions.elementRef`), as std's `LValueIdxAccess` does.
+  `CanStore.load(r)` evaluates the memref and reads the element at its position as a read does
+  (`memrefLoad`). `CanStore.store(r, v)` evaluates the memref, then the value, and the array's cell
+  takes the value at the memref's position, keeping its length and default element, as an element
+  write's last array does (`memrefStore`). A memref's position is below its array's length, which no
+  write changes, so the load's check passes. Core does not change.
 - Arrays stay outside `StaticProfile` and the proved subset, as row 1's conversions did. The
   meaning proofs and their statements do not change.
 
@@ -611,6 +621,11 @@ upstream wrote it, behind a word wrapper, `slicesAt(x0, x1, x2, x3, i)`, which r
 arguments instead of the ABI's decoding, and how the copy leaves, read back by index instead of
 ABI-encoded, so the fixture's `slices([10,20,30,40]) -> [20,30]` is checked as 20 at index 0, 30 at
 1 and `0x32` at 2. No other function was adapted.
+
+As built in step 7f, the array fixtures test runs mem-array's `bump(r)` and `bumpElement(v)` as
+upstream wrote them, with the contract's method as a function, so the fixture's
+`bumpElement(7) -> 8` is checked through `bump`, which loads and stores through `lidx`'s memref. No
+other function was adapted.
 
 ### Outside row 4's Lean side
 
@@ -816,7 +831,7 @@ meaning proofs. A program that mentions no array keeps all its proofs.
 | 7d | Memrefs: inference's typing of `lidx(a, i)`, a compiler call whose index waits for finalization as a read's | 22–30 files, +650–950/−10–40; measured at 22 files, +641/−42 | none |
 | 7e-i | Memrefs: inference's typing of `CanStore.load(r)` | 18–24 files, +450–650/−10–30; measured at 20 files, +518/−5 | none |
 | 7e-ii | Memrefs: inference's typing of `CanStore.store(r, v)`, whose value's type unifies with the element type | 22–30 files, +700–1,100/−10–40; measured at 20 files, +663/−4 | none |
-| 7f | Memrefs: the lowering, a memref as a Core product of its array's cell and its index, and the loads and stores through it | 8–12 files, +250–450/−10–30 | bump(r), bumpElement(v) |
+| 7f | Memrefs: the lowering, a memref as a Core product of its array's cell and its index, and the loads and stores through it | 8–12 files, +250–450/−10–30; measured at 9 files, +151/−5 | bump(r), bumpElement(v) |
 | 8 | All ports in one test, as row 1's step 8e | 2–4 files, +250–450 | the 34 functions above |
 
 In all, that is about 785 to 1,079 file changes, +20,535 to 30,895 and −2,015 to 3,880 lines over

@@ -61,8 +61,8 @@ def Catalog.project (catalog : Catalog) : Ty → Except Error Core.Ty
   | .constructor (.builtin .integer) => pure .integer
   -- A memory array is a Core cell of its length, its default element and the mapping of
   -- its present elements from index to element, which `registerType` registers. A slice is
-  -- the product of its base, its start and its length. Any other application is a nominal
-  -- type's.
+  -- the product of its base, its start and its length, and a memref the product of its
+  -- array and its position. Any other application is a nominal type's.
   | .application function element =>
       match SourceCoreRawMetadata.runtimeType function with
       | .constructor (.builtin .memoryArray) => do
@@ -74,6 +74,13 @@ def Catalog.project (catalog : Catalog) : Ty → Except Error Core.Ty
       | .constructor (.builtin .arraySlice) => do
           let baseType ← catalog.project element
           pure (.product baseType (.product .word .word))
+      | .constructor (.builtin .memref) => do
+          let elementType ← catalog.project element
+          match catalog.identity? (.mapping (.constructor (.builtin .word)) element) with
+          | some identity =>
+              pure (.product (.cell (.product .word (.product elementType (.namedData identity)))) .word)
+          | none => throw (.catalog (.missingRepresentation
+              (SourceCoreRawMetadata.runtimeType (.application function element))))
       | _ => match catalog.identity? (.application function element) with
           | some identity => pure (.namedData identity)
           | none => throw (.catalog (.missingRepresentation
@@ -156,6 +163,10 @@ mutual
       | .application (.constructor (.builtin .arraySlice)) base => do
           let (catalog, _) ← registerType signatures fuel catalog base
           pure (catalog, ← catalog.project type)
+      | .application (.constructor (.builtin .memref)) element => do
+          let (catalog, _) ← registerType signatures fuel catalog
+            (.mapping (.constructor (.builtin .word)) element)
+          pure (catalog, ← catalog.project type)
       | _ => do
           let (declaration, arguments) ← match SourceCoreDataCatalog.nominalParts type with
             | some parts => pure parts
@@ -211,6 +222,9 @@ mutual
       -- A slice's own product takes no metadata: only its base can.
       | .application (.constructor (.builtin .arraySlice)) base =>
           discoverMetadata signatures fuel seen base
+      -- Nor does a memref's: only its element can.
+      | .application (.constructor (.builtin .memref)) element =>
+          discoverMetadata signatures fuel seen element
       | _ => do
           let (declaration, arguments) ← match SourceCoreDataCatalog.nominalParts type with
             | some parts => pure parts
