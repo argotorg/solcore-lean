@@ -36,9 +36,9 @@ API, and families with a finite profile.
 | [AcceptedExpressions](../../Solcore/SourceSemantics/CoreLowering/AcceptedExpressions.lean) | The first expression subset (`CellAwareInvocationAcceptedExpressionTrees.Subset`, `CellAwareInvocationAcceptedExpressions.Closed`) and the named-row entry |
 | [AcceptedShapes](../../Solcore/SourceSemantics/CoreLowering/AcceptedShapes.lean) | A Source shape that implies `Covered` (`CellAwareInvocationAcceptedBodyShape.Shape`, checked by `shapeWith?`), and staged traces of call-free bodies lifted from Source (`CellAwareInvocationAcceptedStatementLifting.body`) |
 | [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean) | Direct calls at expression roots and their check on a compiled row |
-| [AcceptedConversions](../../Solcore/SourceSemantics/CoreLowering/AcceptedConversions.lean) | The conversions of a word as compiler sites: the native check, the compiler's receipt, the dirty-integer revert's token law (`CellAwareInvocationAcceptedConversionFaults.DirtyToken`) and the head |
-| [AcceptedNestedCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedNestedCalls.lean) | Direct calls and the conversions of a word inside expressions and as arguments (`CellAwareInvocationAcceptedNestedTrees.Nested`), their closure and check, and the closure of a family of rows by strong induction on the grade |
-| [AcceptedCallLifting](../../Solcore/SourceSemantics/CoreLowering/AcceptedCallLifting.lean) | Staged traces lifted from Source for bodies with direct calls and the conversions of a word at any expression position, by strong induction on the size of the original derivation (`CellAwareInvocationAcceptedCallLifting.body`) |
+| [AcceptedConversions](../../Solcore/SourceSemantics/CoreLowering/AcceptedConversions.lean) | The builtin conversions as compiler sites: the native check, the compiler's receipt, the dirty-integer revert's token law (`CellAwareInvocationAcceptedConversionFaults.DirtyToken`) and the head |
+| [AcceptedNestedCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedNestedCalls.lean) | Direct calls and the builtin conversions inside expressions and as arguments (`CellAwareInvocationAcceptedNestedTrees.Nested`), their closure and check, and the closure of a family of rows by strong induction on the grade |
+| [AcceptedCallLifting](../../Solcore/SourceSemantics/CoreLowering/AcceptedCallLifting.lean) | Staged traces lifted from Source for bodies with direct calls and the builtin conversions at any expression position, by strong induction on the size of the original derivation (`CellAwareInvocationAcceptedCallLifting.body`) |
 | [AcceptedPublicRoots](../../Solcore/SourceSemantics/CoreLowering/AcceptedPublicRoots.lean) | Accepted bodies at the actual public start |
 | [PublicSupport](../../Solcore/SourceSemantics/CoreLowering/PublicSupport.lean) | `CompilerProgramStaticProfile.StaticProfile`, program support, `SelectedCompilationPublicSessionState.State` |
 | [PublicSessions](../../Solcore/SourceSemantics/CoreLowering/PublicSessions.lean), [PublicSessionOutcomes](../../Solcore/SourceSemantics/CoreLowering/PublicSessionOutcomes.lean) | From actual compilation to an issued session, and one call of it in both directions |
@@ -152,7 +152,7 @@ Build the umbrella and work up from the lowest failing file: its importers fail 
 - **A new builtin function**, such as the conversions `uint256(w)`, `uintN(w)` and `intN(w)`. A
   builtin that is not a closure stays out of `BuiltinFunctionId.all`, so no program's globals,
   callable table or closure identities change, and `lowerExpressionWithPolicy` lowers it inline.
-  On the accepted-body route the conversions of a word are nested sites
+  On the accepted-body route the conversions are nested sites
   (`CellAwareInvocationAcceptedConversionSites.of_accepted`); the older families' builtin calls
   still take `function.conversion? = none` (`BuiltinCalls.call_of_accepted`).
 - **A form only the compatible profile lowers**, such as row 4's arrays, slices and memrefs. The
@@ -229,7 +229,7 @@ work, under "Remaining work for the second goal". In short:
 - `Covered` still excludes writes and matches under contextual metadata views, and statements after
   an always-returning prefix in a non-Unit function.
 - The expression closure covers a first subset, direct calls at any expression position and the
-  conversions of a word. Indirect calls, the other builtin calls, methods, indices, tuples,
+  builtin conversions. Indirect calls, the other builtin calls, methods, indices, tuples,
   constructors, generalized reads, closures and coercions remain.
 - The proof target is a successful selected compilation, not the whole workspace and not checker
   acceptance alone. Each extension ends in a consumer of the real public API.
@@ -285,7 +285,7 @@ The tests are by subject under
 | `Compatible/`, `Data/`, `Mixed/`, `Named/`, `Recursive/`, `Chosen/`, `Closed/` | Profiles and families: places, assignments, matches, loops, named and recursive rows |
 | [Selected/Profiles](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/Profiles.lean), [Generalized/Export](../../Solcore/Test/SourceSemantics/CoreLowering/Generalized/Export.lean) | Instantiate the front's session and public-root theorems on fixtures |
 | `UnifiedCorpus`, `UnifiedOperatorCorpus` | The unified runtime on canonical checked programs |
-| `Accepted/Fixture`, `Accepted/OneCall` | A compiled program with its inventory, family rows and callees' receipts; the call root's theorems in both directions at a direct call, at a call whose argument is a call and at a conversion, and in reflection at a dirty word |
+| `Accepted/Fixture`, `Accepted/OneCall` | A compiled program with its inventory, family rows and callees' receipts; the call root's theorems in both directions at a direct call, at a call whose argument is a call, at a conversion and at `Typedef.rep` of a conversion, and in reflection at dirty words |
 
 ```sh
 lake build Solcore.SourceSemantics.CoreLowering

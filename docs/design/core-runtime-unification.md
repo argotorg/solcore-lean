@@ -118,7 +118,7 @@ These theorems keep explicit premises:
 
 - **`Expressions`** supplies meaning for exactly the expressions the compiler accepted, at every
   compiler fuel. The expression closure below discharges it for named-row bodies of a first subset
-  with direct calls and the conversions of a word at any expression position.
+  with direct calls and the builtin conversions at any expression position.
 - **`Covered`** admits returns, final values, discards, `break`/`continue`, blocks, conditionals,
   `while` and `for` loops, monomorphic initialized or uninitialized declarations, and bare and
   projected assignments and bit-not updates when the compiler view is the original Source, as for
@@ -240,7 +240,7 @@ Direct calls are in [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/A
   `CellAwareInvocationAcceptedNestedTrees.Nested` closes the subset's forms and direct calls under
   one another, so a call may also be an operand, a branch, a pair element or another call's
   argument; the family takes rows whose accepted expressions are nested sites (`ClosedNested`).
-  The conversions of a word are nested sites too, with the dirty-integer revert's token law as an
+  The builtin conversions are nested sites too, with the dirty-integer revert's token law as an
   instance argument (`CellAwareInvocationAcceptedConversionFaults.DirtyToken`).
 - **Authority.** `CellAwareInvocationAcceptedCallAuthority` derives `Ports` from a complete
   inventory: a call receipt's global slot names an indexed function, and the inventory's header for
@@ -349,15 +349,15 @@ program.
   uses are general over the subset and the shape.
 - **One call.** The test
   [Accepted/OneCall](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/OneCall.lean) compiles
-  a four-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
-  `identity(value)`, `twice` returns `identity(identity(value))` and `narrow` returns
-  `uint8(value)`. Its `accepted_call` meets every premise of
+  a five-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
+  `identity(value)`, `twice` returns `identity(identity(value))`, `narrow` returns `uint8(value)`
+  and `roundTrip` returns `Typedef.rep(uint8(value))`. Its `accepted_call` meets every premise of
   `CellAwarePublicAcceptedCallForward.first_value_selected`,
   `CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected` and
   `checkpoint_reflects_selected` at `relay`'s first public call, at `twice`'s, where the inner
-  call's result is the outer call's argument, and at `narrow`'s at a canonical word. At a dirty
-  word, `accepted_reflection` meets the reflection's premises and the call fails with the
-  dirty-integer reason. The fixture
+  call's result is the outer call's argument, and at `narrow`'s and `roundTrip`'s at a canonical
+  word. At a dirty word, `accepted_reflection` meets the reflection's premises at both, and the
+  call fails with the dirty-integer reason. The fixture
   [Accepted/Fixture](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/Fixture.lean) builds
   the family rows and the callees' receipts from runtime checks of every cache row and a complete
   inventory (`WholeInventory.family_row`, `WholeInventory.callees`), and the staged trace is lifted
@@ -386,10 +386,11 @@ On the accepted-body route above, the next connected steps are:
     available Source input.
 - **Extend the expression closure beyond its first subset**, over the same actual accepted
   expression compiler.
-  - Direct calls and the conversions of a word at any expression position are closed over
+  - Direct calls and the builtin conversions at any expression position are closed over
     families of rows, with call authority from a complete inventory. They are connected at the
     public root in both directions, original traces of call-containing bodies are lifted, and a
-    program with a call, a nested call and a conversion instantiates both directions.
+    program with a call, a nested call, a conversion and `Typedef.rep` of a conversion
+    instantiates both directions.
   - Next come indirect calls, the other builtin calls, methods, indices, tuples, constructors,
     generalized reads, closures and coercions.
   - Expressions of contextual closures need the relation between the compiler view and the Source

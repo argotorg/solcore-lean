@@ -54,11 +54,11 @@ obligations. None follows from agreement in a test corpus.
   ([Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal)).
   - Done: statement closure over the actual compiler tree; a first expression subset and
     statement shape for named rows, connected to the unchanged public root; one concrete instance
-    (`AcceptedTick` in `Generalized/Export`); direct calls and the conversions of a word at any
+    (`AcceptedTick` in `Generalized/Export`); direct calls and the builtin conversions at any
     expression position, closed by one size induction over a family of rows; call authority from
     a complete inventory; and the public root in both directions for call-containing rows
     (`CellAwarePublicAcceptedCallRoot`), with their original traces lifted and instances at a
-    call, a nested call and a conversion (`Accepted/OneCall`).
+    call, a nested call, a conversion and `Typedef.rep` of a conversion (`Accepted/OneCall`).
   - Remaining: the remaining expression and statement forms, fault lifting, a richer instance
     and chained public calls.
 - **Hull public connections** ([Hull meaning preservation](hull-meaning-preservation.md)).
@@ -109,13 +109,13 @@ The last two are recorded without investigation, and the generators avoid them.
 
 ### Now
 
-1. **A check of solcore-rs main past `e2eef194`**, for a re-pin: a survey of upstream's changes
-   up to `d1b5ac28`, which is cloned locally, and of the steps Lean would need. Rows 1 to 7 of
-   the upstream table are done.
-2. **Meaning proofs.** Row 1's leftovers: `Typedef.rep` at the twelve types, after a fix to the
-   Source semantics, which also faults there; then compound assignments and in-place `~` at
-   the twelve types ([what remains](integer-types-unchecked-shifts.md#what-remains)). Then the
-   rest of native Source goal two.
+1. **A re-pin to `d1b5ac28`.** The survey is done. Upstream changed its trait coherence rules and
+   `std.sol`, not its Hull, backends or parser, so the re-pin alone changes no expected outcome.
+   The new rules refuse five forms that Lean's native frontend accepts, and whether Lean follows
+   them is open. Rows 1 to 7 of the upstream table are done.
+2. **Meaning proofs.** Row 1's leftovers: compound assignments and in-place `~` at the twelve
+   types ([what remains](integer-types-unchecked-shifts.md#what-remains)). Then the rest of
+   native Source goal two.
 3. **Lean's native frontend as a fourth differential path.** The survey is done. It recommends a
    harness that runs admitted pure cases through the native pipeline first, then native
    `std.opcodes`. Not started.
@@ -156,7 +156,7 @@ code.
 
 | Row | Upstream change | Status | Fixtures |
 | ---: | --- | --- | --- |
-| 1 | Checked integer types and literal defaulting (#95): `uint8` to `uint256` and `int8` to `int256`, checked `+ - * / %` that panic with `0x11` or `0x12`, unary negation, range-checked literals, ABI validation of narrow integers, and an unconstrained literal defaulting to `uint256` instead of `word` | **Done.** The twelve types are builtins with comparisons, bitwise operators, checked and unchecked arithmetic, shifts and their compound forms, range-checked literals, the `uint256` default, the constructors from `word`, and `Typedef.abs` and `Typedef.rep` where the call's type is known. Compound assignments, in-place `~` and `Typedef.rep` at the twelve types are compiled but outside the meaning proofs, and four differences from upstream remain ([integer note](integer-types-unchecked-shifts.md#semantics-in-lean), [differences](integer-types-unchecked-shifts.md#differences-from-upstream)). | `checked-arith`, `int-ops`, `issue92-checked-defaults`, `shift-operators`, `mini-erc20`, `deposit` |
+| 1 | Checked integer types and literal defaulting (#95): `uint8` to `uint256` and `int8` to `int256`, checked `+ - * / %` that panic with `0x11` or `0x12`, unary negation, range-checked literals, ABI validation of narrow integers, and an unconstrained literal defaulting to `uint256` instead of `word` | **Done.** The twelve types are builtins with comparisons, bitwise operators, checked and unchecked arithmetic, shifts and their compound forms, range-checked literals, the `uint256` default, the constructors from `word`, and `Typedef.abs` and `Typedef.rep` where the call's type is known. Compound assignments and in-place `~` at the twelve types are compiled but outside the meaning proofs, and four differences from upstream remain ([integer note](integer-types-unchecked-shifts.md#semantics-in-lean), [differences](integer-types-unchecked-shifts.md#differences-from-upstream)). | `checked-arith`, `int-ops`, `issue92-checked-defaults`, `shift-operators`, `mini-erc20`, `deposit` |
 | 2 | `unchecked` blocks (#119): `+ - * / %` inside a block resolve to `std.unchecked`'s wrapping instances, lexically | **Done** for `word` and the twelve types. `+ - * / %` and their compound forms wrap to the type's width, and `/ %` panic with `0x12` on a zero divisor ([unchecked blocks](integer-types-unchecked-shifts.md#unchecked-blocks-as-implemented)). | `unchecked-scope`, `shift-operators` |
 | 3 | Shift operators (#129): `<<` and `>>` with `Shl`, `Shr` and `ShiftAmount`, arithmetic `>>` for signed types, no revert, amounts of at least the width giving 0 or -1 | **Done** for `word` and the twelve types: `<<`, `>>`, `<<=` and `>>=` by a `word` or unsigned amount ([shifts](integer-types-unchecked-shifts.md#shifts-as-implemented)). | `shift-operators` |
 | 4 | Memory arrays, slices and panic codes (#145): `T[]`, `new T[](n)` zeroed, `a.length` and methods on any receiver, `a[i]` through a checked `memref`, read-only slices `a[s:e]`, memory arrays in the public ABI, `Panic(0x32)` for indices and slice bounds, `Panic(0x31)` for an empty pop, `Panic(0x41)` for allocation overflow | **Done for memory arrays in functions.** `T[]`, `new`, literals, reads, element writes and compound assignments, lengths, slices, `toArray(s)`, `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` are typed, have their source semantics and compile through the compatible profile, outside the meaning proofs. A compound assignment evaluates its element place once, by the user's decision, where upstream evaluates it twice. Storage and calldata arrays and `T[]` in the ABI wait for native contract storage and a calldata ABI ([memory arrays note](memory-arrays-slices.md), [differences](memory-arrays-slices.md#differences-from-upstream-that-lean-would-keep)). | `array-syntax`, `mem-array`, `array-slice`, `calldata-slice`, `memory-array-abi`, `user-collection-index`, `memory-allocation-bounds`, `allocator-bounds`, `abi-sum-padding`, `array-ops` |
