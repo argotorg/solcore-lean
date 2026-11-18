@@ -14,7 +14,7 @@ use hull::{
 };
 use serde_json::{Value, json};
 
-const UPSTREAM_COMMIT: &str = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0";
+const UPSTREAM_COMMIT: &str = "d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09";
 
 fn span<'db>(db: &'db dyn hir::Db, value: Span<'db>) -> Value {
     let absolute = value.resolve_to_absolute(db);

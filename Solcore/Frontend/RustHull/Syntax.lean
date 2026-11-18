@@ -16,7 +16,7 @@ set_option autoImplicit false
 namespace Solcore.Frontend.RustHull
 
 def schemaName : String := "solcore-rs.hull.v1"
-def upstreamCommit : String := "e2eef19409fc8879cd4a9cc342ed60e3152f72c0"
+def upstreamCommit : String := "d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09"
 
 /-- Resolved file offsets; upstream anchor-relative offsets must be resolved first. -/
 structure Span where

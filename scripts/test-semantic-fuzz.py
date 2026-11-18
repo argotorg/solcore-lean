@@ -837,11 +837,11 @@ class FixtureRunTests(unittest.TestCase):
     def test_each_cycle_runs_every_fixture_once_from_the_base_seed(self):
         config = {"base_seed": 7, "shard_index": 0, "shard_count": 1, "fixture_count": 8}
         pool = fuzz.fixture_pool(config)
-        self.assertEqual(len(pool), 182)
+        self.assertEqual(len(pool), 184)
         self.assertFalse(any(set(name) & set("*?[") for name in pool))  # ids pass to --fixture as exact globs
         cycle = [fuzz.fixture_selection(config, iteration) for iteration in range(23)]
         self.assertEqual(sorted(sum(cycle, [])), pool)
-        self.assertEqual([len(selection) for selection in cycle], [8] * 22 + [6])
+        self.assertEqual([len(selection) for selection in cycle], [8] * 23)
         self.assertEqual(fuzz.fixture_selection(config, 3), cycle[3])
         self.assertNotEqual(fuzz.fixture_selection(config, 23), cycle[0])
         self.assertNotEqual(fuzz.fixture_selection({**config, "base_seed": 8}, 0), cycle[0])

@@ -21,7 +21,7 @@ import sys
 import time
 
 ROOT = Path(__file__).resolve().parent.parent
-COMMIT = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0"
+COMMIT = "d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09"
 PREFIX = {"sonatina": "sonatina_evm_e2e__", "yul": "yul_evm_e2e_fixture__"}
 BUILD = ["cargo", "test", "--profile", "e2e", "-p", "solcore-yul", "-p",
          "solcore-sonatina", "--test", "e2e", "--locked", "--offline", "--no-run",
@@ -95,12 +95,12 @@ def outcome(result: subprocess.CompletedProcess) -> tuple[str, str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261116")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/evm-reference-target")
     parser.add_argument("--build", action="store_true")
     parser.add_argument("--build-only", action="store_true")
     parser.add_argument("--backend", choices=list(PREFIX), action="append")
-    parser.add_argument("--fixture", action="append", help="fixture id glob; omitted selects all 182")
+    parser.add_argument("--fixture", action="append", help="fixture id glob; omitted selects all 184")
     parser.add_argument("--output", type=Path, default=ROOT / ".upstream/evm-reference.json")
     parser.add_argument("--report-only", action="store_true")
     args = parser.parse_args()

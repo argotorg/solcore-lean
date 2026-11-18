@@ -1,6 +1,6 @@
 {
-  "upstreamCommit": "e2eef19409fc8879cd4a9cc342ed60e3152f72c0",
-  "scope": "All 105 fixtures using method directives, with 820 calls/sends and 105 constructors. Raw scenarios are inventoried separately.",
+  "upstreamCommit": "d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09",
+  "scope": "All 107 fixtures using method directives, with 828 calls/sends and 107 constructors. Raw scenarios are inventoried separately.",
   "fixtures": [
     {
       "id": "00answer",
@@ -269,11 +269,18 @@
       "expectedCallCount": 9
     },
     {
+      "id": "abi-layout-through-reexport",
+      "source": "tests/e2e/abi-layout-through-reexport/main.sol",
+      "sha256": "1e11288112e7eb4fbdac4cf55f5c1f938422cb6b594b06dd7ceb1554ced773a8",
+      "contract": "AbiLayoutThroughReexport",
+      "expectedCallCount": 2
+    },
+    {
       "id": "abi-raw-default-codec",
       "source": "tests/e2e/abi-raw-default-codec/main.sol",
-      "sha256": "1e11c8f239db5e4ed84aaaa5655d185632e45dbf17d4a8acc22b6fd109d7b8f2",
+      "sha256": "66491abb14408371ee65a563cef66a9fadb2a84506ccee3f5276562dad698cda",
       "contract": "DefaultRawCodec",
-      "expectedCallCount": 6
+      "expectedCallCount": 8
     },
     {
       "id": "abi-sum-padding",
@@ -285,7 +292,7 @@
     {
       "id": "abi-word-custom-codec",
       "source": "tests/e2e/abi-word-custom-codec/main.sol",
-      "sha256": "bef39bcbdac1c0622e4e63fd3ede2efbfc426f30ca8122891c93e3faaa721906",
+      "sha256": "5294ebd7e482a5af205b9eafa8fccccb2ca180126228f9621c00fdec3d3b84e3",
       "contract": "CustomWordCodec",
       "expectedCallCount": 4
     },
@@ -682,6 +689,13 @@
       "sha256": "4dbc6ff231843625e5ab81375646e247ffb6d167805e599d3cabdb35067a381d",
       "contract": "StructShadowedNamespace",
       "expectedCallCount": 5
+    },
+    {
+      "id": "superclass-default-through-subtrait",
+      "source": "tests/e2e/superclass-default-through-subtrait/main.sol",
+      "sha256": "c4809cab0e00d495fed7cd549dea0b956f343902fc87ae5f0cdd64c0d881ea74",
+      "contract": "SuperclassDefaultThroughSubtrait",
+      "expectedCallCount": 4
     },
     {
       "id": "superclass-dictionaries",

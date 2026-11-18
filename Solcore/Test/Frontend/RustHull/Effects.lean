@@ -224,7 +224,7 @@ private def require (condition : Bool) (message : String) : IO Unit :=
 
 private def sample : String := r#"{
   "schema":"solcore-rs.hull.v1",
-  "upstreamCommit":"e2eef19409fc8879cd4a9cc342ed60e3152f72c0",
+  "upstreamCommit":"d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09",
   "program":{
     "entryPoints":["entry"],
     "span":{"file":"main.sol","start":0,"end":120},

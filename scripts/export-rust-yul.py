@@ -375,7 +375,7 @@ def parse_args(argv=None):
     parser.add_argument("--fixture-edit", type=Path,
                         help="with --fixture: a JSON single-site edit of the pinned sources that SOURCE's directory holds")
     parser.add_argument("--solc", type=Path, required=True, help="preinstalled solc " + SOLC_VERSION)
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261116")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--root", type=Path)
     parser.add_argument("--hull-output", type=Path, help="fresh checked Hull sibling; default OUTPUT.hull.json")

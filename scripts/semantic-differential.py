@@ -348,7 +348,7 @@ CASE_CONTRACTS = {CASE_SCHEMA: "SynthesizedG0", INPUT_CASE_SCHEMA: "SynthesizedI
                   ARRAY_ABI_CASE_SCHEMA: "SynthesizedArrayAbi", CLOSURE_CAPTURES_CASE_SCHEMA: "SynthesizedClosureCaptures",
                   CLOSURE_FACTORIES_CASE_SCHEMA: "SynthesizedClosureFactories"}
 REPORT_SCHEMA = "solcore-lean.semantic-differential.v1"
-UPSTREAM_COMMIT = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0"
+UPSTREAM_COMMIT = "d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09"
 BACKEND_COMMIT = "6bd0ce661ea327c149429b00fee3c8608616040f"
 SONATINA_BACKENDS = ("sonatina-o0", "sonatina-o2")
 BACKENDS = (*SONATINA_BACKENDS, "yul")
@@ -2044,7 +2044,7 @@ def main() -> int:
     parser.add_argument("--case-tool", type=Path, default=ROOT / ".lake/build/bin/semantic-case-tool")
     parser.add_argument("--core-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-scenario")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261116")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--backend", choices=BACKENDS, help="default Sonatina O0; exact replay inherits its saved backend")
     parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "solc"), help="pinned solc, used only for --backend yul")

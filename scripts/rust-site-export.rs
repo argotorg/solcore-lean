@@ -16,7 +16,7 @@ use hir::{
 use serde_json::{Value, json};
 use std::{env, fs, path::Path};
 
-const COMMIT: &str = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0";
+const COMMIT: &str = "d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09";
 
 #[salsa::db]
 #[derive(Default, Clone)]

@@ -154,7 +154,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case-tool", type=Path, default=ROOT / ".lake/build/bin/semantic-case-tool")
     parser.add_argument("--hull-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-contract")
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261116")
     parser.add_argument("--generated", type=int, default=12)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--nodes", type=int, default=24)

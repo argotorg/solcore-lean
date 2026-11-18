@@ -55,7 +55,7 @@ def pins(path: Path) -> set[tuple]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", nargs="?", type=Path)
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261116")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--build", action="store_true")

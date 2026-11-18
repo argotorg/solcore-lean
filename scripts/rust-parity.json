@@ -1,6 +1,6 @@
 {
   "upstream_url": "https://github.com/argotorg/solcore-rs",
-  "upstream_commit": "e2eef19409fc8879cd4a9cc342ed60e3152f72c0",
+  "upstream_commit": "d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09",
   "scope": "Unmodified std-free top-level source execution. E2E contract coverage is tracked separately. Expected values are taken from upstream specialization assertions or direct scalar inputs.",
   "cases": [
     {

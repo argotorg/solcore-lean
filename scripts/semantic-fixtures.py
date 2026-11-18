@@ -202,7 +202,7 @@ class Stream:
 
 
 def inventory() -> list[dict]:
-    """The 182 pinned fixtures of the two existing parity manifests."""
+    """The 184 pinned fixtures of the two existing parity manifests."""
     fixtures, seen = [], set()
     for name, mode in MANIFESTS:
         document = json.loads((ROOT / "scripts" / name).read_text())
@@ -2477,7 +2477,7 @@ def main(argv=None) -> int:
                         help="per Lean Core invocation of a raw scenario or a deployment")
     parser.add_argument("--hull-entry-timeout", type=float, default=HULL_ENTRY_TIMEOUT,
                         help="per Lean Core invocation of one method entry")
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261116")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--hull-runner", type=Path, default=ROOT / ".lake/build/bin/rust-hull-scenario")
     parser.add_argument("--solc", type=Path, default=Path(shutil.which("solc") or "/opt/homebrew/bin/solc"))

@@ -1,6 +1,6 @@
 {
-  "upstreamCommit": "e2eef19409fc8879cd4a9cc342ed60e3152f72c0",
-  "scope": "All 77 raw scenarios selected by upstream source_e2e_scenario; 105 method-directive fixtures remain a separate inventory.",
+  "upstreamCommit": "d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09",
+  "scope": "All 77 raw scenarios selected by upstream source_e2e_scenario; 107 method-directive fixtures remain a separate inventory.",
   "gasPolicy": "Absent unless explicitly configured per fixture. 30m is a fixed available-gas input, not metered EVM execution.",
   "fixtures": [
     {

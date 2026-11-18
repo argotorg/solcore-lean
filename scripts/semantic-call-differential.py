@@ -1662,7 +1662,7 @@ def main():
     parser.add_argument("--case-tool", type=Path, help="default: the profile's native case tool")
     parser.add_argument("--core-runner", type=Path, help="default: the profile's imported-Hull scenario runner")
     parser.add_argument("--anvil", type=Path, default=Path(shutil.which("anvil") or "anvil"))
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261116")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     defaults = {"direct_fuel": 1000000, "core_fuel": 10000000, "gas": 10000000, "timeout": 300,
         "startup_timeout": 30, "total_timeout": 900, "output_limit": 4 * 1024 * 1024, "artifact_limit": 64 * 1024 * 1024}

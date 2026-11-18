@@ -19,7 +19,7 @@ from urllib.parse import unquote, urlparse
 
 
 ROOT = Path(__file__).resolve().parent.parent
-COMMIT = "e2eef19409fc8879cd4a9cc342ed60e3152f72c0"
+COMMIT = "d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09"
 SCHEMA = "solcore-rs.hull.v1"
 
 
@@ -89,7 +89,7 @@ def source_hashes(value: object) -> dict[str, str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path, nargs="?")
-    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261102")
+    parser.add_argument("--upstream", type=Path, default=ROOT / ".upstream/solcore-rs-20261116")
     parser.add_argument("--target-dir", type=Path, default=ROOT / ".upstream/rust-parity-target")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--build", action="store_true", help="build only the pinned compiler driver")
