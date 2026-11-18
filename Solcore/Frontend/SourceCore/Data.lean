@@ -36,6 +36,8 @@ inductive Error where
   | unfinishedDefinition (index : Nat)
   | invalidDefinitions
   | invalidProjection (type : Ty) (projected : Core.Ty)
+  /-- An instantiation of the nominal type `id` has more nodes than `limit` (`maxTypeNodes`). -/
+  | typeSizeExceeded (id : Resolved.DeclarationId) (limit : Nat)
   deriving Repr, DecidableEq
 
 /-- Representation keys erase outer staging wrappers while retaining observable
@@ -62,6 +64,20 @@ def nominalParts : Ty → Option (Resolved.DeclarationId × List Ty)
       let (id, arguments) ← nominalParts function
       pure (id, arguments ++ [argument])
   | _ => none
+
+/-- A type's nodes as upstream counts a specialized type for `--pe-max-type-nodes`
+(`ty_node_budget_exceeded`): one for each constructor, function, product, mapping, proxy and
+comptime, a nominal type's arguments sitting under its constructor's node. -/
+def typeNodes : Ty → Nat
+  | .application function argument => typeNodes function + typeNodes argument
+  | .function parameter result | .product parameter result | .mapping parameter result =>
+      typeNodes parameter + typeNodes result + 1
+  | .proxy inner | .comptime inner => typeNodes inner + 1
+  | .variable _ | .parameter _ | .constructor _ | .error => 1
+
+/-- Upstream's default `--pe-max-type-nodes`. Discovery refuses a nominal instantiation with more
+nodes, so a recursive type whose arguments grow fast stops before it exhausts the fuel. -/
+def maxTypeNodes : Nat := 4096
 
 structure Entry where
   sourceType : Ty
@@ -164,6 +180,7 @@ mutual
           let (id, arguments) ← match nominalParts type with
             | some parts => pure parts
             | none => throw (.unsupportedType type)
+          unless typeNodes type ≤ maxTypeNodes do throw (.typeSizeExceeded id maxTypeNodes)
           let signature ← exactData signatures id
           if signature.parameters.length ≠ arguments.length then
             throw (.parameterCount id signature.parameters.length arguments.length)

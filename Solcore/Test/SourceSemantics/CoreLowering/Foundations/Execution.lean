@@ -6598,6 +6598,56 @@ private def runClosureParameterFixtures : IO Unit := do
     analogSession := completed.session
   IO.println "SOURCE_CORE_CLOSURE_PARAMETERS_PASS: upstream's closure-parameters cases that need no contract storage and no inline assembly, as upstream wrote them, give the fixture's values and Panic(0x11), a closure factory's checked addition panicking when the factory runs, and Lean's storage-free analogs of its storage cases give the pinned driver's values: a factory's writes happen when it runs, in order, whether its closure is used, discarded or replaced, and its closure reads the factory's own bindings, not a caller's or an expired local's"
 
+/-- Upstream's `growing_product` layout fixture (`crates/hull/tests/fixtures/layouts`), as written:
+`Nest`'s recursion doubles its type argument, so expanding it to the catalog's fuel would not end.
+Upstream refuses it with `SC0420`. -/
+private def growingProductWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := []
+  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+    "pragma solcore;", "",
+    "//~ layout: non-regular",
+    "enum Box<a> {", "    Box(a)", "}",
+    "enum Nest<a> {", "    Nil,", "    Cons(a, (Nest<(a, a)>, word))", "}",
+    "function main(x: Nest<word>) returns (word) {", "    return 0;", "}"] }]
+}
+
+/-- Upstream's `nested_box_inline` layout fixture without its unused `struct`, which Lean does not
+parse: 24 nested `Box`es, built and matched in one expression. -/
+private def nestedBoxWorkspace : Workspace.RawWorkspace :=
+  let nest (open_ close inner : String) := String.join (List.replicate 24 open_) ++ inner ++
+    String.join (List.replicate 24 close)
+  { entry := "main.solc", externalLibraries := []
+    mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+      "pragma solcore;", "",
+      "enum Box<a> {", "    Box(a)", "}",
+      s!"function unwrap(value: {nest "Box<" ">" "word"}) returns (word) " ++ "{",
+      "    match (value) {",
+      s!"        case {nest "Box(" ")" "payload"} " ++ "{", "            return payload;", "        }",
+      "        default {", "            return 0;", "        }",
+      "    }", "}",
+      "function main(input: word) returns (word) {",
+      s!"    return unwrap({nest "Box(" ")" "input"});", "}"] }] }
+
+/-- Row 6's step 2: the catalog refuses a nominal instantiation past `maxTypeNodes`, upstream's
+default `--pe-max-type-nodes`, so `growing_product` is refused at once, while a deep finite tower
+stays far below the bound. -/
+private def runLayoutBound : IO Unit := do
+  let growing ← get "growing_product check" (checkProgram growingProductWorkspace)
+  match compile growingProductWorkspace [← seed growing "main"] with
+  | .error (.compilation (.compilation (.compatible (.catalog (.catalog (.typeSizeExceeded _ limit)))))) =>
+      require (limit == SourceCoreDataCatalog.maxTypeNodes) s!"growing_product refused at {limit} nodes"
+  | .error error => throw (IO.userError s!"growing_product refused otherwise: {(reprStr error).take 400}")
+  | .ok _ => throw (IO.userError "growing_product compiled")
+  let nested ← get "nested_box_inline check" (checkProgram nestedBoxWorkspace)
+  let compiled ← get "nested_box_inline compilation" (compile nestedBoxWorkspace [← seed nested "main"])
+  let session ← boot (← compiled.open)
+  let root ← match compiled.keys[0]? with
+    | some key => pure key
+    | none => throw (IO.userError "nested_box_inline root missing")
+  let completed ← execute session root [word 5]
+  require (completed.value == word 5) s!"nested_box_inline gave {reprStr completed.value}"
+  IO.println "SOURCE_CORE_LAYOUT_BOUND_PASS: upstream's growing_product layout, whose type argument doubles at each level, is refused once an instantiation passes upstream's default --pe-max-type-nodes, instead of expanding without end, and upstream's nested_box_inline layout, 24 Boxes deep, compiles and runs"
+
 set_option maxRecDepth 2048 in
 def run : IO Unit := do
   let program ← get "public check" (checkProgram workspace)
@@ -6906,6 +6956,7 @@ def run : IO Unit := do
   require (abiResult.value == word 31) "public ABI root changed execution"
   runCaptures
   runClosureParameterFixtures
+  runLayoutBound
 
 end Tests.SourceCoreExecution
 end

@@ -171,6 +171,8 @@ mutual
           let (declaration, arguments) ← match SourceCoreDataCatalog.nominalParts type with
             | some parts => pure parts
             | none => throw (.catalog (.unsupportedType original))
+          unless SourceCoreDataCatalog.typeNodes type ≤ SourceCoreDataCatalog.maxTypeNodes do
+            throw (.catalog (.typeSizeExceeded declaration SourceCoreDataCatalog.maxTypeNodes))
           let signature ← exactData signatures declaration
           unless signature.parameters.length = arguments.length do
             throw (.catalog (.parameterCount declaration signature.parameters.length arguments.length))
