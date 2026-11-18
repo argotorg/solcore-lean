@@ -30,6 +30,8 @@ inductive ErrorView : Dynamic.SemanticFault → SourceTypedRuntime.RuntimeError 
       ErrorView reason error
   | arity (expected actual : Nat) :
       ErrorView (.argumentArityMismatch expected actual) (.argumentArityMismatch expected actual)
+  /-- A conversion of a word that is not canonical for its type. -/
+  | dirty : ErrorView .dirtyHigherBitsForInteger .dirtyHigherBitsForInteger
 
 def faults (table : SourceCoreFaultSites.Table) : FunctionCalls.FaultRep :=
   fun reason token => ∃ diagnostic,
@@ -47,6 +49,11 @@ theorem tokens {table : SourceCoreFaultSites.Table} (free : table.PanicFree) :
 theorem stagedTokens {table : SourceCoreFaultSites.Table} (free : table.PanicFree) :
     RecursiveStageMeaning.FaultTokens (stagedSemanticFaults table) :=
   ⟨fun code => (tokens free).panic code⟩
+
+/-- Such a table decodes the dirty-integer reason as `DirtyHigherBitsForInteger()`. -/
+theorem dirty {table : SourceCoreFaultSites.Table} (free : table.PanicFree) :
+    faults table .dirtyHigherBitsForInteger SourceCorePanics.dirtyReason :=
+  ⟨_, SourceCoreFaultSites.Table.dirty_diagnostic free, .dirty⟩
 
 theorem of_decoded {table : SourceCoreFaultSites.Table} {reason : Dynamic.SemanticFault}
     {token : Word} {diagnostic : SourceCoreFaultSites.Diagnostic}
