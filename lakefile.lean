@@ -183,3 +183,8 @@ lean_exe semanticLongBytesTool where
 lean_exe semanticNestedArrayTool where
   root := `Tests.SemanticNestedArrayTool
   exeName := "semantic-nested-array-tool"
+
+-- Not in prepare-semantic-tools.py's receipt: scripts/semantic-native.py checks its identity itself.
+lean_exe semanticNativeTool where
+  root := `Tests.SemanticNativeTool
+  exeName := "semantic-native-tool"
