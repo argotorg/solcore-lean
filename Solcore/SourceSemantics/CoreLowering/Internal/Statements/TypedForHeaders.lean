@@ -49,8 +49,7 @@ inductive Syntax (source : TypedSource) : SourceSemantics.Context → List ForIt
         WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
+      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
       (remaining : Syntax source context rest) : Syntax source context (.assignValue assignment operator rhs :: rest)
 
 inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
@@ -1046,8 +1045,7 @@ inductive UnarySyntax (source : TypedSource) : SourceSemantics.Context → List 
         WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
+      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
       (remaining : UnarySyntax source context rest) : UnarySyntax source context (.assignValue assignment operator rhs :: rest)
   | bitNot {context assignment rest}
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →

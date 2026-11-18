@@ -832,8 +832,7 @@ theorem initialized_success
     (observations : FunctionObservations checked.catalog functions identities)
     {sourceType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
     {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType sourceType))
     (divisor : operator.mayPanic = false ∨ right ≠ .word Word.zero)
     (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
     (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
@@ -872,8 +871,7 @@ theorem preserves
     (observations : FunctionObservations checked.catalog functions identities)
     {sourceType : TypeSystem.Ty} {type : Ty} {left right result : Dynamic.Value} {leftCore rightCore : Value}
     {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType sourceType))
     (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
     (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
     (applied : Dynamic.AssignmentValueApplies operator (some left) right result)
@@ -896,8 +894,7 @@ theorem initialized_outcome
     (observations : FunctionObservations checked.catalog functions identities)
     {sourceType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
     {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType sourceType))
     (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
     (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshot rhs : Expr}

@@ -2244,8 +2244,7 @@ structure AssignmentReceipt (source : TypedSource) (expressionSyntax : Expressio
     WritableLocal context assignment.target.root binder.scheme.body
   free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections
   right : AssignedOperandTyped source context operator rhs assignment.target.type
-  profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-    SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false
+  profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type)
   children : ∀ id, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
     expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type
 

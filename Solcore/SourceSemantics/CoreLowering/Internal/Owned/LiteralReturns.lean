@@ -1912,8 +1912,7 @@ theorem fixed_compound_excluded
     (kind : FixedCompoundAssignmentOperator operator)
     (rhsTyped : ExpressionHasType source context rhs (.fixed type))
     (view : AssignedRhsView operator leaf node.type)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false) : False := by
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf)) : False := by
   obtain ⟨actual, contains, storedType⟩ := rhsTyped.stored_type
   have sameNode : actual = node := Option.some.inj
     ((lookupExpression?_complete unique contains).symm.trans found)
@@ -1939,8 +1938,7 @@ theorem heap_after_assignment
     (found : source.lookupExpression? rhs = some node)
     (typed : SourceAssignmentHasType source context assignment operator rhs)
     (view : AssignedRhsView operator leaf node.type)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
     (targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (snapshot : BareTarget environment before assignment.target target)
@@ -2027,8 +2025,7 @@ theorem source_profile
     (found : source.lookupExpression? rhs = some node)
     (typed : SourceAssignmentHasType source context assignment operator rhs)
     (view : AssignedRhsView operator leaf node.type)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false) :
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf)) :
     operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word := by
   cases typed with
   | equal _ _ _ => exact .inl rfl

@@ -57,7 +57,7 @@ structure Head (values : ValuesContext) (source : TypedSource)
   right : certificate scope rhs lowered
   rightView : AssignedRhsView operator leaf node.type
   rightType : lowered.type = prepared.route.leafType
-  profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false
+  profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf)
   /-- The target is not a checked compound assignment's fixed-width target. -/
   targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator
 
@@ -145,8 +145,7 @@ theorem Head.of_lower_bare_with_token {values : ValuesContext} {source : TypedSo
     (unique : NodeOccurrencesUnique source)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
     (extract : ∀ lowered, expression fuel source scope rhs reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? rhs = some node ∧ certificate scope rhs lowered)
     (accepted : lower values values.checked.signatures expression fuel source scope site assignment operator (some rhs)
@@ -176,8 +175,7 @@ theorem Head.of_lower_bare {values : ValuesContext} {source : TypedSource}
     (unique : NodeOccurrencesUnique source)
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
     (extract : ∀ lowered, expression fuel source scope rhs reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? rhs = some node ∧ certificate scope rhs lowered)
     (accepted : lower values values.checked.signatures expression fuel source scope site assignment operator (some rhs)
@@ -229,8 +227,7 @@ theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSour
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id lowered ∧
@@ -305,8 +302,7 @@ theorem Head.of_lower_with_token {values : ValuesContext} {source : TypedSource}
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id lowered ∧
@@ -334,8 +330,7 @@ theorem Head.of_lower {values : ValuesContext} {source : TypedSource}
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id lowered ∧
@@ -449,7 +444,7 @@ theorem prepared_operands {source : TypedSource} {first : Nat} {table : Table}
     {node : StatementNode} {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
     (prepared : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
     (occurs : OperandAt node assignment operator)
-    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false) :
+    (rawProfile : AssignmentProfile operator assignment.target.type) :
     AssignmentOperandDiagnostics.OperandsLaw (OperandRep table) operator
       (token table (.occurrence node.id.occurrence) assignment.target.root operator) :=
   prepared_operands_target prepared member occurs
@@ -474,7 +469,7 @@ theorem prepared_operands_included {source : TypedSource} {first : Nat} {table :
     (included : ∀ reason word, OperandRep table reason word → faults reason word)
     (prepared : prepare source first = .ok table) (member : Node.statement node ∈ source.nodes)
     (occurs : OperandAt node assignment operator)
-    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false) :
+    (rawProfile : AssignmentProfile operator assignment.target.type) :
     AssignmentOperandDiagnostics.OperandsLaw faults operator
       (token table (.occurrence node.id.occurrence) assignment.target.root operator) := by
   intro previous right invalid
@@ -515,7 +510,7 @@ theorem Head.reachable_of_token
     (prepared : SourceCoreAssignmentFaultSites.prepare source first = .ok table)
     (member : Node.statement node ∈ source.nodes)
     (occurs : SourceCoreAssignmentFaultSites.Certificates.OperandAt node assignment operator)
-    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false)
+    (rawProfile : AssignmentProfile operator assignment.target.type)
     (missing : ∀ {root resolved reason word count},
       CompatibleMixedRoute.FaultToken values.checked registry root head.prepared.steps resolved reason word count → faults reason word)
     [FunctionCalls.FaultTokens faults] (uninitialized : ∀ location, faults (.uninitializedLocation location) head.prepared.invalidProjection) :
@@ -541,7 +536,7 @@ theorem Head.of_prepared_policy
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false)
+    (rawProfile : AssignmentProfile operator assignment.target.type)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered → ∃ child,
       source.lookupExpression? id = some child ∧ certificate scope id lowered ∧
@@ -559,8 +554,7 @@ theorem Head.of_prepared_policy
       head.invalid = token table (.occurrence node.id.occurrence) assignment.target.root operator ∧
       AssignmentOperandDiagnostics.OperandsLaw faults operator head.invalid := by
   rw [policy_assignment] at accepted
-  have profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false := by
+  have profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type) := by
     rcases rawProfile with equal | word | ⟨integer, notWordOnly⟩
     · exact .inl equal
     · exact .inr (.inl (by rw [word]; rfl))

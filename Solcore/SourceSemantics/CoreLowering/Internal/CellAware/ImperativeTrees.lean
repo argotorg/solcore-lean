@@ -1360,7 +1360,7 @@ theorem collected
           exact ⟨rhsNode, rhsFound, child⟩) accepted
       have tailTyped := TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)
       obtain ⟨first, tablePrepared⟩ := assignmentsPrepared
-      have rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false := by
+      have rawProfile : AssignmentProfile operator assignment.target.type := by
         rcases profile with equal | word
         · exact .inl equal
         · exact .inr (.inl word)
@@ -1400,7 +1400,7 @@ theorem collected
           accepted nativeTyped
       have tailTyped := TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)
       obtain ⟨first, tablePrepared⟩ := assignmentsPrepared
-      have rawProfile : operator = .equal ∨ assignment.target.type = .word ∨ assignment.target.type = .integer ∧ operator.wordOnly = false := by
+      have rawProfile : AssignmentProfile operator assignment.target.type := by
         rcases profile with equal | word
         · exact .inl equal
         · exact .inr (.inl word)

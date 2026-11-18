@@ -27,8 +27,7 @@ theorem passes_of_applies
     (observations : FunctionObservations checked.catalog functions identities)
     {sourceType : TypeSystem.Ty} {type : Ty} {snapshot : Option Dynamic.Value} {right result : Dynamic.Value}
     {rightCore : Value} {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType sourceType))
     (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
     (applies : Dynamic.AssignmentValueApplies operator snapshot right result) (integer : Bool) :
     SourceCoreDataPlaces.Passes (binaryOperator integer operator) rightCore := by
@@ -82,8 +81,7 @@ theorem resolved_plain {program : Program} {context : SourceSemantics.Context}
 
 /-- The operator profiles exclude checked arithmetic at a fixed-width target. -/
 theorem plain_of_profile {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType target = .word ∨
-      SourceCoreRawMetadata.runtimeType target = .integer ∧ operator.wordOnly = false) :
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType target)) :
     ∀ type, target = .fixed type → ¬ FixedCheckedCompound operator :=
   DataPlaceModifier.plain_of_checkedCompound (checkedCompound_of_profile profile)
 
@@ -145,8 +143,7 @@ theorem initialized_valid
     (observations : FunctionObservations checked.catalog functions identities)
     {sourceType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
     {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType sourceType = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType sourceType))
     (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
     (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type) :
     ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right := by
@@ -655,8 +652,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (rhsView : AssignedRhsView operator leaf node.type)
     (rhsCoreType : lowered.type = prepared.route.leafType)
-    (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
+    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -1050,8 +1046,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (rhsView : AssignedRhsView operator leaf node.type)
     (rhsCoreType : lowered.type = prepared.route.leafType)
-    (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
+    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before targetHeap rhsHeap : Dynamic.Heap} {store : Store} {index : Nat}
     {sourceTarget : Dynamic.ResolvedPlace} {right : Dynamic.Value} {cell : Dynamic.Cell} {initial : Option Dynamic.Value} {reason : Dynamic.SemanticFault}
@@ -1813,8 +1808,7 @@ theorem preserves_from_source {compilation : SourceCoreCompatibleDataPlaces.Cont
     {operator : Syntax.ValueAssignOp}
     (rhsView : AssignedRhsView operator leaf node.type)
     (rhsCoreType : lowered.type = prepared.route.leafType)
-    (operatorProfile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word ∨
-      SourceCoreRawMetadata.runtimeType leaf = .integer ∧ operator.wordOnly = false)
+    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)

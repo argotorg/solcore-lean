@@ -758,8 +758,7 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       WritableLocal context assignment.target.root actual.scheme.body) ∧
     AssignedOperandTyped source context operator rhs assignment.target.type ∧
-    (operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false) := by
+    AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type) := by
   have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
       AssignedOperandTyped source context operator rhs type ∧ (operator = .equal ∨ type = .word) := by
     cases typed with
@@ -807,8 +806,7 @@ theorem projected_assignment_facts {source : TypedSource} {context : SourceSeman
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       WritableLocal context assignment.target.root actual.scheme.body) ∧
     AssignedOperandTyped source context operator rhs assignment.target.type ∧
-    (operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false) := by
+    AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type) := by
   have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
       AssignedOperandTyped source context operator rhs type ∧ (operator = .equal ∨ type = .word) := by
     cases typed with

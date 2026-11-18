@@ -51,8 +51,7 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
         WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
+      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
       (children : ∀ id, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
         expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
       (remaining : Syntax source expressionSyntax context rest) : Syntax source expressionSyntax context (.assignValue assignment operator rhs :: rest)
@@ -96,8 +95,7 @@ inductive PreparedSyntax (source : TypedSource) (expressionSyntax : ExpressionId
         WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer ∧ operator.wordOnly = false)
+      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
       (children : ∀ id, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
         expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
       (remaining : PreparedSyntax source expressionSyntax context rest) : PreparedSyntax source expressionSyntax context (.assignValue assignment operator rhs :: rest)

@@ -4,6 +4,7 @@ import Solcore.Frontend.SourceCore.DataPlaces
 import Solcore.SourceSemantics.Dynamic.Fault
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceExecution
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.PlaceMappings
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.AssignmentProfiles
 
 /-!
 # Data: place reflection
@@ -52,7 +53,7 @@ theorem assignment_divisor {operator : Syntax.ValueAssignOp}
 
 /-- A panicking operator meets the operator profile at Word leaves only. -/
 theorem panicking_word {operator : Syntax.ValueAssignOp} {sourceType : TypeSystem.Ty}
-    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator sourceType)
     (panics : operator.mayPanic = true) : sourceType = .word := by
   rcases profile with same | word | ⟨_, notWordOnly⟩
   · subst same; simp [Syntax.ValueAssignOp.mayPanic] at panics
@@ -79,7 +80,7 @@ theorem passes_of_applies {catalog : SourceCoreDataCatalog.Catalog} {signatures 
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {operator : Syntax.ValueAssignOp}
     {snapshot : Option Dynamic.Value} {right result : Dynamic.Value} {rightCore : Value}
-    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator sourceType)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     (applies : Dynamic.AssignmentValueApplies operator snapshot right result) (integer : Bool) :
     Passes (binaryOperator integer operator) rightCore := by
@@ -202,7 +203,7 @@ primitive values. No source execution or Core modifier evaluation is assumed. -/
 theorem initialized_success {catalog : SourceCoreDataCatalog.Catalog} {signatures : ProgramSignatures}
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
-    {operator : Syntax.ValueAssignOp} (numeric : sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
+    {operator : Syntax.ValueAssignOp} (numeric : NumericAssignment operator sourceType)
     (divisor : operator.mayPanic = false ∨ right ≠ .word Word.zero)
     (leftRep : ValueRep catalog signatures functions mapping world sourceType left leftCore type)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
@@ -236,7 +237,7 @@ with the total primitive result follows from the source rules themselves. -/
 theorem initialized_preserves {catalog : SourceCoreDataCatalog.Catalog} {signatures : ProgramSignatures}
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {left right result : Dynamic.Value} {leftCore rightCore : Value}
-    {operator : Syntax.ValueAssignOp} (numeric : sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
+    {operator : Syntax.ValueAssignOp} (numeric : NumericAssignment operator sourceType)
     (leftRep : ValueRep catalog signatures functions mapping world sourceType left leftCore type)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     (source : Dynamic.AssignmentValueApplies operator (some left) right result)
@@ -907,7 +908,7 @@ theorem evaluates {catalog : SourceCoreDataCatalog.Catalog} {signatures : Progra
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {snapshot : Option Dynamic.Value}
     {right : Dynamic.Value} {snapshotCore rightCore : Value} {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator sourceType)
     (snapshotRep : DataPlaceSnapshot.OptionalRep catalog signatures functions mapping world sourceType type snapshot snapshotCore)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshotExpression rightExpression : Expr}
@@ -947,7 +948,7 @@ theorem reflects {catalog : SourceCoreDataCatalog.Catalog} {signatures : Program
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {snapshot : Option Dynamic.Value}
     {right : Dynamic.Value} {snapshotCore rightCore : Value} {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator sourceType)
     (snapshotRep : DataPlaceSnapshot.OptionalRep catalog signatures functions mapping world sourceType type snapshot snapshotCore)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshotExpression rightExpression : Expr}
@@ -1573,7 +1574,7 @@ theorem reflects_ready {checked : SourceCoreDataCatalog.Checked} {signatures : P
     [FunctionCalls.FaultTokens faults]
     (missingTokens : ∀ type, faults (.missingMappingDefault type) (missing type))
     {operator : Syntax.ValueAssignOp} {invalid : Word}
-    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer ∧ operator.wordOnly = false)
+    (operatorProfile : AssignmentProfile operator place.type)
     (invalidToken : faults (.invalidAssignmentOperands operator) invalid)
     (setterTyped : HasType
       (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
@@ -1802,7 +1803,7 @@ theorem reflects {checked : SourceCoreDataCatalog.Checked} {signatures : Program
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsSourceType : node.type = place.type) (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp} {invalid : Word}
-    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer ∧ operator.wordOnly = false)
+    (operatorProfile : AssignmentProfile operator place.type)
     (invalidOperandToken : faults (.invalidAssignmentOperands operator) invalid)
     (setterTyped : HasType
       (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
@@ -1856,7 +1857,7 @@ theorem modifier_preserves {catalog : SourceCoreDataCatalog.Catalog} {signatures
     {functions : GenericHeap.PayloadModel catalog} {mapping : LocationMap} {world : StoreTyping}
     {sourceType : TypeSystem.Ty} {type : Ty} {snapshot : Option Dynamic.Value}
     {right result : Dynamic.Value} {snapshotCore rightCore : Value} {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false)
+    (profile : AssignmentProfile operator sourceType)
     (snapshotRep : DataPlaceSnapshot.OptionalRep catalog signatures functions mapping world sourceType type snapshot snapshotCore)
     (rightRep : ValueRep catalog signatures functions mapping world sourceType right rightCore type)
     (applied : Dynamic.AssignmentValueApplies operator snapshot right result)
@@ -1871,7 +1872,7 @@ theorem modifier_preserves {catalog : SourceCoreDataCatalog.Catalog} {signatures
   · subst operator
     cases applied
     exact ⟨rightCore, rightRep, DataPlaceModifier.equal_modified rightSelected store invalid⟩
-  · have numeric : sourceType = .word ∨ sourceType = .integer ∧ operator.wordOnly = false := profile.resolve_left equal
+  · have numeric : NumericAssignment operator sourceType := profile.resolve_left equal
     cases snapshotRep with
     | absent => cases applied; exact (equal rfl).elim
     | present represented =>
@@ -1899,7 +1900,7 @@ theorem preserves {checked : SourceCoreDataCatalog.Checked} {signatures : Progra
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsSourceType : node.type = place.type) (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
-    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer ∧ operator.wordOnly = false)
+    (operatorProfile : AssignmentProfile operator place.type)
     (setterTyped : HasType
       (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
         OptionalCell.referenceType prepared.route.rootType :: (SourceCoreLocalCell.coreContext scope ++ administrativeContext))
@@ -2128,7 +2129,7 @@ theorem preserves_from_source {checked : SourceCoreDataCatalog.Checked} {signatu
     (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
     (rhsSourceType : node.type = place.type) (rhsCoreType : lowered.type = prepared.route.leafType)
     {operator : Syntax.ValueAssignOp}
-    (operatorProfile : operator = .equal ∨ place.type = .word ∨ place.type = .integer ∧ operator.wordOnly = false)
+    (operatorProfile : AssignmentProfile operator place.type)
     (setterTyped : HasType
       (prepared.route.leafType :: prepared.route.leafType :: prepared.optionalLeaf :: (SourceCoreCalls.packArguments codes).type ::
         OptionalCell.referenceType prepared.route.rootType :: (SourceCoreLocalCell.coreContext scope ++ administrativeContext))
