@@ -5,8 +5,7 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedConversions
 
 Extends the expression closure of named-row bodies to direct calls at every
 expression position: inside operators, conditionals, groups and pairs, and as
-the arguments of other direct calls, and to the builtin conversions of a word
-there. Closes a family of such rows by one strong induction on the grade.
+the arguments of other direct calls, and to the builtin conversions there. Closes a family of such rows by one strong induction on the grade.
 
 Main declarations:
 - `CellAwareInvocationAcceptedNestedTrees.Nested`, the sites, and
@@ -29,8 +28,8 @@ Main declarations:
 
 section
 /-! Direct calls and conversions inside the expressions of named-row bodies.
-`Nested` closes the first subset's forms, direct calls and conversions of a
-word under one another: every operand, branch and pair element, every argument
+`Nested` closes the first subset's forms, direct calls and builtin conversions
+under one another: every operand, branch and pair element, every argument
 of a direct call and the argument of a conversion is again a `Nested` site.
 `NestedTree` keeps the first subset's receipts at its forms, the direct-call
 receipts of `CellAwareInvocationAcceptedCallTrees.CallTree` at its calls, and
@@ -57,7 +56,7 @@ open CallableIndexedOwnedPreparedStagedDirectCallAuthority (Port)
 
 /-- Sites of the nested closure: the first subset's forms with nested
 children, direct calls with nested arguments whose instantiation the caller's
-family admits, and conversions of a word with a nested argument. -/
+family admits, and builtin conversions with a nested argument. -/
 inductive Nested {checked : SourceCoreCompatibleCatalog.Checked}
     (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
     (source : TypedSource) (called : DeclarationInstantiation → Prop) : ExpressionId → Prop where
@@ -182,7 +181,6 @@ inductive NestedTree (whole : SourceCoreUnifiedCompilation.Compiled)
       (metadata : CompatibleExpressionPrimitives.Metadata whole.compatible.checked source id node .word)
       (form : node.form = .call callee [argument] (.builtinFunction function))
       (conversion : function.conversion? = some target)
-      (word : function.parameterTypes = [.word])
       (argumentFound : ∃ argumentNode, source.lookupExpression? argument = some argumentNode)
       (child : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope
         argument ⟨.word, argumentCode⟩) :
@@ -257,7 +255,7 @@ theorem projected
   | call receipt _ _ _ _ _ _ _ =>
     cases Option.some.inj (found.symm.trans receipt.metadata.found)
     exact receipt.metadata.projected
-  | conversion metadata _ _ _ _ _ =>
+  | conversion metadata _ _ _ _ =>
     cases Option.some.inj (found.symm.trans metadata.found)
     exact metadata.projected
 
@@ -566,7 +564,7 @@ theorem of_nested {id : ExpressionId}
       obtain ⟨argumentsTyped, _resultType⟩ :=
         CallableIndexedOwnedPreparedStagedBuiltinSourceInversion.source_types unique site.found site.form
           site.coercions typed
-      exact .conversion metadata site.form site.conversion site.word ⟨_, argumentFound⟩
+      exact .conversion metadata site.form site.conversion ⟨_, argumentFound⟩
         (ih argumentFound (CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique
           argumentsTyped (List.mem_singleton_self _) argumentFound) generated)
 
@@ -837,7 +835,7 @@ theorem preserves_nested_tree [RecursiveStageMeaning.FaultTokens faults]
       valueModel index registry faults unique wellFormed runtime covers size ordered childMeaning
       (applications port.header port.member (port.metadata ▸ selected)) ⟨rfl, rfl, rfl⟩ nodeFound typed
       environments heaps locals agrees actualTyped initial admitted authority physical frameOwner ownerFrame trace
-  | @conversion id node callee argument function target argumentCode metadata form conversion word argumentFound
+  | @conversion id node callee argument function target argumentCode metadata form conversion argumentFound
       child ih =>
     intro size applications
     have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
@@ -847,7 +845,7 @@ theorem preserves_nested_tree [RecursiveStageMeaning.FaultTokens faults]
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareInvocationAcceptedConversions.preserves callerBridge.forgetSlots functions
-      ⟨metadata.found, form, metadata.coercions, metadata.requirements, conversion, word, argumentFound⟩
+      ⟨metadata.found, form, metadata.coercions, metadata.requirements, conversion, argumentFound⟩
       unique selectedBodies runtime covers size children ⟨rfl, rfl, rfl⟩
 
 include callerBridge keyPhysical cache extension sameLedger uninitialized selectedBodies wellFormed runtime covers in
@@ -985,7 +983,7 @@ theorem reflects_nested_tree [RecursiveStageMeaning.FaultTokens faults]
       valueModel index registry faults unique wellFormed runtime covers size ordered childMeaning
       (applications port.header port.member (port.metadata ▸ selected)) ⟨rfl, rfl, rfl⟩ nodeFound typed
       environments heaps locals agrees actualTyped initial admitted authority physical frameOwner ownerFrame completed
-  | @conversion id node callee argument function target argumentCode metadata form conversion word argumentFound
+  | @conversion id node callee argument function target argumentCode metadata form conversion argumentFound
       child ih =>
     intro size applications
     have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
@@ -995,7 +993,7 @@ theorem reflects_nested_tree [RecursiveStageMeaning.FaultTokens faults]
     intro current expression code point
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareInvocationAcceptedConversions.reflects callerBridge.forgetSlots functions
-      ⟨metadata.found, form, metadata.coercions, metadata.requirements, conversion, word, argumentFound⟩
+      ⟨metadata.found, form, metadata.coercions, metadata.requirements, conversion, argumentFound⟩
       unique selectedBodies runtime covers size children ⟨rfl, rfl, rfl⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedBounds

@@ -8,30 +8,33 @@ import Solcore.Test.SourceSemantics.CoreLowering.Builtin
 `relay` returns `identity(value)`, a direct call of the program's first
 function, and `twice` returns `identity(identity(value))`, a direct call whose
 argument is another direct call, both at a `Word` parameter; `narrow` returns
-`uint8(value)`, a conversion of its `Word` parameter. Runtime checks place
-every expression node of the four rows among the nested sites that call
-`identity`'s instantiation or their callees, and each statement list in the
-supported shape. With the complete inventory the rows make a family and give
+`uint8(value)`, a conversion of its `Word` parameter, and `roundTrip` returns
+`Typedef.rep(uint8(value))`, the word of that value. Runtime checks place every
+expression node of the five rows among the nested sites that call `identity`'s
+instantiation or their callees, and each statement list in the supported
+shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
-`relay`, `twice` and `narrow` (at words canonical for `uint8`) are lifted to
+`relay`, `twice`, `narrow` and `roundTrip` (at words canonical for `uint8`) are lifted to
 staged traces, and the call root's theorems apply at the first public call of
 each in both directions: the actual resumption succeeds, and actual native
 completion reconstructs a staged Source execution. At other words the call
-root's reflection applies to `narrow` and the actual resumption fails with the
-dirty-integer reason.
+root's reflection applies to `narrow` and `roundTrip`, and the actual
+resumption fails with the dirty-integer reason.
 
 Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.twice_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_source`,
+`Tests.SourceCoreAcceptedOneCall.roundTrip_source`,
 `Tests.SourceCoreAcceptedOneCall.accepted_call`,
 `Tests.SourceCoreAcceptedOneCall.accepted_reflection` and the runtime checks
 `Tests.SourceCoreAcceptedOneCall.AcceptedCallRuntime.run`,
-`Tests.SourceCoreAcceptedOneCall.AcceptedNestedCallRuntime.run` and
-`Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`.
+`Tests.SourceCoreAcceptedOneCall.AcceptedNestedCallRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run` and
+`Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`.
 -/
 
 section
-/-! The program and the declarative typing of its four functions, constructed
+/-! The program and the declarative typing of its five functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -46,7 +49,8 @@ def workspace : Workspace.RawWorkspace := {
     "function identity(value: Word) returns (Word) { return value; }",
     "function relay(value: Word) returns (Word) { return identity(value); }",
     "function twice(value: Word) returns (Word) { return identity(identity(value)); }",
-    "function narrow(value: Word) returns (uint8) { return uint8(value); }" ]}] }
+    "function narrow(value: Word) returns (uint8) { return uint8(value); }",
+    "function roundTrip(value: Word) returns (Word) { return Typedef.rep(uint8(value)); }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -244,19 +248,16 @@ structure NarrowParts (source : TypedSource) where
   statementFound : source.lookupStatement? statement.id = some statement
   statementForm : statement.form = .returnStmt (some converted.value.node.id)
 
-/-- The conversion `uint8(argument)`, from its actual callee and call nodes. -/
-def observeConversion (source : TypedSource) (argument : ExpressionId) (calleeNode valueNode : ExpressionNode) :
-    IO (Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedFromWord ⟨false, .w8⟩) argument) := do
-  let callee ← Tests.SourceCoreOperatorCalls.observeNode source calleeNode
-    (BuiltinFunctionId.fixedFromWord ⟨false, .w8⟩).type
-  let value ← Tests.SourceCoreOperatorCalls.observeNode source valueNode
-    (BuiltinFunctionId.fixedFromWord ⟨false, .w8⟩).returnType
-  let .reference name (.builtinFunction _) := calleeNode.form | throw (IO.userError "narrow callee form")
-  let ⟨calleeForm⟩ ← observed
-    (callee.node.form = .reference name (.builtinFunction (.fixedFromWord ⟨false, .w8⟩))) "narrow callee"
-  let ⟨form⟩ ← observed
-    (value.node.form = .call callee.node.id [argument] (.builtinFunction (.fixedFromWord ⟨false, .w8⟩)))
-    "narrow conversion"
+/-- A conversion `function(argument)`, from its actual callee and call nodes. -/
+def observeConversion (source : TypedSource) (function : BuiltinFunctionId) (argument : ExpressionId)
+    (calleeNode valueNode : ExpressionNode) :
+    IO (Tests.SourceCoreBuiltinCalls.BuiltinCall source function argument) := do
+  let callee ← Tests.SourceCoreOperatorCalls.observeNode source calleeNode function.type
+  let value ← Tests.SourceCoreOperatorCalls.observeNode source valueNode function.returnType
+  let .reference name (.builtinFunction _) := calleeNode.form | throw (IO.userError "conversion callee form")
+  let ⟨calleeForm⟩ ← observed (callee.node.form = .reference name (.builtinFunction function)) "conversion callee"
+  let ⟨form⟩ ← observed (value.node.form = .call callee.node.id [argument] (.builtinFunction function))
+    "conversion call"
   return {callee, value, name, calleeForm, form}
 
 def observeNarrowParts (source : TypedSource) : IO (NarrowParts source) := do
@@ -269,7 +270,7 @@ def observeNarrowParts (source : TypedSource) : IO (NarrowParts source) := do
   let some calleeNode := source.lookupExpression? calleeId | throw (IO.userError "narrow callee")
   let some readNode := source.lookupExpression? readId | throw (IO.userError "narrow read")
   let read ← Tests.SourceCoreNamedBranch.observeRead source binder readNode .word
-  let converted ← observeConversion source read.node.id calleeNode valueNode
+  let converted ← observeConversion source (.fixedFromWord ⟨false, .w8⟩) read.node.id calleeNode valueNode
   let ⟨inputs⟩ ← observed (source.inputs = [binder]) "narrow inputs"
   let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "narrow roots shape"
   let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement) "narrow statementFound"
@@ -330,52 +331,158 @@ def observeNarrow (function : CheckedFunction) (signature : ProgramFunctionSigna
   return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, binderOrdinary,
     statementType⟩
 
+/-- The nodes of a body that returns `Typedef.rep(uint8(value))`, found by
+following the return statement's expression graph. -/
+structure RoundTripParts (source : TypedSource) where
+  binder : TypedBinder
+  read : Tests.SourceCoreNamedBranch.Read source binder .word
+  narrowed : Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedFromWord ⟨false, .w8⟩) read.node.id
+  represented : Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedToWord ⟨false, .w8⟩) narrowed.value.node.id
+  statement : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement statement.id]
+  statementFound : source.lookupStatement? statement.id = some statement
+  statementForm : statement.form = .returnStmt (some represented.value.node.id)
+
+def observeRoundTripParts (source : TypedSource) : IO (RoundTripParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "roundTrip input")
+  let [.statement statementId] := source.roots | throw (IO.userError "roundTrip roots")
+  let some statement := source.lookupStatement? statementId | throw (IO.userError "roundTrip statement")
+  let .returnStmt (some outerId) := statement.form | throw (IO.userError "roundTrip return")
+  let some outerNode := source.lookupExpression? outerId | throw (IO.userError "roundTrip outer node")
+  let .call outerCalleeId [innerId] _ := outerNode.form | throw (IO.userError "roundTrip outer form")
+  let some outerCallee := source.lookupExpression? outerCalleeId | throw (IO.userError "roundTrip outer callee")
+  let some innerNode := source.lookupExpression? innerId | throw (IO.userError "roundTrip inner node")
+  let .call innerCalleeId [readId] _ := innerNode.form | throw (IO.userError "roundTrip inner form")
+  let some innerCallee := source.lookupExpression? innerCalleeId | throw (IO.userError "roundTrip inner callee")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "roundTrip read")
+  let read ← Tests.SourceCoreNamedBranch.observeRead source binder readNode .word
+  let narrowed ← observeConversion source (.fixedFromWord ⟨false, .w8⟩) read.node.id innerCallee innerNode
+  let represented ← observeConversion source (.fixedToWord ⟨false, .w8⟩) narrowed.value.node.id outerCallee outerNode
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "roundTrip inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "roundTrip roots shape"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement)
+    "roundTrip statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some represented.value.node.id))
+    "roundTrip statementForm"
+  return ⟨binder, read, narrowed, represented, statement, inputs, roots, statementFound, statementForm⟩
+
+/-- `roundTrip`'s body: the read of its parameter, its conversion to `uint8`,
+`Typedef.rep` of that value and the return of it. -/
+structure RoundTripShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : RoundTripParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  binderScheme : parts.binder.scheme = .mono .word
+  binderRequirements : parts.binder.schemeRequirements = []
+  binderOrdinary : parts.binder.comptime = false
+  statementType : parts.statement.type = .word
+
+theorem RoundTripShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : RoundTripShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.statement.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := true, control := .returned}
+  refine ⟨BodyFacts.singleton facts, rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have narrow : TypeAdmissible lexical (.fixed ⟨false, .w8⟩) := ⟨binders, .builtin (.fixed ⟨false, .w8⟩)⟩
+    have read := shape.parts.read.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have narrowed := shape.parts.narrowed.typed rfl narrow read
+    have represented := shape.parts.represented.typed rfl word narrowed
+    exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.parts.statementFound)
+      shape.parts.statementForm represented shape.statementType)⟩
+
+def observeRoundTrip (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (RoundTripShape function signature) := do
+  let parts ← observeRoundTripParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "roundTrip parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "roundTrip inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "roundTrip returns"
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "roundTrip binderScheme"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "roundTrip binderRequirements"
+  let ⟨binderOrdinary⟩ ← observed (parts.binder.comptime = false) "roundTrip binderOrdinary"
+  let ⟨statementType⟩ ← observed (parts.statement.type = .word) "roundTrip statementType"
+  return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, binderOrdinary,
+    statementType⟩
+
 /-- The declarative typing of the complete checked program. -/
 def observeWellFormed {program : CheckedProgram}
     (checked : checkProgram workspace options.checkingFuel = .ok program) :
     IO (PLift (ProgramWellFormed (Program.ofChecked program))) := do
   match functions : program.functions, signatures : program.signatures.functions with
-  | [identityFunction, relayFunction, twiceFunction, narrowFunction],
-    [identitySignature, relaySignature, twiceSignature, narrowSignature] =>
+  | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction],
+    [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
     let narrowShape ← observeNarrow narrowFunction narrowSignature
+    let roundTripShape ← observeRoundTrip roundTripFunction roundTripSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
     let ⟨relayDeclaration⟩ ← observed (relayFunction.declaration = relaySignature.id) "calls relayDeclaration"
     let ⟨twiceDeclaration⟩ ← observed (twiceFunction.declaration = twiceSignature.id) "calls twiceDeclaration"
     let ⟨narrowDeclaration⟩ ← observed (narrowFunction.declaration = narrowSignature.id) "calls narrowDeclaration"
+    let ⟨roundTripDeclaration⟩ ← observed (roundTripFunction.declaration = roundTripSignature.id)
+      "calls roundTripDeclaration"
     let ⟨identityRelay⟩ ← observed (identitySignature.id ≠ relaySignature.id) "calls identityRelay"
     let ⟨identityTwice⟩ ← observed (identitySignature.id ≠ twiceSignature.id) "calls identityTwice"
     let ⟨relayTwice⟩ ← observed (relaySignature.id ≠ twiceSignature.id) "calls relayTwice"
     let ⟨identityNarrow⟩ ← observed (identitySignature.id ≠ narrowSignature.id) "calls identityNarrow"
     let ⟨relayNarrow⟩ ← observed (relaySignature.id ≠ narrowSignature.id) "calls relayNarrow"
     let ⟨twiceNarrow⟩ ← observed (twiceSignature.id ≠ narrowSignature.id) "calls twiceNarrow"
+    let ⟨identityRoundTrip⟩ ← observed (identitySignature.id ≠ roundTripSignature.id) "calls identityRoundTrip"
+    let ⟨relayRoundTrip⟩ ← observed (relaySignature.id ≠ roundTripSignature.id) "calls relayRoundTrip"
+    let ⟨twiceRoundTrip⟩ ← observed (twiceSignature.id ≠ roundTripSignature.id) "calls twiceRoundTrip"
+    let ⟨narrowRoundTrip⟩ ← observed (narrowSignature.id ≠ roundTripSignature.id) "calls narrowRoundTrip"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
         intro actual member candidate candidateMember accepted
         have declared := checkFunctionBody_success_declaration accepted
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
         simp only [signatures, List.mem_cons, List.not_mem_nil, or_false] at candidateMember
-        rcases member with rfl | rfl | rfl | rfl <;> rcases candidateMember with rfl | rfl | rfl | rfl
+        rcases member with rfl | rfl | rfl | rfl | rfl <;>
+          rcases candidateMember with rfl | rfl | rfl | rfl | rfl
         · exact identityShape.statementTyping program.signatures
         · exact False.elim (identityRelay (identityDeclaration.symm.trans declared))
         · exact False.elim (identityTwice (identityDeclaration.symm.trans declared))
         · exact False.elim (identityNarrow (identityDeclaration.symm.trans declared))
+        · exact False.elim (identityRoundTrip (identityDeclaration.symm.trans declared))
         · exact False.elim (identityRelay (declared.symm.trans relayDeclaration))
         · exact relayShape.statementTyping program.signatures (by simp [signatures])
         · exact False.elim (relayTwice (relayDeclaration.symm.trans declared))
         · exact False.elim (relayNarrow (relayDeclaration.symm.trans declared))
+        · exact False.elim (relayRoundTrip (relayDeclaration.symm.trans declared))
         · exact False.elim (identityTwice (declared.symm.trans twiceDeclaration))
         · exact False.elim (relayTwice (declared.symm.trans twiceDeclaration))
         · exact twiceShape.statementTyping program.signatures (by simp [signatures])
         · exact False.elim (twiceNarrow (twiceDeclaration.symm.trans declared))
+        · exact False.elim (twiceRoundTrip (twiceDeclaration.symm.trans declared))
         · exact False.elim (identityNarrow (declared.symm.trans narrowDeclaration))
         · exact False.elim (relayNarrow (declared.symm.trans narrowDeclaration))
         · exact False.elim (twiceNarrow (declared.symm.trans narrowDeclaration))
         · exact narrowShape.statementTyping program.signatures
+        · exact False.elim (narrowRoundTrip (narrowDeclaration.symm.trans declared))
+        · exact False.elim (identityRoundTrip (declared.symm.trans roundTripDeclaration))
+        · exact False.elim (relayRoundTrip (declared.symm.trans roundTripDeclaration))
+        · exact False.elim (twiceRoundTrip (declared.symm.trans roundTripDeclaration))
+        · exact False.elim (narrowRoundTrip (declared.symm.trans roundTripDeclaration))
+        · exact roundTripShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -384,11 +491,11 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the four functions and their original Source
+/-! The cache rows of the five functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
-`identity` with that call, and `narrow` returns the conversion of its
-parameter, at a word canonical for `uint8`. Each call's global application is
+`identity` with that call, `narrow` returns the conversion of its parameter,
+and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
 a given body invocation. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -502,6 +609,17 @@ def observeNarrowBody (source : TypedSource) : IO (NarrowBody source) := do
   let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "narrow row binderScheme"
   return ⟨parts, binderScheme⟩
 
+/-- `roundTrip`'s cache row: the nodes of `Typedef.rep(uint8(value))` at its
+`Word` parameter. -/
+structure RoundTripBody (source : TypedSource) where
+  parts : RoundTripParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeRoundTripBody (source : TypedSource) : IO (RoundTripBody source) := do
+  let parts ← observeRoundTripParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "roundTrip row binderScheme"
+  return ⟨parts, binderScheme⟩
+
 /-- The read of a parameter at the next cell of a heap. -/
 theorem read_value {source : TypedSource} {binder : TypedBinder}
     (read : Tests.SourceCoreNamedBranch.Read source binder .word) {program : SourceSemantics.Program}
@@ -612,19 +730,20 @@ theorem TwiceBody.trace {fixture : CompiledFixture workspace options} {target : 
         (call_value body.parts.inner (read_value body.parts.read evidence before word) innerValid innerApplies)
         outerValid outerApplies)
 
-/-- `uint8(argument)` evaluates to a canonical argument word. -/
-theorem conversion_value {source : TypedSource} {argument : ExpressionId}
-    (converted : Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedFromWord ⟨false, .w8⟩) argument)
+/-- A conversion of an argument evaluates to the word that its Source
+application gives the argument's word. -/
+theorem conversion_value {source : TypedSource} {function : BuiltinFunctionId} {argument : ExpressionId}
+    (converted : Tests.SourceCoreBuiltinCalls.BuiltinCall source function argument)
     {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {environment : Dynamic.Environment} {before after : Dynamic.Heap} {word : Core.Word}
     (argumentTrace : Dynamic.ExpressionEvaluates program context evidence source environment before argument
       (.word word) after)
-    (canonical : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = true) :
+    (applied : Dynamic.BuiltinApplies function [.word word] (.word word)) :
     Dynamic.ExpressionEvaluates program context evidence source environment before converted.value.node.id
       (.word word) after := by
   apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound converted.value.found)
   · rw [converted.form, converted.value.requirements, converted.value.coercions]
-    exact .builtinCall rfl (.cons argumentTrace .nil) (.builtin (.fixedFromWord canonical))
+    exact .builtinCall rfl (.cons argumentTrace .nil) (.builtin applied)
   · rw [converted.value.coercions]
     exact .nil
 
@@ -639,17 +758,35 @@ theorem NarrowBody.trace {source : TypedSource} (body : NarrowBody source) {prog
     rw [body.parts.statementForm] at impossible
     cases impossible
   · exact .returnValue (lookupStatement?_sound body.parts.statementFound) body.parts.statementForm
-      (conversion_value body.parts.converted (read_value body.parts.read evidence before word) canonical)
+      (conversion_value body.parts.converted (read_value body.parts.read evidence before word)
+        (.fixedFromWord canonical))
+
+/-- `roundTrip`'s body returns a parameter word canonical for `uint8`: the
+conversion gives the value, and `Typedef.rep` its word. -/
+theorem RoundTripBody.trace {source : TypedSource} (body : RoundTripBody source) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (word : Core.Word) (canonical : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = true) :
+    Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.statement.id] context (.returned (.word word)) (wordHeap before word) := by
+  apply Dynamic.FunctionStatementsExecute.singleton (lookupStatement?_sound body.parts.statementFound)
+  · intro expression impossible
+    rw [body.parts.statementForm] at impossible
+    cases impossible
+  · exact .returnValue (lookupStatement?_sound body.parts.statementFound) body.parts.statementForm
+      (conversion_value body.parts.represented
+        (conversion_value body.parts.narrowed (read_value body.parts.read evidence before word)
+          (.fixedFromWord canonical))
+        (.fixedToWord canonical))
 
 end Tests.SourceCoreAcceptedOneCall
 end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the four rows among the nested sites or their callees
+every expression node of the five rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
-receipts. The original Source executions of `relay`, `twice` and `narrow`,
+receipts. The original Source executions of `relay`, `twice`, `narrow` and `roundTrip`,
 whose calls run `identity`'s body instance, are lifted through the checked
 shapes, and with the existing start receipts the call root's theorems apply at
 the first public call of each in both directions. The call root's reflection
@@ -811,6 +948,18 @@ theorem narrow_source (selected : SelectedInventory whole row) (narrowBody : Nar
       selected.packet.header.context (.returned (.word word)) (wordHeap ⟨[]⟩ word) := by
   rw [single_body selected narrowBody.parts.roots, selected.source_eq]
   exact narrowBody.trace selected.packet.header.function.evidence ⟨[]⟩ word canonical
+
+/-- The original Source execution of `roundTrip`'s body at its header, at a
+word canonical for `uint8`. -/
+theorem roundTrip_source (selected : SelectedInventory whole row)
+    (roundTripBody : RoundTripBody row.original.function.typedBody)
+    (word : Core.Word) (canonical : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = true) :
+    Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment roundTripBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.word word)) (wordHeap ⟨[]⟩ word) := by
+  rw [single_body selected roundTripBody.parts.roots, selected.source_eq]
+  exact roundTripBody.trace selected.packet.header.function.evidence ⟨[]⟩ word canonical
 
 /-- The first public call of a row, with the conclusions of the call root's
 output theorem, its checkpoint sufficiency theorem and its checkpoint
@@ -1124,6 +1273,50 @@ def run : IO Unit := do
   IO.println "ACCEPTED_CONVERSION_PUBLIC_PASS"
 
 end AcceptedConversionRuntime
+
+namespace AcceptedRepresentationRuntime
+
+/-- As `AcceptedConversionRuntime.run`, at `roundTrip`, which returns
+`Typedef.rep(uint8(value))`: at words canonical for `uint8` both directions
+apply and the actual call returns the word; at other words the reflection
+applies and the actual call fails with the dirty-integer reason. -/
+def run : IO Unit := do
+  let observed ← observe
+  let roundTrip ← observeRow observed.fixture "roundTrip"
+  let roundTripBody ← observeRoundTripBody roundTrip.original.function.typedBody
+  for word in [Word.zero, Word.ofNatModulo 7, Word.ofNatModulo 255] do
+    let ⟨canonical⟩ ← Tests.SourceCoreAcceptedFixture.observed
+      (TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = true) "roundTrip canonical word"
+    let started ← observeStarted observed.fixture roundTrip.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole roundTrip),
+        Nonempty (AcceptedCall selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select roundTrip
+      exact ⟨whole, selected, accepted_call selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile roundTripBody.parts.inputs
+        roundTripBody.binderScheme (roundTrip_source selected roundTripBody word canonical)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .succeeded returned =>
+      unless returned.value == .word word do throw (IO.userError "accepted representation output changed")
+    | _ => throw (IO.userError "accepted representation did not succeed")
+  for word in [Word.ofNatModulo 256, Word.maximum] do
+    let started ← observeStarted observed.fixture roundTrip.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole roundTrip),
+        Nonempty (AcceptedReflection selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select roundTrip
+      exact ⟨whole, selected, accepted_reflection selected observed.calls word observed.wellFormed started
+        observed.callableProfile roundTripBody.parts.inputs roundTripBody.binderScheme⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .failed reason _ =>
+      unless reason == SourceCorePanics.dirtyReason do
+        throw (IO.userError "accepted representation failure changed")
+    | _ => throw (IO.userError "accepted representation of a dirty word did not fail")
+  IO.println "ACCEPTED_REPRESENTATION_PUBLIC_PASS"
+
+end AcceptedRepresentationRuntime
 
 end Tests.SourceCoreAcceptedOneCall
 end

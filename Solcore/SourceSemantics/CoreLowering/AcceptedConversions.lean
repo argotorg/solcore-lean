@@ -3,10 +3,10 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedCalls
 /-!
 # Accepted bodies: builtin conversions
 
-The conversions of a word, `uintN(w)`, `intN(w)`, and `Typedef.abs` and `Typedef.rep` at `word`,
-as compiler sites of named-row bodies: the native check of the lowered word, the compiler's
-receipt at a conversion, the rejection of a conversion's callee lowered on its own, and the token
-of `DirtyHigherBitsForInteger()`.
+The builtin conversions, `uintN(w)`, `intN(w)`, `Typedef.abs` and `Typedef.rep`, as compiler
+sites of named-row bodies: the native check of the lowered word, the compiler's receipt at a
+conversion, the rejection of a conversion's callee lowered on its own, and the token of
+`DirtyHigherBitsForInteger()`.
 
 Main declarations:
 - `CellAwareInvocationAcceptedConversionCode.canonicalWord_beq`, and the evaluation of
@@ -19,8 +19,6 @@ Main declarations:
   `CellAwareInvocationAcceptedConversionFaults.dirtyToken`, the token law of a dirty word;
 - `CellAwareInvocationAcceptedConversions.preserves` and
   `CellAwareInvocationAcceptedConversions.reflects`, the cell-aware head of a conversion.
-
-`Typedef.rep` at a fixed-width type is not a site yet.
 -/
 
 section
@@ -247,13 +245,14 @@ section
 site has no coercions or requirements, is not a generalized initializer and
 lies in a row without evidence assumptions, so the named policy's special
 callback declines it and its read policy is the compatible reader, as at a
-direct site. Its builtin converts a word (`word`): `uintN(w)`, `intN(w)`, and
-`Typedef.abs` and `Typedef.rep` at `word`. The compiler lowers a conversion
-where it is called (`of_accepted`): its argument at `word`, and the conversion
-of the argument's code. The callee of a conversion is a builtin reference that
-the compiler cannot lower on its own (`reference_rejected`), since a conversion
-is no closure of the builtin inventory. `conversionSite?` and
-`conversionReference?` recognize both on an actually compiled row. -/
+direct site. Its builtin is a conversion: `uintN(w)`, `intN(w)`, `Typedef.abs`,
+or `Typedef.rep`, which at the twelve types takes a fixed-width value. The
+compiler lowers a conversion where it is called (`of_accepted`): its argument
+at `word`, and the conversion of the argument's code. The callee of a
+conversion is a builtin reference that the compiler cannot lower on its own
+(`reference_rejected`), since a conversion is no closure of the builtin
+inventory. `conversionSite?` and `conversionReference?` recognize both on an
+actually compiled row. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxRecDepth 4096
@@ -262,7 +261,7 @@ open Core Frontend SourceInference
 open CallableIndexedNamedGeneration (Prepared Compilation context representation)
 open GeneralizedLocalInitializerCompilation (namedPolicy namedLowerBody)
 
-/-- A conversion of a word in a named-row body. -/
+/-- A builtin conversion in a named-row body. -/
 structure ConversionSite {checked : SourceCoreCompatibleCatalog.Checked}
     (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
     (source : TypedSource) (id callee argument : ExpressionId) (function : BuiltinFunctionId)
@@ -276,7 +275,6 @@ structure ConversionSite {checked : SourceCoreCompatibleCatalog.Checked}
     decide (binding.caller = named.signature.key ∧ binding.initializer = id)) = none
   assumptions : named.specialized.assumptions = []
   conversion : function.conversion? = some target
-  word : function.parameterTypes = [.word]
 
 /-- The callee of a conversion: a reference to a conversion builtin, in a row
 without evidence assumptions. -/
@@ -540,19 +538,17 @@ def conversionSite? (prepared : Prepared checked) (named : SourceCoreGeneralFunc
       match conversion : function.conversion? with
       | none => none
       | some target =>
-        if word : function.parameterTypes = [.word] then
-          match coercions : node.coercions, requirements : node.requirements with
-          | [], [] =>
-            match initializer : prepared.base.locals.bindings.find? (fun binding =>
-                decide (binding.caller = named.signature.key ∧ binding.initializer = id)) with
-            | some _ => none
-            | none =>
-              match assumptions : named.specialized.assumptions with
-              | [] => some ⟨callee, argument, function, target,
-                  ⟨node, found, form, coercions, requirements, initializer, assumptions, conversion, word⟩⟩
-              | _ :: _ => none
-          | _, _ => none
-        else none
+        match coercions : node.coercions, requirements : node.requirements with
+        | [], [] =>
+          match initializer : prepared.base.locals.bindings.find? (fun binding =>
+              decide (binding.caller = named.signature.key ∧ binding.initializer = id)) with
+          | some _ => none
+          | none =>
+            match assumptions : named.specialized.assumptions with
+            | [] => some ⟨callee, argument, function, target,
+                ⟨node, found, form, coercions, requirements, initializer, assumptions, conversion⟩⟩
+            | _ :: _ => none
+        | _, _ => none
     | _ => none
 
 /-- Proof-producing recognition of a conversion's callee. -/
@@ -593,7 +589,6 @@ def transport {first second : SourceCoreGeneralFunctions.Function}
   notInitializer := keyEq ▸ site.notInitializer
   assumptions := assumptions
   conversion := site.conversion
-  word := site.word
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedConversionSites
 end
@@ -624,10 +619,13 @@ section
 /-! The cell-aware head of a conversion. A conversion runs its argument in the
 same invocation and applies its builtin at the reached heap and store, which
 the application keeps. The native check returns a canonical word and fails with
-the dirty-integer reason on any other word, which `DirtyToken` represents; an
+the dirty-integer reason on any other word, which `DirtyToken` represents. At
+`Typedef.rep` of a fixed-width value the native code is the argument's, and the
+argument's representation gives the canonical word the Source rule asks for. An
 argument's failure is the conversion's own. Preservation uses the argument's
 meaning below the grade. Reflection uses it at most at the grade, since at
-`word` and at the 256-bit types the conversion is its argument's code. -/
+`word`, at the 256-bit types and at `Typedef.rep` the conversion is its
+argument's code. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -648,29 +646,37 @@ structure Node (source : TypedSource) (id callee argument : ExpressionId) (node 
   coercions : node.coercions = []
   requirements : node.requirements = []
   conversion : function.conversion? = some target
-  word : function.parameterTypes = [.word]
   argumentFound : ∃ argumentNode, source.lookupExpression? argument = some argumentNode
 
-/-- The Source application of a conversion of a word. -/
+/-- The Source application of a conversion to a word. -/
 inductive Applied : BuiltinFunctionId → TypeSystem.Ty → Word → Staging.Recursive.Outcome → Prop where
   | canonical {type : TypeSystem.FixedInteger} {word : Word} (canonical : type.canonical word.val = true) :
       Applied (.fixedFromWord type) (.fixed type) word (.value (.word word))
   | dirty {type : TypeSystem.FixedInteger} {word : Word} (dirty : type.canonical word.val = false) :
       Applied (.fixedFromWord type) (.fixed type) word (.fault (.semantic .dirtyHigherBitsForInteger))
   | identity {word : Word} : Applied .wordIdentity .word word (.value (.word word))
+  | representation {type : TypeSystem.FixedInteger} {word : Word} (canonical : type.canonical word.val = true) :
+      Applied (.fixedToWord type) .word word (.value (.word word))
 
 variable {function : BuiltinFunctionId} {target : TypeSystem.Ty}
 
+/-- A conversion takes one argument, of the runtime shape `word`. -/
+theorem parameter_shape (conversion : function.conversion? = some target) :
+    function.parameterTypes.map Dynamic.runtimeType = [.word] := by
+  cases function <;> simp [BuiltinFunctionId.conversion?] at conversion <;>
+    simp [BuiltinFunctionId.parameterTypes, Dynamic.runtimeType, TypeSystem.Ty.fixed, TypeSystem.Ty.word]
+
 /-- Every original rule of a conversion's application at a word is inspected:
-the word's runtime type is its parameter type, so arity and type faults are
-excluded, and the application keeps the heap. -/
+a word has the runtime shape of the parameter type, so arity and type faults
+are excluded, and the application keeps the heap. -/
 theorem applied {program : Program} {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
     {context : SourceSemantics.Context} {size : Nat} {heap after : Dynamic.Heap} {word : Word}
     {outcome : Staging.Recursive.Outcome}
-    (conversion : function.conversion? = some target) (parameter : function.parameterTypes = [.word])
+    (conversion : function.conversion? = some target)
     (called : Staging.Recursive.Size.Applies program stages size invocation context heap (.builtin ⟨function⟩)
       [.word word] outcome after) :
     after = heap ∧ Applied function target word outcome := by
+  have shape := parameter_shape conversion
   cases called with
   | builtin primitive =>
     refine ⟨rfl, ?_⟩
@@ -683,16 +689,24 @@ theorem applied {program : Program} {stages : Staging.Recursive.Registry} {invoc
       simp only [BuiltinFunctionId.conversion?, Option.some.injEq] at conversion
       subst conversion
       exact .identity
-    | fixedToWord _ =>
-      exact absurd parameter (by simp [BuiltinFunctionId.parameterTypes, TypeSystem.Ty.fixed, TypeSystem.Ty.word])
+    | fixedToWord canonical =>
+      simp only [BuiltinFunctionId.conversion?, Option.some.injEq] at conversion
+      subst conversion
+      exact .representation canonical
     | wordToInteger => simp [BuiltinFunctionId.conversion?] at conversion
-  | builtinArity mismatch => simp [parameter] at mismatch
+  | builtinArity mismatch =>
+    have count := congrArg List.length shape
+    simp at count
+    exact absurd count (by simpa using mismatch)
   | builtinType _ mismatch =>
     exfalso
     change Dynamic.ValuesFirstTypeMismatch [.word word] function.parameterTypes _ _ at mismatch
-    rw [parameter] at mismatch
+    generalize function.parameterTypes = types at mismatch shape
     cases mismatch with
-    | head actual different => cases actual; exact different rfl
+    | head actual different =>
+      cases actual
+      simp only [List.map_cons, List.cons.injEq] at shape
+      exact different (by rw [shape.1] <;> rfl)
     | tail _ rest => cases rest
   | builtinFault fault =>
     refine ⟨rfl, ?_⟩
@@ -702,17 +716,20 @@ theorem applied {program : Program} {stages : Staging.Recursive.Registry} {invoc
       subst conversion
       exact .dirty dirty
 
-/-- A conversion of a word applies in the Source. -/
-theorem applies (conversion : function.conversion? = some target) (parameter : function.parameterTypes = [.word])
-    (word : Word) : ∃ outcome, Applied function target word outcome := by
-  cases function <;>
-    simp [BuiltinFunctionId.conversion?, BuiltinFunctionId.parameterTypes, TypeSystem.Ty.fixed, TypeSystem.Ty.word]
-      at conversion parameter
+/-- A conversion applies in the Source to a word that is canonical where the
+conversion takes a fixed-width value. -/
+theorem applies (conversion : function.conversion? = some target) (word : Word)
+    (representation : ∀ type, function = .fixedToWord type → type.canonical word.val = true) :
+    ∃ outcome, Applied function target word outcome := by
+  cases function <;> simp [BuiltinFunctionId.conversion?] at conversion
   case fixedFromWord type =>
     subst conversion
     cases canonical : type.canonical word.val
     · exact ⟨_, .dirty canonical⟩
     · exact ⟨_, .canonical canonical⟩
+  case fixedToWord type =>
+    subst conversion
+    exact ⟨_, .representation (representation type rfl)⟩
   case wordIdentity =>
     subst conversion
     exact ⟨_, .identity⟩
@@ -740,13 +757,21 @@ private theorem argument_typed (unique : NodeOccurrencesUnique invocation.source
     (typed : ExpressionHasType invocation.source context id node.type) :
     ∃ argumentNode, invocation.source.lookupExpression? argument = some argumentNode ∧
       ExpressionHasType invocation.source context argument argumentNode.type ∧
-      node.type = function.returnType := by
+      function.parameterTypes = [argumentNode.type] ∧ node.type = function.returnType := by
   obtain ⟨argumentsTyped, resultType⟩ :=
     CallableIndexedOwnedPreparedStagedBuiltinSourceInversion.source_types unique site.found site.form
       site.coercions typed
   obtain ⟨argumentNode, argumentFound⟩ := site.argumentFound
-  exact ⟨argumentNode, argumentFound, CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed
-    unique argumentsTyped (List.mem_singleton_self _) argumentFound, resultType⟩
+  refine ⟨argumentNode, argumentFound, CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed
+    unique argumentsTyped (List.mem_singleton_self _) argumentFound, ?_, resultType⟩
+  generalize function.parameterTypes = types at argumentsTyped ⊢
+  cases argumentsTyped with
+  | cons head tail =>
+    cases tail
+    obtain ⟨stored, contains, storedType⟩ := head.stored_type
+    have same : stored = argumentNode :=
+      Option.some.inj ((lookupExpression?_complete unique contains).symm.trans argumentFound)
+    rw [← same, storedType]
 
 /-- A Source trace of a conversion determines the actual native check and the
 argument's reached state. -/
@@ -766,7 +791,8 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults] [DirtyToken faults]
   obtain ⟨currentEq, expressionEq, codeEq⟩ := certified
   subst current expression code
   cases Option.some.inj (found.symm.trans site.found)
-  obtain ⟨argumentNode, argumentFound, argumentTyped, resultType⟩ := argument_typed unique site sourceTyped
+  obtain ⟨argumentNode, argumentFound, argumentTyped, _parameterType, resultType⟩ :=
+    argument_typed unique site sourceTyped
   have raw : ∃ value finalStore finalMap finalWorld,
       Evaluates actual store ((SourceCoreInteger.builtinConversion target argumentCode).rename ξ) value finalStore ∧
       RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type .word faults outcome value ∧
@@ -794,7 +820,7 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults] [DirtyToken faults]
         cases represented with
         | value payload =>
           obtain ⟨word, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields payload
-          obtain ⟨rfl, result⟩ := applied site.conversion site.word called
+          obtain ⟨rfl, result⟩ := applied site.conversion called
           rw [resultType]
           cases result with
           | canonical canonical =>
@@ -805,6 +831,9 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults] [DirtyToken faults]
             exact ⟨_, finalStore, finalMap, finalWorld, conversion_dirty evaluated dirty,
               .fault DirtyToken.dirty, finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
           | identity =>
+            exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .value (ValueRep.word word), finalHeaps, maps, worlds,
+              frame, heapMetadata, effect, reached, related⟩
+          | representation _ =>
             exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .value (ValueRep.word word), finalHeaps, maps, worlds,
               frame, heapMetadata, effect, reached, related⟩
     · subst outcomeEq
@@ -846,7 +875,8 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults] [DirtyToken faults]
   obtain ⟨currentEq, expressionEq, codeEq⟩ := certified
   subst current expression code
   cases Option.some.inj (found.symm.trans site.found)
-  obtain ⟨argumentNode, argumentFound, argumentTyped, resultType⟩ := argument_typed unique site sourceTyped
+  obtain ⟨argumentNode, argumentFound, argumentTyped, parameterType, resultType⟩ :=
+    argument_typed unique site sourceTyped
   have occurrence : Staging.Recursive.Occurrence invocation id
       (.call callee [argument] (.builtinFunction function)) :=
     ⟨_, lookupExpression?_sound site.found, site.form, site.requirements, site.coercions⟩
@@ -879,8 +909,17 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults] [DirtyToken faults]
         .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
     | value payload =>
       obtain ⟨word, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields payload
+      have representation : ∀ type, function = .fixedToWord type → type.canonical word.val = true := by
+        intro type same
+        subst same
+        have argumentFixed : argumentNode.type = .fixed type := by
+          simpa [BuiltinFunctionId.parameterTypes] using parameterType.symm
+        obtain ⟨_, sameSource, _, _, canonical⟩ := CompatibleExpressionPrimitives.fixed_fields payload
+          (by rw [argumentFixed] <;> rfl)
+        cases sameSource
+        exact canonical
       rw [resultType]
-      obtain ⟨_, result⟩ := applies site.conversion site.word word
+      obtain ⟨_, result⟩ := applies site.conversion word representation
       cases result with
       | canonical canonical =>
         obtain ⟨rfl, rfl⟩ := evaluation_deterministic (conversion_success argumentEvaluation.sound canonical)
@@ -897,6 +936,11 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults] [DirtyToken faults]
         obtain ⟨rfl, rfl⟩ := evaluation_deterministic argumentEvaluation.sound complete
         exact ⟨_, _, after, finalMap, finalWorld,
           .builtinApplied occurrence (.cons argumentTrace .nil) (.builtin (.wordIdentity word)),
+          .value (ValueRep.word word), finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+      | representation canonical =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic argumentEvaluation.sound complete
+        exact ⟨_, _, after, finalMap, finalWorld,
+          .builtinApplied occurrence (.cons argumentTrace .nil) (.builtin (.fixedToWord canonical)),
           .value (ValueRep.word word), finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
     maps, worlds, frame, metadata, effect, reached, related⟩ := raw
