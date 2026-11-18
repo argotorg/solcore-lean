@@ -1,7 +1,7 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedConversions
 
 /-!
-# Accepted bodies: direct calls inside expressions
+# Accepted bodies: direct calls and conversions inside expressions
 
 Extends the expression closure of named-row bodies to direct calls at every
 expression position: inside operators, conditionals, groups and pairs, and as
@@ -28,16 +28,17 @@ Main declarations:
 -/
 
 section
-/-! Direct calls inside the expressions of named-row bodies. `Nested` closes
-the first subset's forms, direct calls and conversions of a word under one
-another: every operand, branch and pair element, every argument of a direct
-call and the argument of a conversion is again a `Nested` site. `NestedTree`
-keeps the first subset's receipts at its forms, the direct-call receipts of
-`CellAwareInvocationAcceptedCallTrees.CallTree` at its calls, and the node's
-metadata at `word` at its conversions. A call's argument receipts are indexed by the pairs of the
-arguments and their lowered codes: a receipt tree cannot be the certificate of
-the head's argument sequence (`DataExpressionSequence.Tree`) inside its own
-definition, so the bounds rebuild that sequence. -/
+/-! Direct calls and conversions inside the expressions of named-row bodies.
+`Nested` closes the first subset's forms, direct calls and conversions of a
+word under one another: every operand, branch and pair element, every argument
+of a direct call and the argument of a conversion is again a `Nested` site.
+`NestedTree` keeps the first subset's receipts at its forms, the direct-call
+receipts of `CellAwareInvocationAcceptedCallTrees.CallTree` at its calls, and
+the node's metadata at `word` at its conversions. A call's argument receipts
+are indexed by the pairs of the arguments and their lowered codes: a receipt
+tree cannot be the certificate of the head's argument sequence
+(`DataExpressionSequence.Tree`) inside its own definition, so the bounds
+rebuild that sequence. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxRecDepth 4096

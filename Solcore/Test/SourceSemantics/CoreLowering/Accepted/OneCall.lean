@@ -1,30 +1,37 @@
 import Solcore.Test.SourceSemantics.CoreLowering.Accepted.Fixture
 import Solcore.Test.SourceSemantics.CoreLowering.Direct.Calls
+import Solcore.Test.SourceSemantics.CoreLowering.Builtin
 
 /-!
-# Direct calls at the accepted-body public root
+# Direct calls and a conversion at the accepted-body public root
 
 `relay` returns `identity(value)`, a direct call of the program's first
 function, and `twice` returns `identity(identity(value))`, a direct call whose
-argument is another direct call, both at a `Word` parameter. Runtime checks
-place every expression node of the three rows among the nested sites that call
-`identity`'s instantiation, and each statement list in the supported shape.
-With the complete inventory the rows make a family and give the admitted
-callee's static receipts. The original Source executions of `relay` and
-`twice`, whose calls run `identity`'s body instance, are lifted to staged
-traces, and the call root's theorems apply at the first public call of each in
-both directions: the actual resumption succeeds, and actual native completion
-reconstructs a staged Source execution.
+argument is another direct call, both at a `Word` parameter; `narrow` returns
+`uint8(value)`, a conversion of its `Word` parameter. Runtime checks place
+every expression node of the four rows among the nested sites that call
+`identity`'s instantiation or their callees, and each statement list in the
+supported shape. With the complete inventory the rows make a family and give
+the admitted callee's static receipts. The original Source executions of
+`relay`, `twice` and `narrow` (at words canonical for `uint8`) are lifted to
+staged traces, and the call root's theorems apply at the first public call of
+each in both directions: the actual resumption succeeds, and actual native
+completion reconstructs a staged Source execution. At other words the call
+root's reflection applies to `narrow` and the actual resumption fails with the
+dirty-integer reason.
 
 Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.twice_source`,
-`Tests.SourceCoreAcceptedOneCall.accepted_call` and the runtime checks
-`Tests.SourceCoreAcceptedOneCall.AcceptedCallRuntime.run` and
-`Tests.SourceCoreAcceptedOneCall.AcceptedNestedCallRuntime.run`.
+`Tests.SourceCoreAcceptedOneCall.narrow_source`,
+`Tests.SourceCoreAcceptedOneCall.accepted_call`,
+`Tests.SourceCoreAcceptedOneCall.accepted_reflection` and the runtime checks
+`Tests.SourceCoreAcceptedOneCall.AcceptedCallRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedNestedCallRuntime.run` and
+`Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`.
 -/
 
 section
-/-! The program and the declarative typing of its three functions, constructed
+/-! The program and the declarative typing of its four functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -38,7 +45,8 @@ def workspace : Workspace.RawWorkspace := {
     "pragma solcore;",
     "function identity(value: Word) returns (Word) { return value; }",
     "function relay(value: Word) returns (Word) { return identity(value); }",
-    "function twice(value: Word) returns (Word) { return identity(identity(value)); }" ]}] }
+    "function twice(value: Word) returns (Word) { return identity(identity(value)); }",
+    "function narrow(value: Word) returns (uint8) { return uint8(value); }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -224,39 +232,150 @@ def observeTwice (function : CheckedFunction) (signature identity : ProgramFunct
     parts.inputs, binderScheme, binderRequirements, binderOrdinary, parts.roots, parts.statementFound,
     parts.statementForm, statementType⟩
 
+/-- The nodes of a body that returns `uint8(value)`, found by following the
+return statement's expression graph. -/
+structure NarrowParts (source : TypedSource) where
+  binder : TypedBinder
+  read : Tests.SourceCoreNamedBranch.Read source binder .word
+  converted : Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedFromWord ⟨false, .w8⟩) read.node.id
+  statement : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement statement.id]
+  statementFound : source.lookupStatement? statement.id = some statement
+  statementForm : statement.form = .returnStmt (some converted.value.node.id)
+
+/-- The conversion `uint8(argument)`, from its actual callee and call nodes. -/
+def observeConversion (source : TypedSource) (argument : ExpressionId) (calleeNode valueNode : ExpressionNode) :
+    IO (Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedFromWord ⟨false, .w8⟩) argument) := do
+  let callee ← Tests.SourceCoreOperatorCalls.observeNode source calleeNode
+    (BuiltinFunctionId.fixedFromWord ⟨false, .w8⟩).type
+  let value ← Tests.SourceCoreOperatorCalls.observeNode source valueNode
+    (BuiltinFunctionId.fixedFromWord ⟨false, .w8⟩).returnType
+  let .reference name (.builtinFunction _) := calleeNode.form | throw (IO.userError "narrow callee form")
+  let ⟨calleeForm⟩ ← observed
+    (callee.node.form = .reference name (.builtinFunction (.fixedFromWord ⟨false, .w8⟩))) "narrow callee"
+  let ⟨form⟩ ← observed
+    (value.node.form = .call callee.node.id [argument] (.builtinFunction (.fixedFromWord ⟨false, .w8⟩)))
+    "narrow conversion"
+  return {callee, value, name, calleeForm, form}
+
+def observeNarrowParts (source : TypedSource) : IO (NarrowParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "narrow input")
+  let [.statement statementId] := source.roots | throw (IO.userError "narrow roots")
+  let some statement := source.lookupStatement? statementId | throw (IO.userError "narrow statement")
+  let .returnStmt (some valueId) := statement.form | throw (IO.userError "narrow return")
+  let some valueNode := source.lookupExpression? valueId | throw (IO.userError "narrow conversion node")
+  let .call calleeId [readId] _ := valueNode.form | throw (IO.userError "narrow conversion form")
+  let some calleeNode := source.lookupExpression? calleeId | throw (IO.userError "narrow callee")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "narrow read")
+  let read ← Tests.SourceCoreNamedBranch.observeRead source binder readNode .word
+  let converted ← observeConversion source read.node.id calleeNode valueNode
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "narrow inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "narrow roots shape"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement) "narrow statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some converted.value.node.id))
+    "narrow statementForm"
+  return ⟨binder, read, converted, statement, inputs, roots, statementFound, statementForm⟩
+
+/-- `narrow`'s body: the read of its parameter, its conversion `uint8(value)`
+and the return of the conversion. -/
+structure NarrowShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : NarrowParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.fixed ⟨false, .w8⟩]
+  binderScheme : parts.binder.scheme = .mono .word
+  binderRequirements : parts.binder.schemeRequirements = []
+  binderOrdinary : parts.binder.comptime = false
+  statementType : parts.statement.type = .fixed ⟨false, .w8⟩
+
+theorem NarrowShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : NarrowShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.statement.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts :=
+    {type := .fixed ⟨false, .w8⟩, hasValue := true, sawReturn := true, control := .returned}
+  refine ⟨BodyFacts.singleton facts, rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have narrow : TypeAdmissible lexical (.fixed ⟨false, .w8⟩) := ⟨binders, .builtin (.fixed ⟨false, .w8⟩)⟩
+    have read := shape.parts.read.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have converted := shape.parts.converted.typed rfl narrow read
+    exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.parts.statementFound)
+      shape.parts.statementForm converted shape.statementType)⟩
+
+def observeNarrow (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (NarrowShape function signature) := do
+  let parts ← observeNarrowParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "narrow parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "narrow inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.fixed ⟨false, .w8⟩]) "narrow returns"
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "narrow binderScheme"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "narrow binderRequirements"
+  let ⟨binderOrdinary⟩ ← observed (parts.binder.comptime = false) "narrow binderOrdinary"
+  let ⟨statementType⟩ ← observed (parts.statement.type = .fixed ⟨false, .w8⟩) "narrow statementType"
+  return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, binderOrdinary,
+    statementType⟩
+
 /-- The declarative typing of the complete checked program. -/
 def observeWellFormed {program : CheckedProgram}
     (checked : checkProgram workspace options.checkingFuel = .ok program) :
     IO (PLift (ProgramWellFormed (Program.ofChecked program))) := do
   match functions : program.functions, signatures : program.signatures.functions with
-  | [identityFunction, relayFunction, twiceFunction], [identitySignature, relaySignature, twiceSignature] =>
+  | [identityFunction, relayFunction, twiceFunction, narrowFunction],
+    [identitySignature, relaySignature, twiceSignature, narrowSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
+    let narrowShape ← observeNarrow narrowFunction narrowSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
     let ⟨relayDeclaration⟩ ← observed (relayFunction.declaration = relaySignature.id) "calls relayDeclaration"
     let ⟨twiceDeclaration⟩ ← observed (twiceFunction.declaration = twiceSignature.id) "calls twiceDeclaration"
+    let ⟨narrowDeclaration⟩ ← observed (narrowFunction.declaration = narrowSignature.id) "calls narrowDeclaration"
     let ⟨identityRelay⟩ ← observed (identitySignature.id ≠ relaySignature.id) "calls identityRelay"
     let ⟨identityTwice⟩ ← observed (identitySignature.id ≠ twiceSignature.id) "calls identityTwice"
     let ⟨relayTwice⟩ ← observed (relaySignature.id ≠ twiceSignature.id) "calls relayTwice"
+    let ⟨identityNarrow⟩ ← observed (identitySignature.id ≠ narrowSignature.id) "calls identityNarrow"
+    let ⟨relayNarrow⟩ ← observed (relaySignature.id ≠ narrowSignature.id) "calls relayNarrow"
+    let ⟨twiceNarrow⟩ ← observed (twiceSignature.id ≠ narrowSignature.id) "calls twiceNarrow"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
         intro actual member candidate candidateMember accepted
         have declared := checkFunctionBody_success_declaration accepted
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
         simp only [signatures, List.mem_cons, List.not_mem_nil, or_false] at candidateMember
-        rcases member with rfl | rfl | rfl <;> rcases candidateMember with rfl | rfl | rfl
+        rcases member with rfl | rfl | rfl | rfl <;> rcases candidateMember with rfl | rfl | rfl | rfl
         · exact identityShape.statementTyping program.signatures
         · exact False.elim (identityRelay (identityDeclaration.symm.trans declared))
         · exact False.elim (identityTwice (identityDeclaration.symm.trans declared))
+        · exact False.elim (identityNarrow (identityDeclaration.symm.trans declared))
         · exact False.elim (identityRelay (declared.symm.trans relayDeclaration))
         · exact relayShape.statementTyping program.signatures (by simp [signatures])
         · exact False.elim (relayTwice (relayDeclaration.symm.trans declared))
+        · exact False.elim (relayNarrow (relayDeclaration.symm.trans declared))
         · exact False.elim (identityTwice (declared.symm.trans twiceDeclaration))
         · exact False.elim (relayTwice (declared.symm.trans twiceDeclaration))
         · exact twiceShape.statementTyping program.signatures (by simp [signatures])
+        · exact False.elim (twiceNarrow (twiceDeclaration.symm.trans declared))
+        · exact False.elim (identityNarrow (declared.symm.trans narrowDeclaration))
+        · exact False.elim (relayNarrow (declared.symm.trans narrowDeclaration))
+        · exact False.elim (twiceNarrow (declared.symm.trans narrowDeclaration))
+        · exact narrowShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -265,11 +384,12 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the three functions and their original Source
+/-! The cache rows of the four functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
-of `identity` with its parameter, and `twice` returns the direct call of
-`identity` with that call. Each call's global application is a given body
-invocation. -/
+of `identity` with its parameter, `twice` returns the direct call of
+`identity` with that call, and `narrow` returns the conversion of its
+parameter, at a word canonical for `uint8`. Each call's global application is
+a given body invocation. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreAcceptedOneCall
@@ -371,6 +491,16 @@ def observeTwiceBody (fixture : CompiledFixture workspace options) (target : Dec
   let ⟨innerSelects⟩ ← observed (parts.inner.instantiation = target) "twice row inner target"
   let ⟨outerSelects⟩ ← observed (parts.outer.instantiation = target) "twice row outer target"
   return ⟨identity, member, parts, binderScheme, innerSelects, outerSelects⟩
+
+/-- `narrow`'s cache row: the nodes of `uint8(value)` at its `Word` parameter. -/
+structure NarrowBody (source : TypedSource) where
+  parts : NarrowParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeNarrowBody (source : TypedSource) : IO (NarrowBody source) := do
+  let parts ← observeNarrowParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "narrow row binderScheme"
+  return ⟨parts, binderScheme⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
 theorem read_value {source : TypedSource} {binder : TypedBinder}
@@ -482,18 +612,48 @@ theorem TwiceBody.trace {fixture : CompiledFixture workspace options} {target : 
         (call_value body.parts.inner (read_value body.parts.read evidence before word) innerValid innerApplies)
         outerValid outerApplies)
 
+/-- `uint8(argument)` evaluates to a canonical argument word. -/
+theorem conversion_value {source : TypedSource} {argument : ExpressionId}
+    (converted : Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedFromWord ⟨false, .w8⟩) argument)
+    {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap} {word : Core.Word}
+    (argumentTrace : Dynamic.ExpressionEvaluates program context evidence source environment before argument
+      (.word word) after)
+    (canonical : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = true) :
+    Dynamic.ExpressionEvaluates program context evidence source environment before converted.value.node.id
+      (.word word) after := by
+  apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound converted.value.found)
+  · rw [converted.form, converted.value.requirements, converted.value.coercions]
+    exact .builtinCall rfl (.cons argumentTrace .nil) (.builtin (.fixedFromWord canonical))
+  · rw [converted.value.coercions]
+    exact .nil
+
+/-- `narrow`'s body returns a canonical parameter word. -/
+theorem NarrowBody.trace {source : TypedSource} (body : NarrowBody source) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (word : Core.Word) (canonical : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = true) :
+    Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.statement.id] context (.returned (.word word)) (wordHeap before word) := by
+  apply Dynamic.FunctionStatementsExecute.singleton (lookupStatement?_sound body.parts.statementFound)
+  · intro expression impossible
+    rw [body.parts.statementForm] at impossible
+    cases impossible
+  · exact .returnValue (lookupStatement?_sound body.parts.statementFound) body.parts.statementForm
+      (conversion_value body.parts.converted (read_value body.parts.read evidence before word) canonical)
+
 end Tests.SourceCoreAcceptedOneCall
 end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the three rows among the nested sites and each
-statement list in the supported shape; the complete inventory turns them into
-the rows of a family and gives the admitted callee's static receipts. The
-original Source executions of `relay` and `twice`, whose calls run
-`identity`'s body instance, are lifted through the checked shapes, and with the
-existing start receipts the call root's theorems apply at the first public call
-of each in both directions. -/
+every expression node of the four rows among the nested sites or their callees
+and each statement list in the supported shape; the complete inventory turns
+them into the rows of a family and gives the admitted callee's static
+receipts. The original Source executions of `relay`, `twice` and `narrow`,
+whose calls run `identity`'s body instance, are lifted through the checked
+shapes, and with the existing start receipts the call root's theorems apply at
+the first public call of each in both directions. The call root's reflection
+needs no Source execution (`accepted_reflection`). -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -641,6 +801,17 @@ theorem twice_source (selected : SelectedInventory whole row) {identity : Row fi
     (identity_applies identitySelected calls identityBody twiceBody.outerSelects selected.packet.header.context
       selected.packet.header.function.evidence (wordHeap (wordHeap ⟨[]⟩ word) word) word)
 
+/-- The original Source execution of `narrow`'s body at its header, at a word
+canonical for `uint8`. -/
+theorem narrow_source (selected : SelectedInventory whole row) (narrowBody : NarrowBody row.original.function.typedBody)
+    (word : Core.Word) (canonical : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = true) :
+    Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment narrowBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.word word)) (wordHeap ⟨[]⟩ word) := by
+  rw [single_body selected narrowBody.parts.roots, selected.source_eq]
+  exact narrowBody.trace selected.packet.header.function.evidence ⟨[]⟩ word canonical
+
 /-- The first public call of a row, with the conclusions of the call root's
 output theorem, its checkpoint sufficiency theorem and its checkpoint
 reflection theorem. -/
@@ -759,7 +930,74 @@ theorem accepted_call (selected : SelectedInventory whole row) {called : Declara
           selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows)
     exact ⟨sidecar, size, environment, bound, finalContext, outcome, after, allocated, staged, result⟩
 
-/-- The receipts that both runtime checks observe: the compiled program, its
+/-- The first public call of a row with the conclusion of the call root's
+checkpoint reflection theorem alone. -/
+structure AcceptedReflection (selected : SelectedInventory whole row) (word : Word)
+    (started : Started fixture row.original.key [.word word]) where
+  start : SelectedCompilationPublicSessionInitial.Started whole.rows fixture.ready selected.packet.header started.call
+  reflects : ∀ fuel (value : Value) (finalStore : Store), start.checkpoint.NativeDone fuel value finalStore →
+    ∃ (sidecar : SourceCoreStageContracts.Sidecar) (size : Nat) (environment : Dynamic.Environment)
+      (bound : Dynamic.Heap) (finalContext : SourceSemantics.Context) (outcome : Staging.Recursive.BodyOutcome)
+      (after : Dynamic.Heap),
+      Dynamic.BindersAllocate [] ⟨[]⟩ selected.packet.header.function.parameters [.word word] environment bound ∧
+      Staging.Recursive.Size.Statements (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+        (SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled) size
+        (RecursiveStageRegistry.scope sidecar [] selected.packet.header.function) selected.packet.header.context
+        environment bound selected.packet.header.function.body finalContext outcome after ∧
+      Staging.Recursive.BodyResult selected.packet.header.function.resultType outcome
+        (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome)
+
+/-- The reflection part of `accepted_call`, which needs no Source execution, so
+it applies at every argument word. -/
+theorem accepted_reflection (selected : SelectedInventory whole row) {called : DeclarationInstantiation → Prop}
+    (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions) (word : Word)
+    (wellFormed : ProgramWellFormed (Program.ofChecked fixture.recipe.compiled.sourceProgram))
+    (started : Started fixture row.original.key [.word word])
+    (callableProfile : fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true)
+    {binder : TypedBinder} (inputs : row.original.function.typedBody.inputs = [binder])
+    (scheme : binder.scheme = .mono .word) :
+    Nonempty (AcceptedReflection selected word started) := by
+  obtain ⟨types, _allocated⟩ := word_parameter selected inputs scheme ⟨[]⟩ word
+  have support := SelectedCompilationNamedSupport.Support.of_program wellFormed
+  obtain ⟨start⟩ := CellAwarePublicInitialSelectedStart.from_selected_call
+    (rows := whole.rows) (prepared := fixture.ready) (header := selected.packet.header) (call := started.call)
+    fixture.accepted fixture.selected started.opened started.bootstrap started.fresh
+    started.authority (.single started.ready) (fun _ member key => selected.root_selection member key)
+  have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
+      selected.packet.header.function.context [.word word] selected.packet.header.types := by
+    rw [types]
+    exact .cons ⟨.word word, by simp [SourceCoreIndexedSession.DataInput.publicValue], .word word⟩ .nil
+  have inputMeanings : RecursiveNamedPublicDataInputs.Meanings [.word word] [.word word] :=
+    .cons ⟨.word word, by simp [SourceCoreIndexedSession.DataInput.publicValue], .word word⟩ .nil
+  obtain ⟨origin, _contextAt, _issued, _extension⟩ := CellAwarePublicInitialStart.receiver start
+  obtain ⟨initial⟩ := CellAwarePublicInitialStart.of_started whole.distinct callableProfile
+    origin.result.context.registry (CallableIndexedOwnedPublicDecodedCallFaults.faults origin.result.diagnostics)
+    support.bodyTyping start inputTypes inputMeanings
+  let prepared := CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued selected.input.prepared selected.packet.selected
+  have diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared :=
+    ⟨selected.packet.selected.diagnostics, selected.packet.selected.found, rfl⟩
+  obtain ⟨sidecar, _sidecarIssued, bodySelected⟩ := whole.invocation selected.packet selected.retained
+  obtain ⟨body, covered, closed, ports⟩ := whole.call_inputs calls selected.packet
+  obtain ⟨_sourceCompiled, artifact, checked⟩ := CellAwarePublicAcceptedNamedRoot.compilation_receipts
+    fixture.checked fixture.accepted fixture.selected
+  obtain ⟨_entry, entryMember, _shape, _first⟩ := start.selected.2
+  let rows : ∀ header, header ∈ headers whole.rows → called header.instantiation →
+      CellAwareInvocationAcceptedCallFamily.Row (headers := headers whole.rows) called header :=
+    fun _header member _ => Classical.choice (whole.family_row calls support entryMember member)
+  refine ⟨⟨start, ?_⟩⟩
+  intro fuel completedValue completedStore completed
+  obtain ⟨_capture, size, environment, bound, finalContext, outcome, after, _finalMap, _finalWorld,
+      allocated, staged, result, _named⟩ :=
+    CellAwarePublicAcceptedCallRoot.checkpoint_reflects_selected callableProfile initial.issued prepared
+      selected.packet.aligned fixture.ready diagnostic support start.selected (owner fixture.recipe.compiled)
+      initial.caller.base.val initial.globalReference initial.keyPhysical initial.caller.physical initial.stable
+      initial.heapTyped initial.argumentsTyped bodySelected artifact checked body covered initial.represented
+      initial.heaps rfl start.started completed
+      (CellAwarePublicAcceptedCallRoot.expressions_of_family callableProfile initial.issued prepared
+        selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows)
+  exact ⟨sidecar, size, environment, bound, finalContext, outcome, after, allocated, staged, result⟩
+
+/-- The receipts that the runtime checks observe: the compiled program, its
 cache, `identity`'s row and body, the checked rows of the family that admits
 `identity`'s retained instantiation, the program typing and the callable
 profile. -/
@@ -842,6 +1080,50 @@ def run : IO Unit := do
   IO.println "ACCEPTED_NESTED_CALL_PUBLIC_PASS"
 
 end AcceptedNestedCallRuntime
+
+namespace AcceptedConversionRuntime
+
+/-- As `AcceptedCallRuntime.run`, at `narrow`, which returns `uint8(value)`. At
+words canonical for `uint8` the call root's theorems apply in both directions
+and the actual resumption returns the word; at other words the call root's
+reflection applies and the actual resumption fails with the dirty-integer
+reason. -/
+def run : IO Unit := do
+  let observed ← observe
+  let narrow ← observeRow observed.fixture "narrow"
+  let narrowBody ← observeNarrowBody narrow.original.function.typedBody
+  for word in [Word.zero, Word.ofNatModulo 7, Word.ofNatModulo 255] do
+    let ⟨canonical⟩ ← Tests.SourceCoreAcceptedFixture.observed
+      (TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = true) "narrow canonical word"
+    let started ← observeStarted observed.fixture narrow.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole narrow),
+        Nonempty (AcceptedCall selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select narrow
+      exact ⟨whole, selected, accepted_call selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile narrowBody.parts.inputs narrowBody.binderScheme
+        (narrow_source selected narrowBody word canonical)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .succeeded returned =>
+      unless returned.value == .word word do throw (IO.userError "accepted conversion output changed")
+    | _ => throw (IO.userError "accepted conversion did not succeed")
+  for word in [Word.ofNatModulo 256, Word.maximum] do
+    let started ← observeStarted observed.fixture narrow.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole narrow),
+        Nonempty (AcceptedReflection selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select narrow
+      exact ⟨whole, selected, accepted_reflection selected observed.calls word observed.wellFormed started
+        observed.callableProfile narrowBody.parts.inputs narrowBody.binderScheme⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .failed reason _ =>
+      unless reason == SourceCorePanics.dirtyReason do throw (IO.userError "accepted conversion failure changed")
+    | _ => throw (IO.userError "accepted conversion of a dirty word did not fail")
+  IO.println "ACCEPTED_CONVERSION_PUBLIC_PASS"
+
+end AcceptedConversionRuntime
 
 end Tests.SourceCoreAcceptedOneCall
 end
