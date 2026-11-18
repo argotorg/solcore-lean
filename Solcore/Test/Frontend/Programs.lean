@@ -3821,14 +3821,16 @@ private def testMethodFailures : IO Unit := do
   expectSingleError (String.intercalate "\n" [
     "trait Marker<T> {}",
     "trait Add<T> {",
-    "  function add(left: T, right: T) returns (T) where T: Marker;",
+    "  function add(left: T, right: T) returns (T);",
     "}",
     "impl Add<Word> {",
-    "  function add(left: Word, right: Word) returns (Word) { return left; }",
+    "  function add(left: Word, right: Word) returns (Word) where Word: Marker {",
+    "    return left;",
+    "  }",
     "}"
   ]) fun error => match error with
-    | .implMethodPredicateMismatch { methodIndex := 0, .. }
-        { methodIndex := 0, .. } [_] [] => true
+    | .implMethodUndeclaredPredicate { methodIndex := 0, .. }
+        { methodIndex := 0, .. } predicate => decide (predicate.subject = .word)
     | _ => false
   expectSingleError (String.intercalate "\n" [
     "trait Add<T> { function add(value: T) returns (T); }",
@@ -3845,6 +3847,109 @@ private def testMethodFailures : IO Unit := do
   ]) fun error => match error with
     | .traitMethodLocalGenerics { methodIndex := 0, .. } => true
     | _ => false
+
+private def implMethodPredicateWorkspace (content : String) :
+    Workspace.RawWorkspace := {
+  entry := "main.solc"
+  mainSources := [{ path := "main.solc", content }]
+  externalLibraries := []
+}
+
+/-- The checked program of an accepted source, whose implementation methods
+keep the predicates they declare. -/
+private def acceptedImplMethodPredicates (label content : String) :
+    IO (List (List ProgramPredicate)) := do
+  match checkProgram (implMethodPredicateWorkspace content) with
+  | .ok program => pure (program.signatures.implementations.map fun implementation =>
+      implementation.methods.flatMap fun method => method.wherePredicates)
+  | .error errors => throw (IO.userError s!"{label} was rejected: {reprStr errors}")
+
+/-- Upstream's `impl_method_extra_constraint` (`81afb96b`, `SC0249`) and the
+rule it checks: an implementation method may require only its trait method's
+predicates, instantiated at the head, and its implementation's own, which
+contain the trait's instantiated where predicates.  Upstream's bodies call
+`D.d`, which Lean's source syntax lacks, so these return constants.  Its `F`
+restates a predicate of a method-local generic, which Lean refuses, so here the
+trait method's predicate is on the trait parameter. -/
+private def testImplMethodPredicateRule : IO Unit := do
+  let base := [
+    "pragma solcore;",
+    "trait C<T> { function c(x: T) returns (Word); }",
+    "trait D<T> { function d(x: T) returns (Word); }",
+    "enum Box<A> { Wrap(A) }"]
+  -- Nothing provides `A: D` to `C.c`.
+  expectSingleError (String.intercalate "\n" (base ++ [
+    "impl<A> C<Box<A>> {",
+    "  function c(x: Box<A>) returns (Word) where A: D { return 1; }",
+    "}"])) fun error => match error with
+    | .implMethodUndeclaredPredicate { methodIndex := 0, .. }
+        { methodIndex := 0, .. } predicate =>
+        match predicate.subject with
+        | .parameter parameter => parameter.index == 0
+        | _ => false
+    | _ => false
+  -- `A: D` follows from the implementation's `A: E`, but it is not provided.
+  expectSingleError (String.intercalate "\n" (base ++ [
+    "trait E<T> where T: D {}",
+    "enum Pair<A> { Two(A, A) }",
+    "impl<A> C<Pair<A>> where A: E {",
+    "  function c(x: Pair<A>) returns (Word) where A: D { return 2; }",
+    "}"])) fun error => match error with
+    | .implMethodUndeclaredPredicate { methodIndex := 0, .. }
+        { methodIndex := 0, .. } _ => true
+    | _ => false
+  -- Restating the trait method's predicate.
+  let restated ← acceptedImplMethodPredicates "a restated trait method predicate"
+    (String.intercalate "\n" (base ++ [
+      "trait F<T> { function f(x: T) returns (Word) where T: D; }",
+      "impl<A> F<Box<A>> {",
+      "  function f(x: Box<A>) returns (Word) where Box<A>: D { return 4; }",
+      "}"]))
+  assertTrue (restated.map List.length == [1])
+    "a restated trait method predicate was not kept"
+  -- Restating the implementation's own predicate.
+  let condition ← acceptedImplMethodPredicates "a restated implementation predicate"
+    (String.intercalate "\n" (base ++ [
+      "impl<A> D<Box<A>> where A: D {",
+      "  function d(x: Box<A>) returns (Word) where A: D { return 3; }",
+      "}"]))
+  assertTrue (condition.map List.length == [1])
+    "a restated implementation predicate was not kept"
+  -- Omitting, reordering and repeating the trait method's predicates.
+  let traits := base ++ [
+    "trait E<T> { function e(x: T) returns (Word); }",
+    "trait G<T> { function g(x: T) returns (Word) where T: D, T: E; }"]
+  for (label, clause, count) in [
+      ("an omitted trait method predicate", "", 0),
+      ("reordered trait method predicates", " where Box<A>: E, Box<A>: D", 2),
+      ("a repeated trait method predicate", " where Box<A>: D, Box<A>: D", 2)] do
+    let methods ← acceptedImplMethodPredicates label
+      (String.intercalate "\n" (traits ++ [
+        "impl<A> G<Box<A>> {",
+        s!"  function g(x: Box<A>) returns (Word){clause} \{ return 5; }",
+        "}"]))
+    assertTrue (methods.map List.length == [count]) s!"{label} was not kept"
+  -- Restating the trait's own where predicate, which the implementation restates.
+  let superclass ← acceptedImplMethodPredicates "a restated trait where predicate"
+    (String.intercalate "\n" (base ++ [
+      "trait H<T> where T: D { function h(x: T) returns (Word); }",
+      "impl<A> D<Box<A>> { function d(x: Box<A>) returns (Word) { return 7; } }",
+      "impl<A> H<Box<A>> where Box<A>: D {",
+      "  function h(x: Box<A>) returns (Word) where Box<A>: D { return 8; }",
+      "}"]))
+  assertTrue (superclass.map List.length == [0, 1])
+    "a restated trait where predicate was not kept"
+  -- The body sees only the predicates its method declares: an omitted
+  -- predicate cannot be used, as upstream's `SC0207` refuses.
+  match checkProgram (implMethodPredicateWorkspace (String.intercalate "\n" (base ++ [
+      "trait F<T> { function f(x: T) returns (Word) where T: D; }",
+      "function useD<T>(x: T) returns (Word) where T: D { return 0; }",
+      "impl<A> D<Box<A>> where A: D { function d(x: Box<A>) returns (Word) { return 7; } }",
+      "impl<A> F<Box<A>> {",
+      "  function f(x: Box<A>) returns (Word) { return useD(x); }",
+      "}"]))) with
+  | .ok _ => throw (IO.userError "an impl method body used an undeclared predicate")
+  | .error _ => pure ()
 
 private def testAmbiguousTrait : IO Unit := do
   let left ← parsed "left.solc" "export {Shared}; trait Shared<T> {}"
@@ -3890,6 +3995,7 @@ def testProgramSignatures : IO Unit := do
   ProgramSignatures.testFailures
   ProgramSignatures.testTraitPredicateContainmentAllowsReorderingAndExtras
   ProgramSignatures.testMethodFailures
+  ProgramSignatures.testImplMethodPredicateRule
   ProgramSignatures.testAmbiguousTrait
   ProgramSignatures.testStrictTraitVisibility
 

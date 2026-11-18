@@ -155,7 +155,7 @@ inductive OperatorMethodSelected (program : Program) (context : Context)
       (method_requirements : RequirementsProduceEnvironment context
         callerEvidence
         methodRequirements
-        (method.wherePredicates.map
+        ((dispatchPredicates trait implementation method).map
           (ProgramPredicate.applyParameters substitution)) methodEvidence)
       (instantiates : TraitMethodInstantiates program implementation method
         trait definition substitution bodyInstance)

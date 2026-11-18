@@ -848,6 +848,9 @@ structure Selection (program : CheckedProgram) (primary : TypedTraitResolution.E
   declarationName : declaration.name = name
   methodsGoals : method.methodPremises.map SourceCompilationPlan.runtimeEvidenceGoal = method.methodPredicates
   predicates : method.methodPredicates = declaration.wherePredicates.map (ProgramPredicate.applyParameters supplied)
+  /-- The executable boundary still requires the method's predicates to be its
+  trait method's, so a caller proves exactly them. -/
+  dispatch : SourceSemantics.dispatchPredicates trait implementation declaration = declaration.wherePredicates
 
 theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evidence}
     {evidence : List TypedTraitResolution.Evidence} {arity : Nat} {name : String}
@@ -881,7 +884,7 @@ theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evi
     obtain ⟨traitOwner, accepted⟩ := require_ok accepted
     obtain ⟨associated, accepted⟩ := require_ok accepted
     obtain ⟨_, accepted⟩ := require_ok accepted
-    obtain ⟨_, accepted⟩ := require_ok accepted
+    obtain ⟨genericPredicates, accepted⟩ := require_ok accepted
     obtain ⟨closedPredicates, accepted⟩ := require_ok accepted
     obtain ⟨_, _, accepted⟩ := bind_ok accepted
     obtain ⟨resultUnit, methodsValidated, accepted⟩ := bind_ok accepted
@@ -981,6 +984,20 @@ theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evi
       have member : trait ∈ [trait] := List.mem_cons_self
       rw [← selected] at member
       exact ⟨(List.mem_filter.mp member).1, of_decide_eq_true (List.mem_filter.mp member).2⟩
+    have dispatch : SourceSemantics.dispatchPredicates trait implementation declaration =
+        declaration.wherePredicates := by
+      have found : trait.methods.find? (fun candidate => candidate.name == declaration.name) =
+          some traitMethod := by
+        change ((match trait.methods.filter _ with
+          | [] => .error _ | [value] => .ok value | values => .error _) : Except ExecutableImplMethods.Error ProgramTraitMethodSignature) = .ok traitMethod at traitMethodSelected
+        split at traitMethodSelected <;> try contradiction
+        cases traitMethodSelected
+        rename_i selected
+        rw [declarationName]
+        exact filtered_find selected
+      unfold SourceSemantics.dispatchPredicates
+      rw [found]
+      exact genericPredicates
     refine ⟨{
       implementation, trait, declaration, generic, supplied := headMatch.parameterSubstitution
       implementationMember, methodMember, traitLookup, traitMethodMember := traitMember
@@ -995,6 +1012,7 @@ theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evi
       declarationName
       methodsGoals
       predicates := closedPredicates
+      dispatch
     }⟩
 
 
@@ -1629,9 +1647,11 @@ theorem MethodCertificate.selects {program : CheckedProgram}
   have methodsProduced := requirements_produce signatures ledger assumptions resolved
     receipt.roots.methodsSelected receipt.roots.methodsValid
   have methodsGoals : receipt.roots.methodEvidence.map SourceCompilationPlan.runtimeEvidenceGoal =
-      receipt.selected.declaration.wherePredicates.map
+      (SourceSemantics.dispatchPredicates receipt.selected.trait receipt.selected.implementation
+          receipt.selected.declaration).map
         (ProgramPredicate.applyParameters method.specialized.parameterSubstitution) := by
-    rw [← receipt.roots.methods, receipt.selected.methodsGoals, receipt.selected.method_predicates formed]
+    rw [← receipt.roots.methods, receipt.selected.methodsGoals, receipt.selected.method_predicates formed,
+      receipt.selected.dispatch]
   rw [methodsGoals] at methodsProduced
   have assembled := (CallableCoercionEvidenceOrigins.roots_origins receipt.roots covered resolved
     (CallableCoercionEvidenceOrigins.materialized_operator materialized)).1

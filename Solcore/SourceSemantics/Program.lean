@@ -657,8 +657,10 @@ structure ImplMethodSignatureWellFormed (signatures : ProgramSignatures)
       methodSignature.returnTypes.map substitution.apply ∧
     method.parameterComptime = methodSignature.parameterComptime ∧
     method.returnComptime = methodSignature.returnComptime ∧
-    method.wherePredicates = methodSignature.wherePredicates.map
-      (ProgramPredicate.applyParameters substitution)
+    ∀ predicate, predicate ∈ method.wherePredicates →
+      predicate ∈ methodSignature.wherePredicates.map
+        (ProgramPredicate.applyParameters substitution) ++
+          implementation.wherePredicates
   parameter_names_nodup : method.parameterNames.Nodup
   parameter_types : TypesWellFormed
     (signatureContext signatures implementation.id implementation.parameters
@@ -772,6 +774,22 @@ def methodAssumptions (trait : ProgramTraitSignature)
     (implementation : ProgramImplementationSignature)
     (method : ProgramImplMethodSignature) : List ProgramPredicate :=
   implementation.methodAssumptions trait method
+
+/-- The predicates that a caller proves for a call answered by an
+implementation method: the where predicates of its trait method, the trait's
+method of the same name, instantiated at the implementation head.  The method's
+own predicates are among these and the implementation's, so its dictionary is
+assembled from the caller's evidence and the implementation's premises. -/
+def dispatchPredicates (trait : ProgramTraitSignature)
+    (implementation : ProgramImplementationSignature)
+    (method : ProgramImplMethodSignature) : List ProgramPredicate :=
+  match trait.methods.find? fun traitMethod =>
+      traitMethod.name == method.name with
+  | some traitMethod => traitMethod.wherePredicates.map
+      (ProgramPredicate.applyParameters
+        (trait.parameters.zip
+          (implementation.head.subject :: implementation.head.arguments)))
+  | none => []
 
 namespace FunctionDefinition
 

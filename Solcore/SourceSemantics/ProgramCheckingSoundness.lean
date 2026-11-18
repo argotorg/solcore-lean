@@ -971,8 +971,10 @@ theorem semantic_method
         methodSignature.returnTypes.map substitution.apply ∧
       method.parameterComptime = methodSignature.parameterComptime ∧
       method.returnComptime = methodSignature.returnComptime ∧
-      method.wherePredicates = methodSignature.wherePredicates.map
-        (ProgramPredicate.applyParameters substitution) := by
+      ∀ predicate, predicate ∈ method.wherePredicates →
+        predicate ∈ methodSignature.wherePredicates.map
+          (ProgramPredicate.applyParameters substitution) ++
+            implementation.wherePredicates := by
   rcases validated.trait_catalog with
     ⟨trait, traitMember, headTrait, correspondence, completeness⟩
   obtain ⟨traitMethod, traitMethodMember, traitMethodId, traitMethodName,
@@ -1229,8 +1231,16 @@ theorem implementationWellFormed
       rw [returnTypes]
       exact returnTypesWellFormed
     · change PredicatesWellFormed targetContext method.wherePredicates
-      rw [methodPredicates]
-      exact predicatesWellFormed
+      have implementationPredicatesWellFormed : PredicatesWellFormed
+          targetContext signature.wherePredicates :=
+        SignaturePredicatesFormationValidated.predicatesWellFormed
+          predicateFormation parameters
+          (signature.wherePredicates ++ method.wherePredicates)
+      intro predicate predicateMember
+      rcases List.mem_append.mp (methodPredicates predicate predicateMember) with
+        traitMember | implementationMember
+      · exact predicatesWellFormed predicate traitMember
+      · exact implementationPredicatesWellFormed predicate implementationMember
   · intro catalogTrait method catalogTraitMember catalogHeadTrait methodMember
     exact
       ImplementationSignatureMethodCatalogValidated.semantic_methods_complete

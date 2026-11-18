@@ -533,7 +533,9 @@ structure ImplementationSignatureHeadValidated
 /-- Method-to-trait correspondence fixed by required-method validation and
 trait-method attachment.  Completeness is stated for the exact trait selected
 while collecting the implementation; catalog-wide trait identity uniqueness
-allows later semantic consumers to transport it to any equal-headed entry. -/
+allows later semantic consumers to transport it to any equal-headed entry.
+Each method's predicates are among its trait method's, instantiated at the
+head, and the implementation's own. -/
 structure ImplementationSignatureMethodCatalogValidated
     (traits : List ProgramTraitSignature)
     (signature : ProgramImplementationSignature) : Prop where
@@ -552,8 +554,10 @@ structure ImplementationSignatureMethodCatalogValidated
           traitMethod.returnTypes.map substitution.apply ∧
         method.parameterComptime = traitMethod.parameterComptime ∧
         method.returnComptime = traitMethod.returnComptime ∧
-        method.wherePredicates = traitMethod.wherePredicates.map
-          (ProgramPredicate.applyParameters substitution)) ∧
+        ∀ predicate, predicate ∈ method.wherePredicates →
+          predicate ∈ traitMethod.wherePredicates.map
+            (ProgramPredicate.applyParameters substitution) ++
+              signature.wherePredicates) ∧
     (∀ traitMethod, traitMethod ∈ trait.methods →
       ∃ method ∈ signature.methods, method.traitMethod = traitMethod.id)
 
@@ -863,9 +867,9 @@ inductive ProgramSignatureError where
       (method : ProgramImplMethodId) (traitMethod : ProgramTraitMethodId)
       (expectedParameters actualParameters : List Bool)
       (expectedReturn actualReturn : Bool)
-  | implMethodPredicateMismatch
+  | implMethodUndeclaredPredicate
       (method : ProgramImplMethodId) (traitMethod : ProgramTraitMethodId)
-      (expected actual : List ProgramPredicate)
+      (predicate : ProgramPredicate)
   | traitCatalogUnavailable
       (implementation trait : Resolved.DeclarationId)
   | implementationParameterNotInHead
@@ -899,7 +903,7 @@ private def programSignatureErrorDeclaration :
   | .extraImplMethod method _ => method.implementation
   | .implMethodSignatureMismatch method _ _ _ _ _ => method.implementation
   | .implMethodComptimeMismatch method _ _ _ _ _ => method.implementation
-  | .implMethodPredicateMismatch method _ _ _ => method.implementation
+  | .implMethodUndeclaredPredicate method _ _ => method.implementation
   | .traitCatalogUnavailable implementation _ => implementation
   | .implementationParameterNotInHead implementation _ => implementation
   | .missingImplementationTraitPredicate implementation _ => implementation
@@ -1557,10 +1561,12 @@ private def parameterComptime
 
 end UnmatchedProgramImplMethod
 
-/-- The exact signature comparison performed before an implementation method
-is attached to its selected trait method identity. -/
+/-- The signature comparison performed before an implementation method is
+attached to its selected trait method identity: an exact shape, and only
+predicates that its callers or its implementation provide. -/
 private structure UnmatchedImplMethodMatchesTrait
     (substitution : TypeSystem.ParameterSubstitution)
+    (implementationPredicates : List ProgramPredicate)
     (traitMethod : ProgramTraitMethodSignature)
     (implMethod : UnmatchedProgramImplMethod) : Prop where
   name : traitMethod.name = implMethod.name
@@ -1571,8 +1577,9 @@ private structure UnmatchedImplMethodMatchesTrait
   parameter_comptime : implMethod.parameterComptime =
     traitMethod.parameterComptime
   return_comptime : implMethod.returnComptime = traitMethod.returnComptime
-  predicates : implMethod.wherePredicates = traitMethod.wherePredicates.map
-    (ProgramPredicate.applyParameters substitution)
+  predicates : ∀ predicate, predicate ∈ implMethod.wherePredicates →
+    predicate ∈ traitMethod.wherePredicates.map
+      (ProgramPredicate.applyParameters substitution) ++ implementationPredicates
 
 /-- Two members of a list with duplicate-free projected keys and the same key
 are the same retained value. -/
@@ -1750,9 +1757,49 @@ private theorem unmatchedImplMethodsOfDeclaration_success_structure
                       · exact restStructure.method_parameter_names_nodup method
                           member
 
+/-- Check a source-ordered list of required values against an available list,
+returning the caller-provided error for the first missing value. -/
+private def validateContained {value : Type} [DecidableEq value]
+    (missing : value → ProgramSignatureError) (available : List value) :
+    List value → Except ProgramSignatureError Unit
+  | [] => .ok ()
+  | value :: rest =>
+      if value ∈ available then
+        validateContained missing available rest
+      else
+        .error (missing value)
+
+/-- Successful containment validation is an exact subset witness. -/
+private theorem validateContained_success
+    {value : Type} [DecidableEq value]
+    {missing : value → ProgramSignatureError}
+    {available required : List value}
+    (success : validateContained missing available required = .ok ()) :
+    ∀ candidate, candidate ∈ required → candidate ∈ available := by
+  induction required with
+  | nil => simp
+  | cons head tail induction =>
+      simp only [validateContained] at success
+      by_cases member : head ∈ available
+      · simp only [member, if_true] at success
+        intro candidate candidateMember
+        simp only [List.mem_cons] at candidateMember
+        rcases candidateMember with rfl | candidateMember
+        · exact member
+        · exact induction success candidate candidateMember
+      · simp [member] at success
+
+/-- Each trait method needs one implementation method of the same
+instantiated shape. Its predicates must be among those that are provided, as
+upstream checks with `SC0249`: a caller proves the trait method's predicates,
+instantiated at the head, and the implementation adds its own, which contain
+the trait's instantiated where predicates. The rule is membership, so an
+omitted, reordered, repeated or restated predicate is accepted, while one that
+only follows from the provided predicates is refused. -/
 private def validateRequiredImplMethods
     (implementation : Resolved.DeclarationId)
-    (substitution : TypeSystem.ParameterSubstitution) :
+    (substitution : TypeSystem.ParameterSubstitution)
+    (implementationPredicates : List ProgramPredicate) :
     List ProgramTraitMethodSignature → List UnmatchedProgramImplMethod →
       Except ProgramSignatureError Unit
   | [], _ => .ok ()
@@ -1763,17 +1810,19 @@ private def validateRequiredImplMethods
       let expectedParameters :=
         traitMethod.parameterTypes.map substitution.apply
       let expectedReturns := traitMethod.returnTypes.map substitution.apply
-      let expectedPredicates := traitMethod.wherePredicates.map
-        (ProgramPredicate.applyParameters substitution)
       if expectedParameters = implMethod.parameterTypes &&
           expectedReturns = implMethod.returnTypes then
         if traitMethod.parameterComptime = implMethod.parameterComptime &&
             traitMethod.returnComptime = implMethod.returnComptime then
-          if expectedPredicates = implMethod.wherePredicates then
-            validateRequiredImplMethods implementation substitution rest implMethods
-          else
-            throw (.implMethodPredicateMismatch implMethod.id traitMethod.id
-              expectedPredicates implMethod.wherePredicates)
+          validateContained
+            (ProgramSignatureError.implMethodUndeclaredPredicate implMethod.id
+              traitMethod.id)
+            (traitMethod.wherePredicates.map
+                (ProgramPredicate.applyParameters substitution) ++
+              implementationPredicates)
+            implMethod.wherePredicates
+          validateRequiredImplMethods implementation substitution
+            implementationPredicates rest implMethods
         else
           throw (.implMethodComptimeMismatch implMethod.id traitMethod.id
             traitMethod.parameterComptime implMethod.parameterComptime
@@ -1783,18 +1832,20 @@ private def validateRequiredImplMethods
           expectedParameters implMethod.parameterTypes
           expectedReturns implMethod.returnTypes)
 
-/-- Successful required-method validation supplies one exactly matching source
+/-- Successful required-method validation supplies one matching source
 implementation method for every trait method. -/
 private theorem validateRequiredImplMethods_success_matches
     {implementation : Resolved.DeclarationId}
     {substitution : TypeSystem.ParameterSubstitution}
+    {implementationPredicates : List ProgramPredicate}
     {traitMethods : List ProgramTraitMethodSignature}
     {implMethods : List UnmatchedProgramImplMethod}
     (success : validateRequiredImplMethods implementation substitution
-      traitMethods implMethods = .ok ()) :
+      implementationPredicates traitMethods implMethods = .ok ()) :
     ∀ traitMethod, traitMethod ∈ traitMethods →
       ∃ implMethod, implMethod ∈ implMethods ∧
-        UnmatchedImplMethodMatchesTrait substitution traitMethod implMethod := by
+        UnmatchedImplMethodMatchesTrait substitution implementationPredicates
+          traitMethod implMethod := by
   induction traitMethods with
   | nil => simp
   | cons traitMethod rest induction =>
@@ -1814,16 +1865,24 @@ private theorem validateRequiredImplMethods_success_matches
                   traitMethod.parameterComptime = implMethod.parameterComptime
               · by_cases returnComptimeEq :
                     traitMethod.returnComptime = implMethod.returnComptime
-                · by_cases predicatesEq :
-                      traitMethod.wherePredicates.map
-                          (ProgramPredicate.applyParameters substitution) =
-                        implMethod.wherePredicates
-                  · have restSuccess :
+                · cases containedEq : validateContained
+                      (ProgramSignatureError.implMethodUndeclaredPredicate
+                        implMethod.id traitMethod.id)
+                      (traitMethod.wherePredicates.map
+                          (ProgramPredicate.applyParameters substitution) ++
+                        implementationPredicates)
+                      implMethod.wherePredicates with
+                  | error error =>
+                      simp [parameterTypesEq, returnTypesEq,
+                        parameterComptimeEq, returnComptimeEq, containedEq,
+                        bind, Except.bind] at success
+                  | ok checked =>
+                    have restSuccess :
                         validateRequiredImplMethods implementation substitution
-                            rest implMethods = .ok () := by
+                            implementationPredicates rest implMethods = .ok () := by
                       simpa [parameterTypesEq, returnTypesEq,
-                        parameterComptimeEq, returnComptimeEq, predicatesEq]
-                        using success
+                        parameterComptimeEq, returnComptimeEq, containedEq,
+                        bind, Except.bind] using success
                     intro candidate member
                     simp only [List.mem_cons] at member
                     rcases member with rfl | member
@@ -1832,18 +1891,16 @@ private theorem validateRequiredImplMethods_success_matches
                       have nameEq : implMethod.name = candidate.name := by
                         have accepted := List.find?_some foundEq
                         simpa using accepted
+                      cases checked
                       exact ⟨implMethod, implMember, {
                         name := nameEq.symm
                         parameter_types := parameterTypesEq.symm
                         return_types := returnTypesEq.symm
                         parameter_comptime := parameterComptimeEq.symm
                         return_comptime := returnComptimeEq.symm
-                        predicates := predicatesEq.symm
+                        predicates := validateContained_success containedEq
                       }⟩
                     · exact induction restSuccess candidate member
-                  · simp [parameterTypesEq, returnTypesEq,
-                      parameterComptimeEq, returnComptimeEq, predicatesEq]
-                      at success
                 · simp [parameterTypesEq, returnTypesEq,
                     parameterComptimeEq, returnComptimeEq] at success
               · simp [parameterTypesEq, returnTypesEq, parameterComptimeEq]
@@ -2045,9 +2102,11 @@ private theorem attachTraitMethods_success_structure
               · simp [restResult.2]
 
 /-- Exact method correspondence and completeness for one selected trait after
-required-method validation and identity attachment. -/
+required-method validation and identity attachment. Each method's predicates
+are among its trait method's instantiated ones and the implementation's. -/
 private structure ImplMethodCatalogMatchesTrait
     (substitution : TypeSystem.ParameterSubstitution)
+    (implementationPredicates : List ProgramPredicate)
     (trait : ProgramTraitSignature)
     (resolvedMethods : List ProgramImplMethodSignature) : Prop where
   method_correspondence : ∀ method, method ∈ resolvedMethods →
@@ -2060,8 +2119,10 @@ private structure ImplMethodCatalogMatchesTrait
         traitMethod.returnTypes.map substitution.apply ∧
       method.parameterComptime = traitMethod.parameterComptime ∧
       method.returnComptime = traitMethod.returnComptime ∧
-      method.wherePredicates = traitMethod.wherePredicates.map
-        (ProgramPredicate.applyParameters substitution)
+      ∀ predicate, predicate ∈ method.wherePredicates →
+        predicate ∈ traitMethod.wherePredicates.map
+          (ProgramPredicate.applyParameters substitution) ++
+            implementationPredicates
   complete : ∀ traitMethod, traitMethod ∈ trait.methods →
     ∃ method ∈ resolvedMethods, method.traitMethod = traitMethod.id
 
@@ -2071,6 +2132,7 @@ independent name lookups in opposite directions. -/
 private theorem validatedAndAttachedImplMethods_matchTrait
     {implementation : Resolved.DeclarationId}
     {substitution : TypeSystem.ParameterSubstitution}
+    {implementationPredicates : List ProgramPredicate}
     {trait : ProgramTraitSignature}
     {unmatchedMethods : List UnmatchedProgramImplMethod}
     {methods : List ProgramImplMethodSignature}
@@ -2078,9 +2140,10 @@ private theorem validatedAndAttachedImplMethods_matchTrait
     (unmatchedStructure : UnmatchedImplMethodsStructural implementation 0 []
       unmatchedMethods)
     (validated : validateRequiredImplMethods implementation substitution
-      trait.methods unmatchedMethods = .ok ())
+      implementationPredicates trait.methods unmatchedMethods = .ok ())
     (attached : attachTraitMethods trait.methods unmatchedMethods = .ok methods) :
-    ImplMethodCatalogMatchesTrait substitution trait methods := by
+    ImplMethodCatalogMatchesTrait substitution implementationPredicates trait
+      methods := by
   have required := validateRequiredImplMethods_success_matches validated
   have correspondence := attachTraitMethods_success_correspondence attached
   constructor
@@ -2113,7 +2176,8 @@ private theorem validatedAndAttachedImplMethods_matchTrait
             UnmatchedProgramImplMethod.parameterComptime, methodParameters]
         _ = traitMethod.parameterComptime := methodMatch.parameter_comptime
     · exact methodReturnComptime.trans methodMatch.return_comptime
-    · exact methodPredicates.trans methodMatch.predicates
+    · intro predicate member
+      exact methodMatch.predicates predicate (methodPredicates ▸ member)
   · intro traitMethod traitMethodMember
     obtain ⟨unmatched, unmatchedMember, methodMatch⟩ :=
       required traitMethod traitMethodMember
@@ -2129,38 +2193,6 @@ private theorem validatedAndAttachedImplMethods_matchTrait
         (selectedName.trans methodMatch.name.symm)
     subst selected
     exact ⟨method, methodMember, selectedId⟩
-
-/-- Check a source-ordered list of required values against an available list,
-returning the caller-provided error for the first missing value. -/
-private def validateContained {value : Type} [DecidableEq value]
-    (missing : value → ProgramSignatureError) (available : List value) :
-    List value → Except ProgramSignatureError Unit
-  | [] => .ok ()
-  | value :: rest =>
-      if value ∈ available then
-        validateContained missing available rest
-      else
-        .error (missing value)
-
-/-- Successful containment validation is an exact subset witness. -/
-private theorem validateContained_success
-    {value : Type} [DecidableEq value]
-    {missing : value → ProgramSignatureError}
-    {available required : List value}
-    (success : validateContained missing available required = .ok ()) :
-    ∀ candidate, candidate ∈ required → candidate ∈ available := by
-  induction required with
-  | nil => simp
-  | cons head tail induction =>
-      simp only [validateContained] at success
-      by_cases member : head ∈ available
-      · simp only [member, if_true] at success
-        intro candidate candidateMember
-        simp only [List.mem_cons] at candidateMember
-        rcases candidateMember with rfl | candidateMember
-        · exact member
-        · exact induction success candidate candidateMember
-      · simp [member] at success
 
 private def implementationSignatureOfDeclaration
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
@@ -2197,7 +2229,7 @@ private def implementationSignatureOfDeclaration
     wherePredicates requiredPredicates
   let unmatchedMethods ← unmatchedImplMethodsOfDeclaration environment
     declaration scope source.value.methods 0 []
-  validateRequiredImplMethods declaration.id substitution
+  validateRequiredImplMethods declaration.id substitution wherePredicates
     traitSignature.methods unmatchedMethods
   let methods ← attachTraitMethods traitSignature.methods unmatchedMethods
   pure {
@@ -2850,15 +2882,16 @@ private theorem implementationSignatureOfDeclaration_success_method_catalog
                 have validationFacts : Except.SuccessSatisfies
                     (fun _ : Unit =>
                       validateRequiredImplMethods declaration.id substitution
-                        traitSignature.methods unmatchedMethods = .ok ())
+                        wherePredicates traitSignature.methods unmatchedMethods =
+                          .ok ())
                     (validateRequiredImplMethods declaration.id substitution
-                      traitSignature.methods unmatchedMethods) :=
+                      wherePredicates traitSignature.methods unmatchedMethods) :=
                   Except.SuccessSatisfies.of_success _ (fun result resultEq => by
                     cases result
                     exact resultEq)
                 apply Except.SuccessSatisfies.bind_property
                   (validateRequiredImplMethods declaration.id substitution
-                    traitSignature.methods unmatchedMethods) _
+                    wherePredicates traitSignature.methods unmatchedMethods) _
                   validationFacts
                 intro methodsChecked validationSuccess
                 cases methodsChecked
