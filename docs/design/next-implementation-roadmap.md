@@ -42,7 +42,7 @@ obligations. None follows from agreement in a test corpus.
 - **Source emitter proofs** for fifteen emitters
   ([source emitter meaning](scalar-emitter-meaning.md)).
 - **The re-pin to `e2eef194`** (`4da119798`). It found no new upstream defect.
-- **Upstream rows 1 to 5 and 7** in Lean, row 4 for memory arrays in functions: see
+- **Upstream rows 1 to 7** in Lean, row 4 for memory arrays in functions: see
   [the upstream table](#following-upstreams-semantics-the-next-units).
 - **Closures capture by value** (solcore-rs #120), in Lean and in the closure capture and closure
   factory profiles ([source semantics](../guide/source-semantics.md#closures-capture-by-value)).
@@ -54,11 +54,11 @@ obligations. None follows from agreement in a test corpus.
   ([Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal)).
   - Done: statement closure over the actual compiler tree; a first expression subset and
     statement shape for named rows, connected to the unchanged public root; one concrete instance
-    (`AcceptedTick` in `Generalized/Export`); direct calls at any expression position, closed by
-    one size induction over a family of rows; call authority from a complete inventory; and the
-    public root in both directions for call-containing rows (`CellAwarePublicAcceptedCallRoot`),
-    with their original traces lifted and instances at a call and at a nested call
-    (`Accepted/OneCall`).
+    (`AcceptedTick` in `Generalized/Export`); direct calls and the conversions of a word at any
+    expression position, closed by one size induction over a family of rows; call authority from
+    a complete inventory; and the public root in both directions for call-containing rows
+    (`CellAwarePublicAcceptedCallRoot`), with their original traces lifted and instances at a
+    call, a nested call and a conversion (`Accepted/OneCall`).
   - Remaining: the remaining expression and statement forms, fault lifting, a richer instance
     and chained public calls.
 - **Hull public connections** ([Hull meaning preservation](hull-meaning-preservation.md)).
@@ -71,8 +71,8 @@ obligations. None follows from agreement in a test corpus.
   - Remaining: further state operations, ECRECOVER and P256VERIFY, init frames and public
     deployment, the rest of inline Yul, object linking, and then divergence and reverse
     correspondence.
-- **Upstream row 6**: upstream's check for non-regular recursive layouts, so that Lean refuses
-  them at once ([the upstream table](#following-upstreams-semantics-the-next-units)).
+- **A check of solcore-rs main past `e2eef194`** for a re-pin, first up to `d1b5ac28`: what
+  upstream changed and what Lean would need to follow it.
 
 ### Open
 
@@ -109,31 +109,31 @@ The last two are recorded without investigation, and the generators avoid them.
 
 ### Now
 
-1. **Row 6 of the upstream table**: upstream's check for non-regular recursive layouts, so that
-   they are refused at once. Q006 and a bound on a type's size are done, and Lean keeps
-   accepting the recursive layouts that `SC0420` refuses.
-2. **Meaning proofs.** Row 1's leftovers: the conversions, then compound assignments and in-place
-   `~` at the twelve types ([what remains](integer-types-unchecked-shifts.md#what-remains)). Then
-   the rest of native Source goal two.
+1. **A check of solcore-rs main past `e2eef194`**, for a re-pin: a survey of upstream's changes
+   up to `d1b5ac28`, which is cloned locally, and of the steps Lean would need. Rows 1 to 7 of
+   the upstream table are done.
+2. **Meaning proofs.** Row 1's leftovers: `Typedef.rep` at the twelve types, after a fix to the
+   Source semantics, which also faults there; then compound assignments and in-place `~` at
+   the twelve types ([what remains](integer-types-unchecked-shifts.md#what-remains)). Then the
+   rest of native Source goal two.
 3. **Lean's native frontend as a fourth differential path.** The survey is done. It recommends a
    harness that runs admitted pure cases through the native pipeline first, then native
    `std.opcodes`. Not started.
 
 ### Then
 
-4. A check of solcore-rs main past `e2eef194`, for a re-pin.
-5. Row 4 in the meaning proofs: a unit that relates array objects to their Core cells
+4. Row 4 in the meaning proofs: a unit that relates array objects to their Core cells
    ([decision 6](memory-arrays-slices.md#6-meaning-proofs)).
-6. The remaining Hull public connections and emitter proofs.
-7. Deferred type resolution at finalization. It would lift row 4's differences 14, 15, 18, 19 and
+5. The remaining Hull public connections and emitter proofs.
+6. Deferred type resolution at finalization. It would lift row 4's differences 14, 15, 18, 19 and
    22 to 24 and the open `Typedef` call. It is unscheduled.
 
 ### Later
 
-8. The fuzzing leftovers.
-9. Generic code over the twelve integer types, `where` with builtin `Int`, `comptime<T>` locals and
+7. The fuzzing leftovers.
+8. Generic code over the twelve integer types, `where` with builtin `Int`, `comptime<T>` locals and
    contract storage at the twelve types.
-10. Storage and calldata arrays, which first need native contract storage and a calldata ABI.
+9. Storage and calldata arrays, which first need native contract storage and a calldata ABI.
 
 CI has no passing hosted run, and its automatic triggers are disabled: the
 [workflow](../../.github/workflows/semantic.yml) runs only on manual dispatch.
@@ -156,12 +156,12 @@ code.
 
 | Row | Upstream change | Status | Fixtures |
 | ---: | --- | --- | --- |
-| 1 | Checked integer types and literal defaulting (#95): `uint8` to `uint256` and `int8` to `int256`, checked `+ - * / %` that panic with `0x11` or `0x12`, unary negation, range-checked literals, ABI validation of narrow integers, and an unconstrained literal defaulting to `uint256` instead of `word` | **Done.** The twelve types are builtins with comparisons, bitwise operators, checked and unchecked arithmetic, shifts and their compound forms, range-checked literals, the `uint256` default, the constructors from `word`, and `Typedef.abs` and `Typedef.rep` where the call's type is known. Compound assignments, in-place `~` and the conversions at the twelve types are compiled but outside the meaning proofs, and four differences from upstream remain ([integer note](integer-types-unchecked-shifts.md#semantics-in-lean), [differences](integer-types-unchecked-shifts.md#differences-from-upstream)). | `checked-arith`, `int-ops`, `issue92-checked-defaults`, `shift-operators`, `mini-erc20`, `deposit` |
+| 1 | Checked integer types and literal defaulting (#95): `uint8` to `uint256` and `int8` to `int256`, checked `+ - * / %` that panic with `0x11` or `0x12`, unary negation, range-checked literals, ABI validation of narrow integers, and an unconstrained literal defaulting to `uint256` instead of `word` | **Done.** The twelve types are builtins with comparisons, bitwise operators, checked and unchecked arithmetic, shifts and their compound forms, range-checked literals, the `uint256` default, the constructors from `word`, and `Typedef.abs` and `Typedef.rep` where the call's type is known. Compound assignments, in-place `~` and `Typedef.rep` at the twelve types are compiled but outside the meaning proofs, and four differences from upstream remain ([integer note](integer-types-unchecked-shifts.md#semantics-in-lean), [differences](integer-types-unchecked-shifts.md#differences-from-upstream)). | `checked-arith`, `int-ops`, `issue92-checked-defaults`, `shift-operators`, `mini-erc20`, `deposit` |
 | 2 | `unchecked` blocks (#119): `+ - * / %` inside a block resolve to `std.unchecked`'s wrapping instances, lexically | **Done** for `word` and the twelve types. `+ - * / %` and their compound forms wrap to the type's width, and `/ %` panic with `0x12` on a zero divisor ([unchecked blocks](integer-types-unchecked-shifts.md#unchecked-blocks-as-implemented)). | `unchecked-scope`, `shift-operators` |
 | 3 | Shift operators (#129): `<<` and `>>` with `Shl`, `Shr` and `ShiftAmount`, arithmetic `>>` for signed types, no revert, amounts of at least the width giving 0 or -1 | **Done** for `word` and the twelve types: `<<`, `>>`, `<<=` and `>>=` by a `word` or unsigned amount ([shifts](integer-types-unchecked-shifts.md#shifts-as-implemented)). | `shift-operators` |
 | 4 | Memory arrays, slices and panic codes (#145): `T[]`, `new T[](n)` zeroed, `a.length` and methods on any receiver, `a[i]` through a checked `memref`, read-only slices `a[s:e]`, memory arrays in the public ABI, `Panic(0x32)` for indices and slice bounds, `Panic(0x31)` for an empty pop, `Panic(0x41)` for allocation overflow | **Done for memory arrays in functions.** `T[]`, `new`, literals, reads, element writes and compound assignments, lengths, slices, `toArray(s)`, `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` are typed, have their source semantics and compile through the compatible profile, outside the meaning proofs. A compound assignment evaluates its element place once, by the user's decision, where upstream evaluates it twice. Storage and calldata arrays and `T[]` in the ABI wait for native contract storage and a calldata ABI ([memory arrays note](memory-arrays-slices.md), [differences](memory-arrays-slices.md#differences-from-upstream-that-lean-would-keep)). | `array-syntax`, `mem-array`, `array-slice`, `calldata-slice`, `memory-array-abi`, `user-collection-index`, `memory-allocation-bounds`, `allocator-bounds`, `abi-sum-padding`, `array-ops` |
 | 5 | `pragma solcore;` (#141): required first in every file, once, without arguments | **Done.** Every emitter prints the pragma. Lean's loader rejects a file without it, with it after another declaration, twice, or with arguments, as upstream's `SC0002` does; the parser reads it as an ordinary pragma. | every fixture |
-| 6 | Compiler fixes #130 to #133: recursive layouts rejected with `SC0420`, canonical ABI outputs of memory dynamic arrays, frontend diagnostics before specialization, inline Yul calls to Hull functions qualified with `usr$` | **In progress.** The recursive-layout gate and the records of the three fixtures that Q008 and Q010 admitted follow upstream, and the importer accepts a plain-name Hull call from inline Yul as upstream's checker resolves it (Q006). Lean keeps accepting and running the recursive layouts that upstream's backends refuse with `SC0420`, a limit of their lowering rather than of the language. Lean's catalogs refuse a nominal instantiation of more than 4096 nodes, the default of upstream's `--pe-max-type-nodes`, which upstream applies only where it specializes; a non-regular layout whose type doubles at each level is thus refused at once. Left: refusing the other non-regular layouts at once, which Lean's compile refuses when its fuel runs out. | `storage-array`, `ufcs-array`, `module-local-function-evidence`, `storage-adt-recursive-ok`, `asm-substitution` |
+| 6 | Compiler fixes #130 to #133: recursive layouts rejected with `SC0420`, canonical ABI outputs of memory dynamic arrays, frontend diagnostics before specialization, inline Yul calls to Hull functions qualified with `usr$` | **Done.** The recursive-layout gate and the records of the three fixtures that Q008 and Q010 admitted follow upstream, and the importer accepts a plain-name Hull call from inline Yul as upstream's checker resolves it (Q006). Lean's catalogs refuse a non-regular recursive layout at once, as upstream's Hull emitter does with `SC0420`, and a nominal instantiation of more than 4096 nodes, the default of upstream's `--pe-max-type-nodes`, which upstream applies only where it specializes. Lean keeps accepting and running the regular recursive layouts that upstream's backends refuse with `SC0420`, a limit of their lowering rather than of the language, and the mutually recursive data types that upstream's name resolution refuses for now (`SC0203`). | `storage-array`, `ufcs-array`, `module-local-function-evidence`, `storage-adt-recursive-ok`, `asm-substitution` |
 | 7 | Closure factories (`bf7114a8`, `ad1f49cf`): captures resolved in the factory's own scope, a factory's runtime effects kept | **Done where the native pipeline runs the fixture.** Captures resolve in the factory's own scope, and a factory's body runs when it is called, as upstream now does; Lean's typing, source semantics and lowering needed no change. Calls that use contract storage or inline assembly wait for them ([closures](../guide/source-semantics.md#closures-capture-by-value)). | `closure-parameters` (36 → 49 calls) |
 | — | `msgSender` (#142) and contract-declared struct state (#138) | **Nothing to do.** #142 uses std's existing `msgSender` in examples, and #138 changes only examples. | `msg-context` |
 

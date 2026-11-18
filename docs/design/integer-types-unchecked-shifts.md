@@ -162,8 +162,9 @@ rejected before the body runs, as a data-conversion error: the counterpart of st
 **Unchanged:** Core, the Hull importer and the shared contract runtime.
 
 **Meaning proofs.** The operators, literals, unary minus and `case uint256(p)` at the twelve types
-are inside the meaning proofs. Compound assignments and in-place `~` at fixed-width targets, and
-the conversions, are compiled but outside them.
+are inside the meaning proofs, and so, on the accepted-body route, are the conversions of a word.
+Compound assignments and in-place `~` at fixed-width targets, and `Typedef.rep` at the twelve
+types, are compiled but outside them.
 
 **Tests.** `Tests.SourceCoreShiftExecution` and `Tests.SourceCoreUncheckedExecution` run shifts
 and blocks through the public API. `runUpstreamFixtures` in `Tests.SourceCoreFixedIntegerOperators`
@@ -524,12 +525,13 @@ Chosen by the user, option (a). The rule for `Typedef` is option B.
   fault-site tables allocate below it. The decoder gives `RuntimeError.dirtyHigherBitsForInteger`,
   and `SourceCorePanics.dirtyRevertData` is upstream's `0x6cc54a63`. It is a Frontend convention,
   as the panics are.
-- **Outside the closed subset.** Builtin calls are proved through `InputRep`, which has no
-  conversion, and the builtin-call inversion (`BuiltinCalls.call_of_accepted`) takes
-  `function.conversion? = none`. `FaultTokens` has no law for the revert yet, since no proof reads
-  it. **Bringing them in** would take a builtin profile with the dirty reason's token, which adds
-  that law. `case uint256(p)` needs no exclusion: the pattern proofs take it as `p` at the value's
-  word (`Tree.uint256Word`).
+- **In the meaning proofs.** On the accepted-body route a conversion of a word is a nested site,
+  with the revert's token law (`CellAwareInvocationAcceptedConversionFaults.DirtyToken`); the
+  older families' builtin calls still exclude conversions (`function.conversion? = none`).
+  `Typedef.rep` at the twelve types stays out: the Source semantics also derives a type mismatch
+  there, since it compares a fixed-width value's runtime type, `word`, with the parameter type.
+  `case uint256(p)` needs no exclusion: the pattern proofs take it as `p` at the value's word
+  (`Tree.uint256Word`).
 
 ## Differences from upstream
 
@@ -578,7 +580,7 @@ struct types, such as `case uint8(w)`, are rejected as upstream rejects them.
     divisor (`DivisorPasses`), and the unchecked and shift forms wrap the leaf (`placeWrap`); the
     note lists nothing further for them;
   - in-place `~` at fixed-width targets, whose compiler profiles take only a `Word` target;
-  - the conversions, which need a builtin profile with the dirty reason's token.
+  - `Typedef.rep` at the twelve types, where the Source semantics also derives a type mismatch.
 - **Deferred `Typedef` resolution** at finalization (option A). It is not scheduled.
 - **`where` with the builtin `Int`**, a frontend gap older than row 1.
 - **Generic code**, such as `Typedef`'s identity at other types, which row 1 leaves out.
