@@ -309,7 +309,7 @@ setter sees the RHS store, and the write follows all setter administrative
 allocations. No source-expression phase is repeated. -/
 theorem execute_success {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
     {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand : Word}
-    {environment : Environment} {before keyStore snapshotStore rhsStore modifiedStore setterStore written finalStore : Store}
+    {wrap : Option TypeSystem.FixedInteger} {environment : Environment} {before keyStore snapshotStore rhsStore modifiedStore setterStore written finalStore : Store}
     {location : Location} {keyValue snapshot right changed updated old result : Value}
     (referenceSelected : DataEquality.Selects environment reference (.cellRef (OptionalCell.cellType prepared.route.rootType) location))
     (keysEvaluated : Evaluates (referenceEnvironment prepared.route.rootType location environment) before
@@ -319,22 +319,28 @@ theorem execute_success {prepared : Prepared} {reference rhs next : Expr} {keys 
     (rhsEvaluated : Evaluates (snapshotEnvironment prepared.route.rootType location keyValue snapshot environment) snapshotStore
       (shift 3 rhs) (.inRight .word right) rhsStore)
     (modifiedEvaluated : Evaluates (rhsEnvironment prepared.route.rootType location keyValue snapshot right environment) rhsStore
-      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalidOperand) (.inRight .word changed) modifiedStore)
+      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalidOperand wrap) (.inRight .word changed) modifiedStore)
     (setterEvaluated : Evaluates (modifiedEnvironment prepared.route.rootType location keyValue snapshot right changed environment) modifiedStore
       (.apply (setter prepared keys.type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0)))) (.inRight .word updated) setterStore)
-    (passes : Passes operator right)
+    (guarded : ∀ {result : Value} {finalStore : Store},
+      Evaluates (updated :: modifiedEnvironment prepared.route.rootType location keyValue snapshot right changed environment)
+        setterStore (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next)) result finalStore →
+      Evaluates (updated :: modifiedEnvironment prepared.route.rootType location keyValue snapshot right changed environment)
+        setterStore (guard outputType operator (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next)))
+        result finalStore)
     (read : setterStore.read? location = some old)
     (write : setterStore.write? location (.inRight .unit updated) = some written)
     (nextEvaluated : Evaluates (writtenEnvironment prepared.route.rootType location keyValue snapshot right changed updated environment)
       written (shift 7 next) result finalStore) :
-    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand) result finalStore := by
+    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand wrap)
+      result finalStore := by
   exact .letE (referenceSelected.evaluates before)
     (LanguageResult.bind_success _ keysEvaluated
       (LanguageResult.bind_success _ snapshotEvaluated
         (LanguageResult.bind_success _ rhsEvaluated
           (LanguageResult.bind_success _ modifiedEvaluated
             (LanguageResult.bind_success _ setterEvaluated
-              (guard_passes passes (.letE (.storeCell (.var rfl) read (.inRight (.var rfl)) write) nextEvaluated)))))))
+              (guarded (.letE (.storeCell (.var rfl) read (.inRight (.var rfl)) write) nextEvaluated)))))))
 
 /-- A panicking modifier with a zero right-hand side fails after the
 structural update, with the setter's store and no write. -/
@@ -368,16 +374,18 @@ theorem execute_panic {prepared : Prepared} {reference rhs next : Expr} {keys : 
 continuation. Each premise is for the actual shifted key code. -/
 theorem execute_keys_failure {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
     {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand reason : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     {environment : Environment} {before after : Store} {location : Location}
     (referenceSelected : DataEquality.Selects environment reference (.cellRef (OptionalCell.cellType prepared.route.rootType) location))
     (keysEvaluated : Evaluates (referenceEnvironment prepared.route.rootType location environment) before
       (shift 1 keys.expression) (.inLeft keys.type (.word reason)) after) :
-    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand)
+    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand wrap)
       (.inLeft outputType (.word reason)) after :=
   .letE (referenceSelected.evaluates before) (LanguageResult.bind_failure _ keysEvaluated)
 
 theorem execute_snapshot_failure {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
     {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand reason : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     {environment : Environment} {before keyStore after : Store} {location : Location} {keyValue : Value}
     (referenceSelected : DataEquality.Selects environment reference (.cellRef (OptionalCell.cellType prepared.route.rootType) location))
     (keysEvaluated : Evaluates (referenceEnvironment prepared.route.rootType location environment) before
@@ -385,13 +393,14 @@ theorem execute_snapshot_failure {prepared : Prepared} {reference rhs next : Exp
     (snapshotEvaluated : Evaluates (keysEnvironment prepared.route.rootType location keyValue environment) keyStore
       (.apply (getter prepared keys.type) (.pair (.loadCell (.var 1)) (.var 0)))
       (.inLeft prepared.optionalLeaf (.word reason)) after) :
-    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand)
+    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand wrap)
       (.inLeft outputType (.word reason)) after :=
   .letE (referenceSelected.evaluates before)
     (LanguageResult.bind_success _ keysEvaluated (LanguageResult.bind_failure _ snapshotEvaluated))
 
 theorem execute_rhs_failure {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
     {outputType rightType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand reason : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     {environment : Environment} {before keyStore snapshotStore after : Store}
     {location : Location} {keyValue snapshot : Value}
     (referenceSelected : DataEquality.Selects environment reference (.cellRef (OptionalCell.cellType prepared.route.rootType) location))
@@ -401,7 +410,7 @@ theorem execute_rhs_failure {prepared : Prepared} {reference rhs next : Expr} {k
       (.apply (getter prepared keys.type) (.pair (.loadCell (.var 1)) (.var 0))) (.inRight .word snapshot) snapshotStore)
     (rhsEvaluated : Evaluates (snapshotEnvironment prepared.route.rootType location keyValue snapshot environment) snapshotStore
       (shift 3 rhs) (.inLeft rightType (.word reason)) after) :
-    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand)
+    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand wrap)
       (.inLeft outputType (.word reason)) after :=
   .letE (referenceSelected.evaluates before)
     (LanguageResult.bind_success _ keysEvaluated
@@ -409,6 +418,7 @@ theorem execute_rhs_failure {prepared : Prepared} {reference rhs next : Expr} {k
 
 theorem execute_modified_failure {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
     {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand reason : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     {environment : Environment} {before keyStore snapshotStore rhsStore after : Store}
     {location : Location} {keyValue snapshot right : Value}
     (referenceSelected : DataEquality.Selects environment reference (.cellRef (OptionalCell.cellType prepared.route.rootType) location))
@@ -419,9 +429,9 @@ theorem execute_modified_failure {prepared : Prepared} {reference rhs next : Exp
     (rhsEvaluated : Evaluates (snapshotEnvironment prepared.route.rootType location keyValue snapshot environment) snapshotStore
       (shift 3 rhs) (.inRight .word right) rhsStore)
     (modifiedEvaluated : Evaluates (rhsEnvironment prepared.route.rootType location keyValue snapshot right environment) rhsStore
-      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalidOperand)
+      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalidOperand wrap)
       (.inLeft prepared.route.leafType (.word reason)) after) :
-    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand)
+    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand wrap)
       (.inLeft outputType (.word reason)) after :=
   .letE (referenceSelected.evaluates before)
     (LanguageResult.bind_success _ keysEvaluated
@@ -430,6 +440,7 @@ theorem execute_modified_failure {prepared : Prepared} {reference rhs next : Exp
 
 theorem execute_setter_failure {prepared : Prepared} {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
     {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand reason : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     {environment : Environment} {before keyStore snapshotStore rhsStore modifiedStore after : Store}
     {location : Location} {keyValue snapshot right changed : Value}
     (referenceSelected : DataEquality.Selects environment reference (.cellRef (OptionalCell.cellType prepared.route.rootType) location))
@@ -440,11 +451,11 @@ theorem execute_setter_failure {prepared : Prepared} {reference rhs next : Expr}
     (rhsEvaluated : Evaluates (snapshotEnvironment prepared.route.rootType location keyValue snapshot environment) snapshotStore
       (shift 3 rhs) (.inRight .word right) rhsStore)
     (modifiedEvaluated : Evaluates (rhsEnvironment prepared.route.rootType location keyValue snapshot right environment) rhsStore
-      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalidOperand) (.inRight .word changed) modifiedStore)
+      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalidOperand wrap) (.inRight .word changed) modifiedStore)
     (setterEvaluated : Evaluates (modifiedEnvironment prepared.route.rootType location keyValue snapshot right changed environment) modifiedStore
       (.apply (setter prepared keys.type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
       (.inLeft prepared.route.rootType (.word reason)) after) :
-    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand)
+    Evaluates environment before (execute prepared reference keys rhs next outputType operator bitNot invalidOperand wrap)
       (.inLeft outputType (.word reason)) after :=
   .letE (referenceSelected.evaluates before)
     (LanguageResult.bind_success _ keysEvaluated
@@ -569,7 +580,8 @@ theorem keys_fault {checked : SourceCoreDataCatalog.Checked} {signatures : Progr
       Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before assignment.target operator rhsId reason after ∧
       Evaluates coreEnvironment store
         (execute prepared (.var index) (SourceCoreCalls.packArguments codes) rhs next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand)
+          (assignmentModifier assignment.target.type (prepared.route.leafType = .integer) operator) false invalidOperand
+          (placeWrap assignment.target.type operator false))
         (.inLeft outputType (.word token)) finalStore ∧
       faults reason token ∧ GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧

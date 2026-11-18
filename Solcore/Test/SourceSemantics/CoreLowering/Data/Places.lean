@@ -129,13 +129,15 @@ private theorem resolved (program : SourceSemantics.Program) :
 private theorem not_mapping : ¬ ∃ key value, (.bool : TypeSystem.Ty) = .mapping key value := by
   intro impossible; rcases impossible with ⟨_, _, same⟩; cases same
 
-private theorem written : Dynamic.ResolvedPlaceWrites (fun _ updated => Dynamic.AssignmentValueApplies .equal none (.bool true) updated)
+private theorem written : Dynamic.ResolvedPlaceWrites
+    (fun _ updated => Dynamic.CompoundAssignmentApplies assignment.target.type .equal none (.bool true) updated)
     before target (.bool true) after :=
   .intro (.intro .head) rfl (.uninitialized (type := .bool) not_mapping)
-    (.leaf (.equal _ _)) (.intro (.intro .head) .head)
+    (.leaf (.primitive (fun _ _ checked => by cases checked) (.equal _ _))) (.intro (.intro .head) .head)
 
 private theorem complete (program : SourceSemantics.Program) : ∃ updatedValue finalStore finalMap finalWorld,
-    Dynamic.SourcePlaceAssignment program context [] source (Dynamic.AssignmentValueApplies .equal)
+    Dynamic.SourcePlaceAssignment program context [] source
+      (Dynamic.CompoundAssignmentApplies assignment.target.type .equal)
       sourceEnvironment before assignment.target rhs (.bool true) after ∧
     Evaluates coreEnvironment store expression (.inRight .word .unit) finalStore ∧
     ValueRep catalog signatures functions finalMap finalWorld .bool (.bool true) updatedValue .bool ∧
@@ -143,7 +145,7 @@ private theorem complete (program : SourceSemantics.Program) : ∃ updatedValue 
     LocationMap.Extends [0] finalMap ∧ WorldExtends world finalWorld ∧
     AdministrativePreserved [0] store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
   exact DataPlaceAssignmentSuccess.preserves targetLayout (meaning program) observations faithful layouts
-    (Child.literal scope) found rfl rfl (.inl rfl) (infer_sound (by decide)) environments heapRelated locals
+    (Child.literal scope) found rfl rfl (.inl (.inl rfl)) (infer_sound (by decide)) environments heapRelated locals
     rfl rfl (resolved program) (literal.source_evaluates program context [] sourceEnvironment before) written Word.zero
 
 example (program : SourceSemantics.Program) : ∃ finalStore finalMap finalWorld required,
@@ -313,12 +315,12 @@ private theorem reflected (program : SourceSemantics.Program) :
   exact DataPlaceAssignmentReflection.reflects (checked := checked) targetLayout
     (steps := []) (.nil rfl) (fuel := 5) (missing := fun _ => Word.zero) (.nil 0)
     (meaning program) functionTypes layouts observations faithful (fun _ => trivial)
-    (Child.literal scope) found rfl rfl (Or.inl rfl) trivial (infer_sound (by decide))
+    (Child.literal scope) found rfl rfl (Or.inl (Or.inl rfl)) trivial (infer_sound (by decide))
     environments heapRelated locals rfl .head (.intro .head) rfl trivial
     (runStateful_evaluation_sound ran)
 
 example (program : SourceSemantics.Program) : ∃ updated after finalMap finalWorld,
-    Dynamic.SourcePlaceAssignment program sourceContext [] source (Dynamic.AssignmentValueApplies .equal)
+    Dynamic.SourcePlaceAssignment program sourceContext [] source (Dynamic.CompoundAssignmentApplies place.type .equal)
       sourceEnvironment heap place id updated after ∧
     GenericHeap.HeapRepresents model finalMap finalWorld after finalStore ∧
     GeneralHeap.LocationMap.Extends [0] finalMap ∧ WorldExtends world finalWorld ∧
@@ -348,7 +350,7 @@ example (program : SourceSemantics.Program) : ∃ outcome after finalMap finalWo
   have assignment := DataPlaceAssignmentReflection.reflects (checked := checked) targetLayout
     (steps := []) (.nil rfl) (fuel := 5) (missing := fun _ => Word.zero) (.nil 0)
     (meaning program) functionTypes layouts observations faithful (fun _ => trivial)
-    (Child.literal scope) found rfl rfl (Or.inl rfl) trivial (infer_sound (by decide))
+    (Child.literal scope) found rfl rfl (Or.inl (Or.inl rfl)) trivial (infer_sound (by decide))
     environments heapRelated locals rfl .head (.intro .head) rfl trivial
     (runStateful_evaluation_sound ranNext)
   exact DataPlaceContinuationReflection.reflects (meaning program) (Child.literal scope) found environments locals assignment
@@ -465,7 +467,7 @@ private theorem reflected (program : SourceSemantics.Program) :
   exact DataPlaceAssignmentReflection.reflects (checked := checked) (operator := .add) (invalid := invalid) targetLayout
     (steps := []) (.nil rfl) (fuel := 5) (missing := fun _ => Word.zero) (.nil 0)
     (meaning program) functionTypes layouts observations faithful (fun _ => rfl)
-    (Child.literal scope) found rfl rfl (Or.inr (Or.inl rfl)) rfl (infer_sound (by decide))
+    (Child.literal scope) found rfl rfl (Or.inl (Or.inr (Or.inl rfl))) rfl (infer_sound (by decide))
     environments heapRelated locals rfl .head (.intro .head) rfl rfl
     (runStateful_evaluation_sound ran)
 
@@ -1357,40 +1359,53 @@ example (operator : Syntax.ValueAssignOp) (left right : Word) (before after : St
     after = before ∧ ∃ source value,
       Dynamic.AssignmentValueApplies operator (some (.word left)) (.word right) source ∧
       ValueRep catalog signatures functions [] [] .word source value .word ∧ result = .inRight .word value := by
+  have plain := checkedCompound_word operator
+  have relation := Dynamic.CompoundAssignmentApplies.eq_of_plain (DataPlaceModifier.plain_of_checkedCompound plain)
+  rw [← assignmentModifier_plain plain, ← placeWrap_plain plain] at completed
   obtain ⟨sameStore, related⟩ := reflects (catalog := catalog) (signatures := signatures) (functions := functions)
-    (.inr (.inl rfl)) (.present (.word left)) (.word right) (.var rfl) (.var (index := 1) rfl) completed
+    (.inl (.inr (.inl rfl))) (.present (.word left)) (.word right) (.var (index := 0) rfl) (.var (index := 1) rfl) completed
   refine ⟨sameStore, ?_⟩
   cases related with
-  | applied applied value => exact ⟨_, _, applied, value, rfl⟩
+  | computed agreement _ value =>
+    cases agreement with
+    | applied applied _ _ => exact ⟨_, _, relation ▸ applied, value, rfl⟩
+    | panicked _ _ excluded _ =>
+      obtain ⟨_, applied, _⟩ := DataPlaceModifier.word_success operator left right divisor
+        (environment := [.inRight .unit (.word left), .word right]) (.var (index := 0) rfl) (.var (index := 1) rfl) before Word.zero
+      exact (excluded _ (relation ▸ applied)).elim
   | uninitialized absent => cases absent
-  | panicking zero selected _ _ =>
-    rcases divisor with total | nonzero
-    · rw [DataPlaceModifier.binaryOperator_panics selected] at total; cases total
-    · cases zero; exact (nonzero rfl).elim
 
 private def token : Word := ⟨17, by decide⟩
-private def absentAdd : Expr := modified .integer (binaryOperator true .add) false (.var 0) (.var 1) token
+private def absentAdd : Expr :=
+  modified .integer (assignmentModifier .integer (Ty.integer = .integer) .add) false (.var 0) (.var 1) token
+    (placeWrap .integer .add false)
 private theorem absentRan : runStateful 30 (.initial absentAdd [.inLeft .integer .unit, .integer 5] [.integer 900]) =
     .done (.inLeft .integer (.word token)) [.integer 900] := by cbv
 
 example : Dynamic.AssignmentOperandsInvalid .add none (.integer 5) := by
   have result := reflects (catalog := catalog) (signatures := signatures) (functions := functions)
-    (mapping := []) (world := []) (.inr (.inr ⟨rfl, rfl⟩)) .absent (.integer 5)
+    (mapping := []) (world := []) (.inl (.inr (.inr ⟨rfl, rfl⟩))) .absent (.integer 5)
     (.var rfl) (.var (index := 1) rfl) (runStateful_evaluation_sound absentRan)
   exact result.2.invalid.2.2
 
-private def initializeCode : Expr := modified .bool (binaryOperator false .equal) false (.var 0) (.var 1) token
+private def initializeCode : Expr :=
+  modified .bool (assignmentModifier .bool (Ty.bool = .integer) .equal) false (.var 0) (.var 1) token
+    (placeWrap .bool .equal false)
 private theorem initializeRan : runStateful 30 (.initial initializeCode [.inLeft .bool .unit, .bool true] [.integer 900]) =
     .done (.inRight .word (.bool true)) [.integer 900] := by cbv
 
 example : ∃ source, Dynamic.AssignmentValueApplies .equal none (.bool true) source ∧
     ValueRep catalog signatures functions [] [] .bool source (.bool true) .bool := by
   have result := reflects (catalog := catalog) (signatures := signatures) (functions := functions)
-    (mapping := []) (world := []) (.inl rfl) .absent (.bool true)
+    (mapping := []) (world := []) (.inl (.inl rfl)) .absent (.bool true)
     (.var rfl) (.var (index := 1) rfl) (runStateful_evaluation_sound initializeRan)
+  have relation : Dynamic.CompoundAssignmentApplies .bool .equal = Dynamic.AssignmentValueApplies .equal :=
+    Dynamic.CompoundAssignmentApplies.eq_of_plain fun _ _ checked => by cases checked
   cases result.2 with
-  | applied applied related => exact ⟨_, applied, related⟩
-  | panicking _ selected _ _ => cases selected
+  | computed agreement _ related =>
+    cases agreement with
+    | applied applied _ _ => exact ⟨_, relation ▸ applied, related⟩
+    | panicked _ _ excluded _ => exact (excluded _ (relation ▸ Dynamic.AssignmentValueApplies.equal _ _)).elim
 
 end Tests.SourceCoreDataPlaceModifierReflection
 end
@@ -1507,7 +1522,7 @@ private theorem ran : runStateful 100 (.initial expression environment store) =
     .done (.inLeft .unit (.word invalid)) store := by cbv
 private theorem reflected (program : SourceSemantics.Program) :
     DataPlacePrefixReflection.Result checked signatures functions program sourceContext [] source faults prepared [] [] place
-      sourceEnvironment environment heap store [0] world skippedRhs (LanguageResult.success .unit) .unit none false Word.zero
+      sourceEnvironment environment heap store [0] world skippedRhs (LanguageResult.success .unit) .unit none false Word.zero none
       (.inLeft .unit (.word invalid)) store :=
   DataPlacePrefixReflection.reflects targetLayout raw (DataPlaceMappingPreparation.steps_of_prepare preparedBy).2.2
     (meaning program) functionTypes layouts observations faithful (fun _ => trivial) environments heapRelated locals rfl

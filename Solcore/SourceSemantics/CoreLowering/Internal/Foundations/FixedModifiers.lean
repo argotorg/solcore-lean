@@ -816,21 +816,37 @@ private theorem no_division {binary : Syntax.BinaryOp} (kind : FixedCheckedArith
   intro division
   cases kind <;> simp [SourceCorePrimitive.checkedDivision] at division
 
-/-- How a modifier's check, after the setter, agrees with the source on a compound assignment, under
-the check's binders: it writes when the source applies the operation, with `result`, and otherwise
-fails with the source's panic, writing nothing. -/
+/-- The check of `modifier` passes on the right-hand side `right` and the snapshot `snapshot`: a total
+or nonzero check (`SourceCoreDataPlaces.Passes`), or a range check whose zero test and range test
+pass. -/
+def CheckPasses (modifier : Option SourceCoreDataPlaces.Modifier) (snapshot right : Value) : Prop :=
+  SourceCoreDataPlaces.Passes modifier right ∨
+    ∃ operation type binary, modifier = some ⟨operation, .range type binary⟩ ∧
+      SourceCoreDataPlaces.DivisorPasses binary right ∧ SourceCoreDataPlaces.RangePasses type binary [snapshot] right
+
+/-- How a modifier's check, after the setter, agrees with the source on a compound assignment: under
+any binders over the right-hand side `rightCore` and the snapshot `snapshotCore`, the check of
+`modifier` writes when the source applies the operation, with `result`, and otherwise fails with the
+source's panic, writing nothing. -/
 inductive Agreement (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) (snapshot : Option Dynamic.Value)
-    (right result : Dynamic.Value) (binders : Environment) (store : Store) (check write : Expr)
-    (outputType : Ty) : Prop where
-  /-- The source applies the operation, and the check writes. -/
+    (right result : Dynamic.Value) (modifier : Option SourceCoreDataPlaces.Modifier) (snapshotCore rightCore : Value) :
+    Prop where
+  /-- The source applies the operation, and the check passes and writes. -/
   | applied (applies : Dynamic.CompoundAssignmentApplies target operator snapshot right result)
-      (writes : ∀ value after,
-        Evaluates binders store check value after ↔ Evaluates binders store write value after)
+      (passing : CheckPasses modifier snapshotCore rightCore)
+      (writes : ∀ {binders : Environment} {store after : Store} {outputType : Ty} {write : Expr}
+          {value updated changed : Value},
+        Evaluates (updated :: changed :: rightCore :: snapshotCore :: binders) store
+            (SourceCoreDataPlaces.guard outputType modifier write) value after ↔
+          Evaluates (updated :: changed :: rightCore :: snapshotCore :: binders) store write value after)
   /-- The source panics and applies nothing, and the check fails with the panic. -/
   | panicked (code : UInt8) (panics : Dynamic.AssignmentOperandsPanic target operator snapshot right code)
       (excluded : ∀ other, ¬ Dynamic.CompoundAssignmentApplies target operator snapshot right other)
-      (fails : ∀ value after, Evaluates binders store check value after ↔
-        (value = .inLeft outputType (.word (SourceCorePanics.reason code)) ∧ after = store))
+      (fails : ∀ {binders : Environment} {store after : Store} {outputType : Ty} {write : Expr}
+          {value updated changed : Value},
+        Evaluates (updated :: changed :: rightCore :: snapshotCore :: binders) store
+            (SourceCoreDataPlaces.guard outputType modifier write) value after ↔
+          (value = .inLeft outputType (.word (SourceCorePanics.reason code)) ∧ after = store))
 
 private theorem agrees_checked {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
     {binary : Syntax.BinaryOp} {left right : Word} (corresponds : Dynamic.AssignmentOperatorBinary operator binary)
@@ -841,17 +857,17 @@ private theorem agrees_checked {type : TypeSystem.FixedInteger} {operator : Synt
       Word.ofIntModulo (Dynamic.checkedResult binary (value type left) (value type right)))
     {operation : BinaryOp} :
     Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
-      (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
-      store (SourceCoreDataPlaces.guard outputType (some ⟨operation, .range type binary⟩) write) write outputType := by
+      (some ⟨operation, .range type binary⟩) (.inRight leftType (.word left)) (.word right) := by
   by_cases inRange : Dynamic.FixedInRange type (Dynamic.checkedResult binary (value type left) (value type right))
-  · refine .applied ?_ (guard_range_pass (no_division arithmetic right)
-      ((checkedInRange_arithmetic arithmetic left right).mpr inRange))
+  · refine .applied ?_ (.inr ⟨operation, type, binary, rfl, no_division arithmetic right,
+      .inr ⟨leftType, left, right, rfl, rfl, (checkedInRange_arithmetic arithmetic left right).mpr inRange⟩⟩)
+      (guard_range_pass (no_division arithmetic right) ((checkedInRange_arithmetic arithmetic left right).mpr inRange) _ _)
     rw [leafEq]
     exact applies (.checked arithmetic left right inRange)
   · have panics := Dynamic.FixedBinaryPanics.overflow arithmetic left right inRange
     exact .panicked 0x11 (.compound corresponds (.fixed rfl panics)) (not_applies corresponds checked panics)
       (guard_range_overflow (no_division arithmetic right)
-        (Bool.eq_false_iff.mpr fun same => inRange ((checkedInRange_arithmetic arithmetic left right).mp same)))
+        (Bool.eq_false_iff.mpr fun same => inRange ((checkedInRange_arithmetic arithmetic left right).mp same)) _ _)
 
 private theorem agrees_division {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
     {binary : Syntax.BinaryOp} {left right : Word} (corresponds : Dynamic.AssignmentOperatorBinary operator binary)
@@ -862,32 +878,32 @@ private theorem agrees_division {type : TypeSystem.FixedInteger} {operator : Syn
       Word.ofIntModulo (Dynamic.divisionResult binary (value type left) (value type right)))
     {operation : BinaryOp} :
     Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
-      (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
-      store (SourceCoreDataPlaces.guard outputType (some ⟨operation, .range type binary⟩) write) write outputType := by
+      (some ⟨operation, .range type binary⟩) (.inRight leftType (.word left)) (.word right) := by
   have divides : SourceCorePrimitive.checkedDivision binary = true := by cases division <;> rfl
   by_cases zero : right = Word.zero
   · subst zero
     have panics := Dynamic.FixedBinaryPanics.divisionByZero (type := type) division left
     exact .panicked 0x12 (.compound corresponds (.fixed rfl panics)) (not_applies corresponds checked panics)
-      (guard_range_zero divides)
+      (guard_range_zero divides _ _)
   · have divisor : SourceCoreDataPlaces.DivisorPasses binary (.word right) := fun _ => ⟨right, rfl, zero⟩
     by_cases inRange : Dynamic.FixedInRange type (Dynamic.divisionResult binary (value type left) (value type right))
-    · refine .applied ?_ (guard_range_pass divisor ((checkedInRange_division division left zero).mpr inRange))
+    · refine .applied ?_ (.inr ⟨operation, type, binary, rfl, divisor,
+        .inr ⟨leftType, left, right, rfl, rfl, (checkedInRange_division division left zero).mpr inRange⟩⟩)
+        (guard_range_pass divisor ((checkedInRange_division division left zero).mpr inRange) _ _)
       rw [leafEq zero]
       exact applies (.division division left right zero inRange)
     · have panics := Dynamic.FixedBinaryPanics.divisionOverflow division left right zero inRange
       exact .panicked 0x11 (.compound corresponds (.fixed rfl panics)) (not_applies corresponds checked panics)
         (guard_range_overflow divisor
-          (Bool.eq_false_iff.mpr fun same => inRange ((checkedInRange_division division left zero).mp same)))
+          (Bool.eq_false_iff.mpr fun same => inRange ((checkedInRange_division division left zero).mp same)) _ _)
 
 private theorem agrees_total {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp} {left right : Word}
     (applies : Dynamic.CompoundAssignmentApplies (.fixed type) operator (some (.word left)) (.word right)
       (.word (leaf type operator left right)))
     {operation : BinaryOp} :
     Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
-      (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
-      store (SourceCoreDataPlaces.guard outputType (some ⟨operation, .total⟩) write) write outputType :=
-  .applied applies fun _ _ => Iff.rfl
+      (some ⟨operation, .total⟩) (.inRight leftType (.word left)) (.word right) :=
+  .applied applies (.inl (.total fun _ same => by cases same; rfl)) Iff.rfl
 
 private theorem agrees_unchecked_division {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
     {binary : Syntax.BinaryOp} {left right : Word} (corresponds : Dynamic.AssignmentOperatorBinary operator binary)
@@ -896,13 +912,12 @@ private theorem agrees_unchecked_division {type : TypeSystem.FixedInteger} {oper
       (.word right) (.word (leaf type operator left right)))
     (panics : Dynamic.BinaryPrimitivePanics binary (.word left) (.word Word.zero) 0x12) {operation : BinaryOp} :
     Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
-      (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
-      store (SourceCoreDataPlaces.guard outputType (some ⟨operation, .divisor⟩) write) write outputType := by
+      (some ⟨operation, .divisor⟩) (.inRight leftType (.word left)) (.word right) := by
   by_cases zero : right = Word.zero
   · subst zero
     exact .panicked 0x12 (.compound corresponds (.primitive panics)) (not_applies_zero corresponds kind left)
-      (guard_divisor_zero)
-  · exact .applied (applies zero) (guard_divisor_nonzero zero)
+      (guard_divisor_zero _ _)
+  · exact .applied (applies zero) (.inl (.nonzero zero)) (guard_divisor_nonzero zero _ _)
 
 /-- The check of the modifier after the setter, under the check's binders (the updated root, the
 modified leaf, the right-hand side and the snapshot), agrees with the source: it writes exactly when
@@ -910,9 +925,8 @@ the source applies the operation, with the leaf, and otherwise fails with the so
 theorem guard_agrees {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
     (kind : FixedCompoundAssignmentOperator operator) (left right : Word) :
     Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
-      (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
-      store (SourceCoreDataPlaces.guard outputType
-        (SourceCoreDataPlaces.assignmentModifier (.fixed type) false operator) write) write outputType := by
+      (SourceCoreDataPlaces.assignmentModifier (.fixed type) false operator) (.inRight leftType (.word left))
+      (.word right) := by
   cases kind
   · exact agrees_checked .add .add .add (fun applied => .add rfl applied) (leaf_add type left right)
   · exact agrees_checked .subtract .subtract .subtract (fun applied => .subtract rfl applied)
