@@ -16,7 +16,9 @@ Main declarations:
 - `CellAwareInvocationAcceptedConversionSites.ConversionReference` and
   `CellAwareInvocationAcceptedConversionSites.reference_rejected`, its callee;
 - `CellAwareInvocationAcceptedConversionFaults.DirtyToken` and
-  `CellAwareInvocationAcceptedConversionFaults.dirtyToken`, the token law of a dirty word.
+  `CellAwareInvocationAcceptedConversionFaults.dirtyToken`, the token law of a dirty word;
+- `CellAwareInvocationAcceptedConversions.preserves` and
+  `CellAwareInvocationAcceptedConversions.reflects`, the cell-aware head of a conversion.
 
 `Typedef.rep` at a fixed-width type is no site. Its parameter type is the fixed-width type, while
 a fixed-width value's runtime type is `word`, so the Source rule `builtinType` gives a type
@@ -252,7 +254,8 @@ direct site. Its builtin converts a word (`word`): `uintN(w)`, `intN(w)`, and
 where it is called (`of_accepted`): its argument at `word`, and the conversion
 of the argument's code. The callee of a conversion is a builtin reference that
 the compiler cannot lower on its own (`reference_rejected`), since a conversion
-is no closure of the builtin inventory. -/
+is no closure of the builtin inventory. `conversionSite?` and
+`conversionReference?` recognize both on an actually compiled row. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxRecDepth 4096
@@ -526,6 +529,74 @@ theorem reference_rejected (reference : ConversionReference prepared named sourc
           cases closure
     · simp [owner, bind, Except.bind] at accepted
 
+/-- Proof-producing recognition of a conversion site of the row. -/
+def conversionSite? (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
+    (source : TypedSource) (id : ExpressionId) :
+    Option (Σ' (callee argument : ExpressionId) (function : BuiltinFunctionId) (target : TypeSystem.Ty),
+      ConversionSite prepared named source id callee argument function target) :=
+  match found : source.lookupExpression? id with
+  | none => none
+  | some node =>
+    match form : node.form with
+    | .call callee [argument] (.builtinFunction function) =>
+      match conversion : function.conversion? with
+      | none => none
+      | some target =>
+        if word : function.parameterTypes = [.word] then
+          match coercions : node.coercions, requirements : node.requirements with
+          | [], [] =>
+            match initializer : prepared.base.locals.bindings.find? (fun binding =>
+                decide (binding.caller = named.signature.key ∧ binding.initializer = id)) with
+            | some _ => none
+            | none =>
+              match assumptions : named.specialized.assumptions with
+              | [] => some ⟨callee, argument, function, target,
+                  ⟨node, found, form, coercions, requirements, initializer, assumptions, conversion, word⟩⟩
+              | _ :: _ => none
+          | _, _ => none
+        else none
+    | _ => none
+
+/-- Proof-producing recognition of a conversion's callee. -/
+def conversionReference? (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
+    (source : TypedSource) (id : ExpressionId) : Option (ConversionReference prepared named source id) :=
+  match found : source.lookupExpression? id with
+  | none => none
+  | some node =>
+    match form : node.form with
+    | .reference name (.builtinFunction function) =>
+      match conversion : function.conversion? with
+      | none => none
+      | some target =>
+        match coercions : node.coercions, requirements : node.requirements with
+        | [], [] =>
+          match initializer : prepared.base.locals.bindings.find? (fun binding =>
+              decide (binding.caller = named.signature.key ∧ binding.initializer = id)) with
+          | some _ => none
+          | none =>
+            match assumptions : named.specialized.assumptions with
+            | [] => some ⟨node, name, function, target, found, form, coercions, requirements, initializer,
+                assumptions, conversion⟩
+            | _ :: _ => none
+        | _, _ => none
+    | _ => none
+
+/-- A conversion site depends on its row only through the row's key and its
+empty assumptions. -/
+def transport {first second : SourceCoreGeneralFunctions.Function}
+    (keyEq : first.signature.key = second.signature.key) (assumptions : second.specialized.assumptions = [])
+    (site : ConversionSite prepared first source id callee argument function target) :
+    ConversionSite prepared second source id callee argument function target where
+  node := site.node
+  found := site.found
+  form := site.form
+  coercions := site.coercions
+  requirements := site.requirements
+  notInitializer := keyEq ▸ site.notInitializer
+  assumptions := assumptions
+  conversion := site.conversion
+  word := site.word
+
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedConversionSites
 end
 
@@ -549,4 +620,292 @@ theorem dirtyToken {table : SourceCoreFaultSites.Table} (free : table.PanicFree)
   ⟨CallableIndexedOwnedPublicDecodedCallFaults.dirty free⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedConversionFaults
+end
+
+section
+/-! The cell-aware head of a conversion. A conversion runs its argument in the
+same invocation and applies its builtin at the reached heap and store, which
+the application keeps. The native check returns a canonical word and fails with
+the dirty-integer reason on any other word, which `DirtyToken` represents; an
+argument's failure is the conversion's own. Preservation uses the argument's
+meaning below the grade. Reflection uses it at most at the grade, since at
+`word` and at the 256-bit types the conversion is its argument's code. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxHeartbeats 4000000
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedConversions
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
+open CellAwareInvocationExpressionBounds
+open CallableIndexedOwnedPreparedStagedPhysicalDirectHeadBounds (Point)
+open CellAwareInvocationAcceptedConversionCode
+open CellAwareInvocationAcceptedConversionFaults (DirtyToken)
+universe u
+
+/-- The static facts of a conversion node that its head reads. -/
+structure Node (source : TypedSource) (id callee argument : ExpressionId) (node : ExpressionNode)
+    (function : BuiltinFunctionId) (target : TypeSystem.Ty) : Prop where
+  found : source.lookupExpression? id = some node
+  form : node.form = .call callee [argument] (.builtinFunction function)
+  coercions : node.coercions = []
+  requirements : node.requirements = []
+  conversion : function.conversion? = some target
+  word : function.parameterTypes = [.word]
+  argumentFound : ∃ argumentNode, source.lookupExpression? argument = some argumentNode
+
+/-- The Source application of a conversion of a word. -/
+inductive Applied : BuiltinFunctionId → TypeSystem.Ty → Word → Staging.Recursive.Outcome → Prop where
+  | canonical {type : TypeSystem.FixedInteger} {word : Word} (canonical : type.canonical word.val = true) :
+      Applied (.fixedFromWord type) (.fixed type) word (.value (.word word))
+  | dirty {type : TypeSystem.FixedInteger} {word : Word} (dirty : type.canonical word.val = false) :
+      Applied (.fixedFromWord type) (.fixed type) word (.fault (.semantic .dirtyHigherBitsForInteger))
+  | identity {word : Word} : Applied .wordIdentity .word word (.value (.word word))
+
+variable {function : BuiltinFunctionId} {target : TypeSystem.Ty}
+
+/-- Every original rule of a conversion's application at a word is inspected:
+the word's runtime type is its parameter type, so arity and type faults are
+excluded, and the application keeps the heap. -/
+theorem applied {program : Program} {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
+    {context : SourceSemantics.Context} {size : Nat} {heap after : Dynamic.Heap} {word : Word}
+    {outcome : Staging.Recursive.Outcome}
+    (conversion : function.conversion? = some target) (parameter : function.parameterTypes = [.word])
+    (called : Staging.Recursive.Size.Applies program stages size invocation context heap (.builtin ⟨function⟩)
+      [.word word] outcome after) :
+    after = heap ∧ Applied function target word outcome := by
+  cases called with
+  | builtin primitive =>
+    refine ⟨rfl, ?_⟩
+    cases primitive with
+    | fixedFromWord canonical =>
+      simp only [BuiltinFunctionId.conversion?, Option.some.injEq] at conversion
+      subst conversion
+      exact .canonical canonical
+    | wordIdentity =>
+      simp only [BuiltinFunctionId.conversion?, Option.some.injEq] at conversion
+      subst conversion
+      exact .identity
+    | fixedToWord _ =>
+      exact absurd parameter (by simp [BuiltinFunctionId.parameterTypes, TypeSystem.Ty.fixed, TypeSystem.Ty.word])
+    | wordToInteger => simp [BuiltinFunctionId.conversion?] at conversion
+  | builtinArity mismatch => simp [parameter] at mismatch
+  | builtinType _ mismatch =>
+    exfalso
+    change Dynamic.ValuesFirstTypeMismatch [.word word] function.parameterTypes _ _ at mismatch
+    rw [parameter] at mismatch
+    cases mismatch with
+    | head actual different => cases actual; exact different rfl
+    | tail _ rest => cases rest
+  | builtinFault fault =>
+    refine ⟨rfl, ?_⟩
+    cases fault with
+    | fixedFromWord dirty =>
+      simp only [BuiltinFunctionId.conversion?, Option.some.injEq] at conversion
+      subst conversion
+      exact .dirty dirty
+
+/-- A conversion of a word applies in the Source. -/
+theorem applies (conversion : function.conversion? = some target) (parameter : function.parameterTypes = [.word])
+    (word : Word) : ∃ outcome, Applied function target word outcome := by
+  cases function <;>
+    simp [BuiltinFunctionId.conversion?, BuiltinFunctionId.parameterTypes, TypeSystem.Ty.fixed, TypeSystem.Ty.word]
+      at conversion parameter
+  case fixedFromWord type =>
+    subst conversion
+    cases canonical : type.canonical word.val
+    · exact ⟨_, .dirty canonical⟩
+    · exact ⟨_, .canonical canonical⟩
+  case wordIdentity =>
+    subst conversion
+    exact ⟨_, .identity⟩
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled program)}
+  {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+  (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
+  (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {bodyRelation : ActualBodyInvocation.BodyRelation}
+  {attachment : optParam
+    (Dynamic.GeneralizedClosure → SourceCoreLocalPolymorphism.Binding → TypeSystem.Substitution → Prop)
+    (fun _ _ _ => True)}
+  {index : ActualBodyInvocation.Index compiled bodyRelation}
+  {registry : SourceCoreRawMetadata.Registry} {context : SourceSemantics.Context}
+  {stages : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
+  {faults : RecursiveStageMeaning.FaultRep}
+  {scope : SourceCoreLocalCell.Scope} {id callee argument : ExpressionId} {node : ExpressionNode}
+  {argumentCode : Expr}
+local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked registry functions
+
+private theorem argument_typed (unique : NodeOccurrencesUnique invocation.source)
+    (site : Node invocation.source id callee argument node function target)
+    (typed : ExpressionHasType invocation.source context id node.type) :
+    ∃ argumentNode, invocation.source.lookupExpression? argument = some argumentNode ∧
+      ExpressionHasType invocation.source context argument argumentNode.type ∧
+      node.type = function.returnType := by
+  obtain ⟨argumentsTyped, resultType⟩ :=
+    CallableIndexedOwnedPreparedStagedBuiltinSourceInversion.source_types unique site.found site.form
+      site.coercions typed
+  obtain ⟨argumentNode, argumentFound⟩ := site.argumentFound
+  exact ⟨argumentNode, argumentFound, CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed
+    unique argumentsTyped (List.mem_singleton_self _) argumentFound, resultType⟩
+
+/-- A Source trace of a conversion determines the actual native check and the
+argument's reached state. -/
+theorem preserves [RecursiveStageMeaning.FaultTokens faults] [DirtyToken faults]
+    (site : Node invocation.source id callee argument node function target)
+    (unique : NodeOccurrencesUnique invocation.source)
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program stages)
+    (runtime : Dynamic.SourceRuntimeValid program context invocation.source)
+    (covers : invocation.evidence.Covers context) (size : Nat)
+    (childMeaning : PreservesBelow (attachment := attachment) bridge context model index stages invocation
+      (Point scope argument ⟨.word, argumentCode⟩) faults size) :
+    PreservesAt (attachment := attachment) bridge context model index stages invocation
+      (Point scope id ⟨.word, SourceCoreInteger.builtinConversion target argumentCode⟩) faults size := by
+  intro current expression code certified actualNode found sourceTyped mapping world administrative environment
+    canonical actual actualContext before store ξ outcome after environments heaps locals agrees actualTyped
+    initial admitted authority physical owner ownerFrame trace
+  obtain ⟨currentEq, expressionEq, codeEq⟩ := certified
+  subst current expression code
+  cases Option.some.inj (found.symm.trans site.found)
+  obtain ⟨argumentNode, argumentFound, argumentTyped, resultType⟩ := argument_typed unique site sourceTyped
+  have raw : ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreInteger.builtinConversion target argumentCode).rename ξ) value finalStore ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type .word faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    rw [builtinConversion_rename]
+    rcases CallableIndexedOwnedPreparedStagedBuiltinSourceInversion.children unique site.found site.form trace with
+      ⟨sequenceSize, invocationSize, argumentsHeap, values, sizeEq, sequence, called⟩ |
+      ⟨sequenceSize, failure, sizeEq, outcomeEq, sequence⟩
+    · cases sequence with
+      | cons head tail =>
+        cases tail
+        obtain ⟨argumentValue, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+            frame, heapMetadata, effect, reached, related, _post⟩ :=
+          childMeaning _ (by
+              simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at sizeEq
+              omega) ⟨rfl, rfl, rfl⟩ argumentFound argumentTyped environments heaps locals agrees actualTyped
+            initial admitted authority physical owner ownerFrame head
+        cases represented with
+        | value payload =>
+          obtain ⟨word, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields payload
+          obtain ⟨rfl, result⟩ := applied site.conversion site.word called
+          rw [resultType]
+          cases result with
+          | canonical canonical =>
+            exact ⟨_, finalStore, finalMap, finalWorld, conversion_success evaluated canonical,
+              .value (ValueRep.fixed word canonical), finalHeaps, maps, worlds, frame, heapMetadata, effect, reached,
+              related⟩
+          | dirty dirty =>
+            exact ⟨_, finalStore, finalMap, finalWorld, conversion_dirty evaluated dirty,
+              .fault DirtyToken.dirty, finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+          | identity =>
+            exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .value (ValueRep.word word), finalHeaps, maps, worlds,
+              frame, heapMetadata, effect, reached, related⟩
+    · subst outcomeEq
+      cases sequence with
+      | headFault head =>
+        obtain ⟨argumentValue, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+            frame, heapMetadata, effect, reached, related, _post⟩ :=
+          childMeaning _ (by
+              simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at sizeEq
+              omega) ⟨rfl, rfl, rfl⟩ argumentFound argumentTyped environments heaps locals agrees actualTyped
+            initial admitted authority physical owner ownerFrame head
+        cases represented with
+        | fault matched =>
+          exact ⟨_, finalStore, finalMap, finalWorld, builtinConversion_failure evaluated, .fault matched,
+            finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+      | tailFault _ tail => cases tail
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata, effect, reached, related⟩ := raw
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps,
+    maps, worlds, frame, metadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers
+      locals sourceTyped trace frame⟩
+
+/-- Native completion of a conversion reconstructs its staged Source
+execution: the argument's, and the application of the builtin. -/
+theorem reflects [RecursiveStageMeaning.FaultTokens faults] [DirtyToken faults]
+    (site : Node invocation.source id callee argument node function target)
+    (unique : NodeOccurrencesUnique invocation.source)
+    (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program stages)
+    (runtime : Dynamic.SourceRuntimeValid program context invocation.source)
+    (covers : invocation.evidence.Covers context) (size : Nat)
+    (childMeaning : ReflectsBelow (attachment := attachment) bridge context model index stages invocation
+      (Point scope argument ⟨.word, argumentCode⟩) faults (size + 1)) :
+    ReflectsAt (attachment := attachment) bridge context model index stages invocation
+      (Point scope id ⟨.word, SourceCoreInteger.builtinConversion target argumentCode⟩) faults size := by
+  intro current expression code certified actualNode found sourceTyped mapping world administrative environment
+    canonical actual actualContext before store ξ value finalStore environments heaps locals agrees actualTyped
+    initial admitted authority physical owner ownerFrame completed
+  obtain ⟨currentEq, expressionEq, codeEq⟩ := certified
+  subst current expression code
+  cases Option.some.inj (found.symm.trans site.found)
+  obtain ⟨argumentNode, argumentFound, argumentTyped, resultType⟩ := argument_typed unique site sourceTyped
+  have occurrence : Staging.Recursive.Occurrence invocation id
+      (.call callee [argument] (.builtinFunction function)) :=
+    ⟨_, lookupExpression?_sound site.found, site.form, site.requirements, site.coercions⟩
+  have raw : ∃ sourceSize outcome after finalMap finalWorld,
+      Staging.Recursive.Size.Expression program stages sourceSize invocation context environment before id
+        outcome after ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type .word faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    change EvaluationSize size actual store ((SourceCoreInteger.builtinConversion target argumentCode).rename ξ)
+      value finalStore at completed
+    rw [builtinConversion_rename] at completed
+    have complete := completed.sound
+    obtain ⟨argumentSize, argumentValue, middle, within, argumentEvaluation⟩ := argument_of_conversion completed
+    obtain ⟨_, argumentOutcome, after, finalMap, finalWorld, argumentTrace, represented, finalHeaps, maps, worlds,
+        frame, heapMetadata, effect, reached, related, _post⟩ :=
+      childMeaning argumentSize (Nat.lt_succ_of_le within) ⟨rfl, rfl, rfl⟩ argumentFound argumentTyped
+        environments heaps locals agrees actualTyped initial admitted authority physical owner ownerFrame
+        argumentEvaluation
+    cases represented with
+    | fault matched =>
+      obtain ⟨rfl, rfl⟩ := evaluation_deterministic (builtinConversion_failure argumentEvaluation.sound) complete
+      exact ⟨_, _, after, finalMap, finalWorld, .builtinArgumentsFault occurrence (.headFault argumentTrace),
+        .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+    | value payload =>
+      obtain ⟨word, rfl, rfl⟩ := CompatibleExpressionPrimitives.word_fields payload
+      rw [resultType]
+      obtain ⟨_, result⟩ := applies site.conversion site.word word
+      cases result with
+      | canonical canonical =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic (conversion_success argumentEvaluation.sound canonical)
+          complete
+        exact ⟨_, _, after, finalMap, finalWorld,
+          .builtinApplied occurrence (.cons argumentTrace .nil) (.builtin (.fixedFromWord canonical)),
+          .value (ValueRep.fixed word canonical), finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+      | dirty dirty =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic (conversion_dirty argumentEvaluation.sound dirty) complete
+        exact ⟨_, _, after, finalMap, finalWorld,
+          .builtinApplied occurrence (.cons argumentTrace .nil) (.builtinFault (.fixedFromWord dirty)),
+          .fault DirtyToken.dirty, finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+      | identity =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic argumentEvaluation.sound complete
+        exact ⟨_, _, after, finalMap, finalWorld,
+          .builtinApplied occurrence (.cons argumentTrace .nil) (.builtin (.wordIdentity word)),
+          .value (ValueRep.word word), finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+    maps, worlds, frame, metadata, effect, reached, related⟩ := raw
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps,
+    maps, worlds, frame, metadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers
+      locals sourceTyped trace frame⟩
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedConversions
 end

@@ -696,6 +696,8 @@ theorem expressions_of_family {called : DeclarationInstantiation → Prop}
         (index prepared aligned) stages child faults size := by
   haveI := CallableIndexedOwnedPublicDecodedStagedCallFaults.tokens
     (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
+  haveI := CellAwareInvocationAcceptedConversionFaults.dirtyToken
+    (CallableIndexedOwnedReceivingPreparedShapeInterpretations.issued_panicFree whole receiver)
   intro size owner keyPhysical child selectedChild
   have issuer := CellAwareNamedDiagnosticIssuer.of_prepared prepared diagnostic aligned
   rw [aligned.reasonAt, aligned.named] at issuer

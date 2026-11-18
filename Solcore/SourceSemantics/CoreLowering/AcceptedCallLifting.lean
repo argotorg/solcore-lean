@@ -465,7 +465,8 @@ section
 staged executions. A direct call's original rule runs the callee body, so the
 lifting is one strong induction on the size of the original derivation across
 bodies: at a call of a given size, the callee body's derivation is smaller, and
-its lifting below that size gives the staged global application. Inside one
+its lifting below that size gives the staged global application. A
+conversion's original rule applies its builtin as the staged rule does. Inside one
 body, a nested site is lifted by induction on the site, over the sized
 derivations of its operands, branches, elements and arguments. The admitted
 callees are static inputs (`Callees`): the registry scope of each callee's
@@ -765,6 +766,31 @@ theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Stag
             exact .directApplied ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
               ⟨_, calleeContains, calleeForm, calleeRequirements, calleeCoercions⟩ valid stagedArguments produced
               (.global instantiates covers rootsEq closure parameters allocate staged (by rw [resultUnit]; exact .unit))
+    | generalizedLocal found formEq =>
+      cases node_unique unique found contains
+      rw [site.form] at formEq
+      cases formEq
+  | @conversion id callee argument function target site _ child =>
+    intro size context environment before after value within trace
+    have contains := lookupExpression?_sound site.found
+    cases trace with
+    | intro found form coercions =>
+      cases node_unique unique found contains
+      rw [site.coercions] at coercions
+      cases coercions
+      rw [site.form, site.requirements, site.coercions] at form
+      cases form with
+      | builtinCall layout evaluated applies =>
+        have stagedArguments := arguments_value (registry := registry)
+          (fun other member => by
+            cases List.mem_singleton.mp member
+            exact child) (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+          omega) evaluated
+        cases applies with
+        | builtin applied =>
+          exact .builtinApplied ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
+            stagedArguments (.builtin applied)
     | generalizedLocal found formEq =>
       cases node_unique unique found contains
       rw [site.form] at formEq
