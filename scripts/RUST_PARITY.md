@@ -2,7 +2,7 @@
 
 These gates run the pinned Rust compiler's own end-to-end fixtures: on Lean Core through the
 checked Hull import, and separately on the EVM through upstream's harness. The reference checkout
-is `.upstream/solcore-rs-20261102` at `e2eef19409fc8879cd4a9cc342ed60e3152f72c0`. Every manifest
+is `.upstream/solcore-rs-20261116` at `d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09`. Every manifest
 pins both the revision and each fixture's source hash. The tools reject a different revision or an
 unexpected tracked edit to that checkout, and they never modify the sibling Rust repository.
 
@@ -43,7 +43,7 @@ python3 scripts/rust-method-parity.py --reuse-exports --output .upstream/methods
   constructor.
 - **Raw scenario gate:** 77 fixtures, with 77 constructors and 697 ordered transactions.
   Successful calls keep their state; reverts discard their changes.
-- **Method gate:** the remaining 105 fixtures, with 105 constructors and 820 directives. Ordinary
+- **Method gate:** the remaining 107 fixtures, with 107 constructors and 828 directives. Ordinary
   directives discard their state changes, matching upstream's `eth_call`; `send` directives keep
   them and must succeed. Constructor and send callers are the standard Anvil account. Ordinary
   calls use zero, because the upstream JSON-RPC request omits `from`.
@@ -112,8 +112,8 @@ recorded steps and seeded mutants across those four paths
 ([pinned fixtures](SEMANTIC_DIFFERENTIAL.md#compare-the-pinned-end-to-end-fixtures-across-paths)).
 - On that route the code-image tool crashed at O2 on `ignored-builtin-effects` at `2a745e12`,
   which the in-memory upstream harness passed; the crash is a recorded finding.
-- At `e2eef194`, whose Sonatina carries upstream's fix of that fixture, all 182 fixtures compile on
-  every path.
+- Since `e2eef194`, whose Sonatina carries upstream's fix of that fixture, every pinned fixture
+  compiles on every path.
 - The fuzz driver can run this comparison as an opt-in run kind
   ([continuous fuzzing](SEMANTIC_CI.md#continuous-fuzzing)).
 

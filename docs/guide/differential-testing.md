@@ -34,6 +34,9 @@ These are triage hints, not proofs of which component is wrong.
   depending on the profile, balances, logs and return data.
 - **The pinned end-to-end fixtures** compare the compiled paths with each other, without a Core
   reference.
+- **The native path** (`scripts/semantic-native.py`, opt-in) runs Lean's native frontend on the
+  pure cases it admits and compares each run with direct Core. Admission is a versioned predicate
+  decided before the native run, so a native rejection of an admitted case is a finding.
 
 ## Where things are
 

@@ -68,14 +68,15 @@ A merged test file is a sequence of sections. Each starts at a line
 | --- | --- | --- |
 | [`Main.lean`](../../Tests/Main.lean) | The test driver. A few older tests are defined in it. | `lake test` (`lean_exe solcoreTests`, executable `solcore-tests`) |
 | `Semantic*Tool.lean` | The case tools of the synthesis profiles: `SemanticCaseTool` for every pure profile, one tool per stateful profile; see [Synthesis](synthesis.md#profiles) | One `lean_exe` each in [`lakefile.lean`](../../lakefile.lean) |
+| `SemanticNativeTool.lean` | The native path's tool: Lean's native frontend on one program, run once per input | `lean_exe semanticNativeTool`; `scripts/semantic-native.py` runs it |
 | `RustHullContractRun.lean`, `RustHull*ScenarioRun.lean` | The imported-Hull runners of the differential tests | One `lean_exe` each (`rust-hull-*`) |
 | The other `RustHull*Run.lean`, `RustHull*Profile.lean`, `RustParity.lean` | Scripts with a `main`. Some run one group of driver tests: `RustHullKeccakRun.lean` is `def main : IO Unit := Tests.RustHullKeccak.run`. `scripts/rust-*-parity.py` and `scripts/test-rust-opcode-wrappers.py` run others. | `lake env lean --run Tests/<File>.lean`; no target builds them |
 | [`Fixtures/`](../../Tests/Fixtures) | Inputs of scripts: the EVM account reference (`EvmAccounts/`, for `scripts/evm-account-reference.py`; the Hull creation tests repeat its address vectors) and Solidity sources for `scripts/test-rust-opcode-wrappers.py` and `scripts/test-rust-recursive-layouts.py` | — |
 | [`scripts/`](../../Tests/scripts) | The corpus validators `test-semantic-*-corpus.py` and `test-semantic-chunked-generation.py`, which run the native case tools and no EVM | `python3 Tests/scripts/<file>` |
 
-Every executable other than the driver is also listed in `TARGETS` of
+Every executable other than the driver and `semantic-native-tool` is also listed in `TARGETS` of
 `scripts/prepare-semantic-tools.py`, which prepares them for the differential tests; a new one goes
-in both places.
+in both places. `semantic-native.py` checks the native tool's identity itself.
 
 ## The driver
 

@@ -61,7 +61,7 @@ design notes that record the differences from upstream.
 ## Running solcore-rs output
 
 The [Rust Hull importer](Solcore/Frontend/RustHull/) accepts typed Hull output from solcore-rs at
-commit `e2eef19409fc8879cd4a9cc342ed60e3152f72c0`. It checks the imported annotations, translates
+commit `d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09`. It checks the imported annotations, translates
 Hull and inline Yul into Core, and checks the result before running it.
 
 - **Supported:** all 81 standard opcode wrappers, constructors, dynamic ABI values, byte memory,
@@ -80,8 +80,8 @@ Hull and inline Yul into Core, and checks the result before running it.
   - [export-rust-code-image.py](scripts/export-rust-code-image.py) exports linked code images.
   - [rust-scenario-parity.py](scripts/rust-scenario-parity.py) runs the fixtures' constructor
     and call scenarios.
-- **Parity:** the checked Rust driver accepts all 182 fixtures of the pinned contract inventory,
-  and their 1,699 constructor and call observations match the fixture expectations on Core.
+- **Parity:** the checked Rust driver accepts all 184 fixtures of the pinned contract inventory,
+  and their 1,709 constructor and call observations match the fixture expectations on Core.
   [RUST_PARITY.md](scripts/RUST_PARITY.md) lists the gates and how to reproduce them.
 
 Importing Rust Hull does not prove the Rust compiler correct, and it does not extend the native
@@ -156,7 +156,7 @@ coverage.
 - **Pinned fixtures.** [semantic-fixtures.py](scripts/semantic-fixtures.py) runs the recorded steps
   of solcore-rs's own end-to-end fixtures on Hull, O0, O2 and Yul. It also runs mutants of their
   inputs, call sequences and sources. These fixtures have no original Core, so only the compiled
-  paths are compared; all 1,699 recorded steps agree on every path.
+  paths are compared; all 1,709 recorded steps agree on every path.
 - **CI.** The [workflow](.github/workflows/semantic.yml) runs the fixed corpora and recorded random
   seeds. Its automatic triggers are disabled, so it runs only on manual dispatch.
 

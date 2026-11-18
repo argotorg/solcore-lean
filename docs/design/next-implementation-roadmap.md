@@ -1,7 +1,7 @@
 # Next implementation roadmap
 
 Updated: 2026-11-18. Where the work stands, and the order of the next work, as the user approved
-it on 2026-11-17. solcore-rs is pinned at `e2eef194`.
+it on 2026-11-17 and 2026-11-18. solcore-rs is pinned at `d1b5ac28`.
 
 ## Status at a glance
 
@@ -22,7 +22,7 @@ obligations. None follows from agreement in a test corpus.
   limits. The fuzz driver repeats random suites with advancing seeds. It counts findings by
   signature, so recorded upstream findings with stable signatures and recorded mismatch classes
   count as known.
-- **Pinned fixtures.** All 182 end-to-end fixtures of solcore-rs at `e2eef194` compile on Hull, O0,
+- **Pinned fixtures.** All 184 end-to-end fixtures of solcore-rs at `d1b5ac28` compile on Hull, O0,
   O2 and Yul, and their recorded steps agree on every path. Mutants of their derived ADT arguments,
   call sequences and sources run too. The fixtures have no original Core, so only the compiled
   paths are compared. The comparison runs only locally, standalone or as the fuzz driver's opt-in
@@ -41,7 +41,8 @@ obligations. None follows from agreement in a test corpus.
   storage on all three paths.
 - **Source emitter proofs** for fifteen emitters
   ([source emitter meaning](scalar-emitter-meaning.md)).
-- **The re-pin to `e2eef194`** (`4da119798`). It found no new upstream defect.
+- **The re-pins to `e2eef194`** (`4da119798`) **and `d1b5ac28`** (row 8). Neither found a new
+  upstream defect.
 - **Upstream rows 1 to 7** in Lean, row 4 for memory arrays in functions: see
   [the upstream table](#following-upstreams-semantics-the-next-units).
 - **Closures capture by value** (solcore-rs #120), in Lean and in the closure capture and closure
@@ -71,8 +72,10 @@ obligations. None follows from agreement in a test corpus.
   - Remaining: further state operations, ECRECOVER and P256VERIFY, init frames and public
     deployment, the rest of inline Yul, object linking, and then divergence and reverse
     correspondence.
-- **A check of solcore-rs main past `e2eef194`** for a re-pin, first up to `d1b5ac28`: what
-  upstream changed and what Lean would need to follow it.
+- **Upstream rows 9 to 13**: Lean follows upstream's new trait coherence rules, one row at a time
+  ([the upstream table](#following-upstreams-semantics-the-next-units)).
+- **Lean's native frontend as a fourth path**: the harness compares the admitted pure cases with
+  direct Core, and the fuzz driver's run kind is next.
 
 ### Open
 
@@ -109,16 +112,15 @@ The last two are recorded without investigation, and the generators avoid them.
 
 ### Now
 
-1. **A re-pin to `d1b5ac28`.** The survey is done. Upstream changed its trait coherence rules and
-   `std.sol`, not its Hull, backends or parser, so the re-pin alone changes no expected outcome.
-   The new rules refuse five forms that Lean's native frontend accepts, and whether Lean follows
-   them is open. Rows 1 to 7 of the upstream table are done.
+1. **Upstream's new trait coherence rules** (rows 9 to 13). The re-pin to `d1b5ac28` is done.
+   Lean follows the new rules: rows 10 to 12 and part of row 13 refuse forms that Lean accepts
+   today, and rows 9 and 13 widen what it accepts. Lean keeps ignoring `#[derive]`.
 2. **Meaning proofs.** Row 1's leftovers: compound assignments and in-place `~` at the twelve
    types ([what remains](integer-types-unchecked-shifts.md#what-remains)). Then the rest of
    native Source goal two.
-3. **Lean's native frontend as a fourth differential path.** The survey is done. It recommends a
-   harness that runs admitted pure cases through the native pipeline first, then native
-   `std.opcodes`. Not started.
+3. **Lean's native frontend as a fourth differential path.** The harness runs the admitted pure
+   cases through the native pipeline. Next are the fuzz driver's `native` run kind, then native
+   `std.opcodes`.
 
 ### Then
 
@@ -164,6 +166,13 @@ code.
 | 6 | Compiler fixes #130 to #133: recursive layouts rejected with `SC0420`, canonical ABI outputs of memory dynamic arrays, frontend diagnostics before specialization, inline Yul calls to Hull functions qualified with `usr$` | **Done.** The recursive-layout gate and the records of the three fixtures that Q008 and Q010 admitted follow upstream, and the importer accepts a plain-name Hull call from inline Yul as upstream's checker resolves it (Q006). Lean's catalogs refuse a non-regular recursive layout at once, as upstream's Hull emitter does with `SC0420`, and a nominal instantiation of more than 4096 nodes, the default of upstream's `--pe-max-type-nodes`, which upstream applies only where it specializes. Lean keeps accepting and running the regular recursive layouts that upstream's backends refuse with `SC0420`, a limit of their lowering rather than of the language, and the mutually recursive data types that upstream's name resolution refuses for now (`SC0203`). | `storage-array`, `ufcs-array`, `module-local-function-evidence`, `storage-adt-recursive-ok`, `asm-substitution` |
 | 7 | Closure factories (`bf7114a8`, `ad1f49cf`): captures resolved in the factory's own scope, a factory's runtime effects kept | **Done where the native pipeline runs the fixture.** Captures resolve in the factory's own scope, and a factory's body runs when it is called, as upstream now does; Lean's typing, source semantics and lowering needed no change. Calls that use contract storage or inline assembly wait for them ([closures](../guide/source-semantics.md#closures-capture-by-value)). | `closure-parameters` (36 → 49 calls) |
 | — | `msgSender` (#142) and contract-declared struct state (#138) | **Nothing to do.** #142 uses std's existing `msgSender` in examples, and #138 changes only examples. | `msg-context` |
+| 8 | Re-pin to `d1b5ac28` (#146, #155; #147 and #148 change only the playground) | **Done.** Upstream's Hull format and backends are unchanged, so the importer and the harness took only the new commit, and every existing expectation holds. | `abi-layout-through-reexport` (new), `superclass-default-through-subtrait` (new), `abi-raw-default-codec` (6 → 8 calls), `abi-word-custom-codec` |
+| 9 | Impl method constraints (`81afb96b`, `SC0249`): an impl method may require only what its trait method declares or entails | **Next.** Lean's equality also refuses the restated and entailed constraints that upstream accepts, so following upstream only widens acceptance. The superclass-entailed case waits for row 13. | uitest `impl_method_extra_constraint` |
+| 10 | No default for a type-parameter goal (`1c7fe983`, `SC0207`) | **To follow.** Lean's compile already refuses a called generic that needs one; its checker will also refuse an uncalled one, as upstream's does. | uitest `default_not_used_for_type_parameter`, `default_not_used_for_tuple_of_type_parameter` |
+| 11 | Overlapping unconditional defaults (`4f22ddb0`, `SC0247`) | **To follow.** Lean refuses an ambiguous use; it will also refuse the declarations, as upstream does. | uitest `overlapping_unconditional_default` |
+| 12 | The orphan rule (`02456cee`, `282cb2c8`, `SC0246`): an impl sits next to its trait or its type, std counting as one unit and a tuple as its first element | **To follow.** Lean's impls are global and may sit anywhere; it will refuse an orphan impl as upstream does, and two of its tests will be rewritten. | uitest `orphan_*`; the six rewritten e2e fixtures |
+| 13 | Superclass obligations (`6e3c4d3c`, `7bdd9a0a`, `SC0248`): each impl proves its superclasses at declaration, and a given entails its superclasses | **To follow, measured first.** Lean restates superclass predicates in each impl and never projects. It will refuse an impl whose superclass has no impl, and accept the impls without the restatement and the projections that it refuses today. | `superclass-default-through-subtrait`; uitest `missing_superclass_instance`; the solver fixtures |
+| — | Impls through re-exports (`9286baea`), std's generic impls (`ad8f003f`), `SC0416` (`86d7bc02`), derive checks (`ba16e8e5`) | **Nothing to do.** Lean's impls are visible everywhere, so neither re-export visibility nor a goal with two impls in different places arises. std's changes reach the importer through the Hull. Lean ignores `#[derive]`, so `SC0230`'s check waits for derive itself. | `abi-layout-through-reexport` |
 
 The new `evm-word-boundaries` fixture checks the `word` operations at their extremes, which the
 scalar meaning already covers.

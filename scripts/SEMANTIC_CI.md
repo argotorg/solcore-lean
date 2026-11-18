@@ -34,6 +34,8 @@ python3 scripts/prepare-semantic-tools.py --verify
 - The readiness receipt hashes the tool executables, native sources, exporter sources,
   dependency locks and build receipts. Changed inputs or binaries need fresh preparation, and no
   cache is accepted merely because its directory exists.
+- `semantic-native-tool`, which `semantic-native.py` runs, is outside the receipt and the
+  forty-two tools: build it with `lake build semanticNativeTool`. No CI job builds it.
 - The CI cache holds dependency downloads, not executable proof artifacts or saved expected
   results. CI disables Cargo incremental compilation and debug information to limit disk use.
 - The stateful comparisons enumerate EVM storage from Anvil's prestate diffs. After changing

@@ -7,8 +7,8 @@ The comparison model and the rules for reading a disagreement are in the develop
 all-profile suites, CI and continuous fuzzing are in
 [Running the semantic test suite](SEMANTIC_CI.md).
 
-The reference Rust revision is `e2eef19409fc8879cd4a9cc342ed60e3152f72c0`, upstream main of
-2026-11-02; until then it was `2a745e12`.
+The reference Rust revision is `d1b5ac28c0a5821c1a56758f182e27bc5e7c4f09`, upstream main of
+2026-11-16; before it the pin was `e2eef194`, and before that `2a745e12`.
 
 Run records up to 2026-11-17 are in git history at `049f8ce1f`.
 
@@ -1920,14 +1920,14 @@ python3 scripts/semantic-suite.py --mode fixed --backend yul \
 
 ### Compare the pinned end-to-end fixtures across paths
 
-`scripts/semantic-fixtures.py` runs the pinned checkout's 182 end-to-end fixtures
+`scripts/semantic-fixtures.py` runs the pinned checkout's 184 end-to-end fixtures
 (`tests/e2e/*/main.sol`) on four compiled paths. No generator reaches most of their language, and
 no original Core exists for them, so the paths are compared with each other and with each
 fixture's recorded upstream expectations, and mutated inputs across the paths only. Agreement is
 never reported as a Core comparison.
 
-- **Fixtures:** the 182 that `rust-scenario-parity.json` and `rust-method-parity.json` pin by
-  source hash: 77 raw scenarios and 105 method-directive fixtures.
+- **Fixtures:** the 184 that `rust-scenario-parity.json` and `rust-method-parity.json` pin by
+  source hash: 77 raw scenarios and 107 method-directive fixtures.
 - **Paths:** `hull`, checked Hull on Lean Core with Sonatina O0 images; `sonatina-o0` and
   `sonatina-o2` on Anvil; `yul`, the driver's Yul compiled by solc via `export-rust-yul.py
   --fixture`.
@@ -1967,7 +1967,7 @@ python3 scripts/test-semantic-fixtures.py
 - `report.json` (`solcore-lean.semantic-fixtures.v1`) states `coreReference: false`. The command
   returns 1 for any finding, harness error or changed tool.
 
-Status: at `e2eef194` all 182 fixtures compile on every path, and in the fixed run there every
+Status: at `d1b5ac28` all 184 fixtures compile on every path, and in the fixed run there every
 recorded step agreed on all four paths and met its recorded expectation. Known findings:
 - Sonatina O2 crashed on `ignored-builtin-effects` at `2a745e12`; `e2eef194` carries upstream's fix.
 - The first-allocation class `offset-by-first-allocations`: source mutants whose returned words
@@ -1975,3 +1975,31 @@ recorded step agreed on all four paths and met its recorded expectation. Known f
   `0x140` and O0 at `0x200`.
 - Two Yul stores moved to `2^256 - 1` fail Hull memory's range and run Sonatina out of gas, while
   solc's Yul drops the store and returns. The fuzz driver lists this as known.
+
+### Compare pure cases on Lean's native frontend
+
+`scripts/semantic-native.py` takes the pure runner's own cases, the fixed corpora or a draw seeded
+as `semantic-suite.py` seeds it (`--mode random --seed N`), and runs each admitted case through
+`semantic-native-tool`. The case's source is lifted out of its contract by `native-lift-v1`, a Word
+entry for its method is appended, and the program is compiled once and run once per input. The
+path is opt-in: no suite, fuzz run or CI job runs it.
+
+- **Admission** (`native-admission-v1`) is decided from the case alone, before any native run: its
+  emitter, the Core operations of its program, its plan's integer types, and the adapter's reading
+  of the source, which must be one contract with functions only, no storage field and `uint256`
+  parameters. Cases that are not admitted are counted by reason.
+- **Comparison** (`native-compare-v1`): a returned Word against direct Core's, and the revert data
+  of a native panic, which the native session decodes, against direct Core's revert output. Out of
+  fuel and timeouts are inconclusive.
+- **Findings.** A native rejection, a crash or a different observation of an admitted case is a
+  finding under a stable signature, with a request that `semantic-native-tool` replays. The known
+  differences from upstream (row 1's open `Typedef` call, local lambda generalization, `bool ==`,
+  `!=` at types without a builtin, reads of uninitialized locals) are findings under their own
+  labels.
+- `--check` prints the identity of every tool, script and corpus a run reads. A run whose identity
+  changes while it runs does not pass.
+
+```sh
+lake build semanticNativeTool
+python3 scripts/semantic-native.py --output .upstream/semantic-native
+```
