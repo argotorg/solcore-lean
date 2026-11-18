@@ -3612,18 +3612,20 @@ theorem registered_shapes (signatures : ProgramSignatures) (fuel : Nat) :
                 exact shaped
           · split at accepted
             · split at accepted
-              · obtain ⟨signature, selected, accepted⟩ := bind_ok accepted
-                have selected := exact_signature selected
-                split at accepted
-                · split at accepted
-                  · obtain ⟨_, _, accepted⟩ := bind_ok accepted
-                    obtain ⟨registered, child, accepted⟩ := bind_ok accepted
-                    cases accepted
-                    have reserved := previous.append (reservation (by assumption) selected)
-                    obtain ⟨shaped, count⟩ := ih.2 _ _ _ _ reserved child
-                    apply install_preserves _ (registerTypes_entries child) shaped
-                    apply installed (by assumption) selected
-                    simpa using count
+              · split at accepted
+                · obtain ⟨signature, selected, accepted⟩ := bind_ok accepted
+                  have selected := exact_signature selected
+                  split at accepted
+                  · split at accepted
+                    · obtain ⟨_, _, accepted⟩ := bind_ok accepted
+                      obtain ⟨registered, child, accepted⟩ := bind_ok accepted
+                      cases accepted
+                      have reserved := previous.append (reservation (by assumption) selected)
+                      obtain ⟨shaped, count⟩ := ih.2 _ _ _ _ reserved child
+                      apply install_preserves _ (registerTypes_entries child) shaped
+                      apply installed (by assumption) selected
+                      simpa using count
+                    · cases accepted
                   · cases accepted
                 · cases accepted
               · cases accepted

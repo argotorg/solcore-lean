@@ -38,6 +38,8 @@ inductive Error where
   | invalidProjection (type : Ty) (projected : Core.Ty)
   /-- An instantiation of the nominal type `id` has more nodes than `limit` (`maxTypeNodes`). -/
   | typeSizeExceeded (id : Resolved.DeclarationId) (limit : Nat)
+  /-- The data type `id`'s type arguments grow without bound (`layoutFinite`). -/
+  | nonRegularType (id : Resolved.DeclarationId)
   deriving Repr, DecidableEq
 
 /-- Representation keys erase outer staging wrappers while retaining observable
@@ -78,6 +80,141 @@ def typeNodes : Ty → Nat
 /-- Upstream's default `--pe-max-type-nodes`. Discovery refuses a nominal instantiation with more
 nodes, so a recursive type whose arguments grow fast stops before it exhausts the fuel. -/
 def maxTypeNodes : Nat := 4096
+
+/-! Upstream's layout finiteness (`crates/hull/src/emit/layout_finiteness.rs` at `e2eef194`): a data
+type expands into finitely many instantiations unless a cycle of its parameters' flows into its own
+recursive occurrences wraps an argument in a constructor, a product, a function or a qualifier.
+Arguments are lazy, so a parameter that no payload uses is never expanded. -/
+namespace Finiteness
+
+/-- An argument of an expansion: its type, the frame its parameters belong to (their declaration
+and its arguments) and the expansion path it was written on. A root parameter has no frame. -/
+inductive Argument where
+  | mk (type : Ty) (frame : Option (Resolved.DeclarationId × List Argument))
+      (path : List Resolved.DeclarationId)
+
+abbrev Frame := Option (Resolved.DeclarationId × List Argument)
+
+structure Analysis where
+  /-- `(source, target, wrapped)`: the root's parameter `source` reaches the argument `target` of
+  a recursive occurrence of the root, under a constructor or qualifier when `wrapped`. -/
+  flows : List (Nat × Nat × Bool) := []
+  /-- The data types the expansion reaches. -/
+  reached : List Resolved.DeclarationId := []
+
+def signatureOf (signatures : ProgramSignatures) (id : Resolved.DeclarationId) :
+    Option ProgramDataSignature :=
+  signatures.dataTypes.find? fun item => decide (item.id = id)
+
+/-- Upstream's `argument_flows`: where an argument of the root's recursive occurrence `target`
+comes from among the root's parameters. -/
+def flows (root : Resolved.DeclarationId) : Nat → Ty → Frame → Nat → Bool → Analysis → Analysis
+  | 0, _, _, _, _, analysis => analysis
+  | fuel + 1, type, frame, target, wrapped, analysis =>
+    match type with
+    | .parameter parameter =>
+      match frame with
+      | some (owner, arguments) =>
+        if parameter.owner = owner then
+          match arguments[parameter.index]? with
+          | some (.mk argument argumentFrame _) =>
+              flows root fuel argument argumentFrame target wrapped analysis
+          | none => analysis
+        else analysis
+      | none =>
+        if parameter.owner = root then
+          {analysis with flows := analysis.flows ++ [(parameter.index, target, wrapped)]}
+        else analysis
+    | .application function argument | .function function argument
+    | .product function argument | .mapping function argument =>
+        flows root fuel argument frame target true (flows root fuel function frame target true analysis)
+    | .proxy inner | .comptime inner => flows root fuel inner frame target true analysis
+    | _ => analysis
+
+/-- Upstream's `Analysis::ty`: walk a type of the root's expansion, expanding each data type off
+the path with lazy arguments, and record the flows of the root's own recursive occurrences. -/
+def walk (signatures : ProgramSignatures) (root : Resolved.DeclarationId) :
+    Nat → Ty → Frame → List Resolved.DeclarationId → Analysis → Analysis
+  | 0, _, _, _, analysis => analysis
+  | fuel + 1, type, frame, path, analysis =>
+    match nominalParts type with
+    | some (id, arguments) =>
+      match signatureOf signatures id with
+      | none => arguments.foldl (fun analysis argument =>
+          walk signatures root fuel argument frame path analysis) analysis
+      | some signature =>
+        let analysis := {analysis with reached := analysis.reached ++ [id]}
+        if id ∈ path then
+          if id = root then
+            arguments.zipIdx.foldl (fun analysis (argument, target) =>
+              flows root fuel argument frame target false analysis) analysis
+          else analysis
+        else
+          let inner : Frame := some (id, arguments.map fun argument => .mk argument frame path)
+          signature.constructors.foldl (fun analysis constructor =>
+            constructor.payloadTypes.foldl (fun analysis payload =>
+              walk signatures root fuel payload inner (path ++ [id]) analysis) analysis) analysis
+    | none =>
+      match type with
+      | .parameter parameter =>
+        match frame with
+        | some (owner, arguments) =>
+          if parameter.owner = owner then
+            match arguments[parameter.index]? with
+            | some (.mk argument argumentFrame argumentPath) =>
+                walk signatures root fuel argument argumentFrame argumentPath analysis
+            | none => analysis
+          else analysis
+        | none => analysis
+      | .application function argument | .function function argument
+      | .product function argument | .mapping function argument =>
+          walk signatures root fuel argument frame path (walk signatures root fuel function frame path analysis)
+      | .proxy inner | .comptime inner => walk signatures root fuel inner frame path analysis
+      | _ => analysis
+
+/-- The parameters that the flows reach from `seen`, which they include. -/
+def reachable (edges : List (Nat × Nat × Bool)) : Nat → List Nat → List Nat
+  | 0, seen => seen
+  | fuel + 1, seen =>
+    let next := (seen ++ edges.filterMap fun (source, target, _) =>
+      if source ∈ seen then some target else none).eraseDups
+    if next.length = seen.length then seen else reachable edges fuel next
+
+/-- Upstream's `has_growing_cycle`: a wrapped flow whose target reaches its source. -/
+def growing (arity : Nat) (edges : List (Nat × Nat × Bool)) : Bool :=
+  edges.any fun (source, target, wrapped) => wrapped && source ∈ reachable edges (arity + 1) [target]
+
+/-- The analysis of one data type as the root, its parameters unbound. -/
+def analyze (signatures : ProgramSignatures) (fuel : Nat) (signature : ProgramDataSignature) :
+    Analysis :=
+  let frame : Frame :=
+    some (signature.id, signature.parameters.map fun parameter => .mk (.parameter parameter) none [])
+  signature.constructors.foldl (fun analysis constructor =>
+    constructor.payloadTypes.foldl (fun analysis payload =>
+      walk signatures signature.id fuel payload frame [signature.id] analysis) analysis) {}
+
+/-- Upstream's `LayoutFiniteness::check`: no data type in `pending`, nor any that their expansions
+reach, has a growing cycle. -/
+def check (signatures : ProgramSignatures) (fuel : Nat) :
+    Nat → List Resolved.DeclarationId → List Resolved.DeclarationId → Bool
+  | 0, _, _ => true
+  | _ + 1, [], _ => true
+  | count + 1, id :: pending, seen =>
+    match signatureOf signatures id with
+    | none => check signatures fuel count (pending.filter (· ≠ id)) (id :: seen)
+    | some signature =>
+      let analysis := analyze signatures fuel signature
+      if growing signature.parameters.length analysis.flows then false
+      else check signatures fuel count
+        ((pending ++ analysis.reached).eraseDups.filter fun item => item ∉ id :: seen) (id :: seen)
+
+end Finiteness
+
+/-- Whether the data type `root` has a finite layout, as upstream's Hull emitter requires before
+lowering one (`NonRegularRecursiveType`, `SC0420`). Each walk's depth is bounded by `maxTypeNodes`;
+one that reached the bound would leave the type to discovery. -/
+def layoutFinite (signatures : ProgramSignatures) (root : Resolved.DeclarationId) : Bool :=
+  Finiteness.check signatures maxTypeNodes (signatures.dataTypes.length + 1) [root] []
 
 structure Entry where
   sourceType : Ty
@@ -181,6 +318,7 @@ mutual
             | some parts => pure parts
             | none => throw (.unsupportedType type)
           unless typeNodes type ≤ maxTypeNodes do throw (.typeSizeExceeded id maxTypeNodes)
+          unless layoutFinite signatures id do throw (.nonRegularType id)
           let signature ← exactData signatures id
           if signature.parameters.length ≠ arguments.length then
             throw (.parameterCount id signature.parameters.length arguments.length)

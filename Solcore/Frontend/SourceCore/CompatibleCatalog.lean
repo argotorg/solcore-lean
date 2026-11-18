@@ -173,6 +173,8 @@ mutual
             | none => throw (.catalog (.unsupportedType original))
           unless SourceCoreDataCatalog.typeNodes type ≤ SourceCoreDataCatalog.maxTypeNodes do
             throw (.catalog (.typeSizeExceeded declaration SourceCoreDataCatalog.maxTypeNodes))
+          unless SourceCoreDataCatalog.layoutFinite signatures declaration do
+            throw (.catalog (.nonRegularType declaration))
           let signature ← exactData signatures declaration
           unless signature.parameters.length = arguments.length do
             throw (.catalog (.parameterCount declaration signature.parameters.length arguments.length))

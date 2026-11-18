@@ -985,13 +985,15 @@ theorem registered_prefix_with_closed (signatures : ProgramSignatures) (fuel : N
                 exact extension
           · split at accepted
             · split at accepted
-              · obtain ⟨signature, selected, accepted⟩ := bind_ok accepted
-                split at accepted
-                · split at accepted
-                  · obtain ⟨_, _, accepted⟩ := bind_ok accepted
-                    obtain ⟨registered, child, accepted⟩ := bind_ok accepted
-                    cases accepted
-                    exact installed _ (fun _ => rfl) closed (ih.2 _ _ _ _ child)
+              · split at accepted
+                · obtain ⟨signature, selected, accepted⟩ := bind_ok accepted
+                  split at accepted
+                  · split at accepted
+                    · obtain ⟨_, _, accepted⟩ := bind_ok accepted
+                      obtain ⟨registered, child, accepted⟩ := bind_ok accepted
+                      cases accepted
+                      exact installed _ (fun _ => rfl) closed (ih.2 _ _ _ _ child)
+                    · cases accepted
                   · cases accepted
                 · cases accepted
               · cases accepted
