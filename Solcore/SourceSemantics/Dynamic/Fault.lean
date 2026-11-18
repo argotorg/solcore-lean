@@ -568,21 +568,23 @@ theorem requirements_produce_or_fault
         · exact .inr ⟨failed, .tail produces tailFault⟩
       · exact .inr ⟨id, .head unavailable⟩
 
-/-- The first source-ordered argument whose runtime type differs from the
-declared parameter type.  A successfully typed prefix is explicit. -/
+/-- The first source-ordered argument whose runtime shape differs from the
+declared parameter type's, as `ValueRuntimeTypeMatches` compares them: a
+fixed-width value is a word, so it passes at its own type.  A prefix that
+passes is explicit. -/
 inductive ValuesFirstTypeMismatch :
     List Value → List Ty → Ty → Ty → Prop where
   | head
       {value : Value} {values : List Value} {expected actual : Ty}
       {types : List Ty}
       (actual_type : ValueRuntimeType value actual)
-      (different : actual ≠ expected) :
+      (different : runtimeType actual ≠ runtimeType expected) :
       ValuesFirstTypeMismatch (value :: values) (expected :: types)
         expected actual
   | tail
       {value : Value} {values : List Value} {expected : Ty}
       {types : List Ty} {failedExpected failedActual : Ty}
-      (head_type : ValueRuntimeType value expected)
+      (head_type : ValueRuntimeTypeMatches value expected)
       (tail_fault : ValuesFirstTypeMismatch values types
         failedExpected failedActual) :
       ValuesFirstTypeMismatch (value :: values) (expected :: types)

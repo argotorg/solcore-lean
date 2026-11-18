@@ -20,9 +20,7 @@ Main declarations:
 - `CellAwareInvocationAcceptedConversions.preserves` and
   `CellAwareInvocationAcceptedConversions.reflects`, the cell-aware head of a conversion.
 
-`Typedef.rep` at a fixed-width type is no site. Its parameter type is the fixed-width type, while
-a fixed-width value's runtime type is `word`, so the Source rule `builtinType` gives a type
-mismatch where the native code returns the word.
+`Typedef.rep` at a fixed-width type is not a site yet.
 -/
 
 section

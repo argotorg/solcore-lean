@@ -1432,7 +1432,7 @@ private theorem types_exclude_mismatch {values : List Dynamic.Value} {types : Li
   | nil => cases mismatch
   | cons head tail ih =>
     cases mismatch with
-    | head actual different => exact different (head.functional actual).symm
+    | head actual different => exact different (congrArg Dynamic.runtimeType (head.functional actual)).symm
     | tail _ fault => exact ih fault
 
 theorem InputRep.source_argument_types {function : BuiltinFunctionId} {arguments : List Dynamic.Value} {input : Value}
