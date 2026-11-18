@@ -60,6 +60,8 @@ structure Head (values : ValuesContext) (source : TypedSource)
   profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf)
   /-- The target is not a checked compound assignment's fixed-width target. -/
   targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator
+  /-- The leaf's runtime view is the target's. -/
+  leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type
 
 namespace Head
 variable {values : ValuesContext} {source : TypedSource}
@@ -158,7 +160,8 @@ theorem Head.of_lower_bare_with_token {values : ValuesContext} {source : TypedSo
   obtain ⟨node, found, tree⟩ := extract lowered generated
   refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
     .bare bare layout, slot, rootType ▸ writable binder binding, found, tree,
-    (rightTyped.view unique found).transport rawView, sameType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩, codeEq, rfl⟩
+    (rightTyped.view unique found).transport rawView, sameType, ?_, CompatiblePlaceModifier.plain_of_profile profile, rawView⟩,
+    codeEq, rfl⟩
   rcases profile with equal | word | ⟨integer, notWordOnly⟩
   · exact .inl equal
   · exact .inr (.inl (rawView.trans word))
@@ -280,7 +283,8 @@ theorem Head.of_lower_with_prepared {values : ValuesContext} {source : TypedSour
           exact description.ordinary (fun k v same => notMapping k v (rootEq.trans same))
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
-          found, certified, (rightTyped.view unique found).transport leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩,
+          found, certified, (rightTyped.view unique found).transport leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile,
+          leafView⟩,
           by simp [Head.emit, routeEq, SourceCoreCompatibleDataPlaces.placeModifier,
             assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)], rfl, ?_⟩
         · rcases profile with equal | word | ⟨integer, notWordOnly⟩
@@ -611,7 +615,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   try rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at *
   cases shape with
   | bare empty layout =>
@@ -635,7 +639,7 @@ theorem preserves_fault_reachable [FunctionCalls.FaultTokens faults] (errors : h
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   try rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at *
   cases shape with
   | bare empty layout =>
@@ -677,19 +681,24 @@ theorem reflects_reachable (functionTypes : FunctionRuntimeViews functions) [Fun
       AdministrativePreserved mapping store finalMap written ∧ Dynamic.HeapMetadataExtend before after ∧
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
-  try rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at *
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | bare empty layout =>
-    have result := CompatibleBareAssignment.reflects_reachable layout empty extension reflection observations right found rightView rightType profile
-      environments heaps locals agrees actualTyped slot writable errors.operands completed
+    simp only [Head.emit] at completed
+    rw [← assignmentModifier_plain none, ← SourceCoreDataPlaces.placeWrap_plain none] at completed
+    have result := CompatibleBareAssignment.reflects_reachable_wide layout empty extension reflection observations right found rightView
+      rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot writable errors.operands completed
     cases result with
     | fault trace same matched finalHeaps maps worlds frame metadata => exact .inl ⟨_, _, _, _, _, trace, same, matched, finalHeaps, maps, worlds, frame, metadata⟩
     | success trace _ finalHeaps maps worlds frame metadata count typed continuation =>
       exact .inr ⟨_, _, _, _, _, _, trace, finalHeaps, maps, worlds, frame, metadata, count, by simpa [Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext, Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed, continuation⟩
   | projected layout ordinary =>
+    simp only [Head.emit] at completed
+    rw [← assignmentModifier_plain none, ← SourceCoreDataPlaces.placeWrap_plain none] at completed
     rcases CompatibleRenamedPlaceReflection.reflects layout ordinary extension reflection meaning functionTypes faithful observations
-      errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType profile environments heaps agrees actualTyped locals slot writable completed with
+      errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps agrees
+      actualTyped locals slot writable completed with
       ⟨_, _, _, _, _, trace, same, matched, finalHeaps, maps, worlds, frame, metadata⟩ |
       ⟨_, _, _, _, _, _, trace, finalHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩
     · exact .inl ⟨_, _, _, _, _, trace, same, matched, finalHeaps, maps, worlds, frame, metadata⟩

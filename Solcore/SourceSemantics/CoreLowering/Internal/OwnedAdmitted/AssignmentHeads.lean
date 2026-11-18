@@ -199,7 +199,7 @@ theorem preserves_prefix_bounded (budget : Nat)
         callerProtocol.Relates initial reached ∧ Admission bridge context reached) ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -233,7 +233,7 @@ theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (bu
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -259,7 +259,10 @@ theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : 
     ResultAt bridge size values.checked registry functions context evidence source faults
       scope (head.writtenContext actualContext) assignment operator rhs environment canonical actual
       before store mapping world initial (next.rename ξ) output value finalStore := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
+  simp only [GenericAssignmentStatements.Head.emit] at completed
+  rw [← assignmentModifier_plain none, ← SourceCoreDataPlaces.placeWrap_plain none] at completed
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -270,7 +273,9 @@ theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : 
     have result := ProtectedBareAssignment.Stateful.reflects_reachable_bounded_with_rhs callerProtocol transport budget initial layout empty extension
       (fun snapshot child smaller {_ _} evaluated => rhs_reflects_at bridge snapshot child (boundedReflection child smaller)
         right found sourceTyped environments heaps locals agrees actualTyped initial admitted evaluated)
-      observations right found rightView rightType profile environments heaps locals agrees actualTyped slot writable errors.operands completed bounded
+      observations right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot
+      writable errors.operands completed bounded
+    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     cases result with
     | fault trace same matched finalHeaps maps worlds preservation metadata post =>
       obtain ⟨reached, related⟩ := post
@@ -441,7 +446,7 @@ theorem preserves_prefix_bounded (budget : Nat)
         callerProtocol.Relates initial reached ∧ Admission bridge context reached) ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | bare empty _layout => exact (projected empty).elim
   | projected layout ordinary =>
@@ -479,7 +484,7 @@ theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (bu
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | bare empty _layout => exact (projected empty).elim
   | projected layout ordinary =>
@@ -512,7 +517,10 @@ theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : 
     CallableIndexedOwnedAdmittedBareAssignmentHeads.ResultAt bridge size values.checked registry functions context evidence source faults
       scope (head.writtenContext actualContext) assignment operator rhs environment canonical actual
       before store mapping world initial (next.rename ξ) output value finalStore := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
+  simp only [GenericAssignmentStatements.Head.emit] at completed
+  rw [← assignmentModifier_plain none, ← SourceCoreDataPlaces.placeWrap_plain none] at completed
   cases shape with
   | bare empty _layout => exact (projected empty).elim
   | projected layout ordinary =>
@@ -520,7 +528,8 @@ theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : 
     obtain ⟨type, targetTyped⟩ := CallableIndexedOwnedPlaceAdmission.assignment_target_typed assignmentTyped
     obtain ⟨originalTypes, keyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
     have result := ProtectedPlaceAssignmentReflection.Stateful.reflects_bounded_with_producers budget layout ordinary extension callerProtocol transport functionTypes faithful observations
-      errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType profile environments heaps agrees actualTyped initial
+      errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType (.inl (leafView ▸ profile)) leafView
+      environments heaps agrees actualTyped initial
       (fun target _ hiddenTyped => CallableIndexedOwnedAdmittedSequenceProducer.reflects bridge initial admitted
         layout.children unique keyTyped environments heaps locals
         (DataPlaceChildExpressions.prefix_agrees agrees [.cellRef (OptionalCell.cellType prepared.route.rootType) target])
@@ -528,6 +537,7 @@ theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : 
       (rhs_reflects_after bridge initial admitted wellFormed runtime covers targetTyped sourceTyped right found
         environments locals agrees actualTyped budget boundedReflection)
       locals slot writable completed bounded
+    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     cases result with
     | fault trace same matched finalHeaps maps worlds frame metadata post =>
       obtain ⟨reached, related⟩ := post
@@ -1722,7 +1732,7 @@ theorem preserves_fault_with_operands [FunctionCalls.FaultTokens faults] (budget
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1748,7 +1758,10 @@ theorem reflects_with_operands [FunctionCalls.FaultTokens faults] (budget : Nat)
     CallableIndexedOwnedAdmittedBareAssignmentHeads.ResultAt bridge size values.checked registry functions context evidence source faults
       scope (head.writtenContext actualContext) assignment operator rhs environment canonical actual
       before store mapping world initial (next.rename ξ) output value finalStore := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
+  simp only [GenericAssignmentStatements.Head.emit] at completed
+  rw [← assignmentModifier_plain none, ← SourceCoreDataPlaces.placeWrap_plain none] at completed
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1759,7 +1772,8 @@ theorem reflects_with_operands [FunctionCalls.FaultTokens faults] (budget : Nat)
     have result := ProtectedBareAssignment.Stateful.reflects_reachable_bounded_with_rhs callerProtocol transport budget initial layout empty extension
       (fun snapshot child smaller {_ _} evaluated => rhs_reflects_at bridge snapshot child (boundedReflection child smaller)
         right found sourceTyped environments heaps locals agrees actualTyped initial admitted evaluated)
-      observations right found rightView rightType profile environments heaps locals agrees actualTyped slot writable operands completed bounded
+      observations right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot writable operands completed bounded
+    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     cases result with
     | fault trace same matched finalHeaps maps worlds preservation metadata post =>
       obtain ⟨reached, related⟩ := post
@@ -1842,7 +1856,7 @@ theorem preserves_fault_with_diagnostics [FunctionCalls.FaultTokens faults] (bud
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions callerProtocol source context certificate
     scope administrative environment assignment.target prepared operator invalid initial faults shape at errors
   cases errors with
@@ -1878,7 +1892,10 @@ theorem reflects_with_diagnostics [FunctionCalls.FaultTokens faults] (budget : N
     CallableIndexedOwnedAdmittedBareAssignmentHeads.ResultAt bridge size values.checked registry functions context evidence source faults
       scope (head.writtenContext actualContext) assignment operator rhs environment canonical actual
       before store mapping world initial (next.rename ξ) output value finalStore := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
+  simp only [GenericAssignmentStatements.Head.emit] at completed
+  rw [← assignmentModifier_plain none, ← SourceCoreDataPlaces.placeWrap_plain none] at completed
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions callerProtocol source context certificate
     scope administrative environment assignment.target prepared operator invalid initial faults shape at errors
   cases errors with
@@ -1888,7 +1905,7 @@ theorem reflects_with_diagnostics [FunctionCalls.FaultTokens faults] (budget : N
     obtain ⟨type, targetTyped⟩ := CallableIndexedOwnedPlaceAdmission.assignment_target_typed assignmentTyped
     obtain ⟨originalTypes, keyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
     have result := ProtectedPlaceAssignmentReflection.Stateful.reflects_bounded_with_producers_with_diagnostics budget layout ordinary extension callerProtocol transport functionTypes faithful observations
-      right found rightView rightType profile environments heaps agrees actualTyped initial missing uninitialized
+      right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps agrees actualTyped initial missing uninitialized
       (fun target _ hiddenTyped => CallableIndexedOwnedAdmittedSequenceProducer.reflects bridge initial admitted
         layout.children unique keyTyped environments heaps locals
         (DataPlaceChildExpressions.prefix_agrees agrees [.cellRef (OptionalCell.cellType prepared.route.rootType) target])
@@ -1896,6 +1913,7 @@ theorem reflects_with_diagnostics [FunctionCalls.FaultTokens faults] (budget : N
       (CallableIndexedOwnedAdmittedProjectedAssignmentHeads.rhs_reflects_after bridge initial admitted wellFormed runtime covers targetTyped sourceTyped right found
         environments locals agrees actualTyped budget boundedReflection)
       locals slot writable completed bounded
+    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     cases result with
     | fault trace same matched finalHeaps maps worlds frame metadata post =>
       obtain ⟨reached, related⟩ := post

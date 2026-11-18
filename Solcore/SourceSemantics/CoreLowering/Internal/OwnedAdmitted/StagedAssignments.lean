@@ -898,7 +898,7 @@ theorem preserves_value (budget : Nat)
         callerProtocol.Relates initial reached ∧ Admission bridge context reached) ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | projected layout ordinary =>
@@ -948,7 +948,7 @@ theorem preserves_key_fault (budget : Nat)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | projected layout ordinary =>
@@ -996,7 +996,7 @@ theorem preserves_fault (budget : Nat)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | projected layout ordinary =>
@@ -1050,7 +1050,7 @@ theorem preserves_getter_fault (budget : Nat)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions callerProtocol invocation.source context certificate
     scope administrative environment assignment.target prepared operator invalid initial
     (fun reason token => faults (.semantic reason) token) shape at errors
@@ -1124,7 +1124,7 @@ theorem preserves_write_fault [RecursiveStageMeaning.FaultTokens faults] (budget
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions callerProtocol invocation.source context certificate
     scope administrative environment assignment.target prepared operator invalid initial
     (fun reason token => faults (.semantic reason) token) shape at errors
@@ -1243,7 +1243,7 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
     ResultAt bridge size values.checked registry functions context stages invocation faults
       scope (head.writtenContext actualContext) assignment operator rhs environment canonical actual
       before store mapping world initial (next.rename ξ) output value finalStore := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions callerProtocol invocation.source context certificate
     scope administrative environment assignment.target prepared operator invalid initial
     (fun reason token => faults (.semantic reason) token) shape at errors
@@ -1579,7 +1579,7 @@ include extension environments heaps locals agrees bare head in
 pre-RHS snapshot; no Source assignment execution is assumed. -/
 theorem target_snapshot :
     ∃ target, Staging.Recursive.BareTarget environment before assignment.target target := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1599,7 +1599,7 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
     ResultAt bridge size values.checked registry functions context stages invocation faults
       scope (head.writtenContext actualContext) assignment operator rhs environment canonical actual
       before store mapping world initial (next.rename ξ) output value finalStore := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1651,7 +1651,7 @@ theorem preserves_value {sourceSize : Nat}
         callerProtocol.Relates initial reached ∧ Admission bridge context reached) ∧
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1687,7 +1687,7 @@ theorem preserves_fault {sourceSize : Nat}
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1721,7 +1721,7 @@ theorem preserves_operands {sourceSize : Nat}
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1755,7 +1755,7 @@ theorem preserves_panic {sourceSize : Nat}
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
-  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path

@@ -900,7 +900,8 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (rhsView : AssignedRhsView operator leaf node.type)
     (rhsCoreType : lowered.type = prepared.route.leafType)
-    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
+    (operatorProfile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType place.type)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -913,7 +914,8 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
     (completed : Evaluates coreEnvironment store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
-        (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ) result finalStore) :
+        (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+        (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ) result finalStore) :
     (∃ reason token after finalMap finalWorld,
       Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before place operator rhs reason after ∧
       result = .inLeft outputType (.word token) ∧ faults reason token ∧
@@ -921,7 +923,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
         environment before place rhs updated after ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -941,7 +943,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     CompatibleExpressionTyped.reflects functions registryExtension program evidence contextValid uninitialized missing
   exact CompatibleRenamedPlaceReflection.reflects layout ordinary registryExtension reflection preservation
     functionTypes faithful observations missingTokens invalidTokens rhsGenerated found rhsView rhsCoreType
-    operatorProfile environments heaps agrees actualTyped locals slot rootTyped completed
+    operatorProfile leafView environments heaps agrees actualTyped locals slot rootTyped completed
 
 theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}

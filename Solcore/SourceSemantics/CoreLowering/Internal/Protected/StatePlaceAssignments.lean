@@ -253,7 +253,7 @@ inductive KeyResultAt {Records : Type v} (protocol : ProtectedStateTransition.Pr
     (scope : SourceCoreLocalCell.Scope) (canonical : Environment)
     (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩) (index : Nat)
     (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word)
-    (result : Value) (finalStore : Store) : Prop where
+    (result : Value) (finalStore : Store) (wrap : Option TypeSystem.FixedInteger := none) : Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
       (sourceFault : SourceExecutionSize.SourcePlaceFaults program sourceSize context evidence source environment before place reason after)
@@ -263,7 +263,7 @@ inductive KeyResultAt {Records : Type v} (protocol : ProtectedStateTransition.Pr
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after)
       (post : ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) :
       KeyResultAt protocol size checked registry functions program context evidence source faults prepared codes sourceTypes place environment
-        coreEnvironment before store mapping world scope canonical initialState index rhs next outputType operator bitNot invalid result finalStore
+        coreEnvironment before store mapping world scope canonical initialState index rhs next outputType operator bitNot invalid result finalStore wrap
   | keys {sourceSize remainingSize : Nat} {location : Dynamic.Location} {resolved : List Dynamic.EvaluatedProjection} {after : Dynamic.Heap}
       (lookup : Dynamic.Environment.LooksUp environment place.root location)
       (trace : SourceExecutionSize.SourceProjectionsEvaluate program sourceSize context evidence source environment before place.projections resolved after)
@@ -271,10 +271,11 @@ inductive KeyResultAt {Records : Type v} (protocol : ProtectedStateTransition.Pr
         coreEnvironment before after store mapping world index)
       (bounded : remainingSize < size)
       (continuation : EvaluationSize remainingSize (keysEnvironment prepared.route.rootType execution.target (packValues execution.values) coreEnvironment)
-        execution.keyStore (CompatiblePlaceKeyReflection.remainder prepared (SourceCoreCalls.packArguments codes).type rhs next outputType operator bitNot invalid) result finalStore)
+        execution.keyStore (CompatiblePlaceKeyReflection.remainder prepared (SourceCoreCalls.packArguments codes).type rhs next outputType operator bitNot invalid wrap)
+        result finalStore)
       (post : ProtectedStateTransition.Transition protocol initialState ⟨scope, execution.keyMap, execution.keyWorld, after, execution.keyStore, canonical⟩) :
       KeyResultAt protocol size checked registry functions program context evidence source faults prepared codes sourceTypes place environment
-        coreEnvironment before store mapping world scope canonical initialState index rhs next outputType operator bitNot invalid result finalStore
+        coreEnvironment before store mapping world scope canonical initialState index rhs next outputType operator bitNot invalid result finalStore wrap
 
 
 theorem KeyResultAt.forget {Records : Type v} {protocol : ProtectedStateTransition.Protocol.{u, v} Records} {size : Nat} {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
@@ -287,11 +288,11 @@ theorem KeyResultAt.forget {Records : Type v} {protocol : ProtectedStateTransiti
     {scope : SourceCoreLocalCell.Scope} {canonical : Environment}
     {initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩} {index : Nat}
     {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
-    {result : Value} {finalStore : Store}
+    {result : Value} {finalStore : Store} {wrap : Option TypeSystem.FixedInteger}
     (receipt : KeyResultAt protocol size checked registry functions program context evidence source faults prepared codes sourceTypes place environment
-        coreEnvironment before store mapping world scope canonical initialState index rhs next outputType operator bitNot invalid result finalStore) :
+        coreEnvironment before store mapping world scope canonical initialState index rhs next outputType operator bitNot invalid result finalStore wrap) :
     RecursiveNamedPlaceAssignmentContracts.KeyResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place environment
-        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore := by
+        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore wrap := by
   cases receipt with
   | fault trace same represented heaps maps worlds frame metadata _ =>
     exact .fault trace same represented heaps maps worlds frame metadata
@@ -307,7 +308,7 @@ inductive PrefixResultAt {Records : Type v} (protocol : ProtectedStateTransition
     (scope : SourceCoreLocalCell.Scope) (canonical : Environment)
     (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
     (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word)
-    (result : Value) (finalStore : Store) : Prop where
+    (result : Value) (finalStore : Store) (wrap : Option TypeSystem.FixedInteger := none) : Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
       (sourceFault : SourceExecutionSize.SourcePlaceFaults program sourceSize context evidence source environment before place reason after)
@@ -317,7 +318,7 @@ inductive PrefixResultAt {Records : Type v} (protocol : ProtectedStateTransition
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after)
       (post : ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) :
       PrefixResultAt protocol size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world scope canonical initialState rhs next outputType operator bitNot invalid result finalStore
+        coreEnvironment before store mapping world scope canonical initialState rhs next outputType operator bitNot invalid result finalStore wrap
   | resolved {sourceSize remainingSize : Nat} {target : Dynamic.ResolvedPlace} {after : Dynamic.Heap}
       (sourceTrace : SourceExecutionSize.SourcePlaceResolves program sourceSize context evidence source environment before place target after)
       (execution : CompatiblePlaceResolution.Execution checked registry functions prepared codes sourceTypes place leaf target
@@ -325,10 +326,11 @@ inductive PrefixResultAt {Records : Type v} (protocol : ProtectedStateTransition
       (bounded : remainingSize < size)
       (continuation : EvaluationSize remainingSize (snapshotEnvironment prepared.route.rootType execution.target (packValues execution.values)
         (.inRight .unit execution.snapshot) coreEnvironment) execution.store
-        (CompatiblePlacePrefixReflection.remainder prepared (SourceCoreCalls.packArguments codes).type rhs next outputType operator bitNot invalid) result finalStore)
+        (CompatiblePlacePrefixReflection.remainder prepared (SourceCoreCalls.packArguments codes).type rhs next outputType operator bitNot invalid
+          wrap) result finalStore)
       (post : ProtectedStateTransition.Transition protocol initialState ⟨scope, execution.mapping, execution.world, after, execution.store, canonical⟩) :
       PrefixResultAt protocol size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world scope canonical initialState rhs next outputType operator bitNot invalid result finalStore
+        coreEnvironment before store mapping world scope canonical initialState rhs next outputType operator bitNot invalid result finalStore wrap
 
 theorem PrefixResultAt.forget {Records : Type v} {protocol : ProtectedStateTransition.Protocol.{u, v} Records} {size : Nat} {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions}
@@ -340,11 +342,11 @@ theorem PrefixResultAt.forget {Records : Type v} {protocol : ProtectedStateTrans
     {scope : SourceCoreLocalCell.Scope} {canonical : Environment}
     {initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩}
     {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
-    {result : Value} {finalStore : Store}
+    {result : Value} {finalStore : Store} {wrap : Option TypeSystem.FixedInteger}
     (receipt : PrefixResultAt protocol size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world scope canonical initialState rhs next outputType operator bitNot invalid result finalStore) :
+        coreEnvironment before store mapping world scope canonical initialState rhs next outputType operator bitNot invalid result finalStore wrap) :
     RecursiveNamedPlaceAssignmentContracts.PrefixResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-      coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore := by
+      coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore wrap := by
   cases receipt with
   | fault trace same represented heaps maps worlds frame metadata _ =>
     exact .fault trace same represented heaps maps worlds frame metadata
@@ -361,7 +363,9 @@ inductive RhsResultAt {Records : Type v} (protocol : ProtectedStateTransition.Pr
     (scope : SourceCoreLocalCell.Scope) (canonical : Environment)
     (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
     (rhs : ExpressionId) (node : ExpressionNode) (lowered : SourceCoreBasic.LoweredExpr) (next : Expr) (outputType : Ty)
-    (operator : Syntax.ValueAssignOp) (invalid : Word) (result : Value) (finalStore : Store) : Prop where
+    (operator : Syntax.ValueAssignOp) (invalid : Word) (result : Value) (finalStore : Store)
+    (modifier : Option Frontend.SourceCoreDataPlaces.Modifier := binaryOperator (prepared.route.leafType = .integer) operator)
+    (wrap : Option TypeSystem.FixedInteger := none) : Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
       (sourceFault : SourceExecutionSize.SourcePlaceAssignmentFaults program sourceSize context evidence source environment before place operator rhs reason after)
@@ -371,7 +375,7 @@ inductive RhsResultAt {Records : Type v} (protocol : ProtectedStateTransition.Pr
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after)
       (post : ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) :
       RhsResultAt protocol size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world scope canonical initialState rhs node lowered next outputType operator invalid result finalStore
+        coreEnvironment before store mapping world scope canonical initialState rhs node lowered next outputType operator invalid result finalStore modifier wrap
   | ready {sourceSize remainingSize : Nat} {target : Dynamic.ResolvedPlace} {targetHeap : Dynamic.Heap}
       (sourceTrace : SourceExecutionSize.SourcePlaceResolves program sourceSize context evidence source environment before place target targetHeap)
       (resolution : CompatiblePlaceResolution.Execution checked registry functions prepared codes sourceTypes place leaf target
@@ -384,10 +388,10 @@ inductive RhsResultAt {Records : Type v} (protocol : ProtectedStateTransition.Pr
       (continuation : EvaluationSize remainingSize (rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
         (.inRight .unit resolution.snapshot) right.value coreEnvironment) right.store
         (CompatiblePlaceRhsReflection.remainder prepared (SourceCoreCalls.packArguments codes).type next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) invalid) result finalStore)
+          modifier invalid wrap) result finalStore)
       (post : ProtectedStateTransition.Transition protocol initialState ⟨scope, right.mapping, right.world, right.heap, right.store, canonical⟩) :
       RhsResultAt protocol size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world scope canonical initialState rhs node lowered next outputType operator invalid result finalStore
+        coreEnvironment before store mapping world scope canonical initialState rhs node lowered next outputType operator invalid result finalStore modifier wrap
 
 theorem RhsResultAt.forget {Records : Type v} {protocol : ProtectedStateTransition.Protocol.{u, v} Records} {size : Nat} {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions}
@@ -400,10 +404,11 @@ theorem RhsResultAt.forget {Records : Type v} {protocol : ProtectedStateTransiti
     {initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩}
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr} {next : Expr} {outputType : Ty}
     {operator : Syntax.ValueAssignOp} {invalid : Word} {result : Value} {finalStore : Store}
+    {modifier : Option Frontend.SourceCoreDataPlaces.Modifier} {wrap : Option TypeSystem.FixedInteger}
     (receipt : RhsResultAt protocol size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world scope canonical initialState rhs node lowered next outputType operator invalid result finalStore) :
+        coreEnvironment before store mapping world scope canonical initialState rhs node lowered next outputType operator invalid result finalStore modifier wrap) :
     RecursiveNamedPlaceAssignmentContracts.RhsResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-      coreEnvironment before store mapping world rhs node lowered next outputType operator invalid result finalStore := by
+      coreEnvironment before store mapping world rhs node lowered next outputType operator invalid result finalStore modifier wrap := by
   cases receipt with
   | fault trace same represented heaps maps worlds frame metadata _ =>
     exact .fault trace same represented heaps maps worlds frame metadata
@@ -420,7 +425,9 @@ inductive ResultAt {Records : Type v} (protocol : ProtectedStateTransition.Proto
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping)
     (scope : SourceCoreLocalCell.Scope) (canonical : Environment)
     (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
-    (next : Expr) (outputType : Ty) (result : Value) (finalStore : Store) : Prop where
+    (next : Expr) (outputType : Ty) (result : Value) (finalStore : Store)
+    (Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop := Dynamic.AssignmentValueApplies operator) :
+    Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
       (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program sourceSize context evidence source environment before place operator rhs reason after)
@@ -430,10 +437,10 @@ inductive ResultAt {Records : Type v} (protocol : ProtectedStateTransition.Proto
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after)
       (post : ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) :
       ResultAt protocol size checked registry functions program context evidence source faults prepared keyType actualContext place operator rhs environment coreEnvironment
-        before store mapping world scope canonical initialState next outputType result finalStore
+        before store mapping world scope canonical initialState next outputType result finalStore Modify
   | committed {sourceSize remainingSize : Nat} {updated : Dynamic.Value} {after : Dynamic.Heap} {written : Store}
       {finalMap : LocationMap} {finalWorld : StoreTyping} {slots : Environment}
-      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.AssignmentValueApplies operator)
+      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source Modify
         environment before place rhs updated after)
       (heaps : HeapRepresents checked registry functions finalMap finalWorld after written)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
@@ -445,7 +452,7 @@ inductive ResultAt {Records : Type v} (protocol : ProtectedStateTransition.Proto
       (bounded : remainingSize < size)
       (continuation : EvaluationSize remainingSize (slots ++ coreEnvironment) written (shift 7 next) result finalStore) :
       ResultAt protocol size checked registry functions program context evidence source faults prepared keyType actualContext place operator rhs environment coreEnvironment
-        before store mapping world scope canonical initialState next outputType result finalStore
+        before store mapping world scope canonical initialState next outputType result finalStore Modify
 
 theorem ResultAt.forget {Records : Type v} {protocol : ProtectedStateTransition.Protocol.{u, v} Records} {size : Nat} {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions} {functions : FunctionModel checked.catalog ambient}
@@ -455,10 +462,11 @@ theorem ResultAt.forget {Records : Type v} {protocol : ProtectedStateTransition.
     {before : Dynamic.Heap} {store : Store} {mapping : LocationMap} {world : StoreTyping}
     {scope : SourceCoreLocalCell.Scope} {canonical : Environment}
     {initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩} {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
+    {Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop}
     (result : ResultAt protocol size checked registry functions program context evidence source faults prepared keyType actualContext place operator rhs
-      environment actual before store mapping world scope canonical initialState next output value finalStore) :
+      environment actual before store mapping world scope canonical initialState next output value finalStore Modify) :
     RecursiveNamedPlaceAssignmentContracts.ResultAt size checked registry functions program context evidence source faults prepared keyType actualContext place operator rhs environment actual
-      before store mapping world next output value finalStore := by
+      before store mapping world next output value finalStore Modify := by
   cases result with
   | fault trace same represented heaps maps worlds frame metadata _ =>
     exact .fault trace same represented heaps maps worlds frame metadata
@@ -473,10 +481,11 @@ theorem ResultAt.weaken_bound {Records : Type v} {protocol : ProtectedStateTrans
     {before : Dynamic.Heap} {store : Store} {mapping : LocationMap} {world : StoreTyping}
     {scope : SourceCoreLocalCell.Scope} {canonical : Environment}
     {initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩} {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
+    {Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop}
     (result : ResultAt protocol size checked registry functions program context evidence source faults prepared keyType actualContext place operator rhs
-      environment actual before store mapping world scope canonical initialState next output value finalStore) (bound : size ≤ larger) :
+      environment actual before store mapping world scope canonical initialState next output value finalStore Modify) (bound : size ≤ larger) :
     ResultAt protocol larger checked registry functions program context evidence source faults prepared keyType actualContext place operator rhs
-      environment actual before store mapping world scope canonical initialState next output value finalStore := by
+      environment actual before store mapping world scope canonical initialState next output value finalStore Modify := by
   cases result with
   | fault trace same represented heaps maps worlds frame metadata post =>
     exact .fault trace same represented heaps maps worlds frame metadata post
@@ -520,7 +529,9 @@ inductive ResultAt {Records : Type v} (protocol : Protocol.{u, v} Records) (size
     (environment : Dynamic.Environment) (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping)
     (rhs : ExpressionId) (actual : Environment) (actualContext : Core.Context) (ξ : Renaming)
     (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
-    (next : Expr) (outputType : Ty) (value : Value) (finalStore : Store) : Prop where
+    (next : Expr) (outputType : Ty) (value : Value) (finalStore : Store)
+    (Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop := Dynamic.AssignmentValueApplies operator) :
+    Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap} {finalMap : LocationMap} {finalWorld : StoreTyping}
       (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program sourceSize context evidence source environment before place operator rhs reason after)
       (result : value = .inLeft outputType (.word token)) (represented : faults reason token)
@@ -529,10 +540,10 @@ inductive ResultAt {Records : Type v} (protocol : Protocol.{u, v} Records) (size
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after)
       (post : Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) :
       ResultAt protocol size compilation registry functions program context evidence source faults prepared place operator scope canonical environment before store mapping world
-        rhs actual actualContext ξ initial next outputType value finalStore
+        rhs actual actualContext ξ initial next outputType value finalStore Modify
   | success {sourceSize remainingSize : Nat} {updated : Dynamic.Value} {updatedValue : Value} {after : Dynamic.Heap} {commitStore : Store}
       {finalMap : LocationMap} {finalWorld : StoreTyping} {slots : Environment}
-      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.AssignmentValueApplies operator)
+      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source Modify
         environment before place rhs updated after)
       (represented : ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType)
       (heaps : HeapRepresents compilation.checked registry functions finalMap finalWorld after commitStore)
@@ -544,7 +555,7 @@ inductive ResultAt {Records : Type v} (protocol : Protocol.{u, v} Records) (size
       (continuation : EvaluationSize remainingSize (slots ++ actual) commitStore (shift 7 (next.rename ξ)) value finalStore)
       (post : Transition protocol initial ⟨scope, finalMap, finalWorld, after, commitStore, canonical⟩) :
       ResultAt protocol size compilation registry functions program context evidence source faults prepared place operator scope canonical environment before store mapping world
-        rhs actual actualContext ξ initial next outputType value finalStore
+        rhs actual actualContext ξ initial next outputType value finalStore Modify
 
 
 theorem ResultAt.forget {Records : Type v} {protocol : Protocol.{u, v} Records}
@@ -558,10 +569,11 @@ theorem ResultAt.forget {Records : Type v} {protocol : Protocol.{u, v} Records}
     {actual : Environment} {actualContext : Core.Context} {ξ : Renaming}
     {initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩}
     {next : Expr} {outputType : Ty} {value : Value} {finalStore : Store}
+    {Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop}
     (result : ResultAt protocol size compilation registry functions program context evidence source faults prepared place operator
-      scope canonical environment before store mapping world rhs actual actualContext ξ initial next outputType value finalStore) :
+      scope canonical environment before store mapping world rhs actual actualContext ξ initial next outputType value finalStore Modify) :
     RecursiveNamedBareAssignmentContracts.ResultAt size compilation registry functions program context evidence source faults prepared place operator
-      environment before store mapping world rhs actual actualContext ξ next outputType value finalStore := by
+      environment before store mapping world rhs actual actualContext ξ next outputType value finalStore Modify := by
   cases result with
   | fault trace same represented heaps maps worlds frame metadata _ =>
     exact .fault trace same represented heaps maps worlds frame metadata
@@ -806,7 +818,9 @@ inductive ResultAt {Records : Type v} (protocol : Protocol.{u, v} Records) (size
     (environment : Dynamic.Environment) (canonical actual : Environment)
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping)
     (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
-    (next : Expr) (output : Ty) (value : Value) (finalStore : Store) : Prop where
+    (next : Expr) (output : Ty) (value : Value) (finalStore : Store)
+    (Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop := Dynamic.AssignmentValueApplies operator) :
+    Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
       (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program sourceSize context evidence source environment before place operator rhs reason after)
@@ -816,10 +830,10 @@ inductive ResultAt {Records : Type v} (protocol : Protocol.{u, v} Records) (size
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after)
       (post : Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) :
       ResultAt protocol size checked registry functions program context evidence source faults scope writtenContext place operator rhs
-        environment canonical actual before store mapping world initial next output value finalStore
+        environment canonical actual before store mapping world initial next output value finalStore Modify
   | success {sourceSize remainingSize : Nat} {updated : Dynamic.Value} {after : Dynamic.Heap}
       {written : Store} {finalMap : LocationMap} {finalWorld : StoreTyping} {slots : Environment}
-      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.AssignmentValueApplies operator)
+      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source Modify
         environment before place rhs updated after)
       (heaps : HeapRepresents checked registry functions finalMap finalWorld after written)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
@@ -830,7 +844,7 @@ inductive ResultAt {Records : Type v} (protocol : Protocol.{u, v} Records) (size
       (bounded : remainingSize < size)
       (remaining : EvaluationSize remainingSize (slots ++ actual) written (shift 7 next) value finalStore) :
       ResultAt protocol size checked registry functions program context evidence source faults scope writtenContext place operator rhs
-        environment canonical actual before store mapping world initial next output value finalStore
+        environment canonical actual before store mapping world initial next output value finalStore Modify
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedStateAssignmentHeadContracts
 end

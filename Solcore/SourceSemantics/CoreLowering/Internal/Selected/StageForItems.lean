@@ -75,14 +75,14 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
   have typed := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique head.found assignmentTyped
   obtain ⟨targetType, targetTyped⟩ := CallableIndexedOwnedPlaceAdmission.assignment_target_typed assignmentTyped
   obtain ⟨originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
-  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
+  rcases head with ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, shape, slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain, leafView⟩
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | @projected codes leaf sourceTypes site layout ordinary =>
     let head : GenericAssignmentStatements.Head (.initial compiled.compatible.checked) invocation.source context
         certificate scope administrative (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions assignment operator rhs :=
       ⟨prepared, index, codes, leaf, lowered, rhsNode, invalid, .projected layout ordinary,
-        slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain⟩
+        slot, writable, rhsFound, generated, rightView, rightType, profile, targetPlain, leafView⟩
     have keyTyped := CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.tree_typed layout.children unique originalKeyTyped
     have liftResolved {resolvedTarget : Dynamic.ResolvedPlace} {resolvedHeap : Dynamic.Heap} {resolvedGrade : Nat}
         (resolved : SourceExecutionSize.SourcePlaceResolves program resolvedGrade context invocation.evidence invocation.source

@@ -45,14 +45,15 @@ theorem snapshot_prefix_sized
     (layout : Layout compilation prepared)
     (snapshot : Snapshot compilation.checked registry functions prepared place environment actual heap store mapping world (ξ index))
     {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word}
-    {size : Nat} {value : Value} {finalStore : Store}
+    {wrap : Option TypeSystem.FixedInteger} {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store
-      ((execute prepared (.var index) (SourceCoreCalls.packArguments []) rhs next outputType operator false invalid).rename ξ) value finalStore) :
+      ((execute prepared (.var index) (SourceCoreCalls.packArguments []) rhs next outputType operator false invalid wrap).rename ξ)
+      value finalStore) :
     ∃ remainingSize, remainingSize < size ∧
       EvaluationSize remainingSize
         (snapshotEnvironment prepared.route.rootType snapshot.target .unit snapshot.value actual) store
         (LanguageResult.bind outputType (shift 3 (rhs.rename ξ))
-          (CompatiblePlaceRhsReflection.remainder prepared .unit (next.rename ξ) outputType operator invalid)) value finalStore := by
+          (CompatiblePlaceRhsReflection.remainder prepared .unit (next.rename ξ) outputType operator invalid wrap)) value finalStore := by
   rw [execute_rename layout] at completed
   obtain ⟨first, firstBound, firstEval⟩ := completed.let_body (.var snapshot.nativeLookup)
   obtain ⟨second, secondBound, secondEval⟩ := firstEval.bind_success (keys_evaluates _ store)
@@ -63,9 +64,9 @@ theorem snapshot_prefix_sized
 snapshot. -/
 private theorem modified_absent {environment : Environment} {store after : Store} {type : Ty}
     {modifier : Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {rhs : Expr} {invalid : Word}
-    {changed : Value} {rightType : Ty} {payload : Value}
+    {changed : Value} {rightType : Ty} {payload : Value} {wrap : Option TypeSystem.FixedInteger}
     (found : environment[1]? = some (.inLeft rightType payload))
-    (evaluated : Evaluates environment store (modified type (some modifier) bitNot (.var 1) rhs invalid)
+    (evaluated : Evaluates environment store (modified type (some modifier) bitNot (.var 1) rhs invalid wrap)
       (.inRight .word changed) after) : False := by
   unfold modified at evaluated
   split at evaluated
@@ -81,7 +82,7 @@ private theorem modified_absent {environment : Environment} {store after : Store
 /-- A completed run whose right-hand side is Unit passes the modifier's check. -/
 theorem execute_unit_passes_sized {prepared : Prepared} {reference rhs next : Expr}
     {keys : SourceCoreBasic.LoweredExpr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier}
-    {bitNot : Bool} {invalid : Word} {actual : Environment}
+    {bitNot : Bool} {invalid : Word} {wrap : Option TypeSystem.FixedInteger} {actual : Environment}
     {before keyStore snapshotStore rhsStore modifiedStore setterStore finalStore : Store}
     {target : Location} {keyValue saved changed updated value : Value}
     (referenceSelected : DataEquality.Selects actual reference (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
@@ -92,13 +93,13 @@ theorem execute_unit_passes_sized {prepared : Prepared} {reference rhs next : Ex
     (rightEvaluated : Evaluates (snapshotEnvironment prepared.route.rootType target keyValue saved actual) snapshotStore
       (shift 3 rhs) (.inRight .word .unit) rhsStore)
     (modifiedEvaluated : Evaluates (rhsEnvironment prepared.route.rootType target keyValue saved .unit actual) rhsStore
-      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalid) (.inRight .word changed) modifiedStore)
+      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalid wrap) (.inRight .word changed) modifiedStore)
     (setterEvaluated : Evaluates (modifiedEnvironment prepared.route.rootType target keyValue saved .unit changed actual) modifiedStore
       (.apply (setter prepared keys.type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
       (.inRight .word updated) setterStore)
     {size : Nat}
     (completed : EvaluationSize size actual before
-      (execute prepared reference keys rhs next outputType operator bitNot invalid) value finalStore) :
+      (execute prepared reference keys rhs next outputType operator bitNot invalid wrap) value finalStore) :
     SourceCoreDataPlaces.Passes operator .unit := by
   obtain ⟨_, _, firstEval⟩ := completed.let_body (referenceSelected.evaluates before)
   obtain ⟨_, _, secondEval⟩ := firstEval.bind_success keysEvaluated
@@ -124,7 +125,7 @@ executions align values/stores; all costs come from the original derivation.
 The terminal Unit execution identifies only the store after its real write. -/
 theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : Expr}
     {keys : SourceCoreBasic.LoweredExpr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier}
-    {bitNot : Bool} {invalid : Word} {actual : Environment}
+    {bitNot : Bool} {invalid : Word} {wrap : Option TypeSystem.FixedInteger} {actual : Environment}
     {before keyStore snapshotStore rhsStore modifiedStore setterStore commitStore finalStore : Store}
     {target : Location} {keyValue saved right changed updated value : Value}
     (referenceSelected : DataEquality.Selects actual reference (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
@@ -135,15 +136,15 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
     (rightEvaluated : Evaluates (snapshotEnvironment prepared.route.rootType target keyValue saved actual) snapshotStore
       (shift 3 rhs) (.inRight .word right) rhsStore)
     (modifiedEvaluated : Evaluates (rhsEnvironment prepared.route.rootType target keyValue saved right actual) rhsStore
-      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalid) (.inRight .word changed) modifiedStore)
+      (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalid wrap) (.inRight .word changed) modifiedStore)
     (setterEvaluated : Evaluates (modifiedEnvironment prepared.route.rootType target keyValue saved right changed actual) modifiedStore
       (.apply (setter prepared keys.type) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
       (.inRight .word updated) setterStore)
     (terminal : Evaluates actual before
-      (execute prepared reference keys rhs .unit outputType operator bitNot invalid) .unit commitStore)
+      (execute prepared reference keys rhs .unit outputType operator bitNot invalid wrap) .unit commitStore)
     {size : Nat}
     (completed : EvaluationSize size actual before
-      (execute prepared reference keys rhs next outputType operator bitNot invalid) value finalStore) :
+      (execute prepared reference keys rhs next outputType operator bitNot invalid wrap) value finalStore) :
     ∃ remainingSize, remainingSize < size ∧
       EvaluationSize remainingSize (writtenEnvironment prepared.route.rootType target keyValue saved right changed updated actual)
         commitStore (shift 7 next) value finalStore := by
@@ -171,7 +172,7 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
     · -- The terminal run meets the same check, which fails.
       subst selected zero
       have failed : Evaluates actual before
-          (execute prepared reference keys rhs .unit outputType (some ⟨operation, .divisor⟩) bitNot invalid)
+          (execute prepared reference keys rhs .unit outputType (some ⟨operation, .divisor⟩) bitNot invalid wrap)
           (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) setterStore :=
         .letE (referenceSelected.evaluates before)
           (LanguageResult.bind_success _ keysEvaluated
@@ -186,7 +187,7 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
       simp only [List.head?_cons, Option.some.injEq] at head
       subst head rightEq
       have failed : Evaluates actual before
-          (execute prepared reference keys rhs .unit outputType (some ⟨operation, .range type binary⟩) bitNot invalid)
+          (execute prepared reference keys rhs .unit outputType (some ⟨operation, .range type binary⟩) bitNot invalid wrap)
           (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.arithmetic))) setterStore :=
         .letE (referenceSelected.evaluates before)
           (LanguageResult.bind_success _ keysEvaluated
@@ -199,7 +200,7 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
     · -- The terminal run meets the same zero test, which fails.
       subst zero
       have failed : Evaluates actual before
-          (execute prepared reference keys rhs .unit outputType (some ⟨operation, .range type binary⟩) bitNot invalid)
+          (execute prepared reference keys rhs .unit outputType (some ⟨operation, .range type binary⟩) bitNot invalid wrap)
           (.inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero))) setterStore :=
         .letE (referenceSelected.evaluates before)
           (LanguageResult.bind_success _ keysEvaluated
@@ -214,7 +215,7 @@ theorem execute_continuation_sized {prepared : Prepared} {reference rhs next : E
     cases write with
     | storeCell referenceEval read input written =>
       have nativePrefix : Evaluates actual before
-          (execute prepared reference keys rhs .unit outputType operator bitNot invalid) .unit writtenStore := by
+          (execute prepared reference keys rhs .unit outputType operator bitNot invalid wrap) .unit writtenStore := by
         exact .letE (referenceSelected.evaluates before)
           (LanguageResult.bind_success _ keysEvaluated
             (LanguageResult.bind_success _ snapshotEvaluated
@@ -238,20 +239,21 @@ theorem continuation_sized
     (layout : Layout compilation prepared)
     (snapshot : Snapshot compilation.checked registry functions prepared place environment actual heap store mapping world (ξ index))
     {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word}
-    {right changed : Value} {rhsStore commitStore : Store} {optional : Value}
+    {wrap : Option TypeSystem.FixedInteger} {right changed : Value} {rhsStore commitStore : Store} {optional : Value}
     (rightEvaluated : Evaluates
       (snapshotEnvironment prepared.route.rootType snapshot.target .unit snapshot.value actual) store
       (shift 3 (rhs.rename ξ)) (.inRight .word right) rhsStore)
     (modifiedEvaluated : Evaluates
       (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value right actual) rhsStore
-      (modified prepared.route.leafType operator false (.var 1) (.var 0) invalid) (.inRight .word changed) rhsStore)
+      (modified prepared.route.leafType operator false (.var 1) (.var 0) invalid wrap) (.inRight .word changed) rhsStore)
     (latestRead : rhsStore.read? snapshot.target = some optional)
     (terminal : Evaluates actual store
-      ((execute prepared (.var index) (SourceCoreCalls.packArguments []) rhs .unit outputType operator false invalid).rename ξ)
+      ((execute prepared (.var index) (SourceCoreCalls.packArguments []) rhs .unit outputType operator false invalid wrap).rename ξ)
       .unit commitStore)
     {size : Nat} {value : Value} {finalStore : Store}
     (completed : EvaluationSize size actual store
-      ((execute prepared (.var index) (SourceCoreCalls.packArguments []) rhs next outputType operator false invalid).rename ξ) value finalStore) :
+      ((execute prepared (.var index) (SourceCoreCalls.packArguments []) rhs next outputType operator false invalid wrap).rename ξ)
+      value finalStore) :
     ∃ remainingSize, remainingSize < size ∧
       EvaluationSize remainingSize
         (writtenEnvironment prepared.route.rootType snapshot.target .unit snapshot.value right changed changed actual)
@@ -267,7 +269,9 @@ inductive ResultAt (size : Nat) (compilation : SourceCoreCompatibleDataPlaces.Co
     (faults : FaultRep) (prepared : Prepared) (place : PlaceResolution) (operator : Syntax.ValueAssignOp)
     (environment : Dynamic.Environment) (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping)
     (rhs : ExpressionId) (actual : Environment) (actualContext : Core.Context) (ξ : Renaming)
-    (next : Expr) (outputType : Ty) (value : Value) (finalStore : Store) : Prop where
+    (next : Expr) (outputType : Ty) (value : Value) (finalStore : Store)
+    (Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop := Dynamic.AssignmentValueApplies operator) :
+    Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap} {finalMap : LocationMap} {finalWorld : StoreTyping}
       (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program sourceSize context evidence source environment before place operator rhs reason after)
       (result : value = .inLeft outputType (.word token)) (represented : faults reason token)
@@ -275,10 +279,10 @@ inductive ResultAt (size : Nat) (compilation : SourceCoreCompatibleDataPlaces.Co
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after) :
       ResultAt size compilation registry functions program context evidence source faults prepared place operator environment before store mapping world
-        rhs actual actualContext ξ next outputType value finalStore
+        rhs actual actualContext ξ next outputType value finalStore Modify
   | success {sourceSize remainingSize : Nat} {updated : Dynamic.Value} {updatedValue : Value} {after : Dynamic.Heap} {commitStore : Store}
       {finalMap : LocationMap} {finalWorld : StoreTyping} {slots : Environment}
-      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.AssignmentValueApplies operator)
+      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source Modify
         environment before place rhs updated after)
       (represented : ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType)
       (heaps : HeapRepresents compilation.checked registry functions finalMap finalWorld after commitStore)
@@ -289,17 +293,17 @@ inductive ResultAt (size : Nat) (compilation : SourceCoreCompatibleDataPlaces.Co
       (bounded : remainingSize < size)
       (continuation : EvaluationSize remainingSize (slots ++ actual) commitStore (shift 7 (next.rename ξ)) value finalStore) :
       ResultAt size compilation registry functions program context evidence source faults prepared place operator environment before store mapping world
-        rhs actual actualContext ξ next outputType value finalStore
+        rhs actual actualContext ξ next outputType value finalStore Modify
 
 
 /-- Erasure preserves all source outcomes, actual slots, and heap receipts. -/
 theorem ResultAt.erase {size : Nat} {faults : FunctionCalls.FaultRep} {operator : Syntax.ValueAssignOp}
     {rhs : ExpressionId} {actualContext : Core.Context} {next : Expr} {outputType : Ty}
-    {value : Value} {finalStore : Store}
+    {value : Value} {finalStore : Store} {Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop}
     (result : ResultAt size compilation registry functions program context evidence source faults prepared place operator
-      environment heap store mapping world rhs actual actualContext ξ next outputType value finalStore) :
+      environment heap store mapping world rhs actual actualContext ξ next outputType value finalStore Modify) :
     CompatibleBareAssignment.Result compilation registry functions program context evidence source faults prepared place operator
-      environment heap store mapping world rhs actual actualContext ξ next outputType value finalStore := by
+      environment heap store mapping world rhs actual actualContext ξ next outputType value finalStore Modify := by
   cases result with
   | fault trace same represented heaps maps worlds frame metadata =>
     exact .fault trace.sound same represented heaps maps worlds frame metadata
@@ -477,7 +481,7 @@ inductive KeyResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRaw
     (place : PlaceResolution) (environment : Dynamic.Environment) (coreEnvironment : Environment)
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping) (index : Nat)
     (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word)
-    (result : Value) (finalStore : Store) : Prop where
+    (result : Value) (finalStore : Store) (wrap : Option TypeSystem.FixedInteger := none) : Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
       (sourceFault : SourceExecutionSize.SourcePlaceFaults program sourceSize context evidence source environment before place reason after)
@@ -486,7 +490,7 @@ inductive KeyResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRaw
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after) :
       KeyResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place environment
-        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore
+        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore wrap
   | keys {sourceSize remainingSize : Nat} {location : Dynamic.Location} {resolved : List Dynamic.EvaluatedProjection} {after : Dynamic.Heap}
       (lookup : Dynamic.Environment.LooksUp environment place.root location)
       (trace : SourceExecutionSize.SourceProjectionsEvaluate program sourceSize context evidence source environment before place.projections resolved after)
@@ -494,9 +498,10 @@ inductive KeyResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRaw
         coreEnvironment before after store mapping world index)
       (bounded : remainingSize < size)
       (continuation : EvaluationSize remainingSize (keysEnvironment prepared.route.rootType execution.target (packValues execution.values) coreEnvironment)
-        execution.keyStore (CompatiblePlaceKeyReflection.remainder prepared (SourceCoreCalls.packArguments codes).type rhs next outputType operator bitNot invalid) result finalStore) :
+        execution.keyStore (CompatiblePlaceKeyReflection.remainder prepared (SourceCoreCalls.packArguments codes).type rhs next outputType operator bitNot invalid wrap)
+        result finalStore) :
       KeyResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place environment
-        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore
+        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore wrap
 
 
 inductive PrefixResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
@@ -507,7 +512,7 @@ inductive PrefixResultAt (size : Nat) (checked : Checked) (registry : SourceCore
     (place : PlaceResolution) (leaf : TypeSystem.Ty) (environment : Dynamic.Environment) (coreEnvironment : Environment)
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping)
     (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word)
-    (result : Value) (finalStore : Store) : Prop where
+    (result : Value) (finalStore : Store) (wrap : Option TypeSystem.FixedInteger := none) : Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
       (sourceFault : SourceExecutionSize.SourcePlaceFaults program sourceSize context evidence source environment before place reason after)
@@ -516,7 +521,7 @@ inductive PrefixResultAt (size : Nat) (checked : Checked) (registry : SourceCore
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after) :
       PrefixResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore
+        coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore wrap
   | resolved {sourceSize remainingSize : Nat} {target : Dynamic.ResolvedPlace} {after : Dynamic.Heap}
       (sourceTrace : SourceExecutionSize.SourcePlaceResolves program sourceSize context evidence source environment before place target after)
       (execution : CompatiblePlaceResolution.Execution checked registry functions prepared codes sourceTypes place leaf target
@@ -524,9 +529,10 @@ inductive PrefixResultAt (size : Nat) (checked : Checked) (registry : SourceCore
       (bounded : remainingSize < size)
       (continuation : EvaluationSize remainingSize (snapshotEnvironment prepared.route.rootType execution.target (packValues execution.values)
         (.inRight .unit execution.snapshot) coreEnvironment) execution.store
-        (CompatiblePlacePrefixReflection.remainder prepared (SourceCoreCalls.packArguments codes).type rhs next outputType operator bitNot invalid) result finalStore) :
+        (CompatiblePlacePrefixReflection.remainder prepared (SourceCoreCalls.packArguments codes).type rhs next outputType operator bitNot invalid
+          wrap) result finalStore) :
       PrefixResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore
+        coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore wrap
 
 
 inductive RhsResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
@@ -537,7 +543,9 @@ inductive RhsResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRaw
     (place : PlaceResolution) (leaf : TypeSystem.Ty) (environment : Dynamic.Environment) (coreEnvironment : Environment)
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping)
     (rhs : ExpressionId) (node : ExpressionNode) (lowered : SourceCoreBasic.LoweredExpr) (next : Expr) (outputType : Ty)
-    (operator : Syntax.ValueAssignOp) (invalid : Word) (result : Value) (finalStore : Store) : Prop where
+    (operator : Syntax.ValueAssignOp) (invalid : Word) (result : Value) (finalStore : Store)
+    (modifier : Option Frontend.SourceCoreDataPlaces.Modifier := binaryOperator (prepared.route.leafType = .integer) operator)
+    (wrap : Option TypeSystem.FixedInteger := none) : Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
       (sourceFault : SourceExecutionSize.SourcePlaceAssignmentFaults program sourceSize context evidence source environment before place operator rhs reason after)
@@ -546,7 +554,7 @@ inductive RhsResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRaw
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after) :
       RhsResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world rhs node lowered next outputType operator invalid result finalStore
+        coreEnvironment before store mapping world rhs node lowered next outputType operator invalid result finalStore modifier wrap
   | ready {sourceSize remainingSize : Nat} {target : Dynamic.ResolvedPlace} {targetHeap : Dynamic.Heap}
       (sourceTrace : SourceExecutionSize.SourcePlaceResolves program sourceSize context evidence source environment before place target targetHeap)
       (resolution : CompatiblePlaceResolution.Execution checked registry functions prepared codes sourceTypes place leaf target
@@ -558,10 +566,10 @@ inductive RhsResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRaw
       (bounded : remainingSize < size)
       (continuation : EvaluationSize remainingSize (rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
         (.inRight .unit resolution.snapshot) right.value coreEnvironment) right.store
-        (CompatiblePlaceRhsReflection.remainder prepared (SourceCoreCalls.packArguments codes).type next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) invalid) result finalStore) :
+        (CompatiblePlaceRhsReflection.remainder prepared (SourceCoreCalls.packArguments codes).type next outputType modifier invalid wrap)
+        result finalStore) :
       RhsResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world rhs node lowered next outputType operator invalid result finalStore
+        coreEnvironment before store mapping world rhs node lowered next outputType operator invalid result finalStore modifier wrap
 
 
 inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
@@ -572,7 +580,9 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
     (place : PlaceResolution) (operator : Syntax.ValueAssignOp) (rhs : ExpressionId)
     (environment : Dynamic.Environment) (coreEnvironment : Environment)
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping)
-    (next : Expr) (outputType : Ty) (result : Value) (finalStore : Store) : Prop where
+    (next : Expr) (outputType : Ty) (result : Value) (finalStore : Store)
+    (Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop := Dynamic.AssignmentValueApplies operator) :
+    Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
       (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program sourceSize context evidence source environment before place operator rhs reason after)
@@ -581,10 +591,10 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after) :
       ResultAt size checked registry functions program context evidence source faults prepared keyType actualContext place operator rhs environment coreEnvironment
-        before store mapping world next outputType result finalStore
+        before store mapping world next outputType result finalStore Modify
   | committed {sourceSize remainingSize : Nat} {updated : Dynamic.Value} {after : Dynamic.Heap} {written : Store}
       {finalMap : LocationMap} {finalWorld : StoreTyping} {slots : Environment}
-      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.AssignmentValueApplies operator)
+      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source Modify
         environment before place rhs updated after)
       (heaps : HeapRepresents checked registry functions finalMap finalWorld after written)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
@@ -595,7 +605,7 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
       (bounded : remainingSize < size)
       (continuation : EvaluationSize remainingSize (slots ++ coreEnvironment) written (shift 7 next) result finalStore) :
       ResultAt size checked registry functions program context evidence source faults prepared keyType actualContext place operator rhs environment coreEnvironment
-        before store mapping world next outputType result finalStore
+        before store mapping world next outputType result finalStore Modify
 
 
 theorem KeyResultAt.erase {size : Nat} {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
@@ -606,11 +616,11 @@ theorem KeyResultAt.erase {size : Nat} {checked : Checked} {registry : SourceCor
     {place : PlaceResolution} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store : Store} {mapping : LocationMap} {world : StoreTyping} {index : Nat}
     {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
-    {result : Value} {finalStore : Store}
+    {result : Value} {finalStore : Store} {wrap : Option TypeSystem.FixedInteger}
     (receipt : KeyResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place environment
-        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore) :
+        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore wrap) :
     CompatiblePlaceKeyReflection.Result checked registry functions program context evidence source faults prepared codes sourceTypes place environment
-        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore := by
+        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore wrap := by
   cases receipt with
   | fault trace same represented heaps maps worlds frame metadata =>
     exact .fault trace.sound same represented heaps maps worlds frame metadata
@@ -625,11 +635,11 @@ theorem PrefixResultAt.erase {size : Nat} {checked : Checked} {registry : Source
     {place : PlaceResolution} {leaf : TypeSystem.Ty} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store : Store} {mapping : LocationMap} {world : StoreTyping}
     {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
-    {result : Value} {finalStore : Store}
+    {result : Value} {finalStore : Store} {wrap : Option TypeSystem.FixedInteger}
     (receipt : PrefixResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore) :
+        coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore wrap) :
     CompatiblePlacePrefixReflection.Result checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore := by
+        coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore wrap := by
   cases receipt with
   | fault trace same represented heaps maps worlds frame metadata =>
     exact .fault trace.sound same represented heaps maps worlds frame metadata
@@ -645,10 +655,11 @@ theorem RhsResultAt.erase {size : Nat} {checked : Checked} {registry : SourceCor
     {before : Dynamic.Heap} {store : Store} {mapping : LocationMap} {world : StoreTyping}
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr} {next : Expr} {outputType : Ty}
     {operator : Syntax.ValueAssignOp} {invalid : Word} {result : Value} {finalStore : Store}
+    {modifier : Option Frontend.SourceCoreDataPlaces.Modifier} {wrap : Option TypeSystem.FixedInteger}
     (receipt : RhsResultAt size checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world rhs node lowered next outputType operator invalid result finalStore) :
+        coreEnvironment before store mapping world rhs node lowered next outputType operator invalid result finalStore modifier wrap) :
     CompatiblePlaceRhsReflection.Result checked registry functions program context evidence source faults prepared codes sourceTypes place leaf environment
-        coreEnvironment before store mapping world rhs node lowered next outputType operator invalid result finalStore := by
+        coreEnvironment before store mapping world rhs node lowered next outputType operator invalid result finalStore modifier wrap := by
   cases receipt with
   | fault trace same represented heaps maps worlds frame metadata =>
     exact .fault trace.sound same represented heaps maps worlds frame metadata
@@ -661,10 +672,11 @@ theorem ResultAt.erase {size : Nat} {checked : Checked} {registry : SourceCoreRa
     {prepared : Prepared} {keyType : Ty} {actualContext : Core.Context} {place : PlaceResolution}
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {environment : Dynamic.Environment} {actual : Environment}
     {before : Dynamic.Heap} {store : Store} {mapping : LocationMap} {world : StoreTyping} {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
+    {Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop}
     (result : ResultAt size checked registry functions program context evidence source faults prepared keyType actualContext place operator rhs
-      environment actual before store mapping world next output value finalStore) :
+      environment actual before store mapping world next output value finalStore Modify) :
     CompatiblePlaceTailReflection.Result checked registry functions program context evidence source faults place operator rhs
-      environment actual before store mapping world next output value finalStore := by
+      environment actual before store mapping world next output value finalStore Modify := by
   cases result with
   | fault trace same represented heaps maps worlds frame metadata =>
     exact .fault trace.sound same represented heaps maps worlds frame metadata
@@ -677,10 +689,11 @@ theorem ResultAt.weaken_bound {size larger : Nat} {checked : Checked} {registry 
     {prepared : Prepared} {keyType : Ty} {actualContext : Core.Context} {place : PlaceResolution}
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {environment : Dynamic.Environment} {actual : Environment}
     {before : Dynamic.Heap} {store : Store} {mapping : LocationMap} {world : StoreTyping} {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
+    {Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop}
     (result : ResultAt size checked registry functions program context evidence source faults prepared keyType actualContext place operator rhs
-      environment actual before store mapping world next output value finalStore) (bound : size ≤ larger) :
+      environment actual before store mapping world next output value finalStore Modify) (bound : size ≤ larger) :
     ResultAt larger checked registry functions program context evidence source faults prepared keyType actualContext place operator rhs
-      environment actual before store mapping world next output value finalStore := by
+      environment actual before store mapping world next output value finalStore Modify := by
   cases result with
   | fault trace same represented heaps maps worlds frame metadata =>
     exact .fault trace same represented heaps maps worlds frame metadata
@@ -1146,7 +1159,9 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
     (place : PlaceResolution) (operator : Syntax.ValueAssignOp) (rhs : ExpressionId)
     (environment : Dynamic.Environment) (canonical actual : Environment)
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping)
-    (next : Expr) (output : Ty) (value : Value) (finalStore : Store) : Prop where
+    (next : Expr) (output : Ty) (value : Value) (finalStore : Store)
+    (Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop := Dynamic.AssignmentValueApplies operator) :
+    Prop where
   | fault {sourceSize : Nat} {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
       (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program sourceSize context evidence source environment before place operator rhs reason after)
@@ -1156,10 +1171,10 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after)
       (installed : entry scope finalMap finalWorld after finalStore canonical) :
       ResultAt size checked registry functions program context evidence source faults entry scope writtenContext place operator rhs
-        environment canonical actual before store mapping world next output value finalStore
+        environment canonical actual before store mapping world next output value finalStore Modify
   | success {sourceSize remainingSize : Nat} {updated : Dynamic.Value} {after : Dynamic.Heap}
       {written : Store} {finalMap : LocationMap} {finalWorld : StoreTyping} {slots : Environment}
-      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.AssignmentValueApplies operator)
+      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source Modify
         environment before place rhs updated after)
       (heaps : HeapRepresents checked registry functions finalMap finalWorld after written)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
@@ -1170,7 +1185,7 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
       (bounded : remainingSize < size)
       (remaining : EvaluationSize remainingSize (slots ++ actual) written (shift 7 next) value finalStore) :
       ResultAt size checked registry functions program context evidence source faults entry scope writtenContext place operator rhs
-        environment canonical actual before store mapping world next output value finalStore
+        environment canonical actual before store mapping world next output value finalStore Modify
 
 theorem ResultAt.erase {size : Nat} {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions} {functions : FunctionModel checked.catalog ambient}
@@ -1180,8 +1195,9 @@ theorem ResultAt.erase {size : Nat} {checked : Checked} {registry : SourceCoreRa
     {environment : Dynamic.Environment} {canonical actual : Environment}
     {before : Dynamic.Heap} {store : Store} {mapping : LocationMap} {world : StoreTyping}
     {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
+    {Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop}
     (result : ResultAt size checked registry functions program context evidence source faults entry scope writtenContext place operator rhs
-      environment canonical actual before store mapping world next output value finalStore) :
+      environment canonical actual before store mapping world next output value finalStore Modify) :
     (∃ reason token after finalMap finalWorld,
       Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before place operator rhs reason after ∧
       value = .inLeft output (.word token) ∧ faults reason token ∧
@@ -1190,7 +1206,7 @@ theorem ResultAt.erase {size : Nat} {checked : Checked} {registry : SourceCoreRa
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source Modify
         environment before place rhs updated after ∧
       HeapRepresents checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧

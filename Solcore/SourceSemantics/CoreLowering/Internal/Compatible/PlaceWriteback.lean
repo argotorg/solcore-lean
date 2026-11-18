@@ -305,6 +305,47 @@ theorem panic_of_selected {environment : Environment} {store : Store} {outputTyp
   subst selected
   exact SourceCoreDataPlaces.guard_panic
 
+/-- A check that passes, in the sense of `CheckPasses`, lets a sized run through the guard reach its
+write, no larger. -/
+theorem passes_sized {environment : Environment} {before after : Store} {outputType : Ty}
+    {operator : Option SourceCoreDataPlaces.Modifier} {write : Expr} {result : Value}
+    {updated changed right snapshot : Value} {size : Nat}
+    (passing : FixedCompoundModifier.CheckPasses operator snapshot right)
+    (evaluated : EvaluationSize size (updated :: changed :: right :: snapshot :: environment) before
+      (SourceCoreDataPlaces.guard outputType operator write) result after) :
+    ∃ child, child ≤ size ∧
+      EvaluationSize child (updated :: changed :: right :: snapshot :: environment) before write result after := by
+  rcases inv_sized evaluated with ⟨_, child, bound, run⟩ | ⟨operation, selected, zero, _, _⟩ |
+      ⟨operation, type, binary, selected, ⟨_, _, child, bound, run⟩ |
+        ⟨⟨leftType, left, rightWord, head, rightEq, outside⟩, _, _, _⟩ | ⟨division, zero, _, _⟩⟩
+  · exact ⟨child, bound, run⟩
+  · subst selected zero
+    rcases passing with passes | ⟨_, _, _, same, _⟩
+    · cases passes with
+      | total total => cases total _ rfl
+      | nonzero nonzero => exact (nonzero rfl).elim
+    · cases same
+  · exact ⟨child, bound, run⟩
+  · subst selected
+    rcases passing with passes | ⟨_, _, _, same, _, rangePasses⟩
+    · exact passes.not_range.elim
+    · cases same
+      simp only [List.head?_cons, Option.some.injEq] at head
+      subst head rightEq
+      rcases rangePasses with ⟨_, _, impossible⟩ | ⟨_, _, _, same, rightSame, inRange⟩
+      · cases impossible
+      · cases same
+        cases rightSame
+        rw [inRange] at outside
+        cases outside
+  · subst selected zero
+    rcases passing with passes | ⟨_, _, _, same, divisor, _⟩
+    · exact passes.not_range.elim
+    · cases same
+      obtain ⟨_, same, nonzero⟩ := divisor division
+      cases same
+      exact (nonzero rfl).elim
+
 /-- The check reads only its own three binders and the snapshot, so renaming
 under them reaches the write alone. -/
 theorem rename_lift (outputType : Ty) (operator : Option SourceCoreDataPlaces.Modifier) (write : Expr) (ξ : Renaming) :

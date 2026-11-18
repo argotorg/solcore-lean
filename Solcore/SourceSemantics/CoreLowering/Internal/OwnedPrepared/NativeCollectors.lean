@@ -403,7 +403,8 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
           exact description.ordinary (fun k v same => notMapping k v (rootEq.trans same))
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
-          found, certified, (rightTyped.view unique found).transport leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile⟩,
+          found, certified, (rightTyped.view unique found).transport leafView, rhsType, ?_, CompatiblePlaceModifier.plain_of_profile profile,
+          leafView⟩,
           by simp [Head.emit, routeEq, placeModifier, assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)], rfl, ?_⟩
         · rcases profile with equal | word | ⟨integer, notWordOnly⟩
           · exact .inl equal
@@ -3533,7 +3534,8 @@ theorem tree
         rightView := (rightTyped.view unique rhsFound).transport _rawView
         rightType := _sameType
         profile := .inl rfl
-        targetPlain := CompatiblePlaceModifier.plain_of_profile (.inl rfl) }
+        targetPlain := CompatiblePlaceModifier.plain_of_profile (.inl rfl)
+        leafView := _rawView }
       have emittedOriginal : code = originalHead.emit body (LocalLoop.controlType type) := codeEq
       rw [emittedOriginal]
       exact .assign found form originalHead

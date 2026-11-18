@@ -2333,6 +2333,7 @@ variable {targetPrepared : Prepared} {index : Nat} {node : ExpressionNode} {lowe
   (rhsView : AssignedRhsView operator leaf node.type)
   (rhsCore : lowered.type = targetPrepared.route.leafType)
   (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
+  (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType place.type)
   (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, targetPrepared.route.rootType))
   (rootTyped : WritableLocal context place.root targetPrepared.route.rootSourceType)
   (missingTokens : ∀ {root resolved reason token count},
@@ -2388,23 +2389,25 @@ theorem named_fault [FunctionCalls.FaultTokens faults] (budget : Nat) {reason : 
     targetPlain environments heaps locals agrees actualTyped installed slot rootTyped trace bounded next outputType invalid
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
-  uninitialized missing bodyUninitialized bodyMissing layout ordinary generated found rhsView rhsCore profile slot rootTyped missingTokens invalidTokens in
+  uninitialized missing bodyUninitialized bodyMissing layout ordinary generated found rhsView rhsCore profile leafView slot rootTyped missingTokens
+  invalidTokens in
 /-- Reflection uses concrete named reflection only; source preservation is not
 replayed to obtain the continuation slots or a native cost. -/
 theorem named_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) {next : Expr} {outputType : Ty} {invalid : Word} {value : Value} {finalStore : Store}
     {size : Nat} (completed : EvaluationSize size actual store
       ((execute targetPrepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
-        (binaryOperator (targetPrepared.route.leafType = .integer) operator) false invalid).rename ξ) value finalStore)
+        (assignmentModifier place.type (targetPrepared.route.leafType = .integer) operator) false invalid
+        (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ) value finalStore)
     (bounded : size ≤ budget) :
     RecursiveNamedPlaceAssignmentContracts.ResultAt size values.checked registry functions program context evidence source faults
       targetPrepared (SourceCoreCalls.packArguments codes).type actualContext place operator rhs environment actual
-      before store mapping world (next.rename ξ) outputType value finalStore :=
+      before store mapping world (next.rename ξ) outputType value finalStore (Dynamic.CompoundAssignmentApplies place.type operator) :=
   ProtectedPlaceAssignmentReflection.reflects_bounded budget layout ordinary extension
     (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix)
     (RecursiveNamedBoundedContracts.reflects_below_of_unbounded
       (NamedCallExpressions.Tree.reflects functions extension faithful observations runtimeViews evidence valid
         uninitialized missing bodyUninitialized bodyMissing) budget)
-    runtimeViews faithful observations missingTokens invalidTokens generated found rhsView rhsCore profile
+    runtimeViews faithful observations missingTokens invalidTokens generated found rhsView rhsCore (.inl (leafView ▸ profile)) leafView
     environments heaps agrees actualTyped installed locals slot rootTyped completed bounded
 end Static
 
