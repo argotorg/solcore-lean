@@ -213,11 +213,16 @@ theorem setter_rename {checked : SourceCoreCompatibleCatalog.Checked} {source : 
   · simp only [Expr.rename, normalize_rename closed, update_rename path]
     simp [LanguageResult.failure, Expr.rename, Renaming.lift]
 
-private theorem modified_rename (type : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word) (ξ : Renaming) :
-    (modified type operator bitNot (.var 1) (.var 0) invalid).rename ξ.lift.lift =
-      modified type operator bitNot (.var 1) (.var 0) invalid := by
-  cases bitNot <;> cases operator <;> simp [modified, LanguageResult.success, LanguageResult.failure,
-    shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, Expr.rename, Renaming.lift]
+private theorem modified_rename (type : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word) (ξ : Renaming)
+    {wrap : Option TypeSystem.FixedInteger} :
+    (modified type operator bitNot (.var 1) (.var 0) invalid wrap).rename ξ.lift.lift =
+      modified type operator bitNot (.var 1) (.var 0) invalid wrap := by
+  rcases wrap with _ | wrapType
+  · cases bitNot <;> cases operator <;> simp [modified, LanguageResult.success, LanguageResult.failure,
+      shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, Expr.rename, Renaming.lift]
+  · by_cases signed : wrapType.signed = true <;> cases bitNot <;> cases operator <;>
+      simp [modified, signed, LanguageResult.success, LanguageResult.failure,
+        shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, Expr.rename, Renaming.lift]
 
 /-- The entire emitted assignment is renamed together with its children and
 continuation. Getter/setter closures will still capture the actual environment
@@ -226,9 +231,11 @@ theorem execute_rename {checked : SourceCoreCompatibleCatalog.Checked} {source :
     {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat} {prepared : Prepared}
     (path : CompatibleMixedRoute.PreparedPath checked source site root projections position prepared.steps prepared.keys leaf)
     (closed : VirtualClosed prepared) (reference : Expr) (keys : SourceCoreBasic.LoweredExpr)
-    (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word) (ξ : Renaming) :
-    (execute prepared reference keys rhs next outputType operator bitNot invalid).rename ξ =
-      execute prepared (reference.rename ξ) (renamed keys ξ) (rhs.rename ξ) (next.rename ξ) outputType operator bitNot invalid := by
+    (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word) (ξ : Renaming)
+    {wrap : Option TypeSystem.FixedInteger} :
+    (execute prepared reference keys rhs next outputType operator bitNot invalid wrap).rename ξ =
+      execute prepared (reference.rename ξ) (renamed keys ξ) (rhs.rename ξ) (next.rename ξ) outputType operator bitNot invalid
+        wrap := by
   simp [execute, renamed, LanguageResult.bind, shift, List.range, List.range.loop, List.foldl,
     Expr.rename, getter_rename path closed, setter_rename path closed, modified_rename, DataPlaceGuard.rename_lift, Renaming.lift]
 
@@ -634,15 +641,17 @@ private theorem none_update {modify : Option Dynamic.Value → Dynamic.Value →
 
 /-- An independent successful transaction constructs every native phase.
 Raw metadata and duplicate entries are retained by the full payload relation;
-the native store additionally contains tracked administrative helper cells. -/
-theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
+the native store additionally contains tracked administrative helper cells. Over the wider profile,
+the trace's relation and the code are at any target type: the success direction has no panic, so
+the target need not be the place's own type. -/
+theorem preserves_prefix_wide {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
     {functions : FunctionModel compilation.checked.catalog ambient}
     {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
     {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
     {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
     {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
-    {administrativeContext actualContext : Core.Context} {ξ : Renaming}
+    {administrativeContext actualContext : Core.Context} {ξ : Renaming} {targetType : TypeSystem.Ty}
     (layout : Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
     (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
@@ -654,7 +663,8 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (rhsView : AssignedRhsView operator leaf node.type)
     (rhsCoreType : lowered.type = prepared.route.leafType)
-    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
+    (operatorProfile : WideAssignmentProfile operator targetType)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType targetType)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -664,8 +674,8 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
     (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
-      environment before place rhs updatedRoot after)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source
+      (Dynamic.CompoundAssignmentApplies targetType operator) environment before place rhs updatedRoot after)
     (invalidOperand : Word) :
     ∃ updatedValue finalStore finalMap finalWorld,
       ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updatedRoot updatedValue prepared.route.rootType ∧
@@ -678,7 +688,8 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
             actualContext) ambient.definitions ∧
         ∀ next outputType, ContinuationAgreement coreEnvironment store
           ((execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
-            (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand).rename ξ)
+            (assignmentModifier targetType (prepared.route.leafType = .integer) operator) false invalidOperand
+            (SourceCoreDataPlaces.placeWrap targetType operator false)).rename ξ)
           (slots ++ coreEnvironment) finalStore (shift 7 (next.rename ξ)) := by
   have closed := virtual_closed layout ordinary
   have respects := environment_respects environments.runtime_hasTypes actualTyped agrees
@@ -707,10 +718,8 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
         have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
         obtain ⟨replacement, applies, changed⟩ := DataPlaceAssignmentWriteBack.replacement_of_update update
         rw [resolution.selectedEq] at applies
-        have passes := CompatiblePlaceModifier.passes_of_applies observations operatorProfile rightRep applies
-          (prepared.route.leafType = .integer)
-        obtain ⟨replacementValue, replacementRep, modifiedEvaluated, _⟩ :=
-          CompatiblePlaceModifier.preserves observations operatorProfile snapshotRep rightRep applies
+        obtain ⟨replacementValue, replacementRep, modifiedEvaluated, _, guarded⟩ :=
+          CompatiblePlaceModifier.wide_preserves observations operatorProfile leafView snapshotRep rightRep applies
             (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
               (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
             (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -769,8 +778,61 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
                 ((ContinuationAgreement.bind rhsResult.evaluated).trans
                   ((ContinuationAgreement.bind modifiedEvaluated).trans
                     ((ContinuationAgreement.bind setterEvaluated).trans
-                      ((DataPlaceGuard.agreement passes).trans
+                      ((ContinuationAgreement.mk (fun written => guarded.mpr written) (fun checked => guarded.mp checked)).trans
                         (ContinuationAgreement.letE (.storeCell (.var rfl) helperRead (.inRight (.var rfl)) coreWritten))))))))
+
+theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
+    {functions : FunctionModel compilation.checked.catalog ambient}
+    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
+    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
+    {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
+    {administrativeContext actualContext : Core.Context} {ξ : Renaming}
+    (layout : Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
+    (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (meaning : TypedGenericExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (observations : FunctionObservations compilation.checked.catalog functions identities)
+    {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
+    (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
+    {operator : Syntax.ValueAssignOp}
+    (rhsView : AssignedRhsView operator leaf node.type)
+    (rhsCoreType : lowered.type = prepared.route.leafType)
+    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
+    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
+    {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
+    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
+    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
+    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
+    (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
+    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
+    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      environment before place rhs updatedRoot after)
+    (invalidOperand : Word) :
+    ∃ updatedValue finalStore finalMap finalWorld,
+      ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updatedRoot updatedValue prepared.route.rootType ∧
+      HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      ∃ slots : Environment, slots.length = 7 ∧
+        RuntimeEnvironmentHasTypes finalWorld (slots ++ coreEnvironment)
+          (writtenContext prepared (SourceCoreCalls.packArguments codes).type
+            actualContext) ambient.definitions ∧
+        ∀ next outputType, ContinuationAgreement coreEnvironment store
+          ((execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
+            (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand).rename ξ)
+          (slots ++ coreEnvironment) finalStore (shift 7 (next.rename ξ)) := by
+  have none := checkedCompound_of_profile operatorProfile
+  have plain := DataPlaceModifier.plain_of_checkedCompound none
+  have wide := preserves_prefix_wide (targetType := leaf) layout ordinary registryExtension meaning faithful observations
+    rhsGenerated found rhsView rhsCoreType (.inl operatorProfile) rfl environments heaps locals agrees actualTyped slot
+    rootTyped ((Dynamic.CompoundAssignmentApplies.eq_of_plain plain).symm ▸ trace) invalidOperand
+  rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at wide
+  exact wide
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceSuccess
 end
@@ -866,10 +928,12 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     (lookup : Dynamic.Environment.LooksUp environment place.root location)
     (initialRead : Dynamic.Heap.Reads before location initialCell)
     {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
+    {wrap : Option TypeSystem.FixedInteger}
     (completed : Evaluates coreEnvironment store
-      (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) :
+      (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid wrap)
+      result finalStore) :
     Result checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place environment
-      coreEnvironment before store mapping world (ξ index) rhs next outputType operator bitNot invalid result finalStore := by
+      coreEnvironment before store mapping world (ξ index) rhs next outputType operator bitNot invalid result finalStore wrap := by
   obtain ⟨target, selected, reference⟩ := environments.lookup_visible lookup slot
   have reflectKeys := fun {keyValue : Value} {keyStore : Store}
       (evaluated : Evaluates (referenceEnvironment prepared.route.rootType target coreEnvironment) store
@@ -960,10 +1024,12 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
+    {wrap : Option TypeSystem.FixedInteger}
     (completed : Evaluates coreEnvironment store
-      (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid) result finalStore) :
+      (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) rhs next outputType operator bitNot invalid wrap)
+      result finalStore) :
     Result compilation.checked registry functions program context evidence source faults prepared (renamedCodes codes ξ) sourceTypes place leaf environment
-      coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore := by
+      coreEnvironment before store mapping world rhs next outputType operator bitNot invalid result finalStore wrap := by
   have closed := virtual_closed layout ordinary
   have getterTyped := getter_typed layout closed (environment_respects environments.runtime_hasTypes actualTyped agrees)
   obtain ⟨scheme, staticLookup, _, _, _⟩ := rootTyped.scheme

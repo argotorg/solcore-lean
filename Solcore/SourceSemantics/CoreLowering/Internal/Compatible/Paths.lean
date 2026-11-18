@@ -878,6 +878,119 @@ private theorem replaced_eq_set {values output : List Dynamic.Value} {index : Na
     | indexFound found tailUpdate inserted => exact finish represented (.found found) tailUpdate inserted
     | indexDefault absent defaulted tailUpdate inserted => exact finish represented (.default absent defaulted) tailUpdate inserted
 
+/-- An update along an authenticated path runs for any replacement, represented or not: the old
+root's representation drives every lookup and insertion, the replacement is only placed at the
+leaf, and the store grows by administrative cells. -/
+theorem Arguments.update_evaluates {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : GeneralHeap.LocationMap} {world : StoreTyping}
+    {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {keys : List Value}
+    {root leaf : TypeSystem.Ty} {projections : List PlaceProjection} {position : Nat}
+    {steps : List PreparedStep} {keySites : List (ExpressionId × Ty)}
+    {path : PreparedPath checked source site root projections position steps keySites leaf}
+    {resolved : List Dynamic.EvaluatedProjection}
+    (arguments : Arguments checked registry functions mapping world source site keys path resolved)
+    (prepared : Prepared) {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (functionLeaves : CompatibleEquality.FunctionObservations checked.catalog functions identities)
+    (keyLength : prepared.keyTypes.length = keys.length) {replacementSource : Dynamic.Value} {replacement : Value} :
+    ∀ {current updated : Dynamic.Value} {value : Value} {type : Ty},
+      ValueRep checked registry functions mapping world root current value type →
+      Dynamic.ProjectionsUpdate (fun _ value => value = replacementSource) (some current) resolved updated →
+      ∀ (environment : Environment) (store : Store) (currentExpression keyExpression replacementExpression : Expr),
+        DataEquality.Selects environment currentExpression value →
+        DataEquality.Selects environment keyExpression (DataPatternValues.packValues keys) →
+        DataEquality.Selects environment replacementExpression replacement →
+        ∃ native administrative,
+          Evaluates environment store (update prepared steps type currentExpression keyExpression replacementExpression)
+            (.inRight .word native) (store ++ administrative) := by
+  induction arguments with
+  | nil =>
+    intro _ _ _ _ _ _ environment store _ _ _ _ _ replacementSelected
+    exact ⟨replacement, [], by rw [List.append_nil]; exact .inRight (replacementSelected.evaluates store)⟩
+  | @member root field leaf name index signature typeArguments identity branches fieldType projections steps position keySites nominal selectedSignature certificate tail resolved arguments ih =>
+    intro current updated value type represented changes environment store currentExpression keyExpression
+      replacementExpression selected keysSelected replacementSelected
+    cases changes with
+    | member sourceAt tailUpdate replaced =>
+      obtain ⟨tag, id, values, types, valueEq, typeEq, fields⟩ := constructor_fields represented rfl
+      obtain ⟨owner, branch, actual, sourceChild, valueChild, branchAt, constructor, branchTypes,
+        sourceField, view, coreField, found, coreAt, childRelated⟩ := certificate.select nominal selectedSignature fields
+      have same := valueAt_unique found sourceAt
+      subst sourceChild valueEq typeEq
+      have arity : branch.payloadTypes.length = values.length :=
+        branchTypes ▸ (fields.payloads.length.2.2.symm.trans fields.payloads.length.2.1)
+      let payload := Value.pair (.word id) (DataPatternValues.packValues values)
+      obtain ⟨child, administrative, evaluated⟩ :=
+        ih (.compatible view.symm childRelated) tailUpdate (payload :: environment) store _ (shift 1 keyExpression)
+          (shift 1 replacementExpression) (DataPatternValues.projectPacked_selects (.second (.var (index := 0) rfl)) arity index coreAt)
+          (by simpa [shift] using keysSelected.weaken payload) (by simpa [shift] using replacementSelected.weaken payload)
+      exact ⟨_, administrative, Evaluates.matchData (selected.evaluates store) owner
+        (by simp only [List.getElem?_map, branchAt, Option.map_some]; rfl)
+        (LanguageResult.bind_success _ evaluated (by
+          rw [constructor]
+          exact .inRight (.construct (.pair (.first (.var rfl)) (replacePacked_evaluates arity (.second (.var rfl)) (.var rfl))))))⟩
+  | @index root keySource valueSource leaf key layout projections steps position keySites comparison missing certificate generated tail lookup keyValue resolved keyAt keyRelated arguments ih =>
+    intro current updated value type represented changes environment store currentExpression keyExpression
+      replacementExpression selected keysSelected replacementSelected
+    have finish {rawKey rawValue : TypeSystem.Ty} {entries : List (Dynamic.Value × Dynamic.Value)}
+        {child updatedChild : Dynamic.Value}
+        (represented : ValueRep checked registry functions mapping world root (.mapping rawKey rawValue entries) value type)
+        (selectedAt : Selected lookup entries rawValue child)
+        (tailUpdate : Dynamic.ProjectionsUpdate (fun _ value => value = replacementSource) (some child) resolved
+          updatedChild) :
+        ∃ native administrative,
+          Evaluates environment store
+            (update prepared (.index ⟨layout, key, position, comparison, missing⟩ :: steps) type currentExpression
+              keyExpression replacementExpression) (.inRight .word native) (store ++ administrative) := by
+      obtain ⟨header, nativeEntries, fallback, valueEq, _, keyView, valueView, fields⟩ :=
+        certificate.mappingFields represented
+      have rawKeyView : SourceCoreRawMetadata.runtimeType rawKey = SourceCoreRawMetadata.runtimeType keySource := by
+        rw [keyView, SourceCoreRawMetadata.runtimeType_idempotent]
+      have rawValueView : SourceCoreRawMetadata.runtimeType rawValue = SourceCoreRawMetadata.runtimeType valueSource := by
+        rw [valueView, SourceCoreRawMetadata.runtimeType_idempotent]
+      subst valueEq
+      have keyRep : Payload registry functions mapping world rawKey layout.keyType lookup keyValue :=
+        .compatible rawKeyView keyRelated
+      have keySelected := DataPatternValues.projectPacked_selects keysSelected keyLength position keyAt
+      obtain ⟨result, meaning, evaluated⟩ := selectedIndex_meaning generated prepared faithful functionLeaves fields keyRep
+        environment store currentExpression keyExpression selected keySelected
+      obtain ⟨native, rfl, related⟩ := selectedAt.payload meaning
+      obtain ⟨before, beforeAppended, _⟩ :=
+        Transport.lookupStore_extension generated.comparison layout environment store header fallback nativeEntries keyValue
+      rw [beforeAppended] at evaluated
+      obtain ⟨changedNative, childCells, childEvaluated⟩ :=
+        ih (.compatible rawValueView.symm related) tailUpdate (native :: environment) (store ++ before)
+          (.var 0) (shift 1 keyExpression) (shift 1 replacementExpression) (.var rfl)
+          (by simpa [shift] using keysSelected.weaken native) (by simpa [shift] using replacementSelected.weaken native)
+      obtain ⟨equal, correct⟩ := CompatibleMappingComparison.exists_predicate_correct generated.comparison registry faithful
+      have keyTypeEq : layout.keyType = generated.comparison.type := generated.keyType
+      have observedKey : CompatibleMappingComparison.KeyRep generated.comparison registry identities lookup keyValue := by
+        have observed := CompatibleEquality.ValueRep.observation functionLeaves keyRep
+        rw [keyTypeEq] at observed
+        exact observed
+      let later := changedNative :: native :: environment
+      have insertedEvaluation := Transport.insert_evaluates generated.comparison layout generated.keyType faithful equal
+        correct observedKey (entries_observed generated.comparison functionLeaves generated.keyType fields.stored) later
+        (store ++ before ++ childCells) header fallback (shift 2 currentExpression)
+        (SourceCoreDataExpressions.projectPacked position prepared.keyTypes (shift 2 keyExpression)) (.var 0)
+        (by simpa [shift, List.range_succ] using (selected.weaken native).weaken changedNative)
+        (by simpa [shift, List.range_succ, projectPacked_weaken] using (keySelected.weaken native).weaken changedNative)
+        (.var rfl)
+      obtain ⟨after, afterAppended, _⟩ := Transport.insertStore_extension generated.comparison layout later
+        (store ++ before ++ childCells) header fallback nativeEntries keyValue changedNative
+      have storeEq : store ++ (before ++ childCells ++ after) = Transport.insertStore generated.comparison layout later
+          (store ++ before ++ childCells) header fallback nativeEntries keyValue changedNative := by
+        rw [afterAppended]
+        simp only [List.append_assoc]
+      have expressionEq : comparison = generated.comparison.expression := generated.expression
+      exact ⟨_, before ++ childCells ++ after, by
+        rw [storeEq]
+        exact LanguageResult.bind_success _ evaluated (LanguageResult.bind_success _ childEvaluated
+          (by rw [← expressionEq] at insertedEvaluation; exact insertedEvaluation))⟩
+    cases changes with
+    | indexFound found tailUpdate _ => exact finish represented (.found found) tailUpdate
+    | indexDefault absent defaulted tailUpdate _ => exact finish represented (.default absent defaulted) tailUpdate
+
 end Solcore.SourceSemantics.CoreLowering.CompatibleMixedRoute
 end
 

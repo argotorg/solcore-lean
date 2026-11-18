@@ -2199,7 +2199,7 @@ theorem actual_lower_reflects {code : Expr}
     {after : Store}
     (completed : Evaluates nativeEnvironment store code (.inRight .word (.bool true)) after) :
     ∃ updated sourceAfter finalMap finalWorld,
-      Dynamic.SourcePlaceAssignment program context [] source (Dynamic.AssignmentValueApplies .equal)
+      Dynamic.SourcePlaceAssignment program context [] source (Dynamic.CompoundAssignmentApplies assignment.target.type .equal)
         environment before assignment.target key updated sourceAfter ∧
       HeapRepresents checked compilation.registry (noFunctions checked.catalog) finalMap finalWorld sourceAfter after ∧
       LocationMap.Extends [0] finalMap ∧ WorldExtends world finalWorld ∧
@@ -2218,7 +2218,7 @@ theorem actual_lower_reflects {code : Expr}
     (fun actual found => by cases binding actual found; exact rootWritable) (by simp [assignment])
     (fun _ member => by simp [assignment] at member) childReceipt accepted typed
     (.refl _) (childReflects compilation.registry (fun _ _ => True)) functionViews faithful observations
-    (fun _ _ => True.intro) (fun _ => True.intro) (.inl rfl) environments heaps localAgrees completed
+    (fun _ _ => True.intro) (fun _ => True.intro) (.inl (.inl rfl)) environments heaps localAgrees completed
   cases reflected with
   | fault _ resultEq => cases resultEq
   | committed trace heaps maps worlds frame metadata length continuation =>
@@ -2236,7 +2236,7 @@ theorem checked_lower_reflects {certified : Certified checked.catalog.definition
     {after : Store}
     (completed : Evaluates nativeEnvironment store certified.expression (.inRight .word (.bool true)) after) :
     ∃ updated sourceAfter finalMap finalWorld,
-      Dynamic.SourcePlaceAssignment program context [] source (Dynamic.AssignmentValueApplies .equal)
+      Dynamic.SourcePlaceAssignment program context [] source (Dynamic.CompoundAssignmentApplies assignment.target.type .equal)
         environment before assignment.target key updated sourceAfter ∧
       HeapRepresents checked compilation.registry (noFunctions checked.catalog) finalMap finalWorld sourceAfter after ∧
       LocationMap.Extends [0] finalMap ∧ WorldExtends world finalWorld ∧

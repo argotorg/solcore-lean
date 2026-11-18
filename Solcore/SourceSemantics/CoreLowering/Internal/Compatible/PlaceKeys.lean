@@ -956,22 +956,24 @@ open CompatiblePayload CompatibleEquality CompatibleHeap SourceCoreCompatibleDat
 
 /-- The exact subtree after the packed keys binder in `execute`. -/
 def remainder (prepared : Prepared) (keyType : Ty) (rhs next : Expr) (outputType : Ty)
-    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word) : Expr :=
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word)
+    (wrap : Option TypeSystem.FixedInteger := none) : Expr :=
   LanguageResult.bind outputType
     (.apply (getter prepared keyType) (.pair (.loadCell (.var 1)) (.var 0)))
     (LanguageResult.bind outputType (shift 3 rhs)
       (LanguageResult.bind outputType
-        (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalid)
+        (modified prepared.route.leafType operator bitNot (.var 1) (.var 0) invalid wrap)
         (LanguageResult.bind outputType
           (.apply (setter prepared keyType) (.pair (.loadCell (.var 4)) (.pair (.var 3) (.var 0))))
           (Frontend.SourceCoreDataPlaces.guard outputType operator
             (.letE (.storeCell (.var 5) (.inRight .unit (.var 0))) (shift 7 next))))))
 
 theorem execute_eq (prepared : Prepared) (reference : Expr) (keys : SourceCoreBasic.LoweredExpr)
-    (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word) :
-    execute prepared reference keys rhs next outputType operator bitNot invalid =
+    (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word)
+    (wrap : Option TypeSystem.FixedInteger := none) :
+    execute prepared reference keys rhs next outputType operator bitNot invalid wrap =
       .letE reference (LanguageResult.bind outputType (shift 1 keys.expression)
-        (remainder prepared keys.type rhs next outputType operator bitNot invalid)) := rfl
+        (remainder prepared keys.type rhs next outputType operator bitNot invalid wrap)) := rfl
 
 inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
     {ambient : AmbientDefinitions checked.catalog.definitions}
@@ -981,7 +983,7 @@ inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
     (place : PlaceResolution) (environment : Dynamic.Environment) (coreEnvironment : Environment)
     (before : Dynamic.Heap) (store : Store) (mapping : LocationMap) (world : StoreTyping) (index : Nat)
     (rhs next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (bitNot : Bool) (invalid : Word)
-    (result : Value) (finalStore : Store) : Prop where
+    (result : Value) (finalStore : Store) (wrap : Option TypeSystem.FixedInteger := none) : Prop where
   | fault {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
       (sourceFault : Dynamic.SourcePlaceFaults program context evidence source environment before place reason after)
@@ -990,16 +992,16 @@ inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after) :
       Result checked registry functions program context evidence source faults prepared codes sourceTypes place environment
-        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore
+        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore wrap
   | keys {location : Dynamic.Location} {resolved : List Dynamic.EvaluatedProjection} {after : Dynamic.Heap}
       (lookup : Dynamic.Environment.LooksUp environment place.root location)
       (trace : Dynamic.SourceProjectionsEvaluate program context evidence source environment before place.projections resolved after)
       (execution : CompatiblePlaceTargetKeys.Execution checked registry functions prepared place codes sourceTypes location resolved
         coreEnvironment before after store mapping world index)
       (continuation : Evaluates (keysEnvironment prepared.route.rootType execution.target (packValues execution.values) coreEnvironment)
-        execution.keyStore (remainder prepared (SourceCoreCalls.packArguments codes).type rhs next outputType operator bitNot invalid) result finalStore) :
+        execution.keyStore (remainder prepared (SourceCoreCalls.packArguments codes).type rhs next outputType operator bitNot invalid wrap) result finalStore) :
       Result checked registry functions program context evidence source faults prepared codes sourceTypes place environment
-        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore
+        coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore wrap
 
 /-- Completed emitted code supplies the key runs to the universal reflection
 IH. No source projection trace or child runtime execution is an input. -/
@@ -1022,11 +1024,12 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     (lookup : Dynamic.Environment.LooksUp environment place.root location)
     (initialRead : Dynamic.Heap.Reads before location initialCell)
-    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word} {result : Value}
+    {rhs next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
+    {wrap : Option TypeSystem.FixedInteger} {result : Value}
     (completed : Evaluates coreEnvironment store
-      (execute prepared (.var index) (SourceCoreCalls.packArguments codes) rhs next outputType operator bitNot invalid) result finalStore) :
+      (execute prepared (.var index) (SourceCoreCalls.packArguments codes) rhs next outputType operator bitNot invalid wrap) result finalStore) :
     Result checked registry functions program context evidence source faults prepared codes sourceTypes place environment
-      coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore := by
+      coreEnvironment before store mapping world index rhs next outputType operator bitNot invalid result finalStore wrap := by
   obtain ⟨target, selected, reference⟩ := environments.lookup_visible lookup slot
   have sameEnvironment : ReadOnly.EnvironmentsAgree Renaming.id coreEnvironment coreEnvironment := by intro _ _ found; exact found
   have reflectKeys := fun {keyValue : Value} {keyStore : Store}

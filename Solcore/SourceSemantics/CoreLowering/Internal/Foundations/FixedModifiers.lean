@@ -8,7 +8,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.AssignmentProfi
 
 The modifier that both place compilers emit for `+= -= *= /= %=`, their unchecked forms and
 `&= |= ^=` at the twelve fixed-width integer types, beside the source rules on the same operands,
-and the profile that admits them beside `AssignmentProfile`. The meaning proofs do not use them yet.
+and the profile that admits them beside `AssignmentProfile`. The data and compatible place pipelines
+use them.
 
 Main declarations:
 - `FixedCompoundAssignment` and `WideAssignmentProfile`, the profile with these targets;

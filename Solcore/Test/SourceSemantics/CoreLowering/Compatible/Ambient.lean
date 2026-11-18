@@ -350,7 +350,7 @@ inductive Outcome (program : SourceSemantics.Program) (context : SourceSemantics
     (environment : Dynamic.Environment) (before : Dynamic.Heap) (place : PlaceResolution)
     (operator : Syntax.ValueAssignOp) (rhs : ExpressionId) : Value → Dynamic.Heap → Prop where
   | succeeded {updated : Dynamic.Value} {after : Dynamic.Heap}
-      (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
         environment before place rhs updated after) : Outcome program context evidence source faults environment before place operator rhs
           (.inRight .word .unit) after
   | failed {reason : Dynamic.SemanticFault} {token : Word} {after : Dynamic.Heap}
@@ -367,7 +367,8 @@ theorem terminal {checked : Checked} {ambient : AmbientDefinitions checked.catal
     {environment : Dynamic.Environment} {coreEnvironment : Environment} {before : Dynamic.Heap} {store finalStore : Store}
     {mapping : LocationMap} {world : StoreTyping} {result : Value}
     (reflected : CompatiblePlaceTailReflection.Result checked registry functions program context evidence source faults place operator rhs
-      environment coreEnvironment before store mapping world (LanguageResult.success .unit) .unit result finalStore) :
+      environment coreEnvironment before store mapping world (LanguageResult.success .unit) .unit result finalStore
+      (Dynamic.CompoundAssignmentApplies place.type operator)) :
     ∃ after finalMap finalWorld,
       Outcome program context evidence source faults environment before place operator rhs result after ∧
       CompatibleAmbientHeap.HeapRepresents checked registry functions finalMap finalWorld after finalStore ∧
@@ -423,7 +424,7 @@ theorem checked_run_reflects {compilation : SourceCoreCompatibleDataPlaces.Conte
         prepare compilation fuel route invalid missing = .ok prepared) →
       FaultToken compilation.checked registry root prepared.steps resolved reason token count → faults reason token)
     (invalidTokens : ∀ location, faults (.uninitializedLocation location) invalid)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+    (profile : WideAssignmentProfile operator assignment.target.type)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {result : Value} {runtimeFuel : Nat}
     (environments : DataHeap.EnvRepresents (definitions := artifact.layouts.definitions) (storageCatalog compilation.checked.catalog)
@@ -1362,7 +1363,8 @@ theorem whole_success_under_indexed {compilation : SourceCoreCompatibleDataPlace
     {operator : Syntax.ValueAssignOp}
     (rhsView : AssignedRhsView operator leaf node.type)
     (rhsCoreType : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType place.type)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := artifact.layouts.definitions) (storageCatalog compilation.checked.catalog)
@@ -1371,12 +1373,13 @@ theorem whole_success_under_indexed {compilation : SourceCoreCompatibleDataPlace
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
       environment before place rhs updatedRoot after) (invalid : Word) :
     ∃ updatedValue finalStore finalMap finalWorld,
       FiniteRun coreEnvironment store
         (execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression (LanguageResult.success .unit) .unit
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false))
         (.inRight .word .unit) finalStore ∧
       ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updatedRoot updatedValue prepared.route.rootType ∧
       CompatibleAmbientHeap.HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
@@ -1384,7 +1387,7 @@ theorem whole_success_under_indexed {compilation : SourceCoreCompatibleDataPlace
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
   obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩ :=
     CompatiblePlaceAssignmentSuccess.preserves layout registryExtension meaning faithful observations rhsGenerated found rhsView
-      rhsCoreType profile environments heaps locals slot rootTyped trace invalid
+      rhsCoreType profile leafView environments heaps locals slot rootTyped trace invalid
   exact ⟨value, finalStore, finalMap, finalWorld, .of_evaluates evaluated, represented, finalHeaps, maps, worlds, frame, metadata⟩
 
 private def w (n : Nat) : Word := Word.ofNatModulo n

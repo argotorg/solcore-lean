@@ -162,7 +162,8 @@ private theorem localAgrees : Dynamic.EnvironmentAgrees before context.locals en
   .cons (.intro .head) rfl (.ordinary rfl rfl) .nil
 private theorem rootWritable : WritableLocal context binder.id rootType :=
   WritableLocal.withLocal_mono _ _ _ ⟨(TypeParameterBindersWellFormed.ofSignatures signatures).withLocal binder.id binder.scheme, .mapping (.builtin .bool) (.builtin .bool)⟩
-private theorem sourceAssignment : Dynamic.SourcePlaceAssignment program context [] source (Dynamic.AssignmentValueApplies .equal)
+private theorem sourceAssignment : Dynamic.SourcePlaceAssignment program context [] source
+    (Dynamic.CompoundAssignmentApplies assignment.target.type .equal)
     environment before assignment.target key (.mapping .bool .bool [(.bool true, .bool true)]) after := by
   have resolved : Dynamic.SourcePlaceResolves program context [] source environment before assignment.target
       ⟨⟨0⟩, rootType, .bool, [.index (.bool true)], some (.bool false)⟩ before :=
@@ -170,7 +171,8 @@ private theorem sourceAssignment : Dynamic.SourcePlaceAssignment program context
       (.indexDefault .nil .bool .nil)
   refine .intro resolved (keyEvaluates environment before) ?_
   exact .intro (.intro .head) rfl (.emptyMapping .bool .bool)
-    (.indexDefault .nil .bool (.leaf (.equal _ _)) (.append .nil)) (.intro (.intro .head) .head)
+    (.indexDefault .nil .bool (.leaf (.primitive (fun _ _ checked => by cases checked) (.equal _ _))) (.append .nil))
+    (.intro (.intro .head) .head)
 
 theorem whole {route : Route} {prepared : Prepared}
     (described : describe compilation checked.signatures source site assignment = .ok route)
@@ -192,7 +194,8 @@ theorem whole {route : Route} {prepared : Prepared}
     .cons reference (.nil .nil)
   have writable : WritableLocal context binder.id prepared.route.rootSourceType := rootEq ▸ rootWritable
   exact CompatiblePlaceContinuation.preserves_from_source (compilation := compilation) (ambient := .original checked.catalog.definitions) (functions := noFunctions checked.catalog) (node := node) (nextNode := node) (index := 0) layout (.refl _) childMeaning faithful observations
-    ⟨rfl, rfl⟩ (by cbv) (.same leafView) leafEq.symm (.inl rfl) environments heaps localAgrees (by simp [scope, SourceCoreLocalCell.lookup?, assignment])
+    ⟨rfl, rfl⟩ (by cbv) (.same leafView) leafEq.symm (.inl (.inl rfl)) leafView environments heaps localAgrees
+    (by simp [scope, SourceCoreLocalCell.lookup?, assignment])
     writable sourceAssignment Word.zero ⟨rfl, rfl⟩ (by cbv) (.value (keyEvaluates environment after))
 
 /-- Staging changes the retained source type, while the actual modifier uses
@@ -431,7 +434,8 @@ theorem whole {route : Route} {prepared : Prepared}
     (completed : Evaluates (nativeEnvironment prepared) [native] (body prepared) result after) :
     CompatiblePlaceTailReflection.Result checked registry (noFunctions checked.catalog) program context [] source
       (diagnostics registry prepared) assignment.target .equal key environment (nativeEnvironment prepared)
-      (before initial) [native] [0] (world prepared) lowered.expression .bool result after := by
+      (before initial) [native] [0] (world prepared) lowered.expression .bool result after
+      (Dynamic.CompoundAssignmentApplies assignment.target.type .equal) := by
   obtain ⟨rootEq, leafEq, rootProjection, leaf, leafView, layout⟩ := staticReceipt described preparedBy keyTypes nonempty getterTyped setterTyped
   obtain ⟨actualBinder, _, description⟩ := CompatiblePlaceDescription.of_describe described
   have same := Except.ok.inj (description.binding.symm.trans (show rootBinder source assignment.target.root = .ok binder by cbv))
@@ -448,7 +452,7 @@ theorem whole {route : Route} {prepared : Prepared}
   exact CompatiblePlaceAssignmentReflection.reflects (node := node) (index := 0) layout ordinary registryExtension
     (childReflects registry _) functionViews faithful observations
     (fun receipt => .inl ⟨_, _, _, receipt⟩) (fun location => .inr (.inl ⟨location, rfl, rfl⟩))
-    ⟨rfl, rfl⟩ (by cbv) (.same leafView) leafEq.symm (.inl rfl) environments heaps (localAgrees initial)
+    ⟨rfl, rfl⟩ (by cbv) (.same leafView) leafEq.symm (.inl (.inl rfl)) (by exact leafView) environments heaps (localAgrees initial)
     (by simp [scope, SourceCoreLocalCell.lookup?, assignment]) (rootEq ▸ rootWritable) completed
 
 /-- A successful whole run with this compiled literal continuation yields an
@@ -466,7 +470,7 @@ theorem successful_whole {route : Route} {prepared : Prepared}
     {after : Store}
     (completed : Evaluates (nativeEnvironment prepared) [native] (body prepared) (.inRight .word (.bool true)) after) :
     ∃ updated sourceAfter finalMap finalWorld,
-      Dynamic.SourcePlaceAssignment program context [] source (Dynamic.AssignmentValueApplies .equal)
+      Dynamic.SourcePlaceAssignment program context [] source (Dynamic.CompoundAssignmentApplies assignment.target.type .equal)
         environment (before initial) assignment.target key updated sourceAfter ∧
       HeapRepresents checked registry (noFunctions checked.catalog) finalMap finalWorld sourceAfter after ∧
       LocationMap.Extends [0] finalMap ∧ WorldExtends (world prepared) finalWorld ∧
@@ -2556,7 +2560,8 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (rhsView : AssignedRhsView operator leaf node.type)
     (rhsCoreType : lowered.type = prepared.route.leafType)
-    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
+    (operatorProfile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType place.type)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -2564,7 +2569,7 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
       environment before place rhs updatedRoot after)
     (invalidOperand : Word) :
     ∃ updatedValue finalStore finalMap finalWorld,
@@ -2578,14 +2583,15 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
             (SourceCoreLocalCell.coreContext scope ++ administrativeContext)) ambient.definitions ∧
         ∀ next outputType, ContinuationAgreement coreEnvironment store
           (execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
-            (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand)
+            (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalidOperand
+            (SourceCoreDataPlaces.placeWrap place.type operator false))
           (slots ++ coreEnvironment) finalStore (shift 7 next) := by
   have preservation : TypedGenericExpressionMeaning.Preserves
       (payloadModel compilation.checked registry functions) program context evidence source
       (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) faults :=
     CompatibleExpressionTyped.preserves functions registryExtension program evidence contextValid unique uninitialized missing
   exact CompatibleTypedPlaceAssignmentSuccess.preserves_prefix layout registryExtension preservation faithful observations
-    rhsGenerated found rhsView rhsCoreType operatorProfile environments heaps locals slot rootTyped trace invalidOperand
+    rhsGenerated found rhsView rhsCoreType operatorProfile leafView environments heaps locals slot rootTyped trace invalidOperand
 
 
 theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
@@ -2616,7 +2622,8 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (rhsView : AssignedRhsView operator leaf node.type)
     (rhsCoreType : lowered.type = prepared.route.leafType)
-    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
+    (operatorProfile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType place.type)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before : Dynamic.Heap} {store finalStore : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -2627,7 +2634,8 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
     (completed : Evaluates coreEnvironment store
       (execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
-        (binaryOperator (prepared.route.leafType = .integer) operator) false invalid) result finalStore) :
+        (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+        (SourceCoreDataPlaces.placeWrap place.type operator false)) result finalStore) :
     (∃ reason token after finalMap finalWorld,
       Dynamic.SourcePlaceAssignmentFaults program context evidence source environment before place operator rhs reason after ∧
       result = .inLeft outputType (.word token) ∧ faults reason token ∧
@@ -2635,7 +2643,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
         environment before place rhs updated after ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -2655,7 +2663,7 @@ theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     CompatibleExpressionTyped.reflects functions registryExtension program evidence contextValid uninitialized missing
   exact CompatibleTypedPlaceAssignmentReflection.reflects layout ordinary registryExtension reflection preservation
     functionTypes faithful observations missingTokens invalidTokens rhsGenerated found rhsView rhsCoreType
-    operatorProfile environments heaps locals slot rootTyped completed
+    operatorProfile leafView environments heaps locals slot rootTyped completed
 
 private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO α
   | .ok value => pure value
@@ -2823,8 +2831,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (rhsView : AssignedRhsView operator leaf node.type)
     (rhsCoreType : lowered.type = prepared.route.leafType)
-    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
-    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
+    (operatorProfile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType place.type)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment coreEnvironment)
@@ -2838,7 +2846,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     ∃ token finalStore finalMap finalWorld,
       Evaluates coreEnvironment store
         (execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false))
         (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -2848,7 +2857,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) faults :=
     CompatibleExpressionTyped.preserves functions registryExtension program evidence valid unique uninitialized missing
   exact CompatibleTypedPlaceAssignmentFaults.preserves layout ordinary registryExtension meaning faithful observations
-    missingTokens invalidTokens rhsGenerated found rhsView rhsCoreType operatorProfile targetPlain environments heaps locals
+    missingTokens invalidTokens rhsGenerated found rhsView rhsCoreType operatorProfile leafView environments heaps locals
     slot rootTyped trace next outputType invalid
 
 private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO α
