@@ -637,7 +637,9 @@ structure TraitSignatureWellFormed (signatures : ProgramSignatures)
     TraitMethodSignatureWellFormed signatures signature method
 
 /-- One implementation method has a closed signature in the implementation's
-rigid scope and names a cataloged method of the implemented trait. -/
+rigid scope and names a cataloged method of the implemented trait.  It may
+require only predicates that its callers or its implementation provide: its
+trait method's, instantiated at the head, and the implementation's own. -/
 structure ImplMethodSignatureWellFormed (signatures : ProgramSignatures)
     (implementation : ProgramImplementationSignature)
     (method : ProgramImplMethodSignature) : Prop where

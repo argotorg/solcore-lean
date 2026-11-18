@@ -1449,7 +1449,7 @@ def coercionMethodRuntimeEvidence (program : CheckedProgram)
   let traitEvidence ← resolveClosedMethodEvidence program caller node
     step.requirement method.traitPredicates
   let environment := traitEvidence ++ method.implementationPremises ++
-    method.methodPremises
+    method.declaredPremises
   validateRuntimeEvidence method.specialized.key method.specialized.assumptions
     environment
   pure environment
@@ -1462,7 +1462,7 @@ def operatorMethodRuntimeEvidence (program : CheckedProgram)
   let traitEvidence ← resolveClosedMethodEvidence program caller node
     selection.primaryRequirement method.traitPredicates
   let environment := traitEvidence ++ method.implementationPremises ++
-    method.methodPremises
+    method.declaredPremises
   validateRuntimeEvidence method.specialized.key method.specialized.assumptions
     environment
   pure environment

@@ -824,8 +824,12 @@ private def testMethodPredicateEvidence : IO Unit := do
   let methodEvidenceMatches := match method.methodPremises with
     | [first, second] => first == eqEvidence && second == markEvidence
     | _ => false
-  assertTrue (methodEvidenceMatches && decide (
+  let declaredEvidenceMatches := match method.declaredPremises with
+    | [first, second] => first == eqEvidence && second == markEvidence
+    | _ => false
+  assertTrue (methodEvidenceMatches && declaredEvidenceMatches && decide (
       method.methodPredicates = [eqWord, markWord] ∧
+      method.declaredPredicates = [eqWord, markWord] ∧
       method.traitPredicates = [] ∧
       method.implementationPredicates = [] ∧
       method.synthetic.scheme.predicates = [eqWord, markWord] ∧
@@ -885,18 +889,21 @@ private def testMethodPredicateEvidence : IO Unit := do
         else candidate
     }
   }
+  -- Reordered method predicates are still provided (upstream's `SC0249`): the
+  -- caller keeps proving the trait method's order, and the method's own
+  -- dictionary follows its declaration.
   match ExecutableImplMethods.checkMethodWithEvidenceAndArity reversedProgram
       primaryEvidence [eqEvidence, markEvidence] 1 "guard" with
-  | .error (.methodPredicateMismatch id traitMethod expected actual) =>
-      assertTrue (decide (id = implementationMethod.id ∧
-          traitMethod = implementationMethod.traitMethod ∧
-          expected = implementationMethod.wherePredicates ∧
-          actual = implementationMethod.wherePredicates.reverse))
-        "generic method-predicate mismatch lost its ordered catalogs"
+  | .ok reversed =>
+      let premisesMatch := match reversed.declaredPremises with
+        | [first, second] => first == markEvidence && second == eqEvidence
+        | _ => false
+      assertTrue (premisesMatch && decide (
+          reversed.methodPredicates = [eqWord, markWord] ∧
+          reversed.declaredPredicates = [markWord, eqWord]))
+        "reordered method predicates lost the caller's order or their own"
   | .error error => throw (IO.userError
-      s!"tampered generic method predicates had the wrong rejection: {reprStr error}")
-  | .ok _ => throw (IO.userError
-      "tampered generic method predicates were executable")
+      s!"reordered method predicates were not executable: {reprStr error}")
   let foreignParameter : TypeSystem.TypeParameterId := {
     owner := guard.id
     index := guard.parameters.length + 11

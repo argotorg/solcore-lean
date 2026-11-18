@@ -37,8 +37,15 @@ structure CheckedMethod where
   traitPredicates : List ProgramPredicate
   implementationPredicates : List ProgramPredicate
   implementationPremises : List TypedTraitResolution.Evidence
+  /-- The trait method's closed predicates, which the caller proves, and the
+  caller's evidence for them. -/
   methodPredicates : List ProgramPredicate
   methodPremises : List TypedTraitResolution.Evidence
+  /-- The implementation method's own closed predicates, which its body
+  assumes, and their evidence, selected from the caller's evidence and the
+  implementation's premises. -/
+  declaredPredicates : List ProgramPredicate
+  declaredPremises : List TypedTraitResolution.Evidence
   synthetic : ProgramFunctionSignature
   checked : SourceInference.CheckedFunction
   specialized : SourceSpecialization.SpecializedFunction
@@ -123,9 +130,11 @@ inductive Error where
       (method : ProgramImplMethodId) (predicates : List ProgramPredicate)
   | traitMethodPredicatesPresent
       (method : ProgramTraitMethodId) (predicates : List ProgramPredicate)
-  | methodPredicateMismatch
+  | methodPredicateUndeclared
       (method : ProgramImplMethodId) (traitMethod : ProgramTraitMethodId)
-      (expected actual : List ProgramPredicate)
+      (predicate : ProgramPredicate)
+  | declaredMethodPredicateUnprovided
+      (method : ProgramImplMethodId) (predicate : ProgramPredicate)
   | closedMethodPredicateMismatch
       (method : ProgramImplMethodId) (traitMethod : ProgramTraitMethodId)
       (expected actual : List ProgramPredicate)
@@ -281,6 +290,65 @@ private def validateMethodEvidence (program : CheckedProgram)
     throw (.methodEvidenceCountMismatch method predicates.length evidence.length)
   validateMethodEvidenceGoals program method 0 predicates evidence
 
+/-- Each required value is provided, returning the caller's error for the
+first one that is not.  It checks that each predicate of an implementation
+method is its trait method's, instantiated at the head, or its implementation's
+own, as the signature collector does (upstream's `SC0249`). -/
+private def validateProvided {value : Type} [DecidableEq value]
+    (missing : value → Error) (provided : List value) :
+    List value → Except Error Unit
+  | [] => pure ()
+  | value :: rest =>
+      if value ∈ provided then
+        validateProvided missing provided rest
+      else
+        .error (missing value)
+
+/-- The evidence for each closed predicate of an implementation method: the
+first provided entry with the same goal, among the caller's evidence for the
+trait method's predicates and then the implementation's premises. -/
+def selectDeclaredPremises (method : ProgramImplMethodId)
+    (provided : List (ProgramPredicate × TypedTraitResolution.Evidence)) :
+    List ProgramPredicate → Except Error (List TypedTraitResolution.Evidence)
+  | [] => pure []
+  | predicate :: rest =>
+      match provided.find? fun entry => decide (entry.1 = predicate) with
+      | some entry => do
+          let tail ← selectDeclaredPremises method provided rest
+          pure (entry.2 :: tail)
+      | none => .error (.declaredMethodPredicateUnprovided method predicate)
+
+/-- Every selected premise is one of the provided entries. -/
+theorem selectDeclaredPremises_mem {method : ProgramImplMethodId}
+    {provided : List (ProgramPredicate × TypedTraitResolution.Evidence)}
+    {predicates : List ProgramPredicate}
+    {selected : List TypedTraitResolution.Evidence}
+    (success : selectDeclaredPremises method provided predicates = .ok selected) :
+    ∀ evidence, evidence ∈ selected →
+      ∃ predicate, (predicate, evidence) ∈ provided := by
+  induction predicates generalizing selected with
+  | nil =>
+      simp only [selectDeclaredPremises, pure, Except.pure, Except.ok.injEq] at success
+      subst selected
+      simp
+  | cons predicate rest induction =>
+      simp only [selectDeclaredPremises] at success
+      cases found : provided.find? (fun entry => decide (entry.1 = predicate)) with
+      | none => simp [found] at success
+      | some entry =>
+          simp only [found] at success
+          cases tailEq : selectDeclaredPremises method provided rest with
+          | error error => simp [tailEq, bind, Except.bind] at success
+          | ok tail =>
+              simp only [tailEq, bind, Except.bind, pure, Except.pure,
+                Except.ok.injEq] at success
+              subst selected
+              intro evidence member
+              simp only [List.mem_cons] at member
+              rcases member with rfl | member
+              · exact ⟨entry.1, by simpa using List.mem_of_find?_eq_some found⟩
+              · exact induction tailEq evidence member
+
 private def validateDeterminedParameters
     (implementation : Resolved.DeclarationId)
     (substitution : ParameterSubstitution) : Except Error Unit := do
@@ -385,17 +453,12 @@ def checkMethodWithEvidenceAndArity
       traitMethod.returnComptime implementationMethod.returnComptime)
   let genericMethodPredicates := traitMethod.wherePredicates.map
     (ProgramPredicate.applyParameters genericTraitParameterSubstitution)
-  unless genericMethodPredicates = implementationMethod.wherePredicates do
-    throw (.methodPredicateMismatch implementationMethod.id traitMethod.id
-      genericMethodPredicates implementationMethod.wherePredicates)
+  validateProvided
+    (Error.methodPredicateUndeclared implementationMethod.id traitMethod.id)
+    (genericMethodPredicates ++ implementation.wherePredicates)
+    implementationMethod.wherePredicates
   let methodPredicates := traitMethod.wherePredicates.map
     (ProgramPredicate.applyParameters traitParameterSubstitution)
-  let closedImplementationMethodPredicates :=
-    implementationMethod.wherePredicates.map
-      (ProgramPredicate.applyParameters headMatch.parameterSubstitution)
-  unless methodPredicates = closedImplementationMethodPredicates do
-    throw (.closedMethodPredicateMismatch implementationMethod.id traitMethod.id
-      methodPredicates closedImplementationMethodPredicates)
   for predicate in methodPredicates do
     match firstNonClosedGoalType predicate with
     | some reason => throw (.methodPredicateNotClosed implementationMethod.id
@@ -403,6 +466,11 @@ def checkMethodWithEvidenceAndArity
     | none => pure ()
   validateMethodEvidence program implementationMethod.id methodPredicates
     methodEvidence
+  let declaredPredicates := implementationMethod.wherePredicates.map
+    (ProgramPredicate.applyParameters headMatch.parameterSubstitution)
+  let declaredPremises ← selectDeclaredPremises implementationMethod.id
+    (methodPredicates.zip methodEvidence ++ headMatch.wherePredicates.zip premises)
+    declaredPredicates
   let baseSynthetic :=
     implementation.functionSignatureOfMethod implementationMethod
   let genericSynthetic := {
@@ -418,10 +486,17 @@ def checkMethodWithEvidenceAndArity
     genericChecked headMatch.parameterSubstitution |>.mapError
       Error.specialization
   let expectedAssumptions := traitPredicates ++ headMatch.wherePredicates ++
-    methodPredicates
+    declaredPredicates
   unless specialized.assumptions = expectedAssumptions do
     throw (.specializedAssumptionsMismatch implementation.id
       expectedAssumptions specialized.assumptions)
+  -- The caller's predicates are the trait method's, instantiated at the head
+  -- and then by the specialization.
+  let dispatchedPredicates := genericMethodPredicates.map
+    (ProgramPredicate.applyParameters specialized.parameterSubstitution)
+  unless methodPredicates = dispatchedPredicates do
+    throw (.closedMethodPredicateMismatch implementationMethod.id traitMethod.id
+      methodPredicates dispatchedPredicates)
   let synthetic := closedSyntheticSignature genericSynthetic specialized
   pure {
     id := implementationMethod.id
@@ -431,6 +506,8 @@ def checkMethodWithEvidenceAndArity
     implementationPremises := premises
     methodPredicates
     methodPremises := methodEvidence
+    declaredPredicates
+    declaredPremises
     synthetic
     checked := specialized.function
     specialized

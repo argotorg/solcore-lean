@@ -687,7 +687,8 @@ def exactOperatorTraitMethod (context : Context)
 /-- The operator occurrence owns both selection of the primary trait and the
 named method's declaration-ordered local obligations.  Operator traits have
 one source parameter, so instantiating it with the inferred operand closes the
-same method predicates that implementation signatures are checked against.
+trait method's predicates, which a caller proves and among which, with its
+implementation's own, an implementation method's predicates must be.
 The instantiated parameter and result lists must also match the operator's
 fixed source-level signature. -/
 def operatorTraitPredicates (context : Context)

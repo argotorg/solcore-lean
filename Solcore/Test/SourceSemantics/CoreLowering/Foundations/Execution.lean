@@ -7223,6 +7223,67 @@ private def runLayoutFixtures : IO Unit := do
   layoutOutcome "a mutual cycle through comptime" (mutualWorkspace "comptime<b>") (some "A") false
   IO.println "SOURCE_CORE_LAYOUT_FIXTURES_PASS: upstream's 26 layout fixtures give upstream's outcomes, every non-regular one refused at once at the type SC0420 names and every finite or regular recursive one compiled, the word-taking ones giving 5; an unused non-regular declaration is accepted, and of upstream's mutual cycles the regular one compiles while those through Box and comptime are refused"
 
+/-- Row 9: implementation methods whose predicates are not their trait method's, as upstream's
+`SC0249` allows. `Add<Box>.add` omits the trait method's `Box: BitNot`; `Add<Pair<A>>.add`
+requires only its implementation's own `A: BitNot` and uses it; `Sub<Box>.sub` reorders the trait
+method's two predicates and uses one. Each method's dictionary is selected from the caller's
+evidence and its implementation's premises. -/
+private def implMethodPredicateWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := []
+  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+    "pragma solcore;",
+    "trait Marker<T> {}",
+    "trait BitNot<T> { function bnot(value: T) returns (T); }",
+    "trait Add<T> { function add(left: T, right: T) returns (T) where T: BitNot; }",
+    "trait Sub<T> { function sub(left: T, right: T) returns (T) where T: BitNot, T: Marker; }",
+    "enum Box { Wrap(word) }",
+    "enum Pair<A> { Two(A, A) }",
+    "impl Marker<Box> {}",
+    "impl BitNot<Box> {",
+    "    function bnot(value: Box) returns (Box) { match (value) { case Box.Wrap(x) { return Box.Wrap(x + 100); } } }",
+    "}",
+    "impl<A> BitNot<Pair<A>> where A: BitNot {",
+    "    function bnot(value: Pair<A>) returns (Pair<A>) { match (value) { case Pair.Two(x, y) { return Pair.Two(~x, ~y); } } }",
+    "}",
+    "impl Add<Box> {",
+    "    function add(left: Box, right: Box) returns (Box) {",
+    "        match (left) { case Box.Wrap(x) { match (right) { case Box.Wrap(y) { return Box.Wrap(x + y); } } } }",
+    "    }",
+    "}",
+    "impl<A> Add<Pair<A>> where A: BitNot {",
+    "    function add(left: Pair<A>, right: Pair<A>) returns (Pair<A>) where A: BitNot {",
+    "        match (left) { case Pair.Two(x, unused) { match (right) { case Pair.Two(other, y) { return Pair.Two(~x, ~y); } } } }",
+    "    }",
+    "}",
+    "impl Sub<Box> {",
+    "    function sub(left: Box, right: Box) returns (Box) where Box: Marker, Box: BitNot { return ~left; }",
+    "}",
+    "function first(value: Box) returns (word) { match (value) { case Box.Wrap(x) { return x; } } }",
+    "function omitted(a: word, b: word) returns (word) { return first(Box.Wrap(a) + Box.Wrap(b)); }",
+    "function restated(a: word, b: word) returns (word) {",
+    "    let sum: Pair<Box> = Pair.Two(Box.Wrap(a), Box.Wrap(0)) + Pair.Two(Box.Wrap(0), Box.Wrap(b));",
+    "    match (sum) { case Pair.Two(x, y) { return first(x) * 1000 + first(y); } }",
+    "}",
+    "function reordered(a: word, b: word) returns (word) { return first(Box.Wrap(a) - Box.Wrap(b)); }"] }]
+}
+
+private def runImplMethodPredicates : IO Unit := do
+  let program ← get "impl method predicate check" (checkProgram implMethodPredicateWorkspace)
+  let names := ["omitted", "restated", "reordered"]
+  let compiled ← get "impl method predicate compilation"
+    (compile implMethodPredicateWorkspace (← names.mapM (seed program)))
+  let mut session ← boot (← compiled.open)
+  for (index, arguments, expected) in ([(0, [2, 3], 5), (1, [1, 2], 101102), (2, [7, 9], 107)] :
+      List (Nat × List Nat × Nat)) do
+    let key ← match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError "impl method predicate root missing")
+    let completed ← execute session key (arguments.map word)
+    require (completed.value == word expected)
+      s!"{names[index]!}{reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  IO.println "SOURCE_CORE_IMPL_METHOD_PREDICATES_PASS: implementation methods that omit, restate or reorder their trait method's predicates, as upstream's SC0249 allows, compile and run, each dictionary selected from the caller's evidence and its implementation's premises"
+
 set_option maxRecDepth 2048 in
 def run : IO Unit := do
   let program ← get "public check" (checkProgram workspace)
@@ -7533,6 +7594,7 @@ def run : IO Unit := do
   runClosureParameterFixtures
   runLayoutBound
   runLayoutFixtures
+  runImplMethodPredicates
 
 end Tests.SourceCoreExecution
 end

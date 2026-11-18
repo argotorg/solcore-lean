@@ -1600,8 +1600,7 @@ theorem selects
       (SourceSemantics.dispatchPredicates receipt.selected.trait receipt.selected.implementation
           receipt.selected.declaration).map
         (ProgramPredicate.applyParameters method.specialized.parameterSubstitution) := by
-    rw [← receipt.roots.methods, receipt.selected.methodsGoals, receipt.selected.method_predicates formed,
-      receipt.selected.dispatch]
+    rw [← receipt.roots.methods, receipt.selected.methodsGoals, receipt.selected.dispatch]
   rw [methodsGoals] at methodsProduced
   have assembled := (CallableCoercionEvidenceOrigins.roots_origins receipt.roots covered resolved
     (CallableCoercionEvidenceOrigins.materialized_operator materialized)).1

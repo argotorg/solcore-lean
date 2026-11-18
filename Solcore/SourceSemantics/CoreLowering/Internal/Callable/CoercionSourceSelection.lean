@@ -55,7 +55,9 @@ private theorem method_fields {program : CheckedProgram} {primary : RawEvidence}
     {method : ExecutableImplMethods.CheckedMethod}
     (accepted : ExecutableImplMethods.checkMethodWithEvidenceAndArity program primary methodEvidence arity name = .ok method) :
     ∃ goal implementation, primary = .byImpl goal implementation method.implementationPremises ∧
-      method.methodPremises = methodEvidence := by
+      method.methodPremises = methodEvidence ∧
+      ∀ evidence ∈ method.declaredPremises,
+        evidence ∈ method.methodPremises ∨ evidence ∈ method.implementationPremises := by
   cases primary with
   | byImpl goal implementation premises =>
     simp only [ExecutableImplMethods.checkMethodWithEvidenceAndArity] at accepted
@@ -80,15 +82,21 @@ private theorem method_fields {program : CheckedProgram} {primary : RawEvidence}
     obtain ⟨_, accepted⟩ := require_ok accepted
     obtain ⟨_, accepted⟩ := require_ok accepted
     obtain ⟨_, accepted⟩ := require_ok accepted
-    obtain ⟨_, accepted⟩ := require_ok accepted
-    obtain ⟨_, accepted⟩ := require_ok accepted
     obtain ⟨_, _, accepted⟩ := bind_ok accepted
     obtain ⟨_, _, accepted⟩ := bind_ok accepted
+    obtain ⟨_, _, accepted⟩ := bind_ok accepted
+    obtain ⟨declaredPremises, declaredSelected, accepted⟩ := bind_ok accepted
     obtain ⟨genericChecked, _, accepted⟩ := bind_ok accepted
     obtain ⟨specialized, _, accepted⟩ := bind_ok accepted
     obtain ⟨_, accepted⟩ := require_ok accepted
+    obtain ⟨_, accepted⟩ := require_ok accepted
     cases accepted
-    exact ⟨goal, _, rfl, rfl⟩
+    refine ⟨goal, _, rfl, rfl, ?_⟩
+    intro selected member
+    obtain ⟨_, provided⟩ := ExecutableImplMethods.selectDeclaredPremises_mem declaredSelected selected member
+    rcases List.mem_append.mp provided with provided | provided
+    · exact .inl (List.of_mem_zip provided).2
+    · exact .inr (List.of_mem_zip provided).2
 
 open Solcore.SourceSemantics.Dynamic CallableEvidenceEnvironment
 open CallableNamedMetadata (evidence environment evidence_represents)
@@ -162,6 +170,10 @@ structure Roots (program : CheckedProgram) (caller : SourceSpecialization.Specia
   checked : ExecutableImplMethods.checkMethodWithEvidenceAndArity program primary methodEvidence arity name = .ok method
   shape : ∃ goal implementation, primary = .byImpl goal implementation method.implementationPremises
   methods : method.methodPremises = methodEvidence
+  /-- The implementation method's own premises are among the caller's method
+  evidence and the implementation's premises. -/
+  declared : ∀ evidence ∈ method.declaredPremises,
+    evidence ∈ method.methodPremises ∨ evidence ∈ method.implementationPremises
   primaryValid : EvidenceValid [] program.signatures.resolutionRules (SourceCompilationPlan.runtimeEvidenceGoal primary) (evidence primary)
   methodsValid : Forall₂ (fun goal raw => EvidenceValid [] program.signatures.resolutionRules goal (evidence raw))
     (methodEvidence.map SourceCompilationPlan.runtimeEvidenceGoal) methodEvidence
@@ -193,8 +205,11 @@ def Roots.of_selected {program : CheckedProgram} {caller : SourceSpecialization.
     obtain ⟨goal, implementation, shape, _⟩ := method_fields checked
     exact ⟨goal, implementation, shape⟩
   methods := by
-    obtain ⟨_, _, _, methods⟩ := method_fields checked
+    obtain ⟨_, _, _, methods, _⟩ := method_fields checked
     exact methods
+  declared := by
+    obtain ⟨_, _, _, _, declared⟩ := method_fields checked
+    exact declared
   primaryValid := by
     have same := SourceCompilationPlan.exactRuntimeRequirementEvidence_success_goal _ _ _ _ _ _ _ primarySelected
     rw [same]
@@ -220,6 +235,10 @@ structure Certificate (program : CheckedProgram) (caller : SourceSpecialization.
   checked : ExecutableImplMethods.checkMethodWithEvidenceAndArity program primary methodEvidence 2 "coerce" = .ok method
   shape : ∃ goal implementation, primary = .byImpl goal implementation method.implementationPremises
   methods : method.methodPremises = methodEvidence
+  /-- The implementation method's own premises are among the caller's method
+  evidence and the implementation's premises. -/
+  declared : ∀ evidence ∈ method.declaredPremises,
+    evidence ∈ method.methodPremises ∨ evidence ∈ method.implementationPremises
   primaryValid : EvidenceValid [] program.signatures.resolutionRules (SourceCompilationPlan.runtimeEvidenceGoal primary) (evidence primary)
   methodsValid : Forall₂ (fun goal raw => EvidenceValid [] program.signatures.resolutionRules goal (evidence raw))
     (methodEvidence.map SourceCompilationPlan.runtimeEvidenceGoal) methodEvidence
@@ -230,7 +249,8 @@ def Certificate.roots {program : CheckedProgram} {caller : SourceSpecialization.
     (receipt : Certificate program caller node available step method) :
     Roots program caller node available step.requirement step.methodRequirements 2 "coerce" method :=
   ⟨receipt.primary, receipt.methodEvidence, receipt.primarySelected, receipt.methodsSelected,
-    receipt.checked, receipt.shape, receipt.methods, receipt.primaryValid, receipt.methodsValid⟩
+    receipt.checked, receipt.shape, receipt.methods, receipt.declared, receipt.primaryValid,
+    receipt.methodsValid⟩
 
 /-- No separate premise is required for an intermediate method selection. -/
 theorem of_accepted {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
@@ -252,7 +272,8 @@ theorem of_accepted {program : CheckedProgram} {caller : SourceSpecialization.Sp
   have checked := mapError_ok accepted
   let roots := Roots.of_selected primarySelected methodsSelected checked
   exact ⟨⟨roots.primary, roots.methodEvidence, roots.primarySelected, roots.methodsSelected,
-    roots.checked, roots.shape, roots.methods, roots.primaryValid, roots.methodsValid⟩⟩
+    roots.checked, roots.shape, roots.methods, roots.declared, roots.primaryValid,
+    roots.methodsValid⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableCoercionMethodCertificates
 end
@@ -366,12 +387,13 @@ theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evi
     obtain ⟨traitOwner, accepted⟩ := require_ok accepted
     obtain ⟨associated, accepted⟩ := require_ok accepted
     obtain ⟨_, accepted⟩ := require_ok accepted
-    obtain ⟨_, accepted⟩ := require_ok accepted
-    obtain ⟨_, accepted⟩ := require_ok accepted
+    obtain ⟨_, _, accepted⟩ := bind_ok accepted
+    obtain ⟨_, _, accepted⟩ := bind_ok accepted
     obtain ⟨_, _, accepted⟩ := bind_ok accepted
     obtain ⟨_, _, accepted⟩ := bind_ok accepted
     obtain ⟨generic, genericChecked, accepted⟩ := bind_ok accepted
     obtain ⟨specialized, specializedChecked, accepted⟩ := bind_ok accepted
+    obtain ⟨_, accepted⟩ := require_ok accepted
     obtain ⟨_, accepted⟩ := require_ok accepted
     cases accepted
     have implementationMember : implementation ∈ program.signatures.implementations := by
@@ -847,10 +869,13 @@ structure Selection (program : CheckedProgram) (primary : TypedTraitResolution.E
   goalTrait : goal.trait = .declaration trait.id
   declarationName : declaration.name = name
   methodsGoals : method.methodPremises.map SourceCompilationPlan.runtimeEvidenceGoal = method.methodPredicates
-  predicates : method.methodPredicates = declaration.wherePredicates.map (ProgramPredicate.applyParameters supplied)
-  /-- The executable boundary still requires the method's predicates to be its
-  trait method's, so a caller proves exactly them. -/
-  dispatch : SourceSemantics.dispatchPredicates trait implementation declaration = declaration.wherePredicates
+  /-- The method's own closed predicates, which its body assumes. -/
+  declared : method.declaredPredicates = declaration.wherePredicates.map (ProgramPredicate.applyParameters supplied)
+  /-- The caller proves the trait method's predicates, instantiated at the head
+  and then by the specialization. -/
+  dispatch : method.methodPredicates =
+    (SourceSemantics.dispatchPredicates trait implementation declaration).map
+      (ProgramPredicate.applyParameters method.specialized.parameterSubstitution)
 
 theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evidence}
     {evidence : List TypedTraitResolution.Evidence} {arity : Nat} {name : String}
@@ -884,8 +909,7 @@ theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evi
     obtain ⟨traitOwner, accepted⟩ := require_ok accepted
     obtain ⟨associated, accepted⟩ := require_ok accepted
     obtain ⟨_, accepted⟩ := require_ok accepted
-    obtain ⟨genericPredicates, accepted⟩ := require_ok accepted
-    obtain ⟨closedPredicates, accepted⟩ := require_ok accepted
+    obtain ⟨_, _, accepted⟩ := bind_ok accepted
     obtain ⟨_, _, accepted⟩ := bind_ok accepted
     obtain ⟨resultUnit, methodsValidated, accepted⟩ := bind_ok accepted
     cases resultUnit
@@ -914,9 +938,11 @@ theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evi
             have tails : rest.length = remaining.length := by simpa using lengths
             simpa only [List.map_cons, SourceCompilationPlan.runtimeEvidenceGoal, same] using
               congrArg (List.cons predicate) (ih tails (index + 1) checked)
+    obtain ⟨_, _, accepted⟩ := bind_ok accepted
     obtain ⟨generic, genericChecked, accepted⟩ := bind_ok accepted
     obtain ⟨specialized, specializedChecked, accepted⟩ := bind_ok accepted
     obtain ⟨_, accepted⟩ := require_ok accepted
+    obtain ⟨dispatchedPredicates, accepted⟩ := require_ok accepted
     cases accepted
     have implementationMember : implementation ∈ program.signatures.implementations := by
       change ((match program.signatures.implementations.filter _ with
@@ -984,20 +1010,15 @@ theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evi
       have member : trait ∈ [trait] := List.mem_cons_self
       rw [← selected] at member
       exact ⟨(List.mem_filter.mp member).1, of_decide_eq_true (List.mem_filter.mp member).2⟩
-    have dispatch : SourceSemantics.dispatchPredicates trait implementation declaration =
-        declaration.wherePredicates := by
-      have found : trait.methods.find? (fun candidate => candidate.name == declaration.name) =
-          some traitMethod := by
-        change ((match trait.methods.filter _ with
-          | [] => .error _ | [value] => .ok value | values => .error _) : Except ExecutableImplMethods.Error ProgramTraitMethodSignature) = .ok traitMethod at traitMethodSelected
-        split at traitMethodSelected <;> try contradiction
-        cases traitMethodSelected
-        rename_i selected
-        rw [declarationName]
-        exact filtered_find selected
-      unfold SourceSemantics.dispatchPredicates
-      rw [found]
-      exact genericPredicates
+    have found : trait.methods.find? (fun candidate => candidate.name == declaration.name) =
+        some traitMethod := by
+      change ((match trait.methods.filter _ with
+        | [] => .error _ | [value] => .ok value | values => .error _) : Except ExecutableImplMethods.Error ProgramTraitMethodSignature) = .ok traitMethod at traitMethodSelected
+      split at traitMethodSelected <;> try contradiction
+      cases traitMethodSelected
+      rename_i selected
+      rw [declarationName]
+      exact filtered_find selected
     refine ⟨{
       implementation, trait, declaration, generic, supplied := headMatch.parameterSubstitution
       implementationMember, methodMember, traitLookup, traitMethodMember := traitMember
@@ -1011,8 +1032,11 @@ theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evi
       goalTrait := by rw [traitEntry.2]; exact goalTrait
       declarationName
       methodsGoals
-      predicates := closedPredicates
-      dispatch
+      declared := rfl
+      dispatch := by
+        unfold SourceSemantics.dispatchPredicates
+        rw [found]
+        exact dispatchedPredicates
     }⟩
 
 
@@ -1057,15 +1081,6 @@ theorem determines (selected : Selection program primary name method)
   rw [specialization_predicate selected.specialized selected.implementation.head formed.headParameters,
     selected.suppliedEq]
   exact matched_parameter_head selected.matched formed.headRigid
-
-theorem method_predicates (selected : Selection program primary name method)
-    (formed : Formation selected.implementation selected.declaration) :
-    method.methodPredicates = selected.declaration.wherePredicates.map
-      (ProgramPredicate.applyParameters method.specialized.parameterSubstitution) := by
-  rw [selected.predicates]
-  apply List.map_congr_left
-  intro predicate member
-  exact (specialization_predicate selected.specialized predicate (formed.methodParameters predicate member)).symm
 
 /-- Actual same-fuel retained checking and structural substitution yield the
 source method instantiation. Range formation is not inferred from groundness. -/
@@ -1154,11 +1169,12 @@ theorem materialized_operator {program : CheckedProgram} {caller : SourceSpecial
     {dictionary : Dictionary}
     (accepted : SourceCompilationPlan.operatorMethodRuntimeEvidence program caller node selection = .ok dictionary) :
     ∃ headers, Resolved program selection.method.traitPredicates headers ∧
-      dictionary = headers ++ selection.method.implementationPremises ++ selection.method.methodPremises ∧
+      dictionary = headers ++ selection.method.implementationPremises ++ selection.method.declaredPremises ∧
       dictionary.map SourceCompilationPlan.runtimeEvidenceGoal = selection.method.specialized.assumptions := by
   rcases selection with ⟨requirement, method⟩
   cases method with
-  | mk id traitMethod predicates implementationPredicates implementationPremises methodPredicates methodPremises synthetic checked specialized =>
+  | mk id traitMethod predicates implementationPredicates implementationPremises methodPredicates methodPremises
+      declaredPredicates declaredPremises synthetic checked specialized =>
     induction predicates generalizing specialized dictionary with
     | nil =>
       unfold SourceCompilationPlan.operatorMethodRuntimeEvidence at accepted
@@ -1184,11 +1200,11 @@ theorem materialized_operator {program : CheckedProgram} {caller : SourceSpecial
       split at headersAccepted <;> try contradiction
       obtain ⟨tail, tailAccepted, headersEq⟩ := bind_ok headersAccepted
       cases headersEq
-      let tailDictionary := tail ++ implementationPremises ++ methodPremises
+      let tailDictionary := tail ++ implementationPremises ++ declaredPremises
       let tailSpecialized := { specialized with assumptions := tailDictionary.map SourceCompilationPlan.runtimeEvidenceGoal }
       have tailRun : SourceCompilationPlan.operatorMethodRuntimeEvidence program caller node
           ⟨requirement, ⟨id, traitMethod, rest, implementationPredicates, implementationPremises, methodPredicates, methodPremises,
-            synthetic, checked, tailSpecialized⟩⟩ = .ok tailDictionary := by
+            declaredPredicates, declaredPremises, synthetic, checked, tailSpecialized⟩⟩ = .ok tailDictionary := by
         simp only [SourceCompilationPlan.operatorMethodRuntimeEvidence]
         rw [tailAccepted]
         change (do SourceCompilationPlan.validateRuntimeEvidence specialized.key (tailDictionary.map SourceCompilationPlan.runtimeEvidenceGoal) tailDictionary; pure tailDictionary) = .ok tailDictionary
@@ -1207,7 +1223,7 @@ theorem materialized {program : CheckedProgram} {caller : SourceSpecialization.S
     {dictionary : Dictionary}
     (accepted : SourceCompilationPlan.coercionMethodRuntimeEvidence program caller node step method = .ok dictionary) :
     ∃ headers, Resolved program method.traitPredicates headers ∧
-      dictionary = headers ++ method.implementationPremises ++ method.methodPremises ∧
+      dictionary = headers ++ method.implementationPremises ++ method.declaredPremises ∧
       dictionary.map SourceCompilationPlan.runtimeEvidenceGoal = method.specialized.assumptions :=
   materialized_operator (selection := ⟨step.requirement, method⟩) accepted
 
@@ -1327,7 +1343,7 @@ theorem roots_origins {program : CheckedProgram} {caller : SourceSpecialization.
     (covered : CallerCovered caller method)
     (callerAccepted : SourceCompilationPlan.resolveRuntimeEvidenceEnvironment program caller.key caller.assumptions = .ok available)
     (materialization : ∃ headers, Resolved program method.traitPredicates headers ∧
-      dictionary = headers ++ method.implementationPremises ++ method.methodPremises ∧
+      dictionary = headers ++ method.implementationPremises ++ method.declaredPremises ∧
       dictionary.map SourceCompilationPlan.runtimeEvidenceGoal = method.specialized.assumptions) :
     EvidenceEnvironment.AssembledFrom (environment available)
         (evidence selected.primary :: selected.methodEvidence.map evidence) method.specialized.assumptions (environment dictionary) ∧
@@ -1335,6 +1351,22 @@ theorem roots_origins {program : CheckedProgram} {caller : SourceSpecialization.
       (environment dictionary).map Prod.fst = method.specialized.assumptions := by
   obtain ⟨headers, resolvedHeaders, shape, goals⟩ := materialization
   have callerResolved := caller_resolved callerAccepted
+  have premiseOrigin : ∀ item ∈ method.implementationPremises, EvidenceEntryOriginates (environment available)
+      (evidence selected.primary :: selected.methodEvidence.map evidence)
+      (SourceCompilationPlan.runtimeEvidenceGoal item) (evidence item) := by
+    intro item member
+    obtain ⟨goal, implementation, primaryShape⟩ := selected.shape
+    apply EvidenceEntryOriginates.root (root := evidence selected.primary) (by simp)
+    · rw [primaryShape]
+      simp only [evidence]
+      exact .premise (List.mem_map.mpr ⟨item, member, rfl⟩) (.self _)
+    · exact evidence_goal _
+  have methodOrigin : ∀ item ∈ method.methodPremises, EvidenceEntryOriginates (environment available)
+      (evidence selected.primary :: selected.methodEvidence.map evidence)
+      (SourceCompilationPlan.runtimeEvidenceGoal item) (evidence item) := by
+    intro item member
+    rw [selected.methods] at member
+    exact .root (by simp [List.mem_map.mpr ⟨item, member, rfl⟩]) (.self _) (evidence_goal _)
   have roots : ∀ item ∈ dictionary, EvidenceEntryOriginates (environment available)
       (evidence selected.primary :: selected.methodEvidence.map evidence)
       (SourceCompilationPlan.runtimeEvidenceGoal item) (evidence item) := by
@@ -1345,14 +1377,25 @@ theorem roots_origins {program : CheckedProgram} {caller : SourceSpecialization.
       · obtain ⟨goal, goalMember, resolved⟩ := resolved_each resolvedHeaders item member
         rw [resolved_goal resolved]
         exact .caller (callerResolved.lookup (covered _ goalMember) resolved)
-      · obtain ⟨goal, implementation, primaryShape⟩ := selected.shape
-        apply EvidenceEntryOriginates.root (root := evidence selected.primary) (by simp)
-        · rw [primaryShape]
-          simp only [evidence]
-          exact .premise (List.mem_map.mpr ⟨item, member, rfl⟩) (.self _)
-        · exact evidence_goal _
-    · rw [selected.methods] at member
-      exact .root (by simp [List.mem_map.mpr ⟨item, member, rfl⟩]) (.self _) (evidence_goal _)
+      · exact premiseOrigin item member
+    · rcases selected.declared item member with member | member
+      · exact methodOrigin item member
+      · exact premiseOrigin item member
+  have premiseValid : ∀ item ∈ method.implementationPremises,
+      EvidenceValid [] program.signatures.resolutionRules (SourceCompilationPlan.runtimeEvidenceGoal item) (evidence item) := by
+    intro item member
+    obtain ⟨goal, implementation, primaryShape⟩ := selected.shape
+    have valid := selected.primaryValid
+    rw [primaryShape] at valid
+    simp only [evidence, SourceCompilationPlan.runtimeEvidenceGoal] at valid
+    cases valid with
+    | implementation _ _ _ children =>
+      simpa only [evidence_goal] using valid_each children (evidence item) (List.mem_map.mpr ⟨item, member, rfl⟩)
+  have methodValid : ∀ item ∈ method.methodPremises,
+      EvidenceValid [] program.signatures.resolutionRules (SourceCompilationPlan.runtimeEvidenceGoal item) (evidence item) := by
+    intro item member
+    rw [selected.methods] at member
+    exact raw_valid_each selected.methodsValid item member
   have eachValid : ∀ item ∈ dictionary,
       EvidenceValid [] program.signatures.resolutionRules (SourceCompilationPlan.runtimeEvidenceGoal item) (evidence item) := by
     intro item member
@@ -1361,15 +1404,10 @@ theorem roots_origins {program : CheckedProgram} {caller : SourceSpecialization.
     · rcases List.mem_append.mp member with member | member
       · obtain ⟨goal, _, resolved⟩ := resolved_each resolvedHeaders item member
         simpa only [resolved_goal resolved] using resolved_valid resolved
-      · obtain ⟨goal, implementation, primaryShape⟩ := selected.shape
-        have valid := selected.primaryValid
-        rw [primaryShape] at valid
-        simp only [evidence, SourceCompilationPlan.runtimeEvidenceGoal] at valid
-        cases valid with
-        | implementation _ _ _ children =>
-          simpa only [evidence_goal] using valid_each children (evidence item) (List.mem_map.mpr ⟨item, member, rfl⟩)
-    · rw [selected.methods] at member
-      exact raw_valid_each selected.methodsValid item member
+      · exact premiseValid item member
+    · rcases selected.declared item member with member | member
+      · exact methodValid item member
+      · exact premiseValid item member
   exact ⟨goals ▸ assembled_each roots, dictionary_valid eachValid, by simpa only [environment, List.map_map, Function.comp_def] using goals⟩
 
 theorem Certificate.origins {program : CheckedProgram} {caller : SourceSpecialization.SpecializedFunction}
@@ -1650,8 +1688,7 @@ theorem MethodCertificate.selects {program : CheckedProgram}
       (SourceSemantics.dispatchPredicates receipt.selected.trait receipt.selected.implementation
           receipt.selected.declaration).map
         (ProgramPredicate.applyParameters method.specialized.parameterSubstitution) := by
-    rw [← receipt.roots.methods, receipt.selected.methodsGoals, receipt.selected.method_predicates formed,
-      receipt.selected.dispatch]
+    rw [← receipt.roots.methods, receipt.selected.methodsGoals, receipt.selected.dispatch]
   rw [methodsGoals] at methodsProduced
   have assembled := (CallableCoercionEvidenceOrigins.roots_origins receipt.roots covered resolved
     (CallableCoercionEvidenceOrigins.materialized_operator materialized)).1
