@@ -127,10 +127,11 @@ Build the umbrella and work up from the lowest failing file: its importers fail 
     from the left operand's type and the operator, as the source semantics does. Division divides
     the magnitudes and restores the sign (`truncatedDivision`), since Core's `integerDiv` and
     `integerMod` are Euclidean.
-  - A compound form carries the assignment profile
-    `operator = .equal ∨ T = .word ∨ T = .integer ∧ operator.wordOnly = false`. A new Word-only
-    compound operator goes into `Syntax.ValueAssignOp.wordOnly`; `DataPlaceModifier.word_success`
-    gains its case and `integer_success` refutes it.
+  - A compound form carries the assignment profile, `AssignmentProfile`
+    (`Foundations/AssignmentProfiles`): plain assignment, or a compound one at a `Word` target or
+    at an `integer` one whose operator is not Word-only. A new Word-only compound operator goes
+    into `Syntax.ValueAssignOp.wordOnly`; `DataPlaceModifier.word_success` gains its case and
+    `integer_success` refutes it.
   - Fixed-width compound targets are compiled, with the modified leaf wrapped to the type's width
     (`placeWrap`) and the operator's checks in `guard`, but the profile leaves them out of the
     meaning proofs. The
@@ -246,7 +247,9 @@ work, under "Remaining work for the second goal". In short:
 - **Lockstep with the semantics.** Both sides call one copy decision,
   `CaptureBinders.copiedBinder?`, and `Foundations/SourceExecutionSize` restates every dynamic rule
   with a size.
-- **The assignment profile is text, not a definition.** Search for `wordOnly` to find every copy.
+- **The assignment profile is named only at Source types** (`AssignmentProfile`). The receipts'
+  copies of the compiler's operator check at a Core leaf (`operatorValid`, `operatorType`), where
+  a fixed-width leaf is `word`, and Frontend's `checkedCompound_of_profile` spell it out.
 - **Bare names depend on imports.** `Foundations/CoreEvaluation` and `Callable/ViewWrappers` stay
   below the Source [Context](../../Solcore/SourceSemantics/Context.lean): `Context` there is
   `Core.Context` through `open Core`. `Statements/GenericImperativeFor` and `TypedImperativeFor`

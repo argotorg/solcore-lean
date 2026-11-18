@@ -338,15 +338,14 @@ upstream wrote them.
 - **Fault sites.** A fixed-width target has its own site
   (`SourceCoreAssignmentFaultSites.operandTarget`), so an absent operand fails with its own
   `invalidAssignmentOperands` diagnostic, naming the target's type.
-- **Outside the meaning proofs.** The proofs' operator profiles
-  (`operator = .equal ∨ T = .word ∨ T = .integer ∧ operator.wordOnly = false`, on the metadata
-  view) exclude fixed-width compound targets, as the receipts' `sourceProfile`
+- **Outside the meaning proofs.** The proofs' operator profile (`AssignmentProfile`, on the
+  metadata view) excludes fixed-width compound targets, as the receipts' `sourceProfile`
   (`operator = .equal ∨ T = .word`) excludes Integer targets. Inside the profiles,
   `assignmentModifier_plain` turns the compiler's choice back into `binaryOperator`'s, and
   `CompoundAssignmentApplies.eq_of_plain` the relation back into `AssignmentValueApplies`.
 - **Bringing in** checked `+= -= *=` and `&= |= ^=` would take:
-  - a fixed disjunct in the profiles, `T = .fixed t ∧ FixedCompoundAssignmentOperator operator`,
-    and in the receipts' `sourceProfile`;
+  - a fixed disjunct, `T = .fixed t ∧ FixedCompoundAssignmentOperator operator`, at the end of
+    `AssignmentProfile` and in the receipts' `sourceProfile`;
   - a checked case in `DataPlaceModifier`'s modifier lemmas: in range, Word's `+ - *` is the exact
     result's word (congruence modulo `2^256`), and `SourceCorePrimitive.checkedInRange` is
     `Dynamic.FixedInRange` of `checkedResult` by definition;
