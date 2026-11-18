@@ -18,6 +18,14 @@ per-fixture mutant, sequence mutant, source mutant and time budgets and an
 iteration time budget. That
 harness compares compiled paths with each other and with upstream's recorded
 expectations, never with original Core.
+
+The opt-in run kind `native` runs scripts/semantic-native.py in random mode on
+each iteration's draws: the suite's root seed, shard, case counts, attempts and
+node-budget scale, on the pure profiles whose emitter the native admission
+admits, within a run time budget. That harness compares Lean's native frontend
+with each admitted case's direct Core result, never with a compiled path, and
+its labels of Lean's known differences from upstream count as known. `replay`
+reruns a kept native example through the harness's own comparison.
 """
 from __future__ import annotations
 
@@ -52,7 +60,13 @@ SCHEMA = "solcore-lean.semantic-fuzz.v1"
 BACKENDS = ("sonatina-o0", "sonatina-o2", "yul")
 # A fixtures run compares every compiled path of the pinned end-to-end fixtures at once.
 FIXTURES = "fixtures"
-RUN_KINDS = BACKENDS + (FIXTURES,)
+# A native run compares Lean's native frontend with original Core on the admitted pure cases.
+NATIVE = "native"
+RUN_KINDS = BACKENDS + (FIXTURES, NATIVE)
+# The native harness's counts of a run, in its order, and its time budget for one program (its default).
+NATIVE_COUNTS = ("cases", "generationExcluded", "notAdmitted", "admitted", "programs", "agree", "mismatch", "rejected",
+                 "inconclusive", "unexecuted")
+NATIVE_PROGRAM_SECONDS = 120.0
 INCONCLUSIVE = {"inconclusive-resource"}
 # Categories identified by the failing tool's message rather than by the program.
 SYMPTOM_CATEGORIES = {"compiler-crash", "source-rejected", "compilation-rejected", "execution-error", "adapter-error",
@@ -72,7 +86,7 @@ CONFIG_DEFAULTS = {"base_seed": None, "shard_index": 0, "shard_count": 1, "backe
                    "target_dir": None,
                    "anvil": None, "solc": None, "fixture_count": 8, "fixture_mutants": 32, "fixture_sequences": 8, "fixture_sources": 2,
                    "fixture_seconds": 300.0,
-                   "fixture_run_seconds": 1800.0, "fixture_jobs": 2, "cast": None}
+                   "fixture_run_seconds": 1800.0, "fixture_jobs": 2, "cast": None, "native_seconds": 1800.0}
 PATH_OPTIONS = ("bin_dir", "upstream", "target_dir", "anvil", "solc")
 # Paths only a fixtures run reads; the suite takes none of them.
 FIXTURE_PATH_OPTIONS = ("cast",)
@@ -236,9 +250,26 @@ FIXTURE_MISMATCH_CLASSES = (
      "the paths' first allocations differ, Hull and solc at 0x80, Sonatina O2 at 0x140 and O0 at 0x200, in source "
      "mutants that return addresses (questions.md, 2026-10-31)"),
 )
+# Lean's known differences from upstream, by the labels semantic-native.py gives them (its KNOWN): a native rejection
+# or mismatch with one of these labels counts under its label's class, never as new. Every other native finding,
+# one with a label not listed here included, keeps its own key.
+NATIVE_CLASSES = tuple(({"backend": NATIVE, "category": category, "stage": stage, "class": name}, label)
+                       for category, stage, name, label in (
+    ("native-rejection", "inference", "open-typedef-call",
+     "Lean rejects a `Typedef` call whose type is still open at the call (integer note, differences from upstream)"),
+    ("native-rejection", "inference", "generalized-lambda-parameter",
+     "Lean generalizes a local lambda, so an operator on a parameter that nothing types is rejected (integer note, "
+     "differences from upstream)"),
+    ("native-rejection", "inference", "bool-equality", "Lean has no `==` on `bool` (semantic-native.py)"),
+    ("native-rejection", "inference", "not-equal",
+     "Lean has no `!=` at a type without a builtin one, which upstream takes from std's `ne` (semantic-native.py)"),
+    ("native-mismatch", "execution", "uninitialized-local",
+     "Lean faults on a read of an uninitialized local, which upstream reads as zero (source semantics, uninitialized "
+     "locals)")))
 KNOWN = {canonical_id(key): label for key, label in KNOWN_FINDINGS} | \
     {canonical_id(key): label for key, _, _, label in MISMATCH_CLASSES} | \
-    {canonical_id(key): label for key, _, label in FIXTURE_MISMATCH_CLASSES}
+    {canonical_id(key): label for key, _, label in FIXTURE_MISMATCH_CLASSES} | \
+    {canonical_id(key): label for key, label in NATIVE_CLASSES}
 
 
 def mismatch_class(profile, fingerprint, final):
@@ -264,6 +295,21 @@ def fixture_mismatch_class(finding):
             if shares(finding):
                 return dict(key)
     return None
+
+
+def native_signature_key(finding):
+    """A native finding of the harness's report: its label's class, else a rejection's stage and symptom or a
+    mismatch's profile and observation classes, as the harness signs it."""
+    category = finding.get("kind")
+    for key, _ in NATIVE_CLASSES:
+        if finding.get("label") == key["class"] and category == key["category"] and \
+                (category != "native-rejection" or finding.get("stage") == key["stage"]):
+            return dict(key)
+    if category == "native-rejection":
+        return {"backend": NATIVE, "category": category, "stage": finding.get("stage"),
+                "symptom": {"message": finding.get("symptom")}}
+    return {"backend": NATIVE, "category": category, "stage": "execution", "profile": finding.get("profile"),
+            "fingerprint": {"core": finding.get("core"), "native": finding.get("native")}}
 
 
 def normalize(text):
@@ -424,7 +470,14 @@ class State:
 def profiles_for(config, backend):
     """Yul runs the pure and storage-family profiles and, of the call profiles, only
     the two-source ones, configured or not. The suite's own Yul default is only the
-    pure profiles, so the others are selected explicitly."""
+    pure profiles, so the others are selected explicitly. A native run takes the
+    pure profiles whose emitter the native admission admits."""
+    if backend == NATIVE:
+        if config["profile"] is None:
+            return None  # The native harness's own random selection, which is the same.
+        native = native_harness()
+        return [profile for profile in config["profile"]
+                if profile in native.PURE_PROFILES and native.profile_emitter(profile) in native.EMITTERS]
     if backend == "yul":
         selected = list(suite.PROFILES) if config["profile"] is None else config["profile"]
         return [profile for profile in selected if suite.PROFILES[profile][1] != "call" or profile in suite.YUL_CALL_PROFILES]
@@ -449,14 +502,24 @@ def setting(config, key):
     return CONFIG_DEFAULTS[key] if value is None else value
 
 
-@functools.cache
-def harness():
-    """The fixture harness, loaded only for its inventory and seeded streams."""
-    spec = importlib.util.spec_from_file_location("semantic_fuzz_fixtures", ROOT / "scripts/semantic-fixtures.py")
+def script_module(name, filename):
+    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / filename)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+@functools.cache
+def harness():
+    """The fixture harness, loaded only for its inventory and seeded streams."""
+    return script_module("semantic_fuzz_fixtures", "semantic-fixtures.py")
+
+
+@functools.cache
+def native_harness():
+    """The native harness, loaded only for its profile selection, its argument checks and its replays."""
+    return script_module("semantic_fuzz_native", "semantic-native.py")
 
 
 def fixture_pool(config):
@@ -499,6 +562,40 @@ def fixtures_command(config, iteration, output, fixtures=None):
     for fixture in fixture_selection(config, iteration) if fixtures is None else fixtures:
         argv += ["--fixture", fixture]
     return argv + fixture_paths(config)
+
+
+def native_tool(config):
+    """The native tool beside the configured tools, else where `lake build semanticNativeTool` puts it."""
+    return Path(config["bin_dir"]) / "semantic-native-tool" if config.get("bin_dir") else \
+        ROOT / ".lake/build/bin/semantic-native-tool"
+
+
+def native_paths(config):
+    return ["--bin-dir", config["bin_dir"], "--native-tool", str(native_tool(config))] if config.get("bin_dir") else []
+
+
+def native_command(config, iteration, output, profiles=None):
+    """A native run of the iteration's draws, the root seed, shard, sizes and scale its suite runs take, on the
+    admitted pure profiles, or on `profiles`, within the configured budget."""
+    argv = [sys.executable, str(ROOT / "scripts/semantic-native.py"), "--mode", "random",
+            "--seed", str(root_seed(config, iteration)), "--shard-index", str(config["shard_index"]),
+            "--shard-count", str(config["shard_count"]), "--cases", str(config["cases"]),
+            "--nodes-scale", str(nodes_scale(config, iteration)), "--seconds", str(setting(config, "native_seconds")),
+            "--output", str(output)]
+    for key in ("functions", "attempts", "nodes"):
+        if config.get(key) is not None:
+            argv += ["--" + key, str(config[key])]
+    for profile in (profiles_for(config, NATIVE) or []) if profiles is None else profiles:
+        argv += ["--profile", profile]
+    return argv + native_paths(config)
+
+
+def run_command(config, iteration, backend, output):
+    if backend == FIXTURES:
+        return fixtures_command(config, iteration, output)
+    if backend == NATIVE:
+        return native_command(config, iteration, output)
+    return suite_command(config, iteration, backend, output)
 
 
 def suite_command(config, iteration, backend, output):
@@ -554,6 +651,18 @@ def configure(state, args):
             if not fixture_pool(config):
                 raise NotReady("no pinned fixture falls on this shard")
             continue
+        if backend == NATIVE:
+            if config["native_seconds"] <= 0:
+                raise NotReady("--native-seconds must be positive")
+            if config["profile"] is not None and not profiles_for(config, NATIVE):
+                raise NotReady("no selected profile is a pure profile whose emitter the native harness admits")
+            try:
+                with open(os.devnull, "w") as sink, contextlib.redirect_stderr(sink):
+                    native_harness().parse_args(native_command(config, 0, state.directory / "unused")[2:])
+            except SystemExit:
+                raise NotReady("the native harness rejects this configuration: "
+                               f"{native_command(config, 0, 'OUTPUT')[2:]}") from None
+            continue
         if config["profile"] is not None and not profiles_for(config, backend):
             raise NotReady(f"no selected profile runs on {backend}")
         # Reject what the suite would reject before any run is recorded.
@@ -600,18 +709,30 @@ def verify_tools(config):
     return Path(report["receipt"])
 
 
-def fixture_check(config):
-    """The fixture harness's readiness: the receipts of the compilers and directive tools, solc, and the identity of
-    every script, binary and tool a fixtures run reads, with the parity manifests and the inventory."""
-    argv = [sys.executable, str(ROOT / "scripts/semantic-fixtures.py"), "--check", *fixture_paths(config)]
+def ready_check(argv, name):
+    """A harness's `--check` report, which must say it is ready."""
     result = subprocess.run(argv, cwd=ROOT, capture_output=True, text=True, timeout=1800)
     lines = result.stdout.strip().splitlines()
     check = None
     with contextlib.suppress(ValueError):
         check = json.loads(lines[-1]) if result.returncode == 0 and lines else None
     if not isinstance(check, dict) or check.get("status") != "ready":
-        raise NotReady("the fixture harness is not ready: " + (result.stderr.strip() or result.stdout.strip())[-2000:])
+        raise NotReady(f"the {name} harness is not ready: " + (result.stderr.strip() or result.stdout.strip())[-2000:])
     return check
+
+
+def fixture_check(config):
+    """The fixture harness's readiness: the receipts of the compilers and directive tools, solc, and the identity of
+    every script, binary and tool a fixtures run reads, with the parity manifests and the inventory."""
+    return ready_check([sys.executable, str(ROOT / "scripts/semantic-fixtures.py"), "--check", *fixture_paths(config)],
+                       "fixture")
+
+
+def native_check(config):
+    """The native harness's readiness: its admission, adapter and comparison versions, its admitted emitters, and the
+    identity of the native tool, which no receipt covers, of the case tool and of the scripts a native run reads."""
+    return ready_check([sys.executable, str(ROOT / "scripts/semantic-native.py"), "--check", "--mode", "random",
+                        *native_paths(config)], "native")
 
 
 def current_epoch(config):
@@ -625,6 +746,12 @@ def current_epoch(config):
         epoch["fixturesSha256"] = hashlib.sha256(json.dumps({key: check.get(key) for key in (
             "tools", "builds", "manifests", "fixtures")}, sort_keys=True).encode()).hexdigest()
         identity["fixtures"] = epoch["fixturesSha256"]
+    if NATIVE in config["backend"]:
+        # Likewise a state without native runs keeps its epoch formula.
+        check = native_check(config)
+        epoch["nativeSha256"] = hashlib.sha256(json.dumps({key: check.get(key) for key in (
+            "versions", "admittedEmitters", "tools", "scripts")}, sort_keys=True).encode()).hexdigest()
+        identity["native"] = epoch["nativeSha256"]
     epoch["id"] = canonical_id(identity)
     return epoch
 
@@ -639,6 +766,13 @@ def check_epoch(state, epoch, iteration, accept):
                            "rerun with --accept-new-epoch to continue under the new epoch")
     epochs.append({**epoch, "firstIteration": iteration, "accepted": now()})
     save(state.state_path, record)
+
+
+def signalled(backend, summary, exit_code):
+    """Whether a run stopped on a signal: the suite and the fixture harness record it, the native harness exits 130."""
+    if backend == NATIVE:
+        return exit_code == 130
+    return isinstance(summary, dict) and summary.get("stop") == ("signal" if backend == FIXTURES else "interrupted")
 
 
 def run_suite(argv, stdout_path, stderr_path, stop, grace=120.0):
@@ -701,9 +835,10 @@ def crash_sites(config, output, summary):
     return sites
 
 
-def note_occurrence(state, config, registry, sid, key, brief, destination, keep, first_time):
-    """Count one occurrence of a signature. While it has fewer than --examples kept, `keep(destination)` keeps the
-    occurrence's archive there and says whether it did. A known finding is counted but never new."""
+def note_occurrence(state, config, registry, sid, key, brief, destination, keep, first_time, cases=1):
+    """Count one occurrence of a signature, of `cases` cases. While it has fewer than --examples kept,
+    `keep(destination)` keeps the occurrence's archive there and says whether it did. A known finding is counted but
+    never new."""
     entry = registry["signatures"].get(sid)
     new = entry is None and sid not in KNOWN
     if entry is None:
@@ -715,9 +850,9 @@ def note_occurrence(state, config, registry, sid, key, brief, destination, keep,
     if destination.exists() or len(entry["examples"]) < config["examples"] and keep(destination):
         retained = str(destination.relative_to(state.directory))
     if first_time:
-        entry["count"] += 1
-        entry["backends"][brief["backend"]] = entry["backends"].get(brief["backend"], 0) + 1
-        entry["profiles"][brief["profile"]] = entry["profiles"].get(brief["profile"], 0) + 1
+        entry["count"] += cases
+        entry["backends"][brief["backend"]] = entry["backends"].get(brief["backend"], 0) + cases
+        entry["profiles"][brief["profile"]] = entry["profiles"].get(brief["profile"], 0) + cases
         entry["lastSeen"] = brief
         entry["recent"] = (entry["recent"] + [brief])[-RECENT:]
         if retained and retained not in entry["examples"]:
@@ -825,6 +960,47 @@ def register_fixture_findings(state, config, epoch, iteration, run_dir, outcome)
     return occurrences
 
 
+def register_native_findings(state, config, epoch, iteration, run_dir, outcome):
+    """Count each native finding's cases once per profile. The harness lists a finding's profiles in the order of
+    their first cases and archives its first case, so the first profile's occurrence keeps that archive."""
+    registry = state.registry()
+    run_id = f"{iteration:06d}-{NATIVE}"
+    first_time = run_id not in registry["processedRuns"]
+    occurrences = []
+    for finding in outcome.get("findings") or []:
+        key = native_signature_key(finding)
+        sid = canonical_id(key)
+        archive = run_dir / "findings" / str(finding.get("signature"))[:16]
+        for profile, cases in (finding.get("profiles") or {}).items():
+            example = next((item for item in finding.get("examples") or [] if item.get("profile") == profile), {})
+            brief = {"iteration": iteration, "backend": NATIVE, "rootSeed": str(root_seed(config, iteration)),
+                     "profile": profile, "profileSeed": None, "kind": "primary",
+                     "case": f"case-{example['case']}" if "case" in example else f"{cases} cases",
+                     "epoch": epoch["id"], "program": example.get("programSha256")}
+
+            def keep(destination, finding=finding, brief=brief, sid=sid, archive=archive, profile=profile):
+                if not archive.is_dir():
+                    return False
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(archive), str(destination))
+                place = str(destination.relative_to(state.directory))
+                # The harness's own replay path pointed into the run directory.
+                recorded = {name: value for name, value in finding.items() if name != "replay"}
+                save(destination / "occurrence.json", {
+                    **brief, "signature": sid, "finding": recorded,
+                    "replay": [sys.executable, str(ROOT / "scripts/semantic-fuzz.py"), "replay", "--state",
+                               str(state.directory), place],
+                    "rerun": native_command(config, iteration, "OUTPUT", [profile])})
+                return True
+            destination = state.directory / "findings" / sid / f"{iteration:06d}-{NATIVE}-{profile}-{archive.name}"
+            occurrence = note_occurrence(state, config, registry, sid, key, brief, destination, keep, first_time, cases)
+            occurrences.append({**occurrence, "cases": cases})
+    if first_time:
+        registry["processedRuns"].append(run_id)
+    save(state.registry_path, registry)
+    return occurrences
+
+
 def problems_of(summary):
     """Runs and profiles that did not pass without a finding that explains them."""
     problems = []
@@ -840,16 +1016,20 @@ def problems_of(summary):
     return problems
 
 
+def remove_run(run_dir):
+    """A run's directory and logs, and its iteration's directory once that is empty."""
+    for path in [run_dir, *(run_dir.with_name(run_dir.name + suffix) for suffix in (".stdout.log", ".stderr.log"))]:
+        remove(path)
+    with contextlib.suppress(OSError):
+        run_dir.parent.rmdir()
+
+
 def prune(run_dir, summary, keep):
     """Reduce a recorded run to compact records; random cases replay from their recorded seeds."""
     if keep or not run_dir.exists():
         return
-    logs = [run_dir.with_name(run_dir.name + suffix) for suffix in (".stdout.log", ".stderr.log")]
     if summary.get("status") == "passed":
-        for path in [run_dir, *logs]:
-            remove(path)
-        with contextlib.suppress(OSError):
-            run_dir.parent.rmdir()
+        remove_run(run_dir)
         return
     statuses = {row["output"]: row.get("status") for row in summary.get("profiles", []) if "output" in row}
     for path in list(run_dir.iterdir()):
@@ -867,7 +1047,7 @@ def prune(run_dir, summary, keep):
 def retain_interrupted(state, run_dir):
     """An interrupted run is rerun from its seed; partial findings stay for inspection only."""
     logs = [run_dir.with_name(run_dir.name + suffix) for suffix in (".stdout.log", ".stderr.log")]
-    if run_dir.exists() and (any(run_dir.glob("*/findings/*/*")) or
+    if run_dir.exists() and (any(run_dir.glob("*/findings/*/*")) or any(run_dir.glob("findings/*/*")) or
                              any((load(path) or {}).get("findings") for path in run_dir.glob("fixtures/*.json"))):
         destination = state.directory / "interrupted" / f"{run_dir.parent.name}-{run_dir.name}-{int(time.time())}"
         destination.mkdir(parents=True)
@@ -890,10 +1070,13 @@ def unrecorded_runs(state, ledger):
             continue
         if (int(run_dir.parent.name), run_dir.name) in done:
             continue
-        if run_dir.name == FIXTURES:
-            # The harness writes its report only when the run ends.
+        if run_dir.name in (FIXTURES, NATIVE):
+            # The harnesses write their reports only when the run ends. The native one says only that it stopped, on
+            # a signal or at its time budget, so such a run reruns as an interrupted one does.
             outcome = load(run_dir / "report.json")
-            if isinstance(outcome, dict) and outcome.get("stop") != "signal":
+            finished = isinstance(outcome, dict) and (outcome.get("stop") != "signal" if run_dir.name == FIXTURES
+                                                      else not outcome.get("stopped"))
+            if finished:
                 found.append((int(run_dir.parent.name), run_dir.name, run_dir, outcome))
             else:
                 retain_interrupted(state, run_dir)
@@ -980,10 +1163,7 @@ def prune_fixture_run(run_dir, outcome, status, keep):
     if keep or not run_dir.exists() or not isinstance(outcome, dict):
         return
     if status == "passed":
-        for path in [run_dir, *(run_dir.with_name(run_dir.name + suffix) for suffix in (".stdout.log", ".stderr.log"))]:
-            remove(path)
-        with contextlib.suppress(OSError):
-            run_dir.parent.rmdir()
+        remove_run(run_dir)
         return
     kept = {finding["fixture"] for finding in outcome.get("findings") or []} | \
         {error["fixture"] for error in outcome.get("errors") or []}
@@ -1008,6 +1188,91 @@ def record_fixture_run(state, config, epoch, iteration, run_dir, outcome, exit_c
     return row
 
 
+def native_status(outcome):
+    if not isinstance(outcome, dict):
+        return "missing-summary"
+    if outcome.get("errors") or not outcome.get("toolsUnchanged"):
+        return "error"
+    return "passed" if outcome.get("status") == "passed" else "failed"
+
+
+def native_counts(outcome):
+    """A native run's admitted cases in the suite's terms, a native rejection as an error, and the harness's counts."""
+    totals = (outcome or {}).get("totals") or {}
+    counts, findings = totals.get("counts") or {}, totals.get("findings") or {}
+    own = {key: counts.get(key, 0) for key in NATIVE_COUNTS}
+    return {"executed": own["agree"] + own["mismatch"] + own["rejected"] + own["inconclusive"], "matched": own["agree"],
+            "mismatched": own["mismatch"], "errors": own["rejected"], **own,
+            "findings": findings.get("signatures", 0), "newFindings": findings.get("new", 0)}
+
+
+def native_problems(outcome):
+    """What kept a native run from passing besides its new findings: a missing report, harness errors, changed tools,
+    and the profiles with inconclusive or unexecuted cases."""
+    if not isinstance(outcome, dict):
+        return [{"profile": None, "status": "missing-summary", "stop": None}]
+    stop = "time budget" if outcome.get("stopped") else None
+    problems = [{"profile": error.get("profile"), "status": "harness-error", "stop": stop,
+                 "detail": str(error.get("detail"))[-500:]} for error in outcome.get("errors") or []]
+    if not outcome.get("toolsUnchanged"):
+        problems.append({"profile": None, "status": "tools-changed", "stop": stop})
+    for profile, totals in (outcome.get("profiles") or {}).items():
+        counts = totals.get("counts") or {}
+        problems += [{"profile": profile, "status": status, "stop": stop, "counts": counts,
+                      "reasons": totals.get("inconclusive") or {}}
+                     for status in ("inconclusive", "unexecuted") if counts.get(status)]
+    if outcome.get("status") != "passed" and not problems and \
+            not ((outcome.get("totals") or {}).get("findings") or {}).get("new"):
+        problems.append({"profile": None, "status": outcome.get("status"), "stop": stop})
+    return problems
+
+
+def prune_native_run(run_dir, outcome, status, keep):
+    """A passed run leaves its ledger row, since its cases replay from the root seed. Otherwise only the report stays,
+    or everything when the report is missing; the kept examples have already moved to their signatures."""
+    if keep or not run_dir.exists() or not isinstance(outcome, dict):
+        return
+    if status == "passed":
+        remove_run(run_dir)
+        return
+    for path in list(run_dir.iterdir()):
+        if path.name != "report.json":
+            remove(path)
+
+
+def record_native_run(state, config, epoch, iteration, run_dir, outcome, exit_code, started, elapsed, keep):
+    status = native_status(outcome)
+    occurrences = register_native_findings(state, config, epoch, iteration, run_dir, outcome) \
+        if isinstance(outcome, dict) else []
+    totals = (outcome or {}).get("totals") or {}
+    row = {"schema": SCHEMA + "/run", "iteration": iteration, "backend": NATIVE,
+           "rootSeed": str(root_seed(config, iteration)), "nodesScale": nodes_scale(config, iteration),
+           "shardIndex": config["shard_index"], "shardCount": config["shard_count"], "epoch": epoch["id"],
+           "started": started, "finished": now(), "elapsedSeconds": elapsed, "exitCode": exit_code,
+           "suiteStatus": status, "stop": "time budget" if (outcome or {}).get("stopped") else None,
+           "counts": native_counts(outcome), "notAdmitted": totals.get("reasons") or {},
+           "known": totals.get("known") or {}, "inconclusiveReasons": totals.get("inconclusive") or {},
+           "profiles": [{"profile": profile, "counts": item.get("counts"), "seconds": item.get("seconds")}
+                        for profile, item in ((outcome or {}).get("profiles") or {}).items()],
+           "occurrences": occurrences, "problems": native_problems(outcome),
+           "retainedRun": None if status == "passed" and not keep or not run_dir.exists()
+           else str(run_dir.relative_to(state.directory))}
+    state.append_ledger(row)
+    prune_native_run(run_dir, outcome, status, keep)
+    return row
+
+
+def record_finished_run(state, config, epoch, iteration, backend, run_dir, summary, exit_code, started, elapsed, keep,
+                        sites=None):
+    """Record a finished run of any kind from its suite summary or harness report, None when it wrote none."""
+    if backend == FIXTURES:
+        return record_fixture_run(state, config, epoch, iteration, run_dir, summary, exit_code, started, elapsed, keep)
+    if backend == NATIVE:
+        return record_native_run(state, config, epoch, iteration, run_dir, summary, exit_code, started, elapsed, keep)
+    return record_run(state, config, epoch, iteration, backend, run_dir,
+                      summary or {"status": "missing-summary", "profiles": []}, exit_code, started, elapsed, keep, sites)
+
+
 def report(state):
     """Write report.json and report.md from the configuration, ledger, registry and labels."""
     if not state.config_path.exists():
@@ -1017,7 +1282,14 @@ def report(state):
     registry = state.registry()
     labels = load(state.labels_path, {})
     runs = {}
+    # A native run's reasons not to admit a case, its known differences and its reasons for inconclusive cases.
+    native = {"notAdmitted": {}, "known": {}, "inconclusive": {}}
     for row in ledger:
+        if row["backend"] == NATIVE:
+            for section, field in (("notAdmitted", "notAdmitted"), ("known", "known"),
+                                   ("inconclusive", "inconclusiveReasons")):
+                for key, value in (row.get(field) or {}).items():
+                    native[section][key] = native[section].get(key, 0) + value
         totals = runs.setdefault(row["backend"], {"runs": 0, "iterations": set(), "statuses": {}, "counts": {},
                                                   "elapsedSeconds": 0.0})
         totals["runs"] += 1
@@ -1047,6 +1319,7 @@ def report(state):
     interrupted = state.directory / "interrupted"
     data = {"schema": SCHEMA + "/report", "generated": now(), "state": str(state.directory), "config": config,
             "epochs": load(state.state_path, {"epochs": []})["epochs"], "runs": runs, "latestIteration": latest,
+            "native": native if NATIVE in runs else None,
             "signatures": signatures, "problemCount": len(problems), "problems": problems[-200:],
             "interrupted": sorted(path.name for path in interrupted.iterdir()) if interrupted.exists() else []}
     save(state.directory / "report.json", data)
@@ -1077,6 +1350,10 @@ def markdown(data):
                   f"{setting(config, 'fixture_seconds'):g} seconds per fixture, "
                   f"{setting(config, 'fixture_run_seconds'):g} seconds per run, {setting(config, 'fixture_jobs')} at a time; "
                   "compiled paths compared with each other and with upstream's recorded expectations, not with original Core.", ""]
+    if NATIVE in config["backend"]:
+        lines += ["Native: Lean's native frontend on each iteration's draws of the pure profiles whose emitter the "
+                  f"native admission admits, within {setting(config, 'native_seconds'):g} seconds per run; each "
+                  "admitted case compared with its direct Core result, not with a compiled path.", ""]
     if data["epochs"]:
         epoch = data["epochs"][-1]
         lines += [f"Epoch `{epoch['id']}` since iteration {epoch['firstIteration']} (readiness receipt "
@@ -1090,6 +1367,18 @@ def markdown(data):
         lines.append(f"| {backend} | {totals['iterations']} | {statuses} | {counts.get('executed', 0)} | "
                      f"{counts.get('matched', 0)} | {counts.get('mismatched', 0)} | {counts.get('errors', 0)} | "
                      f"{counts.get('inconclusive', 0)} | {totals['elapsedSeconds'] / 3600:.2f} |")
+    if data.get("native"):
+        counts, native = data["runs"][NATIVE]["counts"], data["native"]
+        lines += ["", "## Native runs", "",
+                  "Rejected cases are the Errors above; a known difference is a rejection or mismatch under its "
+                  "label.", "",
+                  "| Cases | Generation exclusions | Not admitted | Admitted | Programs | Agree | Mismatch | Rejected | "
+                  "Inconclusive | Unexecuted |", "|" + " ---: |" * len(NATIVE_COUNTS),
+                  "| " + " | ".join(str(counts.get(name, 0)) for name in NATIVE_COUNTS) + " |", ""]
+        sections = (("Not admitted, by reason", "notAdmitted"), ("Known differences, by label", "known"),
+                    ("Inconclusive, by reason", "inconclusive"))
+        lines += [f"- {title}: " + (", ".join(f"{name} {count}" for name, count in sorted(native[section].items()))
+                                    or "none") + "." for title, section in sections]
     lines += ["", "## Findings by signature", "",
               "Untriaged signatures come first. A label marks a signature as known; it stays counted.", "",
               "| Signature | Triage | Category | Stage | Symptom or program | Count | Backends | Profiles | First seen | Last seen | Kept |",
@@ -1202,28 +1491,22 @@ class Driver:
         run_dir = state.run_directory(iteration, backend)
         run_dir.parent.mkdir(parents=True, exist_ok=True)
         started, began = now(), time.monotonic()
-        fixtures = backend == FIXTURES
-        exit_code, interrupted = run_suite(fixtures_command(config, iteration, run_dir) if fixtures else
-                                           suite_command(config, iteration, backend, run_dir),
+        suite_run = backend in BACKENDS
+        exit_code, interrupted = run_suite(run_command(config, iteration, backend, run_dir),
                                            run_dir.with_name(backend + ".stdout.log"),
                                            run_dir.with_name(backend + ".stderr.log"), self.stop)
-        summary = load(run_dir / ("report.json" if fixtures else "summary.json"))
-        if interrupted or isinstance(summary, dict) and summary.get("stop") == ("signal" if fixtures else "interrupted"):
+        summary = load(run_dir / ("summary.json" if suite_run else "report.json"))
+        if interrupted or signalled(backend, summary, exit_code):
             with self.lock:
                 kept = retain_interrupted(state, run_dir)
                 self.end(f"interrupted in iteration {iteration} ({backend}); it reruns on resume", kept=kept)
             return
         summary = summary if isinstance(summary, dict) else None
-        sites = crash_sites(config, run_dir, summary) if summary and not fixtures else {}  # Replays run outside the lock.
+        sites = crash_sites(config, run_dir, summary) if summary and suite_run else {}  # Replays run outside the lock.
         with self.lock:
             self.missing = self.missing + 1 if summary is None else 0
-            if fixtures:
-                row = record_fixture_run(state, config, epoch, iteration, run_dir, summary, exit_code, started,
-                                         round(time.monotonic() - began, 3), args.keep_runs)
-            else:
-                row = record_run(state, config, epoch, iteration, backend, run_dir,
-                                 summary or {"status": "missing-summary", "profiles": []}, exit_code, started,
-                                 round(time.monotonic() - began, 3), args.keep_runs, sites)
+            row = record_finished_run(state, config, epoch, iteration, backend, run_dir, summary, exit_code, started,
+                                      round(time.monotonic() - began, 3), args.keep_runs, sites)
             report(state)
             if self.missing >= MISSING_SUMMARY_LIMIT:
                 self.end(f"{self.missing} consecutive runs produced no suite summary; see their logs", 5)
@@ -1243,12 +1526,9 @@ def run(args):
         previous = {signum: signal.signal(signum, stop) for signum in (signal.SIGTERM, signal.SIGINT)}
         try:
             for iteration, backend, run_dir, summary in unrecorded_runs(state, state.ledger()):
-                if backend == FIXTURES:
-                    record_fixture_run(state, config, current_epoch(config), iteration, run_dir, summary, None, None, None,
-                                       args.keep_runs)
-                else:
-                    record_run(state, config, current_epoch(config), iteration, backend, run_dir, summary, None, None, None,
-                               args.keep_runs, crash_sites(config, run_dir, summary))
+                sites = crash_sites(config, run_dir, summary) if backend in BACKENDS else None
+                record_finished_run(state, config, current_epoch(config), iteration, backend, run_dir, summary, None,
+                                    None, None, args.keep_runs, sites)
             driver = Driver(state, config, args, stop)
             workers = [threading.Thread(target=driver.work, name=f"fuzz-worker-{index}", daemon=True)
                        for index in range(args.jobs)]
@@ -1280,20 +1560,58 @@ def label(args):
     return 0
 
 
+def replay(args):
+    """Rerun a kept native example: the native tool on its archived program with its archived case's arguments, and
+    the harness's own verdict on the case against its direct Core result. It reproduces when the harness finds the
+    finding's signature again."""
+    state = State(args.state)
+    config = load(state.config_path)
+    if config is None:
+        raise NotReady(f"no fuzzing state in {state.directory}")
+    example = args.example if args.example.is_absolute() else state.directory / args.example
+    occurrence, request, case = (load(example / name) for name in ("occurrence.json", "request.json", "case.json"))
+    if not all(isinstance(value, dict) for value in (occurrence, request, case)) or occurrence.get("backend") != NATIVE:
+        raise NotReady(f"{example} is no kept native example")
+    tool = native_tool(config)
+    if not tool.is_file():
+        raise NotReady(f"the native tool is missing: {tool}")
+    native = native_harness()
+    first = ((occurrence.get("finding") or {}).get("examples") or [{}])[0]  # The archived case's own record.
+    group = {"programSha256": first.get("programSha256"), "source": request["sources"][0]["content"],
+             "function": request["function"], "cases": [(first.get("case"), case, first.get("arguments"))]}
+    with tempfile.TemporaryDirectory(prefix="semantic-fuzz-native-replay-") as scratch:
+        options = argparse.Namespace(native_tool=tool, program_seconds=NATIVE_PROGRAM_SECONDS,
+                                     seconds=NATIVE_PROGRAM_SECONDS, output=Path(scratch))
+        run = native.NativeRun(options, None)
+        totals = {"counts": dict.fromkeys(NATIVE_COUNTS, 0), "reasons": {}, "inconclusive": {}, "known": {}}
+        try:
+            run.run_program(occurrence.get("profile"), group, totals, Path(scratch))
+        except ValueError as error:
+            raise NotReady(f"the native tool's result is unexpected: {error}") from None
+    replayed = sorted(canonical_id(native_signature_key(finding)) for finding in run.findings.values())
+    outcome = {"example": str(example), "tool": str(tool), "signature": occurrence.get("signature"),
+               "verdicts": run.programs[0]["verdicts"], "replayed": replayed,
+               "reproduced": occurrence.get("signature") in replayed}
+    print(json.dumps(outcome, sort_keys=True), flush=True)
+    return 0 if outcome["reproduced"] else 1
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
     runner = commands.add_parser("run", help="run iterations until stopped")
     shown = commands.add_parser("report", help="regenerate report.md and report.json and print the Markdown")
     labeller = commands.add_parser("label", help="record or clear the triage label of a signature")
-    for command in (runner, shown, labeller):
+    replayer = commands.add_parser("replay", help="rerun a kept native example through the native harness's comparison")
+    for command in (runner, shown, labeller, replayer):
         command.add_argument("--state", type=Path, default=ROOT / ".upstream/semantic-fuzz", help="state directory")
     runner.add_argument("--base-seed", type=int, help="root seed of iteration zero (default: the creation time)")
     runner.add_argument("--shard-index", type=int)
     runner.add_argument("--shard-count", type=int)
     runner.add_argument("--backend", action="append", choices=RUN_KINDS,
                         help="repeat; default the three suite backends; fixtures adds a mutation run of the pinned "
-                             "end-to-end fixtures on Hull, O0, O2 and Yul")
+                             "end-to-end fixtures on Hull, O0, O2 and Yul; native adds a run of Lean's native frontend "
+                             "on the iteration's admitted pure cases, compared with direct Core")
     runner.add_argument("--profile", action="append", choices=tuple(suite.PROFILES), help="repeat; default the suite's selection, and on Yul also the storage-family, call-return, "
                              "call-sequence and call-branch profiles; the other call profiles never run on Yul")
     runner.add_argument("--size-cycle", type=lambda text: [float(part) for part in text.split(",")],
@@ -1307,7 +1625,8 @@ def parse_args(argv=None):
                              ("fixture-sources", int, "source mutants per fixture at most (default 2; 0 runs none)"),
                              ("fixture-seconds", float, "wall time per fixture (default 300)"),
                              ("fixture-run-seconds", float, "wall time per fixtures run (default 1800)"),
-                             ("fixture-jobs", int, "fixtures run at a time (default 2)")):
+                             ("fixture-jobs", int, "fixtures run at a time (default 2)"),
+                             ("native-seconds", float, "wall time per native run (default 1800)")):
         runner.add_argument("--" + name, type=kind, help=text)
     for name in ("bin-dir", "upstream", "target-dir", "anvil", "solc", "cast"):
         runner.add_argument("--" + name, type=Path)
@@ -1322,6 +1641,7 @@ def parse_args(argv=None):
     labeller.add_argument("signature")
     labeller.add_argument("text", nargs="?")
     labeller.add_argument("--clear", action="store_true")
+    replayer.add_argument("example", type=Path, help="a kept native example, as the registry lists it")
     args = parser.parse_args(argv)
     if args.command == "run" and args.iterations < 0:
         parser.error("--iterations must not be negative")
@@ -1337,6 +1657,8 @@ def main(argv=None):
             return run(args)
         if args.command == "label":
             return label(args)
+        if args.command == "replay":
+            return replay(args)
         state = State(args.state)
         report(state)
         print((state.directory / "report.md").read_text(), end="")

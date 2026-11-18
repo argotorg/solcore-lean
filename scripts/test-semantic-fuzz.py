@@ -1048,5 +1048,287 @@ class FixtureRunTests(unittest.TestCase):
         self.assertEqual([row["iteration"] for row in fuzz.State(self.state).ledger()], [0])
 
 
+NATIVE_CHECK = fuzz.native_check  # the unpatched readiness check
+NATIVE_SOURCE = """pragma solcore;
+import * from std;
+
+contract SynthesizedFunctions {
+    function run(input: uint256) public returns (uint256) {
+        return input; // MARK
+    }
+}
+"""
+NATIVE_INFERENCE = ("Solcore.Frontend.ProgramCheckError.inference { declaration := { moduleId := { library := "
+                    "Solcore.Workspace.LibraryId.main }, declarationIndex := 2 }, error := "
+                    "Solcore.Frontend.SourceInference.Error.")
+# A stand-in for semantic-native-tool with the native frontend's own error texts: a marked source is refused or reads
+# an uninitialized local, and any other source returns each input's word.
+NATIVE_STUB = """#!/usr/bin/env python3
+import json, sys
+request = json.load(open(sys.argv[1]))
+source = request["sources"][0]["content"]
+refused = [detail for mark, detail in %r.items() if mark in source]
+if refused:
+    observations = []
+elif "UNINITIALIZED" in source:
+    observations = [{"status": "failed", "error": "uninitializedLocal", "reason": "1"} for _ in request["inputs"]]
+else:
+    observations = [{"status": "returned", "word": words[0]} for words in request["inputs"]]
+print(json.dumps({"schema": "solcore-lean.semantic-native-result.v1", "status": "rejected" if refused else "compiled",
+                  "stage": "inference" if refused else "compiled", "detail": refused[0] if refused else "",
+                  "milliseconds": {}, "observations": observations}))
+""" % {"NONEXHAUSTIVE": NATIVE_INFERENCE + 'nonExhaustiveMatch { source := { path := "main.sol" }, startByte := 3326 } }',
+       "TYPEDEF": NATIVE_INFERENCE + 'operatorNotSupported "Typedef" (Solcore.TypeSystem.Ty.variable { index := 8 }) }'}
+
+
+def native_case(mark="", word=7, core=None):
+    """A pure case that the native admission admits: a functions source whose method returns its input."""
+    return {"schema": "solcore-lean.semantic-function-case.v1", "source": NATIVE_SOURCE.replace("MARK", mark),
+            "program": {"tag": "apply"}, "provenance": {"emitterVersion": "solcore-source-functions-v2"},
+            "contract": {"method": "run", "signature": "run(uint256)", "calldata": f"0xa444f5e9{word:064x}"},
+            "directCore": core or {"stage": "execution", "status": "returned", "word": str(word)}}
+
+
+def native_scenario(seed, profile):
+    """At root seed 100: an agreeing case, Lean's unlabelled enum exhaustiveness rejection in both profiles, and the
+    known open `Typedef` call and uninitialized local; every later case agrees."""
+    if seed != 100:
+        return [native_case()]
+    if profile == "runtime-functions":
+        return [native_case(), native_case("NONEXHAUSTIVE"), native_case("NONEXHAUSTIVE", 5), native_case("TYPEDEF"),
+                native_case("UNINITIALIZED")]
+    return [native_case("NONEXHAUSTIVE", 9)]
+
+
+class FakeNative:
+    """Runs the native harness's own profile runs, comparisons and report, with the stub tool, on the cases that
+    `scenario(seed, profile)` gives: only the case preparation is replaced. `interrupted` stops it as a signal does,
+    `missing` writes no report, and `finished` is its tools' identity when it ends."""
+
+    def __init__(self, scenario=native_scenario, interrupted=False, missing=False, finished=None):
+        self.scenario, self.interrupted, self.missing, self.finished = scenario, interrupted, missing, finished
+        self.calls = []
+
+    def __call__(self, argv, stdout_path, stderr_path, stop, grace=120.0):
+        native = fuzz.native_harness()
+        args, suite_args = native.parse_args(argv[2:])
+        self.calls.append({"seed": args.seed, "profiles": args.profile})
+        stdout_path.write_text("")
+        stderr_path.write_text("")
+        if self.missing:
+            return 2, False
+        args.output.mkdir(parents=True)
+        run = native.NativeRun(args, suite_args)
+        for profile in args.profile:
+            response = {"cases": self.scenario(args.seed, profile), "excluded": []}
+            with patch.object(native, "prepare", return_value=response), \
+                    patch.object(native.suite, "command", return_value=["python", "runner"]):
+                run.run_profile(profile)
+        run.stopped = run.stopped or self.interrupted
+        report = run.report({"tools": 1}, self.finished or {"tools": 1}, 0.0)
+        (args.output / "report.json").write_text(json.dumps(report, indent=1) + "\n")
+        for leftover in (args.output / ".work").glob("*"):
+            leftover.unlink()
+        (args.output / ".work").rmdir()
+        return (130 if self.interrupted else 0 if report["status"] == "passed" else 1), False
+
+
+class NativeRunTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="semantic-fuzz-native-")
+        self.addCleanup(self.temporary.cleanup)
+        self.directory = Path(self.temporary.name).resolve()
+        self.state = self.directory / "state"
+        self.receipt = self.directory / "semantic-tools-build.json"
+        self.receipt.write_text('{"tools": 1}')
+        self.bin = self.directory / "bin"
+        self.bin.mkdir()
+        self.tool = self.bin / "semantic-native-tool"
+        self.tool.write_text(NATIVE_STUB)
+        self.tool.chmod(0o755)
+        self.check = {"status": "ready", "versions": {"admission": "native-admission-v1"}, "admittedEmitters": ["e"],
+                      "tools": {"nativeTool": {"sha256": "1"}}, "scripts": {"semantic-native.py": "2"}}
+        for target, replacement in (("verify_tools", lambda config: self.receipt),
+                                    ("native_check", lambda config: self.check)):
+            patcher = patch.object(fuzz, target, replacement)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def main(self, *argv, fake=None):
+        fake, output = fake or FakeNative(), io.StringIO()
+        with patch.object(fuzz, "run_suite", fake), contextlib.redirect_stdout(output), \
+                contextlib.redirect_stderr(io.StringIO()):
+            code = fuzz.main(list(argv))
+        return code, fake, output.getvalue()
+
+    def start(self, *argv, state=None, fake=None):
+        return self.main("run", "--state", str(state or self.state), "--base-seed", "100", "--backend", "native",
+                         "--profile", "runtime-functions", "--profile", "runtime-enums", "--bin-dir", str(self.bin),
+                         "--examples", "2", *argv, fake=fake)
+
+    def signature(self, category, **fields):
+        return fuzz.canonical_id({"backend": "native", "category": category, **fields})
+
+    def test_native_is_opt_in_and_draws_the_programs_of_its_iterations_suite_runs(self):
+        self.assertEqual((fuzz.CONFIG_DEFAULTS["backend"], fuzz.parse_args(["run", "--backend", "native"]).backend),
+                         (list(fuzz.BACKENDS), ["native"]))
+        native = fuzz.native_harness()
+        admitted = [profile for profile in native.PURE_PROFILES if native.profile_emitter(profile) in native.EMITTERS]
+        base = {**fuzz.CONFIG_DEFAULTS, "base_seed": 41, "shard_index": 1, "shard_count": 3}
+        for config in (base, {**base, "functions": 2, "nodes": 40}):
+            for iteration in range(3):
+                suite_args = fuzz.suite.parse_args(fuzz.suite_command(config, iteration, "sonatina-o0", self.directory)[2:])
+                args, native_suite = native.parse_args(fuzz.native_command(config, iteration, self.directory)[2:])
+                self.assertEqual((args.profile, args.seconds), (admitted, 1800.0))
+                for profile in admitted:
+                    ours = native.suite.command(native_suite, profile, self.directory, 1.0, 10**9)
+                    theirs = fuzz.suite.command(suite_args, profile, self.directory, 1.0, 10**9)
+                    # A profile's draw: its derived seed, node budget, case or function count and attempts.
+                    self.assertEqual(ours[ours.index("--seed"):], theirs[theirs.index("--seed"):], (iteration, profile))
+        config = {**base, "bin_dir": str(self.bin), "native_seconds": 60.0,
+                  "profile": ["closed-g0", "runtime-assembly", "stateful-storage", "runtime-enums"]}
+        args, _ = native.parse_args(fuzz.native_command(config, 0, self.directory)[2:])
+        self.assertEqual((args.profile, args.seconds, args.native_tool, args.bin_dir),
+                         (["closed-g0", "runtime-enums"], 60.0, self.tool, self.bin))
+        # No admitted pure profile, or no time, is refused before anything is recorded.
+        for options in (["--profile", "runtime-assembly", "--profile", "stateful-storage"], ["--native-seconds", "0"]):
+            code, fake, _ = self.main("run", "--state", str(self.directory / "refused"), "--backend", "native", *options)
+            self.assertEqual((code, fake.calls, (self.directory / "refused/config.json").exists()), (2, [], False))
+
+    def test_runs_count_the_cases_of_new_and_known_findings_and_record_their_counts(self):
+        code, fake, _ = self.start("--iterations", "2")
+        self.assertEqual(code, 0)
+        self.assertEqual([(call["seed"], call["profiles"]) for call in fake.calls],
+                         [(100, ["runtime-functions", "runtime-enums"]), (101, ["runtime-functions", "runtime-enums"])])
+        first, second = fuzz.State(self.state).ledger()
+        # A run that fails only by its new finding is no problem.
+        self.assertEqual((first["suiteStatus"], first["problems"], second["suiteStatus"]), ("failed", [], "passed"))
+        self.assertEqual(first["counts"], {"executed": 6, "matched": 1, "mismatched": 1, "errors": 4, "cases": 6,
+                                           "generationExcluded": 0, "notAdmitted": 0, "admitted": 6, "programs": 5,
+                                           "agree": 1, "mismatch": 1, "rejected": 4, "inconclusive": 0,
+                                           "unexecuted": 0, "findings": 3, "newFindings": 1})
+        self.assertEqual(first["known"], {"open-typedef-call": 1, "uninitialized-local": 1})
+        exhaustive = self.signature("native-rejection", stage="inference", symptom={"message": "nonExhaustiveMatch"})
+        typedef = self.signature("native-rejection", stage="inference", **{"class": "open-typedef-call"})
+        uninitialized = self.signature("native-mismatch", stage="execution", **{"class": "uninitialized-local"})
+        self.assertTrue({typedef, uninitialized} <= set(fuzz.KNOWN) and exhaustive not in fuzz.KNOWN)
+        self.assertEqual({(item["signature"], item["profile"]): (item["cases"], item["new"], bool(item["retained"]))
+                          for item in first["occurrences"]},
+                         {(exhaustive, "runtime-functions"): (2, True, True), (exhaustive, "runtime-enums"): (1, False, False),
+                          (typedef, "runtime-functions"): (1, False, True),
+                          (uninitialized, "runtime-functions"): (1, False, True)})
+        signatures = fuzz.State(self.state).registry()["signatures"]
+        entry = signatures[exhaustive]
+        self.assertEqual((entry["count"], entry["profiles"], entry["backends"], len(entry["examples"])),
+                         (3, {"runtime-functions": 2, "runtime-enums": 1}, {"native": 3}, 1))
+        self.assertEqual((signatures[typedef]["count"], signatures[uninitialized]["count"]), (1, 1))
+        example = self.state / entry["examples"][0]
+        self.assertEqual(sorted(path.name for path in example.iterdir()),
+                         ["case.json", "occurrence.json", "request.json", "result.json"])
+        occurrence = json.loads((example / "occurrence.json").read_text())
+        self.assertEqual((occurrence["case"], occurrence["finding"]["symptom"], "replay" in occurrence["finding"]),
+                         ("case-1", "nonExhaustiveMatch", False))
+        self.assertEqual(occurrence["replay"][2:], ["replay", "--state", str(self.state), entry["examples"][0]])
+        rerun, _ = fuzz.native_harness().parse_args(occurrence["rerun"][2:])
+        self.assertEqual((rerun.seed, rerun.profile), (100, ["runtime-functions"]))
+        # The failed run keeps only its report; the passed one leaves its ledger row.
+        self.assertEqual([path.name for path in (self.state / "runs/000000/native").iterdir()], ["report.json"])
+        self.assertFalse((self.state / "runs/000001").exists())
+        report = (self.state / "report.md").read_text()
+        for text in ("Native: Lean's native frontend on each iteration's draws",
+                     "| native | 2 | failed 1, passed 1 | 8 | 3 | 1 | 4 | 0 |",
+                     "| 8 | 0 | 0 | 8 | 7 | 3 | 1 | 4 | 0 | 0 |", "- Not admitted, by reason: none.",
+                     "- Known differences, by label: open-typedef-call 1, uninitialized-local 1.",
+                     "known: Lean rejects a `Typedef` call", "class uninitialized-local", "| nonExhaustiveMatch |"):
+            self.assertIn(text, report)
+
+    def test_a_run_that_does_not_pass_without_a_finding_is_a_problem(self):
+        invalid = lambda seed, profile: [native_case(core={"stage": "execution", "status": "invalid"})]
+        cases = ((["--base-seed", "100"], FakeNative(invalid), "failed", ["inconclusive", "inconclusive"]),
+                 (["--native-seconds", "1e-9"], FakeNative(), "failed", ["unexecuted", "unexecuted"]),
+                 ([], FakeNative(finished={"tools": 2}), "error", ["tools-changed"]),
+                 ([], FakeNative(missing=True), "missing-summary", ["missing-summary"]))
+        for index, (options, fake, status, problems) in enumerate(cases):
+            state = self.directory / f"state-{index}"
+            code, _, _ = self.main("run", "--state", str(state), "--base-seed", "101", "--backend", "native",
+                                   "--profile", "runtime-functions", "--profile", "runtime-enums", "--bin-dir",
+                                   str(self.bin), "--iterations", "1", *options, fake=fake)
+            row, = fuzz.State(state).ledger()
+            self.assertEqual((code, row["suiteStatus"], [problem["status"] for problem in row["problems"]]),
+                             (0, status, problems), options)
+        self.assertEqual(fuzz.State(self.directory / "state-0").ledger()[0]["inconclusiveReasons"],
+                         {"direct Core execution/invalid": 2})
+        errors = {"status": "failed", "toolsUnchanged": True, "errors": [{"profile": "runtime-word", "detail": "x"}]}
+        self.assertEqual((fuzz.native_status(errors), [problem["status"] for problem in fuzz.native_problems(errors)]),
+                         ("error", ["harness-error"]))
+
+    def test_the_epoch_covers_the_native_harness_only_when_native_runs(self):
+        with patch.object(fuzz, "harness_digest", return_value="h"):
+            suite_only = fuzz.current_epoch({"backend": list(fuzz.BACKENDS)})
+            self.assertEqual(suite_only["id"], fuzz.canonical_id({"receipt": fuzz.suite.digest(self.receipt), "harness": "h"}))
+            self.assertNotIn("nativeSha256", suite_only)
+            config = {"backend": [*fuzz.BACKENDS, "native"]}
+            with_native = fuzz.current_epoch(config)
+            self.assertNotEqual(with_native["id"], suite_only["id"])
+            self.check["tools"] = {"nativeTool": {"sha256": "3"}}
+            self.assertNotEqual(fuzz.current_epoch(config)["id"], with_native["id"])
+        ready = subprocess.CompletedProcess([], 0, json.dumps({"status": "ready", "tools": {}}) + "\n", "")
+        with patch.object(fuzz.subprocess, "run", return_value=ready) as run:
+            self.assertEqual(NATIVE_CHECK({"bin_dir": str(self.bin)})["status"], "ready")
+        self.assertEqual(run.call_args.args[0][2:], ["--check", "--mode", "random", "--bin-dir", str(self.bin),
+                                                     "--native-tool", str(self.tool)])
+        missing = subprocess.CompletedProcess([], 2, json.dumps({"status": "not-ready", "missing": ["nativeTool"]}), "")
+        with patch.object(fuzz.subprocess, "run", return_value=missing), \
+                self.assertRaisesRegex(fuzz.NotReady, "native harness is not ready.*nativeTool"):
+            NATIVE_CHECK({})
+
+    def test_the_native_classes_are_the_harness_labels_and_other_findings_keep_their_keys(self):
+        native = fuzz.native_harness()
+        self.assertEqual(({key["class"] for key, _ in fuzz.NATIVE_CLASSES}, fuzz.NATIVE_COUNTS),
+                         (set(native.KNOWN), native.NativeRun.COUNTS))
+        self.assertTrue(all(fuzz.KNOWN[fuzz.canonical_id(key)] == label for key, label in fuzz.NATIVE_CLASSES))
+        # Lean's enum exhaustiveness rejection has no label; nor has one the driver does not list or one on another
+        # kind or stage.
+        rejection = {"kind": "native-rejection", "stage": "inference", "symptom": "nonExhaustiveMatch", "label": None}
+        for changes in ({}, {"label": "another"}, {"label": "open-typedef-call", "stage": "signatures"},
+                        {"label": "uninitialized-local"}):
+            key = fuzz.native_signature_key({**rejection, **changes})
+            self.assertEqual(key.get("symptom"), {"message": "nonExhaustiveMatch"}, changes)
+            self.assertNotIn(fuzz.canonical_id(key), fuzz.KNOWN, changes)
+        mismatch = {"kind": "native-mismatch", "profile": "runtime-word", "core": "returned", "native": "returned"}
+        self.assertEqual(fuzz.native_signature_key(mismatch)["fingerprint"], {"core": "returned", "native": "returned"})
+
+    def test_a_kept_example_replays_through_the_harness_comparison(self):
+        self.start("--iterations", "1")
+        signatures = fuzz.State(self.state).registry()["signatures"].values()
+        exhaustive, = [entry for entry in signatures if entry["symptom"] == {"message": "nonExhaustiveMatch"}]
+        known = {entry["key"].get("class"): entry for entry in signatures}
+        for entry, verdict in ((exhaustive, "rejected"), (known["open-typedef-call"], "rejected"),
+                               (known["uninitialized-local"], "mismatch")):
+            code, _, output = self.main("replay", "--state", str(self.state), entry["examples"][0])
+            outcome = json.loads(output)
+            self.assertEqual((code, outcome["verdicts"], outcome["replayed"], outcome["reproduced"]),
+                             (0, [verdict], [entry["id"]], True))
+        # A frontend that now accepts the program agrees with direct Core, so its finding does not reproduce.
+        self.tool.write_text(NATIVE_STUB.replace("'NONEXHAUSTIVE'", "'ACCEPTED'"))
+        code, _, output = self.main("replay", "--state", str(self.state), exhaustive["examples"][0])
+        self.assertEqual((code, json.loads(output)["verdicts"], json.loads(output)["reproduced"]), (1, ["agree"], False))
+        self.assertEqual(self.main("replay", "--state", str(self.state), "findings/missing")[0], 2)
+
+    def test_an_interrupted_native_run_is_set_aside_and_a_finished_one_recorded_on_resume(self):
+        code, fake, _ = self.start("--iterations", "1", fake=FakeNative(interrupted=True))
+        self.assertEqual((code, fuzz.State(self.state).ledger()), (0, []))
+        kept, = (self.state / "interrupted").iterdir()
+        self.assertTrue(any((kept / "run/findings").iterdir()))
+        code, fake, _ = self.start("--iterations", "1")
+        self.assertEqual([call["seed"] for call in fake.calls], [100])
+        config = json.loads((self.state / "config.json").read_text())
+        FakeNative()(fuzz.native_command(config, 1, fuzz.State(self.state).run_directory(1, "native")),
+                     self.directory / "out.log", self.directory / "err.log", None)
+        code, fake, _ = self.start("--iterations", "1")
+        recorded = [row["iteration"] for row in fuzz.State(self.state).ledger()]
+        self.assertEqual(([call["seed"] for call in fake.calls], recorded), ([102], [0, 1, 2]))
+
+
 if __name__ == "__main__":
     unittest.main()
