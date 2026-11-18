@@ -68,18 +68,6 @@ theorem resolved_valueType {program : Program} {context : SourceSemantics.Contex
     target.valueType = place.type := by
   cases resolve <;> rfl
 
-/-- Away from checked arithmetic at the place's type, so at its resolved
-target. -/
-theorem resolved_plain {program : Program} {context : SourceSemantics.Context}
-    {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {environment : Dynamic.Environment}
-    {before after : Dynamic.Heap} {place : PlaceResolution} {target : Dynamic.ResolvedPlace}
-    {operator : Syntax.ValueAssignOp}
-    (plain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
-    (resolve : Dynamic.SourcePlaceResolves program context evidence source environment before place target after) :
-    ∀ type, target.valueType = .fixed type → ¬ FixedCheckedCompound operator := by
-  rw [resolved_valueType resolve]
-  exact plain
-
 /-- The operator profiles exclude checked arithmetic at a fixed-width target. -/
 theorem plain_of_profile {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
     (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType target)) :

@@ -200,6 +200,7 @@ theorem preserves_prefix_bounded (budget : Nat)
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -211,7 +212,9 @@ theorem preserves_prefix_bounded (budget : Nat)
       ProtectedBareAssignment.Stateful.preserves_prefix_bounded_with_rhs callerProtocol transport budget initial layout empty extension
         (fun snapshot child smaller {_ _} childTrace => rhs_preserves_at bridge snapshot child (boundedMeaning child smaller)
           right found sourceTyped environments heaps locals agrees actualTyped initial admitted childTrace)
-        observations right found rightView rightType profile environments heaps locals agrees actualTyped slot writable trace bounded invalid
+        observations right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot writable
+        ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ trace) bounded invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at continuation
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, preservation, metadata, count,
       by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
         Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed,
@@ -234,6 +237,7 @@ theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (bu
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -245,7 +249,9 @@ theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (bu
       ProtectedBareAssignment.Stateful.preserves_fault_reachable_bounded_with_rhs callerProtocol budget initial layout empty extension
         (fun snapshot child smaller {_ _} childTrace => rhs_preserves_at bridge snapshot child (boundedMeaning child smaller)
           right found sourceTyped environments heaps locals agrees actualTyped initial admitted childTrace)
-        observations right found rightView rightType profile targetPlain environments heaps locals agrees actualTyped slot writable trace bounded next output invalid errors.operands
+        observations right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot writable trace
+        bounded next output invalid errors.operands
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata,
       reached, related, StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation⟩
 
@@ -447,6 +453,7 @@ theorem preserves_prefix_bounded (budget : Nat)
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | bare empty _layout => exact (projected empty).elim
   | projected layout ordinary =>
@@ -454,7 +461,7 @@ theorem preserves_prefix_bounded (budget : Nat)
     obtain ⟨type, targetTyped⟩ := CallableIndexedOwnedPlaceAdmission.assignment_target_typed assignmentTyped
     obtain ⟨originalTypes, keyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
     obtain ⟨_, finalStore, finalMap, finalWorld, _, finalHeaps, maps, worlds, frame, metadata, slots, count, typed, continuation, reached, related⟩ :=
-      ProtectedPlaceAssignmentSuccess.Stateful.preserves_prefix_bounded_with_producers budget layout ordinary extension callerProtocol transport faithful observations right found rightView rightType profile
+      ProtectedPlaceAssignmentSuccess.Stateful.preserves_prefix_bounded_with_producers budget layout ordinary extension callerProtocol transport faithful observations right found rightView rightType (.inl (leafView ▸ profile)) leafView
         environments heaps locals agrees actualTyped initial
         (fun target _ hiddenTyped => CallableIndexedOwnedAdmittedSequenceProducer.preserves bridge initial admitted
           layout.children unique keyTyped environments heaps locals
@@ -462,7 +469,8 @@ theorem preserves_prefix_bounded (budget : Nat)
           hiddenTyped budget boundedMeaning)
         (rhs_preserves_after bridge initial admitted wellFormed runtime covers targetTyped sourceTyped right found
           environments locals agrees actualTyped budget boundedMeaning)
-        slot writable trace bounded invalid
+        slot writable ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ trace) bounded invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at continuation
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed,
       ⟨reached, related, CallableIndexedOwnedAssignmentAdmission.after_assignment_sized bridge context
         initial reached admitted wellFormed runtime covers locals assignmentTyped targetPlain trace frame⟩, continuation⟩
@@ -485,6 +493,7 @@ theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (bu
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | bare empty _layout => exact (projected empty).elim
   | projected layout ordinary =>
@@ -493,7 +502,8 @@ theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (bu
     obtain ⟨originalTypes, keyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, reached, related⟩ :=
       ProtectedPlaceAssignmentFaults.Stateful.preserves_bounded_with_producers budget layout ordinary extension callerProtocol transport faithful observations
-        errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType profile targetPlain environments heaps locals agrees actualTyped initial
+        errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals
+        agrees actualTyped initial
         (fun target _ hiddenTyped => CallableIndexedOwnedAdmittedSequenceProducer.preserves bridge initial admitted
           layout.children unique keyTyped environments heaps locals
           (DataPlaceChildExpressions.prefix_agrees agrees [.cellRef (OptionalCell.cellType prepared.route.rootType) target])
@@ -501,6 +511,7 @@ theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (bu
         (rhs_preserves_after bridge initial admitted wellFormed runtime covers targetTyped sourceTyped right found
           environments locals agrees actualTyped budget boundedMeaning)
         slot writable trace bounded next output invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata,
       reached, related, StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
 
@@ -1733,6 +1744,7 @@ theorem preserves_fault_with_operands [FunctionCalls.FaultTokens faults] (budget
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1744,7 +1756,8 @@ theorem preserves_fault_with_operands [FunctionCalls.FaultTokens faults] (budget
       ProtectedBareAssignment.Stateful.preserves_fault_reachable_bounded_with_rhs callerProtocol budget initial layout empty extension
         (fun snapshot child smaller {_ _} childTrace => rhs_preserves_at bridge snapshot child (boundedMeaning child smaller)
           right found sourceTyped environments heaps locals agrees actualTyped initial admitted childTrace)
-        observations right found rightView rightType profile targetPlain environments heaps locals agrees actualTyped slot writable trace bounded next output invalid operands
+        observations right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot writable trace bounded next output invalid operands
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata,
       reached, related, StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation⟩
 
@@ -1857,6 +1870,7 @@ theorem preserves_fault_with_diagnostics [FunctionCalls.FaultTokens faults] (bud
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions callerProtocol source context certificate
     scope administrative environment assignment.target prepared operator invalid initial faults shape at errors
   cases errors with
@@ -1867,7 +1881,7 @@ theorem preserves_fault_with_diagnostics [FunctionCalls.FaultTokens faults] (bud
     obtain ⟨originalTypes, keyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, reached, related⟩ :=
       ProtectedPlaceAssignmentFaults.Stateful.preserves_bounded_with_producers_with_diagnostics budget layout ordinary extension callerProtocol transport faithful observations
-        right found rightView rightType profile targetPlain environments heaps locals agrees actualTyped initial missing uninitialized
+        right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped initial missing uninitialized
         (fun target _ hiddenTyped => CallableIndexedOwnedAdmittedSequenceProducer.preserves bridge initial admitted
           layout.children unique keyTyped environments heaps locals
           (DataPlaceChildExpressions.prefix_agrees agrees [.cellRef (OptionalCell.cellType prepared.route.rootType) target])
@@ -1875,6 +1889,7 @@ theorem preserves_fault_with_diagnostics [FunctionCalls.FaultTokens faults] (bud
         (CallableIndexedOwnedAdmittedProjectedAssignmentHeads.rhs_preserves_after bridge initial admitted wellFormed runtime covers targetTyped sourceTyped right found
           environments locals agrees actualTyped budget boundedMeaning)
         slot writable trace bounded next output invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata,
       reached, related, StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
 

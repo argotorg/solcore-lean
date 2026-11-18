@@ -1283,19 +1283,23 @@ theorem preserves_prefix_bounded (budget : Nat)
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
+  rw [← Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at trace
   cases shape with
   | bare empty layout =>
     obtain ⟨_, finalStore, finalMap, finalWorld, slots, _, finalHeaps, maps, worlds, preservation, metadata, count, typed, continuation, post⟩ :=
-      ProtectedBareAssignment.Stateful.preserves_prefix_bounded protocol transport budget initialState layout empty extension boundedMeaning observations right found rightView rightType profile
+      ProtectedBareAssignment.Stateful.preserves_prefix_bounded protocol transport budget initialState layout empty extension boundedMeaning observations right found rightView rightType (.inl (leafView ▸ profile)) leafView
         environments heaps locals agrees actualTyped slot writable trace bounded invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at continuation
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, preservation, metadata, count,
       by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
         Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed,
       post, continuation⟩
   | projected layout ordinary =>
     obtain ⟨_, finalStore, finalMap, finalWorld, _, finalHeaps, maps, worlds, frame, metadata, slots, count, typed, continuation, post⟩ :=
-      ProtectedPlaceAssignmentSuccess.Stateful.preserves_prefix_bounded budget layout ordinary extension protocol transport boundedMeaning faithful observations right found rightView rightType profile
+      ProtectedPlaceAssignmentSuccess.Stateful.preserves_prefix_bounded budget layout ordinary extension protocol transport boundedMeaning faithful observations right found rightView rightType (.inl (leafView ▸ profile)) leafView
         environments heaps locals agrees actualTyped initialState slot writable trace bounded invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at continuation
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, post, continuation⟩
 
 include transport extension faithful observations environments heaps locals agrees actualTyped initialState in
@@ -1312,19 +1316,23 @@ theorem preserves_fault_bounded_with_diagnostics [FunctionCalls.FaultTokens faul
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition protocol initialState ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   change ProtectedPlaceReachedDiagnostics.ShapeErrors values registry functions protocol source context certificate
     scope administrative environment assignment.target prepared operator invalid initialState faults shape at errors
   cases errors with
   | @bare empty layout operands =>
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, post⟩ :=
-      ProtectedBareAssignment.Stateful.preserves_fault_reachable_bounded protocol budget initialState layout empty extension boundedMeaning observations right found rightView rightType profile
-        targetPlain environments heaps locals agrees actualTyped slot writable trace bounded next output invalid operands
+      ProtectedBareAssignment.Stateful.preserves_fault_reachable_bounded protocol budget initialState layout empty extension boundedMeaning observations right found rightView rightType (.inl (leafView ▸ profile)) leafView
+        environments heaps locals agrees actualTyped slot writable trace bounded next output invalid operands
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata,
       post⟩
   | @projected codes leaf sourceTypes site layout ordinary missingFor uninitializedFor =>
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, post⟩ :=
       ProtectedPlaceAssignmentFaults.Stateful.preserves_bounded_with_diagnostics budget layout ordinary extension protocol transport boundedMeaning faithful observations
-      right found rightView rightType profile targetPlain environments heaps locals agrees actualTyped initialState missingFor uninitializedFor slot writable trace bounded next output invalid
+      right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped initialState missingFor
+      uninitializedFor slot writable trace bounded next output invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata,
       post⟩
 
@@ -1457,6 +1465,8 @@ theorem preserves_prefix_bare_bounded (budget : Nat)
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
+  rw [← Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at trace
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1464,8 +1474,9 @@ theorem preserves_prefix_bare_bounded (budget : Nat)
     exact False.elim (layout.nonempty (List.eq_nil_of_length_eq_zero length))
   | bare empty layout =>
     obtain ⟨_, finalStore, finalMap, finalWorld, slots, _, finalHeaps, maps, worlds, preservation, metadata, count, typed, continuation, post⟩ :=
-      ProtectedBareAssignment.Stateful.preserves_prefix_bounded protocol transport budget initial layout empty extension boundedMeaning observations right found rightView rightType profile
+      ProtectedBareAssignment.Stateful.preserves_prefix_bounded protocol transport budget initial layout empty extension boundedMeaning observations right found rightView rightType (.inl (leafView ▸ profile)) leafView
         environments heaps locals agrees actualTyped slot writable trace bounded invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at continuation
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, preservation, metadata, count,
       by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
         Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed,
@@ -1484,6 +1495,7 @@ theorem preserves_fault_reachable_bare_bounded (budget : Nat)
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1491,8 +1503,9 @@ theorem preserves_fault_reachable_bare_bounded (budget : Nat)
     exact False.elim (layout.nonempty (List.eq_nil_of_length_eq_zero length))
   | bare empty layout =>
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, post⟩ :=
-      ProtectedBareAssignment.Stateful.preserves_fault_reachable_bounded protocol budget initial layout empty extension boundedMeaning observations right found rightView rightType profile
-        targetPlain environments heaps locals agrees actualTyped slot writable trace bounded next output invalid errors.operands
+      ProtectedBareAssignment.Stateful.preserves_fault_reachable_bounded protocol budget initial layout empty extension boundedMeaning observations right found rightView rightType (.inl (leafView ▸ profile)) leafView
+        environments heaps locals agrees actualTyped slot writable trace bounded next output invalid errors.operands
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, preservation, metadata, post⟩
 
 include observations transport extension environments heaps locals agrees actualTyped initial bare in
@@ -1585,12 +1598,15 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
+  rw [← Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at trace
   cases shape with
   | bare empty layout => exact (projected layout.steps).elim
   | projected layout ordinary =>
     obtain ⟨_, finalStore, finalMap, finalWorld, _, finalHeaps, maps, worlds, frame, metadata, slots, count, typed, continuation⟩ :=
-      ProtectedPlaceAssignmentSuccess.preserves_prefix layout ordinary extension transport meaning faithful observations right found rightView rightType profile
-        environments heaps locals agrees actualTyped installed slot writable trace invalid
+      ProtectedPlaceAssignmentSuccess.preserves_prefix layout ordinary extension transport meaning faithful observations right found rightView
+        rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped installed slot writable trace invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at continuation
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, transport.extend installed maps worlds frame metadata, continuation⟩
 
 include projected transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
@@ -1605,12 +1621,15 @@ theorem preserves_fault [FunctionCalls.FaultTokens faults] (errors : head.Errors
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | bare empty layout => exact (projected layout.steps).elim
   | projected layout ordinary =>
     obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata⟩ :=
       ProtectedPlaceAssignmentFaults.preserves layout ordinary extension transport meaning faithful observations
-      errors.missing errors.uninitialized right found rightView rightType profile targetPlain environments heaps locals agrees actualTyped installed slot writable trace next output invalid
+      errors.missing errors.uninitialized right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped
+      installed slot writable trace next output invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata,
       transport.extend installed maps worlds frame metadata⟩
 

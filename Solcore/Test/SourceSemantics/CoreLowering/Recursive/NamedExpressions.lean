@@ -591,7 +591,7 @@ variable {targetPrepared : Prepared} {index : Nat} {node : ExpressionNode} {lowe
   (found : source.lookupExpression? rhs = some node)
   (rhsView : AssignedRhsView operator targetPrepared.route.rootSourceType node.type)
   (rhsCore : lowered.type = targetPrepared.route.leafType)
-  (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType targetPrepared.route.rootSourceType))
+  (profile : WideAssignmentProfile operator assignment.target.type)
   (leafView : SourceCoreRawMetadata.runtimeType targetPrepared.route.rootSourceType =
     SourceCoreRawMetadata.runtimeType assignment.target.type)
   (slot : SourceCoreLocalCell.lookup? scope assignment.target.root = some (index, targetPrepared.route.rootType))
@@ -599,10 +599,11 @@ variable {targetPrepared : Prepared} {index : Nat} {node : ExpressionNode} {lowe
 
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
-  uninitialized missing bodyUninitialized bodyMissing layout bare generated found rhsView rhsCore profile slot rootTyped unique owners in
+  uninitialized missing bodyUninitialized bodyMissing layout bare generated found rhsView rhsCore profile leafView slot rootTyped unique owners in
 theorem named_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
-      environment before assignment.target rhs updated after) (bounded : size ≤ budget) (invalid : Word) :
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source
+      (Dynamic.CompoundAssignmentApplies assignment.target.type operator) environment before assignment.target rhs updated after)
+      (bounded : size ≤ budget) (invalid : Word) :
     ∃ updatedValue finalStore finalMap finalWorld slots,
       ValueRep values.checked registry functions finalMap finalWorld targetPrepared.route.rootSourceType updated updatedValue targetPrepared.route.rootType ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -611,26 +612,27 @@ theorem named_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) {updat
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (writtenContext targetPrepared actualContext) ambient.definitions ∧
       ∀ next outputType, ContinuationAgreement actual store
         ((execute targetPrepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (targetPrepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier assignment.target.type (targetPrepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap assignment.target.type operator false)).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) :=
   ProtectedBareAssignment.preserves_prefix_bounded budget layout bare extension
     (RecursiveNamedBoundedContracts.preserves_below_of_unbounded
       (NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
         uninitialized missing bodyUninitialized bodyMissing unique owners) budget)
-    observations generated found rhsView rhsCore profile
+    observations generated found rhsView rhsCore profile leafView
     environments heaps locals agrees actualTyped installed slot rootTyped trace bounded invalid
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
-  uninitialized missing bodyUninitialized bodyMissing layout bare generated found rhsView rhsCore profile slot rootTyped unique owners in
+  uninitialized missing bodyUninitialized bodyMissing layout bare generated found rhsView rhsCore profile leafView slot rootTyped unique owners in
 theorem named_fault [FunctionCalls.FaultTokens faults] (budget : Nat) {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before assignment.target operator rhs reason after) (bounded : size ≤ budget)
-    (targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator)
     (next : Expr) (outputType : Ty) (invalid : Word)
     (invalidToken : AssignmentOperandDiagnostics.OperandsLaw faults operator invalid) :
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store
         ((execute targetPrepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (targetPrepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier assignment.target.type (targetPrepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap assignment.target.type operator false)).rename ξ)
         (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -639,8 +641,8 @@ theorem named_fault [FunctionCalls.FaultTokens faults] (budget : Nat) {reason : 
     (RecursiveNamedBoundedContracts.preserves_below_of_unbounded
       (NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
         uninitialized missing bodyUninitialized bodyMissing unique owners) budget)
-    observations generated found rhsView rhsCore profile
-    targetPlain environments heaps locals agrees actualTyped installed slot rootTyped trace bounded next outputType invalid invalidToken
+    observations generated found rhsView rhsCore profile leafView
+    environments heaps locals agrees actualTyped installed slot rootTyped trace bounded next outputType invalid invalidToken
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
   uninitialized missing bodyUninitialized bodyMissing layout bare generated found rhsView rhsCore profile leafView slot rootTyped in
@@ -656,7 +658,7 @@ theorem named_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) {next :
     (RecursiveNamedBoundedContracts.reflects_below_of_unbounded
       (NamedCallExpressions.Tree.reflects functions extension faithful observations runtimeViews evidence valid
         uninitialized missing bodyUninitialized bodyMissing) budget)
-    observations generated found rhsView rhsCore (.inl (leafView ▸ profile)) leafView
+    observations generated found rhsView rhsCore profile leafView
     environments heaps locals agrees actualTyped installed slot rootTyped invalidToken completed bounded
 
 end Static

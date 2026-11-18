@@ -907,7 +907,8 @@ theorem preserves_prefix_bounded_with_rhs (budget : Nat)
     (_generated : certificate scope id lowered) (_found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -917,7 +918,7 @@ theorem preserves_prefix_bounded_with_rhs (budget : Nat)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
       environment before place id updated after) (bounded : size ≤ budget) (invalid : Word) :
     ∃ updatedValue finalStore finalMap finalWorld slots,
       ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType ∧
@@ -927,7 +928,8 @@ theorem preserves_prefix_bounded_with_rhs (budget : Nat)
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
       (∀ next outputType, ContinuationAgreement actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ))) ∧
       ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
   obtain ⟨snapshot⟩ := snapshot_of_heap layout extension environments heaps locals agrees slot rootTyped
@@ -946,20 +948,20 @@ theorem preserves_prefix_bounded_with_rhs (budget : Nat)
       | intro read sameType initial update written =>
         cases update with
         | leaf applied =>
-          rcases modifier_total observations profile saved rightRep
+          rcases modifier_total_wide observations profile leafView saved rightRep
             (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
             (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
-            ⟨invalidOperands, _⟩ | ⟨replacement, updatedValue, replacementRep, outcome, modified⟩
-          · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
-          · rcases outcome with generatedApply | ⟨_, _, _, panics⟩
-            case inr => exact (CompatiblePlaceModifier.outcome_excludes_applies panics applied).elim
-            have same := DataPlaceModifier.assignment_functional generatedApply applied
-            subst replacement
-            have passes := CompatiblePlaceModifier.passes_of_applies observations profile rightRep applied
-              (prepared.route.leafType = .integer)
+            ⟨invalidOperands, _⟩ | ⟨replacement, updatedValue, _, unique, outcome, modified⟩
+          · exact (DataPlaceModifier.compound_excludes_invalid applied invalidOperands).elim
+          · obtain ⟨same, replacementRep⟩ := unique _ applied
+            subst same
+            rw [layout.sameType] at outcome
+            cases outcome with
+            | panicked _ _ excluded _ => exact (excluded _ applied).elim
+            | applied _ _ writes =>
             obtain ⟨generatedHeap, finalStore, _, generatedWrite, finalHeaps, frame, metadata, typed, writeFrame, writeMetadata, agreement⟩ :=
-              commit_with_write layout snapshot bare result rightRep replacementRep applied (by simpa only [layout.sameType] using modified)
-                passes actualTyped
+              commit_with_write_wide layout snapshot bare result rightRep replacementRep applied
+                (by simpa only [layout.sameType] using modified) writes actualTyped
             have same := writes_functional generatedWrite written
             subst generatedHeap
             obtain ⟨rhsState, rhsRelated⟩ := rhsPost
@@ -981,7 +983,8 @@ theorem preserves_prefix_bounded (budget : Nat)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -991,7 +994,7 @@ theorem preserves_prefix_bounded (budget : Nat)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
       environment before place id updated after) (bounded : size ≤ budget) (invalid : Word) :
     ∃ updatedValue finalStore finalMap finalWorld slots,
       ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType ∧
@@ -1001,13 +1004,14 @@ theorem preserves_prefix_bounded (budget : Nat)
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
       (∀ next outputType, ContinuationAgreement actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ))) ∧
       ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
   exact preserves_prefix_bounded_with_rhs protocol transport budget initial layout bare extension
     (fun snapshot child smaller {_ _} expressionTrace =>
       Stateful.rhs_preserves_at snapshot protocol child (meaning child smaller) generated found
-        environments heaps locals agrees actualTyped initial expressionTrace) observations generated found rhsView rhsCore profile environments heaps locals agrees actualTyped slot rootTyped trace bounded invalid
+        environments heaps locals agrees actualTyped initial expressionTrace) observations generated found rhsView rhsCore profile leafView environments heaps locals agrees actualTyped slot rootTyped trace bounded invalid
 
 end Stateful
 
@@ -1020,7 +1024,8 @@ theorem preserves_prefix_bounded (budget : Nat)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1031,7 +1036,7 @@ theorem preserves_prefix_bounded (budget : Nat)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
       environment before place id updated after) (bounded : size ≤ budget) (invalid : Word) :
     ∃ updatedValue finalStore finalMap finalWorld slots,
       ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType ∧
@@ -1041,14 +1046,15 @@ theorem preserves_prefix_bounded (budget : Nat)
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
       ∀ next outputType, ContinuationAgreement actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   obtain ⟨updatedValue, finalStore, finalMap, finalWorld, slots, represented, finalHeaps, maps, worlds, frame, metadata, count, typed, agreement, _⟩ :=
     Stateful.preserves_prefix_bounded_with_rhs (scope := scope) (canonical := canonical) ProtectedStateBareAssignment.unitProtocol ProtectedStateBareAssignment.unitTransport budget () layout bare extension
     (fun snapshot child smaller {_ _} expressionTrace => by
       obtain ⟨value, rhsStore, rhsMap, rhsWorld, result⟩ := rhs_preserves_at snapshot child (meaning child smaller)
         generated found environments heaps locals agrees actualTyped installed expressionTrace
-      exact ⟨value, rhsStore, rhsMap, rhsWorld, result, (), trivial⟩) observations generated found rhsView rhsCore profile environments heaps locals agrees actualTyped slot rootTyped trace bounded invalid
+      exact ⟨value, rhsStore, rhsMap, rhsWorld, result, (), trivial⟩) observations generated found rhsView rhsCore profile leafView environments heaps locals agrees actualTyped slot rootTyped trace bounded invalid
   exact ⟨updatedValue, finalStore, finalMap, finalWorld, slots, represented, finalHeaps, maps, worlds, frame, metadata, count, typed, agreement⟩
 
 theorem preserves_prefix
@@ -1059,7 +1065,8 @@ theorem preserves_prefix
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1070,7 +1077,7 @@ theorem preserves_prefix
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
       environment before place id updated after) (invalid : Word) :
     ∃ updatedValue finalStore finalMap finalWorld slots,
       ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType ∧
@@ -1080,11 +1087,12 @@ theorem preserves_prefix
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
       ∀ next outputType, ContinuationAgreement actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   obtain ⟨size, sized⟩ := SourceExecutionSize.SourcePlaceAssignment.has_size trace
   exact preserves_prefix_bounded size layout bare extension
-    (RecursiveNamedBoundedContracts.preserves_below_of_unbounded meaning size) observations generated found rhsView rhsCore profile
+    (RecursiveNamedBoundedContracts.preserves_below_of_unbounded meaning size) observations generated found rhsView rhsCore profile leafView
     environments heaps locals agrees actualTyped installed slot rootTyped sized (Nat.le_refl size) invalid
 
 private theorem no_target_fault
@@ -1139,8 +1147,8 @@ theorem preserves_fault_reachable_bounded_with_rhs (budget : Nat)
     (_generated : certificate scope id lowered) (_found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
-    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1156,7 +1164,8 @@ theorem preserves_fault_reachable_bounded_with_rhs (budget : Nat)
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -1164,7 +1173,8 @@ theorem preserves_fault_reachable_bounded_with_rhs (budget : Nat)
       ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ := by
   obtain ⟨snapshot⟩ := snapshot_of_heap layout extension environments heaps locals agrees slot rootTyped
   have phase := snapshot_prefix layout snapshot lowered.expression next outputType
-    (binaryOperator (prepared.route.leafType = .integer) operator) invalid
+    (assignmentModifier place.type (prepared.route.leafType = .integer) operator) invalid
+    (SourceCoreDataPlaces.placeWrap place.type operator false)
   cases trace with
   | target fault => exact (no_target_fault snapshot bare fault.sound).elim
   | rhs resolve fault =>
@@ -1185,19 +1195,21 @@ theorem preserves_fault_reachable_bounded_with_rhs (budget : Nat)
     | @value _ rightValue payload =>
       have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
         rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
-      rcases modifier_total observations profile (snapshot.represented.extend result.maps result.worlds) rightRep
+      rcases modifier_total_wide observations profile leafView (snapshot.represented.extend result.maps result.worlds) rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
-          ⟨_, failed⟩ | ⟨_, _, _, outcome, _⟩
+          ⟨_, failed⟩ | ⟨_, _, _, _, outcome, _⟩
       · have failed : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
-            (modified prepared.route.leafType (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
+            (modified prepared.route.leafType (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false
+              (.var 1) (.var 0) invalid (SourceCoreDataPlaces.placeWrap place.type operator false))
             (.inLeft prepared.route.leafType (.word invalid)) rhsStore := by simpa only [layout.sameType] using failed
         exact ⟨invalid, rhsStore, rhsMap, rhsWorld,
           phase.wrap (LanguageResult.bind_success outputType result.evaluated (LanguageResult.bind_failure outputType failed)),
           invalidToken _ _ invalidOperands, result.heaps, result.maps, result.worlds, result.frame, result.metadata, rhsPost⟩
-      · rcases outcome with applied | ⟨_, _, _, panics⟩
-        · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
-        · exact (DataPlaceModifier.panic_excludes_invalid (panics .word) invalidOperands).elim
+      · rw [layout.sameType] at outcome
+        cases outcome with
+        | applied applied _ _ => exact (DataPlaceModifier.compound_excludes_invalid applied invalidOperands).elim
+        | panicked _ panics _ _ => exact (DataPlaceModifier.panic_excludes_invalid panics invalidOperands).elim
   | panic resolve evaluated _ _ _ _ panics =>
     obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolve.sound
     obtain ⟨value, rhsStore, rhsMap, rhsWorld, result, rhsPost⟩ :=
@@ -1207,31 +1219,30 @@ theorem preserves_fault_reachable_bounded_with_rhs (budget : Nat)
     | @value _ rightValue payload =>
       have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
         rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
-      rcases modifier_total observations profile (snapshot.represented.extend result.maps result.worlds) rightRep
+      rcases modifier_total_wide observations profile leafView (snapshot.represented.extend result.maps result.worlds) rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
-          ⟨invalidOperands, _⟩ | ⟨_, updatedValue, _, outcome, modified⟩
+          ⟨invalidOperands, _⟩ | ⟨_, updatedValue, _, _, outcome, modified⟩
       · exact (DataPlaceModifier.panic_excludes_invalid panics invalidOperands).elim
-      · rcases outcome with applied | ⟨operation, selected, zero, other⟩
-        · exact (CompatiblePlaceModifier.panic_excludes_applies
-          (CompatiblePlaceModifier.resolved_plain targetPlain resolve.sound) panics applied).elim
-        · -- The setter runs and the check fails before the write.
-          have sameCode := CompatiblePlaceModifier.panic_functional panics (other _)
-          subst sameCode zero
-          have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, .divisor⟩ := by
-            simpa only [layout.sameType] using selected
+      · rw [layout.sameType] at outcome
+        cases outcome with
+        | applied applied _ _ => exact (DataPlaceModifier.panic_excludes_compound panics applied).elim
+        | panicked _ other _ fails =>
+          -- The setter runs and the check fails before the write.
+          cases CompatiblePlaceModifier.panic_functional panics other
           have nativeModified : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value
-              (.word Word.zero) actual) rhsStore
-              (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType (binaryOperator (prepared.route.leafType = .integer) operator) false
-                (.var 1) (.var 0) invalid) (.inRight .word updatedValue) rhsStore := by
+              rightValue actual) rhsStore
+              (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType
+                (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid
+                (SourceCoreDataPlaces.placeWrap place.type operator false)) (.inRight .word updatedValue) rhsStore := by
             simpa only [layout.sameType] using modified
           obtain ⟨latest⟩ := result.latest
           exact ⟨_, rhsStore, rhsMap, rhsWorld,
             phase.wrap (LanguageResult.bind_success outputType result.evaluated
               (LanguageResult.bind_success outputType nativeModified
                 (LanguageResult.bind_success outputType
-                  (setter_evaluates layout snapshot.value (.word Word.zero) updatedValue latest.nativeRead)
-                  (DataPlaceGuard.panic_of_selected selected)))),
+                  (setter_evaluates layout snapshot.value rightValue updatedValue latest.nativeRead)
+                  (fails.mpr ⟨rfl, rfl⟩)))),
             FunctionCalls.FaultTokens.panic _, result.heaps, result.maps, result.worlds, result.frame, result.metadata, rhsPost⟩
   | structuralUpdate resolve _ _ _ _ fault =>
     obtain ⟨rfl, rfl⟩ := snapshot.resolve_unique bare resolve.sound
@@ -1247,8 +1258,8 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
-    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1264,7 +1275,8 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -1273,7 +1285,7 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
   exact preserves_fault_reachable_bounded_with_rhs protocol budget initial layout bare extension
     (fun snapshot child smaller {_ _} expressionTrace =>
       Stateful.rhs_preserves_at snapshot protocol child (meaning child smaller) generated found
-        environments heaps locals agrees actualTyped initial expressionTrace) observations generated found rhsView rhsCore profile targetPlain environments heaps locals agrees actualTyped slot rootTyped trace bounded next outputType invalid invalidToken
+        environments heaps locals agrees actualTyped initial expressionTrace) observations generated found rhsView rhsCore profile leafView environments heaps locals agrees actualTyped slot rootTyped trace bounded next outputType invalid invalidToken
 
 end Stateful
 
@@ -1286,8 +1298,8 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
-    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1304,7 +1316,8 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -1314,7 +1327,7 @@ theorem preserves_fault_reachable_bounded (budget : Nat)
     (fun snapshot child smaller {_ _} expressionTrace => by
       obtain ⟨value, rhsStore, rhsMap, rhsWorld, result⟩ := rhs_preserves_at snapshot child (meaning child smaller)
         generated found environments heaps locals agrees actualTyped installed expressionTrace
-      exact ⟨value, rhsStore, rhsMap, rhsWorld, result, (), trivial⟩) observations generated found rhsView rhsCore profile targetPlain environments heaps locals agrees actualTyped slot rootTyped trace bounded next outputType invalid invalidToken
+      exact ⟨value, rhsStore, rhsMap, rhsWorld, result, (), trivial⟩) observations generated found rhsView rhsCore profile leafView environments heaps locals agrees actualTyped slot rootTyped trace bounded next outputType invalid invalidToken
   exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata⟩
 
 theorem preserves_fault_reachable
@@ -1325,8 +1338,8 @@ theorem preserves_fault_reachable
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
-    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1343,14 +1356,15 @@ theorem preserves_fault_reachable
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
   obtain ⟨size, sized⟩ := SourceExecutionSize.SourcePlaceAssignmentFaults.has_size trace
   exact preserves_fault_reachable_bounded size layout bare extension
-    (RecursiveNamedBoundedContracts.preserves_below_of_unbounded meaning size) observations generated found rhsView rhsCore profile targetPlain
+    (RecursiveNamedBoundedContracts.preserves_below_of_unbounded meaning size) observations generated found rhsView rhsCore profile leafView
     environments heaps locals agrees actualTyped installed slot rootTyped sized (Nat.le_refl size) next outputType invalid invalidToken
 
 /-- Compatibility entry point retaining the original operand-token premise. -/
@@ -1362,8 +1376,8 @@ theorem preserves_fault
     (generated : certificate scope id lowered) (found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
-    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1380,12 +1394,13 @@ theorem preserves_fault
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
-  exact preserves_fault_reachable layout bare extension meaning observations generated found rhsView rhsCore profile targetPlain
+  exact preserves_fault_reachable layout bare extension meaning observations generated found rhsView rhsCore profile leafView
     environments heaps locals agrees actualTyped installed slot rootTyped trace next outputType invalid
     (AssignmentOperandDiagnostics.of_unconditional invalidToken)
 

@@ -2332,7 +2332,7 @@ variable {targetPrepared : Prepared} {index : Nat} {node : ExpressionNode} {lowe
   (found : source.lookupExpression? rhs = some node)
   (rhsView : AssignedRhsView operator leaf node.type)
   (rhsCore : lowered.type = targetPrepared.route.leafType)
-  (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
+  (profile : WideAssignmentProfile operator place.type)
   (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType place.type)
   (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, targetPrepared.route.rootType))
   (rootTyped : WritableLocal context place.root targetPrepared.route.rootSourceType)
@@ -2341,11 +2341,11 @@ variable {targetPrepared : Prepared} {index : Nat} {node : ExpressionNode} {lowe
   (invalidTokens : ∀ location, faults (.uninitializedLocation location) targetPrepared.invalidProjection)
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
-  uninitialized missing bodyUninitialized bodyMissing layout ordinary generated found rhsView rhsCore profile slot rootTyped unique owners in
+  uninitialized missing bodyUninitialized bodyMissing layout ordinary generated found rhsView rhsCore profile leafView slot rootTyped unique owners in
 /-- Original source children are below one fixed outer budget. -/
 theorem named_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
-      environment before place rhs updated after) (bounded : size ≤ budget) (invalid : Word) :
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source
+      (Dynamic.CompoundAssignmentApplies place.type operator) environment before place rhs updated after) (bounded : size ≤ budget) (invalid : Word) :
     ∃ updatedValue finalStore finalMap finalWorld,
       ValueRep values.checked registry functions finalMap finalWorld targetPrepared.route.rootSourceType updated updatedValue targetPrepared.route.rootType ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -2356,26 +2356,29 @@ theorem named_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) {updat
         (ProtectedPlaceAssignmentSuccess.writtenContext targetPrepared (SourceCoreCalls.packArguments codes).type actualContext) ambient.definitions ∧
       ∀ next outputType, ContinuationAgreement actual store
         ((execute targetPrepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
-          (binaryOperator (targetPrepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (targetPrepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) :=
   ProtectedPlaceAssignmentSuccess.preserves_prefix_bounded budget layout ordinary extension
     (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix)
     (RecursiveNamedBoundedContracts.preserves_below_of_unbounded
       (NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
         uninitialized missing bodyUninitialized bodyMissing unique owners) budget)
-    faithful observations generated found rhsView rhsCore profile
+    faithful observations generated found rhsView rhsCore profile leafView
     environments heaps locals agrees actualTyped installed slot rootTyped trace bounded invalid
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
-  uninitialized missing bodyUninitialized bodyMissing layout ordinary generated found rhsView rhsCore profile slot rootTyped unique owners missingTokens invalidTokens in
+  uninitialized missing bodyUninitialized bodyMissing layout ordinary generated found rhsView rhsCore profile leafView slot rootTyped unique owners
+  missingTokens invalidTokens in
 /-- Fault prefixes retain the effects of earlier keys and RHS calls. -/
 theorem named_fault [FunctionCalls.FaultTokens faults] (budget : Nat) {reason : Dynamic.SemanticFault} {after : Dynamic.Heap}
     {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignmentFaults program size context evidence source environment before place operator rhs reason after)
-    (bounded : size ≤ budget) (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator) (next : Expr) (outputType : Ty) (invalid : Word) :
+    (bounded : size ≤ budget) (next : Expr) (outputType : Ty) (invalid : Word) :
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store
         ((execute targetPrepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
-          (binaryOperator (targetPrepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (targetPrepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -2385,8 +2388,8 @@ theorem named_fault [FunctionCalls.FaultTokens faults] (budget : Nat) {reason : 
     (RecursiveNamedBoundedContracts.preserves_below_of_unbounded
       (NamedCallExpressions.Tree.preserves functions extension faithful observations runtimeViews evidence valid
         uninitialized missing bodyUninitialized bodyMissing unique owners) budget)
-    faithful observations missingTokens invalidTokens generated found rhsView rhsCore profile
-    targetPlain environments heaps locals agrees actualTyped installed slot rootTyped trace bounded next outputType invalid
+    faithful observations missingTokens invalidTokens generated found rhsView rhsCore profile leafView
+    environments heaps locals agrees actualTyped installed slot rootTyped trace bounded next outputType invalid
 
 include extension faithful observations environments heaps locals agrees actualTyped installed valid runtimeViews
   uninitialized missing bodyUninitialized bodyMissing layout ordinary generated found rhsView rhsCore profile leafView slot rootTyped missingTokens
@@ -2407,7 +2410,7 @@ theorem named_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) {next :
     (RecursiveNamedBoundedContracts.reflects_below_of_unbounded
       (NamedCallExpressions.Tree.reflects functions extension faithful observations runtimeViews evidence valid
         uninitialized missing bodyUninitialized bodyMissing) budget)
-    runtimeViews faithful observations missingTokens invalidTokens generated found rhsView rhsCore (.inl (leafView ▸ profile)) leafView
+    runtimeViews faithful observations missingTokens invalidTokens generated found rhsView rhsCore profile leafView
     environments heaps agrees actualTyped installed locals slot rootTyped completed bounded
 end Static
 

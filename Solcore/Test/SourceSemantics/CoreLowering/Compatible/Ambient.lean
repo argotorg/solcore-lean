@@ -1532,7 +1532,8 @@ theorem preserves_prefix [FunctionCalls.FaultTokens faults]
     (generated : CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt scope id lowered) (found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1542,7 +1543,7 @@ theorem preserves_prefix [FunctionCalls.FaultTokens faults]
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
       environment before place id updated after) (invalid : Word) :
     ∃ updatedValue finalStore finalMap finalWorld slots,
       ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType ∧
@@ -1552,12 +1553,13 @@ theorem preserves_prefix [FunctionCalls.FaultTokens faults]
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
       ∀ next outputType, ContinuationAgreement actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   have meaning : TypedGenericExpressionMeaning.Preserves (payloadModel compilation.checked registry functions)
     program context evidence source (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) faults :=
     CompatibleExpressionTyped.preserves functions extension program evidence valid unique uninitialized missing
-  exact CompatibleBareAssignment.preserves_prefix layout bare extension meaning observations generated found rhsView rhsCore profile
+  exact CompatibleBareAssignment.preserves_prefix layout bare extension meaning observations generated found rhsView rhsCore profile leafView
     environments heaps locals agrees actualTyped slot rootTyped trace invalid
 
 theorem preserves_fault [FunctionCalls.FaultTokens faults]
@@ -1572,8 +1574,8 @@ theorem preserves_fault [FunctionCalls.FaultTokens faults]
     (generated : CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt scope id lowered) (found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
-    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1589,7 +1591,8 @@ theorem preserves_fault [FunctionCalls.FaultTokens faults]
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -1598,7 +1601,7 @@ theorem preserves_fault [FunctionCalls.FaultTokens faults]
     program context evidence source (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) faults :=
     CompatibleExpressionTyped.preserves functions extension program evidence valid unique uninitialized missing
   exact CompatibleBareAssignment.preserves_fault layout bare extension meaning observations generated found rhsView rhsCore profile
-    targetPlain environments heaps locals agrees actualTyped slot rootTyped trace next outputType invalid invalidToken
+    leafView environments heaps locals agrees actualTyped slot rootTyped trace next outputType invalid invalidToken
 
 theorem reflects [FunctionCalls.FaultTokens faults]
     (layout : Layout compilation prepared) (bare : place.projections = [])

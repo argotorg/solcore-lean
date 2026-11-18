@@ -972,8 +972,8 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
     {operator : Syntax.ValueAssignOp}
     (rhsView : AssignedRhsView operator leaf node.type)
     (rhsCoreType : lowered.type = prepared.route.leafType)
-    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
-    (targetPlain : ∀ type, place.type = .fixed type → ¬ FixedCheckedCompound operator)
+    (operatorProfile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType place.type)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -989,7 +989,8 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
     ∃ token finalStore finalMap finalWorld,
       Evaluates coreEnvironment store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
-          (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (.inLeft outputType (.word token)) finalStore ∧ faults reason token ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -999,7 +1000,7 @@ theorem preserves_fault {compilation : SourceCoreCompatibleDataPlaces.Context}
       (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) faults :=
     CompatibleExpressionTyped.preserves functions registryExtension program evidence valid unique uninitialized missing
   exact CompatibleRenamedPlaceFaults.preserves layout ordinary registryExtension meaning faithful observations
-    missingTokens invalidTokens rhsGenerated found rhsView rhsCoreType operatorProfile targetPlain environments heaps locals agrees actualTyped
+    missingTokens invalidTokens rhsGenerated found rhsView rhsCoreType operatorProfile leafView environments heaps locals agrees actualTyped
     slot rootTyped trace next outputType invalid
 
 

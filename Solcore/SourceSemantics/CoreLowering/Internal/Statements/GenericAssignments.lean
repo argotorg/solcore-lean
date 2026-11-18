@@ -616,17 +616,19 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
-  try rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at *
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | bare empty layout =>
     obtain ⟨_, finalStore, finalMap, finalWorld, slots, _, finalHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩ :=
-      CompatibleBareAssignment.preserves_prefix layout empty extension meaning observations right found rightView rightType profile
-        environments heaps locals agrees actualTyped slot writable trace invalid
+      CompatibleBareAssignment.preserves_prefix layout empty extension meaning observations right found rightView rightType
+        (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot writable trace invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at continuation
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, by simpa [Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext, Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed, continuation⟩
   | projected layout ordinary =>
     obtain ⟨_, finalStore, finalMap, finalWorld, _, finalHeaps, maps, worlds, frame, metadata, slots, count, typed, continuation⟩ :=
-      CompatibleRenamedPlaceSuccess.preserves_prefix layout ordinary extension meaning faithful observations right found rightView rightType profile
-        environments heaps locals agrees actualTyped slot writable trace invalid
+      CompatibleRenamedPlaceSuccess.preserves_prefix_wide layout ordinary extension meaning faithful observations right found rightView
+        rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot writable trace invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at continuation
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩
 
 include extension meaning faithful observations environments heaps locals agrees actualTyped in
@@ -640,14 +642,19 @@ theorem preserves_fault_reachable [FunctionCalls.FaultTokens faults] (errors : h
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
-  try rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at *
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | bare empty layout =>
-    exact CompatibleBareAssignment.preserves_fault_reachable layout empty extension meaning observations right found rightView rightType profile
-      targetPlain environments heaps locals agrees actualTyped slot writable trace next output invalid errors.operands
+    have faulted := CompatibleBareAssignment.preserves_fault_reachable layout empty extension meaning observations right found rightView
+      rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot writable trace next output invalid errors.operands
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at faulted
+    exact faulted
   | projected layout ordinary =>
-    exact CompatibleRenamedPlaceFaults.preserves layout ordinary extension meaning faithful observations
-      errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType profile targetPlain environments heaps locals agrees actualTyped slot writable trace next output invalid
+    have faulted := CompatibleRenamedPlaceFaults.preserves layout ordinary extension meaning faithful observations
+      errors.missing (errors.uninitialized layout.nonempty) right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals
+      agrees actualTyped slot writable trace next output invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at faulted
+    exact faulted
 
 include extension meaning faithful observations environments heaps locals agrees actualTyped in
 /-- Compatibility entry point retaining the original diagnostic receipt. -/

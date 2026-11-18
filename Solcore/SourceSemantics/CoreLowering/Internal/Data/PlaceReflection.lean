@@ -401,6 +401,21 @@ theorem panic_excludes_compound {targetType : TypeSystem.Ty} {operator : Syntax.
         cases Option.some.inj operand
         exact panics.excludes_application applies
 
+/-- An applied compound assignment, at any target, has valid operands. -/
+theorem compound_excludes_invalid {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
+    {snapshot : Option Dynamic.Value} {right result : Dynamic.Value}
+    (applied : Dynamic.CompoundAssignmentApplies targetType operator snapshot right result) :
+    ¬ Dynamic.AssignmentOperandsInvalid operator snapshot right := by
+  cases applied
+  case primitive applies => exact assignment_excludes_invalid applies
+  all_goals
+    rename_i target applies
+    intro invalid
+    cases invalid with
+    | compound corresponds invalid =>
+      cases corresponds
+      exact invalid.excludes_value (.fixed (congrArg some target) applies)
+
 /-- A resolved place keeps its static type. -/
 theorem resolved_valueType {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {environment : Dynamic.Environment}
