@@ -132,6 +132,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.BasicStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CaptureCopies
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.ControlStatements
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.CoreEvaluation
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FixedModifiers
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.FunctionCalls
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GeneralExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.GenericHeaps
