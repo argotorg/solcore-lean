@@ -1,19 +1,21 @@
 import Solcore.Frontend.SourceCore.Compatible
 import Solcore.SourceSemantics.Dynamic.Fault
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Equality
+import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.AssignmentProfiles
 
 /-!
 # Foundations: compound assignments at fixed-width targets
 
 The modifier that both place compilers emit for `+= -= *= /= %=`, their unchecked forms and
-`&= |= ^=` at the twelve fixed-width integer types, beside the source rules on the same operands.
-Nothing here is used by the meaning proofs yet.
+`&= |= ^=` at the twelve fixed-width integer types, beside the source rules on the same operands,
+and the profile that admits them beside `AssignmentProfile`. The meaning proofs do not use them yet.
 
 Main declarations:
+- `FixedCompoundAssignment` and `WideAssignmentProfile`, the profile with these targets;
 - `leaf`, the word Core's modifier computes, and `modified_evaluates` and
   `compatible_modified_evaluates`, its evaluation in each place compiler;
 - `applies_leaf`, an applied source operation gives that word;
-- `guard_agrees`, an `Agreement`: the modifier's check after the setter writes exactly when the
+- `Agreement` and `guard_agrees`: the modifier's check after the setter writes exactly when the
   source applies the operation, and otherwise fails with the source's panic;
 - `canonical_of_applies`, an applied result is canonical for the type.
 -/
@@ -376,6 +378,28 @@ end Solcore.SourceSemantics.CoreLowering.FixedCompoundModifier
 end
 
 section
+/-! The profile with fixed-width compound targets, beside `AssignmentProfile`. Its fourth disjunct
+is at the target's own type, not its metadata view: the view erases `comptime`, and at a type whose
+view is fixed-width but which is not one of the twelve, the compiler and the source take Word's
+operations, whose results need not be canonical for the view. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering
+open Frontend
+
+/-- A compound assignment at one of the twelve fixed-width integer types whose binary operator is a
+builtin there (`FixedCompoundAssignmentOperator`): `+= -= *= /= %=`, their unchecked forms and
+`&= |= ^=`. The shifts, whose amount has its own type, are not among them. -/
+abbrev FixedCompoundAssignment (operator : Syntax.ValueAssignOp) (target : TypeSystem.Ty) : Prop :=
+  (∃ type, target = .fixed type) ∧ FixedCompoundAssignmentOperator operator
+
+/-- `AssignmentProfile` on a target's metadata view, or `FixedCompoundAssignment` at its own type. -/
+abbrev WideAssignmentProfile (operator : Syntax.ValueAssignOp) (target : TypeSystem.Ty) : Prop :=
+  AssignmentProfile operator (SourceCoreRawMetadata.runtimeType target) ∨ FixedCompoundAssignment operator target
+
+end Solcore.SourceSemantics.CoreLowering
+end
+
+section
 /-! The leaf. Both place compilers choose the modifier with `assignmentModifier` and the wrap with
 `SourceCoreDataPlaces.placeWrap`. At a fixed-width target the modifier applies Word's operation to
 the snapshot's word and the right-hand side's, and the unchecked forms wrap the result. -/
@@ -669,10 +693,22 @@ private theorem not_applies_zero {type : TypeSystem.FixedInteger} {operator : Sy
         | cases ‹FixedCheckedDivision _›
         | cases ‹FixedUncheckedArithmetic _›)
 
+/-- Word operands of these operators are never invalid. -/
+theorem words_valid {operator : Syntax.ValueAssignOp} (kind : FixedCompoundAssignmentOperator operator)
+    (left right : Word) : ¬ Dynamic.AssignmentOperandsInvalid operator (some (.word left)) (.word right) := by
+  intro invalid
+  cases invalid with
+  | compound corresponds invalid =>
+    cases invalid with
+    | numeric _ pair => exact pair trivial
+    | word _ pair => exact pair trivial
+    | logical operatorClass => cases kind <;> cases corresponds <;> cases operatorClass
+
 variable {environment : Environment} {store : Store} {outputType leftType : Ty} {write : Expr}
   {updated changed : Value}
 
-private theorem guard_divisor_nonzero {operation : BinaryOp} {right : Word} (nonzero : right ≠ Word.zero)
+/-- A nonzero right-hand side passes a zero test. -/
+theorem guard_divisor_nonzero {operation : BinaryOp} {right : Word} (nonzero : right ≠ Word.zero)
     (result : Value) (after : Store) :
     Evaluates (updated :: changed :: .word right :: environment) store
         (SourceCoreDataPlaces.guard outputType (some ⟨operation, .divisor⟩) write) result after ↔
@@ -686,7 +722,8 @@ private theorem guard_divisor_nonzero {operation : BinaryOp} {right : Word} (non
     · cases ranged
   · exact SourceCoreDataPlaces.guard_passes (.nonzero nonzero)
 
-private theorem guard_divisor_zero {operation : BinaryOp} (result : Value) (after : Store) :
+/-- A zero right-hand side fails it with `Panic(0x12)`. -/
+theorem guard_divisor_zero {operation : BinaryOp} (result : Value) (after : Store) :
     Evaluates (updated :: changed :: .word Word.zero :: environment) store
         (SourceCoreDataPlaces.guard outputType (some ⟨operation, .divisor⟩) write) result after ↔
       (result = .inLeft outputType (.word (SourceCorePanics.reason SourceCorePanics.divisionByZero)) ∧
@@ -779,23 +816,21 @@ private theorem no_division {binary : Syntax.BinaryOp} (kind : FixedCheckedArith
   intro division
   cases kind <;> simp [SourceCorePrimitive.checkedDivision] at division
 
-/-- How the modifier's check, after the setter, agrees with the source on a compound assignment at a
-fixed-width target, under the check's binders. -/
-inductive Agreement (type : TypeSystem.FixedInteger) (operator : Syntax.ValueAssignOp) (left right : Word)
-    (binders : Environment) (store : Store) (check write : Expr) (outputType : Ty) : Prop where
-  /-- The source applies the operation, with the leaf, and the check writes. -/
-  | applied
-      (applies : Dynamic.CompoundAssignmentApplies (.fixed type) operator (some (.word left)) (.word right)
-        (.word (leaf type operator left right)))
-      (writes : ∀ result after,
-        Evaluates binders store check result after ↔ Evaluates binders store write result after)
-  /-- The source panics and applies nothing, and the check fails with the panic, writing nothing. -/
-  | panicked (code : UInt8)
-      (panics : Dynamic.AssignmentOperandsPanic (.fixed type) operator (some (.word left)) (.word right) code)
-      (excluded : ∀ result,
-        ¬ Dynamic.CompoundAssignmentApplies (.fixed type) operator (some (.word left)) (.word right) result)
-      (fails : ∀ result after, Evaluates binders store check result after ↔
-        (result = .inLeft outputType (.word (SourceCorePanics.reason code)) ∧ after = store))
+/-- How a modifier's check, after the setter, agrees with the source on a compound assignment, under
+the check's binders: it writes when the source applies the operation, with `result`, and otherwise
+fails with the source's panic, writing nothing. -/
+inductive Agreement (target : TypeSystem.Ty) (operator : Syntax.ValueAssignOp) (snapshot : Option Dynamic.Value)
+    (right result : Dynamic.Value) (binders : Environment) (store : Store) (check write : Expr)
+    (outputType : Ty) : Prop where
+  /-- The source applies the operation, and the check writes. -/
+  | applied (applies : Dynamic.CompoundAssignmentApplies target operator snapshot right result)
+      (writes : ∀ value after,
+        Evaluates binders store check value after ↔ Evaluates binders store write value after)
+  /-- The source panics and applies nothing, and the check fails with the panic. -/
+  | panicked (code : UInt8) (panics : Dynamic.AssignmentOperandsPanic target operator snapshot right code)
+      (excluded : ∀ other, ¬ Dynamic.CompoundAssignmentApplies target operator snapshot right other)
+      (fails : ∀ value after, Evaluates binders store check value after ↔
+        (value = .inLeft outputType (.word (SourceCorePanics.reason code)) ∧ after = store))
 
 private theorem agrees_checked {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
     {binary : Syntax.BinaryOp} {left right : Word} (corresponds : Dynamic.AssignmentOperatorBinary operator binary)
@@ -805,7 +840,8 @@ private theorem agrees_checked {type : TypeSystem.FixedInteger} {operator : Synt
     (leafEq : leaf type operator left right =
       Word.ofIntModulo (Dynamic.checkedResult binary (value type left) (value type right)))
     {operation : BinaryOp} :
-    Agreement type operator left right (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
+    Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
+      (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
       store (SourceCoreDataPlaces.guard outputType (some ⟨operation, .range type binary⟩) write) write outputType := by
   by_cases inRange : Dynamic.FixedInRange type (Dynamic.checkedResult binary (value type left) (value type right))
   · refine .applied ?_ (guard_range_pass (no_division arithmetic right)
@@ -825,7 +861,8 @@ private theorem agrees_division {type : TypeSystem.FixedInteger} {operator : Syn
     (leafEq : right ≠ Word.zero → leaf type operator left right =
       Word.ofIntModulo (Dynamic.divisionResult binary (value type left) (value type right)))
     {operation : BinaryOp} :
-    Agreement type operator left right (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
+    Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
+      (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
       store (SourceCoreDataPlaces.guard outputType (some ⟨operation, .range type binary⟩) write) write outputType := by
   have divides : SourceCorePrimitive.checkedDivision binary = true := by cases division <;> rfl
   by_cases zero : right = Word.zero
@@ -847,7 +884,8 @@ private theorem agrees_total {type : TypeSystem.FixedInteger} {operator : Syntax
     (applies : Dynamic.CompoundAssignmentApplies (.fixed type) operator (some (.word left)) (.word right)
       (.word (leaf type operator left right)))
     {operation : BinaryOp} :
-    Agreement type operator left right (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
+    Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
+      (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
       store (SourceCoreDataPlaces.guard outputType (some ⟨operation, .total⟩) write) write outputType :=
   .applied applies fun _ _ => Iff.rfl
 
@@ -857,7 +895,8 @@ private theorem agrees_unchecked_division {type : TypeSystem.FixedInteger} {oper
     (applies : right ≠ Word.zero → Dynamic.CompoundAssignmentApplies (.fixed type) operator (some (.word left))
       (.word right) (.word (leaf type operator left right)))
     (panics : Dynamic.BinaryPrimitivePanics binary (.word left) (.word Word.zero) 0x12) {operation : BinaryOp} :
-    Agreement type operator left right (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
+    Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
+      (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
       store (SourceCoreDataPlaces.guard outputType (some ⟨operation, .divisor⟩) write) write outputType := by
   by_cases zero : right = Word.zero
   · subst zero
@@ -870,7 +909,8 @@ modified leaf, the right-hand side and the snapshot), agrees with the source: it
 the source applies the operation, with the leaf, and otherwise fails with the source's panic. -/
 theorem guard_agrees {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
     (kind : FixedCompoundAssignmentOperator operator) (left right : Word) :
-    Agreement type operator left right (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
+    Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
+      (updated :: changed :: .word right :: .inRight leftType (.word left) :: environment)
       store (SourceCoreDataPlaces.guard outputType
         (SourceCoreDataPlaces.assignmentModifier (.fixed type) false operator) write) write outputType := by
   cases kind
