@@ -496,7 +496,7 @@ theorem reflects_position [RecursiveStageMeaning.FaultTokens faults] {budget : N
                 (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
             exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
               .assignBare (lookupStatement?_sound found) form snapshot childTrace
-                ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+                write trace, represented,
               finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
               metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
       ·
@@ -544,7 +544,7 @@ theorem reflects_position [RecursiveStageMeaning.FaultTokens faults] {budget : N
                 (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
             exact ⟨Staging.Recursive.Size.stepSize [_, _, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
               .assignProjected (lookupStatement?_sound found) form bare keyTrace snapshot childTrace
-                ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+                write trace, represented,
               finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
               metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
   | @block context scope mode id node statements rest expected type innerCode body found form inner remaining innerErrors remainingErrors innerIH remainingIH =>
@@ -953,7 +953,7 @@ theorem reflects_position [RecursiveStageMeaning.FaultTokens faults] {budget : N
                 (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
             exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], outcome, after, finalMap, finalWorld,
               CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_assignment snapshot childTrace
-                ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+                write trace, represented,
               finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
               metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
       ·
@@ -1001,7 +1001,7 @@ theorem reflects_position [RecursiveStageMeaning.FaultTokens faults] {budget : N
                 (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
             exact ⟨Staging.Recursive.Size.stepSize [_, _, sourceSize], outcome, after, finalMap, finalWorld,
               CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_projected_assignment bare keyTrace snapshot childTrace
-                ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+                write trace, represented,
               finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
               metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
   | @initializerBitNot context scope assignment rest body test post statements expected type head remaining remainingErrors headErrors ih =>
@@ -1734,7 +1734,7 @@ theorem preserves_at {budget : Nat}
             (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
             (context := context) (scope := scope) (administrative := administrative)
             bridge functions extension transport head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-            (typedChildren childSize childStrict) snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+            (typedChildren childSize childStrict) snapshot childTrace write
         obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
             finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
           ih rfl tailMode tailShape (ProtectedStateImperativeStatementSuffixTyping.assignment unique sourceTyped found form)

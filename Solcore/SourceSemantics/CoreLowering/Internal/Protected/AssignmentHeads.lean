@@ -1272,7 +1272,7 @@ variable {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
 include transport extension faithful observations environments heaps locals agrees actualTyped initialState in
 theorem preserves_prefix_bounded (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) (bounded : size ≤ budget) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -1284,7 +1284,6 @@ theorem preserves_prefix_bounded (budget : Nat)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   have none := checkedCompound_of_profile (leafView ▸ profile)
-  rw [← Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at trace
   cases shape with
   | bare empty layout =>
     obtain ⟨_, finalStore, finalMap, finalWorld, slots, _, finalHeaps, maps, worlds, preservation, metadata, count, typed, continuation, post⟩ :=
@@ -1363,7 +1362,7 @@ theorem reflects_bounded_with_diagnostics [FunctionCalls.FaultTokens faults] (bu
     {size : Nat} (completed : EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore) (bounded : size ≤ budget) :
     ProtectedStateAssignmentHeadContracts.ResultAt protocol size values.checked registry functions program context evidence source faults
       scope (head.writtenContext actualContext) assignment.target operator rhs environment canonical actual
-      before store mapping world initialState (next.rename ξ) output value finalStore := by
+      before store mapping world initialState (next.rename ξ) output value finalStore (Dynamic.CompoundAssignmentApplies assignment.target.type operator) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   have none := checkedCompound_of_profile (leafView ▸ profile)
   simp only [GenericAssignmentStatements.Head.emit] at completed
@@ -1375,7 +1374,6 @@ theorem reflects_bounded_with_diagnostics [FunctionCalls.FaultTokens faults] (bu
     have result := ProtectedBareAssignment.Stateful.reflects_reachable_bounded protocol transport budget initialState layout empty extension
       boundedReflection observations right found rightView rightType (.inl (leafView ▸ profile)) leafView
       environments heaps locals agrees actualTyped slot writable operands completed bounded
-    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     cases result with
     | fault trace same matched finalHeaps maps worlds preservation metadata post =>
       exact .fault trace same matched finalHeaps maps worlds preservation metadata
@@ -1389,7 +1387,6 @@ theorem reflects_bounded_with_diagnostics [FunctionCalls.FaultTokens faults] (bu
     have result := ProtectedPlaceAssignmentReflection.Stateful.reflects_bounded_with_diagnostics budget layout ordinary extension protocol
       transport boundedReflection functionTypes faithful observations right found rightView rightType (.inl (leafView ▸ profile)) leafView
       environments heaps agrees actualTyped initialState missingFor uninitializedFor locals slot writable completed bounded
-    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     cases result with
     | fault trace same matched finalHeaps maps worlds frame metadata post =>
       exact .fault trace same matched finalHeaps maps worlds frame metadata post
@@ -1404,7 +1401,7 @@ theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : 
     {size : Nat} (completed : EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore) (bounded : size ≤ budget) :
     ProtectedStateAssignmentHeadContracts.ResultAt protocol size values.checked registry functions program context evidence source faults
       scope (head.writtenContext actualContext) assignment.target operator rhs environment canonical actual
-      before store mapping world initialState (next.rename ξ) output value finalStore := by
+      before store mapping world initialState (next.rename ξ) output value finalStore (Dynamic.CompoundAssignmentApplies assignment.target.type operator) := by
   exact reflects_bounded_with_diagnostics (functions := functions) (extension := extension)
     (program := program) (evidence := evidence) (protocol := protocol) (transport := transport)
     (faithful := faithful) (observations := observations) (head := head) (environments := environments)
@@ -1454,7 +1451,7 @@ variable {values : SourceCoreCompatibleValues.Context} {source : TypedSource}
 include observations transport extension environments heaps locals agrees actualTyped initial bare in
 theorem preserves_prefix_bare_bounded (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => ProtectedStateTransition.PreservesAt protocol (payloadModel values.checked registry functions) program context evidence source certificate faults size)) {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) (bounded : size ≤ budget) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -1466,7 +1463,6 @@ theorem preserves_prefix_bare_bounded (budget : Nat)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   have none := checkedCompound_of_profile (leafView ▸ profile)
-  rw [← Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at trace
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -1515,7 +1511,7 @@ theorem reflects_reachable_bare_bounded (budget : Nat)
     {size : Nat} (completed : EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore) (bounded : size ≤ budget) :
     ProtectedStateAssignmentHeadContracts.ResultAt protocol size values.checked registry functions program context evidence source faults
       scope (head.writtenContext actualContext) assignment.target operator rhs environment canonical actual
-      before store mapping world initial (next.rename ξ) output value finalStore := by
+      before store mapping world initial (next.rename ξ) output value finalStore (Dynamic.CompoundAssignmentApplies assignment.target.type operator) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   have none := checkedCompound_of_profile (leafView ▸ profile)
   simp only [GenericAssignmentStatements.Head.emit] at completed
@@ -1529,7 +1525,6 @@ theorem reflects_reachable_bare_bounded (budget : Nat)
     have result := ProtectedBareAssignment.Stateful.reflects_reachable_bounded protocol transport budget initial layout empty extension
       boundedReflection observations right found rightView rightType (.inl (leafView ▸ profile)) leafView
       environments heaps locals agrees actualTyped slot writable errors.operands completed bounded
-    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     cases result with
     | fault trace same matched finalHeaps maps worlds preservation metadata post =>
       exact .fault trace same matched finalHeaps maps worlds preservation metadata post
@@ -1587,7 +1582,7 @@ variable {values : ValuesContext} {source : TypedSource}
 
 include projected transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
 theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -1599,7 +1594,6 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
   have none := checkedCompound_of_profile (leafView ▸ profile)
-  rw [← Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at trace
   cases shape with
   | bare empty layout => exact (projected layout.steps).elim
   | projected layout ordinary =>
@@ -1645,7 +1639,7 @@ theorem reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRun
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -1663,7 +1657,6 @@ theorem reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRun
     have result := ProtectedPlaceAssignmentReflection.reflects layout ordinary extension transport reflection meaning functionTypes faithful
       observations errors.missing errors.uninitialized right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps
       agrees actualTyped installed locals slot writable completed
-    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     rcases result with
       ⟨_, _, _, _, _, trace, same, matched, finalHeaps, maps, worlds, frame, metadata⟩ |
       ⟨_, _, _, _, _, _, trace, finalHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩

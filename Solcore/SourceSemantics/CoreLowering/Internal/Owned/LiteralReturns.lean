@@ -1900,58 +1900,69 @@ theorem heap_after_equal
             rw [currentType, cellType, bodyType, ← storedType]
             exact rightTyped
 
-/-- The meaning proofs' operator profiles (plain assignment, a Word or an
-Integer target) exclude a compound assignment at a fixed-width integer type:
-its right-hand side has that type, which the metadata view keeps. -/
-theorem fixed_compound_excluded
-    {source : TypedSource} {context : SourceSemantics.Context}
-    {operator : Syntax.ValueAssignOp} {rhs : ExpressionId} {node : ExpressionNode}
-    {leaf : TypeSystem.Ty} {type : TypeSystem.FixedInteger}
-    (unique : NodeOccurrencesUnique source)
-    (found : source.lookupExpression? rhs = some node)
+/-- A compound assignment at a fixed-width target reads a word, so the current value's typing at the
+target's type on one heap holds on any other. -/
+theorem fixed_current_typed
+    {context : SourceSemantics.Context} {first second : Dynamic.Heap}
+    {targetType : TypeSystem.Ty} {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
+    {current : Option Dynamic.Value} {right result : Dynamic.Value}
     (kind : FixedCompoundAssignmentOperator operator)
-    (rhsTyped : ExpressionHasType source context rhs (.fixed type))
-    (view : AssignedRhsView operator leaf node.type)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf)) : False := by
-  obtain ⟨actual, contains, storedType⟩ := rhsTyped.stored_type
-  have sameNode : actual = node := Option.some.inj
-    ((lookupExpression?_complete unique contains).symm.trans found)
-  subst actual
-  rw [storedType] at view
-  rcases profile with equal | word | ⟨integer, _⟩
-  · subst equal
-    cases kind
-  · cases view with
-    | same view => cases view.symm.trans word
-    | shiftAmount shift _ _ => cases kind <;> cases shift
-  · cases view with
-    | same view => cases view.symm.trans integer
-    | shiftAmount shift _ _ => cases kind <;> cases shift
+    (targetEq : targetType = .fixed type)
+    (applies : Dynamic.CompoundAssignmentApplies targetType operator current right result)
+    (typed : Dynamic.OptionalValueHasType context first current (.fixed type)) :
+    Dynamic.OptionalValueHasType context second current (.fixed type) := by
+  cases typed with
+  | none => exact .none _
+  | some typed =>
+      cases applies with
+      | primitive plain applies =>
+          cases kind
+          all_goals first
+            | exact (plain _ targetEq (by constructor)).elim
+            | (cases applies
+               rename_i primitive
+               cases primitive <;>
+                 (first | exact .some (.fixed _ (Dynamic.fixed_word_canonical typed)) | cases typed))
+      | add _ applies | subtract _ applies | multiply _ applies | divide _ applies | modulo _ applies
+      | uncheckedAdd _ applies | uncheckedSubtract _ applies | uncheckedMultiply _ applies
+      | uncheckedDivide _ applies | uncheckedModulo _ applies | shiftLeft _ applies | shiftRight _ applies =>
+          cases applies <;> exact .some (.fixed _ (Dynamic.fixed_word_canonical typed))
 
+/-- The actual current-cell write keeps deep heap typing at the exact RHS endpoint. Plain assignment
+writes the right-hand value; a compound one at a Word target is Word's operation, and at a fixed-width
+target keeps the target's type (`Dynamic.CompoundAssignmentApplies.preserves`), from the snapshot,
+typed on the heap before the RHS, and the right-hand value. The wider profile has no shift at a
+fixed-width target. -/
 theorem heap_after_assignment
     {source : TypedSource} {context : SourceSemantics.Context}
     {operator : Syntax.ValueAssignOp}
     {assignment : AssignmentResolution} {rhs : ExpressionId} {node : ExpressionNode}
     {environment : Dynamic.Environment} {before middle after : Dynamic.Heap}
-    {target : Dynamic.ResolvedPlace} {right updated : Dynamic.Value} {leaf : TypeSystem.Ty}
+    {target : Dynamic.ResolvedPlace} {right updated : Dynamic.Value}
     (unique : NodeOccurrencesUnique source)
     (found : source.lookupExpression? rhs = some node)
     (typed : SourceAssignmentHasType source context assignment operator rhs)
-    (view : AssignedRhsView operator leaf node.type)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
-    (targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator)
+    (profile : WideAssignmentProfile operator assignment.target.type)
     (locals : Dynamic.EnvironmentAgrees before context.locals environment)
+    (beforeTyped : Dynamic.HeapWellTyped context before)
     (snapshot : BareTarget environment before assignment.target target)
     (heapTyped : Dynamic.HeapWellTyped context middle)
     (rightTyped : Dynamic.ValueHasType context middle right node.type)
     (write : Dynamic.ResolvedPlaceWrites
-      (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected right replacement)
+      (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected right
+        replacement)
       middle target updated after) :
     Dynamic.HeapWellTyped context after := by
   cases typed with
   | equal targetTyped rhsTyped same =>
-      exact heap_after_equal unique found (.equal targetTyped rhsTyped same) locals snapshot heapTyped rightTyped write
+      have plain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound .equal :=
+        fun _ _ checked => by cases checked
+      exact heap_after_equal unique found (.equal targetTyped rhsTyped same) locals snapshot heapTyped rightTyped
+        ((Dynamic.CompoundAssignmentApplies.eq_of_plain plain) ▸ write)
   | wordCompound kind targetTyped rhsTyped same =>
+      have plain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator :=
+        fun _ fixed _ => by rw [targetTyped.type_eq] at fixed; cases fixed
+      have write := (Dynamic.CompoundAssignmentApplies.eq_of_plain plain) ▸ write
       obtain ⟨actual, contains, storedType⟩ := rhsTyped.stored_type
       have sameNode : actual = node := Option.some.inj
         ((lookupExpression?_complete unique contains).symm.trans found)
@@ -1979,13 +1990,52 @@ theorem heap_after_assignment
               refine Dynamic.HeapWellTyped.write heapTyped currentRead (.some ?_) written
               rw [currentType, cellType, bodyType]
               exact updatedWord
-  | fixedCompound kind _ rhsTyped _ =>
-      exact (fixed_compound_excluded unique found kind rhsTyped view profile).elim
+  | @fixedCompound _ _ _ _ type kind targetTyped rhsTyped _ =>
+      have targetEq := targetTyped.type_eq
+      obtain ⟨actual, contains, storedType⟩ := rhsTyped.stored_type
+      have sameNode : actual = node := Option.some.inj
+        ((lookupExpression?_complete unique contains).symm.trans found)
+      subst actual
+      have rightFixed : Dynamic.ValueHasType context middle right (.fixed type) := by
+        rw [← storedType]
+        exact rightTyped
+      cases snapshot with
+      | @intro _ _ selected bare lookup read initial =>
+        cases targetTyped with
+        | intro writable projections _ =>
+          rw [bare] at projections
+          cases projections
+          obtain ⟨scheme, staticLookup, _schemeTyped, _mono, bodyType⟩ := writable.scheme
+          obtain ⟨location, cell, typedLookup, typedRead, cellType, _storage⟩ := locals.lookup staticLookup
+          cases lookup.functional typedLookup
+          cases read.functional typedRead
+          -- The snapshot is typed on the heap before the RHS; the operation reads a word, typed on any heap.
+          have initialTyped := initial.preserves (beforeTyped _ typedRead.member)
+          rw [cellType, bodyType] at initialTyped
+          cases write with
+          | intro currentRead currentType _ update written =>
+            cases update with
+            | leaf modified =>
+              refine Dynamic.HeapWellTyped.write heapTyped currentRead (.some ?_) written
+              rw [currentType, cellType, bodyType]
+              exact Dynamic.CompoundAssignmentApplies.preserves (.fixed kind) targetEq
+                (fixed_current_typed kind targetEq modified initialTyped) rightFixed modified
   | @shiftCompound _ _ _ _ _ amountType kind targetTyped targetKind rhsTyped amount _ =>
       cases targetKind with
       | fixed type =>
-          exact (targetPlain type targetTyped.type_eq (by cases kind <;> constructor)).elim
+          exfalso
+          have targetEq := targetTyped.type_eq
+          rcases profile with narrow | ⟨_, fixedKind⟩
+          · rw [targetEq] at narrow
+            rcases narrow with equal | word | ⟨integer, _⟩
+            · subst equal; cases kind
+            · cases word
+            · cases integer
+          · cases kind <;> cases fixedKind
       | word =>
+      have plain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator :=
+        fun _ fixed _ => by rw [targetTyped.type_eq] at fixed; cases fixed
+      have write := (Dynamic.CompoundAssignmentApplies.eq_of_plain plain) ▸ write
       obtain ⟨actual, contains, storedType⟩ := rhsTyped.stored_type
       have sameNode : actual = node := Option.some.inj
         ((lookupExpression?_complete unique contains).symm.trans found)
@@ -2025,33 +2075,36 @@ theorem source_profile
     (found : source.lookupExpression? rhs = some node)
     (typed : SourceAssignmentHasType source context assignment operator rhs)
     (view : AssignedRhsView operator leaf node.type)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf)) :
-    operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word := by
+    (profile : WideAssignmentProfile operator assignment.target.type)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type) :
+    (operator = .equal ∨ SourceCoreRawMetadata.runtimeType leaf = .word) ∨
+      FixedCompoundAssignment operator assignment.target.type := by
   cases typed with
-  | equal _ _ _ => exact .inl rfl
+  | equal _ _ _ => exact .inl (.inl rfl)
   | wordCompound kind _ rhsTyped _ =>
       obtain ⟨actual, contains, storedType⟩ := rhsTyped.stored_type
       have sameNode : actual = node := Option.some.inj
         ((lookupExpression?_complete unique contains).symm.trans found)
       subst actual
       cases view with
-      | same view => exact .inr (view.trans (congrArg SourceCoreRawMetadata.runtimeType storedType))
+      | same view => exact .inl (.inr (view.trans (congrArg SourceCoreRawMetadata.runtimeType storedType)))
       | shiftAmount shift _ _ => cases kind <;> cases shift
-  | fixedCompound kind _ rhsTyped _ =>
-      exact (fixed_compound_excluded unique found kind rhsTyped view profile).elim
-  | shiftCompound _ _ _ rhsTyped amount _ =>
-      rcases profile with equal | word | ⟨integer, _⟩
-      · exact .inl equal
-      · exact .inr word
-      · exfalso
-        obtain ⟨actual, contains, storedType⟩ := rhsTyped.stored_type
-        have sameNode : actual = node := Option.some.inj
-          ((lookupExpression?_complete unique contains).symm.trans found)
-        subst actual
-        rw [storedType] at view
-        cases view with
-        | same view => cases amount <;> cases view.symm.trans integer
-        | shiftAmount _ leafWord _ => cases leafWord.symm.trans integer
+  | fixedCompound kind targetTyped _ _ => exact .inr ⟨⟨_, targetTyped.type_eq⟩, kind⟩
+  | shiftCompound kind _ _ rhsTyped amount _ =>
+      rcases profile with narrow | ⟨_, fixedKind⟩
+      · rcases narrow with equal | word | ⟨integer, _⟩
+        · exact .inl (.inl equal)
+        · exact .inl (.inr (leafView.trans word))
+        · exfalso
+          obtain ⟨actual, contains, storedType⟩ := rhsTyped.stored_type
+          have sameNode : actual = node := Option.some.inj
+            ((lookupExpression?_complete unique contains).symm.trans found)
+          subst actual
+          rw [storedType] at view
+          cases view with
+          | same view => cases amount <;> cases view.symm.trans (leafView.trans integer)
+          | shiftAmount _ leafWord _ => cases leafWord.symm.trans (leafView.trans integer)
+      · cases kind <;> cases fixedKind
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBareAssignmentAdmission
 end

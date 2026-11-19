@@ -77,7 +77,7 @@ variable {checked : CallableAncestryPairedLookup.Checked} {base : Base checked}
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
 theorem named_preserves [FunctionCalls.FaultTokens faults] (budget : Nat) {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) (bounded : size ≤ budget) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -120,7 +120,7 @@ theorem named_reflects [FunctionCalls.FaultTokens faults] (budget : Nat) (errors
     {size : Nat} (completed : EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore) (bounded : size ≤ budget) :
     RecursiveNamedAssignmentHeadContracts.ResultAt size values.checked registry functions program context evidence source faults
       (NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix) scope (head.writtenContext actualContext)
-      assignment.target operator rhs environment canonical actual before store mapping world (next.rename ξ) output value finalStore  := by
+      assignment.target operator rhs environment canonical actual before store mapping world (next.rename ξ) output value finalStore (Dynamic.CompoundAssignmentApplies assignment.target.type operator)  := by
   exact ProtectedAssignmentHeads.Head.reflects_reachable_bounded functions extension program evidence
     (NamedCallExpressions.entry_transport functions registry bodies compilation.administrativePrefix)
     faithful observations head environments heaps locals agrees actualTyped installed budget
@@ -134,12 +134,12 @@ runtime-typed slots. The source witness receives no native-cost bound. -/
 theorem continuation_below {size budget : Nat} {next : Expr} {output : Ty} {value : Value} {finalStore : Store}
     (receipt : RecursiveNamedAssignmentHeadContracts.ResultAt size values.checked registry functions program context evidence source faults
       (NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix) scope (head.writtenContext actualContext)
-      assignment.target operator rhs environment canonical actual before store mapping world (next.rename ξ) output value finalStore)
+      assignment.target operator rhs environment canonical actual before store mapping world (next.rename ξ) output value finalStore (Dynamic.CompoundAssignmentApplies assignment.target.type operator))
     (within : size ≤ budget) :
     (∃ sourceSize reason after, SourceExecutionSize.SourcePlaceAssignmentFaults program sourceSize context evidence source
       environment before assignment.target operator rhs reason after) ∨
     (∃ sourceSize updated after slots written finalMap finalWorld remainingSize,
-      SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.AssignmentValueApplies operator)
+      SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix scope finalMap finalWorld after written canonical ∧

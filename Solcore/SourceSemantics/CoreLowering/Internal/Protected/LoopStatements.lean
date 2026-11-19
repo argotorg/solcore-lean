@@ -1383,7 +1383,7 @@ theorem Tree.preserves [FunctionCalls.FaultTokens faults]
         ProtectedAssignmentHeads.Head.preserves_prefix functions extension program evidence transport
           (expressionPreserves _ contextValid) faithful observations head
           environments heaps locals agrees actualTyped installed
-          ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned)
+          assigned
       have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
       obtain ⟨value, finalStore, finalMap, finalWorld, completed, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, lexical⟩ :=
         ih contextValid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -1621,7 +1621,7 @@ theorem Tree.reflects [FunctionCalls.FaultTokens faults]
           (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using continuation)
       exact ⟨resultContext, outcome, after, finalMap, finalWorld,
         prepend (lookupStatement?_sound found) (by intro _ _; simp [form])
-          (.assignValue (lookupStatement?_sound found) form ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace)) tail,
+          (.assignValue (lookupStatement?_sound found) form trace) tail,
         represented, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata, lexical⟩
 
   | @breaking context scope mode id node rest expected type found form =>

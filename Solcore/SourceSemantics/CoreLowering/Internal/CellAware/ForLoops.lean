@@ -1873,7 +1873,7 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
         effect, count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=
       CellAwareScopeBareAssignmentHeads.preserves_value bridge functions extension transport head bare
         environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-        (children childSize childStrict) snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+        (children childSize childStrict) snapshot childTrace write
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
         finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, finalEffect, last, lastRelated, post⟩ :=
       tail tailSize tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -1926,7 +1926,7 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift,
           SourceCoreDataPlaces.shift] using remaining)
     exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], outcome, after, finalMap, finalWorld,
-      prepend_assignment snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+      prepend_assignment snapshot childTrace write trace, represented,
       finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
       metadata.trans finalMetadata, effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
@@ -2184,7 +2184,7 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
           (context := context) (scope := scope) (administrative := administrative)
           bridge functions extension transport faithful observations
           head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-          budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot childTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+          budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot childTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) write
       obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
           finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, finalEffect, last, lastRelated, post⟩ :=
         tail _ (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -2247,7 +2247,7 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults] (functionTypes : Fun
           reached nextAdmitted (authority.transport effect) (physical.transport effect preservation) owner sameLocation ready
           (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
       exact ⟨Staging.Recursive.Size.stepSize [_, _, sourceSize], outcome, after, finalMap, finalWorld,
-        CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_projected_assignment projected keyTrace snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+        CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_projected_assignment projected keyTrace snapshot childTrace write trace, represented,
         finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
         metadata.trans finalMetadata, effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
@@ -2875,7 +2875,7 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
         effect, count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=
       CellAwareScopeBareAssignmentHeads.preserves_value bridge functions extension transport head bare
         environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-        (children childSize childStrict) snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+        (children childSize childStrict) snapshot childTrace write
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
         finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, finalEffect, last, lastRelated, post⟩ :=
       tail tailSize tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -2932,7 +2932,7 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift,
           SourceCoreDataPlaces.shift] using remaining)
     exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-      .assignment snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+      .assignment snapshot childTrace write trace, represented,
       finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
       metadata.trans finalMetadata, effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
@@ -3199,7 +3199,7 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
           (context := context) (scope := scope) (administrative := administrative)
           bridge functions extension transport faithful observations
           head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-          budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot childTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+          budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot childTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) write
       obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
           finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, finalEffect, last, lastRelated, post⟩ :=
         tail _ (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -3266,7 +3266,7 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults] (functionTypes : Fun
           reached nextAdmitted (authority.transport effect) (physical.transport effect preservation) owner sameLocation ready
           (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
       exact ⟨Staging.Recursive.Size.stepSize [_, _, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-        .projectedAssignment projected keyTrace snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+        .projectedAssignment projected keyTrace snapshot childTrace write trace, represented,
         finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
         metadata.trans finalMetadata, effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 

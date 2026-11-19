@@ -217,7 +217,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
                 faithful observations head projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
                 (keyStageSize + rhsStageSize + 1) (fun n _ => preservation n)
                 measuredKeys (by omega) snapshot measuredRhs (by omega)
-                ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
+                write
             obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
               (Nat.le_trans (Nat.le_of_lt tailStrict) within)
               ⟨_, _, _, environments.extend maps worlds, middleHeaps,
@@ -761,7 +761,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
           (context := context) (scope := scope) (administrative := administrative)
           bridge functions extension transport head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
           (preservation stagedSize) snapshot measured
-          ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+          write
       obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
         (Nat.le_trans (Nat.le_of_lt tailStrict) within)
         ⟨_, _, _, environments.extend maps worlds, middleHeaps,
@@ -1315,7 +1315,7 @@ theorem assign {budget : Nat} {context : SourceSemantics.Context} {scope : Sourc
           (context := context) (scope := scope) (administrative := administrative)
           bridge functions extension transport head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
           (preservation stagedSize) snapshot measured
-          ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+          write
       obtain ⟨_, result, finalHeap, restTrace, restAdapted⟩ := remaining
         (Nat.le_trans (Nat.le_of_lt tailStrict) within)
         ⟨_, _, _, environments.extend maps worlds, middleHeaps,

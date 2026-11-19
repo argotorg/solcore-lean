@@ -3092,7 +3092,7 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
               (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
           exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
             .assignBare (lookupStatement?_sound found) form snapshot childTrace
-              ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ write)
+              write
               trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩

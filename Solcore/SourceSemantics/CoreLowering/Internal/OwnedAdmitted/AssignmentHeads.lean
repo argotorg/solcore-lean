@@ -139,7 +139,7 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
         environment canonical actual before store mapping world initial next output value finalStore
   | success {sourceSize remainingSize : Nat} {updated : Dynamic.Value} {after : Dynamic.Heap}
       {written : Store} {finalMap : LocationMap} {finalWorld : StoreTyping} {slots : Environment}
-      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.AssignmentValueApplies operator)
+      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after)
       (heaps : HeapRepresents checked registry functions finalMap finalWorld after written)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
@@ -188,7 +188,7 @@ theorem preserves_prefix_bounded (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) (bounded : size ≤ budget) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -213,13 +213,13 @@ theorem preserves_prefix_bounded (budget : Nat)
         (fun snapshot child smaller {_ _} childTrace => rhs_preserves_at bridge snapshot child (boundedMeaning child smaller)
           right found sourceTyped environments heaps locals agrees actualTyped initial admitted childTrace)
         observations right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot writable
-        ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ trace) bounded invalid
+        trace bounded invalid
     rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at continuation
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, preservation, metadata, count,
       by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
         Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed,
       ⟨reached, related, CallableIndexedOwnedAssignmentAdmission.after_assignment_sized bridge context
-        initial reached admitted wellFormed runtime covers locals assignmentTyped targetPlain trace preservation⟩, continuation⟩
+        initial reached admitted wellFormed runtime covers locals assignmentTyped trace preservation⟩, continuation⟩
 
 include observations extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped bare in
 theorem preserves_fault_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : Nat)
@@ -281,7 +281,6 @@ theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : 
         right found sourceTyped environments heaps locals agrees actualTyped initial admitted evaluated)
       observations right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot
       writable errors.operands completed bounded
-    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     cases result with
     | fault trace same matched finalHeaps maps worlds preservation metadata post =>
       obtain ⟨reached, related⟩ := post
@@ -293,7 +292,7 @@ theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : 
         (by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
           Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed)
         reached related (CallableIndexedOwnedAssignmentAdmission.after_assignment_sized bridge context
-          initial reached admitted wellFormed runtime covers locals assignmentTyped targetPlain trace preservation) strict remaining
+          initial reached admitted wellFormed runtime covers locals assignmentTyped trace preservation) strict remaining
 end Heads
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedBareAssignmentHeads
@@ -441,7 +440,7 @@ theorem preserves_prefix_bounded (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) (bounded : size ≤ budget) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -469,11 +468,11 @@ theorem preserves_prefix_bounded (budget : Nat)
           hiddenTyped budget boundedMeaning)
         (rhs_preserves_after bridge initial admitted wellFormed runtime covers targetTyped sourceTyped right found
           environments locals agrees actualTyped budget boundedMeaning)
-        slot writable ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ trace) bounded invalid
+        slot writable trace bounded invalid
     rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at continuation
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count, typed,
       ⟨reached, related, CallableIndexedOwnedAssignmentAdmission.after_assignment_sized bridge context
-        initial reached admitted wellFormed runtime covers locals assignmentTyped targetPlain trace frame⟩, continuation⟩
+        initial reached admitted wellFormed runtime covers locals assignmentTyped trace frame⟩, continuation⟩
 
 include observations faithful transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped wellFormed runtime covers projected in
 /-- A fault retains the actual latest key, getter or RHS state and every row's
@@ -548,7 +547,6 @@ theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : 
       (rhs_reflects_after bridge initial admitted wellFormed runtime covers targetTyped sourceTyped right found
         environments locals agrees actualTyped budget boundedReflection)
       locals slot writable completed bounded
-    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     cases result with
     | fault trace same matched finalHeaps maps worlds frame metadata post =>
       obtain ⟨reached, related⟩ := post
@@ -558,7 +556,7 @@ theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : 
       obtain ⟨reached, related⟩ := post
       exact .success trace finalHeaps maps worlds frame metadata count typed reached related
         (CallableIndexedOwnedAssignmentAdmission.after_assignment_sized bridge context
-          initial reached admitted wellFormed runtime covers locals assignmentTyped targetPlain trace frame) strict remaining
+          initial reached admitted wellFormed runtime covers locals assignmentTyped trace frame) strict remaining
 end Heads
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedProjectedAssignmentHeads
 end
@@ -614,7 +612,7 @@ theorem preserves_prefix_bounded (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size =>
       CallableIndexedOwnedAdmittedExpressionBounds.PreservesAt bridge (payloadModel values.checked registry functions)
         context evidence source certificate faults size)) {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) (bounded : size ≤ budget) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -1786,7 +1784,6 @@ theorem reflects_with_operands [FunctionCalls.FaultTokens faults] (budget : Nat)
       (fun snapshot child smaller {_ _} evaluated => rhs_reflects_at bridge snapshot child (boundedReflection child smaller)
         right found sourceTyped environments heaps locals agrees actualTyped initial admitted evaluated)
       observations right found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps locals agrees actualTyped slot writable operands completed bounded
-    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     cases result with
     | fault trace same matched finalHeaps maps worlds preservation metadata post =>
       obtain ⟨reached, related⟩ := post
@@ -1798,7 +1795,7 @@ theorem reflects_with_operands [FunctionCalls.FaultTokens faults] (budget : Nat)
         (by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
           Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed)
         reached related (CallableIndexedOwnedAssignmentAdmission.after_assignment_sized bridge context
-          initial reached admitted wellFormed runtime covers locals assignmentTyped targetPlain trace preservation) strict remaining
+          initial reached admitted wellFormed runtime covers locals assignmentTyped trace preservation) strict remaining
 end Heads
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedPointwiseBareAssignmentHeads
@@ -1928,7 +1925,6 @@ theorem reflects_with_diagnostics [FunctionCalls.FaultTokens faults] (budget : N
       (CallableIndexedOwnedAdmittedProjectedAssignmentHeads.rhs_reflects_after bridge initial admitted wellFormed runtime covers targetTyped sourceTyped right found
         environments locals agrees actualTyped budget boundedReflection)
       locals slot writable completed bounded
-    rw [Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain] at result
     cases result with
     | fault trace same matched finalHeaps maps worlds frame metadata post =>
       obtain ⟨reached, related⟩ := post
@@ -1938,7 +1934,7 @@ theorem reflects_with_diagnostics [FunctionCalls.FaultTokens faults] (budget : N
       obtain ⟨reached, related⟩ := post
       exact .success trace finalHeaps maps worlds frame metadata count typed reached related
         (CallableIndexedOwnedAssignmentAdmission.after_assignment_sized bridge context
-          initial reached admitted wellFormed runtime covers locals assignmentTyped targetPlain trace frame) strict remaining
+          initial reached admitted wellFormed runtime covers locals assignmentTyped trace frame) strict remaining
 end Heads
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAdmittedPointwiseProjectedAssignmentHeads
 end

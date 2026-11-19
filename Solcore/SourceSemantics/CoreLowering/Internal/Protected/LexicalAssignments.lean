@@ -222,7 +222,7 @@ variable {values : ValuesContext} {source : TypedSource}
 include transport extension faithful observations environments heaps locals agrees actualTyped installed in
 theorem preserves_prefix_bounded (budget : Nat)
     (boundedMeaning : RecursiveNamedBoundedContracts.Below budget (fun size => RecursiveNamedBoundedContracts.PreservesAt size (payloadModel values.checked registry functions) program context evidence source certificate faults entry)) {updated : Dynamic.Value} {after : Dynamic.Heap}
-    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    {size : Nat} (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) (bounded : size ≤ budget) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -242,7 +242,7 @@ theorem preserves_prefix_bounded (budget : Nat)
 
 include transport extension meaning faithful observations environments heaps locals agrees actualTyped installed in
 theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -314,7 +314,7 @@ theorem reflects_reachable_bounded [FunctionCalls.FaultTokens faults] (budget : 
     {size : Nat} (completed : EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore) (bounded : size ≤ budget) :
     RecursiveNamedAssignmentHeadContracts.ResultAt size values.checked registry functions program context evidence source faults
       entry scope (head.writtenContext actualContext) assignment.target operator rhs environment canonical actual
-      before store mapping world (next.rename ξ) output value finalStore := by
+      before store mapping world (next.rename ξ) output value finalStore (Dynamic.CompoundAssignmentApplies assignment.target.type operator) := by
   have result := Stateful.Head.reflects_reachable_bounded functions extension program evidence (ProtectedStatePlaceAssignment.legacyProtocol entry) (ProtectedStatePlaceAssignment.legacyTransport transport) faithful observations head
     environments heaps locals agrees actualTyped ⟨installed⟩ budget
     (fun size smaller => ProtectedStatePlaceAssignment.legacy_reflects transport (boundedReflection size smaller)) functionTypes errors completed bounded
@@ -338,7 +338,7 @@ theorem reflects_reachable [FunctionCalls.FaultTokens faults] (functionTypes : F
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -366,7 +366,7 @@ theorem reflects [FunctionCalls.FaultTokens faults] (functionTypes : FunctionRun
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       entry scope finalMap finalWorld after finalStore canonical) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -429,7 +429,7 @@ variable {checked : CallableAncestryPairedLookup.Checked} {base : Base checked}
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
 theorem preserves_prefix [FunctionCalls.FaultTokens faults] {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -490,7 +490,7 @@ theorem reflects_reachable [FunctionCalls.FaultTokens faults] (errors : head.Rea
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix scope finalMap finalWorld after finalStore canonical) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -519,7 +519,7 @@ theorem reflects [FunctionCalls.FaultTokens faults] (errors : head.Errors regist
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix scope finalMap finalWorld after finalStore canonical) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -1210,7 +1210,7 @@ theorem Tree.preserves [FunctionCalls.FaultTokens faults]
         ProtectedAssignmentHeads.Head.preserves_prefix functions extension program evidence transport
           (expressionPreserves _ contextValid) faithful observations head
           environments heaps locals agrees actualTyped installed
-          ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned)
+          assigned
       have frameRead := (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read
       obtain ⟨value, finalStore, finalMap, finalWorld, completed, represented, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata, lexical⟩ :=
         ih contextValid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -1426,7 +1426,7 @@ theorem Tree.reflects [FunctionCalls.FaultTokens faults]
           (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using continuation)
       exact ⟨resultContext, outcome, after, finalMap, finalWorld,
         prepend (lookupStatement?_sound found) (by intro _ _; simp [form])
-          (.assignValue (lookupStatement?_sound found) form ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace)) tail,
+          (.assignValue (lookupStatement?_sound found) form trace) tail,
         represented, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, preservation.trans lastFrame, metadata.trans lastMetadata, lexical⟩
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedLexicalAssignments

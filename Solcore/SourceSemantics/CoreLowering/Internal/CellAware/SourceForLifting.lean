@@ -345,7 +345,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
                 bridge functions extension transport
                 faithful observations head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
                 (keyStageSize + rhsStageSize + 1) (fun n _ => childMeaning n)
-                measuredKeys (by omega) snapshot measuredRhs (by omega) ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
+                measuredKeys (by omega) snapshot measuredRhs (by omega) write
             obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
               (environments.extend maps worlds) middleHeaps
               (locals.mono metadata) (DataPlaceChildExpressions.prefix_agrees agrees slots) nextTyped runtime covers sameLedger suffix
@@ -1005,7 +1005,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
                 bridge functions extension transport
                 faithful observations head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
                 (keyStageSize + rhsStageSize + 1) (fun n _ => childMeaning n)
-                measuredKeys (by omega) snapshot measuredRhs (by omega) ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
+                measuredKeys (by omega) snapshot measuredRhs (by omega) write
             obtain ⟨nextSize, result, finalHeap, restTrace, restAdapted⟩ := remaining
               ⟨_, _, _, environments.extend maps worlds, middleHeaps,
                 locals.mono metadata, DataPlaceChildExpressions.prefix_agrees agrees slots, nextTyped,
@@ -1454,7 +1454,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
           effect, _count, nextTyped, ⟨middleState, _related, nextAdmitted⟩, _continuation⟩ :=
         CellAwareScopeBareAssignmentHeads.preserves_value bridge functions extension transport head bare
           environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-          (preservation runtime covers sameLedger stagedSize) snapshot measured ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+          (preservation runtime covers sameLedger stagedSize) snapshot measured write
       obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
         ⟨_, _, _, environments.extend maps worlds, middleHeaps, locals.mono metadata,
           DataPlaceChildExpressions.prefix_agrees agrees slots, nextTyped, runtime, covers, sameLedger,
@@ -2273,7 +2273,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
                 bridge functions extension transport
                 faithful observations head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
                 (keyStageSize + rhsStageSize + 1) (fun n _ => childMeaning n)
-                measuredKeys (by omega) snapshot measuredRhs (by omega) ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
+                measuredKeys (by omega) snapshot measuredRhs (by omega) write
             obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
               ⟨_, _, _, environments.extend maps worlds, middleHeaps,
                 locals.mono metadata, DataPlaceChildExpressions.prefix_agrees agrees slots, nextTyped,
@@ -2680,7 +2680,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
           effect, _count, nextTyped, ⟨middleState, _related, nextAdmitted⟩, _continuation⟩ :=
         CellAwareScopeBareAssignmentHeads.preserves_value bridge functions extension transport head bare
           environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-          (preservation runtime covers sameLedger stagedSize) snapshot measured ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+          (preservation runtime covers sameLedger stagedSize) snapshot measured write
       obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
         ⟨_, _, _, environments.extend maps worlds, middleHeaps, locals.mono metadata,
           DataPlaceChildExpressions.prefix_agrees agrees slots, nextTyped, runtime, covers, sameLedger,
@@ -3056,7 +3056,7 @@ theorem lifts {administrative : Core.Context} {scope : SourceCoreLocalCell.Scope
           effect, _count, nextTyped, ⟨middleState, _related, nextAdmitted⟩, _continuation⟩ :=
         CellAwareScopeBareAssignmentHeads.preserves_value bridge functions extension transport head bare
           environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-          (preservation runtime covers sameLedger stagedSize) snapshot measured ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+          (preservation runtime covers sameLedger stagedSize) snapshot measured write
       obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
         (environments.extend maps worlds) middleHeaps (locals.mono metadata)
         (DataPlaceChildExpressions.prefix_agrees agrees slots) nextTyped runtime covers sameLedger suffix

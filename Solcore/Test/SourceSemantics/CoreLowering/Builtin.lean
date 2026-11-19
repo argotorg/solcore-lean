@@ -238,7 +238,8 @@ theorem accepted_preserves (native : SourceCoreGeneralFunctions.CallableContext)
         (slots ++ actual) finalStore (SourceCoreDataPlaces.shift 7 (next.rename ξ)) := by
   obtain ⟨head, codeEq⟩ := accepted_head native accepted
   exact ⟨head, codeEq, BuiltinAssignmentStatements.Head.preserves_prefix (values := values) (ambient := ambient) (functions ambient) (SourceCoreRawMetadata.Extends.refl values.registry) program [] valid unique
-    uninitialized missing faithful (functionLeaves ambient) (functionTypes ambient) head environments heaps locals agrees actualTyped sourceAssigned⟩
+    uninitialized missing faithful (functionLeaves ambient) (functionTypes ambient) head environments heaps locals agrees actualTyped
+    ((Dynamic.CompoundAssignmentApplies.eq_of_plain (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))) ▸ sourceAssigned)⟩
 
 include environments heaps locals agrees actualTyped in
 /-- Any completion of a certified assignment reflects source effects. The
@@ -254,7 +255,7 @@ theorem completed_reflects
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before sourceHeap) ∨
     (∃ updated sourceHeap written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context [] source (Dynamic.AssignmentValueApplies .equal)
+      Dynamic.SourcePlaceAssignment program context [] source (Dynamic.CompoundAssignmentApplies assignment.target.type .equal)
         environment before assignment.target (id 5) updated sourceHeap ∧
       CompatibleHeap.HeapRepresents checked values.registry (functions ambient) finalMap finalWorld sourceHeap written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧

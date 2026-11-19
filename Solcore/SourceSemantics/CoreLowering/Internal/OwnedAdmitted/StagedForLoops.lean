@@ -2856,7 +2856,7 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
                 reached conditioned nextAdmitted
                 (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
             exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-              .assignment snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+              .assignment snapshot childTrace write trace, represented,
               finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
               metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
       · have errors := PreparedAssignmentReachedDiagnostics.shape_errors (environment := environment) headErrors semantic diagnostics assignmentTyped initial
@@ -2896,7 +2896,7 @@ theorem reflects_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
               reached conditioned nextAdmitted
               (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
           exact ⟨_, finalContext, outcome, after, finalMap, finalWorld,
-            .projectedAssignment bare keysTrace snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+            .projectedAssignment bare keysTrace snapshot childTrace write
               trace, represented,
             finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
             metadata.trans finalMetadata, last, callerProtocol.trans related lastRelated, post⟩
@@ -3319,7 +3319,7 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
               (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
               (context := context) (scope := scope) (administrative := administrative)
               bridge functions extension transport head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-              (typedChildren childSize childStrict) snapshot childTrace ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+              (typedChildren childSize childStrict) snapshot childTrace write
           obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
               finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
             ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2 tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -3401,7 +3401,7 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
               bridge functions extension transport faithful observations head bare environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
               budget typedChildren keysTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
               snapshot childTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
-              ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+              write
           obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
               finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
             ih tailShape (CallableIndexedOwnedPreparedStagedForItemsTyping.assignment sourceTyped).2

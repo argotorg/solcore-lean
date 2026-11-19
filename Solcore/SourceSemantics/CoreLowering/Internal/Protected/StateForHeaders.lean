@@ -214,7 +214,7 @@ def AssignmentPrefixPreservesAt (protocol : Protocol.{u, v} Records)
     RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions →
   ∀ initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩,
   ∀ {updated after size},
-    SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after → size ≤ budget →
     ∃ finalStore finalMap finalWorld slots,
       CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -355,7 +355,7 @@ def AssignmentReflectsAt (protocol : Protocol.{u, v} Records)
     EvaluationSize size actual store ((head.emit next output).rename ξ) value finalStore → size ≤ budget →
     ProtectedStateAssignmentHeadContracts.ResultAt protocol size values.checked registry functions program context evidence source faults
       scope (head.writtenContext actualContext) assignment.target operator rhs environment canonical actual before store mapping world
-      initial (next.rename ξ) output value finalStore
+      initial (next.rename ξ) output value finalStore (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedForHeader.Stateful
 end
@@ -495,7 +495,7 @@ inductive AssignmentResultAt {Records : Type v} (protocol : Protocol.{u, v} Reco
         environment canonical actual before store mapping world initial next output value finalStore
   | success {sourceSize remainingSize : Nat} {updated : Dynamic.Value} {after : Dynamic.Heap}
       {written : Store} {finalMap : LocationMap} {finalWorld : StoreTyping} {slots : Environment}
-      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.AssignmentValueApplies operator)
+      (trace : SourceExecutionSize.SourcePlaceAssignment program sourceSize context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
         environment before place rhs updated after)
       (heaps : CompatibleAmbientHeap.HeapRepresents checked registry functions finalMap finalWorld after written)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
@@ -529,7 +529,7 @@ def AssignmentPrefixPreservesAt (protocol : Protocol.{u, v} Records) (readiness 
   ∀ initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩,
     readiness.Ready context initial →
   ∀ {updated after size},
-    SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.AssignmentValueApplies operator)
+    SourceExecutionSize.SourcePlaceAssignment program size context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after → size ≤ budget →
     ∃ finalStore finalMap finalWorld slots,
       CompatibleAmbientHeap.HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -737,7 +737,7 @@ theorem AssignmentResultAt.toOriginal {size : Nat} {checked : Checked}
     (result : AssignmentResultAt protocol readiness size checked registry functions program context evidence source faults
       scope writtenContext place operator rhs environment canonical actual before store mapping world initial next output value finalStore) :
     ProtectedStateAssignmentHeadContracts.ResultAt protocol size checked registry functions program context evidence source faults
-      scope writtenContext place operator rhs environment canonical actual before store mapping world initial next output value finalStore := by
+      scope writtenContext place operator rhs environment canonical actual before store mapping world initial next output value finalStore (Dynamic.CompoundAssignmentApplies place.type operator) := by
   cases result with
   | fault trace same matched heaps maps worlds frame metadata post =>
     exact .fault trace same matched heaps maps worlds frame metadata post.forget

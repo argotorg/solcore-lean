@@ -136,7 +136,7 @@ variable {readFuel : Nat} {values : ValuesContext} {source : TypedSource}
 
 include extension valid unique uninitialized missing faithful observations functionTypes environments heaps locals agrees actualTyped in
 theorem preserves_prefix [FunctionCalls.FaultTokens faults] {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -147,7 +147,7 @@ theorem preserves_prefix [FunctionCalls.FaultTokens faults] {updated : Dynamic.V
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   exact GenericAssignmentStatements.Head.preserves_prefix functions extension program evidence
     (CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing) faithful observations head environments heaps locals agrees actualTyped
-    ((Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace)
+    trace
 
 include extension valid unique uninitialized missing faithful observations functionTypes environments heaps locals agrees actualTyped in
 theorem preserves_fault [FunctionCalls.FaultTokens faults] (errors : head.Errors registry faults)
@@ -173,7 +173,7 @@ theorem reflects [FunctionCalls.FaultTokens faults] (errors : head.Errors regist
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -182,7 +182,7 @@ theorem reflects [FunctionCalls.FaultTokens faults] (errors : head.Errors regist
       Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
   have result := GenericAssignmentStatements.Head.reflects functions extension program evidence
     (CompatibleExpressionBuiltins.preserves functions extension faithful observations functionTypes program evidence valid unique uninitialized missing) (CompatibleExpressionBuiltins.reflects functions extension faithful observations functionTypes program evidence valid uninitialized missing) faithful observations head environments heaps locals agrees actualTyped functionTypes errors completed
-  rwa [Dynamic.CompoundAssignmentApplies.eq_of_plain head.targetPlain] at result
+  exact result
 
 end Head
 end Solcore.SourceSemantics.CoreLowering.BuiltinAssignmentStatements

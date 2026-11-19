@@ -118,7 +118,7 @@ theorem equal_named_reflects [FunctionCalls.FaultTokens faults]
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix scope finalMap finalWorld after finalStore canonical) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies .equal)
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type .equal)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -275,7 +275,7 @@ variable {checked : CallableAncestryPairedLookup.Checked} {base : Base checked}
 include extension faithful observations environments heaps locals agrees actualTyped installed valid unique owners runtimeViews
   uninitialized missing bodyUninitialized bodyMissing in
 theorem concrete_named_preserves_prefix [FunctionCalls.FaultTokens faults] {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
       environment before assignment.target rhs updated after) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -314,7 +314,7 @@ theorem concrete_named_reflects [FunctionCalls.FaultTokens faults] (errors : hea
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
       NamedCallExpressions.Entry functions registry bodies compilation.administrativePrefix scope finalMap finalWorld after finalStore canonical) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies assignment.target.type operator)
         environment before assignment.target rhs updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧

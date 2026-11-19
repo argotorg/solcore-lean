@@ -183,19 +183,16 @@ theorem after_assignment {initial reached : ProtectedStateTransition.Index}
     (covers : evidence.Covers context)
     (locals : Dynamic.EnvironmentAgrees initial.heap context.locals environment)
     (typed : SourceAssignmentHasType source context assignment operator rhs)
-    (targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator)
     (trace : Dynamic.SourcePlaceAssignment program context evidence source
-      (Dynamic.AssignmentValueApplies operator) environment initial.heap assignment.target rhs updated reached.heap)
+      (Dynamic.CompoundAssignmentApplies assignment.target.type operator) environment initial.heap assignment.target rhs
+      updated reached.heap)
     (frame : AdministrativePreserved initial.mapping initial.store reached.mapping reached.store) :
     Admission bridge context last := by
   have expressionPreserves : Dynamic.ExpressionExecutionPreserves program context evidence source environment := by
     intro before after id value type covers locals heapTyped typed evaluated
     exact wellFormed.wholeLanguagePreservation.expression context evidence source environment
       before after id value type runtime covers locals heapTyped typed evaluated
-  have typedTrace : Dynamic.SourcePlaceAssignment program context evidence source
-      (Dynamic.CompoundAssignmentApplies assignment.target.type operator) environment initial.heap assignment.target rhs
-      updated reached.heap := (Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ trace
-  have preserved := typedTrace.preserves expressionPreserves covers locals admitted.heap typed
+  have preserved := trace.preserves expressionPreserves covers locals admitted.heap typed
   exact ⟨preserved.1,
     StableRows.after_administrative (bridge.pool first) (bridge.pool last) admitted.rows frame⟩
 
@@ -211,12 +208,12 @@ theorem after_assignment_sized {initial reached : ProtectedStateTransition.Index
     (covers : evidence.Covers context)
     (locals : Dynamic.EnvironmentAgrees initial.heap context.locals environment)
     (typed : SourceAssignmentHasType source context assignment operator rhs)
-    (targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator)
     (trace : SourceExecutionSize.SourcePlaceAssignment program size context evidence source
-      (Dynamic.AssignmentValueApplies operator) environment initial.heap assignment.target rhs updated reached.heap)
+      (Dynamic.CompoundAssignmentApplies assignment.target.type operator) environment initial.heap assignment.target rhs
+      updated reached.heap)
     (frame : AdministrativePreserved initial.mapping initial.store reached.mapping reached.store) :
     Admission bridge context last :=
-  after_assignment bridge context first last admitted wellFormed runtime covers locals typed targetPlain trace.sound frame
+  after_assignment bridge context first last admitted wellFormed runtime covers locals typed trace.sound frame
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedAssignmentAdmission
 end

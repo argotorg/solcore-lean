@@ -654,7 +654,7 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
       (snapshot : Staging.Recursive.ProjectedTarget.Snapshot environment before targetHeap assignment.target sources target)
       (trace : Staging.Recursive.Size.Expression program stages sourceSize invocation context environment targetHeap rhs (.value right) middle)
       (write : Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected right replacement)
+        (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected right replacement)
         middle target updated after)
       (heaps : HeapRepresents checked registry functions finalMap finalWorld after written)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
@@ -887,7 +887,7 @@ theorem preserves_value (budget : Nat)
     (trace : Staging.Recursive.Size.Expression program stages rhsSize invocation context environment getter rhs (.value right) middle)
     (rhsBound : rhsSize < budget)
     (write : Dynamic.ResolvedPlaceWrites
-      (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected right replacement)
+      (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected right replacement)
       middle target updated after) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -923,7 +923,7 @@ theorem preserves_value (budget : Nat)
         ProtectedStagedProjectedCommit.preserves layout ordinary extension callerProtocol transport faithful observations
           generated found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps agrees actualTyped initial resolution
           coreLookup resolutionState resolutionRelated ordinaryRhs rhsPost
-          ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write) invalid
+          write invalid
       rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at agreement
       refine ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata,
         count, ?_, ⟨reached, related, ?_, ?_⟩, agreement⟩
@@ -932,7 +932,7 @@ theorem preserves_value (budget : Nat)
       · exact CallableIndexedOwnedStagedProjectedAssignmentAdmission.heap_after_assignment unique found assignmentTyped
           locals (by simpa only [Staging.Recursive.ProjectedTarget.keys_eq_sourceKeys] using keyTyped)
           keyValues keyHeap resolution.metadata snapshot (rhsResult.sourcePost _ rfl).2
-          (rhsResult.sourcePost _ rfl).1 rhsResult.metadata ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
+          (rhsResult.sourcePost _ rfl).1 rhsResult.metadata write
       · exact StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame
 
 include environments heaps locals agrees actualTyped initial admitted unique assignmentTyped projected in
@@ -1359,7 +1359,7 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
               (StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame)
           | committed write finalHeaps maps worlds frame metadata count typed post strict continuation =>
             obtain ⟨reached, related⟩ := post
-            exact .success keyTrace snapshot result.trace ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
+            exact .success keyTrace snapshot result.trace write
               finalHeaps maps worlds frame metadata count
               (by simpa only [GenericAssignmentStatements.Head.writtenContext] using typed)
               reached related
@@ -1546,7 +1546,7 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
       (snapshot : Staging.Recursive.BareTarget environment before assignment.target target)
       (trace : Staging.Recursive.Size.Expression program stages sourceSize invocation context environment before rhs (.value right) middle)
       (write : Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected right replacement)
+        (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected right replacement)
         middle target updated after)
       (heaps : HeapRepresents checked registry functions finalMap finalWorld after written)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
@@ -1624,7 +1624,8 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
     have result := ProtectedStagedBareAssignment.reflects_with_rhs callerProtocol transport budget initial layout empty extension
       (fun snapshot child smaller {_ _} evaluated => rhs_reflects_at bridge snapshot child (boundedReflection child smaller)
         right found sourceTyped environments heaps locals agrees actualTyped initial admitted evaluated)
-      rightView rightType (.inl (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)) leafView
+      rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView
+          (.inl (leafView ▸ profile)) leafView) leafView
       environments heaps locals agrees actualTyped slot writable invalidToken completed bounded
     cases result with
     | fault snapshot trace same matched finalHeaps maps worlds preservation metadata post =>
@@ -1641,12 +1642,12 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
         (StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation)
     | success snapshot trace rightTyped middleTyped write finalHeaps maps worlds preservation metadata count typed strict remaining post =>
       obtain ⟨reached, related⟩ := post
-      exact .success snapshot trace ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
+      exact .success snapshot trace write
         finalHeaps maps worlds preservation metadata count
         (by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
           Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed)
-        reached related ⟨CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped rightView profile targetPlain
-          locals snapshot middleTyped rightTyped ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write),
+        reached related ⟨CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped (.inl (leafView ▸ profile))
+          locals admitted.heap snapshot middleTyped rightTyped write,
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation⟩ strict remaining
 include transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped bare in
 theorem preserves_value {sourceSize : Nat}
@@ -1655,7 +1656,7 @@ theorem preserves_value {sourceSize : Nat}
     (snapshot : Staging.Recursive.BareTarget environment before assignment.target target)
     (trace : Staging.Recursive.Size.Expression program stages sourceSize invocation context environment before rhs (.value right) middle)
     (write : Dynamic.ResolvedPlaceWrites
-      (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected right replacement)
+      (fun _ replacement => Dynamic.CompoundAssignmentApplies assignment.target.type operator target.selected right replacement)
       middle target updated after) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -1676,18 +1677,19 @@ theorem preserves_value {sourceSize : Nat}
   | bare empty layout =>
     have sourceTyped := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique found assignmentTyped
     obtain ⟨finalStore, finalMap, finalWorld, slots, rightTyped, middleTyped, finalHeaps, maps, worlds, frame, metadata, count, typed, post, agreement⟩ :=
-      ProtectedStagedBareAssignment.preserves_value_with_rhs callerProtocol transport initial layout empty extension snapshot trace ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
+      ProtectedStagedBareAssignment.preserves_value_with_rhs callerProtocol transport initial layout empty extension snapshot trace write
         (fun snapshot => rhs_preserves_at bridge snapshot sourceSize meaning generated found sourceTyped
           environments heaps locals agrees actualTyped initial admitted trace)
-        rightView rightType (.inl (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)) leafView
+        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView
+          (.inl (leafView ▸ profile)) leafView) leafView
         environments heaps locals agrees actualTyped slot writable invalid
     rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at agreement
     obtain ⟨reached, related⟩ := post
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, count,
       by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
         Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed,
-      ⟨reached, related, CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped rightView profile targetPlain
-        locals snapshot middleTyped rightTyped write,
+      ⟨reached, related, CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped (.inl (leafView ▸ profile))
+        locals admitted.heap snapshot middleTyped rightTyped write,
         StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩,
       agreement⟩
 
@@ -1753,7 +1755,8 @@ theorem preserves_operands {sourceSize : Nat}
       ProtectedStagedBareAssignment.preserves_operands_with_rhs callerProtocol initial layout empty extension snapshot invalidOperands
         (fun snapshot => rhs_preserves_at bridge snapshot sourceSize meaning generated found sourceTyped
           environments heaps locals agrees actualTyped initial admitted trace)
-        rightView rightType (.inl (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)) leafView
+        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView
+          (.inl (leafView ▸ profile)) leafView) leafView
         environments heaps locals agrees slot writable next output invalid invalidToken
     rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     obtain ⟨reached, related⟩ := post
@@ -1790,7 +1793,8 @@ theorem preserves_panic {sourceSize : Nat}
         (by cases snapshot; rfl) panics
         (fun snapshot => rhs_preserves_at bridge snapshot sourceSize meaning generated found sourceTyped
           environments heaps locals agrees actualTyped initial admitted trace)
-        rightView rightType (.inl (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)) leafView
+        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView
+          (.inl (leafView ▸ profile)) leafView) leafView
         environments heaps locals agrees slot writable next output invalid
     rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     obtain ⟨reached, related⟩ := post
