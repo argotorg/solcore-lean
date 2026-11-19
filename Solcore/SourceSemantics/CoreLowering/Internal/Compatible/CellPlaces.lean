@@ -492,6 +492,79 @@ theorem cell_commit_with_write {compilation : SourceCoreCompatibleDataPlaces.Con
           ((ContinuationAgreement.bind (setter_evaluates layout snapshot.value rightValue updatedValue latest.nativeRead)).trans
             ((DataPlaceGuard.agreement passes).trans
               (ContinuationAgreement.letE (.storeCell (.var rfl) latest.nativeRead (.inRight (.var rfl)) coreWritten))))))
+/-- `cell_commit_with_write` over the wider profile: the source's relation and the code are at the
+target's type, and the check after the setter writes exactly when the source applies the operation. -/
+theorem cell_commit_with_write_wide {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {ambient : AmbientDefinitions compilation.checked.catalog.definitions} {functions : FunctionModel compilation.checked.catalog ambient}
+    {cells : GenericHeap.CellModel ambient.definitions}
+    {instances : GeneralizedLocalDescriptorHeap.InstanceModel ambient.definitions}
+    (ordinaryCells : GenericHeap.OrdinaryCells (payloadModel compilation.checked registry functions) cells)
+    (layout : Layout compilation prepared)
+    (snapshot : Snapshot compilation.checked registry functions prepared place environment actual heap store mapping world (ξ index))
+    (bare : place.projections = [])
+    {right updated : Dynamic.Value} {rightValue updatedValue : Value} {rhsHeap : Dynamic.Heap}
+    {rhsStore : Store} {rhsMap : LocationMap} {rhsWorld : StoreTyping} {operator : Syntax.ValueAssignOp} {invalid : Word}
+    (rhs : CellRhsResult (cells := cells) (instances := instances) (program := program) (context := context) (evidence := evidence) (source := source)
+      (faults := faults) (id := id) (node := node) (lowered := lowered) snapshot (.value right) rhsHeap
+        (.inRight .word rightValue) rhsStore rhsMap rhsWorld)
+    (rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType)
+    (replacement : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType)
+    (applied : Dynamic.CompoundAssignmentApplies place.type operator snapshot.initial right updated)
+    (modified : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
+      (modified prepared.route.leafType (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false
+        (.var 1) (.var 0) invalid (SourceCoreDataPlaces.placeWrap place.type operator false))
+      (.inRight .word updatedValue) rhsStore)
+    (writes : ∀ {binders : Environment} {store after : Store} {outputType : Ty} {write : Expr} {value updated changed : Value},
+      Evaluates (updated :: changed :: rightValue :: snapshot.value :: binders) store
+          (SourceCoreDataPlaces.guard outputType (assignmentModifier place.type (prepared.route.leafType = .integer) operator)
+            write) value after ↔
+        Evaluates (updated :: changed :: rightValue :: snapshot.value :: binders) store write value after)
+    {actualContext : Core.Context} (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions) :
+    ∃ after finalStore,
+      Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies place.type operator)
+        environment heap place id updated after ∧
+      Dynamic.Heap.Writes rhsHeap snapshot.location (some updated) after ∧
+      GenericHeap.CellHeapRepresents cells rhsMap rhsWorld after finalStore ∧
+      AdministrativePreserved mapping store rhsMap finalStore ∧ Dynamic.HeapMetadataExtend heap after ∧
+      RuntimeEnvironmentHasTypes rhsWorld
+        (writtenEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue updatedValue updatedValue actual)
+        (writtenContext prepared actualContext) ambient.definitions ∧
+      AdministrativePreserved rhsMap rhsStore rhsMap finalStore ∧
+      Dynamic.HeapMetadataExtend rhsHeap after ∧
+      CellAwareScopeAuthority.Effect instances mapping world heap store rhsMap rhsWorld after finalStore ∧
+      ∀ next outputType, ContinuationAgreement actual store
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+          (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
+        (writtenEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue updatedValue updatedValue actual)
+        finalStore (shift 7 (next.rename ξ)) := by
+  obtain ⟨latest⟩ := rhs.latest
+  obtain ⟨initial, initialValue⟩ := cell_initial latest.related
+  have written := DataPlaceCommitReflection.source_writes latest.read updated
+  obtain ⟨finalStore, coreWritten, finalHeaps, writeFrame⟩ :=
+    rhs.heaps.write_initialized ordinaryCells latest.reference latest.read latest.related.ordinary
+      (latest.type.symm ▸ replacement) written
+  have writeEffect : CellAwareScopeAuthority.Effect instances rhsMap rhsWorld rhsHeap rhsStore rhsMap rhsWorld
+      ⟨rhsHeap.cells.set snapshot.location.index {latest.cell with value := some updated}⟩ finalStore :=
+    .write_ordinary rhs.heaps.injective latest.read latest.related.ordinary latest.reference written coreWritten
+  have trace : Dynamic.SourcePlaceAssignment program context evidence source
+      (Dynamic.CompoundAssignmentApplies place.type operator) environment heap place id updated
+        ⟨rhsHeap.cells.set snapshot.location.index {latest.cell with value := some updated}⟩ := by
+    cases rhs.trace with
+    | value right =>
+      exact .intro (snapshot.resolves bare) right
+        (.intro latest.read (latest.type.trans snapshot.type.symm) initialValue (.leaf applied) written)
+  refine ⟨_, finalStore, trace, written, finalHeaps, rhs.frame.trans writeFrame, rhs.metadata.trans (.of_write written), ?_, writeFrame, .of_write written, rhs.effect.trans writeEffect, ?_⟩
+  · exact .cons .unit (.cons replacement.runtime_hasType (.cons replacement.runtime_hasType
+      (.cons rightRep.runtime_hasType (.cons (snapshot.represented.extend rhs.maps rhs.worlds).runtime_hasType
+        (.cons .unit (.cons (.cellRef latest.reference.typed) (actualTyped.weaken rhs.worlds)))))))
+  · intro next outputType
+    exact (snapshot_prefix layout snapshot _ _ _ _ _ _).trans
+      ((ContinuationAgreement.bind rhs.evaluated).trans
+        ((ContinuationAgreement.bind modified).trans
+          ((ContinuationAgreement.bind (setter_evaluates layout snapshot.value rightValue updatedValue latest.nativeRead)).trans
+            ((ContinuationAgreement.mk (fun evaluated => writes.mpr evaluated) (fun evaluated => writes.mp evaluated)).trans
+              (ContinuationAgreement.letE (.storeCell (.var rfl) latest.nativeRead (.inRight (.var rfl)) coreWritten))))))
 end Solcore.SourceSemantics.CoreLowering.CompatibleBareAssignment
 end
 

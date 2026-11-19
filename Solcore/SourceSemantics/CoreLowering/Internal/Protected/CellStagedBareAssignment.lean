@@ -55,7 +55,9 @@ structure RhsResult
 
 inductive ResultAt (operator : Syntax.ValueAssignOp) (size : Nat)
     (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
-    (next : Expr) (output : Ty) (value : Value) (finalStore : Store) : Prop where
+    (next : Expr) (output : Ty) (value : Value) (finalStore : Store)
+    (Modify : Option Dynamic.Value → Dynamic.Value → Dynamic.Value → Prop := Dynamic.AssignmentValueApplies operator) :
+    Prop where
   | fault {sourceSize : Nat} {target : Dynamic.ResolvedPlace}
       {failure : Staging.Recursive.Failure} {token : Word} {after : Dynamic.Heap}
       {finalMap : LocationMap} {finalWorld : StoreTyping}
@@ -67,7 +69,7 @@ inductive ResultAt (operator : Syntax.ValueAssignOp) (size : Nat)
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after)
       (effect : CellAwareScopeAuthority.Effect instances mapping world before store finalMap finalWorld after finalStore)
       (post : ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) :
-      ResultAt operator size initial next output value finalStore
+      ResultAt operator size initial next output value finalStore Modify
   | operands {sourceSize : Nat} {target : Dynamic.ResolvedPlace}
       {right : Dynamic.Value} {after : Dynamic.Heap} {current : Dynamic.Cell}
       {initialValue : Option Dynamic.Value} {selected : Option Dynamic.Value} {token : Word}
@@ -86,7 +88,7 @@ inductive ResultAt (operator : Syntax.ValueAssignOp) (size : Nat)
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after)
       (effect : CellAwareScopeAuthority.Effect instances mapping world before store finalMap finalWorld after finalStore)
       (post : ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) :
-      ResultAt operator size initial next output value finalStore
+      ResultAt operator size initial next output value finalStore Modify
   /-- The compound operation panics once the root is read; nothing is written. -/
   | panic {sourceSize : Nat} {target : Dynamic.ResolvedPlace}
       {right : Dynamic.Value} {after : Dynamic.Heap} {current : Dynamic.Cell}
@@ -106,7 +108,7 @@ inductive ResultAt (operator : Syntax.ValueAssignOp) (size : Nat)
       (frame : AdministrativePreserved mapping store finalMap finalStore) (metadata : Dynamic.HeapMetadataExtend before after)
       (effect : CellAwareScopeAuthority.Effect instances mapping world before store finalMap finalWorld after finalStore)
       (post : ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩) :
-      ResultAt operator size initial next output value finalStore
+      ResultAt operator size initial next output value finalStore Modify
   | success {sourceSize remainingSize : Nat} {target : Dynamic.ResolvedPlace}
       {right updated : Dynamic.Value} {middle after : Dynamic.Heap}
       {written : Store} {finalMap : LocationMap} {finalWorld : StoreTyping} {slots : Environment}
@@ -115,7 +117,7 @@ inductive ResultAt (operator : Syntax.ValueAssignOp) (size : Nat)
       (rightTyped : Dynamic.ValueHasType context middle right node.type)
       (middleTyped : Dynamic.HeapWellTyped context middle)
       (write : Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected right replacement)
+        (fun _ replacement => Modify target.selected right replacement)
         middle target updated after)
       (heaps : GenericHeap.CellHeapRepresents cells finalMap finalWorld after written)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
@@ -126,7 +128,7 @@ inductive ResultAt (operator : Syntax.ValueAssignOp) (size : Nat)
       (bounded : remainingSize < size)
       (remaining : EvaluationSize remainingSize (slots ++ actual) written (shift 7 next) value finalStore)
       (post : ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, written, canonical⟩) :
-      ResultAt operator size initial next output value finalStore
+      ResultAt operator size initial next output value finalStore Modify
 
 variable (transport : ProtectedStateTransition.AdministrativeTransport protocol)
 
@@ -149,7 +151,9 @@ theorem reflects_with_rhs (budget : Nat)
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
+    (profile : (operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word) ∨
+      FixedCompoundAssignment operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (ordinaryCells : GenericHeap.OrdinaryCells (payloadModel compilation.checked registry functions) cells)
@@ -165,15 +169,17 @@ theorem reflects_with_rhs (budget : Nat)
       (fun reason token => faults (.semantic reason) token) operator invalid)
     {size : Nat} (completed : EvaluationSize size actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-        (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ) value finalStore) (bounded : size ≤ budget) :
+        (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+        (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ) value finalStore) (bounded : size ≤ budget) :
     ResultAt (cells := cells) (instances := instances) (compilation := compilation) (program := program) (context := context) (stages := stages) (invocation := invocation)
       (prepared := prepared) (place := place) (environment := environment) (actual := actual)
       (faults := faults) (id := id) (node := node) (actualContext := actualContext)
-      protocol operator size initial (next.rename ξ) outputType value finalStore := by
+      protocol operator size initial (next.rename ξ) outputType value finalStore
+      (Dynamic.CompoundAssignmentApplies place.type operator) := by
   obtain ⟨snapshot, ordinary⟩ := snapshot_of_cell_heap layout extension environments ordinaryCells heaps heapTyped locals agrees slot rootTyped
   have bareSnapshot := (Staging.Recursive.BareTarget.of_resolves (program := program) (context := context) (evidence := invocation.evidence) (source := invocation.source) bare (snapshot.resolves bare)).2
   have phase := snapshot_prefix layout snapshot lowered.expression next outputType
-    (binaryOperator (prepared.route.leafType = .integer) operator) invalid
+    (assignmentModifier place.type (prepared.route.leafType = .integer) operator) invalid (SourceCoreDataPlaces.placeWrap place.type operator false)
   obtain ⟨prefixSize, prefixBound, remaining⟩ := RecursiveNamedBareAssignmentContracts.snapshot_prefix_sized layout snapshot completed
   cases remaining with
   | caseLeft evaluated _ =>
@@ -200,15 +206,16 @@ theorem reflects_with_rhs (budget : Nat)
             (.value payload) result.heaps result.maps result.worlds result.frame result.metadata result.effect
           obtain ⟨latest⟩ := plain.latest
           obtain ⟨initialValue, initialized⟩ := cell_initial latest.related
-          rcases CompatibleBareWordModifier.modifier_total profile
+          rcases CompatibleBareWordModifier.modifier_total_wide profile leafView
             (snapshot.represented.extend result.maps result.worlds) rightRep
             (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
             (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
-              ⟨invalidOperands, failed⟩ | ⟨replacement, updatedValue, replacementRep, outcome, modified⟩
+              ⟨invalidOperands, failed⟩ | ⟨replacement, updatedValue, _, unique, agreement, modified⟩
+          all_goals try rw [layout.sameType] at agreement
           · have failed : Evaluates
                 (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
                 (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType
-                  (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
+                  (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid (SourceCoreDataPlaces.placeWrap place.type operator false))
                 (.inLeft prepared.route.leafType (.word invalid)) rhsStore := by
               simpa only [layout.sameType] using failed
             have evaluated := phase.wrap (LanguageResult.bind_success outputType result.evaluated
@@ -218,54 +225,46 @@ theorem reflects_with_rhs (budget : Nat)
               (latest.type.trans snapshot.type.symm) initialized .nil invalidOperands rfl
               (invalidToken _ _ invalidOperands) result.heaps result.maps result.worlds
               result.frame result.metadata result.effect rhsPost
-          · rcases outcome with applied | ⟨operation, selected, zero, panics⟩
-            case inr =>
+          · have nativeModified : Evaluates
+                (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
+                (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType
+                  (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid (SourceCoreDataPlaces.placeWrap place.type operator false))
+                (.inRight .word updatedValue) rhsStore := by
+              simpa only [layout.sameType] using modified
+            cases agreement with
+            | panicked code panics _ fails =>
               -- The setter runs and the check fails, so the source panics without a write.
-              have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, .divisor⟩ := by
-                simpa only [layout.sameType] using selected
-              subst zero
-              have nativeModified : Evaluates
-                  (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value (.word Word.zero) actual) rhsStore
-                  (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType
-                    (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
-                  (.inRight .word updatedValue) rhsStore := by
-                simpa only [layout.sameType] using modified
               have evaluated := phase.wrap (LanguageResult.bind_success outputType result.evaluated
                 (LanguageResult.bind_success outputType nativeModified
                   (LanguageResult.bind_success outputType
-                    (setter_evaluates layout snapshot.value (.word Word.zero) updatedValue latest.nativeRead)
-                    (DataPlaceGuard.panic_of_selected selected))))
+                    (setter_evaluates layout snapshot.value rightValue updatedValue latest.nativeRead)
+                    (fails.mpr ⟨rfl, rfl⟩))))
               obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed.sound evaluated
               exact .panic bareSnapshot result.trace latest.read
-                (latest.type.trans snapshot.type.symm) initialized .nil (panics _) rfl
+                (latest.type.trans snapshot.type.symm) initialized .nil panics rfl
                 (RecursiveStageMeaning.FaultTokens.panic _) result.heaps result.maps result.worlds
                 result.frame result.metadata result.effect rhsPost
-            have nativeModified : Evaluates
-                (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
-                (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType
-                  (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
-                (.inRight .word updatedValue) rhsStore := by
-              simpa only [layout.sameType] using modified
-            have passes := CompatibleBareWordModifier.passes_of_applies profile rightRep applied
-              (prepared.route.leafType = .integer)
-            obtain ⟨after, commitStore, _, written, finalHeaps, frame, metadata, typed, writeFrame, writeMetadata, effect, agreement⟩ :=
-              cell_commit_with_write ordinaryCells layout snapshot bare plain rightRep replacementRep applied nativeModified passes actualTyped
-            have terminal := (agreement .unit outputType).wrap
-              (by simpa [shift, Expr.rename, List.range, List.range.loop, List.foldl, Expr.weakenAt] using
-                (Evaluates.unit (environment := writtenEnvironment prepared.route.rootType snapshot.target .unit
-                  snapshot.value rightValue updatedValue updatedValue actual) (store := commitStore)))
-            obtain ⟨remainingSize, remainingBound, remaining⟩ :=
-              RecursiveNamedBareAssignmentContracts.continuation_sized layout snapshot result.evaluated nativeModified
-                latest.nativeRead terminal completed
-            obtain ⟨rhsState, rhsRelated⟩ := rhsPost
-            obtain ⟨rightTyped, middleTyped⟩ := result.sourcePost _ rfl
-            exact .success bareSnapshot result.trace rightTyped middleTyped
-              (.intro latest.read (latest.type.trans snapshot.type.symm) initialized (.leaf applied) written)
-              finalHeaps result.maps result.worlds frame metadata effect
-              (slots := [.unit, updatedValue, updatedValue, rightValue, snapshot.value, .unit,
-                .cellRef (OptionalCell.cellType prepared.route.rootType) snapshot.target]) rfl typed remainingBound remaining
-              ⟨transport.extend rhsState (.refl _) (.refl _) writeFrame writeMetadata,
-                protocol.trans rhsRelated (transport.related rhsState (.refl _) (.refl _) writeFrame writeMetadata)⟩
+            | applied applied _ writes =>
+              obtain ⟨_, replacementRep⟩ := unique _ applied
+              obtain ⟨after, commitStore, _, written, finalHeaps, frame, metadata, typed, writeFrame, writeMetadata, effect, agreement⟩ :=
+                cell_commit_with_write_wide ordinaryCells layout snapshot bare plain rightRep replacementRep applied nativeModified writes
+                  actualTyped
+              have terminal := (agreement .unit outputType).wrap
+                (by simpa [shift, Expr.rename, List.range, List.range.loop, List.foldl, Expr.weakenAt] using
+                  (Evaluates.unit (environment := writtenEnvironment prepared.route.rootType snapshot.target .unit
+                    snapshot.value rightValue updatedValue updatedValue actual) (store := commitStore)))
+              obtain ⟨remainingSize, remainingBound, remaining⟩ :=
+                RecursiveNamedBareAssignmentContracts.continuation_sized layout snapshot result.evaluated nativeModified
+                  latest.nativeRead terminal completed
+              obtain ⟨rhsState, rhsRelated⟩ := rhsPost
+              obtain ⟨rightTyped, middleTyped⟩ := result.sourcePost _ rfl
+              exact .success bareSnapshot result.trace rightTyped middleTyped
+                (.intro latest.read (latest.type.trans snapshot.type.symm) initialized (.leaf applied) written)
+                finalHeaps result.maps result.worlds frame metadata effect
+                (slots := [.unit, updatedValue, updatedValue, rightValue, snapshot.value, .unit,
+                  .cellRef (OptionalCell.cellType prepared.route.rootType) snapshot.target]) rfl typed remainingBound remaining
+                ⟨transport.extend rhsState (.refl _) (.refl _) writeFrame writeMetadata,
+                  protocol.trans rhsRelated (transport.related rhsState (.refl _) (.refl _) writeFrame writeMetadata)⟩
 
 
 private theorem writes_functional {heap left right : Dynamic.Heap} {location : Dynamic.Location}
@@ -295,7 +294,7 @@ theorem preserves_value_with_rhs
     (targetSnapshot : Staging.Recursive.BareTarget environment before place target)
     (sourceTrace : Staging.Recursive.Size.Expression program stages sourceSize invocation context environment before id (.value right) middle)
     (sourceWrite : Dynamic.ResolvedPlaceWrites
-      (fun _ replacement => Dynamic.AssignmentValueApplies operator target.selected right replacement)
+      (fun _ replacement => Dynamic.CompoundAssignmentApplies place.type operator target.selected right replacement)
       middle target updated after)
     (rhsMeaning : ∀ (snapshot : Snapshot compilation.checked registry functions prepared place environment actual before store mapping world (ξ index)),
       ∃ value finalStore finalMap finalWorld,
@@ -305,7 +304,9 @@ theorem preserves_value_with_rhs
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, middle, finalStore, canonical⟩)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
+    (profile : (operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word) ∨
+      FixedCompoundAssignment operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (ordinaryCells : GenericHeap.OrdinaryCells (payloadModel compilation.checked registry functions) cells)
@@ -326,7 +327,8 @@ theorem preserves_value_with_rhs
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
       ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩ ∧
       ∀ next output, ContinuationAgreement actual store
-        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next output (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next output (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+        (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   obtain ⟨snapshot, ordinary⟩ := snapshot_of_cell_heap layout extension environments ordinaryCells heaps heapTyped locals agrees slot rootTyped
   obtain ⟨_, sameTarget⟩ := snapshot.resolve_unique bare (targetSnapshot.resolves program context invocation.evidence invocation.source)
@@ -344,32 +346,32 @@ theorem preserves_value_with_rhs
     | intro latestRead sameType initialValue update written =>
       cases update with
       | leaf applied =>
-        rcases CompatibleBareWordModifier.modifier_total profile
+        rcases CompatibleBareWordModifier.modifier_total_wide profile leafView
           (snapshot.represented.extend result.maps result.worlds) rightRep
           (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
           (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
-            ⟨invalidOperands, _⟩ | ⟨replacement, updatedValue, replacementRep, outcome, modified⟩
-        · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
-        · rcases outcome with generatedApply | ⟨_, _, _, panics⟩
-          case inr => exact (CompatiblePlaceModifier.outcome_excludes_applies panics applied).elim
-          have same := DataPlaceModifier.assignment_functional generatedApply applied
-          subst replacement
-          have passes := CompatibleBareWordModifier.passes_of_applies profile rightRep applied
-            (prepared.route.leafType = .integer)
-          obtain ⟨generatedHeap, finalStore, _, generatedWrite, finalHeaps, frame, metadata, typed, writeFrame, writeMetadata, effect, agreement⟩ :=
-            cell_commit_with_write ordinaryCells layout snapshot bare plain rightRep replacementRep applied
-              (by simpa only [layout.sameType] using modified) passes actualTyped
-          have same := writes_functional generatedWrite written
-          subst generatedHeap
-          obtain ⟨rhsState, rhsRelated⟩ := rhsPost
-          exact ⟨finalStore, rhsMap, rhsWorld,
-            [.unit, updatedValue, updatedValue, rightValue, snapshot.value, .unit,
-              .cellRef (OptionalCell.cellType prepared.route.rootType) snapshot.target],
-            (result.sourcePost _ rfl).1, (result.sourcePost _ rfl).2,
-            finalHeaps, result.maps, result.worlds, frame, metadata, effect, rfl, typed,
-            ⟨transport.extend rhsState (.refl _) (.refl _) writeFrame writeMetadata,
-              protocol.trans rhsRelated (transport.related rhsState (.refl _) (.refl _) writeFrame writeMetadata)⟩,
-            agreement⟩
+            ⟨invalidOperands, _⟩ | ⟨replacement, updatedValue, _, unique, agreement, modified⟩
+        · exact (DataPlaceModifier.compound_excludes_invalid applied invalidOperands).elim
+        · obtain ⟨same, replacementRep⟩ := unique _ applied
+          subst same
+          rw [layout.sameType] at agreement
+          cases agreement with
+          | panicked _ _ excluded _ => exact (excluded _ applied).elim
+          | applied _ _ writes =>
+            obtain ⟨generatedHeap, finalStore, _, generatedWrite, finalHeaps, frame, metadata, typed, writeFrame, writeMetadata, effect, agreement⟩ :=
+              cell_commit_with_write_wide ordinaryCells layout snapshot bare plain rightRep replacementRep applied
+                (by simpa only [layout.sameType] using modified) writes actualTyped
+            have same := writes_functional generatedWrite written
+            subst generatedHeap
+            obtain ⟨rhsState, rhsRelated⟩ := rhsPost
+            exact ⟨finalStore, rhsMap, rhsWorld,
+              [.unit, updatedValue, updatedValue, rightValue, snapshot.value, .unit,
+                .cellRef (OptionalCell.cellType prepared.route.rootType) snapshot.target],
+              (result.sourcePost _ rfl).1, (result.sourcePost _ rfl).2,
+              finalHeaps, result.maps, result.worlds, frame, metadata, effect, rfl, typed,
+              ⟨transport.extend rhsState (.refl _) (.refl _) writeFrame writeMetadata,
+                protocol.trans rhsRelated (transport.related rhsState (.refl _) (.refl _) writeFrame writeMetadata)⟩,
+              agreement⟩
 
 theorem preserves_fault_with_rhs
     (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
@@ -394,7 +396,8 @@ theorem preserves_fault_with_rhs
     (next : Expr) (output : Ty) (invalid : Word) :
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store
-        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next output (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next output (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+        (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (.inLeft output (.word token)) finalStore ∧ faults failure token ∧
       GenericHeap.CellHeapRepresents cells finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -407,7 +410,7 @@ theorem preserves_fault_with_rhs
   | fault matched =>
     exact ⟨_, finalStore, finalMap, finalWorld,
       (snapshot_prefix layout snapshot lowered.expression next output
-        (binaryOperator (prepared.route.leafType = .integer) operator) invalid).wrap
+        (assignmentModifier place.type (prepared.route.leafType = .integer) operator) invalid (SourceCoreDataPlaces.placeWrap place.type operator false)).wrap
         (LanguageResult.bind_failure output result.evaluated),
       matched, result.heaps, result.maps, result.worlds, result.frame, result.metadata, result.effect, post⟩
 
@@ -426,7 +429,9 @@ theorem preserves_operands_with_rhs
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
+    (profile : (operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word) ∨
+      FixedCompoundAssignment operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (ordinaryCells : GenericHeap.OrdinaryCells (payloadModel compilation.checked registry functions) cells)
@@ -441,7 +446,8 @@ theorem preserves_operands_with_rhs
       (fun reason token => faults (.semantic reason) token) operator invalid) :
     ∃ token finalStore finalMap finalWorld,
       Evaluates actual store
-        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next output (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next output (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+        (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (.inLeft output (.word token)) finalStore ∧ faults (.semantic (.invalidAssignmentOperands operator)) token ∧
       GenericHeap.CellHeapRepresents cells finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -457,25 +463,25 @@ theorem preserves_operands_with_rhs
     rename_i rightValue
     have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
       rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
-    rcases CompatibleBareWordModifier.modifier_total profile
+    rcases CompatibleBareWordModifier.modifier_total_wide profile leafView
       (snapshot.represented.extend result.maps result.worlds) rightRep
       (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
       (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
-        ⟨_, failed⟩ | ⟨_, _, _, outcome, _⟩
+        ⟨_, failed⟩ | ⟨_, _, _, _, agreement, _⟩
     · have failed : Evaluates
           (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
           (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType
-            (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
+            (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid (SourceCoreDataPlaces.placeWrap place.type operator false))
           (.inLeft prepared.route.leafType (.word invalid)) rhsStore := by
         simpa only [layout.sameType] using failed
       exact ⟨invalid, rhsStore, rhsMap, rhsWorld,
         (snapshot_prefix layout snapshot lowered.expression next output
-          (binaryOperator (prepared.route.leafType = .integer) operator) invalid).wrap
+          (assignmentModifier place.type (prepared.route.leafType = .integer) operator) invalid (SourceCoreDataPlaces.placeWrap place.type operator false)).wrap
           (LanguageResult.bind_success output result.evaluated (LanguageResult.bind_failure output failed)),
         invalidToken _ _ invalidOperands, result.heaps, result.maps, result.worlds, result.frame, result.metadata, result.effect, post⟩
-    · rcases outcome with applied | ⟨_, _, _, panics⟩
-      · exact (DataPlaceModifier.assignment_excludes_invalid applied invalidOperands).elim
-      · exact (DataPlaceModifier.panic_excludes_invalid (panics .word) invalidOperands).elim
+    · cases agreement with
+      | applied applies _ _ => exact (DataPlaceModifier.compound_excludes_invalid applies invalidOperands).elim
+      | panicked _ panics _ _ => exact (DataPlaceModifier.panic_excludes_invalid panics invalidOperands).elim
 
 /-- A source panic on the operands: the setter runs and the check fails. -/
 theorem preserves_panic_with_rhs
@@ -484,7 +490,7 @@ theorem preserves_panic_with_rhs
     (extension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {sourceSize : Nat} {right : Dynamic.Value} {after : Dynamic.Heap} {target : Dynamic.ResolvedPlace} {code : UInt8}
     (targetSnapshot : Staging.Recursive.BareTarget environment before place target)
-    (panicPlain : ∀ type, target.valueType = .fixed type → ¬ FixedCheckedCompound operator)
+    (valueType : target.valueType = place.type)
     (panics : Dynamic.AssignmentOperandsPanic target.valueType operator target.selected right code)
     (rhsMeaning : ∀ (snapshot : Snapshot compilation.checked registry functions prepared place environment actual before store mapping world (ξ index)),
       ∃ value finalStore finalMap finalWorld,
@@ -494,7 +500,9 @@ theorem preserves_panic_with_rhs
         ProtectedStateTransition.Transition protocol initial ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word)
+    (profile : (operator = .equal ∨ SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word) ∨
+      FixedCompoundAssignment operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (ordinaryCells : GenericHeap.OrdinaryCells (payloadModel compilation.checked registry functions) cells)
@@ -507,7 +515,8 @@ theorem preserves_panic_with_rhs
     (next : Expr) (output : Ty) (invalid : Word) :
     ∃ finalStore finalMap finalWorld,
       Evaluates actual store
-        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next output (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ)
+        ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next output (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+        (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ)
         (.inLeft output (.word (SourceCorePanics.reason code))) finalStore ∧
       GenericHeap.CellHeapRepresents cells finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -527,32 +536,32 @@ theorem preserves_panic_with_rhs
       (faults := fun _ _ => False) (.value result.trace.sound.value_plain) result.evaluated
       (.value payload) result.heaps result.maps result.worlds result.frame result.metadata result.effect
     obtain ⟨latest⟩ := plain.latest
-    rcases CompatibleBareWordModifier.modifier_total profile
+    rcases CompatibleBareWordModifier.modifier_total_wide profile leafView
       (snapshot.represented.extend result.maps result.worlds) rightRep
       (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
       (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
-        ⟨invalidOperands, _⟩ | ⟨_, updatedValue, _, outcome, modified⟩
+        ⟨invalidOperands, _⟩ | ⟨_, updatedValue, _, _, agreement, modified⟩
     · exact (DataPlaceModifier.panic_excludes_invalid panics invalidOperands).elim
-    · rcases outcome with applied | ⟨operation, selected, zero, other⟩
-      · exact (CompatiblePlaceModifier.panic_excludes_applies panicPlain panics applied).elim
-      · have sameCode := CompatiblePlaceModifier.panic_functional panics (other _)
-        subst sameCode zero
-        have selected : binaryOperator (prepared.route.leafType = .integer) operator = some ⟨operation, .divisor⟩ := by
-          simpa only [layout.sameType] using selected
+    · rw [valueType] at panics
+      rw [layout.sameType] at agreement
+      cases agreement with
+      | applied applies _ _ => exact (DataPlaceModifier.panic_excludes_compound panics applies).elim
+      | panicked other otherPanics _ fails =>
+        cases CompatiblePlaceModifier.panic_functional panics otherPanics
         have nativeModified : Evaluates
-            (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value (.word Word.zero) actual) rhsStore
+            (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
             (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType
-              (binaryOperator (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid)
+              (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false (.var 1) (.var 0) invalid (SourceCoreDataPlaces.placeWrap place.type operator false))
             (.inRight .word updatedValue) rhsStore := by
           simpa only [layout.sameType] using modified
         exact ⟨rhsStore, rhsMap, rhsWorld,
           (snapshot_prefix layout snapshot lowered.expression next output
-            (binaryOperator (prepared.route.leafType = .integer) operator) invalid).wrap
+            (assignmentModifier place.type (prepared.route.leafType = .integer) operator) invalid (SourceCoreDataPlaces.placeWrap place.type operator false)).wrap
             (LanguageResult.bind_success output result.evaluated
               (LanguageResult.bind_success output nativeModified
                 (LanguageResult.bind_success output
-                  (setter_evaluates layout snapshot.value (.word Word.zero) updatedValue latest.nativeRead)
-                  (DataPlaceGuard.panic_of_selected selected)))),
+                  (setter_evaluates layout snapshot.value rightValue updatedValue latest.nativeRead)
+                  (fails.mpr ⟨rfl, rfl⟩)))),
           result.heaps, result.maps, result.worlds, result.frame, result.metadata, result.effect, post⟩
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedCellStagedBareAssignment

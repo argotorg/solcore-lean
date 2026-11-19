@@ -282,6 +282,7 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
       scope (head.writtenContext actualContext) assignment operator rhs environment canonical actual
       before store mapping world initial (next.rename ξ) output value finalStore := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, right, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -289,10 +290,12 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
     exact False.elim (layout.nonempty (List.eq_nil_of_length_eq_zero length))
   | bare empty layout =>
     have sourceTyped := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique found assignmentTyped
+    simp only [GenericAssignmentStatements.Head.emit] at completed
+    rw [← assignmentModifier_plain none, ← SourceCoreDataPlaces.placeWrap_plain none] at completed
     have result := ProtectedCellStagedBareAssignment.reflects_with_rhs callerProtocol transport budget initial layout empty extension
       (fun snapshot child smaller {_ _} evaluated => rhs_reflects_at bridge functions snapshot child (boundedReflection child smaller)
         right found sourceTyped environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation evaluated)
-      rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)
+      rightView rightType (.inl (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)) leafView
       environments (GeneralizedLocalDescriptorHeap.ordinary_cells) admitted.heap heaps locals agrees actualTyped slot writable invalidToken completed bounded
     cases result with
     | fault snapshot trace same matched finalHeaps maps worlds preservation metadata effect post =>
@@ -309,11 +312,12 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
         (StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation)
     | success snapshot trace rightTyped middleTyped write finalHeaps maps worlds preservation metadata effect count typed strict remaining post =>
       obtain ⟨reached, related⟩ := post
-      exact .success snapshot trace write finalHeaps maps worlds preservation metadata effect count
+      exact .success snapshot trace ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
+        finalHeaps maps worlds preservation metadata effect count
         (by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
           Prepared.optionalLeaf, SourceCoreCalls.packArguments, layout.sameType] using typed)
         reached related ⟨CallableIndexedOwnedBareAssignmentAdmission.heap_after_assignment unique found assignmentTyped rightView profile targetPlain
-          locals snapshot middleTyped rightTyped write,
+          locals snapshot middleTyped rightTyped ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write),
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows preservation⟩ strict remaining
 include transport extension environments heaps locals agrees actualTyped initial admitted unique assignmentTyped bare authority physical owner sameLocation in
 theorem preserves_value {sourceSize : Nat}
@@ -335,6 +339,7 @@ theorem preserves_value {sourceSize : Nat}
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -343,11 +348,12 @@ theorem preserves_value {sourceSize : Nat}
   | bare empty layout =>
     have sourceTyped := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique found assignmentTyped
     obtain ⟨finalStore, finalMap, finalWorld, slots, rightTyped, middleTyped, finalHeaps, maps, worlds, frame, metadata, effect, count, typed, post, agreement⟩ :=
-      ProtectedCellStagedBareAssignment.preserves_value_with_rhs callerProtocol transport initial layout empty extension snapshot trace write
+      ProtectedCellStagedBareAssignment.preserves_value_with_rhs callerProtocol transport initial layout empty extension snapshot trace ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
         (fun snapshot => rhs_preserves_at bridge functions snapshot sourceSize meaning generated found sourceTyped
           environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation trace)
-        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)
+        rightView rightType (.inl (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)) leafView
         environments (GeneralizedLocalDescriptorHeap.ordinary_cells) admitted.heap heaps locals agrees actualTyped slot writable invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at agreement
     obtain ⟨reached, related⟩ := post
     exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, effect, count,
       by simpa [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext, CompatibleBareAssignment.writtenContext,
@@ -372,6 +378,7 @@ theorem preserves_fault {sourceSize : Nat}
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -384,6 +391,7 @@ theorem preserves_fault {sourceSize : Nat}
         (fun snapshot => rhs_preserves_at bridge functions snapshot sourceSize meaning generated found sourceTyped
           environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation trace)
         environments (GeneralizedLocalDescriptorHeap.ordinary_cells) admitted.heap heaps locals agrees slot writable next output invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     obtain ⟨reached, related⟩ := post
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, effect,
       reached, related, StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
@@ -407,6 +415,7 @@ theorem preserves_operands {sourceSize : Nat}
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -418,8 +427,9 @@ theorem preserves_operands {sourceSize : Nat}
       ProtectedCellStagedBareAssignment.preserves_operands_with_rhs callerProtocol initial layout empty extension snapshot invalidOperands
         (fun snapshot => rhs_preserves_at bridge functions snapshot sourceSize meaning generated found sourceTyped
           environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation trace)
-        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)
+        rightView rightType (.inl (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)) leafView
         environments (GeneralizedLocalDescriptorHeap.ordinary_cells) admitted.heap heaps locals agrees slot writable next output invalid invalidToken
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     obtain ⟨reached, related⟩ := post
     exact ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame, metadata, effect,
       reached, related, StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
@@ -442,6 +452,7 @@ theorem preserves_panic {sourceSize : Nat}
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | projected layout _ =>
     have length := CompatiblePlaceCompilerCertificates.PreparedPath.steps_length layout.path
@@ -451,11 +462,12 @@ theorem preserves_panic {sourceSize : Nat}
     have sourceTyped := CallableIndexedOwnedAssignmentAdmission.rhs_typed unique found assignmentTyped
     obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata, effect, post⟩ :=
       ProtectedCellStagedBareAssignment.preserves_panic_with_rhs callerProtocol initial layout empty extension snapshot
-        (fun type typeEq => targetPlain type (by cases snapshot; exact typeEq)) panics
+        (by cases snapshot; rfl) panics
         (fun snapshot => rhs_preserves_at bridge functions snapshot sourceSize meaning generated found sourceTyped
           environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation trace)
-        rightView rightType (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)
+        rightView rightType (.inl (CallableIndexedOwnedBareAssignmentAdmission.source_profile unique found assignmentTyped rightView profile)) leafView
         environments (GeneralizedLocalDescriptorHeap.ordinary_cells) admitted.heap heaps locals agrees slot writable next output invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     obtain ⟨reached, related⟩ := post
     exact ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata, effect,
       reached, related, StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩

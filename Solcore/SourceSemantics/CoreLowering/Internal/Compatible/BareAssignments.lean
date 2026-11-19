@@ -1837,41 +1837,127 @@ theorem passes_of_applies {sourceType : TypeSystem.Ty} {type : Ty} {snapshot : O
       · exact .nonzero nonzero
   · exact CompatiblePlaceModifier.passes_of_total (by simpa using panics) integer rightCore
 
-/-- The optional pre-RHS snapshot determines whether the actual modifier
-fails or produces a replacement. Every outcome keeps the current RHS store. -/
-theorem modifier_total {sourceType : TypeSystem.Ty} {type : Ty} {initial : Option Dynamic.Value}
+/-- The staged bare profile widened by the fixed-width compound assignments: as
+`CompatiblePlaceModifier.wide_outcome` gives it, the native modifier gives a leaf, the source's only
+result when it applies the operation, and the check after the setter agrees with the source. The
+leaf is a Word's or a fixed-width word, so no callable observation is needed. -/
+theorem wide_outcome
+    {targetType sourceType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
+    {operator : Syntax.ValueAssignOp}
+    (profile : (operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word) ∨
+      FixedCompoundAssignment operator targetType)
+    (leafView : SourceCoreRawMetadata.runtimeType sourceType = SourceCoreRawMetadata.runtimeType targetType)
+    (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
+    (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
+    {environment : Environment} {snapshot rhs : Expr}
+    (snapshotSelected : DataEquality.Selects environment snapshot (.inRight .unit leftCore))
+    (rightSelected : DataEquality.Selects environment rhs rightCore) (store : Store) (invalid : Word) :
+    ∃ result value,
+      Evaluates environment store
+        (modified type (assignmentModifier targetType (type = .integer) operator) false snapshot rhs invalid
+          (SourceCoreDataPlaces.placeWrap targetType operator false)) (.inRight .word value) store ∧
+      RuntimeValueHasType world value type ambient.definitions ∧
+      ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right ∧
+      (∀ other, Dynamic.CompoundAssignmentApplies targetType operator (some left) right other →
+        other = result ∧ ValueRep checked registry functions mapping world sourceType result value type) ∧
+      ∀ {leftType : Ty}, FixedCompoundModifier.Agreement targetType operator (some left) right result
+        (assignmentModifier targetType (type = .integer) operator) (.inRight leftType leftCore) rightCore := by
+  rcases profile with narrow | ⟨⟨fixedType, rfl⟩, kind⟩
+  · have profileAt : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType targetType) := by
+      rcases narrow with equal | word
+      · exact .inl equal
+      · exact .inr (.inl (leafView ▸ word))
+    have none := checkedCompound_of_profile profileAt
+    have plain := DataPlaceModifier.plain_of_checkedCompound none
+    have relation := Dynamic.CompoundAssignmentApplies.eq_of_plain plain
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none, relation]
+    obtain ⟨result, value, related, evaluated, outcome⟩ :=
+      initialized_outcome narrow leftRep rightRep snapshotSelected rightSelected store invalid
+    refine ⟨result, value, evaluated, related.runtime_hasType, ?_, ?_, ?_⟩
+    · rcases outcome with ⟨_, valid⟩ | ⟨_, _, _, panics⟩
+      · exact valid
+      · exact DataPlaceModifier.panic_excludes_invalid (panics .word)
+    · intro other applied
+      rcases outcome with ⟨applies, _⟩ | ⟨_, _, _, panics⟩
+      · exact ⟨DataPlaceModifier.assignment_functional applied applies, related⟩
+      · exact (CompatiblePlaceModifier.panic_excludes_applies plain (panics targetType) applied).elim
+    · intro leftType
+      rcases outcome with ⟨applies, _⟩ | ⟨operation, selected, zero, panics⟩
+      · have passes := passes_of_applies narrow rightRep applies (type = .integer)
+        exact .applied (.primitive plain applies) (.inl passes)
+          ⟨(DataPlaceGuard.agreement passes).unwrap, (DataPlaceGuard.agreement passes).wrap⟩
+      · subst zero
+        refine .panicked _ (panics targetType)
+          (fun other applied => CompatiblePlaceModifier.panic_excludes_applies plain (panics targetType)
+            (relation ▸ applied)) ?_
+        intro binders store after outputType write value updated changed
+        rw [selected]
+        exact FixedCompoundModifier.guard_divisor_zero _ _
+  · have view : SourceCoreRawMetadata.runtimeType sourceType = .fixed fixedType := leafView
+    obtain ⟨leftWord, rfl, rfl, rfl, leftCanonical⟩ := CompatibleExpressionPrimitives.fixed_fields leftRep view
+    obtain ⟨rightWord, rfl, rfl, _, rightCanonical⟩ := CompatibleExpressionPrimitives.fixed_fields rightRep view
+    have integer : decide (Ty.word = Ty.integer) = false := rfl
+    simp only [integer]
+    refine ⟨.word (FixedCompoundModifier.leaf fixedType operator leftWord rightWord),
+      .word (FixedCompoundModifier.leaf fixedType operator leftWord rightWord),
+      FixedCompoundModifier.compatible_modified_evaluates kind snapshotSelected rightSelected store invalid, .word,
+      FixedCompoundModifier.words_valid kind leftWord rightWord, ?_, ?_⟩
+    · intro other applied
+      have same := FixedCompoundModifier.applies_leaf kind applied
+      subst same
+      obtain ⟨word, same, canonical⟩ :=
+        FixedCompoundModifier.canonical_of_applies kind leftCanonical rightCanonical applied
+      cases same
+      exact ⟨rfl, .compatible leafView (.fixed _ canonical)⟩
+    · intro leftType
+      rw [FixedCompoundModifier.compatible_assignmentModifier]
+      exact FixedCompoundModifier.guard_agrees kind leftWord rightWord
+
+/-- `CompatibleBareAssignment.modifier_total_wide` over the staged bare profile widened by the
+fixed-width compound assignments, without a callable observation: an absent compound snapshot fails
+after the RHS, and otherwise the modifier gives a leaf, the source's only result when it applies the
+operation, and the check after the setter agrees with the source. -/
+theorem modifier_total_wide {targetType sourceType : TypeSystem.Ty} {type : Ty} {initial : Option Dynamic.Value}
     {snapshot rightCore : Value} {right : Dynamic.Value} {operator : Syntax.ValueAssignOp}
-    (profile : operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word)
+    (profile : (operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word) ∨
+      FixedCompoundAssignment operator targetType)
+    (leafView : SourceCoreRawMetadata.runtimeType sourceType = SourceCoreRawMetadata.runtimeType targetType)
     (saved : SnapshotRep checked registry functions mapping world sourceType type initial snapshot)
     (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
     {environment : Environment} {snapshotExpression rightExpression : Expr}
     (snapshotSelected : DataEquality.Selects environment snapshotExpression snapshot)
     (rightSelected : DataEquality.Selects environment rightExpression rightCore) (store : Store) (invalid : Word) :
     (Dynamic.AssignmentOperandsInvalid operator initial right ∧
-      Evaluates environment store (modified type (binaryOperator (type = .integer) operator) false snapshotExpression rightExpression invalid)
+      Evaluates environment store (modified type (assignmentModifier targetType (type = .integer) operator) false
+        snapshotExpression rightExpression invalid (SourceCoreDataPlaces.placeWrap targetType operator false))
         (.inLeft type (.word invalid)) store) ∨
-    ∃ result value, ValueRep checked registry functions mapping world sourceType result value type ∧
-      (Dynamic.AssignmentValueApplies operator initial right result ∨
-        ∃ operation, binaryOperator (type = .integer) operator = some ⟨operation, .divisor⟩ ∧ rightCore = .word Word.zero ∧
-          (∀ targetType, Dynamic.AssignmentOperandsPanic targetType operator initial right
-            SourceCorePanics.divisionByZero)) ∧
-      Evaluates environment store (modified type (binaryOperator (type = .integer) operator) false snapshotExpression rightExpression invalid)
+    ∃ result value, RuntimeValueHasType world value type ambient.definitions ∧
+      (∀ other, Dynamic.CompoundAssignmentApplies targetType operator initial right other →
+        other = result ∧ ValueRep checked registry functions mapping world sourceType result value type) ∧
+      FixedCompoundModifier.Agreement targetType operator initial right result
+        (assignmentModifier targetType (type = .integer) operator) snapshot rightCore ∧
+      Evaluates environment store (modified type (assignmentModifier targetType (type = .integer) operator) false
+        snapshotExpression rightExpression invalid (SourceCoreDataPlaces.placeWrap targetType operator false))
         (.inRight .word value) store := by
   cases saved with
   | present related =>
-      obtain ⟨result, value, represented, evaluated, outcome⟩ :=
-        initialized_outcome profile related rightRep snapshotSelected rightSelected store invalid
-      exact .inr ⟨result, value, represented, outcome.imp (fun applied => applied.1) id, evaluated⟩
+    obtain ⟨result, value, evaluated, typed, _, unique, agreement⟩ :=
+      wide_outcome profile leafView related rightRep snapshotSelected rightSelected store invalid
+    exact .inr ⟨result, value, typed, unique, agreement, evaluated⟩
   | absent =>
-      by_cases equal : operator = .equal
-      · subst operator
-        exact .inr ⟨right, rightCore, rightRep, .inl (.equal _ _), .inRight (rightSelected.evaluates store)⟩
-      · refine .inl ⟨.uninitialized equal, ?_⟩
-        cases operator <;> first
-        | exact (equal rfl).elim
-        | (by_cases integer : type = .integer <;>
-            simp only [binaryOperator, integer, ite_true, ite_false, modified] <;>
-            exact .caseLeft (snapshotSelected.evaluates store) (.inLeft .word))
+    by_cases equal : operator = .equal
+    · subst operator
+      have plain : ∀ type, targetType = .fixed type → ¬ FixedCheckedCompound .equal := fun _ _ checked => by cases checked
+      refine .inr ⟨right, rightCore, rightRep.runtime_hasType, fun other applied => ?_,
+        .applied (.primitive plain (.equal _ _)) (.inl (.total fun _ same => by cases same)) Iff.rfl,
+        .inRight (rightSelected.evaluates store)⟩
+      rw [Dynamic.CompoundAssignmentApplies.eq_of_plain plain] at applied
+      cases applied
+      exact ⟨rfl, rightRep⟩
+    · refine .inl ⟨.uninitialized equal, ?_⟩
+      obtain ⟨modifier, chosen⟩ := assignmentModifier_some targetType (type = .integer) equal
+      rw [chosen]
+      exact .caseLeft (snapshotSelected.evaluates store) (.inLeft .word)
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleBareWordModifier
 end

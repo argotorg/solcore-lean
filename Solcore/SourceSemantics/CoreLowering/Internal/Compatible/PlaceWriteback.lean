@@ -107,14 +107,6 @@ theorem panic_excludes_applies {targetType : TypeSystem.Ty} {operator : Syntax.V
   obtain ⟨binary, left, corresponds, rfl, panics⟩ := panics.primitive_of_plain plain
   cases corresponds <;> cases applied <;> exact panics.excludes_application (by assumption)
 
-/-- A Core outcome's panic, a primitive one at every type, excludes an applied
-source operation. -/
-theorem outcome_excludes_applies {operator : Syntax.ValueAssignOp}
-    {snapshot : Option Dynamic.Value} {right result : Dynamic.Value} {code : UInt8}
-    (panics : ∀ targetType, Dynamic.AssignmentOperandsPanic targetType operator snapshot right code)
-    (applied : Dynamic.AssignmentValueApplies operator snapshot right result) : False :=
-  panic_excludes_applies (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inr rfl)) (panics .word) applied
-
 theorem panic_functional {targetType : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
     {snapshot : Option Dynamic.Value} {right : Dynamic.Value} {first second : UInt8}
     (firstPanic : Dynamic.AssignmentOperandsPanic targetType operator snapshot right first)
