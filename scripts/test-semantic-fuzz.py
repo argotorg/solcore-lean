@@ -1146,7 +1146,7 @@ class NativeRunTests(unittest.TestCase):
         self.tool = self.bin / "semantic-native-tool"
         self.tool.write_text(NATIVE_STUB)
         self.tool.chmod(0o755)
-        self.check = {"status": "ready", "versions": {"admission": "native-admission-v2"}, "admittedEmitters": ["e"],
+        self.check = {"status": "ready", "versions": {"admission": "native-admission-v3"}, "admittedEmitters": ["e"],
                       "tools": {"nativeTool": {"sha256": "1"}}, "scripts": {"semantic-native.py": "2"}}
         for target, replacement in (("verify_tools", lambda config: self.receipt),
                                     ("native_check", lambda config: self.check)):

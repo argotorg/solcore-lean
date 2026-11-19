@@ -148,9 +148,9 @@ class AdmissionTests(unittest.TestCase):
         self.assertEqual((admitted["function"], admitted["arguments"]), ("sc_native_run", [str(2**256 - 1)]))
         self.assertEqual(set(native.EMITTERS) & set(native.NOT_ADMITTED), set())
         # Array forms are read only in the array emitter's sources: v1's rules for the others stay.
-        self.assertEqual(decided(source=SOURCE.replace("sc_fn0(sc_x)", "sc_fn0(sc_x[0:1])")), "admitted")
+        self.assertEqual(decided(source=SOURCE.replace("sc_fn0(sc_x)", "sc_fn0(ridx(lidx(sc_x, 0), 1))")), "admitted")
 
-    def test_memory_arrays_are_admitted_without_std_array_traits_slices_or_memrefs(self):
+    def test_memory_arrays_are_admitted_without_std_array_traits_or_a_literal_lidx_index(self):
         def decided(source=ARRAYS, types=("uint64",)):
             result = native.admission(make_case(source=source, emitter="solcore-source-memory-arrays-v2",
                                                 memoryArrayShapes={"types": list(types)}))
@@ -164,37 +164,44 @@ class AdmissionTests(unittest.TestCase):
         get = ("function sc_get<c>(sc_c: c, sc_i: uint256) returns (uint64) where (c, uint256): "
                "RValueIdxAccess<uint64> {\n    return ridx(sc_c, sc_i);\n}\n")
         put = "function sc_put(sc_c: memref<uint64>, sc_w: uint64) {\n    CanStore.store(sc_c, sc_w);\n}\n"
+        tail = ("function sc_tail(sc_v: uint64[], sc_s: uint256) returns (arraySlice<uint64[]>) {\n"
+                "    return sc_v[sc_s:];\n}\n")
         self.assertEqual(decided(), "admitted")
         self.assertEqual(decided(edited("sc_r = sc_r ^ Typedef.rep(Length.length(sc_a0) + sc_a0.length);",
-                                        "// a[0:1], toArray(s) and lidx(a, i) in a comment")), "admitted")
+                                        "// lidx(sc_a0, 1) and RValueIdxAccess in a comment")), "admitted")
+        # Slices, copies and memrefs are admitted, with a `lidx` index that is not a literal.
+        for cut in ("[1:sc_k0]", "[1:]", "[:2]", "[:]", "[sc_a1[0]:2]"):
+            self.assertEqual(decided(edited(f"let sc_s0 = sc_a0{cut};", "let sc_a2: uint64[] = toArray(sc_s0);")),
+                             "admitted", cut)
+        self.assertEqual(decided(edited("let sc_s0 = sc_tail(sc_a0, 1);", helper=tail)), "admitted")
+        for index in ("sc_k0", "uint256(1)", "sc_k0 + 1"):
+            self.assertEqual(decided(edited(f"sc_put(lidx(sc_a0, {index}), sc_v1);", helper=put)), "admitted", index)
         self.assertEqual(decided(types=["int8"]), ("signed narrow type", "int8"))
         storage = ARRAYS.replace("{\n    function run", "{\n    sc_st: uint64[];\n    function run")
         self.assertEqual(decided(storage.replace("return uint256", "sc_st.setLength(2);\n        return uint256")),
                          ("storage field", "1 fields"))
         self.assertEqual(decided(edited(helper=length)), ("std's array trait", "Length"))
         self.assertEqual(decided(edited(helper=get)), ("std's array trait", "RValueIdxAccess, ridx"))
-        for cut in ("[1:sc_k0]", "[1:]", "[:2]", "[:]", "[sc_a1[0]:2]"):
-            self.assertEqual(decided(edited(f"let sc_s0 = sc_a0{cut};")), ("slice", "a[s:e]"), cut)
-        self.assertEqual(decided(edited("let sc_a2: uint64[] = toArray(sc_s0);")), ("slice", "toArray"))
-        self.assertEqual(decided(edited("sc_put(lidx(sc_a0, 1), sc_v1);", helper=put)),
-                         ("memref", "CanStore, lidx, memref<"))
-        # The first reason in a fixed order: the plan's types and the lift's, then std's array traits, slices and
-        # memrefs.
-        self.assertEqual(decided(edited("sc_put(lidx(sc_a0, 1), sc_v1);", "let sc_s0 = sc_a0[1:];", helper=put))[0],
-                         "slice")
-        self.assertEqual(decided(edited("let sc_s0 = sc_a0[1:];", helper=length))[0], "std's array trait")
-        sliced = storage.replace("return uint256", "let sc_s0 = sc_st[0:1];\n        return uint256")
-        self.assertEqual(decided(sliced)[0], "storage field")
-        self.assertEqual(decided(edited(helper=length), types=["int16"])[0], "signed narrow type")
+        literal = edited("sc_put(lidx(sc_a0, 1), sc_v1);", "sc_put(lidx(sc_a0 , 0x1), sc_v1);", helper=put)
+        self.assertEqual(decided(literal), ("literal lidx index", "lidx(sc_a0, 0x1), lidx(sc_a0, 1)"))
+        # The first reason in a fixed order: the plan's types and the lift's, then std's array traits, then a literal
+        # `lidx` index.
+        self.assertEqual(decided(edited("sc_put(lidx(sc_a0, 1), sc_v1);", helper=length + put))[0],
+                         "std's array trait")
+        stored = storage.replace("return uint256", "sc_put(lidx(sc_a0, 1), sc_v1);\n        return uint256")
+        self.assertEqual(decided(stored)[0], "storage field")
+        self.assertEqual(decided(literal, types=["int16"])[0], "signed narrow type")
 
-    def test_slices_are_colons_at_a_brackets_own_depth(self):
-        for code in ("a[1:2]", "a[s:]", "a[:e]", "a[:]", "sc_g0[sc_k0][0:2]", "m[b[0]:2]"):
-            self.assertTrue(native.slices(code), code)
-        for code in ("let g: uint64[][] = [[1, 2], [3]];", "let f = [lam (x: uint256) { return x; }];",
-                     'let t = "a[1:2]";', "let x: uint256 = a[1];", "a[f(x: y)]"):
-            self.assertFalse(native.slices(code), code)
-        code = "let sc_s0 = sc_a0[1:]; // memref<T> and CanStore\nsc_st.setLength(Length.length(sc_s0));"
-        self.assertEqual(native.array_forms(code), {"slice": ["a[s:e]"]})
+    def test_a_literal_lidx_index_is_an_integer_literal_argument_at_the_calls_own_depth(self):
+        for code, found in (("lidx(m, 0)", ["lidx(m, 0)"]), ("lidx( g[1] ,5 )", ["lidx(g[1], 5)"]),
+                            ("f(lidx(m, ((7))))", ["lidx(m, ((7)))"]), ("lidx(m, 0xff)", ["lidx(m, 0xff)"]),
+                            ("lidx(f(a, 1), 2)", ["lidx(f(a, 1), 2)"])):
+            self.assertEqual(native.literal_lidx_calls(code), found, code)
+        for code in ("lidx(m, k)", "lidx(m, uint256(1))", "lidx(m, k + 1)", "lidx(m, (1, 2))", "lidx(m, 1, 2)",
+                     "xlidx(m, 1)", "s.lidx(m, 1)", 'let t = "lidx(m, 1)";', "lidx(m, 1", "lidx(m[1], k)"):
+            self.assertEqual(native.literal_lidx_calls(code), [], code)
+        code = "sc_put(lidx(m, 1), v); // lidx(m, 2)\nlet n = Length.length(m) + m.length;"
+        self.assertEqual(native.array_forms(code), {"literal lidx index": ["lidx(m, 1)"]})
 
 
 class ComparisonTests(unittest.TestCase):
@@ -368,7 +375,7 @@ class RunTests(unittest.TestCase):
                                 "--profile", "runtime-word"])
         check = json.loads(output.getvalue())
         self.assertEqual((code, check["status"], sorted(check["corpora"])), (0, "ready", ["runtime-word"]))
-        self.assertEqual(check["versions"], {"admission": "native-admission-v2", "adapter": "native-lift-v1",
+        self.assertEqual(check["versions"], {"admission": "native-admission-v3", "adapter": "native-lift-v1",
                                              "comparison": "native-compare-v1"})
         self.assertEqual(sorted(check["scripts"]), sorted(native.SCRIPTS))
         args, _ = native.parse_args(["--check", "--mode", "random", "--seed", "5"])
