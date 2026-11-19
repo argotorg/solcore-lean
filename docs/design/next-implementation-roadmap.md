@@ -72,10 +72,10 @@ obligations. None follows from agreement in a test corpus.
   - Remaining: further state operations, ECRECOVER and P256VERIFY, init frames and public
     deployment, the rest of inline Yul, object linking, and then divergence and reverse
     correspondence.
-- **Upstream rows 9 to 13**: Lean follows upstream's new trait coherence rules, one row at a time
+- **Upstream rows 10 to 13**: Lean follows upstream's new trait coherence rules, one row at a time
   ([the upstream table](#following-upstreams-semantics-the-next-units)).
-- **Lean's native frontend as a fourth path**: the harness compares the admitted pure cases with
-  direct Core, and the fuzz driver's run kind is next.
+- **Lean's native frontend as a fourth path**: the harness and the fuzz driver's `native` run kind
+  compare the admitted pure cases with direct Core. Memory arrays in the admission are next.
 
 ### Open
 
@@ -112,15 +112,17 @@ The last two are recorded without investigation, and the generators avoid them.
 
 ### Now
 
-1. **Upstream's new trait coherence rules** (rows 9 to 13). The re-pin to `d1b5ac28` is done.
-   Lean follows the new rules: rows 10 to 12 and part of row 13 refuse forms that Lean accepts
-   today, and rows 9 and 13 widen what it accepts. Lean keeps ignoring `#[derive]`.
+1. **Upstream's new trait coherence rules** (rows 10 to 13). The re-pin and row 9 are done. Rows
+   10 to 12 and part of row 13 refuse forms that Lean accepts today, and the rest of row 13 widens
+   what it accepts. Lean keeps ignoring `#[derive]`. Then Lean checks a match's exhaustiveness as
+   upstream does. Today it counts constructors only for a scrutinee of a nominal type, so an
+   exhaustive match over a pair needs a `_` arm.
 2. **Meaning proofs.** Row 1's leftovers: compound assignments and in-place `~` at the twelve
    types ([what remains](integer-types-unchecked-shifts.md#what-remains)). Then the rest of
    native Source goal two.
 3. **Lean's native frontend as a fourth differential path.** The harness runs the admitted pure
-   cases through the native pipeline. Next are the fuzz driver's `native` run kind, then native
-   `std.opcodes`.
+   cases through the native pipeline, alone or as the fuzz driver's `native` run kind. Next are
+   memory arrays in its admission, then native `std.opcodes`.
 
 ### Then
 
@@ -167,7 +169,7 @@ code.
 | 7 | Closure factories (`bf7114a8`, `ad1f49cf`): captures resolved in the factory's own scope, a factory's runtime effects kept | **Done where the native pipeline runs the fixture.** Captures resolve in the factory's own scope, and a factory's body runs when it is called, as upstream now does; Lean's typing, source semantics and lowering needed no change. Calls that use contract storage or inline assembly wait for them ([closures](../guide/source-semantics.md#closures-capture-by-value)). | `closure-parameters` (36 → 49 calls) |
 | — | `msgSender` (#142) and contract-declared struct state (#138) | **Nothing to do.** #142 uses std's existing `msgSender` in examples, and #138 changes only examples. | `msg-context` |
 | 8 | Re-pin to `d1b5ac28` (#146, #155; #147 and #148 change only the playground) | **Done.** Upstream's Hull format and backends are unchanged, so the importer and the harness took only the new commit, and every existing expectation holds. | `abi-layout-through-reexport` (new), `superclass-default-through-subtrait` (new), `abi-raw-default-codec` (6 → 8 calls), `abi-word-custom-codec` |
-| 9 | Impl method constraints (`81afb96b`, `SC0249`): an impl method may require only what its trait method declares or entails | **Next.** Lean's equality also refuses the restated and entailed constraints that upstream accepts, so following upstream only widens acceptance. The superclass-entailed case waits for row 13. | uitest `impl_method_extra_constraint` |
+| 9 | Impl method constraints (`81afb96b`, `SC0249`): each constraint of an impl method is one of its trait method's, its impl's conditions or its head's direct superclasses, and an entailed one is refused | **Done.** Lean accepts the omitted, reordered, repeated and restated constraints that its equality refused, and refuses an undeclared or entailed one, as upstream does. The method's body sees only its declared constraints. | uitest `impl_method_extra_constraint` |
 | 10 | No default for a type-parameter goal (`1c7fe983`, `SC0207`) | **To follow.** Lean's compile already refuses a called generic that needs one; its checker will also refuse an uncalled one, as upstream's does. | uitest `default_not_used_for_type_parameter`, `default_not_used_for_tuple_of_type_parameter` |
 | 11 | Overlapping unconditional defaults (`4f22ddb0`, `SC0247`) | **To follow.** Lean refuses an ambiguous use; it will also refuse the declarations, as upstream does. | uitest `overlapping_unconditional_default` |
 | 12 | The orphan rule (`02456cee`, `282cb2c8`, `SC0246`): an impl sits next to its trait or its type, std counting as one unit and a tuple as its first element | **To follow.** Lean's impls are global and may sit anywhere; it will refuse an orphan impl as upstream does, and two of its tests will be rewritten. | uitest `orphan_*`; the six rewritten e2e fixtures |

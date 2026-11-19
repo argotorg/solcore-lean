@@ -35,7 +35,8 @@ These are triage hints, not proofs of which component is wrong.
 - **The pinned end-to-end fixtures** compare the compiled paths with each other, without a Core
   reference.
 - **The native path** (`scripts/semantic-native.py`, opt-in) runs Lean's native frontend on the
-  pure cases it admits and compares each run with direct Core. Admission is a versioned predicate
+  pure cases it admits and compares each run with direct Core. The fuzz driver runs it on each
+  iteration's draws when `--backend native` is configured. Admission is a versioned predicate
   decided before the native run, so a native rejection of an admitted case is a finding.
 
 ## Where things are
@@ -68,8 +69,8 @@ Two guides in `scripts/` go into detail:
 - **Keep the reference independent.** The main comparison must not share the Rust frontend with its
   reference computation.
 - **Do not hide failures.** Never suppress a failing generated case, and never turn a compiler
-  failure into a successful comparison. The fuzz driver counts recorded upstream findings as known,
-  by their stable signatures.
+  failure into a successful comparison. The fuzz driver counts recorded upstream findings, and the
+  native path's labelled differences, as known, by their stable signatures.
 - **Do not overclaim.** Do not label an unexplained difference as a confirmed upstream bug. Keep
   suspected upstream defects and confirmed regressions where [Workflow](workflow.md#local-records)
   says.

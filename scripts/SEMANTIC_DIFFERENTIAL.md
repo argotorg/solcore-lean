@@ -1982,7 +1982,8 @@ recorded step agreed on all four paths and met its recorded expectation. Known f
 as `semantic-suite.py` seeds it (`--mode random --seed N`), and runs each admitted case through
 `semantic-native-tool`. The case's source is lifted out of its contract by `native-lift-v1`, a Word
 entry for its method is appended, and the program is compiled once and run once per input. The
-path is opt-in: no suite, fuzz run or CI job runs it.
+path is opt-in: no suite or CI job runs it, and the fuzz driver runs it only with
+`--backend native` ([continuous fuzzing](SEMANTIC_CI.md#continuous-fuzzing)).
 
 - **Admission** (`native-admission-v1`) is decided from the case alone, before any native run: its
   emitter, the Core operations of its program, its plan's integer types, and the adapter's reading

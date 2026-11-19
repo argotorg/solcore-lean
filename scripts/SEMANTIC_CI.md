@@ -194,6 +194,8 @@ default.
   `stateful-calls` or `stateful-forwarded-value`. It selects the stateful ones explicitly, since
   the suite's own Yul default is the pure profiles. With the default sixteen cases this adds 480
   eight-transaction scenarios to each Yul iteration.
+- `--backend native` adds an opt-in run of `semantic-native.py` on the iteration's draws of the
+  pure profiles that the native admission admits, within `--native-seconds` (default 1800).
 - Machines that share a base seed use their own `--shard-index` of a common `--shard-count`.
 - The first `run` fixes the configuration in `config.json`: backends, profiles, cases (default
   16), whole functions (`--functions`, unset by default), attempts (2,048), node-budget scales,
@@ -215,7 +217,8 @@ default.
 **Epochs.** Before every run the driver verifies the prepared tools offline. The digests of the
 readiness receipt and of the harness scripts form an epoch. When the tools or scripts change, the
 driver stops until it is restarted with `--accept-new-epoch`, and the ledger records each run's
-epoch.
+epoch. With `native` configured, the epoch also covers the native harness's `--check`: its
+versions, admitted emitters, tools and scripts.
 
 **Ledger and registry.** Every run appends a line to `ledger.jsonl` with its seeds, statuses,
 counts, finding occurrences and problems. Each occurrence is counted in `registry.json` under a
@@ -239,6 +242,8 @@ signature made of the backend, category and stage plus one of:
   profile that did not pass without a finding, or was left unexecuted, is listed as a problem.
 - `label` records a triage note for a signature in `labels.json`. A labelled signature is shown as
   known; it stays counted and listed, and its new occurrences still enter the ledger.
+- `replay --state DIR EXAMPLE` reruns a kept native example through the native harness's
+  comparison and says whether it reproduces.
 - `report.md` and `report.json` list the signatures (untriaged first, new ones marked), the run
   totals per backend and the latest problems.
 - `--notify-command CMD` runs CMD after a run with a new signature or a missing suite summary,
@@ -276,6 +281,9 @@ class by its own observations, a duplicate's included.
 - Every other mismatch keeps its program signature and is new, including the same pattern on O2
   or Yul, and a source mutant whose words depend on the first allocations otherwise, such as a
   read of the pointer's slot one byte early.
+
+On the native run kind, the native harness's labels of Lean's known differences count as known.
+Any other native rejection or mismatch is a new signature.
 
 **Exit statuses and limits.** The driver exits with status 2 when the tools are not ready or
 another driver holds the state, 3 on an epoch change, 4 when the state reaches
