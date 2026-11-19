@@ -878,6 +878,10 @@ inductive ProgramSignatureError where
   | missingImplementationTraitPredicate
       (implementation : Resolved.DeclarationId)
       (predicate : ProgramPredicate)
+  /-- A default implementation whose head overlaps an earlier default's of the
+  same trait while one of the two has no where predicates (`SC0247`). -/
+  | overlappingDefaultImplementation
+      (implementation overlaps : Resolved.DeclarationId)
   | duplicateDataConstructor
       (dataType : Resolved.DeclarationId) (name : String)
       (firstIndex duplicateIndex : Nat)
@@ -907,6 +911,7 @@ private def programSignatureErrorDeclaration :
   | .traitCatalogUnavailable implementation _ => implementation
   | .implementationParameterNotInHead implementation _ => implementation
   | .missingImplementationTraitPredicate implementation _ => implementation
+  | .overlappingDefaultImplementation implementation _ => implementation
   | .duplicateDataConstructor dataType _ _ _ => dataType
 
 private def declarationParameters
@@ -2321,6 +2326,42 @@ private def collectProgramSignatures
               }
       collectProgramSignatures environment traits rest state
 
+/-- Whether two implementation heads can describe one goal: their subjects, the
+trait's main arguments, unify once both heads' parameters are fresh variables
+apart. The trait's other arguments are not compared, as upstream's
+`instance_heads_overlap` does not compare them. -/
+private def implementationHeadsOverlap
+    (first second : ProgramImplementationSignature) : Bool :=
+  let left := TypedTraitResolution.freshenRuleFor first.implRule second.head
+  let right := TypedTraitResolution.freshenRuleFor second.implRule left.head
+  match TypeSystem.Unification.unifyTypes left.head.subject right.head.subject with
+  | .ok _ => true
+  | .error _ => false
+
+/-- Upstream's `SC0247` (`4f22ddb0`): a default implementation whose head
+overlaps an earlier default's of the same trait, when either of the two has no
+where predicates, since a goal both decide is ambiguous and nothing tells them
+apart. Defaults of the standard library and those of other libraries are
+compared only among themselves. Lean's implementations are visible everywhere,
+so each is compared with every earlier one. -/
+private def overlappingDefaultErrors :
+    List ProgramImplementationSignature → List ProgramImplementationSignature →
+      List ProgramSignatureError
+  | _, [] => []
+  | earlier, implementation :: rest =>
+      let standard (signature : ProgramImplementationSignature) : Bool :=
+        signature.id.moduleId.library == Workspace.LibraryId.standard
+      let overlapped := if implementation.isDefault then
+          earlier.find? fun prior =>
+            prior.isDefault && decide (prior.head.trait = implementation.head.trait) &&
+              standard prior == standard implementation &&
+              (prior.wherePredicates.isEmpty || implementation.wherePredicates.isEmpty) &&
+              implementationHeadsOverlap implementation prior
+        else none
+      overlapped.toList.map (fun prior =>
+          ProgramSignatureError.overlappingDefaultImplementation implementation.id prior.id) ++
+        overlappingDefaultErrors (earlier ++ [implementation]) rest
+
 /-- Resolve every top-level function signature and implementation rule.
 Independent declaration failures are accumulated in source order. -/
 def buildProgramSignatures (environment : ProgramEnvironment) :
@@ -2332,7 +2373,8 @@ def buildProgramSignatures (environment : ProgramEnvironment) :
     match error with
     | .traitCatalogUnavailable _ trait => !(trait ∈ traitState.failedTraits)
     | _ => true
-  let collectedErrors := traitState.errors ++ nonCascadingErrors
+  let collectedErrors := traitState.errors ++ nonCascadingErrors ++
+    overlappingDefaultErrors [] state.implementations
   let errors := environment.declarations.flatMap fun declaration =>
     collectedErrors.filter fun error =>
       decide (programSignatureErrorDeclaration error = declaration.id)

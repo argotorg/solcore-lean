@@ -4091,6 +4091,67 @@ private def testImplMethodPredicateRule : IO Unit := do
   | .ok _ => throw (IO.userError "an impl method body used an undeclared predicate")
   | .error _ => pure ()
 
+/-- The collected signatures of one source, or its signature errors. -/
+private def defaultOverlapSignatures (content : String) :
+    IO (Except (List ProgramSignatureError) ProgramSignatures) := do
+  let source ← parsed "defaults.solc" content
+  pure (buildProgramSignatures (← catalog [source]))
+
+/-- Upstream's `overlapping_unconditional_default` (`4f22ddb0`, `SC0247`) and
+the rule it checks: a default implementation is refused when its subject, the
+trait's main argument, unifies with an earlier default's of the same trait and
+either of the two has no where predicates. -/
+private def testOverlappingDefaultRule : IO Unit := do
+  let base := [
+    "pragma solcore;",
+    "trait Size<A> { function size(x: A) returns (Word); }",
+    "trait Marker<A> { function mark(x: A) returns (Word); }",
+    "trait Conv<A, B> { function conv(x: A, y: B) returns (Word); }",
+    "enum Box<A> { Box(A) }",
+    "enum Wrap<A> { Wrap(A) }",
+    "enum Pair<A, B> { Pair(A, B) }"]
+  let uitest := [
+    "default impl<A> Size<A> { function size(x: A) returns (Word) { return 32; } }",
+    "default impl<A> Size<Box<A>> { function size(x: Box<A>) returns (Word) { return 64; } }"]
+  for (label, lines) in [
+      ("overlapping_unconditional_default", uitest),
+      ("an unconditional default after a conditional one", [
+        "default impl<A> Size<Box<A>> where A: Marker { function size(x: Box<A>) returns (Word) { return 64; } }",
+        "default impl<A> Size<A> { function size(x: A) returns (Word) { return 32; } }"]),
+      ("subjects that unify under other arguments that differ", [
+        "default impl<A> Conv<A, Word> { function conv(x: A, y: Word) returns (Word) { return 1; } }",
+        "default impl<A> Conv<A, Bool> { function conv(x: A, y: Bool) returns (Word) { return 2; } }"])] do
+    match ← defaultOverlapSignatures (String.intercalate "\n" (base ++ lines)) with
+    | .error [.overlappingDefaultImplementation implementation overlaps] =>
+        assertTrue (overlaps.declarationIndex + 1 == implementation.declarationIndex)
+          s!"{label}: the later default was not the one refused"
+    | result => throw (IO.userError s!"{label}: {reprStr result}")
+  for (label, lines) in [
+      ("two conditional defaults", [
+        "default impl<A> Size<Box<A>> where A: Marker { function size(x: Box<A>) returns (Word) { return 32; } }",
+        "default impl<A> Size<Box<Box<A>>> where A: Marker { function size(x: Box<Box<A>>) returns (Word) { return 64; } }"]),
+      ("subjects that do not unify", [
+        "default impl<A> Size<Box<A>> { function size(x: Box<A>) returns (Word) { return 32; } }",
+        "default impl<A> Size<Wrap<A>> { function size(x: Wrap<A>) returns (Word) { return 64; } }"]),
+      ("a default and an ordinary implementation", [
+        "default impl<A> Size<A> { function size(x: A) returns (Word) { return 32; } }",
+        "impl<A> Size<Box<A>> { function size(x: Box<A>) returns (Word) { return 64; } }"]),
+      ("a non-linear subject that does not unify", [
+        "default impl<A> Size<Pair<A, A>> { function size(x: Pair<A, A>) returns (Word) { return 32; } }",
+        "default impl<B> Size<Pair<Word, Box<B>>> { function size(x: Pair<Word, Box<B>>) returns (Word) { return 64; } }"]),
+      ("subjects that differ under other arguments that unify", [
+        "default impl<A> Conv<Box<A>, A> { function conv(x: Box<A>, y: A) returns (Word) { return 1; } }",
+        "default impl<A> Conv<Wrap<A>, A> { function conv(x: Wrap<A>, y: A) returns (Word) { return 2; } }"])] do
+    match ← defaultOverlapSignatures (String.intercalate "\n" (base ++ lines)) with
+    | .ok signatures =>
+        assertTrue (signatures.implementations.length == 2)
+          s!"{label}: an implementation was lost"
+    | .error errors => throw (IO.userError s!"{label} was refused: {reprStr errors}")
+  -- The whole pipeline refuses the uitest at the signature stage.
+  match checkProgram (implMethodPredicateWorkspace (String.intercalate "\n" (base ++ uitest))) with
+  | .error [.signature (.overlappingDefaultImplementation _ _)] => pure ()
+  | result => throw (IO.userError s!"the checked uitest gave {reprStr result}")
+
 private def testAmbiguousTrait : IO Unit := do
   let left ← parsed "left.solc" "export {Shared}; trait Shared<T> {}"
   let right ← parsed "right.solc" "export {Shared}; trait Shared<T> {}"
@@ -4136,6 +4197,7 @@ def testProgramSignatures : IO Unit := do
   ProgramSignatures.testTraitPredicateContainmentAllowsReorderingAndExtras
   ProgramSignatures.testMethodFailures
   ProgramSignatures.testImplMethodPredicateRule
+  ProgramSignatures.testOverlappingDefaultRule
   ProgramSignatures.testAmbiguousTrait
   ProgramSignatures.testStrictTraitVisibility
 
