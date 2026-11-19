@@ -548,6 +548,81 @@ def requirementAssumption?
   context.assumptions.any fun assumption =>
     decide (applyPredicate state assumption = goal)
 
+/-- The type parameter at the head of a predicate's subject as upstream's
+coherence rules read it: the subject itself, or a product's first component's,
+recursively. Lean has no coherence wrappers. -/
+def coherenceParameter? : Ty → Option TypeParameterId
+  | .parameter parameter => some parameter
+  | .product first _ => coherenceParameter? first
+  | _ => none
+
+/-- A trait's own where predicates, its superclasses, at a predicate's
+arguments. -/
+def superclassPredicates (signatures : ProgramSignatures)
+    (predicate : ProgramPredicate) : List ProgramPredicate :=
+  match predicate.trait with
+  | .declaration id =>
+      match signatures.trait? id with
+      | some trait => trait.wherePredicates.map
+          (ProgramPredicate.applyParameters
+            (trait.parameters.zip (predicate.subject :: predicate.arguments)))
+      | none => []
+  | .builtin _ => []
+
+/-- The predicates that upstream's solver proves from a body's givens alone:
+the givens and, transitively, their superclasses, within `fuel` rounds. -/
+def providedPredicates (signatures : ProgramSignatures) :
+    Nat → List ProgramPredicate → List ProgramPredicate
+  | 0, provided => provided
+  | fuel + 1, provided =>
+      let added := ((provided.flatMap (superclassPredicates signatures)).filter
+        fun predicate => !provided.contains predicate).eraseDups
+      if added.isEmpty then provided
+      else providedPredicates signatures fuel (provided ++ added)
+
+mutual
+
+/-- A goal of the retained evidence that a default implementation decides
+although upstream's solver, following the same implementations to it, never
+uses a default there (`1c7fe983`, `SC0207`): its subject's coherence head is a
+type parameter, no ordinary implementation matches it, and the body's givens
+do not provide it. The walk stops at a goal that upstream may decide another
+way: one the givens provide, one with an open type variable, one that two
+ordinary implementations match, or one decided by a default that competes with
+an ordinary implementation or another default. -/
+def defaultForParameter? (rules : List ProgramImplRule)
+    (provided : List ProgramPredicate) :
+    TypedTraitResolution.Evidence → Option ProgramPredicate
+  | .byImpl goal implId premises =>
+      if provided.contains goal ||
+          !(TypedTraitResolution.predicateVariables goal).isEmpty then
+        none
+      else
+        let program := TypedTraitResolution.programOfRules rules
+        let ordinary := (program.ordinaryCandidates goal).length
+        if (rules.find? fun rule => rule.id == implId).any (·.isDefault) then
+          if ordinary != 0 then none
+          else if (coherenceParameter? goal.subject).isSome then some goal
+          else if (program.defaultCandidates goal).length != 1 then none
+          else defaultForParameterList? rules provided premises
+        else if ordinary != 1 then none
+        else defaultForParameterList? rules provided premises
+
+/-- The first such goal among premise evidence, in order. -/
+def defaultForParameterList? (rules : List ProgramImplRule)
+    (provided : List ProgramPredicate) :
+    List TypedTraitResolution.Evidence → Option ProgramPredicate
+  | [] => none
+  | evidence :: rest =>
+      match defaultForParameter? rules provided evidence with
+      | some goal => some goal
+      | none => defaultForParameterList? rules provided rest
+
+end
+
+/-- Solve one normalized goal: an exactly matching assumption, or else trait
+resolution, whose evidence is refused when it decides a goal with a default
+that upstream does not use for a type parameter (`defaultForParameter?`). -/
 def solveNormalizedPredicate (context : Context) (state : State)
     (goal : ProgramPredicate) : Except Error PredicateEvidence :=
   if requirementAssumption? context state goal then
@@ -555,7 +630,13 @@ def solveNormalizedPredicate (context : Context) (state : State)
   else
     match TypedTraitResolution.resolve context.signatures.resolutionRules
         context.traitDepth goal with
-    | { outcome := .success evidence, .. } => .ok (.implementation evidence)
+    | { outcome := .success evidence, .. } =>
+        match defaultForParameter? context.signatures.resolutionRules
+            (providedPredicates context.signatures
+              (context.signatures.traits.length + 1)
+              (context.assumptions.map (applyPredicate state))) evidence with
+        | some _ => .error (.noTraitImplementation goal)
+        | none => .ok (.implementation evidence)
     | { outcome := .noSolution, .. } => .error (.noTraitImplementation goal)
     | { outcome := .inconclusive reason, .. } => .error (.inconclusiveTrait reason)
 

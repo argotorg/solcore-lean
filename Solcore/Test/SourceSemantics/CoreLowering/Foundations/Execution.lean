@@ -7284,6 +7284,43 @@ private def runImplMethodPredicates : IO Unit := do
     session := completed.session
   IO.println "SOURCE_CORE_IMPL_METHOD_PREDICATES_PASS: implementation methods that omit, restate or reorder their trait method's predicates, as upstream's SC0249 allows, compile and run, each dictionary selected from the caller's evidence and its implementation's premises"
 
+private def defaultForTypeParameterWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := []
+  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+    "pragma solcore;",
+    "trait BitNot<T> { function bnot(value: T) returns (T); }",
+    "default impl<T> BitNot<T> { function bnot(value: T) returns (T) { return value; } }",
+    "enum Coin { Head, Tail }",
+    "impl BitNot<Coin> { function bnot(value: Coin) returns (Coin) { match (value) { case Coin.Head { return Coin.Tail; } case Coin.Tail { return Coin.Head; } } } }",
+    "enum Plain { Head, Tail }",
+    "enum Box<A> { Wrap(A) }",
+    "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+    "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
+    "function flip<T>(x: T) returns (T) where T: BitNot { return ~x; }",
+    "function second<T>(x: T) returns ((Word, T)) { return ~(3, x); }",
+    "function boxed<T>(x: Box<T>) returns (Box<T>) { return ~x; }",
+    "function viaCoin() returns (Word) { return coin(flip(Coin.Head)); }",
+    "function viaPlain() returns (Word) { return plain(flip(Plain.Head)); }",
+    "function viaSecond() returns (Word) { match (second(Coin.Head)) { case (w, c) { return w * 10 + coin(c); } } }",
+    "function viaBoxed() returns (Word) { match (boxed(Box.Wrap(Coin.Head))) { case Box.Wrap(c) { return coin(c); } } }"] }]
+}
+
+private def runDefaultForTypeParameter : IO Unit := do
+  let program ← get "default for a type parameter check" (checkProgram defaultForTypeParameterWorkspace)
+  let names := ["viaCoin", "viaPlain", "viaSecond", "viaBoxed"]
+  let compiled ← get "default for a type parameter compilation"
+    (compile defaultForTypeParameterWorkspace (← names.mapM (seed program)))
+  let mut session ← boot (← compiled.open)
+  for (index, expected) in ([(0, 2), (1, 1), (2, 31), (3, 1)] : List (Nat × Nat)) do
+    let key ← match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError "default for a type parameter root missing")
+    let completed ← execute session key []
+    require (completed.value == word expected)
+      s!"{names[index]!} gave {reprStr completed.value}"
+    session := completed.session
+  IO.println "SOURCE_CORE_DEFAULT_FOR_TYPE_PARAMETER_PASS: a generic that takes a type parameter's goal from a where predicate, as upstream's SC0207 requires, compiles and runs with the caller's implementation or, at a type that only the default covers, the default chosen at the call, and a default still decides a goal whose subject is a product with a word first or a nominal type of the parameter"
+
 set_option maxRecDepth 2048 in
 def run : IO Unit := do
   let program ← get "public check" (checkProgram workspace)
@@ -7595,6 +7632,7 @@ def run : IO Unit := do
   runLayoutBound
   runLayoutFixtures
   runImplMethodPredicates
+  runDefaultForTypeParameter
 
 end Tests.SourceCoreExecution
 end

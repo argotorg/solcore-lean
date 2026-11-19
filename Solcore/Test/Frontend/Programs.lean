@@ -1471,6 +1471,138 @@ private def singleSourceWorkspace (content : String) : Workspace.RawWorkspace :=
   externalLibraries := []
 }
 
+private def defaultBitNot : List String := [
+  "trait BitNot<T> { function bnot(value: T) returns (T); }",
+  "default impl<T> BitNot<T> { function bnot(value: T) returns (T) { return value; } }",
+  "enum Coin { Head, Tail }",
+  "impl BitNot<Coin> { function bnot(value: Coin) returns (Coin) { match (value) { case Coin.Head { return Coin.Tail; } case Coin.Tail { return Coin.Head; } } } }",
+  "enum Plain { Head, Tail }",
+  "enum Box<A> { Wrap(A) }",
+  "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+  "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }"]
+
+/-- The subject of the one unsolved trait goal of a refused program. -/
+private def refusedDefaultSubject (label : String) (lines : List String) :
+    IO TypeSystem.Ty := do
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" lines)) with
+  | .error [.noSolution _ predicate] => pure predicate.subject
+  | .error [.methodNoSolution _ predicate] => pure predicate.subject
+  | .error errors => throw (IO.userError s!"{label} had the wrong failure: {reprStr errors}")
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+
+/-- The evidence of the single source-trait requirement of an accepted
+program's function; a literal's builtin `Int` requirement is not counted. -/
+private def acceptedDefaultEvidence (label name : String) (lines : List String) :
+    IO SourceInference.PredicateEvidence := do
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" lines)) with
+  | .error errors => throw (IO.userError s!"{label} was refused: {reprStr errors}")
+  | .ok checked =>
+      let named := checked.functions.find? fun function =>
+        match checked.environment.declaration? function.declaration with
+        | some declaration => declaration.name == some name
+        | none => false
+      match named with
+      | some function =>
+          let traitRequirements := function.solvedRequirements.filter fun requirement =>
+            match requirement.predicate.trait with
+            | .declaration _ => true
+            | .builtin _ => false
+          match traitRequirements with
+          | [requirement] => pure requirement.evidence
+          | requirements => throw (IO.userError
+              s!"{label}: {name} has trait requirements {reprStr requirements}")
+      | none => throw (IO.userError s!"{label}: {name} was not checked")
+
+/-- Upstream's `default_not_used_for_type_parameter` and
+`default_not_used_for_tuple_of_type_parameter` (`1c7fe983`, `SC0207`) and the
+rule they check: a default implementation never decides a goal whose subject's
+coherence head, the subject itself or a product's first component, is a type
+parameter of the checked body, so such a goal must come from a `where`
+predicate.  Upstream's generic calls `Fee.fee`, which Lean's source syntax
+lacks, so here a generic helper that requires `T: Fee` stands for the call. -/
+private def testDefaultForTypeParameter : IO Unit := do
+  let fee := [
+    "trait Fee<T> { function fee(x: T) returns (Word); }",
+    "default impl<T> Fee<T> { function fee(x: T) returns (Word) { return 0; } }",
+    "enum B { Only }",
+    "function feeOf<T>(x: T) returns (Word) where T: Fee { return 5; }"]
+  match ← refusedDefaultSubject "default_not_used_for_type_parameter" (fee ++ [
+      "impl Fee<B> { function fee(x: B) returns (Word) { return 1; } }",
+      "function charge<T>(x: T) returns (Word) { return feeOf(x); }",
+      "function viaGeneric() returns (Word) { return charge(B.Only); }"]) with
+  | .parameter parameter =>
+      assertTrue (parameter.index == 0)
+        "the refused goal is not on the generic's parameter"
+  | subject => throw (IO.userError s!"the refused goal's subject is {reprStr subject}")
+  match ← refusedDefaultSubject "default_not_used_for_tuple_of_type_parameter" (fee ++ [
+      "impl Fee<(B, B)> { function fee(x: (B, B)) returns (Word) { return 1; } }",
+      "function charge<T>(x: T) returns (Word) { return feeOf((x, x)); }",
+      "function viaGeneric() returns (Word) { return charge(B.Only); }"]) with
+  | .product (.parameter first) (.parameter second) =>
+      assertTrue (decide (first = second) && first.index == 0)
+        "the refused tuple goal is not on the generic's parameter"
+  | subject => throw (IO.userError s!"the refused tuple goal's subject is {reprStr subject}")
+  -- An uncalled generic, one called at a type with its own implementation and
+  -- one called at a type that only the default covers, which compiled before.
+  for (label, calls) in [("an uncalled generic", []),
+      ("a generic called at Coin", ["function viaCoin() returns (Word) { return coin(flip(Coin.Head)); }"]),
+      ("a generic called at Plain", ["function viaPlain() returns (Word) { return plain(flip(Plain.Head)); }"])] do
+    match ← refusedDefaultSubject label (defaultBitNot ++
+        ["function flip<T>(x: T) returns (T) { return ~x; }"] ++ calls) with
+    | .parameter _ => pure ()
+    | subject => throw (IO.userError s!"{label}: the refused goal's subject is {reprStr subject}")
+  match ← refusedDefaultSubject "a product whose first component is the parameter" (defaultBitNot ++
+      ["function flip<T>(x: T) returns ((T, Word)) { return ~(x, 3); }"]) with
+  | .product (.parameter _) _ => pure ()
+  | subject => throw (IO.userError s!"the refused product goal's subject is {reprStr subject}")
+  -- A default implementation's body and an ordinary implementation's body.
+  for (label, lines) in [
+      ("a default implementation's body", [
+        "trait Neg<T> { function neg(value: T) returns (T); }",
+        "default impl<T> Neg<T> { function neg(value: T) returns (T) { return ~value; } }"]),
+      ("an implementation's body", [
+        "trait Sub<T> { function sub(left: T, right: T) returns (T); }",
+        "impl<A> Sub<Box<A>> { function sub(left: Box<A>, right: Box<A>) returns (Box<A>) { match (left) { case Box.Wrap(x) { return Box.Wrap(~x); } } } }"])] do
+    match ← refusedDefaultSubject label (defaultBitNot ++ lines) with
+    | .parameter _ => pure ()
+    | subject => throw (IO.userError s!"{label}: the refused goal's subject is {reprStr subject}")
+  -- The same goal from a `where` predicate.
+  match ← acceptedDefaultEvidence "the where predicate" "flip" (defaultBitNot ++
+      ["function flip<T>(x: T) returns (T) where T: BitNot { return ~x; }"]) with
+  | .assumption _ => pure ()
+  | evidence => throw (IO.userError s!"the where predicate gave {reprStr evidence}")
+  -- A default still decides a goal whose coherence head is not a parameter.
+  for (label, function) in [
+      ("a product whose first component is not a parameter",
+        "function flip<T>(x: T) returns ((Word, T)) { return ~(3, x); }"),
+      ("a nominal type of the parameter",
+        "function flip<T>(x: Box<T>) returns (Box<T>) { return ~x; }")] do
+    match ← acceptedDefaultEvidence label "flip" (defaultBitNot ++ [function]) with
+    | .implementation (.byImpl _ (.declaration _) []) => pure ()
+    | evidence => throw (IO.userError s!"{label} gave {reprStr evidence}")
+  -- Goals that upstream decides from the body's givens or an ordinary
+  -- implementation, where Lean's resolution, which reads the givens only at
+  -- the top, keeps the default it used before: a given below an
+  -- implementation, a superclass of a given, and a goal that an ordinary
+  -- implementation matches.
+  for (label, lines) in [
+      ("a given below an implementation", defaultBitNot ++ [
+        "trait Add<T> { function add(left: T, right: T) returns (T); }",
+        "impl<A> Add<Box<A>> where A: BitNot { function add(left: Box<A>, right: Box<A>) returns (Box<A>) { match (left) { case Box.Wrap(x) { return Box.Wrap(~x); } } } }",
+        "function flip<T>(x: Box<T>) returns (Box<T>) where T: BitNot { return x + x; }"]),
+      ("a superclass of a given", defaultBitNot ++ [
+        "trait Sub<T> where T: BitNot { function sub(left: T, right: T) returns (T); }",
+        "function flip<T>(x: T) returns (T) where T: Sub { return ~x; }"]),
+      ("a goal that an ordinary implementation matches", [
+        "trait BitNot<T> { function bnot(value: T) returns (T); }",
+        "trait Add<T> { function add(left: T, right: T) returns (T); }",
+        "default impl<T> Add<T> { function add(left: T, right: T) returns (T) { return right; } }",
+        "impl<T> Add<T> where T: BitNot { function add(left: T, right: T) returns (T) { return ~left; } }",
+        "function flip<T>(x: T, y: T) returns (T) where T: BitNot { return x + y; }"])] do
+    match ← acceptedDefaultEvidence label "flip" lines with
+    | .implementation _ => pure ()
+    | evidence => throw (IO.userError s!"{label} gave {reprStr evidence}")
+
 private def testStageClassification : IO Unit := do
   let missingEntry := {
     singleSourceWorkspace "function ok() { return; }" with
@@ -1710,6 +1842,7 @@ def testProgramChecking : IO Unit := do
   testNoSolution
   testInconclusive
   testDefaultImplementationPriority
+  testDefaultForTypeParameter
   testStageClassification
   testPhantomImplementationParameterRejection
   testMissingImplementationTraitPredicateRejection
