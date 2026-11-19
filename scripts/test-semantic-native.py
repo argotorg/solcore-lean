@@ -35,6 +35,29 @@ contract SynthesizedFunctions {
     }
 }
 """
+# A memory-array case's source as its emitter writes it (fixed corpus, runtime-memory-arrays).
+ARRAYS = """pragma solcore;
+import * from std;
+import * from std.unsigned;
+import * from std.dispatch;
+
+function sc_mk(sc_p: uint64, sc_q: uint64) returns (uint64[]) {
+    return [sc_p, sc_q];
+}
+
+contract SynthesizedMemoryArrays {
+    function run(input: uint256) public returns (uint256) {
+        let sc_x: word = Typedef.rep(input);
+        let sc_v1: uint64 = Typedef.abs(((sc_x + 9223372036854775807) & 0xffffffffffffffff));
+        let sc_k0: uint256 = uint256(((sc_x >> 1) & 1));
+        let sc_r: word = 0;
+        let sc_a0: uint64[] = new uint64[](4);
+        let sc_a1: uint64[] = sc_mk(sc_v1, 1);
+        sc_r = ((sc_r * 1099511628211) ^ Typedef.rep(sc_a1[sc_k0]));
+        return uint256(sc_r);
+    }
+}
+"""
 SELECTOR = "0xa444f5e9"
 INFERENCE = ("Solcore.Frontend.ProgramCheckError.inference { declaration := { moduleId := { library := "
              "Solcore.Workspace.LibraryId.main }, declarationIndex := 2 }, "
@@ -124,6 +147,54 @@ class AdmissionTests(unittest.TestCase):
         admitted = native.admission(make_case(data=calldata(2**256 - 1)))
         self.assertEqual((admitted["function"], admitted["arguments"]), ("sc_native_run", [str(2**256 - 1)]))
         self.assertEqual(set(native.EMITTERS) & set(native.NOT_ADMITTED), set())
+        # Array forms are read only in the array emitter's sources: v1's rules for the others stay.
+        self.assertEqual(decided(source=SOURCE.replace("sc_fn0(sc_x)", "sc_fn0(sc_x[0:1])")), "admitted")
+
+    def test_memory_arrays_are_admitted_without_std_array_traits_slices_or_memrefs(self):
+        def decided(source=ARRAYS, types=("uint64",)):
+            result = native.admission(make_case(source=source, emitter="solcore-source-memory-arrays-v2",
+                                                memoryArrayShapes={"types": list(types)}))
+            return (result["reason"], result["detail"]) if not result["admitted"] else "admitted"
+
+        def edited(*statements, helper=""):
+            return ARRAYS.replace("\ncontract", helper + "\ncontract").replace(
+                "        return uint256(sc_r);", "".join(f"        {item}\n" for item in statements) +
+                "        return uint256(sc_r);")
+        length = "function sc_len<c>(sc_c: c) returns (uint256) where c: Length {\n    return sc_c.length;\n}\n"
+        get = ("function sc_get<c>(sc_c: c, sc_i: uint256) returns (uint64) where (c, uint256): "
+               "RValueIdxAccess<uint64> {\n    return ridx(sc_c, sc_i);\n}\n")
+        put = "function sc_put(sc_c: memref<uint64>, sc_w: uint64) {\n    CanStore.store(sc_c, sc_w);\n}\n"
+        self.assertEqual(decided(), "admitted")
+        self.assertEqual(decided(edited("sc_r = sc_r ^ Typedef.rep(Length.length(sc_a0) + sc_a0.length);",
+                                        "// a[0:1], toArray(s) and lidx(a, i) in a comment")), "admitted")
+        self.assertEqual(decided(types=["int8"]), ("signed narrow type", "int8"))
+        storage = ARRAYS.replace("{\n    function run", "{\n    sc_st: uint64[];\n    function run")
+        self.assertEqual(decided(storage.replace("return uint256", "sc_st.setLength(2);\n        return uint256")),
+                         ("storage field", "1 fields"))
+        self.assertEqual(decided(edited(helper=length)), ("std's array trait", "Length"))
+        self.assertEqual(decided(edited(helper=get)), ("std's array trait", "RValueIdxAccess, ridx"))
+        for cut in ("[1:sc_k0]", "[1:]", "[:2]", "[:]", "[sc_a1[0]:2]"):
+            self.assertEqual(decided(edited(f"let sc_s0 = sc_a0{cut};")), ("slice", "a[s:e]"), cut)
+        self.assertEqual(decided(edited("let sc_a2: uint64[] = toArray(sc_s0);")), ("slice", "toArray"))
+        self.assertEqual(decided(edited("sc_put(lidx(sc_a0, 1), sc_v1);", helper=put)),
+                         ("memref", "CanStore, lidx, memref<"))
+        # The first reason in a fixed order: the plan's types and the lift's, then std's array traits, slices and
+        # memrefs.
+        self.assertEqual(decided(edited("sc_put(lidx(sc_a0, 1), sc_v1);", "let sc_s0 = sc_a0[1:];", helper=put))[0],
+                         "slice")
+        self.assertEqual(decided(edited("let sc_s0 = sc_a0[1:];", helper=length))[0], "std's array trait")
+        sliced = storage.replace("return uint256", "let sc_s0 = sc_st[0:1];\n        return uint256")
+        self.assertEqual(decided(sliced)[0], "storage field")
+        self.assertEqual(decided(edited(helper=length), types=["int16"])[0], "signed narrow type")
+
+    def test_slices_are_colons_at_a_brackets_own_depth(self):
+        for code in ("a[1:2]", "a[s:]", "a[:e]", "a[:]", "sc_g0[sc_k0][0:2]", "m[b[0]:2]"):
+            self.assertTrue(native.slices(code), code)
+        for code in ("let g: uint64[][] = [[1, 2], [3]];", "let f = [lam (x: uint256) { return x; }];",
+                     'let t = "a[1:2]";', "let x: uint256 = a[1];", "a[f(x: y)]"):
+            self.assertFalse(native.slices(code), code)
+        code = "let sc_s0 = sc_a0[1:]; // memref<T> and CanStore\nsc_st.setLength(Length.length(sc_s0));"
+        self.assertEqual(native.array_forms(code), {"slice": ["a[s:e]"]})
 
 
 class ComparisonTests(unittest.TestCase):
@@ -156,7 +227,20 @@ class ComparisonTests(unittest.TestCase):
         equality = INFERENCE + ('operatorNotSupported "Eq" (Solcore.TypeSystem.Ty.constructor (Solcore.TypeSystem.'
                                 'TypeConstructorId.builtin (Solcore.TypeSystem.BuiltinType.bool))) }')
         exhaustive = INFERENCE + "nonExhaustiveMatch { source := { path := \"main.sol\" }, startByte := 3326 } }"
+        # Row 4's array operations on an open base, as the native tool reports them, match before an operator on a
+        # generalized lambda parameter; a read on such a base fails unification, which no label takes.
+        operators = [(INFERENCE + f'operatorNotSupported "{name}" (Solcore.TypeSystem.Ty.variable {{ index := 1 }}) }}',
+                      f'operatorNotSupported "{name}" at variable', "open-array-base")
+                     for name in ("Length", "toArray", "lidx", "CanStore")]
+        read = INFERENCE + ("unification (Solcore.TypeSystem.Unification.Error.mismatch (Solcore.TypeSystem.Ty."
+                            "application (Solcore.TypeSystem.Ty.constructor (Solcore.TypeSystem.TypeConstructorId."
+                            "builtin (Solcore.TypeSystem.BuiltinType.memoryArray))) (Solcore.TypeSystem.Ty.variable "
+                            "{ index := 7 })) (Solcore.TypeSystem.Ty.mapping (Solcore.TypeSystem.Ty.variable "
+                            "{ index := 5 }) (Solcore.TypeSystem.Ty.variable { index := 6 }))) }")
         expectations = [(typedef, 'operatorNotSupported "Typedef" at variable', "open-typedef-call"),
+                        *operators, (INFERENCE + 'unsupportedExpression "slice" }', 'unsupportedExpression "slice"',
+                                     "open-array-base"),
+                        (read, "unification", None),
                         (lambda_, 'operatorNotSupported "Add" at variable', "generalized-lambda-parameter"),
                         (equality, 'operatorNotSupported "Eq" at bool', "bool-equality"),
                         (INFERENCE + 'unknownVariable "ne" }', 'unknownVariable "ne"', "not-equal"),
@@ -166,8 +250,8 @@ class ComparisonTests(unittest.TestCase):
             self.assertEqual(native.symptom(detail), found)
             self.assertEqual(native.rejection_label("inference", found), label)
         self.assertIsNone(native.rejection_label("signatures", 'unknownVariable "ne"'))
-        self.assertEqual(set(native.KNOWN), {"open-typedef-call", "generalized-lambda-parameter", "bool-equality",
-                                             "not-equal", "uninitialized-local"})
+        self.assertEqual(set(native.KNOWN), {"open-typedef-call", "open-array-base", "generalized-lambda-parameter",
+                                             "bool-equality", "not-equal", "uninitialized-local"})
 
 
 STUB = """#!/usr/bin/env python3
@@ -284,11 +368,12 @@ class RunTests(unittest.TestCase):
                                 "--profile", "runtime-word"])
         check = json.loads(output.getvalue())
         self.assertEqual((code, check["status"], sorted(check["corpora"])), (0, "ready", ["runtime-word"]))
-        self.assertEqual(check["versions"], {"admission": "native-admission-v1", "adapter": "native-lift-v1",
+        self.assertEqual(check["versions"], {"admission": "native-admission-v2", "adapter": "native-lift-v1",
                                              "comparison": "native-compare-v1"})
         self.assertEqual(sorted(check["scripts"]), sorted(native.SCRIPTS))
         args, _ = native.parse_args(["--check", "--mode", "random", "--seed", "5"])
         self.assertIn("runtime-shifts", args.profile)
+        self.assertIn("runtime-memory-arrays", args.profile)
         self.assertNotIn("runtime-assembly", args.profile)
         self.assertTrue(all(native.profile_emitter(profile) in native.EMITTERS for profile in args.profile))
         args, _ = native.parse_args(["--check"])

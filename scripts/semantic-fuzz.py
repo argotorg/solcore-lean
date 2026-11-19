@@ -256,7 +256,11 @@ FIXTURE_MISMATCH_CLASSES = (
 NATIVE_CLASSES = tuple(({"backend": NATIVE, "category": category, "stage": stage, "class": name}, label)
                        for category, stage, name, label in (
     ("native-rejection", "inference", "open-typedef-call",
-     "Lean rejects a `Typedef` call whose type is still open at the call (integer note, differences from upstream)"),
+     "Lean rejects a `Typedef` call whose type is still open at the call (integer note, differences from upstream), "
+     "and so an unannotated `let m = [];` (memory-array note, difference 8)"),
+    ("native-rejection", "inference", "open-array-base",
+     "Lean rejects a length, a slice, `toArray`, `lidx` or `CanStore` whose base's type is still open there "
+     "(memory-array note, differences 14, 18, 19 and 22 to 24)"),
     ("native-rejection", "inference", "generalized-lambda-parameter",
      "Lean generalizes a local lambda, so an operator on a parameter that nothing types is rejected (integer note, "
      "differences from upstream)"),

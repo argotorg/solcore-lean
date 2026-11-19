@@ -1146,7 +1146,7 @@ class NativeRunTests(unittest.TestCase):
         self.tool = self.bin / "semantic-native-tool"
         self.tool.write_text(NATIVE_STUB)
         self.tool.chmod(0o755)
-        self.check = {"status": "ready", "versions": {"admission": "native-admission-v1"}, "admittedEmitters": ["e"],
+        self.check = {"status": "ready", "versions": {"admission": "native-admission-v2"}, "admittedEmitters": ["e"],
                       "tools": {"nativeTool": {"sha256": "1"}}, "scripts": {"semantic-native.py": "2"}}
         for target, replacement in (("verify_tools", lambda config: self.receipt),
                                     ("native_check", lambda config: self.check)):
@@ -1297,6 +1297,11 @@ class NativeRunTests(unittest.TestCase):
             self.assertNotIn(fuzz.canonical_id(key), fuzz.KNOWN, changes)
         mismatch = {"kind": "native-mismatch", "profile": "runtime-word", "core": "returned", "native": "returned"}
         self.assertEqual(fuzz.native_signature_key(mismatch)["fingerprint"], {"core": "returned", "native": "returned"})
+        # Row 4's open-base array operations count under their own class, not under the lambda parameter's.
+        for symptom in ('operatorNotSupported "Length" at variable', 'unsupportedExpression "slice"'):
+            label = native.rejection_label("inference", symptom)
+            key = fuzz.native_signature_key({**rejection, "symptom": symptom, "label": label})
+            self.assertEqual((key.get("class"), fuzz.canonical_id(key) in fuzz.KNOWN), ("open-array-base", True))
 
     def test_a_kept_example_replays_through_the_harness_comparison(self):
         self.start("--iterations", "1")

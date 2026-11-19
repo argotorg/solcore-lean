@@ -8,11 +8,13 @@ case's own direct Core result: a returned Word with the Word, and a native panic
 session decodes to upstream's revert data, with the revert's output.
 
 Admission is a versioned predicate decided before the native tool runs. It reads the case's
-provenance (its emitter, the Core operations of its program and its plan's integer types) and the
+provenance (its emitter, the Core operations of its program and its plan's integer types), the
 adapter's reading of the source (one contract with functions only, no storage field, `uint256`
-parameters). Cases that are not admitted are counted by reason. A native rejection, crash or
-different observation of an admitted case is a finding, never an exclusion; the known differences
-from upstream are findings under their own labels. Out of fuel and timeouts are inconclusive.
+parameters) and, for memory arrays, the source's array forms (std's array traits, slices and
+memrefs are not admitted). Cases that are not admitted are counted by reason. A native rejection,
+crash or different observation of an admitted case is a finding, never an exclusion; the known
+differences from upstream are findings under their own labels. Out of fuel and timeouts are
+inconclusive.
 
 Cases come from the pure runner's own preparation (`semantic-campaign.py`, with the arguments
 `semantic-suite.py` gives each profile), for the fixed corpora or a seeded random draw; preparation
@@ -52,7 +54,7 @@ runner = suite.pure_campaign
 SCHEMA = "solcore-lean.semantic-native.v1"
 REQUEST_SCHEMA = "solcore-lean.semantic-native-request.v1"
 RESULT_SCHEMA = "solcore-lean.semantic-native-result.v1"
-ADMISSION = "native-admission-v1"
+ADMISSION = "native-admission-v2"
 ADAPTER = "native-lift-v1"
 COMPARISON = "native-compare-v1"
 TOOL = ROOT / ".lake/build/bin/semantic-native-tool"
@@ -71,7 +73,7 @@ OPCODE_ALIASES = frozenset(("binary:wordDiv", "binary:wordSdiv", "binary:wordMod
                             "binary:wordShr", "binary:wordSar", "binary:wordByte", "ternary:wordAddMod",
                             "ternary:wordMulMod", "unary:wordClz"))
 SUMS = frozenset(("inLeft", "inRight", "case"))
-# Signed types narrower than 256 bits, for which the integer plans' emitters import std.opcodes' `signextend`.
+# Signed types narrower than 256 bits, for which the integer and array plans' emitters import std.opcodes' `signextend`.
 SIGNED_NARROW = frozenset(f"int{bits}" for bits in range(8, 256, 8))
 # Each admitted emitter: the Core operations that exclude a case, and the provenance key and dimension of its plan's
 # integer types, if it has any.
@@ -88,7 +90,21 @@ EMITTERS = {
     "solcore-source-enums-v2": (frozenset(), None),
     "solcore-source-closure-captures-v2": (frozenset(), None),
     "solcore-source-closure-factories-v2": (frozenset(), None),
+    "solcore-source-memory-arrays-v2": (frozenset(), ("memoryArrayShapes", "types")),
 }
+# The array forms of the array emitters' sources that this version does not admit, each a reason, in this order:
+# std's array traits, which row 4's Lean side leaves out (its lengths are compiler forms, and it declares no std
+# trait), then slices and memrefs, which a later version admits. `slices` finds a slice's brackets.
+ARRAY_FORMS = {
+    "std's array trait": re.compile(r"\b(?:RValueIdxAccess|LValueIdxAccess|ridx)\b|\bLength\b(?!\s*\.\s*length\b)"),
+    "slice": re.compile(r"\barraySlice\s*<|\btoArray\b"),
+    "memref": re.compile(r"\bmemref\s*<|\blidx\b|\bCanStore\b"),
+}
+ARRAY_EMITTERS = frozenset(("solcore-source-memory-arrays-v2",))
+# The native errors of row 4's array operations on a base whose type is still open where they are: Lean decides a
+# slice, a length, `toArray`, `lidx` and `CanStore` there (differences 18, 14, 19 and 22 to 24).
+OPEN_ARRAY_BASE = frozenset(('unsupportedExpression "slice"', *(f'operatorNotSupported "{name}" at variable'
+                                                              for name in ("Length", "toArray", "lidx", "CanStore"))))
 # What the other pure emitters' sources need that the native frontend lacks or reads differently.
 NOT_ADMITTED = {
     "solcore-source-assembly-v2": "inline Yul",
@@ -103,12 +119,15 @@ NOT_ADMITTED = {
     "solcore-source-comptime-v3": "comptime constant functions",
     "solcore-source-modules-v3": "comptime constant functions and module bundles",
     "solcore-source-array-abi-v2": "array parameters",
-    "solcore-source-memory-arrays-v2": "row 4's slices, aliases, rows, storage arrays and std's array traits",
 }
 # Known differences from upstream, each recognized by the native error it gives.
 KNOWN = {
     "open-typedef-call": "row 1's waiting `Typedef` call: Lean resolves `Typedef` where the call is and rejects "
-                         "one whose type is still open there",
+                         "one whose type is still open there, as it rejects row 4's unannotated `let m = [];` "
+                         "(difference 8)",
+    "open-array-base": "row 4's array operations on an open base (differences 14, 18, 19 and 22 to 24): Lean decides "
+                       "a length, a slice, `toArray`, `lidx` or `CanStore` on its base's type where it is and rejects "
+                       "one whose base is still open there, while upstream's constraints wait for later uses",
     "generalized-lambda-parameter": "local lambda generalization: Lean quantifies an unannotated lambda parameter that "
                                     "upstream keeps monomorphic, so an operator on it is rejected",
     "bool-equality": "`==` on `bool`, which Lean does not provide",
@@ -239,6 +258,38 @@ def code_only(text: str) -> str:
     return "".join(kept)
 
 
+def slices(code: str) -> bool:
+    """Whether code has a slice, `a[s:e]`, `a[s:]`, `a[:e]` or `a[:]`: a `:` inside brackets, at their own depth."""
+    opened, position = [], 0
+    while position < len(code):
+        after = skip(code, position)
+        if after != position:
+            position = after
+            continue
+        character = code[position]
+        if character in "([{":
+            opened.append(character)
+        elif character in ")]}":
+            if opened:
+                opened.pop()
+        elif character == ":" and opened and opened[-1] == "[":
+            return True
+        position += 1
+    return False
+
+
+def array_forms(source: str) -> dict[str, list[str]]:
+    """The array forms of a source's code that the native path does not read, by reason, each with what was found."""
+    code, found = code_only(source), {}
+    for reason, pattern in ARRAY_FORMS.items():
+        names = sorted({re.sub(r"\s+", "", match.group(0)) for match in pattern.finditer(code)})
+        if reason == "slice" and slices(code):
+            names.append("a[s:e]")
+        if names:
+            found[reason] = names
+    return found
+
+
 def lift(source: str, method: str) -> dict:
     """native-lift-v1 on a case's source: its std imports dropped, each line kept as an empty line, and its one
     contract's functions moved to the top level without their visibility and mutability words, then a Word entry
@@ -301,7 +352,7 @@ def arguments(contract: dict, count: int) -> list[str] | None:
 
 
 def admission(case: dict) -> dict:
-    """native-admission-v1, decided from the case alone before any native run: the program the native tool reads
+    """native-admission-v2, decided from the case alone before any native run: the program the native tool reads
     with the case's arguments, or the first reason in a fixed order that the case is not admitted."""
     def refuse(reason: str, detail=None) -> dict:
         return {"admitted": False, "reason": reason, "detail": detail}
@@ -333,6 +384,10 @@ def admission(case: dict) -> dict:
     words = arguments(contract, lifted["parameters"])
     if words is None:
         return refuse("calldata")
+    forms = array_forms(case["source"]) if emitter in ARRAY_EMITTERS else {}
+    for reason in ARRAY_FORMS:
+        if reason in forms:
+            return refuse(reason, ", ".join(forms[reason]))
     return {"admitted": True, "source": lifted["source"], "function": lifted["function"], "arguments": words}
 
 
@@ -352,6 +407,8 @@ def rejection_label(stage: str, found: str) -> str | None:
         return None
     if found == 'operatorNotSupported "Typedef" at variable':
         return "open-typedef-call"
+    if found in OPEN_ARRAY_BASE:
+        return "open-array-base"
     if re.fullmatch(r'operatorNotSupported "\w+" at variable', found):
         return "generalized-lambda-parameter"
     if found == 'operatorNotSupported "Eq" at bool':
