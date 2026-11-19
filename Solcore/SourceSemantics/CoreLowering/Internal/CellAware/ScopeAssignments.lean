@@ -1214,6 +1214,7 @@ theorem preserves_value (budget : Nat)
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   cases shape with
   | bare empty _ => exact (projected empty).elim
   | projected layout ordinary =>
@@ -1236,8 +1237,9 @@ theorem preserves_value (budget : Nat)
       obtain ⟨updatedValue, finalStore, finalMap, finalWorld, _root, finalHeaps, maps, worlds, frame, metadata, effect,
           slots, count, typed, agreement, reached, related⟩ :=
         CellAwareStagedProjectedCommit.preserves GeneralizedLocalDescriptorHeap.ordinary_cells layout ordinary extension callerProtocol transport faithful observations
-          generated found rightView rightType profile environments heaps agrees actualTyped initial resolution coreLookup
-          resolutionState resolutionRelated ordinaryRhs rhsPost write invalid
+          generated found rightView rightType (.inl (leafView ▸ profile)) leafView environments heaps agrees actualTyped initial resolution
+          coreLookup resolutionState resolutionRelated ordinaryRhs rhsPost ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write) invalid
+      rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at agreement
       refine ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, effect,
         count, ?_, ⟨reached, related, ?_, ?_⟩, agreement⟩
       · simpa only [GenericAssignmentStatements.Head.writtenContext, CompatibleRenamedPlaceSuccess.writtenContext,
@@ -1372,6 +1374,7 @@ theorem preserves_getter_fault (budget : Nat)
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   change ProtectedPlaceReachedDiagnostics.ShapeErrors (.initial compiled.compatible.checked) registry functions callerProtocol invocation.source context certificate
     scope administrative environment assignment.target prepared operator invalid initial
     (fun reason token => faults (.semantic reason) token) shape at errors
@@ -1395,6 +1398,7 @@ theorem preserves_getter_fault (budget : Nat)
         environments agrees actualTyped initial execution ⟨keyState, keyRelated⟩ lookup initialRead
         (ordered.evaluates (ProtectedStagedProjectedPrefix.values_plain trace)) currentRead extension faithful observations
         initialValue fault operator rhs (lowered.expression.rename ξ) (next.rename ξ) output invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     refine ⟨token, finalStore, finalMap, finalWorld, ?_, missing reached related diagnostic,
       finalHeaps, maps, worlds, frame, metadata, effect, reached, related,
       StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
@@ -1410,6 +1414,7 @@ theorem preserves_getter_fault (budget : Nat)
       CellAwareStagedProjectedFaults.preserves_uninitialized GeneralizedLocalDescriptorHeap.ordinary_cells layout callerProtocol initial execution ⟨keyState, keyRelated⟩
         lookup initialRead (ordered.evaluates (ProtectedStagedProjectedPrefix.values_plain trace)) currentRead
         ordinary empty notMapping nonempty operator rhs (lowered.expression.rename ξ) (next.rename ξ) output invalid
+    rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
     refine ⟨prepared.invalidProjection, finalStore, finalMap, finalWorld, ?_, uninitialized reached related diagnostic,
       finalHeaps, maps, worlds, frame, metadata, effect, reached, related,
       StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
@@ -1446,6 +1451,7 @@ theorem preserves_write_fault [RecursiveStageMeaning.FaultTokens faults] (budget
       ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
         callerProtocol.Relates initial reached ∧ StableRows (bridge.pool reached) := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   change ProtectedPlaceReachedDiagnostics.ShapeErrors (.initial compiled.compatible.checked) registry functions callerProtocol invocation.source context certificate
     scope administrative environment assignment.target prepared operator invalid initial
     (fun reason token => faults (.semantic reason) token) shape at errors
@@ -1476,9 +1482,10 @@ theorem preserves_write_fault [RecursiveStageMeaning.FaultTokens faults] (budget
     | panic read rootType initialValue pathRead panics =>
       obtain ⟨finalStore, finalMap, finalWorld, evaluated, finalHeaps, maps, worlds, frame, metadata, effect, reached, related⟩ :=
         CellAwareStagedProjectedFaults.preserves_panic GeneralizedLocalDescriptorHeap.ordinary_cells layout ordinary extension callerProtocol transport faithful observations
-          generated found rightView rightType profile environments agrees actualTyped initial resolution coreLookup
-          resolutionState resolutionRelated ordinaryRhs rhsPost read initialValue pathRead
-          (fun type typeEq => targetPlain type (by cases snapshot; exact typeEq)) panics (next.rename ξ) output invalid
+          generated found rightView rightType (.inl (leafView ▸ profile)) leafView environments agrees actualTyped initial resolution
+          coreLookup resolutionState resolutionRelated ordinaryRhs rhsPost read initialValue pathRead
+          (by cases snapshot; rfl) panics (next.rename ξ) output invalid
+      rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
       refine ⟨_, finalStore, finalMap, finalWorld, ?_, RecursiveStageMeaning.FaultTokens.panic _,
         finalHeaps, maps, worlds, frame, metadata, effect, reached, related,
         StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
@@ -1489,10 +1496,11 @@ theorem preserves_write_fault [RecursiveStageMeaning.FaultTokens faults] (budget
       obtain ⟨token, count, root, finalStore, finalMap, finalWorld, _sourceFault, _initial, _receipt,
           evaluated, finalHeaps, maps, worlds, frame, metadata, effect, reached, related, diagnostic⟩ :=
         CellAwareStagedProjectedFaults.preserves_structural GeneralizedLocalDescriptorHeap.ordinary_cells layout ordinary extension callerProtocol transport faithful observations
-          generated found rightView rightType profile environments agrees actualTyped initial resolution coreLookup
-          resolutionState resolutionRelated ordinaryRhs rhsPost
+          generated found rightView rightType (.inl (leafView ▸ profile)) leafView environments agrees actualTyped initial resolution
+          coreLookup resolutionState resolutionRelated ordinaryRhs rhsPost
           (snapshot.resolves (ProtectedStagedProjectedPrefix.values_plain keyTrace)) trace.sound.value_plain
           read rootType initialValue fault (next.rename ξ) output invalid
+      rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at evaluated
       refine ⟨token, finalStore, finalMap, finalWorld, ?_, missing reached related diagnostic,
         finalHeaps, maps, worlds, frame, metadata, effect, reached, related,
         StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
@@ -1568,6 +1576,7 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
       scope (head.writtenContext actualContext) assignment operator rhs environment canonical actual
       before store mapping world initial (next.rename ξ) output value finalStore := by
   rcases head with ⟨prepared, index, codes, leaf, lowered, node, invalid, shape, slot, writable, found, generated, rightView, rightType, profile, targetPlain, leafView⟩
+  have none := checkedCompound_of_profile (leafView ▸ profile)
   change ProtectedPlaceReachedDiagnostics.ShapeErrors (.initial compiled.compatible.checked) registry functions callerProtocol invocation.source context certificate
     scope administrative environment assignment.target prepared operator invalid initial
     (fun reason token => faults (.semantic reason) token) shape at errors
@@ -1660,8 +1669,9 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
           (snapshot.resolves (CellAwareStagedProjectedPrefix.values_plain keyTrace))
         obtain ⟨plainRhsSize, plainRhsTrace⟩ := SourceExecutionSize.ExpressionEvaluates.has_size result.trace.sound.value_plain
         simp only [packed_renamed_type] at continuation
+        rw [← assignmentModifier_plain none, ← SourceCoreDataPlaces.placeWrap_plain none] at continuation
         have tail := CellAwareStagedProjectedTail.reflects GeneralizedLocalDescriptorHeap.ordinary_cells callerProtocol transport layout ordinary extension functionTypes faithful observations
-          profile environments agrees actualTyped resolve resolution rightExecution plainRhsTrace initial rhsState
+          (.inl (leafView ▸ profile)) leafView environments agrees actualTyped resolve resolution rightExecution plainRhsTrace initial rhsState
           (callerProtocol.trans getterRelated rhsRelated) missing continuation
         cases tail with
         | fault failed same matched finalHeaps maps worlds frame metadata effect post =>
@@ -1670,12 +1680,13 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
             (StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame)
         | committed write finalHeaps maps worlds frame metadata effect count typed post strict continuation =>
           obtain ⟨reached, related⟩ := post
-          exact .success keyTrace snapshot result.trace write finalHeaps maps worlds frame metadata effect count
+          exact .success keyTrace snapshot result.trace ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write)
+            finalHeaps maps worlds frame metadata effect count
             (by simpa only [GenericAssignmentStatements.Head.writtenContext, CallableIndexedAmbient.ambientDefinitions] using typed)
             reached related
             ⟨CallableIndexedOwnedStagedProjectedAssignmentAdmission.heap_after_assignment unique found assignmentTyped locals
               keyRow keyValues getterHeap resolution.metadata snapshot middleTyped rightTyped result.metadata
-              ((Dynamic.CompoundAssignmentApplies.eq_of_plain targetPlain) ▸ write),
+              write,
               StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
             (by omega) continuation
 

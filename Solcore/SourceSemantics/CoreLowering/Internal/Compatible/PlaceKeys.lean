@@ -865,29 +865,6 @@ theorem initialized_success
     obtain ⟨result, applied, evaluated⟩ := DataPlaceModifier.integer_success operator notWordOnly left right snapshotSelected rightSelected store invalid
     exact ⟨_, _, .compatible (actual := .integer) integer (.integer result), applied, evaluated, DataPlaceModifier.assignment_excludes_invalid applied⟩
 
-/-- The source operation determines the same result as the actual native
-modifier, including division/modulo by zero and unbounded Integer arithmetic. -/
-theorem preserves
-    (observations : FunctionObservations checked.catalog functions identities)
-    {sourceType : TypeSystem.Ty} {type : Ty} {left right result : Dynamic.Value} {leftCore rightCore : Value}
-    {operator : Syntax.ValueAssignOp}
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType sourceType))
-    (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
-    (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
-    (applied : Dynamic.AssignmentValueApplies operator (some left) right result)
-    {environment : Environment} {snapshot rhs : Expr}
-    (snapshotSelected : Selects environment snapshot (.inRight .unit leftCore))
-    (rightSelected : Selects environment rhs rightCore) (store : Store) (invalid : Word) :
-    ∃ value, ValueRep checked registry functions mapping world sourceType result value type ∧
-      Evaluates environment store (modified type (binaryOperator (type = .integer) operator) false snapshot rhs invalid)
-        (.inRight .word value) store ∧ ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right := by
-  obtain ⟨result', value, related, applied', evaluated, valid⟩ :=
-    initialized_success observations profile (DataPlaceModifier.assignment_divisor applied) leftRep rightRep
-      snapshotSelected rightSelected store invalid
-  have same := DataPlaceModifier.assignment_functional applied' applied
-  subst result'
-  exact ⟨value, related, evaluated, valid⟩
-
 /-- The native modifier always gives a leaf. The source either applies the
 operation, or panics on a zero divisor once the latest root is traversed. -/
 theorem initialized_outcome

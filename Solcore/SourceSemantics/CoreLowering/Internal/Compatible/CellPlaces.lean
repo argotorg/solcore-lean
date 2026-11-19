@@ -1887,6 +1887,103 @@ theorem reflects
   obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed evaluated
   exact ⟨futureWorld, administrative, resultRep, heaps, worlds, frame, appended⟩
 
+private theorem raw_present_evaluates
+    {optional rootValue : Value} {sourceRoot : Dynamic.Value}
+    (root : RootRead compilation.checked registry functions mapping world prepared heap store location target cell optional sourceRoot rootValue)
+    (arguments : Arguments compilation.checked registry functions mapping world source site keys path resolved)
+    (leafProjected : compilation.checked.catalog.project leaf = .ok prepared.route.leafType)
+    (nonempty : prepared.steps ≠ []) (functionTypes : FunctionRuntimeViews functions)
+    (faithful : DataEquality.IdentityFaithful identities) (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (keyLength : prepared.keyTypes.length = keys.length)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
+    (helperTyped : HasType context (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression)))
+      (LanguageResult.resultType prepared.route.rootType) ambient.definitions)
+    (referenceSelected : DataEquality.Selects environment referenceExpression (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
+    (keysSelected : DataEquality.Selects environment keyExpression (packValues keys))
+    (replacementSelected : DataEquality.Selects environment replacementExpression replacementValue) :
+    ∃ result after futureWorld administrative,
+      Evaluates environment store (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression))) result after ∧
+      CompatiblePlaceSetterReflection.RawResult compilation.checked registry prepared cell resolved replacement result ∧
+      GenericHeap.CellHeapRepresents cells mapping futureWorld heap after ∧
+      WorldExtends world futureWorld ∧ AdministrativePreserved mapping store mapping after ∧ after = store ++ administrative := by
+  rcases CompatiblePlaceReadTotality.read_or_fault arguments functionTypes root.payload leafProjected with
+      ⟨selected, _, read, _⟩ | ⟨reason, fault⟩
+  · obtain ⟨updated, changed⟩ := DataPlaceUpdateTotality.read_update read replacement
+    obtain ⟨native, administrative, evaluated⟩ :=
+      CompatiblePlaceWriteback.raw_setter_at root arguments changed nonempty faithful observations keyLength environment keyType
+        referenceExpression keyExpression replacementExpression referenceSelected keysSelected replacementSelected
+    obtain ⟨futureWorld, extension, finalHeaps, _, frame⟩ :=
+      CellMappingHeap.evaluation_preserves_frame heaps environmentTyped helperTyped evaluated rfl
+    exact ⟨_, _, futureWorld, administrative, evaluated, .updated root.input.initial changed, finalHeaps, extension, frame, rfl⟩
+  · obtain ⟨token, count, receipt, tree⟩ := arguments.faultTree root.payload fault prepared
+    obtain ⟨after, administrative, evaluated, appended, _⟩ :=
+      CompatiblePlaceSetterFault.setter_at root tree nonempty faithful observations keyLength environment keyType
+        referenceExpression keyExpression replacementExpression replacementValue referenceSelected keysSelected replacementSelected
+    obtain ⟨futureWorld, extension, finalHeaps, _, frame⟩ :=
+      CellMappingHeap.evaluation_preserves_frame heaps environmentTyped helperTyped evaluated appended
+    exact ⟨_, after, futureWorld, administrative, evaluated, .missing root.input.initial fault receipt,
+      finalHeaps, extension, frame, appended⟩
+
+/-- The setter's actual run on a replacement that need not be represented, as `reflects` gives it for
+a represented one, without the updated root's representation. -/
+theorem raw_reflects
+    (ordinaryCells : GenericHeap.OrdinaryCells (payloadModel compilation.checked registry functions) cells)
+    (cellOrdinary : cell.generalized = none)
+    (arguments : Arguments compilation.checked registry functions mapping world source site keys path resolved)
+    (leafProjected : compilation.checked.catalog.project leaf = .ok prepared.route.leafType)
+    (virtual : ∀ key value, cell.type = .mapping key value → VirtualRoot.Generated compilation prepared.route key value)
+    (ordinary : (∀ key value, cell.type ≠ .mapping key value) → prepared.route.rootMapping = none)
+    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
+    (nonempty : prepared.steps ≠ []) (functionTypes : FunctionRuntimeViews functions)
+    (faithful : DataEquality.IdentityFaithful identities) (observations : FunctionObservations compilation.checked.catalog functions identities)
+    (keyLength : prepared.keyTypes.length = keys.length)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
+    (reference : ReferenceRepresents mapping world location target prepared.route.rootType)
+    (read : Dynamic.Heap.Reads heap location cell)
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
+    (helperTyped : HasType context (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression)))
+      (LanguageResult.resultType prepared.route.rootType) ambient.definitions)
+    (referenceSelected : DataEquality.Selects environment referenceExpression (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
+    (keysSelected : DataEquality.Selects environment keyExpression (packValues keys))
+    (replacementSelected : DataEquality.Selects environment replacementExpression replacementValue)
+    {result : Value} {after : Store}
+    (completed : Evaluates environment store (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression))) result after) :
+    ∃ futureWorld administrative,
+      CompatiblePlaceSetterReflection.RawResult compilation.checked registry prepared cell resolved replacement result ∧
+      GenericHeap.CellHeapRepresents cells mapping futureWorld heap after ∧
+      WorldExtends world futureWorld ∧ AdministrativePreserved mapping store mapping after ∧ after = store ++ administrative := by
+  have evaluates : ∃ result after futureWorld administrative,
+      Evaluates environment store (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression))) result after ∧
+      CompatiblePlaceSetterReflection.RawResult compilation.checked registry prepared cell resolved replacement result ∧
+      GenericHeap.CellHeapRepresents cells mapping futureWorld heap after ∧
+      WorldExtends world futureWorld ∧ AdministrativePreserved mapping store mapping after ∧ after = store ++ administrative := by
+    obtain ⟨optional, native, represented⟩ := CompatibleCellPlaceRoot.read_at ordinaryCells heaps reference read cellOrdinary
+    cases represented with
+    | initialized related =>
+      exact raw_present_evaluates (.initialized read reference native related) arguments leafProjected nonempty functionTypes
+        faithful observations keyLength heaps environmentTyped helperTyped referenceSelected keysSelected replacementSelected
+    | @uninitialized sourceType payload projected =>
+      by_cases mappingRoot : ∃ key value, sourceType = .mapping key value
+      · obtain ⟨key, value, rfl⟩ := mappingRoot
+        obtain ⟨rootValue, root⟩ := RootRead.virtual (virtual key value rfl) registryExtension projected read reference native
+        exact raw_present_evaluates root arguments leafProjected nonempty functionTypes faithful observations keyLength
+          heaps environmentTyped helperTyped referenceSelected keysSelected replacementSelected
+      · have noVirtual := ordinary (fun key value same => mappingRoot ⟨key, value, same⟩)
+        have evaluated : Evaluates environment store (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression)))
+            (.inLeft prepared.route.rootType (.word prepared.invalidProjection)) store := by
+          apply Evaluates.apply .lambda (.pair (.loadCell (referenceSelected.evaluates store) native) (.pair (keysSelected.evaluates store) (replacementSelected.evaluates store)))
+          cases steps : prepared.steps with
+          | nil => exact (nonempty steps).elim
+          | cons head tail =>
+            simp only [normalizeRoot, noVirtual, LanguageResult.failure]
+            exact .caseLeft (.first (.var rfl)) (.inLeft .word)
+        exact ⟨_, store, world, [], evaluated, .uninitialized rfl mappingRoot (resolved_nonempty arguments nonempty),
+          heaps, .refl _, .refl _ _, by simp⟩
+  obtain ⟨actual, actualStore, futureWorld, administrative, evaluated, resultRep, heaps, worlds, frame, appended⟩ := evaluates
+  obtain ⟨rfl, rfl⟩ := evaluation_deterministic completed evaluated
+  exact ⟨futureWorld, administrative, resultRep, heaps, worlds, frame, appended⟩
+
 end Solcore.SourceSemantics.CoreLowering.CompatibleCellPlaceSetterReflection
 end
 
@@ -2010,6 +2107,47 @@ theorem setter_preserves
     CellMappingHeap.evaluation_preserves_frame heaps environmentTyped setterTyped evaluated appended
   exact ⟨native, helperStore, futureWorld, evaluated, helperHeaps, extension, frame,
     appended.symm ▸ CellAwareScopeAuthority.Effect.append store administrative (.refl heap) (.refl mapping) extension⟩
+
+/-- The setter runs on the latest path for any replacement, represented or not, and keeps the cell
+heap. -/
+theorem raw_setter_preserves
+    {cells : GenericHeap.CellModel ambient.definitions}
+    {instances : GeneralizedLocalDescriptorHeap.InstanceModel ambient.definitions}
+    (root : RootRead checked registry functions mapping world prepared heap store location target cell optional sourceRoot rootValue)
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
+    {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {leaf : TypeSystem.Ty}
+    {sourceProjections : List PlaceProjection} {position : Nat} {keySites : List (ExpressionId × Ty)}
+    {path : PreparedPath checked source site cell.type sourceProjections position prepared.steps keySites leaf}
+    {keys : List Value} {projections : List Dynamic.EvaluatedProjection}
+    (arguments : Arguments checked registry functions mapping world source site keys path projections)
+    {replacementSource updated : Dynamic.Value} {replacement : Value}
+    (changed : Dynamic.ProjectionsUpdate (fun _ value => value = replacementSource) (some sourceRoot) projections updated)
+    (nonempty : prepared.steps ≠ [])
+    {identities : Dynamic.Value → Word → Prop} (faithful : IdentityFaithful identities)
+    (observations : FunctionObservations checked.catalog functions identities) (keyLength : prepared.keyTypes.length = keys.length)
+    {environment : Environment} {context : Core.Context} {keyType : Ty}
+    {referenceExpression keyExpression replacementExpression : Expr}
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
+    (setterTyped : HasType context
+      (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression)))
+      (LanguageResult.resultType prepared.route.rootType) ambient.definitions)
+    (referenceSelected : Selects environment referenceExpression (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
+    (keysSelected : Selects environment keyExpression (packValues keys))
+    (replacementSelected : Selects environment replacementExpression replacement) :
+    ∃ native helperStore futureWorld,
+      Evaluates environment store
+        (.apply (setter prepared keyType) (.pair (.loadCell referenceExpression) (.pair keyExpression replacementExpression)))
+        (.inRight .word native) helperStore ∧
+      GenericHeap.CellHeapRepresents cells mapping futureWorld heap helperStore ∧
+      WorldExtends world futureWorld ∧ AdministrativePreserved mapping store mapping helperStore ∧
+      CellAwareScopeAuthority.Effect instances mapping world heap store mapping futureWorld heap helperStore := by
+  obtain ⟨native, administrative, evaluated⟩ :=
+    CompatiblePlaceWriteback.raw_setter_at root arguments changed nonempty faithful observations keyLength environment keyType
+      referenceExpression keyExpression replacementExpression referenceSelected keysSelected replacementSelected
+  obtain ⟨futureWorld, extension, helperHeaps, _, frame⟩ :=
+    CellMappingHeap.evaluation_preserves_frame heaps environmentTyped setterTyped evaluated rfl
+  exact ⟨native, store ++ administrative, futureWorld, evaluated, helperHeaps, extension, frame,
+    CellAwareScopeAuthority.Effect.append store administrative (.refl heap) (.refl mapping) extension⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleCellPlaceWriteback
 end
