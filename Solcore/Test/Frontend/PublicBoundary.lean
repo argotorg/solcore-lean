@@ -3239,7 +3239,10 @@ private def testSelectedValuesTraitsAndLocalShadowing : IO Unit := do
   let consumer := String.intercalate "\n" [
     "import {remote as imported, Eq as Comparable} from provider;",
     "function remote(value: Word) returns (Word) { return value; }",
-    "impl Comparable<Word> {}",
+    -- An implementation away from its trait's module is for this module's own
+    -- type, as upstream's orphan rule (`SC0246`) requires.
+    "enum Local { Only }",
+    "impl Comparable<Local> {}",
     "function constrained<T>(value: T) returns (T) where T: Comparable { return value; }",
     "function run() returns (Word, Bool) { return (remote(1), imported(true)); }"
   ]
@@ -3332,7 +3335,10 @@ private def testReexportedEntitiesAndModulePath : IO Unit := do
   let consumer := String.intercalate "\n" [
     "import * from facade;",
     "import * as F from facade;",
-    "impl Comparable<Word> {}",
+    -- An implementation away from its trait's module is for this module's own
+    -- type, as upstream's orphan rule (`SC0246`) requires.
+    "enum Local { Only }",
+    "impl Comparable<Local> {}",
     "function constrained<T>(value: T) returns (T) where T: Comparable { return value; }",
     "function run(value: F.P.Box) returns (Bool, Bool) { return (renamed(true), F.P.keep(true)); }"
   ]

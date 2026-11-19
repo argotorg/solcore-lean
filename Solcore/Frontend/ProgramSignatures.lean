@@ -882,6 +882,9 @@ inductive ProgramSignatureError where
   same trait while one of the two has no where predicates (`SC0247`). -/
   | overlappingDefaultImplementation
       (implementation overlaps : Resolved.DeclarationId)
+  /-- An implementation away from its trait's module and from the module of the
+  type at its subject's coherence head (`SC0246`). -/
+  | orphanImplementation (implementation : Resolved.DeclarationId)
   | duplicateDataConstructor
       (dataType : Resolved.DeclarationId) (name : String)
       (firstIndex duplicateIndex : Nat)
@@ -912,6 +915,7 @@ private def programSignatureErrorDeclaration :
   | .implementationParameterNotInHead implementation _ => implementation
   | .missingImplementationTraitPredicate implementation _ => implementation
   | .overlappingDefaultImplementation implementation _ => implementation
+  | .orphanImplementation implementation => implementation
   | .duplicateDataConstructor dataType _ _ _ => dataType
 
 private def declarationParameters
@@ -2362,6 +2366,78 @@ private def overlappingDefaultErrors :
           ProgramSignatureError.overlappingDefaultImplementation implementation.id prior.id) ++
         overlappingDefaultErrors (earlier ++ [implementation]) rest
 
+/-- The modules whose implementations a module sees directly: those that its
+imports and its re-exports name, as upstream's `file_instance_edges` reads
+them. -/
+private def moduleInstanceEdges (environment : ProgramEnvironment)
+    (module : ProgramModule) : List Workspace.ModuleId :=
+  module.source.items.flatMap fun item =>
+    match item.value with
+    | .importDecl declaration =>
+        let path := match declaration.value with
+          | .plain path => path
+          | .namespace path _ => path
+          | .wildcard path _ => path
+          | .selected _ path _ => path
+        (resolveProgramModulePath? environment module.id path).toList
+    | .exportDecl declaration =>
+        let paths : List Syntax.QualifiedName := match declaration.value with
+          | .local items => items.elements.filterMap fun item =>
+              match item.value with
+              | .moduleWildcard path _ => some path
+              | .name _ => none
+          | .module path => [path]
+          | .moduleAs path _ => [path]
+          | .itemsFrom path _ => [path]
+        paths.filterMap (resolveProgramExportPath? environment module.id)
+    | _ => []
+
+/-- The modules seen from `seen`: transitively, those that their imports and
+re-exports name (`instance_import_modules`), within `fuel` rounds. -/
+private def seenModules (edges : Workspace.ModuleId → List Workspace.ModuleId) :
+    Nat → List Workspace.ModuleId → List Workspace.ModuleId
+  | 0, seen => seen
+  | fuel + 1, seen =>
+      let added := ((seen.flatMap edges).filter fun id => !seen.contains id).eraseDups
+      if added.isEmpty then seen else seenModules edges fuel (seen ++ added)
+
+/-- The declared type at a subject's coherence head: a nominal type's
+declaration, after a product's first component, recursively. -/
+private def coherenceTypeDeclaration? : TypeSystem.Ty → Option Resolved.DeclarationId
+  | .product first _ => coherenceTypeDeclaration? first
+  | .application function _ => coherenceTypeDeclaration? function
+  | .constructor (.declaration id) => some id
+  | _ => none
+
+/-- Upstream's `SC0246` (`02456cee`, `282cb2c8`): an implementation must sit in
+its trait's module or in the module of the type at its subject's coherence
+head, or in a module that sees that module and is seen by it, so every module
+that can state a goal sees every implementation that could decide it. A
+standard library counts as one unit. -/
+private def orphanImplementationErrors (environment : ProgramEnvironment)
+    (implementations : List ProgramImplementationSignature) :
+    List ProgramSignatureError :=
+  let edges (id : Workspace.ModuleId) : List Workspace.ModuleId :=
+    match environment.modules.find? fun module => decide (module.id = id) with
+    | some module => moduleInstanceEdges environment module
+    | none => []
+  let fuel := environment.modules.length + 1
+  let seen := environment.modules.map fun module =>
+    (module.id, seenModules edges fuel [module.id])
+  let sees (viewer target : Workspace.ModuleId) : Bool :=
+    match seen.find? fun entry => decide (entry.1 = viewer) with
+    | some entry => entry.2.contains target
+    | none => false
+  let nextTo (module owner : Workspace.ModuleId) : Bool :=
+    decide (module = owner) || (sees module owner && sees owner module) ||
+      (module.library == Workspace.LibraryId.standard &&
+        owner.library == Workspace.LibraryId.standard)
+  implementations.filterMap fun implementation =>
+    let owners := implementation.head.trait.declaration?.toList ++
+      (coherenceTypeDeclaration? implementation.head.subject).toList
+    if owners.any fun owner => nextTo implementation.id.moduleId owner.moduleId then none
+    else some (ProgramSignatureError.orphanImplementation implementation.id)
+
 /-- Resolve every top-level function signature and implementation rule.
 Independent declaration failures are accumulated in source order. -/
 def buildProgramSignatures (environment : ProgramEnvironment) :
@@ -2374,7 +2450,8 @@ def buildProgramSignatures (environment : ProgramEnvironment) :
     | .traitCatalogUnavailable _ trait => !(trait ∈ traitState.failedTraits)
     | _ => true
   let collectedErrors := traitState.errors ++ nonCascadingErrors ++
-    overlappingDefaultErrors [] state.implementations
+    overlappingDefaultErrors [] state.implementations ++
+    orphanImplementationErrors environment state.implementations
   let errors := environment.declarations.flatMap fun declaration =>
     collectedErrors.filter fun error =>
       decide (programSignatureErrorDeclaration error = declaration.id)

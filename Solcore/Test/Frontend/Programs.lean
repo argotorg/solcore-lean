@@ -4152,6 +4152,68 @@ private def testOverlappingDefaultRule : IO Unit := do
   | .error [.signature (.overlappingDefaultImplementation _ _)] => pure ()
   | result => throw (IO.userError s!"the checked uitest gave {reprStr result}")
 
+/-- A workspace of several modules, each beginning with the pragma. -/
+private def orphanWorkspace (files : List (String × List String)) :
+    Workspace.RawWorkspace := {
+  entry := "main.solc"
+  mainSources := files.map fun (path, lines) =>
+    { path, content := String.intercalate "\n" ("pragma solcore;" :: lines) }
+  externalLibraries := []
+}
+
+/-- How many implementations of a workspace are refused as orphans, or `none`
+when it has another error. -/
+private def orphanCount (files : List (String × List String)) : Option Nat :=
+  match checkProgram (orphanWorkspace files) with
+  | .ok _ => some 0
+  | .error errors =>
+      if errors.all fun error => match error with
+          | .signature (.orphanImplementation _) => true
+          | _ => false
+      then some errors.length else none
+
+/-- Upstream's `orphan_impl_in_sibling_module` and
+`orphan_tuple_impl_follows_first_element` (`02456cee`, `282cb2c8`, `SC0246`) and
+the rule they check: an implementation sits in its trait's module or in the
+module of the type at its subject's coherence head, a product's first
+component, or in a module that sees that module through imports and
+re-exports and is seen by it.  Upstream's two `invokable` uitests implement a
+built-in trait for function types, which Lean has no trait for. -/
+private def testOrphanImplementationRule : IO Unit := do
+  let fee := ["export {Fee};", "trait Fee<T> { function fee(x: T) returns (Word); }"]
+  let feeImpl (type : String) (value : Nat) :=
+    s!"impl Fee<{type}> \{ function fee(x: {type}) returns (Word) \{ return {value}; } }"
+  let squares := ["import {Get} from table;", "enum Squares { Squares }", "enum Key { Key }",
+    "impl<I> Get<(Squares, I), Word> { function get(ci: (Squares, I)) returns (Word) { return 1; } }"]
+  let table := ("table.solc", ["export {Get};", "trait Get<C, V> { function get(ci: C) returns (V); }"])
+  for (label, expected, files) in [
+      ("orphan_impl_in_sibling_module", 2, [
+        ("fees.solc", ["export {Fee, A};", "trait Fee<T> { function fee(x: T) returns (Word); }", "enum A { A }"]),
+        ("one.solc", ["import {Fee, A} from fees;", feeImpl "A" 1]),
+        ("two.solc", ["import {Fee, A} from fees;", feeImpl "A" 2]),
+        ("main.solc", ["import * from one;", "import * from two;"])]),
+      ("orphan_tuple_impl_follows_first_element", 1, [table,
+        ("main.solc", squares ++
+          ["impl Get<(Word, Key), Word> { function get(ci: (Word, Key)) returns (Word) { return 2; } }"])]),
+      ("a product whose first component is defined here", 0, [table, ("main.solc", squares)]),
+      ("next to the trait", 0, [("fees.solc", fee ++ [feeImpl "Word" 1]), ("main.solc", ["import {Fee} from fees;"])]),
+      ("next to the type", 0, [("fees.solc", fee), ("main.solc", ["import {Fee} from fees;", "enum A { A }", feeImpl "A" 1])]),
+      ("a builtin type away from the trait", 1, [("fees.solc", fee), ("main.solc", ["import {Fee} from fees;", feeImpl "Word" 2])]),
+      ("an import cycle with the trait's module", 0, [
+        ("main.solc", ["import {Seed} from user;"] ++ fee),
+        ("user.solc", ["import {Fee} from main;", "export {Seed};", "enum Seed { Seed }", feeImpl "Word" 2])]),
+      ("a transitive import cycle", 0, [
+        ("main.solc", ["import {Seed} from b;"]),
+        ("b.solc", ["import {Fee} from c;", "export {Seed};", "enum Seed { Seed }", feeImpl "Word" 4]),
+        ("c.solc", ["import {Mark} from d;"] ++ fee),
+        ("d.solc", ["import {Seed} from b;", "export {Mark};", "enum Mark { Mark }"])]),
+      ("a trait seen through a re-export", 1, [
+        ("fees.solc", fee),
+        ("facade.solc", ["export fees.{Fee};"]),
+        ("main.solc", ["import {Fee} from facade;", "enum A { A }", feeImpl "A" 5, feeImpl "Word" 6])])] do
+    assertTrue (orphanCount files == some expected)
+      s!"{label}: expected {expected} orphan implementations, got {reprStr (checkProgram (orphanWorkspace files))}"
+
 private def testAmbiguousTrait : IO Unit := do
   let left ← parsed "left.solc" "export {Shared}; trait Shared<T> {}"
   let right ← parsed "right.solc" "export {Shared}; trait Shared<T> {}"
@@ -4198,6 +4260,7 @@ def testProgramSignatures : IO Unit := do
   ProgramSignatures.testMethodFailures
   ProgramSignatures.testImplMethodPredicateRule
   ProgramSignatures.testOverlappingDefaultRule
+  ProgramSignatures.testOrphanImplementationRule
   ProgramSignatures.testAmbiguousTrait
   ProgramSignatures.testStrictTraitVisibility
 
