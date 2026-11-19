@@ -68,12 +68,6 @@ theorem resolved_valueType {program : Program} {context : SourceSemantics.Contex
     target.valueType = place.type := by
   cases resolve <;> rfl
 
-/-- The operator profiles exclude checked arithmetic at a fixed-width target. -/
-theorem plain_of_profile {target : TypeSystem.Ty} {operator : Syntax.ValueAssignOp}
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType target)) :
-    ∀ type, target = .fixed type → ¬ FixedCheckedCompound operator :=
-  DataPlaceModifier.plain_of_checkedCompound (checkedCompound_of_profile profile)
-
 /-- A target whose runtime type is `Word` or `integer` has no fixed-width type, so
 in-place `~` there is `BitNotSnapshot` (`Dynamic.BitNotAssignmentApplies.eq_of_plain`). -/
 theorem bitNotPlain_of_runtime {target : TypeSystem.Ty}
@@ -117,22 +111,6 @@ theorem panic_functional {targetType : TypeSystem.Ty} {operator : Syntax.ValueAs
     cases secondPanic with
     | compound other otherPanics =>
       cases corresponds <;> cases other <;> exact panics.functional otherPanics
-
-/-- Represented initialized operands are never invalid, whether the operation
-applies or panics. -/
-theorem initialized_valid
-    (observations : FunctionObservations checked.catalog functions identities)
-    {sourceType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
-    {operator : Syntax.ValueAssignOp}
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType sourceType))
-    (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
-    (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type) :
-    ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right := by
-  obtain ⟨_, _, _, _, outcome⟩ := initialized_outcome observations profile leftRep rightRep
-    (environment := [rightCore, .inRight .unit leftCore]) (.var (index := 1) rfl) (.var (index := 0) rfl) [] Word.zero
-  rcases outcome with ⟨_, valid⟩ | ⟨_, _, _, panics⟩
-  · exact valid
-  · exact DataPlaceModifier.panic_excludes_invalid (panics .word)
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceModifier
 end

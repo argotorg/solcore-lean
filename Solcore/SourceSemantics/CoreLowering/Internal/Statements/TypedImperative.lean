@@ -926,9 +926,10 @@ private theorem guard_typed {context : Core.Context} {outputType result : Ty}
 theorem execute_continuation {prepared : SourceCoreCompatibleDataPlaces.Prepared}
     {reference rhs next : Expr} {keys : SourceCoreBasic.LoweredExpr}
     {output result : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalid : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     {definitions : DataEnvironment} {context : Core.Context}
     (typed : HasType context
-      (SourceCoreCompatibleDataPlaces.execute prepared reference keys rhs next output operator bitNot invalid)
+      (SourceCoreCompatibleDataPlaces.execute prepared reference keys rhs next output operator bitNot invalid wrap)
       result definitions) : HasType context next result definitions := by
   cases typed with
   | letE reference first =>
