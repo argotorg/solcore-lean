@@ -679,7 +679,8 @@ call. Nothing schedules it.
   (`Staging.Recursive.ProjectedTarget.keys` stops at an element projection), and arrays stay
   outside `StaticProfile`.
 - **User collections indexed through `RValueIdxAccess`.** They need std's traits, and `Typedef` at
-  a type parameter, which is row 1's open gap.
+  a type parameter, which is row 1's open gap. Generic code over std's `Length` (`where c: Length`)
+  waits for the same: Lean declares neither trait, so both are rejected with `unknownTrait`.
 - **Raw memory:** `get_free_memory()`, `allocate_memory(size)`, `mload`, `mstore` and
   `abi_encode(v)`.
 - **Deferred type resolution at finalization**, which could lift differences 14, 15, 18, 19 and the

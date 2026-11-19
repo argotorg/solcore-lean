@@ -1985,16 +1985,18 @@ entry for its method is appended, and the program is compiled once and run once 
 path is opt-in: no suite or CI job runs it, and the fuzz driver runs it only with
 `--backend native` ([continuous fuzzing](SEMANTIC_CI.md#continuous-fuzzing)).
 
-- **Admission** (`native-admission-v1`) is decided from the case alone, before any native run: its
+- **Admission** (`native-admission-v2`) is decided from the case alone, before any native run: its
   emitter, the Core operations of its program, its plan's integer types, and the adapter's reading
   of the source, which must be one contract with functions only, no storage field and `uint256`
-  parameters. Cases that are not admitted are counted by reason.
+  parameters. A memory-array source must not use std's array traits, slices or memrefs. Cases
+  that are not admitted are counted by reason.
 - **Comparison** (`native-compare-v1`): a returned Word against direct Core's, and the revert data
   of a native panic, which the native session decodes, against direct Core's revert output. Out of
   fuel and timeouts are inconclusive.
 - **Findings.** A native rejection, a crash or a different observation of an admitted case is a
   finding under a stable signature, with a request that `semantic-native-tool` replays. The known
-  differences from upstream (row 1's open `Typedef` call, local lambda generalization, `bool ==`,
+  differences from upstream (row 1's open `Typedef` call, which also rejects an unannotated
+  `let m = [];`, row 4's array operations on an open base, local lambda generalization, `bool ==`,
   `!=` at types without a builtin, reads of uninitialized locals) are findings under their own
   labels.
 - `--check` prints the identity of every tool, script and corpus a run reads. A run whose identity
