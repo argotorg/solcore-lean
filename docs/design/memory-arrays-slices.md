@@ -270,8 +270,8 @@ Each rejects its slice, array or memref when that operand's type is still open t
 | `CanStore.load(r)` | no namespace or local is named `CanStore` | a memref | `ExpressionForm.memrefLoad`, the memref's element |
 | `CanStore.store(r, v)` | the same holds | a memref, and a value whose type unifies with the memref's element | `ExpressionForm.memrefStore`, `()` |
 
-So `toArray(m[1:3])` has the type `uint256[]` where `m` has, `lidx(m, 1)` is rejected as ambiguous,
-as the pinned driver rejects it, and `CanStore.store(r, 7)` stores a `uint8` where `r` has the type
+So `toArray(m[1:3])` has the type `uint256[]` where `m` has, `lidx(m, 1)` is rejected as ambiguous
+(difference 25), and `CanStore.store(r, 7)` stores a `uint8` where `r` has the type
 `memref<uint8>`.
 
 ### Source semantics
@@ -659,8 +659,13 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
     and `let put = CanStore.store;` applied to the same memref and `uint256(5)`. The value's type,
     unlike the memref's, may still be open: it unifies with the element. Both drivers reject a value
     of another type, the pinned driver with SC0207.
+25. **A literal `lidx` index has no default.** `lidx(m, 1)` is rejected with
+    `ambiguousIntegerLiteral` wherever it is, as in `let r = lidx(m, 1);` or `bump(lidx(m, 1))`. The
+    pinned driver gives the literal `uint256`, as it does a literal in a generic call's bound, and
+    accepts both. It rejects `CanStore.store(lidx(m, 1), v)` and `CanStore.load(lidx(m, 1))` with
+    SC0299, since the memref's type is still open there. `lidx(m, uint256(1))` types in both.
 
-Differences 9 to 13 change only a diagnostic or the room of a resource limit, and 8 and 14 to 24
+Differences 9 to 13 change only a diagnostic or the room of a resource limit, and 8 and 14 to 25
 only reject some programs that upstream accepts. None of them changes what an accepted program
 means. Difference 1 does, by the user's decision 3. Deferring the choice to finalization could lift
 differences 14, 15, 18 and 19 and the first rejection in 22 to 24, as it could the open `Typedef`
