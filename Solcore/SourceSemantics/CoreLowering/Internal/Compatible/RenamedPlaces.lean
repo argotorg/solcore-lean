@@ -781,59 +781,6 @@ theorem preserves_prefix_wide {compilation : SourceCoreCompatibleDataPlaces.Cont
                       ((ContinuationAgreement.mk (fun written => guarded.mpr written) (fun checked => guarded.mp checked)).trans
                         (ContinuationAgreement.letE (.storeCell (.var rfl) helperRead (.inRight (.var rfl)) coreWritten))))))))
 
-theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
-    {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
-    {functions : FunctionModel compilation.checked.catalog ambient}
-    {program : Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
-    {source : TypedSource} {scope : Scope} {site : SourceCoreElaboration.ErrorSite}
-    {certificate : Certificate} {faults : FaultRep} {place : PlaceResolution} {prepared : Prepared}
-    {codes : List SourceCoreBasic.LoweredExpr} {sourceTypes : List TypeSystem.Ty} {leaf : TypeSystem.Ty}
-    {administrativeContext actualContext : Core.Context} {ξ : Renaming}
-    (layout : Layout (definitions := ambient.definitions) compilation source certificate scope site place prepared codes sourceTypes leaf administrativeContext)
-    (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none)
-    (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
-    (meaning : TypedGenericExpressionMeaning.Preserves (payloadModel compilation.checked registry functions) program context evidence source certificate faults)
-    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
-    (observations : FunctionObservations compilation.checked.catalog functions identities)
-    {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
-    (rhsGenerated : certificate scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    {operator : Syntax.ValueAssignOp}
-    (rhsView : AssignedRhsView operator leaf node.type)
-    (rhsCoreType : lowered.type = prepared.route.leafType)
-    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
-    {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
-    {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
-    (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
-    (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
-    (locals : Dynamic.EnvironmentAgrees before context.locals environment)
-    (agrees : ReadOnly.EnvironmentsAgree ξ canonical coreEnvironment)
-    (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
-    (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
-    (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
-      environment before place rhs updatedRoot after)
-    (invalidOperand : Word) :
-    ∃ updatedValue finalStore finalMap finalWorld,
-      ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType updatedRoot updatedValue prepared.route.rootType ∧
-      HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
-      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
-      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
-      ∃ slots : Environment, slots.length = 7 ∧
-        RuntimeEnvironmentHasTypes finalWorld (slots ++ coreEnvironment)
-          (writtenContext prepared (SourceCoreCalls.packArguments codes).type
-            actualContext) ambient.definitions ∧
-        ∀ next outputType, ContinuationAgreement coreEnvironment store
-          ((execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
-            (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand).rename ξ)
-          (slots ++ coreEnvironment) finalStore (shift 7 (next.rename ξ)) := by
-  have none := checkedCompound_of_profile operatorProfile
-  have plain := DataPlaceModifier.plain_of_checkedCompound none
-  have wide := preserves_prefix_wide (targetType := leaf) layout ordinary registryExtension meaning faithful observations
-    rhsGenerated found rhsView rhsCoreType (.inl operatorProfile) rfl environments heaps locals agrees actualTyped slot
-    rootTyped ((Dynamic.CompoundAssignmentApplies.eq_of_plain plain).symm ▸ trace) invalidOperand
-  rw [assignmentModifier_plain none, SourceCoreDataPlaces.placeWrap_plain none] at wide
-  exact wide
-
 end Solcore.SourceSemantics.CoreLowering.CompatibleRenamedPlaceSuccess
 end
 

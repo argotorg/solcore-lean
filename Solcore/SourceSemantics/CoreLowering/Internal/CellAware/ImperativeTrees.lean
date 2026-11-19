@@ -1360,10 +1360,10 @@ theorem collected
           exact ⟨rhsNode, rhsFound, child⟩) accepted
       have tailTyped := TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)
       obtain ⟨first, tablePrepared⟩ := assignmentsPrepared
-      have rawProfile : AssignmentProfile operator assignment.target.type := by
+      have rawProfile : AssignmentProfile operator assignment.target.type ∨ FixedCompoundAssignment operator assignment.target.type := by
         rcases profile with equal | word
-        · exact .inl equal
-        · exact .inr (.inl word)
+        · exact .inl (.inl equal)
+        · exact .inl (.inr (.inl word))
       have operands := GenericAssignmentDiagnostics.prepared_operands tablePrepared
         (lookupStatement?_sound found).1 (.statement form) rawProfile
       rw [(lookupStatement?_sound found).2, ← token] at operands
@@ -1400,10 +1400,10 @@ theorem collected
           accepted nativeTyped
       have tailTyped := TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)
       obtain ⟨first, tablePrepared⟩ := assignmentsPrepared
-      have rawProfile : AssignmentProfile operator assignment.target.type := by
+      have rawProfile : AssignmentProfile operator assignment.target.type ∨ FixedCompoundAssignment operator assignment.target.type := by
         rcases profile with equal | word
-        · exact .inl equal
-        · exact .inr (.inl word)
+        · exact .inl (.inl equal)
+        · exact .inl (.inr (.inl word))
       have operands := GenericAssignmentDiagnostics.prepared_operands tablePrepared
         (lookupStatement?_sound found).1 (.statement form) rawProfile
       rw [(lookupStatement?_sound found).2, ← token] at operands

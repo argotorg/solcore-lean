@@ -105,7 +105,7 @@ def assign {context scope assignment operator rhs rest body}
     (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+    (profile : WideAssignmentProfile operator assignment.target.type)
     (remaining : ProducedDiagnosticExtraction diagnosticPolicy layouts owner active frame globals onError values source factory certificates definitions administrative type continuation
         context scope rest body) :
     ProducedDiagnosticExtraction diagnosticPolicy layouts owner active frame globals onError values source factory certificates definitions administrative type continuation
@@ -223,7 +223,7 @@ def assign {context scope assignment operator rhs rest body}
     (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+    (profile : WideAssignmentProfile operator assignment.target.type)
     (remaining : TokenDiagnosticExtraction diagnosticPolicy layouts owner active frame globals onError values source factory invalidUnary certificates definitions administrative type continuation
         context scope rest body) :
     TokenDiagnosticExtraction diagnosticPolicy layouts owner active frame globals onError values source factory invalidUnary certificates definitions administrative type continuation
@@ -343,7 +343,7 @@ def assign {context scope assignment operator rhs rest body}
     (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+    (profile : WideAssignmentProfile operator assignment.target.type)
     (headFuel : Nat)
     (prepared : head.PreparedAt site headFuel (invalidProjection site assignment.target.root)
       (missingDefault site assignment.target.root))
@@ -450,7 +450,7 @@ inductive Coupled (factory : AssignmentDiagnosticOrigins.Factory tracked diagnos
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+      (profile : WideAssignmentProfile operator assignment.target.type)
       (fuel : Nat)
       (prepared : head.PreparedAt site fuel (invalidProjection site assignment.target.root) (missingDefault site assignment.target.root))
       : Coupled factory invalidProjection missingDefault (.assign head remaining) (.pair remainingPlan (.assignment head site origin sameToken sourceTyped rightTyped profile))
@@ -565,7 +565,7 @@ def assign {context scope assignment operator rhs rest body}
     (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+    (profile : WideAssignmentProfile operator assignment.target.type)
     (headFuel : Nat)
     (prepared : head.PreparedAt site headFuel (invalidProjection site assignment.target.root)
       (missingDefault site assignment.target.root))

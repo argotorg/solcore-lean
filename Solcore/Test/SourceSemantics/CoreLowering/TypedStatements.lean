@@ -763,7 +763,7 @@ private theorem syntaxTree : TypedForHeader.Syntax source context items := by
   · intro index member
     simp [assignment] at member
   · exact .of_type booleanTyped
-  · exact .inl rfl
+  · exact .inl (.inl rfl)
   · exact .nil
 
 private theorem sourceAssigned : Dynamic.SourcePlaceAssignment program context [] source (Dynamic.AssignmentValueApplies .equal)
@@ -1015,7 +1015,7 @@ private theorem syntaxTree (mode : Bool) : TypedImperative.Syntax source context
     · intro index member
       simp [assignment] at member
     · exact .of_type booleanTyped
-    · exact .inl rfl
+    · exact .inl (.inl rfl)
     · exact .breaking (node := breakNode) rfl rfl
   · exact .body (.body (.returnValue [] rfl rfl rfl rfl rfl booleanTyped booleanSyntax))
 
@@ -1254,7 +1254,7 @@ private theorem assignmentSyntax {rest : List ForItemForm} (remaining : TypedFor
   · intro index member
     simp [assignment] at member
   · exact .of_type booleanTyped
-  · exact .inl rfl
+  · exact .inl (.inl rfl)
   · exact remaining
 private theorem syntaxTree (mode : Bool) : TypedImperativeFor.Syntax source context (.statements mode statements) .bool := by
   apply TypedImperativeFor.Syntax.forLoop (node := loopNode) rfl rfl rfl
@@ -1272,7 +1272,7 @@ private theorem syntaxTree (mode : Bool) : TypedImperativeFor.Syntax source cont
       · intro index member
         simp [assignment] at member
       · exact .of_type booleanTyped
-      · exact .inl rfl
+      · exact .inl (.inl rfl)
       · exact .breaking (node := breakNode) rfl rfl
     · exact assignmentSyntax .nil
   · exact .body (.body (.returnValue [] rfl rfl rfl rfl rfl booleanTyped booleanSyntax))

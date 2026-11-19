@@ -309,7 +309,7 @@ inductive Plan (factory : AssignmentDiagnosticOrigins.Factory tracked diagnostic
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type)) : Plan factory
+      (profile : WideAssignmentProfile operator assignment.target.type) : Plan factory
   | unary {context : SourceSemantics.Context} {scope : SourceCoreLocalCell.Scope} {assignment : AssignmentResolution}
       (head : CompatibleBitNotStatements.Head context scope assignment)
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
@@ -345,7 +345,7 @@ structure LocalReceipts (registry : SourceCoreRawMetadata.Registry) (faults : Fu
     (_sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (_rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (_profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type)), factory.residual head registry faults
+    (_profile : WideAssignmentProfile operator assignment.target.type), factory.residual head registry faults
   unary : ∀ {context scope assignment} (head : CompatibleBitNotStatements.Head context scope assignment)
     (_writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
@@ -487,7 +487,7 @@ inductive TokensFor : Plan factory → Prop where
       (sourceTyped : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type)) :
+      (profile : WideAssignmentProfile operator assignment.target.type) :
       TokensFor (.assignment head site origin same sourceTyped rightTyped profile)
   | unary {context scope assignment}
       (head : CompatibleBitNotStatements.Head context scope assignment)
@@ -545,7 +545,7 @@ def PlaceReceipts (registry : SourceCoreRawMetadata.Registry) (faults : Function
     (∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type) →
     AssignedOperandTyped source context operator rhs assignment.target.type →
-    AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type) →
+    WideAssignmentProfile operator assignment.target.type →
     PlaceErrors head registry faults
 
 namespace TokensFor

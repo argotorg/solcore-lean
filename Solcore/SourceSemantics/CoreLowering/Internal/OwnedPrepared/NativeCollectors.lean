@@ -336,7 +336,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+    (profile : WideAssignmentProfile operator assignment.target.type)
     (extract : ∀ id lowered, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered →
       RawTyped (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression definitions →
@@ -351,8 +351,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
   by_cases bare : assignment.target.projections = []
   · obtain ⟨binder, prepared, index, value, _binding, _rootType, _rawView, _slot,
         _layout, generated, _sameType, _profile, codeEq⟩ := CompatibleBareAssignment.of_lower bare accepted
-    rw [assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)] at codeEq
-    have rhsNative := execute_present_rhs (prepared := prepared) (reference := .var index)
+    have rhsNative := execute_present_rhs_assignment (prepared := prepared) (reference := .var index)
       (keys := SourceCoreCalls.packArguments []) (rhs := value.expression) (next := next)
       (output := output) (result := result) (operator := operator) (codeEq ▸ typed)
     obtain ⟨head, emitted, token⟩ := Head.of_lower_bare_with_token bare unique writable rightTyped profile
@@ -367,11 +366,10 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
       | @present id right rhsGenerated rhsType =>
         obtain ⟨binder, leaf, description⟩ := CompatiblePlaceDescription.of_describe described
         obtain ⟨routeEq, _, path⟩ := description.prepared preparedBy
-        have rhsNative := execute_present_rhs (prepared := prepared) (reference := .var index)
+        have rhsNative := execute_present_rhs_assignment (prepared := prepared) (reference := .var index)
           (keys := SourceCoreCalls.packArguments codes) (rhs := right.expression) (next := next)
           (output := output) (result := result) (operator := operator)
-          (by simpa only [routeEq, Option.isNone_some, placeModifier, Bool.false_eq_true, ↓reduceIte,
-            assignmentModifier_plain (checkedCompound_of_profile profile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_profile profile)] using typed)
+          (by simpa only [routeEq, Option.isNone_some, placeModifier, Bool.false_eq_true, ↓reduceIte] using typed)
         obtain ⟨node, found, certified⟩ := extract rhs right (by simp) rhsGenerated ⟨_, rhsNative⟩
         obtain ⟨_rhsRaw, ⟨packedResult, packedNative⟩⟩ := execute_children typed
         obtain ⟨sourceTypes, tree, keyTypes⟩ :=
@@ -403,7 +401,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
           exact description.ordinary (fun k v same => notMapping k v (rootEq.trans same))
         refine ⟨⟨prepared, index, codes, leaf, right, node, invalidOperand,
           .projected layout ordinary, by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding,
-          found, certified, (rightTyped.view unique found).transport leafView, rhsType, .inl profile, leafView⟩,
+          found, certified, (rightTyped.view unique found).transport leafView, rhsType, profile, leafView⟩,
           by simp [Head.emit, routeEq, placeModifier], rfl,
           .projected route layout ordinary rfl described preparedBy⟩
 

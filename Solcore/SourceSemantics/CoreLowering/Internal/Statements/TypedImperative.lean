@@ -206,7 +206,7 @@ inductive Syntax (source : TypedSource) :
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+      (profile : WideAssignmentProfile operator assignment.target.type)
       (remaining : Syntax source context mode rest expected) : Syntax source context mode (id :: rest) expected
 
 inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)

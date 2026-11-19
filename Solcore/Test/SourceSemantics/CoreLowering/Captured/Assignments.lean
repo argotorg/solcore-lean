@@ -1054,7 +1054,7 @@ theorem ObservedFactory.body_syntax {fixture : CompiledFixture} (observed : Obse
                 · intro index member
                   simp [observed.shape.targetBare] at member
                 · rw [targetType]; exact .of_type rhs
-                · exact .inl rfl
+                · exact .inl (.inl rfl)
                 · intro id member
                   simp only [observed.shape.targetBare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
                   cases member

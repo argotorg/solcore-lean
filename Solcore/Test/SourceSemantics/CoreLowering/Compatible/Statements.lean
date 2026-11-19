@@ -633,7 +633,7 @@ private theorem syntaxTree (mode : Bool) : CompatibleAssignmentStatements.Syntax
   · intro index member
     simp [assignment] at member
   · exact .of_type booleanTyped
-  · exact .inl rfl
+  · exact .inl (.inl rfl)
   · exact .tail (.body (.returnValue [] rfl rfl rfl rfl rfl booleanTyped (.fragment (.fragment (.fragment (.fragment (.primitive (.product (.literal rfl (.bool "true" true))))))))))
 
 private theorem sourceAssigned : Dynamic.SourcePlaceAssignment program context [] source (Dynamic.AssignmentValueApplies .equal)
@@ -835,10 +835,11 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
     (observations : FunctionObservations compilation.checked.catalog functions identities)
     {rhs : ExpressionId} {lowered : SourceCoreBasic.LoweredExpr} {node : ExpressionNode}
     (rhsGenerated : (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) scope rhs lowered) (found : source.lookupExpression? rhs = some node)
-    {operator : Syntax.ValueAssignOp}
+    {operator : Syntax.ValueAssignOp} {targetType : TypeSystem.Ty}
     (rhsView : AssignedRhsView operator leaf node.type)
     (rhsCoreType : lowered.type = prepared.route.leafType)
-    (operatorProfile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType leaf))
+    (operatorProfile : WideAssignmentProfile operator targetType)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType targetType)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before after : Dynamic.Heap} {store : Store} {index : Nat} {updatedRoot : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -848,7 +849,7 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
     (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
-    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.AssignmentValueApplies operator)
+    (trace : Dynamic.SourcePlaceAssignment program context evidence source (Dynamic.CompoundAssignmentApplies targetType operator)
       environment before place rhs updatedRoot after)
     (invalidOperand : Word) :
     ∃ updatedValue finalStore finalMap finalWorld,
@@ -862,14 +863,15 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
             actualContext) ambient.definitions ∧
         ∀ next outputType, ContinuationAgreement coreEnvironment store
           ((execute prepared (.var index) (SourceCoreCalls.packArguments codes) lowered.expression next outputType
-            (binaryOperator (prepared.route.leafType = .integer) operator) false invalidOperand).rename ξ)
+            (assignmentModifier targetType (prepared.route.leafType = .integer) operator) false invalidOperand
+            (SourceCoreDataPlaces.placeWrap targetType operator false)).rename ξ)
           (slots ++ coreEnvironment) finalStore (shift 7 (next.rename ξ)) := by
   have preservation : TypedGenericExpressionMeaning.Preserves
       (payloadModel compilation.checked registry functions) program context evidence source
       (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) faults :=
     CompatibleExpressionTyped.preserves functions registryExtension program evidence contextValid unique uninitialized missing
-  exact CompatibleRenamedPlaceSuccess.preserves_prefix layout ordinary registryExtension preservation faithful observations
-    rhsGenerated found rhsView rhsCoreType operatorProfile environments heaps locals agrees actualTyped slot rootTyped trace invalidOperand
+  exact CompatibleRenamedPlaceSuccess.preserves_prefix_wide layout ordinary registryExtension preservation faithful observations
+    rhsGenerated found rhsView rhsCoreType operatorProfile leafView environments heaps locals agrees actualTyped slot rootTyped trace invalidOperand
 
 
 theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}

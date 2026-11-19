@@ -98,7 +98,7 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+      (profile : WideAssignmentProfile operator assignment.target.type)
       (children : ∀ id, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
         expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
       (remaining : Syntax source expressionSyntax context (.statements mode rest) expected) : Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
@@ -145,7 +145,7 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
         WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+      (profile : WideAssignmentProfile operator assignment.target.type)
       (children : ∀ id, id ∈ rhs :: DataPlaceKeyOrder.sourceKeys assignment.target.projections →
         expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
       (remaining : Syntax source expressionSyntax context (.initializers rest condition post statements) expected) : Syntax source expressionSyntax context (.initializers (.assignValue assignment operator rhs :: rest) condition post statements) expected

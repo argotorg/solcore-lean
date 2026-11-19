@@ -191,7 +191,7 @@ theorem accepted_head (native : SourceCoreGeneralFunctions.CallableContext)
       assignment .equal (some (id 5)) output next reasonAt Word.zero Word.zero (fun _ => Word.zero) = .ok code) :
     ∃ head : BuiltinAssignmentStatements.Head 100 values source context [] reasonAt scope administrative definitions assignment .equal (id 5),
       code = head.emit next output := by
-  apply GenericAssignmentStatements.Head.of_lower_bare rfl unique ?_ (.of_type groupTyped) (.inl rfl) ?_ accepted
+  apply GenericAssignmentStatements.Head.of_lower_bare rfl unique ?_ (.of_type groupTyped) (.inl (.inl rfl)) ?_ accepted
   · intro actual binding
     have same := Except.ok.inj ((show SourceCoreCompatibleDataPlaces.rootBinder source binder.id = .ok binder from rfl).symm.trans binding)
     subst actual
@@ -3576,7 +3576,7 @@ private theorem headerSyntax : BuiltinForHeader.Syntax source context items := b
   · intro index member
     simp [assignment] at member
   · exact .of_type groupTyped
-  · exact .inl rfl
+  · exact .inl (.inl rfl)
   · intro expression member
     have same : expression = id 5 := by simpa only [assignment, DataPlaceKeyOrder.sourceKeys, List.mem_singleton] using member
     subst expression
@@ -3854,7 +3854,7 @@ private theorem assignmentSyntax {rest : List ForItemForm} (remaining : GenericF
   · intro index member
     simp [assignment] at member
   · exact .of_type booleanTyped
-  · exact .inl rfl
+  · exact .inl (.inl rfl)
   · exact children
   · exact remaining
 private theorem syntaxTree (mode : Bool) : BuiltinImperativeFor.Syntax source context (.statements mode statements) .bool := by
@@ -3873,7 +3873,7 @@ private theorem syntaxTree (mode : Bool) : BuiltinImperativeFor.Syntax source co
       · intro index member
         simp [assignment] at member
       · exact .of_type booleanTyped
-      · exact .inl rfl
+      · exact .inl (.inl rfl)
       · exact children
       · exact .breaking (node := breakNode) rfl rfl
     · exact assignmentSyntax .nil

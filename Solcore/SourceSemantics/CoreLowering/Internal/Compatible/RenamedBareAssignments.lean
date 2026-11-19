@@ -1695,7 +1695,7 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+    (profile : WideAssignmentProfile operator assignment.target.type)
     (extract : ∀ id lowered, expression fuel source scope id reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? id = some node ∧ CompatibleExpressionTyped.Tree readFuel values source context solved reasonAt scope id lowered ∧
       HasType (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression (LanguageResult.resultType lowered.type) definitions)
@@ -1711,13 +1711,13 @@ theorem Head.of_lower {readFuel : Nat} {values : ValuesContext} {source : TypedS
     obtain ⟨node, found, tree, _⟩ := extract rhs lowered generated
     refine ⟨⟨prepared, index, [], prepared.route.rootSourceType, lowered, node, invalidOperand,
       .bare bare layout, slot, rootType ▸ writable binder binding, found, tree,
-      (rightTyped.view unique found).transport rawView, sameType, .inl profile, rawView⟩, codeEq⟩
+      (rightTyped.view unique found).transport rawView, sameType, profile, rawView⟩, codeEq⟩
   · obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, lowered, node, _, binding, rootType, slot, layout, ordinary,
       _, found, tree, targetView, rawView, sameType, codeEq⟩ :=
       CompatiblePlaceLayoutCertificates.of_lower unique signatures sourceTyped rightTyped bare free extract accepted
         typed
     refine ⟨⟨prepared, index, codes, leaf, lowered, node, invalidOperand,
-      .projected layout ordinary, slot, rootType ▸ writable binder binding, found, tree, rawView, sameType, .inl profile,
+      .projected layout ordinary, slot, rootType ▸ writable binder binding, found, tree, rawView, sameType, profile,
       targetView⟩, codeEq⟩
 
 /-- Static source obligations for the ordinary assignment branch. General
@@ -1732,7 +1732,7 @@ inductive Syntax (source : TypedSource) (context : SourceSemantics.Context) : Bo
       (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+      (profile : WideAssignmentProfile operator assignment.target.type)
       (remaining : Syntax source context mode rest expected) : Syntax source context mode (id :: rest) expected
 
 private theorem read_found {checked : SourceCoreCompatibleCatalog.Checked} {source : TypedSource}

@@ -1146,7 +1146,7 @@ private theorem assigned {source : TypedSource} {context : SourceSemantics.Conte
           · intro index member
             simp [bare] at member
           · rw [target]; exact .of_type rhs
-          · exact .inl rfl
+          · exact .inl (.inl rfl)
           · intro child member
             simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
             subst child
@@ -3405,7 +3405,7 @@ private theorem assigned {source : TypedSource} {context : SourceSemantics.Conte
           · intro index member
             simp [bare] at member
           · rw [target]; exact .of_type rhs
-          · exact .inl rfl
+          · exact .inl (.inl rfl)
           · intro child member
             simp only [bare, DataPlaceKeyOrder.sourceKeys, List.mem_cons, List.not_mem_nil, or_false] at member
             subst child

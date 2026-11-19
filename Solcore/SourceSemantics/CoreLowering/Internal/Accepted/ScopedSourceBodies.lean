@@ -758,7 +758,7 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       WritableLocal context assignment.target.root actual.scheme.body) ∧
     AssignedOperandTyped source context operator rhs assignment.target.type ∧
-    AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type) := by
+    WideAssignmentProfile operator assignment.target.type := by
   have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
       AssignedOperandTyped source context operator rhs type ∧ (operator = .equal ∨ type = .word) := by
     cases typed with
@@ -789,8 +789,8 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
         cases projections
         exact targetType.symm ▸ target.symm ▸ writable
       · rcases profile with equal | word
-        · exact .inl equal
-        · exact .inr (.inl (by rw [target, word]; rfl))
+        · exact .inl (.inl equal)
+        · exact .inl (.inr (.inl (by rw [target, word]; rfl)))
 
 /-- Mapping paths derive the writable declaration from the original key types. -/
 theorem projected_assignment_facts {source : TypedSource} {context : SourceSemantics.Context}
@@ -806,7 +806,7 @@ theorem projected_assignment_facts {source : TypedSource} {context : SourceSeman
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       WritableLocal context assignment.target.root actual.scheme.body) ∧
     AssignedOperandTyped source context operator rhs assignment.target.type ∧
-    AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type) := by
+    WideAssignmentProfile operator assignment.target.type := by
   have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
       AssignedOperandTyped source context operator rhs type ∧ (operator = .equal ∨ type = .word) := by
     cases typed with
@@ -836,8 +836,8 @@ theorem projected_assignment_facts {source : TypedSource} {context : SourceSeman
         cases Except.ok.inj (declaration.symm.trans actualFound)
         exact same ▸ writable
       · rcases profile with equal | word
-        · exact .inl equal
-        · exact .inr (.inl (by rw [target, word]; rfl))
+        · exact .inl (.inl equal)
+        · exact .inl (.inr (.inl (by rw [target, word]; rfl)))
 
 /-- Actual original unary typing supplies the declared writable root. -/
 theorem bitNot_facts {source : TypedSource} {context : SourceSemantics.Context}

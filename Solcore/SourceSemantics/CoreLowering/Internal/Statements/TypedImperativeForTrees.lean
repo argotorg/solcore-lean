@@ -104,7 +104,7 @@ inductive Syntax (source : TypedSource) :
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+      (profile : WideAssignmentProfile operator assignment.target.type)
       (remaining : Syntax source context (.statements mode rest) expected) : Syntax source context (.statements mode (id :: rest)) expected
 
 
@@ -149,7 +149,7 @@ inductive Syntax (source : TypedSource) :
         WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+      (profile : WideAssignmentProfile operator assignment.target.type)
       (remaining : Syntax source context (.initializers rest condition post statements) expected) : Syntax source context (.initializers (.assignValue assignment operator rhs :: rest) condition post statements) expected
 
 inductive Tree (layouts : SourceCoreAllocationLayouts.Prepared)
@@ -1804,7 +1804,7 @@ inductive UnarySyntax (source : TypedSource) :
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+      (profile : WideAssignmentProfile operator assignment.target.type)
       (remaining : UnarySyntax source context (.statements mode rest) expected) : UnarySyntax source context (.statements mode (id :: rest)) expected
 
 
@@ -1849,7 +1849,7 @@ inductive UnarySyntax (source : TypedSource) :
         WritableLocal context assignment.target.root binder.scheme.body)
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
       (rightTyped : AssignedOperandTyped source context operator rhs assignment.target.type)
-      (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType assignment.target.type))
+      (profile : WideAssignmentProfile operator assignment.target.type)
       (remaining : UnarySyntax source context (.initializers rest condition post statements) expected) : UnarySyntax source context (.initializers (.assignValue assignment operator rhs :: rest) condition post statements) expected
   | bitNot {context mode id node assignment rest expected}
       (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)

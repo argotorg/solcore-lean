@@ -1614,7 +1614,8 @@ theorem reflects [FunctionCalls.FaultTokens faults]
     (generated : CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt scope id lowered) (found : source.lookupExpression? id = some node)
     (rhsView : AssignedRhsView operator prepared.route.rootSourceType node.type)
     (rhsCore : lowered.type = prepared.route.leafType)
-    (profile : AssignmentProfile operator (SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType))
+    (profile : WideAssignmentProfile operator place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -1627,14 +1628,15 @@ theorem reflects [FunctionCalls.FaultTokens faults]
     (invalidToken : faults (.invalidAssignmentOperands operator) invalid)
     (completed : Evaluates actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) lowered.expression next outputType
-        (binaryOperator (prepared.route.leafType = .integer) operator) false invalid).rename ξ) value finalStore) :
+        (assignmentModifier place.type (prepared.route.leafType = .integer) operator) false invalid
+        (SourceCoreDataPlaces.placeWrap place.type operator false)).rename ξ) value finalStore) :
     Result compilation registry functions program context evidence source faults prepared place operator environment before store mapping world
-      id actual actualContext ξ next outputType value finalStore := by
+      id actual actualContext ξ next outputType value finalStore (Dynamic.CompoundAssignmentApplies place.type operator) := by
   have meaning : TypedGenericExpressionMeaning.Reflects (payloadModel compilation.checked registry functions)
     program context evidence source (CompatibleExpressionTyped.Tree fuel compilation source context solved reasonAt) faults :=
     CompatibleExpressionTyped.reflects functions extension program evidence valid uninitialized missing
-  exact CompatibleBareAssignment.reflects layout bare extension meaning observations generated found rhsView rhsCore profile
-    environments heaps locals agrees actualTyped slot rootTyped invalidToken completed
+  exact CompatibleBareAssignment.reflects_wide layout bare extension meaning observations generated found rhsView rhsCore profile
+    leafView environments heaps locals agrees actualTyped slot rootTyped invalidToken completed
 
 private def get {α ε : Type} [Repr ε] (label : String) : Except ε α → IO α
   | .ok value => pure value
