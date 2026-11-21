@@ -1855,10 +1855,10 @@ variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
 /-- A source snapshot operation supplies no native execution witness. This
 construction derives the modifier, setter, store write and both directions of
 the continuation agreement from that independent operation. -/
-theorem initialized_prefix (layout : Layout prepared)
-
-    (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+theorem initialized_prefix (layout : Layout prepared) {targetType : TypeSystem.Ty}
+    (profile : WideBitNotProfile targetType)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType =
+      SourceCoreRawMetadata.runtimeType targetType)
     (heaps : HeapRepresents checked registry functions mapping world heap store)
     (reference : ReferenceRepresents mapping world location target prepared.route.rootType)
     (read : Dynamic.Heap.Reads heap location ⟨prepared.route.rootSourceType, some sourceValue, none⟩)
@@ -1869,7 +1869,7 @@ theorem initialized_prefix (layout : Layout prepared)
     (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word)
     (passes : SourceCoreDataPlaces.Passes operator .unit) :
     ∃ updated replacement after finalStore slots,
-      Dynamic.BitNotSnapshot (some sourceValue) updated ∧
+      Dynamic.BitNotAssignmentApplies targetType (some sourceValue) updated ∧
       Dynamic.Heap.Writes heap location (some updated) after ∧
       ValueRep checked registry functions mapping world prepared.route.rootSourceType updated replacement prepared.route.rootType ∧
       HeapRepresents checked registry functions mapping world after finalStore ∧
@@ -1877,11 +1877,11 @@ theorem initialized_prefix (layout : Layout prepared)
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes world (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
       ∀ next output, ContinuationAgreement actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-          next output operator true invalid).rename ξ)
+          next output operator true invalid (SourceCoreDataPlaces.bitNotWrap targetType)).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   obtain ⟨updated, replacement, after, finalStore, slots, applies, written, related, finalHeaps,
     frame, metadata, count, typed, agreement, _⟩ :=
-    initialized_prefix_sized layout profile heaps reference read nativeRead represented lookup actualTyped operator invalid
+    initialized_prefix_sized layout profile leafView heaps reference read nativeRead represented lookup actualTyped operator invalid
   exact ⟨updated, replacement, after, finalStore, slots, applies, written, related, finalHeaps,
     frame, metadata, count, typed, agreement passes⟩
 
@@ -1890,10 +1890,11 @@ continuation. The physical store, including unrelated captured cells, is exact. 
 theorem absent_evaluates (layout : Layout prepared)
     (lookup : actual[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (read : store.read? target = some (.inLeft prepared.route.rootType .unit))
-    (next : Expr) (output : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
+    (next : Expr) (output : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word)
+    {wrap : Option TypeSystem.FixedInteger} :
     Evaluates actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-        next output operator true invalid).rename ξ) (.inLeft output (.word invalid)) store := by
+        next output operator true invalid wrap).rename ξ) (.inLeft output (.word invalid)) store := by
   rw [execute_rename layout]
   exact CompatibleBareBitNotNative.absent_evaluates layout lookup read _ _ _ _
 
@@ -1902,9 +1903,10 @@ theorem absent_reflects (layout : Layout prepared)
     (lookup : actual[ξ index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (read : store.read? target = some (.inLeft prepared.route.rootType .unit))
     {next : Expr} {output : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word} {result : Value} {after : Store}
+    {wrap : Option TypeSystem.FixedInteger}
     (completed : Evaluates actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-        next output operator true invalid).rename ξ) result after) :
+        next output operator true invalid wrap).rename ξ) result after) :
     result = .inLeft output (.word invalid) ∧ after = store :=
   evaluation_deterministic completed (absent_evaluates layout lookup read next output operator invalid)
 
@@ -1937,7 +1939,7 @@ inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
         mapping world actual actualContext ξ next output value finalStore
   | success {updated : Dynamic.Value} {replacement : Value} {after : Dynamic.Heap}
       {written : Store} {slots : Environment}
-      (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
+      (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source (Dynamic.BitNotAssignmentApplies place.type)
         environment before place updated after)
       (represented : ValueRep checked registry functions mapping world prepared.route.rootSourceType updated replacement prepared.route.rootType)
       (heaps : HeapRepresents checked registry functions mapping world after written)
@@ -1963,7 +1965,7 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
         mapping world actual actualContext ξ next output value finalStore
   | success {sourceSize remainingSize : Nat} {updated : Dynamic.Value} {replacement : Value} {after : Dynamic.Heap}
       {written : Store} {slots : Environment}
-      (trace : SourceExecutionSize.SourcePlaceSnapshotUpdate program sourceSize context evidence source Dynamic.BitNotSnapshot
+      (trace : SourceExecutionSize.SourcePlaceSnapshotUpdate program sourceSize context evidence source (Dynamic.BitNotAssignmentApplies place.type)
         environment before place updated after)
       (represented : ValueRep checked registry functions mapping world prepared.route.rootSourceType updated replacement prepared.route.rootType)
       (heaps : HeapRepresents checked registry functions mapping world after written)
@@ -2013,8 +2015,9 @@ private theorem writes_functional {heap left right : Dynamic.Heap} {location : D
 
 theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = [])
 
-    (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+    (profile : WideBitNotProfile place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType =
+      SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -2024,7 +2027,7 @@ theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = 
     (slot : SourceCoreLocalCell.lookup? scope place.root = some (index, prepared.route.rootType))
     (rootTyped : WritableLocal context place.root prepared.route.rootSourceType)
     {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
+    (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source (Dynamic.BitNotAssignmentApplies place.type)
       environment before place updated after) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word)
     (passes : SourceCoreDataPlaces.Passes operator .unit) :
     ∃ replacement finalStore slots,
@@ -2034,7 +2037,7 @@ theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = 
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes world (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
       ∀ next output, ContinuationAgreement actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-          next output operator true invalid).rename ξ)
+          next output operator true invalid (SourceCoreDataPlaces.bitNotWrap place.type)).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   cases trace with
   | intro resolve written =>
@@ -2058,9 +2061,10 @@ theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = 
           obtain ⟨target, nativeLookup, reference⟩ := environments.lookup_visible lookup slot
           cases root with
           | emptyMapping key value =>
-            have impossible := cellType ▸ profile
-            rcases impossible with impossible | impossible <;> cases impossible
-          | uninitialized => cases applies
+            exact (CompatiblePlaceNumericBitNotModifier.not_mapping profile leafView key value cellType.symm).elim
+          | uninitialized =>
+            cases applies with
+            | primitive _ snapshot => cases snapshot
           | initialized =>
             obtain ⟨optional, nativeRead, represented⟩ := heaps.read_at reference currentRead
             cases represented with
@@ -2069,9 +2073,9 @@ theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = 
               subst_vars
               obtain ⟨replacement, native, generatedAfter, finalStore, slots, generated, generatedWrite,
                 related, finalHeaps, frame, metadata, count, typed, agreement⟩ :=
-                initialized_prefix layout profile heaps reference currentRead nativeRead related
+                initialized_prefix layout profile leafView heaps reference currentRead nativeRead related
                   (agrees nativeLookup) actualTyped operator invalid passes
-              have same := CompatiblePlaceBitNotModifier.functional generated applies
+              have same := CompatiblePlaceNumericBitNotModifier.assignment_functional generated applies
               subst replacement
               have same := writes_functional generatedWrite sourceWrite
               subst generatedAfter
@@ -2081,8 +2085,9 @@ theorem preserves_prefix (layout : Layout prepared) (bare : place.projections = 
 produces an independent source fault/write and the actual typed continuation. -/
 theorem reflects_sized (layout : Layout prepared) (bare : place.projections = [])
 
-    (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+    (profile : WideBitNotProfile place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType =
+      SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -2096,7 +2101,7 @@ theorem reflects_sized (layout : Layout prepared) (bare : place.projections = []
     (token : faults (.invalidUnaryOperand .bitNot) invalid)
     {size : Nat} (completed : EvaluationSize size actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-        next output operator true invalid).rename ξ) result finalStore) :
+        next output operator true invalid (SourceCoreDataPlaces.bitNotWrap place.type)).rename ξ) result finalStore) :
     ResultAt size compilation.checked registry functions program context evidence source faults prepared place environment before store
       mapping world actual actualContext ξ next output result finalStore := by
   obtain ⟨scheme, schemeLookup, _, _, bodyEq⟩ := rootTyped.scheme
@@ -2109,8 +2114,7 @@ theorem reflects_sized (layout : Layout prepared) (bare : place.projections = []
     have initial : Dynamic.RootInitialValue _ none := .uninitialized (by
       rintro ⟨key, value, same⟩
       have impossible : prepared.route.rootSourceType = .mapping key value := cellType.symm.trans same
-      rw [impossible] at profile
-      rcases profile with impossible | impossible <;> cases impossible)
+      exact CompatiblePlaceNumericBitNotModifier.not_mapping profile leafView key value impossible)
     have trace := CompatibleBareBitNotMeaning.resolves (program := program) (context := context)
       (evidence := evidence) (source := source) bare sourceLookup sourceRead initial
     obtain ⟨resultEq, storeEq⟩ := absent_reflects layout (agrees nativeLookup) nativeRead completed.sound
@@ -2122,7 +2126,7 @@ theorem reflects_sized (layout : Layout prepared) (bare : place.projections = []
     have trace := CompatibleBareBitNotMeaning.resolves (program := program) (context := context)
       (evidence := evidence) (source := source) bare sourceLookup sourceRead Dynamic.RootInitialValue.initialized
     obtain ⟨updated, replacement, after, written, slots, applies, sourceWrite, represented, finalHeaps,
-      frame, metadata, count, typed, _agreement, remaining⟩ := initialized_prefix_sized layout profile heaps
+      frame, metadata, count, typed, _agreement, remaining⟩ := initialized_prefix_sized layout profile leafView heaps
         reference sourceRead nativeRead related (agrees nativeLookup) actualTyped operator invalid
     obtain ⟨sourceSize, sourceTrace⟩ := SourceExecutionSize.SourcePlaceSnapshotUpdate.has_size
       (.intro trace (.intro sourceRead rfl .initialized (.leaf applies) sourceWrite))
@@ -2131,8 +2135,9 @@ theorem reflects_sized (layout : Layout prepared) (bare : place.projections = []
 
 theorem reflects (layout : Layout prepared) (bare : place.projections = [])
 
-    (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+    (profile : WideBitNotProfile place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType =
+      SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -2146,11 +2151,11 @@ theorem reflects (layout : Layout prepared) (bare : place.projections = [])
     (token : faults (.invalidUnaryOperand .bitNot) invalid)
     (completed : Evaluates actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-        next output operator true invalid).rename ξ) result finalStore) :
+        next output operator true invalid (SourceCoreDataPlaces.bitNotWrap place.type)).rename ξ) result finalStore) :
     Result compilation.checked registry functions program context evidence source faults prepared place environment before store
       mapping world actual actualContext ξ next output result finalStore := by
   obtain ⟨size, sized⟩ := evaluation_has_size completed
-  exact (reflects_sized layout bare profile environments heaps locals agrees actualTyped slot rootTyped token sized).erase
+  exact (reflects_sized layout bare profile leafView environments heaps locals agrees actualTyped slot rootTyped token sized).erase
 
 private theorem excludes_target_fault {heap after : Dynamic.Heap} {location : Dynamic.Location} {cell : Dynamic.Cell}
     {reason : Dynamic.SemanticFault}
@@ -2182,8 +2187,9 @@ private theorem excludes_target_fault {heap after : Dynamic.Heap} {location : Dy
 operand. Generated helpers and the continuation do not alter either heap. -/
 theorem preserves_fault (layout : Layout prepared) (bare : place.projections = [])
 
-    (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+    (profile : WideBitNotProfile place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType =
+      SourceCoreRawMetadata.runtimeType place.type)
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
       mapping world administrativeContext scope environment canonical)
     (heaps : HeapRepresents compilation.checked registry functions mapping world before store)
@@ -2197,7 +2203,7 @@ theorem preserves_fault (layout : Layout prepared) (bare : place.projections = [
     reason = .invalidUnaryOperand .bitNot ∧ after = before ∧
       Evaluates actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-          next output operator true invalid).rename ξ) (.inLeft output (.word invalid)) store := by
+          next output operator true invalid (SourceCoreDataPlaces.bitNotWrap place.type)).rename ξ) (.inLeft output (.word invalid)) store := by
   obtain ⟨scheme, schemeLookup, _, _, bodyEq⟩ := rootTyped.scheme
   obtain ⟨staticLocation, staticCell, staticLookup, staticRead, staticType, _⟩ := locals.lookup schemeLookup
   cases trace with
@@ -2232,15 +2238,14 @@ theorem preserves_fault (layout : Layout prepared) (bare : place.projections = [
       have cellType := staticType.trans bodyEq
       cases root with
       | emptyMapping key value =>
-        have impossible := cellType ▸ profile
-        rcases impossible with impossible | impossible <;> cases impossible
+        exact (CompatiblePlaceNumericBitNotModifier.not_mapping profile leafView key value cellType.symm).elim
       | initialized =>
         obtain ⟨target, nativeLookup, reference⟩ := environments.lookup_visible lookup slot
         obtain ⟨optional, nativeRead, represented⟩ := heaps.read_at reference currentRead
         cases represented with
         | initialized related =>
-          have profile := cellType ▸ profile
-          obtain ⟨_, _, _, _, _, valid⟩ := CompatiblePlaceNumericBitNotModifier.success profile related
+          obtain ⟨_, _, _, _, _, valid⟩ := CompatiblePlaceNumericBitNotModifier.wide_success profile
+            ((congrArg SourceCoreRawMetadata.runtimeType cellType).trans leafView) related
             (environment := [_]) (rhs := .unit) (.var (index := 0) rfl) operator store invalid
           exact (valid invalidOperand).elim
 
@@ -2271,8 +2276,7 @@ variable {compilation : SourceCoreCompatibleDataPlaces.Context} {registry : Sour
   (rootTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
     WritableLocal context assignment.target.root binder.scheme.body)
   (bare : assignment.target.projections = [])
-  (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-    SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+  (profile : WideBitNotProfile assignment.target.type)
 
   (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog)
     mapping world administrativeContext scope environment canonical)
@@ -2292,9 +2296,9 @@ theorem reflects_of_lower
     ∃ prepared, Result compilation.checked registry functions program context evidence source faults prepared assignment.target
       environment before store mapping world actual actualContext ξ next output value finalStore := by
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
-    CompatibleBareBitNotCertificates.of_lower bare profile accepted
+    CompatibleBareBitNotCertificates.of_lower_wide bare profile accepted
   refine ⟨prepared, ?_⟩
-  exact reflects layout bare (view ▸ profile) environments heaps locals agrees actualTyped slot
+  exact reflects layout bare profile view environments heaps locals agrees actualTyped slot
     (rootEq ▸ rootTyped binder binding) token (lowering ▸ completed)
 
 theorem preserves_prefix_of_lower
@@ -2303,8 +2307,8 @@ theorem preserves_prefix_of_lower
     (accepted : lower compilation compilation.checked.signatures expression fuel source scope site assignment operator none
       output next reasonAt invalid invalidOperand missing = .ok lowered)
     {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
-      environment before assignment.target updated after) :
+    (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source
+      (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated after) :
     ∃ prepared replacement finalStore slots,
       ValueRep compilation.checked registry functions mapping world prepared.route.rootSourceType updated replacement prepared.route.rootType ∧
       HeapRepresents compilation.checked registry functions mapping world after finalStore ∧
@@ -2312,9 +2316,9 @@ theorem preserves_prefix_of_lower
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes world (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
       ContinuationAgreement actual store (lowered.rename ξ) (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
-    CompatibleBareBitNotCertificates.of_lower bare profile accepted
+    CompatibleBareBitNotCertificates.of_lower_wide bare profile accepted
   obtain ⟨replacement, finalStore, slots, represented, finalHeaps, frame, metadata, count, typed, agreement⟩ :=
-    preserves_prefix layout bare (view ▸ profile) environments heaps locals agrees actualTyped slot
+    preserves_prefix layout bare profile view environments heaps locals agrees actualTyped slot
       (rootEq ▸ rootTyped binder binding) trace (binaryOperator (prepared.route.leafType = .integer) operator) invalidOperand
       (CompatiblePlaceModifier.passes_of_total total _ _)
   exact ⟨prepared, replacement, finalStore, slots, represented, finalHeaps, frame, metadata, count, typed,
@@ -2328,9 +2332,9 @@ theorem preserves_fault_of_lower
     reason = .invalidUnaryOperand .bitNot ∧ after = before ∧
       Evaluates actual store (lowered.rename ξ) (.inLeft output (.word invalidOperand)) store := by
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
-    CompatibleBareBitNotCertificates.of_lower bare profile accepted
+    CompatibleBareBitNotCertificates.of_lower_wide bare profile accepted
   rw [lowering]
-  exact preserves_fault layout bare (view ▸ profile) environments heaps locals agrees slot
+  exact preserves_fault layout bare profile view environments heaps locals agrees slot
     (rootEq ▸ rootTyped binder binding) trace _ _ _ _
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleRenamedBareBitNot

@@ -48,13 +48,15 @@ theorem functional {current : Option Dynamic.Value} {left right : Dynamic.Value}
   cases first <;> cases second <;> rfl
 
 /-- A successful independent target supplies all structural facts needed for
-a snapshot-only write. No post-RHS source heap exists in this operation. -/
+a snapshot-only write, for any relation of the snapshot and the replacement. No
+post-RHS source heap exists in this operation. -/
 theorem write_exists {program : Program} {context : SourceSemantics.Context}
     {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource} {environment : Dynamic.Environment}
     {before selected : Dynamic.Heap} {place : PlaceResolution} {target : Dynamic.ResolvedPlace}
     (resolved : Dynamic.SourcePlaceResolves program context evidence source environment before place target selected)
-    {replacement : Dynamic.Value} (applies : Dynamic.BitNotSnapshot target.selected replacement) :
-    ∃ updated after, Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotSnapshot target.selected value)
+    {modify : Option Dynamic.Value → Dynamic.Value → Prop}
+    {replacement : Dynamic.Value} (applies : modify target.selected replacement) :
+    ∃ updated after, Dynamic.ResolvedPlaceWrites (fun _ value => modify target.selected value)
       selected target updated after := by
   cases resolved with
   | intro lookup initialRead keys currentRead initial read =>
@@ -97,6 +99,68 @@ theorem success {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
   · exact CompatiblePlaceBitNotModifier.word_success word represented selected operator store invalid
   · exact IntegerBitNotSnapshot.compatible_success integer represented selected operator store invalid
 
+/-- Over in-place `~`'s wider profile, at the target's type: the compiler's `~`, wrapped as it
+wraps it (`SourceCoreDataPlaces.bitNotWrap`), gives a leaf represented at the leaf's type, which the
+source's `BitNotAssignmentApplies` at the target's type gives too. -/
+theorem wide_success {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
+    {ambient : AmbientDefinitions checked.catalog.definitions}
+    {functions : FunctionModel checked.catalog ambient} {mapping : LocationMap} {world : StoreTyping}
+    {targetType sourceType : TypeSystem.Ty} {type : Ty} {source : Dynamic.Value} {value : Value}
+    (profile : WideBitNotProfile targetType)
+    (leafView : SourceCoreRawMetadata.runtimeType sourceType = SourceCoreRawMetadata.runtimeType targetType)
+    (represented : ValueRep checked registry functions mapping world sourceType source value type)
+    {environment : Environment} {snapshot rhs : Expr}
+    (selected : DataEquality.Selects environment snapshot (.inRight .unit value))
+    (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (store : Store) (invalid : Word) :
+    ∃ result native, ValueRep checked registry functions mapping world sourceType result native type ∧
+      Dynamic.BitNotAssignmentApplies targetType (some source) result ∧
+      Evaluates environment store
+        (modified type operator true snapshot rhs invalid (SourceCoreDataPlaces.bitNotWrap targetType))
+        (.inRight .word native) store ∧
+      ¬ Dynamic.UnaryPrimitiveOperandInvalid .bitNot source := by
+  rcases profile with plain | ⟨fixedType, rfl⟩
+  · rw [CompatiblePlaceModifier.bitNotWrap_of_runtime plain,
+      Dynamic.BitNotAssignmentApplies.eq_of_plain (CompatiblePlaceModifier.bitNotPlain_of_runtime plain)]
+    exact success (leafView ▸ plain) represented selected operator store invalid
+  · have view : SourceCoreRawMetadata.runtimeType sourceType = .fixed fixedType := leafView
+    obtain ⟨word, rfl, rfl, rfl, canonical⟩ := CompatibleExpressionPrimitives.fixed_fields represented view
+    exact ⟨_, _, .compatible leafView (.fixed _ (FixedCompoundModifier.bitNot_canonical canonical)),
+      FixedCompoundModifier.bitNot_applies fixedType word,
+      FixedCompoundModifier.bitNot_compatible_modified_evaluates selected operator store invalid,
+      FixedCompoundModifier.bitNot_word_valid word⟩
+
+/-- A leaf whose view is a target's of in-place `~`'s wider profile is not a mapping. -/
+theorem not_mapping {targetType leaf : TypeSystem.Ty} (profile : WideBitNotProfile targetType)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType targetType) :
+    ∀ key value, leaf ≠ .mapping key value := by
+  intro key value same
+  subst same
+  rcases profile with (word | integer) | ⟨type, rfl⟩
+  · cases leafView.trans word
+  · cases leafView.trans integer
+  · cases leafView
+
+/-- The source's in-place `~` at a target's type has one result. -/
+theorem assignment_functional {targetType : TypeSystem.Ty} {current : Option Dynamic.Value}
+    {left right : Dynamic.Value} (first : Dynamic.BitNotAssignmentApplies targetType current left)
+    (second : Dynamic.BitNotAssignmentApplies targetType current right) : left = right := by
+  cases first with
+  | primitive plain applies =>
+    cases second with
+    | primitive _ other => exact CompatiblePlaceBitNotModifier.functional applies other
+    | narrow same narrowApplies => exact absurd narrowApplies.kind (plain _ same)
+  | narrow same applies =>
+    cases second with
+    | primitive plain _ => exact absurd applies.kind (plain _ same)
+    | narrow other otherApplies =>
+      have sameType := same.symm.trans other
+      unfold TypeSystem.Ty.fixed at sameType
+      injection sameType with sameType
+      injection sameType with sameType
+      injection sameType with sameType
+      subst sameType
+      exact applies.functional otherApplies
+
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceNumericBitNotModifier
 end
 
@@ -116,7 +180,8 @@ structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Regist
     (functions : FunctionModel checked.catalog ambient) (prepared : Prepared) (codes : List SourceCoreBasic.LoweredExpr)
     (environment : Environment) (store : Store) (mapping : LocationMap) (world : StoreTyping)
     (target : Location) (keys : List Value) (snapshot : Value) (before after : Dynamic.Heap)
-    (updated : Dynamic.Value) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) where
+    (updated : Dynamic.Value) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word)
+    (wrap : Option TypeSystem.FixedInteger := none) where
   replacement : Value
   value : Value
   helperStore : Store
@@ -128,7 +193,7 @@ structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Regist
   frame : AdministrativePreserved mapping store mapping finalStore
   metadata : Dynamic.HeapMetadataExtend before after
   modified : Evaluates (rhsEnvironment prepared.route.rootType target (packValues keys) (.inRight .unit snapshot) .unit environment) store
-    (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType operator true (.var 1) (.var 0) invalid)
+    (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType operator true (.var 1) (.var 0) invalid wrap)
     (.inRight .word replacement) store
   setter : Evaluates (modifiedEnvironment prepared.route.rootType target (packValues keys) (.inRight .unit snapshot) .unit replacement environment) store
     (.apply (SourceCoreCompatibleDataPlaces.setter prepared (SourceCoreCalls.packArguments codes).type)
@@ -278,6 +343,7 @@ variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
   {environment : Environment} {store : Store} {mapping : LocationMap} {world : StoreTyping}
   {target : Location} {keys : List Value} {snapshot : Value} {before after : Dynamic.Heap}
   {updated : Dynamic.Value} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word}
+  {wrap : Option TypeSystem.FixedInteger}
 
 private theorem unit_rhs (environment : Environment) (store : Store) :
     Evaluates environment store (shift 3 (LanguageResult.success .unit)) (.inRight .word .unit) store := by
@@ -285,14 +351,14 @@ private theorem unit_rhs (environment : Environment) (store : Store) :
     (Evaluates.inRight (leftType := .word) (environment := environment) (initialStore := store) Evaluates.unit)
 
 theorem Execution.plug (execution : Execution checked registry functions prepared codes environment store mapping world
-    target keys snapshot before after updated operator invalid) (passes : SourceCoreDataPlaces.Passes operator .unit)
+    target keys snapshot before after updated operator invalid wrap) (passes : SourceCoreDataPlaces.Passes operator .unit)
     {next : Expr} {outputType : Ty} {result : Value} {finalStore : Store}
     (continuation : Evaluates (writtenEnvironment prepared.route.rootType target (packValues keys)
       (.inRight .unit snapshot) .unit execution.replacement execution.value environment)
       execution.finalStore (shift 7 next) result finalStore) :
     Evaluates (snapshotEnvironment prepared.route.rootType target (packValues keys) (.inRight .unit snapshot) environment)
       store (CompatiblePlacePrefixReflection.remainder prepared (SourceCoreCalls.packArguments codes).type
-        (LanguageResult.success .unit) next outputType operator true invalid) result finalStore := by
+        (LanguageResult.success .unit) next outputType operator true invalid wrap) result finalStore := by
   obtain ⟨optional, read⟩ := execution.read
   exact LanguageResult.bind_success _ (unit_rhs _ _) (LanguageResult.bind_success _ execution.modified
     (LanguageResult.bind_success _ execution.setter
@@ -302,11 +368,11 @@ theorem Execution.plug (execution : Execution checked registry functions prepare
 /-- A completed absent-RHS tail must reach the exact generated mapped commit.
 The remaining seven-slot continuation is recovered as an output witness. -/
 theorem Execution.reflects (execution : Execution checked registry functions prepared codes environment store mapping world
-    target keys snapshot before after updated operator invalid)
+    target keys snapshot before after updated operator invalid wrap)
     {next : Expr} {outputType : Ty} {result : Value} {finalStore : Store}
     (completed : Evaluates (snapshotEnvironment prepared.route.rootType target (packValues keys) (.inRight .unit snapshot) environment)
       store (CompatiblePlacePrefixReflection.remainder prepared (SourceCoreCalls.packArguments codes).type
-        (LanguageResult.success .unit) next outputType operator true invalid) result finalStore) :
+        (LanguageResult.success .unit) next outputType operator true invalid wrap) result finalStore) :
     Evaluates (writtenEnvironment prepared.route.rootType target (packValues keys)
       (.inRight .unit snapshot) .unit execution.replacement execution.value environment)
       execution.finalStore (shift 7 next) result finalStore := by
@@ -564,6 +630,7 @@ theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Contex
     {codes : List SourceCoreBasic.LoweredExpr} {certificate : GenericExpressionMeaning.Certificate}
     {administrativeContext : Core.Context} {reference rhs next : Expr} {outputType resultType : Ty}
     {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {bitNot : Bool} {invalidOperand : Word}
+    {wrap : Option TypeSystem.FixedInteger}
     (unique : NodeOccurrencesUnique source) (signatures : context.signatures = compilation.checked.signatures)
     (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
@@ -574,7 +641,7 @@ theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Contex
     (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id code)
     (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext)
-      (execute prepared reference (SourceCoreCalls.packArguments codes) rhs next outputType operator bitNot invalidOperand)
+      (execute prepared reference (SourceCoreCalls.packArguments codes) rhs next outputType operator bitNot invalidOperand wrap)
       resultType definitions)
     (rhsTyped : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) rhs
       (LanguageResult.resultType .unit) definitions) :
@@ -611,6 +678,54 @@ theorem of_describe_prepare {compilation : SourceCoreCompatibleDataPlaces.Contex
 
 /-- Actual `rhs := none` compilation fixes the Unit RHS, with no source
 expression invented for that administrative value. -/
+theorem of_lower_wide {compilation : SourceCoreCompatibleDataPlaces.Context} {definitions : DataEnvironment}
+    {source : TypedSource} {context : SourceSemantics.Context} {site : SourceCoreElaboration.ErrorSite}
+    {assignment : AssignmentResolution} {fuel : Nat} {expression : ExpressionLowerer} {scope : Scope}
+    {reasonAt : ExpressionId → Word} {operator : Syntax.ValueAssignOp}
+    {next lowered : Expr} {outputType resultType : Ty} {invalid invalidOperand : Word}
+    {missing : TypeSystem.Ty → Word} {certificate : GenericExpressionMeaning.Certificate} {administrativeContext : Core.Context}
+    (unique : NodeOccurrencesUnique source) (signatures : context.signatures = compilation.checked.signatures)
+    (sourceTyped : ∀ binder, rootBinder source assignment.target.root = .ok binder →
+      SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
+    (nonempty : assignment.target.projections ≠ [])
+    (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
+    (extract : ∀ id code, expression fuel source scope id reasonAt = .ok code → ∃ node,
+      source.lookupExpression? id = some node ∧ certificate scope id code)
+    (accepted : lower compilation compilation.checked.signatures expression fuel source scope site assignment operator none outputType
+      next reasonAt invalid invalidOperand missing = .ok lowered)
+    (typed : HasType (SourceCoreLocalCell.coreContext scope ++ administrativeContext) lowered resultType definitions) :
+    ∃ binder leaf prepared codes sourceTypes index,
+      (∃ route, describe compilation compilation.checked.signatures source site assignment = .ok route ∧
+        prepare compilation fuel route invalid missing = .ok prepared) ∧
+      rootBinder source assignment.target.root = .ok binder ∧
+      prepared.route.rootSourceType = binder.scheme.body ∧
+      SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type ∧
+      SourceCoreLocalCell.lookup? scope assignment.target.root = some (index, prepared.route.rootType) ∧
+      CompatiblePlaceAssignmentSuccess.Layout (definitions := definitions) compilation source certificate scope site assignment.target prepared codes sourceTypes leaf administrativeContext .unit ∧
+      ((∀ k v, prepared.route.rootSourceType ≠ .mapping k v) → prepared.route.rootMapping = none) ∧
+      (prepared.route.leafType = .word ∨ prepared.route.leafType = .integer) ∧
+      lowered = execute prepared (.var index) (SourceCoreCalls.packArguments codes) (LanguageResult.success .unit) next outputType
+        (binaryOperator (prepared.route.leafType = .integer) operator) true invalidOperand
+        (SourceCoreDataPlaces.bitNotWrap assignment.target.type) := by
+  have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower
+    (takesElement_of_free free) accepted
+  cases receipt with
+  | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
+    cases rhsGenerated with
+    | absent =>
+      have routeEq := (CompatibleMixedPreparation.of_prepare preparedBy).1
+      simp only [Option.isNone_none, SourceCoreDataPlaces.placeWrap_bitNot] at typed
+      obtain ⟨binder, leaf, sourceTypes, binding, rootEq, leafView, layout, ordinary⟩ :=
+        of_describe_prepare unique signatures sourceTyped nonempty described preparedBy generated extract typed
+          (LanguageResult.success_hasType .unit)
+      have profile : prepared.route.leafType = .word ∨ prepared.route.leafType = .integer := by
+        simpa only [Option.isNone_none, Bool.true_eq_false, and_false, false_or, routeEq] using
+          operatorValid.imp_right (Or.imp_right And.left)
+      exact ⟨binder, leaf, prepared, codes, sourceTypes, index, ⟨route, described, preparedBy⟩, binding, rootEq,
+        leafView, by simpa only [routeEq] using lookup, layout, ordinary, profile,
+        by simp [routeEq, placeModifier, SourceCoreDataPlaces.placeWrap]⟩
+
+/-- The Word and integer case of `of_lower_wide`, whose code has no wrap. -/
 theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definitions : DataEnvironment}
     {source : TypedSource} {context : SourceSemantics.Context} {site : SourceCoreElaboration.ErrorSite}
     {assignment : AssignmentResolution} {fuel : Nat} {expression : ExpressionLowerer} {scope : Scope}
@@ -641,25 +756,11 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context} {definit
       (prepared.route.leafType = .word ∨ prepared.route.leafType = .integer) ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments codes) (LanguageResult.success .unit) next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) true invalidOperand := by
-  have receipt := CompatiblePlaceCompilerCertificates.generated_of_lower
-    (takesElement_of_free free) accepted
-  cases receipt with
-  | intro route prepared index codes value described lookup preparedBy generated operatorValid rhsGenerated =>
-    cases rhsGenerated with
-    | absent =>
-      have routeEq := (CompatibleMixedPreparation.of_prepare preparedBy).1
-      have noWrap := CompatiblePlaceModifier.bitNotWrap_of_runtime targetProfile
-      simp only [Option.isNone_none, SourceCoreDataPlaces.placeWrap_bitNot, noWrap] at typed
-      obtain ⟨binder, leaf, sourceTypes, binding, rootEq, leafView, layout, ordinary⟩ :=
-        of_describe_prepare unique signatures sourceTyped nonempty described preparedBy generated extract typed
-          (LanguageResult.success_hasType .unit)
-      have profile : prepared.route.leafType = .word ∨ prepared.route.leafType = .integer := by
-        simpa only [Option.isNone_none, Bool.true_eq_false, and_false, false_or, routeEq] using
-          operatorValid.imp_right (Or.imp_right And.left)
-      exact ⟨binder, leaf, prepared, codes, sourceTypes, index, ⟨route, described, preparedBy⟩, binding, rootEq,
-        leafView, by simpa only [routeEq] using lookup, layout, ordinary, profile,
-        by simp [routeEq, placeModifier, SourceCoreDataPlaces.placeWrap,
-          CompatiblePlaceModifier.bitNotWrap_of_runtime targetProfile]⟩
+  obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, receipt, binding, rootEq, leafView, lookup, layout, ordinary,
+    profile, lowering⟩ := of_lower_wide unique signatures sourceTyped nonempty free extract accepted typed
+  rw [CompatiblePlaceModifier.bitNotWrap_of_runtime targetProfile] at lowering
+  exact ⟨binder, leaf, prepared, codes, sourceTypes, index, receipt, binding, rootEq, leafView, lookup, layout, ordinary,
+    profile, lowering⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceBitNotCertificates
 end

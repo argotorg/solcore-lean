@@ -697,7 +697,7 @@ theorem Tree.preserves_prefix_bounded_for_with_return_reachable
       cases first with | assignBitNot assigned =>
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
           head.preserves_prefix functions program evidence
-            environments heaps locals agrees actualTyped ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned.sound)
+            environments heaps locals agrees actualTyped assigned.sound
         let middleState := stateTransport.extend state maps worlds preservation metadata
         have middleReady := snapshots.ready state middleState ready valid (sites.snapshot itemFact) assigned.sound locals preservation
         have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignBitNot assigned.sound)

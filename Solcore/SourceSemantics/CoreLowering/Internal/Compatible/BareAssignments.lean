@@ -837,6 +837,51 @@ private theorem nil_fields {checked : Checked} {source : TypedSource} {site : So
   cases path
   exact ⟨rfl, rfl, rfl⟩
 
+/-- Over in-place `~`'s wider profile the compiler's bare layout, with its wrap
+(`SourceCoreDataPlaces.bitNotWrap`) at the target's type. -/
+theorem of_lower_wide {compilation : SourceCoreCompatibleDataPlaces.Context}
+    {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
+    {fuel : Nat} {expression : ExpressionLowerer} {scope : Scope} {reasonAt : ExpressionId → Word}
+    {operator : Syntax.ValueAssignOp} {next lowered : Expr} {outputType : Ty}
+    {invalid invalidOperand : Word} {missing : TypeSystem.Ty → Word}
+    (bare : assignment.target.projections = [])
+    (profile : WideBitNotProfile assignment.target.type)
+    (accepted : lower compilation compilation.checked.signatures expression fuel source scope site assignment operator none
+      outputType next reasonAt invalid invalidOperand missing = .ok lowered) :
+    ∃ binder prepared index,
+      rootBinder source assignment.target.root = .ok binder ∧
+      prepared.route.rootSourceType = binder.scheme.body ∧
+      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = SourceCoreRawMetadata.runtimeType assignment.target.type ∧
+      SourceCoreLocalCell.lookup? scope assignment.target.root = some (index, prepared.route.rootType) ∧
+      Layout prepared ∧
+      lowered = execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit) next outputType
+        (binaryOperator (prepared.route.leafType = .integer) operator) true invalidOperand
+        (SourceCoreDataPlaces.bitNotWrap assignment.target.type) := by
+  cases generated_of_lower (takesElement_of_free (fun _ member => by simp [bare] at member)) accepted with
+  | intro route prepared index codes value described lookup preparedBy generated _ rhsGenerated =>
+    cases rhsGenerated with
+    | absent =>
+      obtain ⟨binder, leaf, description⟩ := CompatiblePlaceDescription.of_describe described
+      obtain ⟨routeEq, _, path⟩ := description.prepared preparedBy
+      rw [bare] at path
+      obtain ⟨steps, keys, rfl⟩ := nil_fields path
+      rw [keys] at generated
+      cases generated
+      have rootEq : prepared.route.rootSourceType = binder.scheme.body := routeEq ▸ description.rootSource
+      have view := description.selectedType
+      have notMapping : ∀ k v, binder.scheme.body ≠ .mapping k v :=
+        CompatiblePlaceNumericBitNotModifier.not_mapping profile view
+      have types : route.rootType = route.leafType :=
+        Except.ok.inj (description.rootProjected.symm.trans (by
+          rw [← compilation.checked.catalog.project_runtimeType binder.scheme.body, view,
+            compilation.checked.catalog.project_runtimeType]
+          exact description.leafProjected))
+      refine ⟨binder, prepared, index, description.binding, rootEq, rootEq ▸ view,
+        by simpa only [routeEq] using lookup, ?_, by
+          simp [routeEq, placeModifier, SourceCoreDataPlaces.placeWrap]⟩
+      exact ⟨steps, routeEq ▸ description.ordinary notMapping, routeEq ▸ types⟩
+
+/-- At a `Word` or `integer` target the layout's code has no wrap. -/
 theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
     {source : TypedSource} {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
     {fuel : Nat} {expression : ExpressionLowerer} {scope : Scope} {reasonAt : ExpressionId → Word}
@@ -855,33 +900,9 @@ theorem of_lower {compilation : SourceCoreCompatibleDataPlaces.Context}
       Layout prepared ∧
       lowered = execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit) next outputType
         (binaryOperator (prepared.route.leafType = .integer) operator) true invalidOperand := by
-  cases generated_of_lower (takesElement_of_free (fun _ member => by simp [bare] at member)) accepted with
-  | intro route prepared index codes value described lookup preparedBy generated _ rhsGenerated =>
-    cases rhsGenerated with
-    | absent =>
-      obtain ⟨binder, leaf, description⟩ := CompatiblePlaceDescription.of_describe described
-      obtain ⟨routeEq, _, path⟩ := description.prepared preparedBy
-      rw [bare] at path
-      obtain ⟨steps, keys, rfl⟩ := nil_fields path
-      rw [keys] at generated
-      cases generated
-      have rootEq : prepared.route.rootSourceType = binder.scheme.body := routeEq ▸ description.rootSource
-      have view := description.selectedType
-      have notMapping : ∀ k v, binder.scheme.body ≠ .mapping k v := by
-        intro k v same
-        rcases profile with word | integer
-        · rw [same, word] at view; cases view
-        · rw [same, integer] at view; cases view
-      have types : route.rootType = route.leafType :=
-        Except.ok.inj (description.rootProjected.symm.trans (by
-          rw [← compilation.checked.catalog.project_runtimeType binder.scheme.body, view,
-            compilation.checked.catalog.project_runtimeType]
-          exact description.leafProjected))
-      refine ⟨binder, prepared, index, description.binding, rootEq, rootEq ▸ view,
-        by simpa only [routeEq] using lookup, ?_, by
-          simp [routeEq, placeModifier, SourceCoreDataPlaces.placeWrap,
-            CompatiblePlaceModifier.bitNotWrap_of_runtime profile]⟩
-      exact ⟨steps, routeEq ▸ description.ordinary notMapping, routeEq ▸ types⟩
+  obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ := of_lower_wide bare (.inl profile) accepted
+  rw [CompatiblePlaceModifier.bitNotWrap_of_runtime profile] at lowering
+  exact ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleBareBitNotCertificates
 end
@@ -925,11 +946,13 @@ theorem prefix_plug (layout : Layout prepared) {index : Nat}
     (lookup : environment[index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (read : store.read? target = some optional)
     {next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word} {result : Value} {after : Store}
+    {wrap : Option TypeSystem.FixedInteger}
     (tail : Evaluates (snapshotEnvironment prepared.route.rootType target .unit optional environment) store
-      (CompatiblePlacePrefixReflection.remainder prepared .unit (LanguageResult.success .unit) next outputType operator true invalid)
+      (CompatiblePlacePrefixReflection.remainder prepared .unit (LanguageResult.success .unit) next outputType operator true invalid
+        wrap)
       result after) :
     Evaluates environment store (execute prepared (.var index) (SourceCoreCalls.packArguments [])
-      (LanguageResult.success .unit) next outputType operator true invalid) result after := by
+      (LanguageResult.success .unit) next outputType operator true invalid wrap) result after := by
   exact .letE (.var lookup) (LanguageResult.bind_success _ (keys_evaluates _ _)
     (LanguageResult.bind_success _ (getter_evaluates layout read) tail))
 
@@ -939,10 +962,12 @@ theorem prefix_reflects (layout : Layout prepared) {index : Nat}
     (lookup : environment[index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (read : store.read? target = some optional)
     {next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word} {result : Value} {after : Store}
+    {wrap : Option TypeSystem.FixedInteger}
     (completed : Evaluates environment store (execute prepared (.var index) (SourceCoreCalls.packArguments [])
-      (LanguageResult.success .unit) next outputType operator true invalid) result after) :
+      (LanguageResult.success .unit) next outputType operator true invalid wrap) result after) :
     Evaluates (snapshotEnvironment prepared.route.rootType target .unit optional environment) store
-      (CompatiblePlacePrefixReflection.remainder prepared .unit (LanguageResult.success .unit) next outputType operator true invalid)
+      (CompatiblePlacePrefixReflection.remainder prepared .unit (LanguageResult.success .unit) next outputType operator true invalid
+        wrap)
       result after := by
   cases completed with
   | letE reference rest =>
@@ -971,9 +996,10 @@ fault. No store cell is changed, even when the continuation would have effects. 
 theorem absent_evaluates (layout : Layout prepared) {index : Nat}
     (lookup : environment[index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (read : store.read? target = some (.inLeft prepared.route.rootType .unit))
-    (next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
+    (next : Expr) (outputType : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word)
+    {wrap : Option TypeSystem.FixedInteger} :
     Evaluates environment store (execute prepared (.var index) (SourceCoreCalls.packArguments [])
-      (LanguageResult.success .unit) next outputType operator true invalid)
+      (LanguageResult.success .unit) next outputType operator true invalid wrap)
       (.inLeft outputType (.word invalid)) store := by
   apply prefix_plug layout lookup read
   apply LanguageResult.bind_success _ (show Evaluates _ _ (shift 3 (LanguageResult.success .unit))
@@ -990,8 +1016,9 @@ theorem absent_reflects (layout : Layout prepared) {index : Nat}
     (lookup : environment[index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) target))
     (read : store.read? target = some (.inLeft prepared.route.rootType .unit))
     {next : Expr} {outputType : Ty} {operator : Option Frontend.SourceCoreDataPlaces.Modifier} {invalid : Word} {result : Value} {after : Store}
+    {wrap : Option TypeSystem.FixedInteger}
     (completed : Evaluates environment store (execute prepared (.var index) (SourceCoreCalls.packArguments [])
-      (LanguageResult.success .unit) next outputType operator true invalid) result after) :
+      (LanguageResult.success .unit) next outputType operator true invalid wrap) result after) :
     result = .inLeft outputType (.word invalid) ∧ after = store :=
   evaluation_deterministic completed (absent_evaluates layout lookup read next outputType operator invalid)
 

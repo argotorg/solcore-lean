@@ -1084,19 +1084,24 @@ private theorem setter_rename (prepared : Prepared) (layout : Layout prepared) (
     (setter prepared .unit).rename ξ = setter prepared .unit := by
   simp [setter, layout.steps, LanguageResult.success, Expr.rename, Renaming.lift]
 
-private theorem modified_rename (type : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) (ξ : Renaming) :
-    (modified type operator true (.var 1) (.var 0) invalid).rename ξ.lift.lift =
-      modified type operator true (.var 1) (.var 0) invalid := by
-  simp [modified, LanguageResult.success, LanguageResult.failure, Expr.rename, Renaming.lift]
+private theorem modified_rename (type : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) (ξ : Renaming)
+    {wrap : Option TypeSystem.FixedInteger} :
+    (modified type operator true (.var 1) (.var 0) invalid wrap).rename ξ.lift.lift =
+      modified type operator true (.var 1) (.var 0) invalid wrap := by
+  rcases wrap with _ | wrapType
+  · simp [modified, LanguageResult.success, LanguageResult.failure, Expr.rename, Renaming.lift]
+  · by_cases signed : wrapType.signed = true <;>
+      simp [modified, signed, LanguageResult.success, LanguageResult.failure, Expr.rename, Renaming.lift]
 
 /-- Only the free lexical reference and continuation move. The Unit RHS stays
 an administrative slot and is never represented as a source expression. -/
 theorem execute_rename {prepared : Prepared} (layout : Layout prepared) (index : Nat)
-    (next : Expr) (output : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) (ξ : Renaming) :
+    (next : Expr) (output : Ty) (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) (ξ : Renaming)
+    {wrap : Option TypeSystem.FixedInteger} :
     (execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-      next output operator true invalid).rename ξ =
+      next output operator true invalid wrap).rename ξ =
     execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-      (next.rename ξ) output operator true invalid := by
+      (next.rename ξ) output operator true invalid wrap := by
   simp [execute, SourceCoreCalls.packArguments, LanguageResult.bind, LanguageResult.success,
     shift, List.range, List.range.loop, List.foldl, Expr.rename, Expr.weakenAt,
     getter_rename _ layout, setter_rename _ layout, modified_rename, DataPlaceGuard.rename_lift, Renaming.lift]

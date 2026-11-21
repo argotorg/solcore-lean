@@ -1359,7 +1359,7 @@ theorem actual_reflects {certified : Certified checked.catalog.definitions (nati
   obtain ⟨heaps, ref⟩ := empty.allocate initialRep Dynamic.Heap.Allocates.append
   have environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) [0] world [.function .unit .word]
       (scope .word) sourceEnvironment (canonical .word) := .cons ref (.nil (.cons readerTyped .nil))
-  exact CompatibleRenamedBareBitNot.reflects_of_lower writable rfl (.inl rfl) environments heaps (localAgrees initial)
+  exact CompatibleRenamedBareBitNot.reflects_of_lower writable rfl (.inl (.inl rfl)) environments heaps (localAgrees initial)
     (agrees .word) actualTyped (CompatiblePlaceCompilerCertificates.lower_of_lowerChecked accepted) True.intro completed
 
 private theorem absentFault : Dynamic.SourcePlaceBitNotFaults program wordContext [] (source .word) sourceEnvironment
@@ -1376,15 +1376,17 @@ theorem actual_absent {certified : Certified checked.catalog.definitions (native
     Dynamic.Heap.Allocates.append
   have environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) [0] world [.function .unit .word]
       (scope .word) sourceEnvironment (canonical .word) := .cons ref (.nil (.cons readerTyped .nil))
-  exact (CompatibleRenamedBareBitNot.preserves_fault_of_lower writable rfl (.inl rfl) environments heaps
+  exact (CompatibleRenamedBareBitNot.preserves_fault_of_lower writable rfl (.inl (.inl rfl)) environments heaps
     (localAgrees none) (agrees .word) (CompatiblePlaceCompilerCertificates.lower_of_lowerChecked accepted) absentFault).2.2
 
 private def seven : Word := Word.ofNatModulo 7
-private theorem sourceUpdate : Dynamic.SourcePlaceSnapshotUpdate program wordContext [] (source .word) Dynamic.BitNotSnapshot
-    sourceEnvironment (sourceHeap (some (.word seven))) (assignment .word).target (.word seven.bitNot)
+private theorem sourceUpdate : Dynamic.SourcePlaceSnapshotUpdate program wordContext [] (source .word)
+    (Dynamic.BitNotAssignmentApplies (assignment .word).target.type) sourceEnvironment (sourceHeap (some (.word seven))) (assignment .word).target (.word seven.bitNot)
     (sourceHeap (some (.word seven.bitNot))) :=
   .intro (CompatibleBareBitNotMeaning.resolves rfl .head (.intro .head) .initialized)
-    (.intro (.intro .head) rfl .initialized (.leaf (.word seven)) (DataPlaceCommitReflection.source_writes (.intro .head) _))
+    (.intro (.intro .head) rfl .initialized
+      (.leaf (.primitive (CompatiblePlaceModifier.bitNotPlain_of_runtime (.inl rfl)) (.word seven)))
+      (DataPlaceCommitReflection.source_writes (.intro .head) _))
 
 /-- The independent source update supplies the exact native prefix and a
 typed actual continuation. No source or Core continuation run is a premise. -/
@@ -1402,7 +1404,7 @@ theorem actual_preserves_prefix {certified : Certified checked.catalog.definitio
   obtain ⟨heaps, ref⟩ := empty.allocate (GenericHeap.CellRepresents.initialized (ValueRep.word seven)) Dynamic.Heap.Allocates.append
   have environments : DataHeap.EnvRepresents (storageCatalog checked.catalog) [0] world [.function .unit .word]
       (scope .word) sourceEnvironment (canonical .word) := .cons ref (.nil (.cons readerTyped .nil))
-  exact CompatibleRenamedBareBitNot.preserves_prefix_of_lower writable rfl (.inl rfl) environments heaps
+  exact CompatibleRenamedBareBitNot.preserves_prefix_of_lower writable rfl (.inl (.inl rfl)) environments heaps
     (localAgrees (some (.word seven))) (agrees .word) actualTyped (by rfl)
     (CompatiblePlaceCompilerCertificates.lower_of_lowerChecked accepted) sourceUpdate
 

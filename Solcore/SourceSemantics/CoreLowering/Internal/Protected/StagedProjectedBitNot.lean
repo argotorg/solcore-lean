@@ -63,7 +63,8 @@ theorem typed_of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
     (registryExtension : SourceCoreRawMetadata.Extends compilation.registry registry)
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
-    (profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
+    (profile : WideBitNotProfile place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType place.type)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before selectedHeap after : Dynamic.Heap} {store : Store} {target : Dynamic.ResolvedPlace} {updated : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -71,11 +72,12 @@ theorem typed_of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
     (actualTyped : RuntimeEnvironmentHasTypes world coreEnvironment actualContext ambient.definitions)
     (resolution : CompatiblePlaceResolution.Execution compilation.checked registry functions prepared (renamedCodes codes ξ) sourceTypes place leaf target
       coreEnvironment store mapping world before selectedHeap)
-    (written : Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotSnapshot target.selected value) selectedHeap target updated after)
+    (written : Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotAssignmentApplies place.type target.selected value)
+      selectedHeap target updated after)
     (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
     ∃ commit : CompatiblePlaceBitNotCommit.Execution compilation.checked registry functions prepared (renamedCodes codes ξ)
         coreEnvironment resolution.store resolution.mapping resolution.world resolution.target resolution.values
-        resolution.snapshot selectedHeap after updated operator invalid,
+        resolution.snapshot selectedHeap after updated operator invalid (SourceCoreDataPlaces.bitNotWrap place.type),
       RuntimeEnvironmentHasTypes commit.finalWorld
         (writtenEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) .unit commit.replacement commit.value coreEnvironment)
@@ -95,11 +97,11 @@ theorem typed_of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
     obtain ⟨replacement, applies, changed⟩ := DataPlaceAssignmentWriteBack.replacement_of_update update
     rw [resolution.selectedEq] at applies
     obtain ⟨replacement', replacementValue, replacementRep, applies', modifiedEvaluated, _⟩ :=
-      CompatiblePlaceNumericBitNotModifier.success profile snapshotRep
+      CompatiblePlaceNumericBitNotModifier.wide_success profile leafView snapshotRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) .unit coreEnvironment)
         (.var (index := 1) rfl) operator resolution.store invalid
-    have same := CompatiblePlaceBitNotModifier.functional applies' applies
+    have same := CompatiblePlaceNumericBitNotModifier.assignment_functional applies' applies
     subst replacement'
     have present : ∃ sourceRoot, initial = some sourceRoot := by
       cases initial with
@@ -156,7 +158,8 @@ theorem of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
     (transport : ProtectedStateTransition.AdministrativeTransport protocol)
     {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
     (observations : FunctionObservations compilation.checked.catalog functions identities)
-    (profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer)
+    (profile : WideBitNotProfile place.type)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType place.type)
     {mapping : LocationMap} {world : StoreTyping} {environment : Dynamic.Environment} {canonical coreEnvironment : Environment}
     {before selectedHeap after : Dynamic.Heap} {store : Store} {target : Dynamic.ResolvedPlace} {updated : Dynamic.Value}
     (environments : DataHeap.EnvRepresents (definitions := ambient.definitions) (storageCatalog compilation.checked.catalog) mapping world administrativeContext scope environment canonical)
@@ -167,18 +170,19 @@ theorem of_write {compilation : SourceCoreCompatibleDataPlaces.Context}
     (initial : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
     (selected : protocol.State ⟨scope, resolution.mapping, resolution.world, selectedHeap, resolution.store, canonical⟩)
     (related : protocol.Relates initial selected)
-    (written : Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotSnapshot target.selected value) selectedHeap target updated after)
+    (written : Dynamic.ResolvedPlaceWrites (fun _ value => Dynamic.BitNotAssignmentApplies place.type target.selected value)
+      selectedHeap target updated after)
     (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
     ∃ commit : CompatiblePlaceBitNotCommit.Execution compilation.checked registry functions prepared (renamedCodes codes ξ)
         coreEnvironment resolution.store resolution.mapping resolution.world resolution.target resolution.values
-        resolution.snapshot selectedHeap after updated operator invalid,
+        resolution.snapshot selectedHeap after updated operator invalid (SourceCoreDataPlaces.bitNotWrap place.type),
       RuntimeEnvironmentHasTypes commit.finalWorld
         (writtenEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) .unit commit.replacement commit.value coreEnvironment)
         (writtenContext prepared (SourceCoreCalls.packArguments codes).type actualContext) ambient.definitions ∧
       ProtectedStateTransition.Transition protocol initial
         ⟨scope, resolution.mapping, commit.finalWorld, after, commit.finalStore, canonical⟩ := by
-  obtain ⟨commit, typed⟩ := typed_of_write layout ordinary registryExtension faithful observations profile
+  obtain ⟨commit, typed⟩ := typed_of_write layout ordinary registryExtension faithful observations profile leafView
     environments agrees actualTyped resolution written operator invalid
   exact ⟨commit, typed, transport.extend selected (.refl _) commit.worlds commit.frame commit.metadata,
     protocol.trans related (transport.related selected (.refl _) commit.worlds commit.frame commit.metadata)⟩
@@ -208,12 +212,13 @@ private theorem unit_rhs (environment : Environment) (store : Store) :
   simpa only [shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, LanguageResult.success] using
     (Evaluates.inRight (leftType := .word) (environment := environment) (initialStore := store) Evaluates.unit)
 
-theorem Execution.reflects_size (execution : Execution checked registry functions prepared codes environment store mapping world
-    target keys snapshot before after updated operator invalid)
+theorem Execution.reflects_size {wrap : Option TypeSystem.FixedInteger}
+    (execution : Execution checked registry functions prepared codes environment store mapping world
+    target keys snapshot before after updated operator invalid wrap)
     {next : Expr} {outputType : Ty} {result : Value} {finalStore : Store} {size : Nat}
     (completed : CoreProof.EvaluationSize size (snapshotEnvironment prepared.route.rootType target (packValues keys) (.inRight .unit snapshot) environment)
       store (CompatiblePlacePrefixReflection.remainder prepared (SourceCoreCalls.packArguments codes).type
-        (LanguageResult.success .unit) next outputType operator true invalid) result finalStore) :
+        (LanguageResult.success .unit) next outputType operator true invalid wrap) result finalStore) :
     ∃ remainingSize, remainingSize < size ∧ CoreProof.EvaluationSize remainingSize (writtenEnvironment prepared.route.rootType target (packValues keys)
       (.inRight .unit snapshot) .unit execution.replacement execution.value environment)
       execution.finalStore (shift 7 next) result finalStore := by
@@ -262,13 +267,15 @@ theorem Execution.prefix_agreement
     {sourceTarget : Dynamic.ResolvedPlace}
     (resolution : CompatiblePlaceResolution.Execution checked registry functions prepared codes sourceTypes place leaf sourceTarget
       environment initialStore initialMap initialWorld before selectedHeap)
+    {wrap : Option TypeSystem.FixedInteger}
     (execution : Execution checked registry functions prepared codes environment resolution.store resolution.mapping resolution.world
-      resolution.target resolution.values resolution.snapshot selectedHeap after updated operator invalid)
+      resolution.target resolution.values resolution.snapshot selectedHeap after updated operator invalid wrap)
     {index : Nat}
     (lookup : environment[index]? = some (.cellRef (OptionalCell.cellType prepared.route.rootType) resolution.target))
     (passes : SourceCoreDataPlaces.Passes operator .unit) (next : Expr) (output : Ty) :
     ContinuationAgreement environment initialStore
-      (execute prepared (.var index) (SourceCoreCalls.packArguments codes) (LanguageResult.success .unit) next output operator true invalid)
+      (execute prepared (.var index) (SourceCoreCalls.packArguments codes) (LanguageResult.success .unit) next output operator true invalid
+        wrap)
       (writtenEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
         (.inRight .unit resolution.snapshot) .unit execution.replacement execution.value environment)
       execution.finalStore (shift 7 next) := by
@@ -336,14 +343,14 @@ theorem preserves_projection
     {initial : Option Dynamic.Value} {reason : Dynamic.SemanticFault}
     (initialValue : Dynamic.RootInitialValue currentCell initial)
     (fault : Dynamic.ProjectionsFaults initial resolved reason)
-    (next : Expr) (outputType : Ty) (invalidOperand : Word) :
+    (next : Expr) (outputType : Ty) (invalidOperand : Word) {wrap : Option TypeSystem.FixedInteger} :
     ∃ token count sourceRoot finalStore finalMap finalWorld,
       Dynamic.SourcePlaceBitNotFaults program context evidence source environment before place reason after ∧
       Dynamic.RootInitialValue currentCell (some sourceRoot) ∧
       FaultToken compilation.checked registry sourceRoot prepared.steps resolved reason token count ∧
       Evaluates coreEnvironment store
         (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) (LanguageResult.success .unit) next outputType
-          (binaryOperator (prepared.route.leafType = .integer) .equal) true invalidOperand)
+          (binaryOperator (prepared.route.leafType = .integer) .equal) true invalidOperand wrap)
         (.inLeft outputType (.word token)) finalStore ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -423,13 +430,13 @@ theorem preserves_uninitialized
     (empty : currentCell.value = none)
     (notMapping : ¬ ∃ key value, currentCell.type = .mapping key value)
     (hasProjection : resolved ≠ [])
-    (next : Expr) (outputType : Ty) (invalidOperand : Word) :
+    (next : Expr) (outputType : Ty) (invalidOperand : Word) {wrap : Option TypeSystem.FixedInteger} :
     ∃ finalStore finalMap finalWorld,
       Dynamic.SourcePlaceBitNotFaults program context evidence source environment before place
         (.uninitializedLocation location) after ∧
       Evaluates coreEnvironment store
         (execute prepared (.var (ξ index)) (SourceCoreCalls.packArguments (renamedCodes codes ξ)) (LanguageResult.success .unit) next outputType
-          (binaryOperator (prepared.route.leafType = .integer) .equal) true invalidOperand)
+          (binaryOperator (prepared.route.leafType = .integer) .equal) true invalidOperand wrap)
         (.inLeft outputType (.word prepared.invalidProjection)) finalStore ∧
       HeapRepresents compilation.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧

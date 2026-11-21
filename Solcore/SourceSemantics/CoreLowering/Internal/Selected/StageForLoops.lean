@@ -1351,7 +1351,7 @@ theorem bitNot {budget : Nat} {context : SourceSemantics.Context} {scope : Sourc
         (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
         (context := context) (scope := scope) (administrative := administrative)
         bridge functions transport head environments heaps locals agrees actualTyped initial admitted assignmentTyped
-        snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+        snapshot write
     obtain ⟨_, result, finalHeap, restTrace, restAdapted⟩ := remaining
       (Nat.le_trans (Nat.le_of_lt tailStrict) within)
       ⟨_, _, _, environments.extend maps worlds, middleHeaps,

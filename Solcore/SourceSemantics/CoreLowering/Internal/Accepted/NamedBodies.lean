@@ -61,15 +61,20 @@ def Receipt.head
         rw [receipt.bare] at projections
         cases projections
         simpa only [stored] using writable
-  profile := .inl (by rw [receipt.rawType, receipt.sourceProfile]; rfl)
-  targetPlain := fun _ fixed => by cases receipt.sourceProfile.symm.trans fixed
+  profile := .inl (.inl (by rw [receipt.sourceProfile]; rfl))
+  leafView := receipt.rawType
 
 theorem Receipt.head_emitted
     (receipt : Receipt policy fuel compilerSource scope site assignment output next reasonAt code)
     (targetType : receipt.binder.scheme.body = assignment.target.type)
     (typed : SourceBitNotAssignmentValid source context assignment) :
-    code = (receipt.head targetType typed).emit next output :=
-  receipt.emitted
+    code = (receipt.head targetType typed).emit next output := by
+  have noWrap : SourceCoreDataPlaces.bitNotWrap assignment.target.type = none := by
+    rw [receipt.sourceProfile]; rfl
+  exact receipt.emitted.trans (congrArg (fun wrap => SourceCoreCompatibleDataPlaces.execute receipt.place
+    (.var receipt.index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit) next output
+    (SourceCoreCompatibleDataPlaces.binaryOperator (receipt.place.route.leafType = .integer) .equal) true
+    (receipt.invalidUnary site assignment.target.root) wrap) noWrap.symm)
 
 theorem Receipt.head_errors
     (receipt : Receipt policy fuel compilerSource scope site assignment output next reasonAt code)

@@ -79,7 +79,7 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
   | success {remainingSize : Nat} {target : Dynamic.ResolvedPlace} {updated : Dynamic.Value}
       {after : Dynamic.Heap} {written : Store} {finalMap : LocationMap} {finalWorld : StoreTyping} {slots : Environment}
       (snapshot : Staging.Recursive.BareTarget environment before assignment.target target)
-      (write : Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      (write : Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         before target updated after)
       (heaps : GenericHeap.CellHeapRepresents cells finalMap finalWorld after written)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
@@ -141,13 +141,13 @@ theorem reflects_bounded (errors : head.Errors faults)
       obtain ⟨reached, related⟩ := ProtectedStateTransition.AdministrativeTransport.transition
         callerProtocol transport initial maps worlds frame metadata
       exact .success snapshot write finalHeaps maps worlds frame metadata effect count typed reached related
-        ⟨(Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)).1,
+        ⟨(Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot write).1,
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩ bounded remaining
 
 include transport ordinaryCells environments heaps locals agrees actualTyped initial admitted assignmentTyped in
 theorem preserves_value {target : Dynamic.ResolvedPlace} {updated : Dynamic.Value} {after : Dynamic.Heap}
     (snapshot : Staging.Recursive.BareTarget environment before assignment.target target)
-    (write : Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+    (write : Dynamic.ResolvedPlaceWrites (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
       before target updated after) :
     ∃ finalStore finalMap finalWorld slots,
       GenericHeap.CellHeapRepresents cells finalMap finalWorld after finalStore ∧
@@ -166,7 +166,7 @@ theorem preserves_value {target : Dynamic.ResolvedPlace} {updated : Dynamic.Valu
     callerProtocol transport initial maps worlds frame metadata
   exact ⟨finalStore, finalMap, finalWorld, slots, finalHeaps, maps, worlds, frame, metadata, effect, count, typed,
     ⟨reached, related,
-      (Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)).1,
+      (Staging.Recursive.SelectedPreservation.bare_write_bitNot locals admitted.heap assignmentTyped snapshot write).1,
       StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩, agreement⟩
 
 include transport ordinaryCells environments heaps locals agrees initial admitted in

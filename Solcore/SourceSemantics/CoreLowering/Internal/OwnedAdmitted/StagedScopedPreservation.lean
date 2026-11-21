@@ -466,7 +466,7 @@ theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : 
               (context := context) (scope := scope) (administrative := administrative)
               bridge functions extension transport faithful observations
               head head.projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-              budget typedChildren keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+              budget typedChildren keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot write
           obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
               finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
             ih tailShape (ProtectedStateImperativeStatementSuffixTyping.bitNot unique sourceTyped found form)
@@ -648,7 +648,7 @@ theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : 
             (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
             (context := context) (scope := scope) (administrative := administrative)
             bridge functions transport head environments heaps locals agrees actualTyped initial admitted assignmentTyped
-            snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+            snapshot write
         obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
             finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
           ih tailShape (ProtectedStateImperativeStatementSuffixTyping.bitNot unique sourceTyped found form)
@@ -1021,7 +1021,7 @@ theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : 
             (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
             (context := context) (scope := scope) (administrative := administrative)
             bridge functions transport head environments heaps locals agrees actualTyped initial admitted assignmentTyped
-            snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+            snapshot write
         obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
             finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
           ih ⟨tailShape, shape.2⟩ (InitializerTyping.bitNot sourceTyped).2 projection tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -1084,7 +1084,7 @@ theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : 
               (context := context) (scope := scope) (administrative := administrative)
               bridge functions extension transport faithful observations
               head head.projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
-              budget typedChildren keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+              budget typedChildren keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot write
           obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
               finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, last, lastRelated, post⟩ :=
             ih ⟨tailShape, shape.2⟩ (InitializerTyping.bitNot sourceTyped).2

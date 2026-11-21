@@ -723,10 +723,10 @@ variable {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
 /-! The actual six phases and write expose a strict child of the original
 Core derivation. Source updates have no expression child; continuation
 agreement transports results but supplies no execution-size bound. -/
-theorem initialized_prefix_sized (layout : Layout prepared)
-
-    (profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
-      SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer)
+theorem initialized_prefix_sized (layout : Layout prepared) {targetType : TypeSystem.Ty}
+    (profile : WideBitNotProfile targetType)
+    (leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType =
+      SourceCoreRawMetadata.runtimeType targetType)
     (heaps : HeapRepresents checked registry functions mapping world heap store)
     (reference : ReferenceRepresents mapping world location target prepared.route.rootType)
     (read : Dynamic.Heap.Reads heap location ⟨prepared.route.rootSourceType, some sourceValue, none⟩)
@@ -736,7 +736,7 @@ theorem initialized_prefix_sized (layout : Layout prepared)
     (actualTyped : RuntimeEnvironmentHasTypes world actual actualContext ambient.definitions)
     (operator : Option Frontend.SourceCoreDataPlaces.Modifier) (invalid : Word) :
     ∃ updated replacement after finalStore slots,
-      Dynamic.BitNotSnapshot (some sourceValue) updated ∧
+      Dynamic.BitNotAssignmentApplies targetType (some sourceValue) updated ∧
       Dynamic.Heap.Writes heap location (some updated) after ∧
       ValueRep checked registry functions mapping world prepared.route.rootSourceType updated replacement prepared.route.rootType ∧
       HeapRepresents checked registry functions mapping world after finalStore ∧
@@ -744,16 +744,16 @@ theorem initialized_prefix_sized (layout : Layout prepared)
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes world (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
       (SourceCoreDataPlaces.Passes operator .unit → ∀ next output, ContinuationAgreement actual store
         ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-          next output operator true invalid).rename ξ)
+          next output operator true invalid (SourceCoreDataPlaces.bitNotWrap targetType)).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ))) ∧
       ∀ {next : Expr} {output : Ty} {result : Value} {after : Store} {size : Nat},
         CoreProof.EvaluationSize size actual store
           ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-            next output operator true invalid).rename ξ) result after →
+            next output operator true invalid (SourceCoreDataPlaces.bitNotWrap targetType)).rename ξ) result after →
         ∃ remainingSize, remainingSize < size ∧ CoreProof.EvaluationSize remainingSize (slots ++ actual)
           finalStore (shift 7 (next.rename ξ)) result after := by
   obtain ⟨updated, replacement, related, applies, modified, _⟩ :=
-    CompatiblePlaceNumericBitNotModifier.success profile represented
+    CompatiblePlaceNumericBitNotModifier.wide_success profile leafView represented
       (environment := rhsEnvironment prepared.route.rootType target .unit (.inRight .unit value) .unit actual)
       (snapshot := .var 1) (rhs := .var 0) (.var rfl) operator store invalid
   have written := DataPlaceCommitReflection.source_writes read updated
@@ -765,11 +765,12 @@ theorem initialized_prefix_sized (layout : Layout prepared)
     simp only [shift, List.range, List.range.loop, List.foldl, Expr.weakenAt, LanguageResult.success]
     exact .inRight .unit
   have modifier : Evaluates (rhsEnvironment prepared.route.rootType target .unit (.inRight .unit value) .unit actual)
-      store (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType operator true (.var 1) (.var 0) invalid)
+      store (SourceCoreCompatibleDataPlaces.modified prepared.route.leafType operator true (.var 1) (.var 0) invalid
+        (SourceCoreDataPlaces.bitNotWrap targetType))
       (.inRight .word replacement) store := by simpa only [← layout.sameType] using modified
   have agreement : SourceCoreDataPlaces.Passes operator .unit → ∀ next output, ContinuationAgreement actual store
       ((execute prepared (.var index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
-        next output operator true invalid).rename ξ)
+        next output operator true invalid (SourceCoreDataPlaces.bitNotWrap targetType)).rename ξ)
       (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
     intro passes next output
     rw [execute_rename layout]

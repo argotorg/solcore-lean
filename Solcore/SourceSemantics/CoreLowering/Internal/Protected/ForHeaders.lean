@@ -64,7 +64,6 @@ theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementN
         TypedLexicalControl.LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
           context scope environment resultContext after := by
     obtain ⟨rfl, same, updated, assigned⟩ := bitNot_view unique (lookupStatement?_sound found) form first
-    rw [Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain] at assigned
     cases same
     obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩ :=
       head.preserves_prefix functions program evidence
@@ -124,7 +123,7 @@ theorem assignment_reflects
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using continuation)
     exact ⟨resultContext, outcome, after, finalMap, finalWorld,
       prepend (lookupStatement?_sound found) (by intro _ _; simp [form])
-        (.assignBitNot (lookupStatement?_sound found) form ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace)) tailTrace,
+        (.assignBitNot (lookupStatement?_sound found) form trace) tailTrace,
       represented, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, frame.trans lastFrame, metadata.trans lastMetadata, lexical⟩
 
 end Solcore.SourceSemantics.CoreLowering.ProtectedBitNotStatements
@@ -174,8 +173,9 @@ variable {values : ValuesContext} {source : TypedSource} {context : SourceSemant
 
 include extension transport faithful observations keyFacts meaning environments heaps locals agrees actualTyped initial ready in
 theorem preserves_prefix_bounded {updated : Dynamic.Value} {after : Dynamic.Heap} {size : Nat}
-    (trace : SourceExecutionSize.SourcePlaceSnapshotUpdate program size context evidence source Dynamic.BitNotSnapshot
-      environment before assignment.target updated after) (bounded : size ≤ budget) :
+    (trace : SourceExecutionSize.SourcePlaceSnapshotUpdate program size context evidence source
+      (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated after)
+    (bounded : size ≤ budget) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -220,7 +220,7 @@ theorem preserves_prefix_bounded {updated : Dynamic.Value} {after : Dynamic.Heap
             maps, worlds, frame, metadata, reached, related⟩)
         head.slot head.writable resolve (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
     obtain ⟨commit, typed, reached, related⟩ := ProtectedStagedProjectedBitNotCommit.of_write
-      head.layout head.ordinary extension protocol transport faithful observations head.profile
+      head.layout head.ordinary extension protocol transport faithful observations head.profile head.leafView
       environments agrees actualTyped resolution initial getterState getterRelated write
       (binaryOperator (head.prepared.route.leafType = .integer) .equal) head.invalid
     refine ⟨commit.finalStore, resolution.mapping, commit.finalWorld,
@@ -231,7 +231,8 @@ theorem preserves_prefix_bounded {updated : Dynamic.Value} {after : Dynamic.Heap
     intro next output
     change ContinuationAgreement actual store
       ((execute head.prepared (.var head.index) (SourceCoreCalls.packArguments head.codes) (LanguageResult.success .unit)
-        next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid).rename ξ) _ _ _
+        next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid
+        (SourceCoreDataPlaces.bitNotWrap assignment.target.type)).rename ξ) _ _ _
     rw [execute_rename head.layout.path (virtual_closed head.layout head.ordinary)]
     simpa only [renamed_packed, Expr.rename, LanguageResult.success, writtenEnvironment, modifiedEnvironment,
       rhsEnvironment, snapshotEnvironment, keysEnvironment, referenceEnvironment, List.cons_append, List.nil_append] using
@@ -513,7 +514,7 @@ theorem Tree.preserves_prefix_bounded_for_with_return
       cases first with | assignBitNot assigned =>
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
           head.preserves_prefix functions program evidence
-            environments heaps locals agrees actualTyped ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned.sound)
+            environments heaps locals agrees actualTyped assigned.sound
         let middleState := stateTransport.extend state maps worlds preservation metadata
         have middleReady := snapshots.ready state middleState ready valid (sites.snapshot itemFact) assigned.sound locals preservation
         have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignBitNot assigned.sound)
@@ -535,7 +536,7 @@ theorem Tree.preserves_prefix_bounded_for_with_return
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, ⟨middleState, middleRelated⟩, prefixAgreement⟩ :=
           head.preserves_prefix_bounded functions extension program evidence protocol stateTransport readiness faithful observations
             (fun id member node found => sites.expression itemFact (.projectedBitNotKey member) found)
-            budget (boundedMeaning context valid) environments heaps locals agrees actualTyped state ready ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned)
+            budget (boundedMeaning context valid) environments heaps locals agrees actualTyped state ready assigned
             (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega)
         have middleReady := snapshots.ready state middleState ready valid (sites.snapshot itemFact) assigned.sound locals preservation
         have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignBitNot assigned.sound)
@@ -1045,7 +1046,7 @@ theorem Tree.preserves_fault_reachable_bounded_for_with_eliminator
         cases first with | assignBitNot assigned =>
           obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
             head.preserves_prefix functions program evidence
-              environments heaps locals agrees actualTyped ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned.sound)
+              environments heaps locals agrees actualTyped assigned.sound
           let middleState := stateTransport.extend state maps worlds preservation metadata
           have middleReady := snapshots.ready state middleState ready valid (sites.snapshot itemFact) assigned.sound locals preservation
           have nextFacts := sites.tail (environment := environment) itemsFacts (Dynamic.ForItemExecutes.assignBitNot assigned.sound)
@@ -1594,10 +1595,10 @@ theorem Tree.reflects_reachable_bounded_for_with_eliminator
           ⟨stateTransport.extend state maps worlds preservation metadata, stateTransport.related state maps worlds preservation metadata,
             readiness.fault_after state _ (readiness.ready_fault ready) preservation⟩
       · let middleState := stateTransport.extend state maps worlds preservation metadata
-        have middleReady := snapshots.ready state middleState ready valid snapshotFact ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace.sound) locals
+        have middleReady := snapshots.ready state middleState ready valid snapshotFact trace.sound locals
           preservation
         have nextFacts := sites.tail (environment := environment) itemsFacts
-          (Dynamic.ForItemExecutes.assignBitNot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace.sound))
+          (Dynamic.ForItemExecutes.assignBitNot trace.sound)
         have reflected := ih valid nextFacts (environments.extend maps worlds) middleHeaps (locals.mono metadata)
           (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
           ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
@@ -1605,7 +1606,7 @@ theorem Tree.reflects_reachable_bounded_for_with_eliminator
           middleState gate middleReady
           (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval) (Nat.le_trans (Nat.le_of_lt smaller) bounded)
         exact reflected.prepend middleState (stateTransport.related state maps worlds preservation metadata)
-          (.assignBitNot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace)) maps worlds preservation metadata (Nat.le_of_lt smaller)
+          (.assignBitNot trace) maps worlds preservation metadata (Nat.le_of_lt smaller)
   exact eliminator M algebra valid itemsFacts environments heaps locals agrees actualTyped reference read unmapped state gate ready evaluated bounded
 
 include definitions registered producer acquire stateTransport stateBindings sites transfers in

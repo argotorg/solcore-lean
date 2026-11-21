@@ -1325,7 +1325,7 @@ theorem preserves (budget : Nat)
       CellAwareBareBitNotHeads.preserves_value (values := .initial compiled.compatible.checked)
         (instances := GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
         bridge functions transport head environments GeneralizedLocalDescriptorHeap.ordinary_cells
-        heaps locals agrees actualTyped initial admitted assignmentTyped snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+        heaps locals agrees actualTyped initial admitted assignmentTyped snapshot write
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
         finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, finalEffect, last, lastRelated, post⟩ :=
       tail tailSize tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -1373,7 +1373,7 @@ theorem reflects (budget : Nat)
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift,
           SourceCoreDataPlaces.shift] using remaining)
     exact ⟨Staging.Recursive.Size.stepSize [sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-      .bitNot snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+      .bitNot snapshot write trace, represented,
       finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
       metadata.trans finalMetadata, effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
@@ -1487,7 +1487,7 @@ theorem preserves (budget : Nat)
           (context := context) (scope := scope) (administrative := administrative)
           bridge functions extension transport faithful observations
           head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-          budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+          budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot write
       obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
           finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, finalEffect, last, lastRelated, post⟩ :=
         tail _ (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -1542,7 +1542,7 @@ theorem reflects (functionTypes : FunctionRuntimeViews functions) (budget : Nat)
           reached nextAdmitted (authority.transport effect) (physical.transport effect preservation) owner sameLocation ready
           (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
       exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-        .projectedBitNot projected keyTrace snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+        .projectedBitNot projected keyTrace snapshot write trace, represented,
         finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
         metadata.trans finalMetadata, effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
@@ -2803,7 +2803,7 @@ theorem preserves (budget : Nat)
       CellAwareBareBitNotHeads.preserves_value (values := .initial compiled.compatible.checked)
         (instances := GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
         bridge functions transport head environments GeneralizedLocalDescriptorHeap.ordinary_cells
-        heaps locals agrees actualTyped initial admitted assignmentTyped snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+        heaps locals agrees actualTyped initial admitted assignmentTyped snapshot write
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
         finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, finalEffect, last, lastRelated, post⟩ :=
       tail tailSize tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -2847,7 +2847,7 @@ theorem reflects (budget : Nat)
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift,
           SourceCoreDataPlaces.shift] using remaining)
     exact ⟨Staging.Recursive.Size.stepSize [sourceSize], outcome, after, finalMap, finalWorld,
-      prepend_bitNot snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+      prepend_bitNot snapshot write trace, represented,
       finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
       metadata.trans finalMetadata, effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
@@ -2957,7 +2957,7 @@ theorem preserves (budget : Nat)
           (context := context) (scope := scope) (administrative := administrative)
           bridge functions extension transport faithful observations
           head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-          budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+          budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot write
       obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
           finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, finalEffect, last, lastRelated, post⟩ :=
         tail _ (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -3008,7 +3008,7 @@ theorem reflects (functionTypes : FunctionRuntimeViews functions) (budget : Nat)
           reached nextAdmitted (authority.transport effect) (physical.transport effect preservation) owner sameLocation ready
           (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
       exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], outcome, after, finalMap, finalWorld,
-        CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_projected_bitNot projected keyTrace snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+        CallableIndexedOwnedAdmittedStagedForInitializerSource.prepend_projected_bitNot projected keyTrace snapshot write trace, represented,
         finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
         metadata.trans finalMetadata, effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 

@@ -1853,14 +1853,14 @@ theorem reflects_sized (errors : head.Errors faults)
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after) ∨
     (∃ sourceSize updated after written finalMap finalWorld slots remainingSize,
-      SourceExecutionSize.SourcePlaceSnapshotUpdate program sourceSize context evidence source Dynamic.BitNotSnapshot
-        environment before assignment.target updated after ∧
+      SourceExecutionSize.SourcePlaceSnapshotUpdate program sourceSize context evidence source
+        (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap written ∧ Dynamic.HeapMetadataExtend before after ∧
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       remainingSize < size ∧ EvaluationSize remainingSize (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
-  cases CompatibleRenamedBareBitNot.reflects_sized (compilation := values) head.layout head.bare head.profile
+  cases CompatibleRenamedBareBitNot.reflects_sized (compilation := values) head.layout head.bare head.profile head.leafView
     environments heaps locals agrees actualTyped head.slot head.writable errors completed with
   | fault trace same matched stores =>
     subst finalStore

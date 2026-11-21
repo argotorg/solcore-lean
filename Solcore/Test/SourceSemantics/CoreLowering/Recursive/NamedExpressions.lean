@@ -830,9 +830,9 @@ theorem actual_lower_reflects_sized
     ∃ prepared, CompatibleRenamedBareBitNot.ResultAt size compilation.checked registry functions program context evidence source faults prepared assignment.target
       environment before store mapping world actual actualContext ξ next output value finalStore := by
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
-    CompatibleBareBitNotCertificates.of_lower bare profile accepted
+    CompatibleBareBitNotCertificates.of_lower_wide bare (.inl profile) accepted
   refine ⟨prepared, ?_⟩
-  exact CompatibleRenamedBareBitNot.reflects_sized layout bare (view ▸ profile) environments heaps locals agrees actualTyped slot
+  exact CompatibleRenamedBareBitNot.reflects_sized layout bare (.inl profile) view environments heaps locals agrees actualTyped slot
     (rootEq ▸ rootTyped binder binding) token (lowering ▸ completed)
 
 end Lowering
@@ -855,8 +855,8 @@ theorem continuation_or_fault
     (∃ sourceSize reason, SourceExecutionSize.SourcePlaceBitNotFaults program sourceSize context evidence source
       environment before place reason before) ∨
     (∃ sourceSize updated after written slots remainingSize,
-      SourceExecutionSize.SourcePlaceSnapshotUpdate program sourceSize context evidence source Dynamic.BitNotSnapshot
-        environment before place updated after ∧
+      SourceExecutionSize.SourcePlaceSnapshotUpdate program sourceSize context evidence source
+        (Dynamic.BitNotAssignmentApplies place.type) environment before place updated after ∧
       slots.length = 7 ∧
       RuntimeEnvironmentHasTypes world (slots ++ actual) (writtenContext prepared actualContext) ambient.definitions ∧
       remainingSize < budget ∧ CoreProof.EvaluationSize remainingSize (slots ++ actual) written
@@ -969,8 +969,8 @@ theorem header_continuation_below (errors : head.Errors faults) (budget : Nat)
     (∃ sourceSize reason after, SourceExecutionSize.SourcePlaceBitNotFaults program sourceSize context evidence source
       environment before assignment.target reason after) ∨
     (∃ sourceSize updated after written finalMap finalWorld slots remainingSize,
-      SourceExecutionSize.SourcePlaceSnapshotUpdate program sourceSize context evidence source Dynamic.BitNotSnapshot
-        environment before assignment.target updated after ∧
+      SourceExecutionSize.SourcePlaceSnapshotUpdate program sourceSize context evidence source
+        (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       AdministrativePreserved mapping store finalMap written ∧
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧

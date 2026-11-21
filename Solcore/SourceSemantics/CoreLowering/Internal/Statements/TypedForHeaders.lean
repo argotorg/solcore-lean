@@ -492,7 +492,7 @@ theorem Tree.preserves_prefix [FunctionCalls.FaultTokens faults] {context finalC
       cases first with | assignBitNot assigned =>
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
           head.preserves_prefix functions program evidence
-            environments heaps locals agrees actualTyped ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned)
+            environments heaps locals agrees actualTyped assigned
         obtain ⟨tail, lastMaps, lastWorlds, lastFrame, lastMetadata, agreement⟩ :=
           ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
             (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
@@ -634,7 +634,7 @@ theorem Tree.preserves_fault [FunctionCalls.FaultTokens faults] {context finalCo
       cases first with | assignBitNot assigned =>
         obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata, count, typed, prefixAgreement⟩ :=
           head.preserves_prefix functions program evidence
-            environments heaps locals agrees actualTyped ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ assigned)
+            environments heaps locals agrees actualTyped assigned
         obtain ⟨token, finalStore, finalMap, finalWorld, completed, matched, finalHeaps, lastMaps, lastWorlds, lastFrame, lastMetadata⟩ :=
           ih valid (environments.extend maps worlds) middleHeaps (locals.mono metadata)
             (DataPlaceChildExpressions.prefix_agrees agrees slots) typed reference
@@ -840,7 +840,7 @@ theorem Tree.reflects [FunctionCalls.FaultTokens faults] (functionTypes : Functi
         ((preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).2.trans read)
         (preservation contextLocation unmapped (List.getElem?_eq_some_iff.mp read).1).1
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using remainingEval)
-      exact reflected.prepend (.assignBitNot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ trace)) maps worlds preservation metadata
+      exact reflected.prepend (.assignBitNot trace) maps worlds preservation metadata
 
 end Solcore.SourceSemantics.CoreLowering.TypedForHeader
 end

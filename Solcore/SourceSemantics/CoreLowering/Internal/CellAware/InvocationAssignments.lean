@@ -1550,7 +1550,7 @@ inductive ResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRawMet
         (Staging.Recursive.ProjectedTarget.keys assignment.target.projections) (.values sources) targetHeap)
       (snapshot : Staging.Recursive.ProjectedTarget.Snapshot environment before targetHeap assignment.target sources target)
       (write : Dynamic.ResolvedPlaceWrites
-        (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+        (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
         targetHeap target updated after)
       (heaps : GenericHeap.CellHeapRepresents cells finalMap finalWorld after written)
       (maps : LocationMap.Extends mapping finalMap) (worlds : WorldExtends world finalWorld)
@@ -1634,7 +1634,7 @@ theorem preserves_value (budget : Nat)
     (keyBound : keySize ≤ budget)
     (snapshot : Staging.Recursive.ProjectedTarget.Snapshot environment before getter assignment.target sources target)
     (write : Dynamic.ResolvedPlaceWrites
-      (fun _ replacement => Dynamic.BitNotSnapshot target.selected replacement)
+      (fun _ replacement => Dynamic.BitNotAssignmentApplies assignment.target.type target.selected replacement)
       getter target updated after) :
     ∃ finalStore finalMap finalWorld slots,
       GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel (payloadModel compiled.compatible.checked registry functions) (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
@@ -1657,7 +1657,7 @@ theorem preserves_value (budget : Nat)
         head.slot head.writable keyTrace keyBound snapshot
     obtain ⟨commit, typed, reached, related⟩ :=
       CellAwareStagedProjectedBitNotCommit.of_write GeneralizedLocalDescriptorHeap.ordinary_cells head.layout head.ordinary extension callerProtocol transport faithful observations
-        head.profile environments agrees actualTyped resolution initial resolutionState resolutionRelated write
+        head.profile head.leafView environments agrees actualTyped resolution initial resolutionState resolutionRelated write
         (binaryOperator (head.prepared.route.leafType = .integer) .equal) head.invalid
     refine ⟨commit.finalStore, resolution.mapping, commit.finalWorld,
       [.unit, commit.value, commit.replacement, .unit, .inRight .unit resolution.snapshot,
@@ -1668,13 +1668,14 @@ theorem preserves_value (budget : Nat)
       ⟨reached, related, ?_, ?_⟩, ?_⟩
     · exact CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped kind requirements)
         locals (by simpa only [Staging.Recursive.ProjectedTarget.keys_eq_sourceKeys] using keyTyped)
-        keyValues keyHeap resolution.metadata snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+        keyValues keyHeap resolution.metadata snapshot write
     · exact StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows
         (resolution.frame.trans commit.frame)
     · intro next output
       change ContinuationAgreement actual store
         ((execute head.prepared (.var head.index) (SourceCoreCalls.packArguments head.codes) (LanguageResult.success .unit)
-          next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid).rename ξ) _ _ _
+          next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid
+          (SourceCoreDataPlaces.bitNotWrap assignment.target.type)).rename ξ) _ _ _
       rw [execute_rename head.layout.path (virtual_closed head.layout head.ordinary)]
       simpa only [renamed_packed, Expr.rename, LanguageResult.success, writtenEnvironment, modifiedEnvironment, rhsEnvironment, snapshotEnvironment, keysEnvironment, referenceEnvironment, List.cons_append, List.nil_append] using
         commit.prefix_agreement resolution coreLookup (CompatiblePlaceModifier.passes_of_total rfl _ _) (next.rename ξ) output
@@ -1712,7 +1713,8 @@ theorem preserves_key_fault (budget : Nat)
       refine ⟨token, finalStore, finalMap, finalWorld, ?_, matched, finalHeaps, maps, worlds, frame, metadata, effect,
         reached, related, post.rows⟩
       change Evaluates actual store ((execute head.prepared (.var head.index) (SourceCoreCalls.packArguments head.codes) (LanguageResult.success .unit)
-        next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid).rename ξ) _ _
+        next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid
+          (SourceCoreDataPlaces.bitNotWrap assignment.target.type)).rename ξ) _ _
       rw [execute_rename head.layout.path (virtual_closed head.layout head.ordinary)]
       simp only [renamed_packed, Expr.rename, LanguageResult.success]
       unfold execute
@@ -1763,7 +1765,8 @@ theorem preserves_getter_fault (budget : Nat)
         finalHeaps, maps, worlds, frame, metadata, effect, reached, related,
         StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
       change Evaluates actual store ((execute head.prepared (.var head.index) (SourceCoreCalls.packArguments head.codes) (LanguageResult.success .unit)
-        next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid).rename ξ) _ _
+        next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid
+          (SourceCoreDataPlaces.bitNotWrap assignment.target.type)).rename ξ) _ _
       simpa only [execute_rename head.layout.path (virtual_closed head.layout head.ordinary), renamed_packed, Expr.rename, LanguageResult.success] using evaluated
     | uninitialized lookup initialRead ordered currentRead empty notMapping nonempty =>
       obtain ⟨execution, _, _, keyState, keyRelated, _post⟩ := CellAwareInvocationProjectedAssignmentHeads.preserves_keys bridge budget head.layout
@@ -1779,7 +1782,8 @@ theorem preserves_getter_fault (budget : Nat)
         finalHeaps, maps, worlds, frame, metadata, effect, reached, related,
         StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows frame⟩
       change Evaluates actual store ((execute head.prepared (.var head.index) (SourceCoreCalls.packArguments head.codes) (LanguageResult.success .unit)
-        next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid).rename ξ) _ _
+        next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid
+          (SourceCoreDataPlaces.bitNotWrap assignment.target.type)).rename ξ) _ _
       simpa only [execute_rename head.layout.path (virtual_closed head.layout head.ordinary), renamed_packed, Expr.rename, LanguageResult.success] using evaluated
 
 end Heads
@@ -1860,7 +1864,8 @@ theorem reflects_bounded (budget : Nat)
     have nativeCompleted := completed
     change EvaluationSize size actual store
       ((execute head.prepared (.var head.index) (SourceCoreCalls.packArguments head.codes) (LanguageResult.success .unit) next output
-        (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid).rename ξ) value finalStore at nativeCompleted
+        (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid
+          (SourceCoreDataPlaces.bitNotWrap assignment.target.type)).rename ξ) value finalStore at nativeCompleted
     rw [execute_rename head.layout.path (virtual_closed head.layout head.ordinary)] at nativeCompleted
     simp only [renamed_packed, Expr.rename, LanguageResult.success] at nativeCompleted
     have prefixResult := CellAwareStagedProjectedPrefix.reflects_getter budget GeneralizedLocalDescriptorHeap.ordinary_cells head.layout head.ordinary extension
@@ -1891,7 +1896,7 @@ theorem reflects_bounded (budget : Nat)
     | resolved resolution keyTrace snapshot keyValues getterHeap prefixBound remaining prefixPost =>
       obtain ⟨getterState, getterRelated⟩ := prefixPost
       obtain ⟨replacement, native, represented, applies, _, _⟩ :=
-        CompatiblePlaceNumericBitNotModifier.success head.profile resolution.snapshotRelated
+        CompatiblePlaceNumericBitNotModifier.wide_success head.profile head.leafView resolution.snapshotRelated
           (environment := rhsEnvironment head.prepared.route.rootType resolution.target (packValues resolution.values)
             (.inRight .unit resolution.snapshot) .unit actual) (rhs := .var 0) (.var (index := 1) rfl)
           (binaryOperator (head.prepared.route.leafType = .integer) .equal) resolution.store head.invalid
@@ -1900,7 +1905,7 @@ theorem reflects_bounded (budget : Nat)
       obtain ⟨updated, after, write⟩ := CompatiblePlaceBitNotModifier.write_exists sourceTrace applies
       obtain ⟨commit, typed, reached, related⟩ :=
         CellAwareStagedProjectedBitNotCommit.of_write GeneralizedLocalDescriptorHeap.ordinary_cells head.layout head.ordinary extension callerProtocol transport faithful observations
-          head.profile environments agrees actualTyped resolution initial getterState getterRelated write
+          head.profile head.leafView environments agrees actualTyped resolution initial getterState getterRelated write
           (binaryOperator (head.prepared.route.leafType = .integer) .equal) head.invalid
       obtain ⟨remainingSize, strict, continuation⟩ := commit.reflects_size remaining
       exact .success keyTrace snapshot write commit.heaps resolution.maps
@@ -1911,7 +1916,7 @@ theorem reflects_bounded (budget : Nat)
           packValues resolution.values, .cellRef (OptionalCell.cellType head.prepared.route.rootType) resolution.target])
         rfl typed reached related
         ⟨CallableIndexedOwnedStagedProjectedBitNotAdmission.heap_after_bitNot unique (.intro targetTyped kind requirements)
-          locals keyRow keyValues getterHeap resolution.metadata snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write),
+          locals keyRow keyValues getterHeap resolution.metadata snapshot write,
           StableRows.after_administrative (bridge.pool initial) (bridge.pool reached) admitted.rows
             (resolution.frame.trans commit.frame)⟩
         (by omega) continuation
@@ -2181,7 +2186,7 @@ theorem preserves (budget : Nat)
       CellAwareBareBitNotHeads.preserves_value (values := .initial compiled.compatible.checked)
         (instances := GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
         bridge functions transport head environments GeneralizedLocalDescriptorHeap.ordinary_cells
-        heaps locals agrees actualTyped initial admitted assignmentTyped snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+        heaps locals agrees actualTyped initial admitted assignmentTyped snapshot write
     obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
         finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, finalEffect, last, lastRelated, post⟩ :=
       tail tailSize tailWithin (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -2229,7 +2234,7 @@ theorem reflects (budget : Nat)
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift,
           SourceCoreDataPlaces.shift] using remaining)
     exact ⟨Staging.Recursive.Size.stepSize [sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-      .bitNotBare (lookupStatement?_sound found) form snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+      .bitNotBare (lookupStatement?_sound found) form snapshot write trace, represented,
       finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
       metadata.trans finalMetadata, effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 
@@ -2551,7 +2556,7 @@ theorem preserves (budget : Nat)
           (context := context) (scope := scope) (administrative := administrative)
           bridge functions extension transport faithful observations
           head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
-          budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+          budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot write
       obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented,
           finalHeaps, finalMaps, finalWorlds, finalFrame, finalMetadata, finalEffect, last, lastRelated, post⟩ :=
         tail _ (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) (environments.extend maps worlds) middleHeaps (locals.mono metadata)
@@ -2606,7 +2611,7 @@ theorem reflects (functionTypes : FunctionRuntimeViews functions) (budget : Nat)
           reached nextAdmitted (authority.transport effect) (physical.transport effect preservation) owner sameLocation ready
           (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreCompatibleDataPlaces.shift, SourceCoreDataPlaces.shift] using remaining)
       exact ⟨Staging.Recursive.Size.stepSize [_, sourceSize], finalContext, outcome, after, finalMap, finalWorld,
-        .bitNotProjected (lookupStatement?_sound found) form projected keyTrace snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write) trace, represented,
+        .bitNotProjected (lookupStatement?_sound found) form projected keyTrace snapshot write trace, represented,
         finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame,
         metadata.trans finalMetadata, effect.trans finalEffect, last, protocol.trans related lastRelated, post⟩
 

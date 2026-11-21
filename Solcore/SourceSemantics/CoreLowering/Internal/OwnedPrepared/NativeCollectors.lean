@@ -1644,10 +1644,8 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
         rw [routeEq]
         exact description.ordinary (fun k v same => notMapping k v (rootEq.trans same))
       refine ⟨⟨prepared, index, codes, leaf, sourceTypes, site, invalidUnary, layout, ordinary,
-        by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding, leafView ▸ profile,
-        CompatiblePlaceModifier.bitNotPlain_of_runtime profile⟩,
-        by simp [Head.emit, routeEq, placeModifier, SourceCoreDataPlaces.placeWrap,
-          CompatiblePlaceModifier.bitNotWrap_of_runtime profile], rfl, ?_⟩
+        by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding, .inl profile, leafView⟩,
+        by simp [Head.emit, routeEq, placeModifier, SourceCoreDataPlaces.placeWrap], rfl, ?_⟩
       exact ⟨rfl, route, described, preparedBy⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors

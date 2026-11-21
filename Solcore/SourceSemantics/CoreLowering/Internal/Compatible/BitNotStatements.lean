@@ -36,10 +36,10 @@ structure Head (context : SourceSemantics.Context) (scope : Scope) (assignment :
   layout : CompatibleBareBitNotCertificates.Layout prepared
   slot : SourceCoreLocalCell.lookup? scope assignment.target.root = some (index, prepared.route.rootType)
   writable : WritableLocal context assignment.target.root prepared.route.rootSourceType
-  profile : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .word ∨
-    SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType = .integer
-  /-- The target's static type has Word's or Integer's `~`, not a narrow one. -/
-  targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedNarrowBitNot type .bitNot
+  /-- The target is of in-place `~`'s wider profile, at its own type. -/
+  profile : WideBitNotProfile assignment.target.type
+  leafView : SourceCoreRawMetadata.runtimeType prepared.route.rootSourceType =
+    SourceCoreRawMetadata.runtimeType assignment.target.type
 
 namespace Head
 variable {context : SourceSemantics.Context} {scope : Scope} {assignment : AssignmentResolution}
@@ -47,6 +47,7 @@ variable {context : SourceSemantics.Context} {scope : Scope} {assignment : Assig
 def emit (head : Head context scope assignment) (next : Expr) (output : Ty) : Expr :=
   execute head.prepared (.var head.index) (SourceCoreCalls.packArguments []) (LanguageResult.success .unit)
     next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid
+    (SourceCoreDataPlaces.bitNotWrap assignment.target.type)
 
 def writtenContext (head : Head context scope assignment) (actual : Core.Context) : Core.Context :=
   CompatibleRenamedBareBitNot.writtenContext head.prepared actual
@@ -66,9 +67,9 @@ theorem of_lower_with_token {values : ValuesContext} {source : TypedSource} {sit
       output next reasonAt invalid invalidOperand missing = .ok code) :
     ∃ head : Head context scope assignment, code = head.emit next output ∧ head.invalid = invalidOperand := by
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
-    CompatibleBareBitNotCertificates.of_lower bare profile accepted
+    CompatibleBareBitNotCertificates.of_lower_wide bare (.inl profile) accepted
   exact ⟨⟨prepared, index, invalidOperand, bare, layout, slot, rootEq ▸ writable binder binding,
-    view ▸ profile, CompatiblePlaceModifier.bitNotPlain_of_runtime profile⟩, lowering, rfl⟩
+    .inl profile, view⟩, lowering, rfl⟩
 
 theorem of_lower {values : ValuesContext} {source : TypedSource} {site : SourceCoreElaboration.ErrorSite}
     {expression : ExpressionLowerer} {fuel : Nat} {next code : Expr} {output : Ty}
@@ -567,9 +568,9 @@ structure Head (values : ValuesContext) (source : TypedSource)
   ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none
   slot : SourceCoreLocalCell.lookup? scope assignment.target.root = some (index, prepared.route.rootType)
   writable : WritableLocal context assignment.target.root prepared.route.rootSourceType
-  profile : SourceCoreRawMetadata.runtimeType leaf = .word ∨ SourceCoreRawMetadata.runtimeType leaf = .integer
-  /-- The target's static type has Word's or Integer's `~`, not a narrow one. -/
-  targetPlain : ∀ type, assignment.target.type = .fixed type → ¬ FixedNarrowBitNot type .bitNot
+  /-- The target is of in-place `~`'s wider profile, at its own type. -/
+  profile : WideBitNotProfile assignment.target.type
+  leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType assignment.target.type
 
 namespace Head
 variable {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
@@ -593,6 +594,7 @@ def emit (head : Head values source context certificate scope administrative def
     (next : Expr) (output : Ty) : Expr :=
   execute head.prepared (.var head.index) (SourceCoreCalls.packArguments head.codes) (LanguageResult.success .unit)
     next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid
+    (SourceCoreDataPlaces.bitNotWrap assignment.target.type)
 
 def writtenContext (head : Head values source context certificate scope administrative definitions assignment)
     (actual : Core.Context) : Core.Context :=
@@ -625,11 +627,9 @@ theorem of_lower {site : SourceCoreElaboration.ErrorSite} {expression : Expressi
     ∃ head : Head values source context certificate scope administrative definitions assignment,
       code = head.emit next output ∧ head.invalid = invalidOperand := by
   obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, _, binding, rootEq, view, slot, layout, ordinary, _, emitted⟩ :=
-    CompatiblePlaceBitNotCertificates.of_lower unique signatures sourceTyped nonempty free profile extract
-      accepted typed
+    CompatiblePlaceBitNotCertificates.of_lower_wide unique signatures sourceTyped nonempty free extract accepted typed
   exact ⟨⟨prepared, index, codes, leaf, sourceTypes, site, invalidOperand, layout, ordinary, slot,
-    rootEq ▸ writable binder binding, view ▸ profile, CompatiblePlaceModifier.bitNotPlain_of_runtime profile⟩,
-    emitted, rfl⟩
+    rootEq ▸ writable binder binding, .inl profile, view⟩, emitted, rfl⟩
 
 end Head
 end Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatements
@@ -672,8 +672,8 @@ variable {values : ValuesContext} {source : TypedSource}
 
 include extension meaning faithful observations environments heaps locals agrees actualTyped in
 theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
-      environment before assignment.target updated after) :
+    (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source
+      (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updated after) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
@@ -690,7 +690,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
         (environment_respects environments.runtime_hasTypes actualTyped agrees))
       meaning faithful observations environments heaps locals agrees actualTyped head.slot head.writable resolve
     obtain ⟨commit, typed⟩ := ProtectedStagedProjectedBitNotCommit.typed_of_write head.layout head.ordinary extension
-      faithful observations head.profile environments agrees actualTyped resolution write
+      faithful observations head.profile head.leafView environments agrees actualTyped resolution write
       (binaryOperator (head.prepared.route.leafType = .integer) .equal) head.invalid
     refine ⟨commit.finalStore, resolution.mapping, commit.finalWorld,
       [.unit, commit.value, commit.replacement, .unit, .inRight .unit resolution.snapshot,
@@ -700,7 +700,8 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
     intro next output
     change ContinuationAgreement actual store
       ((execute head.prepared (.var head.index) (SourceCoreCalls.packArguments head.codes) (LanguageResult.success .unit)
-        next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid).rename ξ) _ _ _
+        next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) true head.invalid
+        (SourceCoreDataPlaces.bitNotWrap assignment.target.type)).rename ξ) _ _ _
     rw [execute_rename head.layout.path (virtual_closed head.layout head.ordinary)]
     simpa only [renamed_packed, Expr.rename, LanguageResult.success, writtenEnvironment, modifiedEnvironment, rhsEnvironment, snapshotEnvironment, keysEnvironment, referenceEnvironment, List.cons_append, List.nil_append] using
       commit.prefix_agreement resolution coreLookup (CompatiblePlaceModifier.passes_of_total rfl _ _) (next.rename ξ) output
@@ -740,7 +741,8 @@ variable   {values : ValuesContext} {source : TypedSource}
 
 include environments heaps locals agrees actualTyped in
 theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
-    (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
+    (trace : Dynamic.SourcePlaceSnapshotUpdate program context evidence source
+      (Dynamic.BitNotAssignmentApplies assignment.target.type)
       environment before assignment.target updated after) :
     ∃ finalStore finalMap finalWorld slots,
       HeapRepresents values.checked registry functions finalMap finalWorld after finalStore ∧
@@ -750,7 +752,7 @@ theorem preserves_prefix {updated : Dynamic.Value} {after : Dynamic.Heap}
       ∀ next output, ContinuationAgreement actual store ((head.emit next output).rename ξ)
         (slots ++ actual) finalStore (shift 7 (next.rename ξ)) := by
   obtain ⟨_, finalStore, slots, _, finalHeaps, frame, metadata, count, typed, continuation⟩ :=
-    CompatibleRenamedBareBitNot.preserves_prefix (compilation := values) head.layout head.bare head.profile
+    CompatibleRenamedBareBitNot.preserves_prefix (compilation := values) head.layout head.bare head.profile head.leafView
       environments heaps locals agrees actualTyped head.slot head.writable trace (binaryOperator (head.prepared.route.leafType = .integer) .equal) head.invalid
       (CompatiblePlaceModifier.passes_of_total rfl _ _)
   exact ⟨finalStore, mapping, world, slots, finalHeaps, .refl _, .refl _, frame, metadata, count, typed, continuation⟩
@@ -766,7 +768,7 @@ theorem preserves_fault (errors : head.Errors faults)
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after := by
   obtain ⟨rfl, rfl, evaluated⟩ := CompatibleRenamedBareBitNot.preserves_fault (compilation := values)
-    head.layout head.bare head.profile environments heaps locals agrees head.slot head.writable trace
+    head.layout head.bare head.profile head.leafView environments heaps locals agrees head.slot head.writable trace
       next output (binaryOperator (head.prepared.route.leafType = .integer) .equal) head.invalid
   exact ⟨head.invalid, store, mapping, world, evaluated, errors, heaps, .refl _, .refl _, .refl _ _, .refl _⟩
 
@@ -781,14 +783,15 @@ theorem reflects (errors : head.Errors faults)
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after) ∨
     (∃ updated after written finalMap finalWorld slots,
-      Dynamic.SourcePlaceSnapshotUpdate program context evidence source Dynamic.BitNotSnapshot
+      Dynamic.SourcePlaceSnapshotUpdate program context evidence source
+      (Dynamic.BitNotAssignmentApplies assignment.target.type)
         environment before assignment.target updated after ∧
       HeapRepresents values.checked registry functions finalMap finalWorld after written ∧
       LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
       AdministrativePreserved mapping store finalMap written ∧ Dynamic.HeapMetadataExtend before after ∧
       slots.length = 7 ∧ RuntimeEnvironmentHasTypes finalWorld (slots ++ actual) (head.writtenContext actualContext) ambient.definitions ∧
       Evaluates (slots ++ actual) written (shift 7 (next.rename ξ)) value finalStore) := by
-  cases CompatibleRenamedBareBitNot.reflects (compilation := values) head.layout head.bare head.profile
+  cases CompatibleRenamedBareBitNot.reflects (compilation := values) head.layout head.bare head.profile head.leafView
     environments heaps locals agrees actualTyped head.slot head.writable errors completed with
   | fault trace same matched stores =>
     subst finalStore
@@ -881,7 +884,6 @@ theorem assignment_preserves {mode : Bool} {id : StatementId} {node : StatementN
         TypedLexicalControl.LexicalResult values.checked ambient.definitions finalMap finalWorld administrative source.owner
           context scope environment resultContext after := by
     obtain ⟨rfl, same, updated, assigned⟩ := bitNot_view unique (lookupStatement?_sound found) form first
-    rw [Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain] at assigned
     cases same
     obtain ⟨written, middleMap, middleWorld, slots, middleHeaps, maps, worlds, frame, metadata, count, typed, continuation⟩ :=
       head.preserves_prefix functions program evidence
@@ -938,8 +940,7 @@ theorem assignment_reflects
         (by simpa only [DataPlaceChildExpressions.rename_prefix, count, SourceCoreDataPlaces.shift, SourceCoreCompatibleDataPlaces.shift] using continuation)
     exact ⟨resultContext, outcome, after, finalMap, finalWorld,
       prepend (lookupStatement?_sound found) (by intro _ _; simp [form])
-        (.assignBitNot (lookupStatement?_sound found) form
-          (by rw [Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain]; exact trace)) tailTrace,
+        (.assignBitNot (lookupStatement?_sound found) form trace) tailTrace,
       represented, finalHeaps, maps.trans lastMaps, worlds.trans lastWorlds, frame.trans lastFrame, metadata.trans lastMetadata, lexical⟩
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleBitNotStatements

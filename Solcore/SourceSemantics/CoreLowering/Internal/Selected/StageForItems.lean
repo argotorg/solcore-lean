@@ -344,13 +344,14 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
       ·
         exact ⟨_, _, _, .projectedBitNotKeysFault projected ready keys, .rejected origin call reason _ reached⟩
       · obtain ⟨replacement, native, represented, applies, _, _⟩ :=
-          CompatiblePlaceNumericBitNotModifier.success head.profile resolution.snapshotRelated
+          CompatiblePlaceNumericBitNotModifier.wide_success head.profile head.leafView resolution.snapshotRelated
             (environment := rhsEnvironment head.prepared.route.rootType resolution.target (packValues resolution.values)
               (.inRight .unit resolution.snapshot) .unit actual) (rhs := .var 0) (.var (index := 1) rfl)
             (binaryOperator (head.prepared.route.leafType = .integer) .equal) resolution.store head.invalid
         have sourceApplies := resolution.selectedEq.symm ▸ applies
         rw [empty] at sourceApplies
-        cases sourceApplies
+        cases sourceApplies with
+        | primitive _ snapshot => cases snapshot
     | operand resolved selected invalid =>
       rcases liftResolved resolved
         (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at *; omega) with
@@ -358,16 +359,13 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
         ⟨sources, keys, snapshot, keyValues, resolution, getterState, _getterRelated, getterAdmission⟩
       ·
         exact ⟨_, _, _, .projectedBitNotKeysFault projected ready keys, .rejected origin call reason _ reached⟩
-      · obtain ⟨replacement, native, represented, applies, _, _⟩ :=
-          CompatiblePlaceNumericBitNotModifier.success head.profile resolution.snapshotRelated
+      · obtain ⟨_, _, _, _, _, valid⟩ :=
+          CompatiblePlaceNumericBitNotModifier.wide_success head.profile head.leafView resolution.snapshotRelated
             (environment := rhsEnvironment head.prepared.route.rootType resolution.target (packValues resolution.values)
               (.inRight .unit resolution.snapshot) .unit actual) (rhs := .var 0) (.var (index := 1) rfl)
             (binaryOperator (head.prepared.route.leafType = .integer) .equal) resolution.store head.invalid
-        have sourceApplies := resolution.selectedEq.symm ▸ applies
-        rw [selected] at sourceApplies
-        cases sourceApplies with
-        | word value => exact (invalid.excludes_application ⟨_, .wordBitNot value⟩).elim
-        | integer value => exact (invalid.excludes_application ⟨_, .integerBitNot value⟩).elim
+        have same := Option.some.inj (selected.symm.trans resolution.selectedEq)
+        exact (valid (same ▸ invalid)).elim
   · cases assigned with
     | intro resolved write =>
       rcases liftResolved resolved
@@ -385,7 +383,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
             bridge functions extension transport
             faithful observations head projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
             (keyStageSize + 1) (fun n _ => preservation n)
-            measuredKeys (by omega) snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+            measuredKeys (by omega) snapshot write
         obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
           (Nat.le_trans (Nat.le_of_lt tailStrict) within)
           ⟨_, _, _, environments.extend maps worlds, middleHeaps,
@@ -831,7 +829,7 @@ theorem lifts {budget : Nat} {context : SourceSemantics.Context} {scope : Source
         (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
         (context := context) (scope := scope) (administrative := administrative)
         bridge functions transport head environments heaps locals agrees actualTyped initial admitted assignmentTyped
-        snapshot ((Dynamic.BitNotAssignmentApplies.eq_of_plain head.targetPlain) ▸ write)
+        snapshot write
     obtain ⟨nextContext, result, finalHeap, restTrace, restAdapted⟩ := remaining
       (Nat.le_trans (Nat.le_of_lt tailStrict) within)
       ⟨_, _, _, environments.extend maps worlds, middleHeaps,
