@@ -1061,11 +1061,11 @@ theorem evaluates {catalog : SourceCoreDataCatalog.Catalog} {signatures : Progra
   · have notEqual : operator ≠ .equal := by
       intro same
       subst same
-      cases kind
+      rcases kind with kind | kind <;> cases kind
     cases snapshotRep with
     | absent =>
       refine ⟨_, .uninitialized rfl notEqual, ?_⟩
-      cases kind <;> exact .caseLeft (snapshotSelected.evaluates store) (.inLeft .word)
+      rcases kind with kind | kind <;> cases kind <;> exact .caseLeft (snapshotSelected.evaluates store) (.inLeft .word)
     | present related =>
       obtain ⟨left, rfl, rfl, rfl⟩ := DataPlaceModifier.fixed_rep related
       obtain ⟨rightWord, rfl, rfl, _⟩ := DataPlaceModifier.fixed_rep rightRep

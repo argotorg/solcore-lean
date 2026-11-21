@@ -1906,7 +1906,7 @@ theorem fixed_current_typed
     {context : SourceSemantics.Context} {first second : Dynamic.Heap}
     {targetType : TypeSystem.Ty} {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
     {current : Option Dynamic.Value} {right result : Dynamic.Value}
-    (kind : FixedCompoundAssignmentOperator operator)
+    (kind : FixedCompoundAssignmentOperator operator ∨ ShiftCompoundAssignmentOperator operator)
     (targetEq : targetType = .fixed type)
     (applies : Dynamic.CompoundAssignmentApplies targetType operator current right result)
     (typed : Dynamic.OptionalValueHasType context first current (.fixed type)) :
@@ -1916,7 +1916,7 @@ theorem fixed_current_typed
   | some typed =>
       cases applies with
       | primitive plain applies =>
-          cases kind
+          rcases kind with kind | kind <;> cases kind
           all_goals first
             | exact (plain _ targetEq (by constructor)).elim
             | (cases applies
@@ -1931,8 +1931,8 @@ theorem fixed_current_typed
 /-- The actual current-cell write keeps deep heap typing at the exact RHS endpoint. Plain assignment
 writes the right-hand value; a compound one at a Word target is Word's operation, and at a fixed-width
 target keeps the target's type (`Dynamic.CompoundAssignmentApplies.preserves`), from the snapshot,
-typed on the heap before the RHS, and the right-hand value. The wider profile has no shift at a
-fixed-width target. -/
+typed on the heap before the RHS, and the right-hand value. A shift keeps its target's type too,
+whatever the amount (`Dynamic.CompoundAssignmentApplies.shiftPreserves`). -/
 theorem heap_after_assignment
     {source : TypedSource} {context : SourceSemantics.Context}
     {operator : Syntax.ValueAssignOp}
@@ -2019,19 +2019,31 @@ theorem heap_after_assignment
               refine Dynamic.HeapWellTyped.write heapTyped currentRead (.some ?_) written
               rw [currentType, cellType, bodyType]
               exact Dynamic.CompoundAssignmentApplies.preserves (.fixed kind) targetEq
-                (fixed_current_typed kind targetEq modified initialTyped) rightFixed modified
+                (fixed_current_typed (.inl kind) targetEq modified initialTyped) rightFixed modified
   | @shiftCompound _ _ _ _ _ amountType kind targetTyped targetKind rhsTyped amount _ =>
       cases targetKind with
       | fixed type =>
-          exfalso
           have targetEq := targetTyped.type_eq
-          rcases profile with narrow | ⟨_, fixedKind⟩
-          · rw [targetEq] at narrow
-            rcases narrow with equal | word | ⟨integer, _⟩
-            · subst equal; cases kind
-            · cases word
-            · cases integer
-          · cases kind <;> cases fixedKind
+          cases snapshot with
+          | @intro _ _ selected bare lookup read initial =>
+            cases targetTyped with
+            | intro writable projections _ =>
+              rw [bare] at projections
+              cases projections
+              obtain ⟨scheme, staticLookup, _schemeTyped, _mono, bodyType⟩ := writable.scheme
+              obtain ⟨location, cell, typedLookup, typedRead, cellType, _storage⟩ := locals.lookup staticLookup
+              cases lookup.functional typedLookup
+              cases read.functional typedRead
+              have initialTyped := initial.preserves (beforeTyped _ typedRead.member)
+              rw [cellType, bodyType] at initialTyped
+              cases write with
+              | intro currentRead currentType _ update written =>
+                cases update with
+                | leaf modified =>
+                  refine Dynamic.HeapWellTyped.write heapTyped currentRead (.some ?_) written
+                  rw [currentType, cellType, bodyType]
+                  exact Dynamic.CompoundAssignmentApplies.shiftPreserves kind (.fixed type) targetEq
+                    (fixed_current_typed (.inr kind) targetEq modified initialTyped) modified
       | word =>
       have plain : ∀ type, assignment.target.type = .fixed type → ¬ FixedCheckedCompound operator :=
         fun _ fixed _ => by rw [targetTyped.type_eq] at fixed; cases fixed
@@ -2090,9 +2102,9 @@ theorem source_profile
       | same view => exact .inl (.inr (view.trans (congrArg SourceCoreRawMetadata.runtimeType storedType)))
       | shiftAmount shift _ _ => cases kind <;> cases shift
       | fixedShiftAmount shift _ _ => cases kind <;> cases shift
-  | fixedCompound kind targetTyped _ _ => exact .inr ⟨⟨_, targetTyped.type_eq⟩, kind⟩
+  | fixedCompound kind targetTyped _ _ => exact .inr ⟨⟨_, targetTyped.type_eq⟩, .inl kind⟩
   | shiftCompound kind _ _ rhsTyped amount _ =>
-      rcases profile with narrow | ⟨_, fixedKind⟩
+      rcases profile with narrow | ⟨fixedTarget, _⟩
       · rcases narrow with equal | word | ⟨integer, _⟩
         · exact .inl (.inl equal)
         · exact .inl (.inr (leafView.trans word))
@@ -2106,7 +2118,7 @@ theorem source_profile
           | same view => cases amount <;> cases view.symm.trans (leafView.trans integer)
           | shiftAmount _ leafWord _ => cases leafWord.symm.trans (leafView.trans integer)
           | fixedShiftAmount _ leafFixed _ => cases leafFixed.symm.trans (leafView.trans integer)
-      · cases kind <;> cases fixedKind
+      · exact .inr ⟨fixedTarget, .inr kind⟩
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBareAssignmentAdmission
 end

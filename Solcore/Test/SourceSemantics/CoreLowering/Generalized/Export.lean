@@ -4500,11 +4500,13 @@ end Tests.SourceCoreShiftSubset
 end
 
 section
-/-! Step 8d's compound shifts at a Word target stay in the statement-level
-meaning proofs: the accepted trees and the assignment head take a shift's
-amount at its own type (`AssignedOperandTyped`, `AssignedRhsView`), so the
-statement shape check, which reads only the Source, admits `w <<= 3`, whose
-amount is a `uint256`, `w <<= n` by a `Word` and `w >>= n` by a `uint8`. -/
+/-! Step 8d's compound shifts stay in the statement-level meaning proofs, at a
+Word target and at a fixed-width one: the accepted trees and the assignment
+head take a shift's amount at its own type (`AssignedOperandTyped`,
+`AssignedRhsView`), so the statement shape check, which reads only the Source,
+admits `w <<= 3`, whose amount is a `uint256`, `w <<= n` by a `Word`,
+`w >>= n` by a `uint8`, a `uint8` target's `r <<= 1` and an `int8` target's
+`r >>= n` by a `uint8`. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreCompoundShiftSubset
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
@@ -4513,10 +4515,13 @@ private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
     "function wordByLiteral(w: Word) returns (Word) { let r: Word = w; r <<= 3; return r; }",
     "function wordByWord(w: Word, n: Word) returns (Word) { let r: Word = w; r <<= n; return r; }",
-    "function wordByNarrow(w: Word, n: uint8) returns (Word) { let r: Word = w; r >>= n; return r; }" ]}] }
+    "function wordByNarrow(w: Word, n: uint8) returns (Word) { let r: Word = w; r >>= n; return r; }",
+    "function fixedByLiteral(x: uint8) returns (uint8) { let r: uint8 = x; r <<= 1; return r; }",
+    "function signedByNarrow(x: int8, n: uint8) returns (int8) { let r: int8 = x; r >>= n; return r; }" ]}] }
 private def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
-private def names : List String := ["wordByLiteral", "wordByWord", "wordByNarrow"]
+private def names : List String :=
+  ["wordByLiteral", "wordByWord", "wordByNarrow", "fixedByLiteral", "signedByNarrow"]
 
 def run : IO Unit := do
   let program ← match checkProgram workspace options.checkingFuel with
@@ -4544,7 +4549,7 @@ def run : IO Unit := do
     if (CellAwareInvocationAcceptedBodyShape.shape? cached.indexed named body original.function.inferredBodyType
         (body.nodes.length + 1) true statements).isNone then
       throw (IO.userError s!"{name} is outside the statement subset")
-  IO.println "SOURCE_CORE_COMPOUND_SHIFT_SUBSET_PASS: the statement shape check admits w <<= 3, w <<= n at Word and w >>= n by a uint8"
+  IO.println "SOURCE_CORE_COMPOUND_SHIFT_SUBSET_PASS: the statement shape check admits w <<= 3, w <<= n at Word, w >>= n by a uint8, a uint8 r <<= 1 and an int8 r >>= n"
 
 end Tests.SourceCoreCompoundShiftSubset
 end

@@ -393,9 +393,11 @@ open Frontend
 
 /-- A compound assignment at one of the twelve fixed-width integer types whose binary operator is a
 builtin there (`FixedCompoundAssignmentOperator`): `+= -= *= /= %=`, their unchecked forms and
-`&= |= ^=`. The shifts, whose amount has its own type, are not among them. -/
+`&= |= ^=`; or a shift (`ShiftCompoundAssignmentOperator`), `<<=` or `>>=`, whose amount has its own
+type. -/
 abbrev FixedCompoundAssignment (operator : Syntax.ValueAssignOp) (target : TypeSystem.Ty) : Prop :=
-  (∃ type, target = .fixed type) ∧ FixedCompoundAssignmentOperator operator
+  (∃ type, target = .fixed type) ∧
+    (FixedCompoundAssignmentOperator operator ∨ ShiftCompoundAssignmentOperator operator)
 
 /-- `AssignmentProfile` on a target's metadata view, or `FixedCompoundAssignment` at its own type. -/
 abbrev WideAssignmentProfile (operator : Syntax.ValueAssignOp) (target : TypeSystem.Ty) : Prop :=
@@ -429,9 +431,17 @@ instance decidableFixedCompoundOperator (operator : Syntax.ValueAssignOp) :
     | exact isTrue (by constructor)
     | exact isFalse (by intro kind; cases kind)
 
+instance decidableShiftCompoundOperator (operator : Syntax.ValueAssignOp) :
+    Decidable (ShiftCompoundAssignmentOperator operator) := by
+  cases operator
+  all_goals first
+    | exact isTrue (by constructor)
+    | exact isFalse (by intro kind; cases kind)
+
 instance decidableFixedCompoundAssignment (operator : Syntax.ValueAssignOp) (target : TypeSystem.Ty) :
     Decidable (FixedCompoundAssignment operator target) :=
-  inferInstanceAs (Decidable ((∃ type, target = .fixed type) ∧ FixedCompoundAssignmentOperator operator))
+  inferInstanceAs (Decidable ((∃ type, target = .fixed type) ∧
+    (FixedCompoundAssignmentOperator operator ∨ ShiftCompoundAssignmentOperator operator)))
 
 end Solcore.SourceSemantics.CoreLowering
 end
@@ -521,13 +531,16 @@ theorem shift_compatible_modified_evaluates {type : TypeSystem.FixedInteger} {op
 /-- At a fixed-width target the modifier's operation, wrapped as the compiler wraps it, computes the
 leaf. -/
 theorem leaf_evaluates {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
-    (kind : FixedCompoundAssignmentOperator operator) {environment : Environment} {store : Store}
+    (kind : FixedCompoundAssignmentOperator operator ∨ ShiftCompoundAssignmentOperator operator) {environment : Environment} {store : Store}
     {shifted : Expr} {left right : Word}
     (rightEvaluated : Evaluates (.word left :: environment) store shifted (.word right) store) :
     ∃ modifier, SourceCoreDataPlaces.assignmentModifier (.fixed type) false operator = some modifier ∧
       Evaluates (.word left :: environment) store
         (SourceCoreDataPlaces.wrapLeaf (SourceCoreDataPlaces.placeWrap (.fixed type) operator false)
           (.binary modifier.operation (.var 0) shifted)) (.word (leaf type operator left right)) store := by
+  rcases kind with kind | shift
+  rotate_left
+  · exact shift_leaf_evaluates shift rightEvaluated
   obtain ⟨signed, width⟩ := type
   cases signed <;> cases kind <;>
     first
@@ -537,7 +550,7 @@ theorem leaf_evaluates {type : TypeSystem.FixedInteger} {operator : Syntax.Value
 
 /-- The data-place compiler's modifier at a fixed-width target gives the leaf. -/
 theorem modified_evaluates {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
-    (kind : FixedCompoundAssignmentOperator operator) {environment : Environment} {snapshot rhs : Expr}
+    (kind : FixedCompoundAssignmentOperator operator ∨ ShiftCompoundAssignmentOperator operator) {environment : Environment} {snapshot rhs : Expr}
     {left right : Word} (snapshotSelected : Selects environment snapshot (.inRight .unit (.word left)))
     (rightSelected : Selects environment rhs (.word right)) (store : Store) (invalid : Word) :
     Evaluates environment store
@@ -551,7 +564,7 @@ theorem modified_evaluates {type : TypeSystem.FixedInteger} {operator : Syntax.V
 
 /-- So does the compatible compiler's. -/
 theorem compatible_modified_evaluates {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
-    (kind : FixedCompoundAssignmentOperator operator) {environment : Environment} {snapshot rhs : Expr}
+    (kind : FixedCompoundAssignmentOperator operator ∨ ShiftCompoundAssignmentOperator operator) {environment : Environment} {snapshot rhs : Expr}
     {left right : Word} (snapshotSelected : Selects environment snapshot (.inRight .unit (.word left)))
     (rightSelected : Selects environment rhs (.word right)) (store : Store) (invalid : Word) :
     Evaluates environment store
@@ -678,9 +691,12 @@ theorem shift_applies_leaf {type : TypeSystem.FixedInteger} {operator : Syntax.V
 
 /-- An applied operation at a fixed-width target gives the leaf. -/
 theorem applies_leaf {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
-    (kind : FixedCompoundAssignmentOperator operator) {left right : Word} {result : Dynamic.Value}
+    (kind : FixedCompoundAssignmentOperator operator ∨ ShiftCompoundAssignmentOperator operator) {left right : Word} {result : Dynamic.Value}
     (applied : Dynamic.CompoundAssignmentApplies (.fixed type) operator (some (.word left)) (.word right) result) :
     result = .word (leaf type operator left right) := by
+  rcases kind with kind | shift
+  rotate_left
+  · exact shift_applies_leaf shift applied
   cases applied
   case primitive plain applies =>
     cases kind <;> try exact (plain type rfl (by constructor)).elim
@@ -756,10 +772,13 @@ theorem shift_canonical_of_applies {type : TypeSystem.FixedInteger} {operator : 
 
 /-- An applied operation keeps the words canonical for the type. -/
 theorem canonical_of_applies {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
-    (kind : FixedCompoundAssignmentOperator operator) {left right : Word} {result : Dynamic.Value}
+    (kind : FixedCompoundAssignmentOperator operator ∨ ShiftCompoundAssignmentOperator operator) {left right : Word} {result : Dynamic.Value}
     (leftCanonical : type.canonical left.val = true) (rightCanonical : type.canonical right.val = true)
     (applied : Dynamic.CompoundAssignmentApplies (.fixed type) operator (some (.word left)) (.word right) result) :
     ∃ word, result = .word word ∧ type.canonical word.val = true := by
+  rcases kind with kind | shift
+  rotate_left
+  · exact shift_canonical_of_applies shift leftCanonical applied
   have bitwise := canonical_bitwise leftCanonical rightCanonical
   have wrapped : ∀ value, type.canonical (Word.ofIntModulo (Dynamic.fixedWrap type value)).val = true :=
     fun value => canonical_ofIntModulo (Dynamic.fixedWrap_inRange type value)
@@ -830,7 +849,7 @@ theorem shift_words_valid {operator : Syntax.ValueAssignOp} (shift : ShiftCompou
     | logical operatorClass => cases shift <;> cases corresponds <;> cases operatorClass
 
 /-- Word operands of these operators are never invalid. -/
-theorem words_valid {operator : Syntax.ValueAssignOp} (kind : FixedCompoundAssignmentOperator operator)
+theorem words_valid {operator : Syntax.ValueAssignOp} (kind : FixedCompoundAssignmentOperator operator ∨ ShiftCompoundAssignmentOperator operator)
     (left right : Word) : ¬ Dynamic.AssignmentOperandsInvalid operator (some (.word left)) (.word right) := by
   intro invalid
   cases invalid with
@@ -1072,10 +1091,13 @@ theorem shift_guard_agrees {type : TypeSystem.FixedInteger} {operator : Syntax.V
 modified leaf, the right-hand side and the snapshot), agrees with the source: it writes exactly when
 the source applies the operation, with the leaf, and otherwise fails with the source's panic. -/
 theorem guard_agrees {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
-    (kind : FixedCompoundAssignmentOperator operator) (left right : Word) :
+    (kind : FixedCompoundAssignmentOperator operator ∨ ShiftCompoundAssignmentOperator operator) (left right : Word) :
     Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
       (SourceCoreDataPlaces.assignmentModifier (.fixed type) false operator) (.inRight leftType (.word left))
       (.word right) := by
+  rcases kind with kind | shift
+  rotate_left
+  · exact shift_guard_agrees shift left right
   cases kind
   · exact agrees_checked .add .add .add (fun applied => .add rfl applied) (leaf_add type left right)
   · exact agrees_checked .subtract .subtract .subtract (fun applied => .subtract rfl applied)

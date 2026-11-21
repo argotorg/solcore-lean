@@ -413,8 +413,8 @@ theorem wide_outcome
       exact FixedCompoundModifier.guard_agrees kind leftWord rightWord
 
 /-- The outcome of `wide_outcome` with the right-hand side at its own type (`AssignedRhsView`): at
-the leaf's runtime type, or a shift's amount, whose word the shift reads. The profile has no shift at
-a fixed-width target yet, so an amount there does not arise. -/
+the leaf's runtime type, or a shift's amount, whose word the shift reads. At a fixed-width target the
+amount need not be canonical for the target's type, and the shift reads it as any word. -/
 theorem assigned_outcome
     (observations : FunctionObservations checked.catalog functions identities)
     {targetType leaf rhsType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
@@ -446,15 +446,31 @@ theorem assigned_outcome
       ((AssignedRhsView.shiftAmount shift leafWord amount).rep
         (fun _ leafFixed _ => by cases leafWord.symm.trans leafFixed) rightRep)
       snapshotSelected rightSelected store invalid
-  | fixedShiftAmount shift leafFixed _ =>
-    exfalso
+  | fixedShiftAmount shift leafFixed amount =>
     have view : SourceCoreRawMetadata.runtimeType targetType = .fixed _ := leafView.symm.trans leafFixed
-    rcases profile with (equal | word | ⟨integer, _⟩) | ⟨_, kind⟩
+    rcases profile with (equal | word | ⟨integer, _⟩) | ⟨⟨fixedType, rfl⟩, _⟩
     · subst equal
       cases shift
     · cases view.symm.trans word
     · cases view.symm.trans integer
-    · cases shift <;> cases kind
+    · obtain ⟨leftWord, rfl, rfl, rfl, leftCanonical⟩ := CompatibleExpressionPrimitives.fixed_fields leftRep leafView
+      obtain ⟨rightWord, rfl, rfl, _⟩ := amount.word_fields rightRep
+      have integer : decide (Ty.word = Ty.integer) = false := rfl
+      simp only [integer]
+      refine ⟨.word (FixedCompoundModifier.leaf fixedType operator leftWord rightWord),
+        .word (FixedCompoundModifier.leaf fixedType operator leftWord rightWord),
+        FixedCompoundModifier.shift_compatible_modified_evaluates shift snapshotSelected rightSelected store invalid,
+        .word, FixedCompoundModifier.shift_words_valid shift leftWord rightWord, ?_, ?_⟩
+      · intro other applied
+        have same := FixedCompoundModifier.shift_applies_leaf shift applied
+        subst same
+        obtain ⟨word, same, canonical⟩ :=
+          FixedCompoundModifier.shift_canonical_of_applies shift leftCanonical applied
+        cases same
+        exact ⟨rfl, .compatible leafView (.fixed _ canonical)⟩
+      · intro leftType
+        rw [FixedCompoundModifier.compatible_assignmentModifier]
+        exact FixedCompoundModifier.shift_guard_agrees shift leftWord rightWord
 
 /-- Represented initialized operands are never invalid over the wider profile. -/
 theorem wide_valid

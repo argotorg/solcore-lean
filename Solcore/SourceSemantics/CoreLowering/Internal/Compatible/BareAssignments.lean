@@ -1650,8 +1650,7 @@ theorem wide_outcome
       exact FixedCompoundModifier.guard_agrees kind leftWord rightWord
 
 /-- `wide_outcome` with the right-hand side at its own type (`AssignedRhsView`): at the leaf's
-runtime type, or a shift's amount, whose word the shift reads. The profile has no shift at a
-fixed-width target yet, so an amount there does not arise. -/
+runtime type, or a shift's amount, whose word the shift reads at a fixed-width target. -/
 theorem assigned_outcome
     {targetType sourceType rhsType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
     {operator : Syntax.ValueAssignOp}
@@ -1682,13 +1681,29 @@ theorem assigned_outcome
       ((AssignedRhsView.shiftAmount shift leafWord amount).rep
         (fun _ leafFixed _ => by cases leafWord.symm.trans leafFixed) rightRep)
       snapshotSelected rightSelected store invalid
-  | fixedShiftAmount shift leafFixed _ =>
-    exfalso
-    rcases profile with (equal | word) | ⟨_, kind⟩
+  | fixedShiftAmount shift leafFixed amount =>
+    rcases profile with (equal | word) | ⟨⟨fixedType, rfl⟩, _⟩
     · subst equal
       cases shift
     · cases word.symm.trans leafFixed
-    · cases shift <;> cases kind
+    · obtain ⟨leftWord, rfl, rfl, rfl, leftCanonical⟩ := CompatibleExpressionPrimitives.fixed_fields leftRep leafView
+      obtain ⟨rightWord, rfl, rfl, _⟩ := amount.word_fields rightRep
+      have integer : decide (Ty.word = Ty.integer) = false := rfl
+      simp only [integer]
+      refine ⟨.word (FixedCompoundModifier.leaf fixedType operator leftWord rightWord),
+        .word (FixedCompoundModifier.leaf fixedType operator leftWord rightWord),
+        FixedCompoundModifier.shift_compatible_modified_evaluates shift snapshotSelected rightSelected store invalid,
+        .word, FixedCompoundModifier.shift_words_valid shift leftWord rightWord, ?_, ?_⟩
+      · intro other applied
+        have same := FixedCompoundModifier.shift_applies_leaf shift applied
+        subst same
+        obtain ⟨word, same, canonical⟩ :=
+          FixedCompoundModifier.shift_canonical_of_applies shift leftCanonical applied
+        cases same
+        exact ⟨rfl, .compatible leafView (.fixed _ canonical)⟩
+      · intro leftType
+        rw [FixedCompoundModifier.compatible_assignmentModifier]
+        exact FixedCompoundModifier.shift_guard_agrees shift leftWord rightWord
 
 /-- `CompatibleBareAssignment.modifier_total_wide` over the staged bare profile widened by the
 fixed-width compound assignments, without a callable observation: an absent compound snapshot fails

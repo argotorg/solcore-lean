@@ -765,15 +765,18 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
     cases typed with
     | equal place value _ => exact ⟨_, place, .of_type value, .inl (.inl rfl)⟩
     | wordCompound _ place value _ => exact ⟨_, place, .of_type value, .inl (.inr rfl)⟩
-    | fixedCompound kind place value _ => exact ⟨_, place, .of_type value, .inr ⟨⟨_, rfl⟩, kind⟩⟩
+    | fixedCompound kind place value _ => exact ⟨_, place, .of_type value, .inr ⟨⟨_, rfl⟩, .inl kind⟩⟩
     | shiftCompound kind place targetKind value amount _ =>
-      -- A Word target's shift amount keeps its own type; no fixed-width compound operator shifts.
-      rcases sourceProfile with (rfl | word) | ⟨_, fixedKind⟩
+      -- A shift's amount keeps its own type, at a Word target and at a fixed-width one.
+      rcases sourceProfile with (rfl | word) | ⟨⟨_, fixed⟩, _⟩
       · cases kind
       · cases targetKind with
         | fixed type => cases word.symm.trans place.type_eq
         | word => exact ⟨_, place, ⟨_, value, .shiftAmount kind rfl amount⟩, .inl (.inr rfl)⟩
-      · cases kind <;> cases fixedKind
+      · cases targetKind with
+        | word => cases fixed.symm.trans place.type_eq
+        | fixed type =>
+          exact ⟨_, place, ⟨_, value, .fixedShiftAmount kind rfl amount⟩, .inr ⟨⟨_, rfl⟩, .inr kind⟩⟩
   obtain ⟨type, place, value, profile⟩ := original
   cases place with
   | intro writable projections target =>
@@ -813,15 +816,18 @@ theorem projected_assignment_facts {source : TypedSource} {context : SourceSeman
     cases typed with
     | equal place value _ => exact ⟨_, place, .of_type value, .inl (.inl rfl)⟩
     | wordCompound _ place value _ => exact ⟨_, place, .of_type value, .inl (.inr rfl)⟩
-    | fixedCompound kind place value _ => exact ⟨_, place, .of_type value, .inr ⟨⟨_, rfl⟩, kind⟩⟩
+    | fixedCompound kind place value _ => exact ⟨_, place, .of_type value, .inr ⟨⟨_, rfl⟩, .inl kind⟩⟩
     | shiftCompound kind place targetKind value amount _ =>
-      -- A Word target's shift amount keeps its own type; no fixed-width compound operator shifts.
-      rcases sourceProfile with (rfl | word) | ⟨_, fixedKind⟩
+      -- A shift's amount keeps its own type, at a Word target and at a fixed-width one.
+      rcases sourceProfile with (rfl | word) | ⟨⟨_, fixed⟩, _⟩
       · cases kind
       · cases targetKind with
         | fixed type => cases word.symm.trans place.type_eq
         | word => exact ⟨_, place, ⟨_, value, .shiftAmount kind rfl amount⟩, .inl (.inr rfl)⟩
-      · cases kind <;> cases fixedKind
+      · cases targetKind with
+        | word => cases fixed.symm.trans place.type_eq
+        | fixed type =>
+          exact ⟨_, place, ⟨_, value, .fixedShiftAmount kind rfl amount⟩, .inr ⟨⟨_, rfl⟩, .inr kind⟩⟩
   obtain ⟨type, place, value, profile⟩ := original
   cases place with
   | intro writable projections target =>
