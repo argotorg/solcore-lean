@@ -49,6 +49,21 @@ def builtinNamed? (context : Context) (name : String) : Option BuiltinFunctionId
       | function :: _ => (WordOpcode.ofName? function).map .wordOpcode
   | .error _ => builtinFunctionNamed? name
 
+/-- The builtin an operator calls: one of the 26 that an import of upstream's `std.opcodes` binds
+the operator's function name to, where upstream calls the function in scope
+(`binaryCallsFunctionInScope`, `unaryCallsFunctionInScope`). Upstream's other operators are
+trait methods or builtins, which no import reaches. -/
+def operatorBuiltin? (context : Context) (callsInScope : Bool) (name : String) :
+    Option BuiltinFunctionId :=
+  if callsInScope then
+    match buildProgramImports context.environment context.scope.currentModule with
+    | .ok visibility =>
+        match visibility.builtinsNamed name with
+        | [] => none
+        | function :: _ => (WordOpcode.ofName? function).map .wordOpcode
+    | .error _ => none
+  else none
+
 def qualifiedFunctionsNamed (context : Context)
     (namespacePath : List String) (name : String) :
     Except Error (Option (List ProgramFunctionSignature)) :=
@@ -457,6 +472,19 @@ def unaryOperatorDispatch : Syntax.UnaryOp → OperatorDispatch
   -- No loaded program keeps a prefix `-` (`Syntax.Unchecked.mark`), and
   -- `inferUnaryOperator` rejects one; no declaration is named `-`.
   | .negate => .function "-"
+
+/-- Whether upstream's binary operator calls the function its name denotes in scope, with a bool
+expected: `!=`, `<`, `<=` and `>=` call `ne`, `lt`, `le` and `ge`. Upstream's others are trait
+methods, and `&&` and `||` are builtins. -/
+def binaryCallsFunctionInScope : Syntax.BinaryOp → Bool
+  | .notEqual | .less | .lessEqual | .greaterEqual => true
+  | _ => false
+
+/-- Whether upstream's unary operator calls the function its name denotes in scope, with the
+operator's expected type: `!` calls `not`. Upstream's `~` is a trait method. -/
+def unaryCallsFunctionInScope : Syntax.UnaryOp → Bool
+  | .logicalNot => true
+  | _ => false
 
 def binaryResultIsBool : Syntax.BinaryOp → Bool
   | .less | .greater | .lessEqual | .greaterEqual

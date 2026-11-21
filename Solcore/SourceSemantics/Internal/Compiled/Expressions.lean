@@ -174,6 +174,116 @@ theorem expressionRetained_unary_operator_for
       resources.solve_success resources.solved_context_eq resources.ledger resources.ownership
       invariant.signaturesEq invariant.solvedRequirementsEq invariant.assumptionsMono covered)
 
+/-- A unary operator that calls the builtin an import of `std.opcodes` binds its function name
+to is typed as that builtin's call of its operand. -/
+theorem expressionRetained_unary_builtin_for
+    {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
+    {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
+    {selected : BodySelection compiled row fuel}
+    {provenance : CallIndex → Prop}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (recursive : ExpressionRetainedSoundnessFor provenance selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression operandExpression callee : Syntax.Expr}
+    {expected : Option Ty} {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext
+      expression expected initial inferred resultState frames target)
+    {allocated operandState : State} {id : ExpressionId}
+    {operand : InferredExpression} {name : String} {function : BuiltinFunctionId}
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (operandSuccess : Detail.inferExprFuel childFuel inferenceContext operandExpression none allocated =
+      .ok (operand, operandState))
+    (operandHere : provenance (.expression childFuel inferenceContext operandExpression none
+      allocated operand operandState))
+    (recorded : Detail.recordBuiltinFunctionCall expression callee name function [operand] id expected
+      operandState = .ok (inferred, resultState)) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+      selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
+  let roots := bodyRoots selected
+  let evidenceState := selected.body.returned
+  have resources := selected.body.resources
+  have resultSubstitutionExtension := boundary.extension
+  have ownerEq := boundary.scope.owner
+  have typeParametersEq := boundary.scope.parameters
+  have signatureFormation := boundary.scope.formation checked
+  have functionsCanonical := boundary.scope.functionsCanonical checked
+  have canonical := boundary.scope.canonical checked
+  have invariant := boundary.invariant
+  have allocatedInvariant := invariant.allocateExpressionId allocationEq
+  have allocatedOperational : GeneralizedActualStateInvariant allocated (evidenceSource selected) := by
+    rw [← show initial.allocateExpressionId.2 = allocated from congrArg Prod.snd allocationEq]
+    exact boundary.operational.allocateExpressionId
+  have properties := Detail.inferExprFuel_inferenceProperties allocatedInvariant.ready
+    signatureFormation functionsCanonical (by simp) operandSuccess
+  have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
+    rw [allocateExpressionId_inferenceNext_eq allocationEq]
+    exact boundary.expectedBelow
+  have operandExpected : ∀ type ∈ expected, type.VariablesBelow operandState.inference.next := by
+    intro type member
+    exact (allocatedExpected type member).weaken properties.1.next_le
+  have recording := Detail.recordBuiltinFunctionCall_inferenceProperties properties.2.1
+    (by intro argument member; cases List.mem_singleton.mp member; exact properties.2.2)
+    operandExpected recorded
+  have childExtension := resultSubstitutionExtension.trans recording.1.substitution_extends
+  have metadata := recordBuiltinFunctionCall_metadata recorded
+  obtain ⟨calleeId, nodesEq⟩ := Detail.recordBuiltinFunctionCall_success_nodes recorded
+  have childToParent : TypingSourceExtends (operandState.toTypedSource roots)
+      (resultState.toTypedSource roots) := by
+    refine ⟨metadata.1, ?_⟩
+    change operandState.nodes <+: resultState.nodes
+    rw [nodesEq]
+    exact List.prefix_append _ _
+  let callNode : ExpressionNode := {
+    id := inferred.id
+    span := expression.span
+    type := inferred.type
+    form := .call calleeId ([operand].map (·.id)) (.builtinFunction function)
+  }
+  have callContains : ContainsExpression (resultState.toTypedSource roots) inferred.id callNode := by
+    refine ⟨?_, rfl⟩
+    change .expression callNode ∈ resultState.nodes
+    rw [nodesEq]
+    simp [callNode]
+  have edge : DirectChild (resultState.toTypedSource roots)
+      (.expression inferred.id) (.expression operand.id) := by
+    refine ⟨.expression callNode, ⟨callContains.1, rfl⟩, ?_⟩
+    simp [callNode, nodeChildIds, Node.references, ExpressionForm.references]
+  have finalEdge := boundary.directChildren edge
+  have childPatterns : operandState.integerPatterns ⊆ evidenceState.integerPatterns := by
+    rw [← metadata.2.1]
+    exact boundary.integerPatterns
+  have childLiterals : operandState.integerLiterals ⊆ evidenceState.integerLiterals := by
+    rw [← metadata.2.2]
+    exact boundary.integerLiterals
+  have childRequirements := List.Subset.trans
+    (Detail.recordBuiltinFunctionCall_requirements_subset recorded) boundary.requirements
+  have typed := expressionRooted_of_retained_for checked recursive operandHere ({
+    accepted := operandSuccess
+    interfaces := boundary.interfaces
+    extension := childExtension
+    scope := boundary.scope
+    invariant := allocatedInvariant
+    actual := boundary.actual
+    operational := allocatedOperational
+    expectedBelow := by simp
+    expectedAdmissible := by simp
+    expectedSafe := by simp
+    integerPatterns := childPatterns
+    integerLiterals := childLiterals
+    requirements := childRequirements
+    covered := boundary.covered.expressionChild resources.graph_closed finalEdge
+    actualCovered := boundary.actualCovered.directChild finalEdge
+    rawSubtree := (boundary.rawProper.childSubtree edge).monoBefore childToParent } :
+    RootedExpressionBoundary selected childFuel inferenceContext operandExpression none
+      allocated operand operandState frames target)
+  have argumentsTyped : ExpressionsHaveTypes selected.body.finalized.typedSource target
+      ([operand].map (·.id))
+      ([operand].map fun argument => selected.body.finalized.substitution.apply argument.type) :=
+    .cons typed (.nil target)
+  exact recordBuiltinFunctionCall_expressionTypingBase_actual recorded resultSubstitutionExtension
+    boundary.proper argumentsTyped
+    (invariant.typeParameterBinders (by simpa only [ownerEq, typeParametersEq] using canonical))
+
 theorem expressionRetained_unary_operator
     {raw : Workspace.RawWorkspace} {compiled : SourceCoreCompiler.Compiled}
     {row : SourceSpecialization.SpecializedFunction} {fuel childFuel : Nat}
@@ -235,6 +345,9 @@ theorem expressionRetained_unary_for
   | traitMethod _ operatorSuccess recorded =>
       exact expressionRetained_unary_operator_for checked (recursive childFuel (Nat.lt_succ_self _))
         boundary allocationEq operandSuccess operandHere operatorSuccess recorded
+  | builtinFunction _ _ _ recorded =>
+      exact expressionRetained_unary_builtin_for checked (recursive childFuel (Nat.lt_succ_self _))
+        boundary allocationEq operandSuccess operandHere recorded
   | selectedFunction _ lookup selectedCall recorded =>
       have argumentCalls := OrderedExpressionCalls.singleton operandSuccess operandHere
       have argumentsSuccess := argumentCalls.accepted

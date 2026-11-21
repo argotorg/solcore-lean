@@ -383,9 +383,73 @@ theorem inferExprFuel_success_tuple_facts
       simp only [elementsSuccess, bind, Except.bind] at success
       exact ⟨inferredElements, elementsState, rfl, success⟩
 
-/-- The executable tail of unary-expression inference has three successful
-shapes: a named operator with no overload candidates, a selected named
-overload, or a trait-dispatched operator.  The literal-origin row is an index
+/-- An operator's builtin is one of the 26 `std.opcodes` functions, which give a word. -/
+theorem operatorBuiltin?_returnType {context : Context} {callsInScope : Bool}
+    {name : String} {function : BuiltinFunctionId}
+    (found : operatorBuiltin? context callsInScope name = some function) :
+    function.returnType = .word := by
+  unfold operatorBuiltin? at found
+  split at found
+  · split at found
+    · split at found
+      · simp at found
+      · rename_i bound _ _
+        cases opcode : WordOpcode.ofName? bound with
+        | none => simp [opcode] at found
+        | some op =>
+            simp [opcode] at found
+            subst found
+            rfl
+    · simp at found
+  · simp at found
+
+/-- A builtin call that must give a bool fails for a builtin that gives a word: unification
+cannot make `word` and `bool` equal. So a binary operator that calls a `std.opcodes` function
+in scope is refused, as upstream refuses it. -/
+theorem recordBuiltinFunctionCall_bool_of_word_false
+    {source callee : Syntax.Expr} {name : String}
+    {function : BuiltinFunctionId} {arguments : List InferredExpression}
+    {call : ExpressionId} {state : State} {result : InferredExpression × State}
+    (word : function.returnType = .word)
+    (success : recordBuiltinFunctionCall source callee name function arguments
+      call (some .bool) state = .ok result) : False := by
+  unfold recordBuiltinFunctionCall at success
+  by_cases arity : arguments.length = function.parameterTypes.length
+  · simp only [arity, ↓reduceIte, bind, Except.bind] at success
+    cases argumentsResult :
+        unifyBuiltinFunctionArgumentsEqual arguments function.parameterTypes
+          state with
+    | error error =>
+        simp [argumentsResult, bind, Except.bind] at success
+    | ok argumentsState =>
+        simp only [argumentsResult, bind, Except.bind] at success
+        cases expectedResult :
+            unify argumentsState function.returnType .bool with
+        | error error =>
+            simp [expectedResult, bind, Except.bind] at success
+        | ok fittedState =>
+            rw [word] at expectedResult
+            unfold unify at expectedResult
+            cases inferred : argumentsState.inference.unify .word .bool with
+            | error error =>
+                simp [inferred, liftUnification, bind, Except.bind] at expectedResult
+            | ok inference =>
+                unfold InferState.unify at inferred
+                cases types : Unification.unifyTypes
+                    (argumentsState.inference.resolve .word)
+                    (argumentsState.inference.resolve .bool) with
+                | error error =>
+                    simp [types, bind, Except.bind] at inferred
+                | ok update =>
+                    have sound := Unification.unifyTypes_sound types
+                    simp [InferState.resolve, Ty.word, Ty.bool,
+                      Substitution.apply] at sound
+  · simp [arity, bind, Except.bind] at success
+
+/-- The executable tail of unary-expression inference has four successful
+shapes: a named operator with no overload candidates, the builtin an import of
+`std.opcodes` binds its name to, a selected named overload, or a
+trait-dispatched operator.  The literal-origin row is an index
 so consumers cannot accidentally use a row computed at another traversal
 point. -/
 inductive UnaryExpressionDispatchFacts
@@ -403,6 +467,21 @@ inductive UnaryExpressionDispatchFacts
       (recording : recordExpressionWithExpected context expression id
         inferred.type (.unary operator.value operand.id)
         inferred.requirements expected inferred.state = .ok result) :
+      UnaryExpressionDispatchFacts context expression id operator operand
+        expected integerLiterals state result
+  | builtinFunction
+      {name : String} {function : BuiltinFunctionId}
+      (dispatch_eq : unaryOperatorDispatch operator.value = .function name)
+      (lookup_eq : functionsNamed context name = .ok [])
+      (builtin_eq : operatorBuiltin? context
+        (unaryCallsFunctionInScope operator.value) name = some function)
+      (recording :
+        let callee : Syntax.Expr := {
+          span := operator.span
+          value := .identifier { span := operator.span, value := name }
+        }
+        recordBuiltinFunctionCall expression callee name function [operand] id
+          expected state = .ok result) :
       UnaryExpressionDispatchFacts context expression id operator operand
         expected integerLiterals state result
   | selectedFunction
@@ -484,18 +563,26 @@ theorem inferExprFuel_success_unary_facts
               cases candidates with
               | nil =>
                   simp only [lookupEq, bind, Except.bind] at success
-                  cases operatorSuccess : inferUnaryOperator context
-                      operator.value operandResult.type expected
-                      (relevantIntegerLiterals operandState
-                        allocated.integerLiterals.length [operandResult])
-                      operandState with
-                  | error error =>
-                      simp [operatorSuccess, bind, Except.bind] at success
-                  | ok inferred =>
-                      simp only [operatorSuccess, bind, Except.bind] at success
+                  cases builtinEq : operatorBuiltin? context
+                      (unaryCallsFunctionInScope operator.value) name with
+                  | some function =>
+                      simp only [builtinEq] at success
                       exact ⟨operandResult, operandState, rfl,
-                        .directFunction dispatchEq lookupEq operatorSuccess
-                          success⟩
+                        .builtinFunction dispatchEq lookupEq builtinEq success⟩
+                  | none =>
+                      simp only [builtinEq] at success
+                      cases operatorSuccess : inferUnaryOperator context
+                          operator.value operandResult.type expected
+                          (relevantIntegerLiterals operandState
+                            allocated.integerLiterals.length [operandResult])
+                          operandState with
+                      | error error =>
+                          simp [operatorSuccess, bind, Except.bind] at success
+                      | ok inferred =>
+                          simp only [operatorSuccess, bind, Except.bind] at success
+                          exact ⟨operandResult, operandState, rfl,
+                            .directFunction dispatchEq lookupEq operatorSuccess
+                              success⟩
               | cons head tail =>
                   simp only [lookupEq, bind, Except.bind] at success
                   cases selectionSuccess : selectFunctionCandidateFrom context
@@ -512,10 +599,12 @@ theorem inferExprFuel_success_unary_facts
                         .selectedFunction dispatchEq lookupEq selectionSuccess
                           success⟩
 
-/-- The executable tail of binary-expression inference has the analogous
-three successful shapes.  Selected named operators retain both their fixed
-Boolean selection expectation and the separate fit to the surrounding
-expectation. -/
+/-- The executable tail of binary-expression inference has three successful
+shapes. A builtin that an import of `std.opcodes` binds the operator's function
+name to is called with a bool expected and gives a word, so it never succeeds
+(`recordBuiltinFunctionCall_bool_of_word_false`). Selected named operators
+retain both their fixed Boolean selection expectation and the separate fit to
+the surrounding expectation. -/
 inductive BinaryExpressionDispatchFacts
     (context : Context) (expression : Syntax.Expr) (id : ExpressionId)
     (operator : Syntax.Located Syntax.BinaryOp)
@@ -624,22 +713,30 @@ theorem inferExprFuel_success_binary_facts
                   cases candidates with
                   | nil =>
                       simp only [lookupEq, bind, Except.bind] at success
-                      cases operatorSuccess : inferBinaryOperator context
-                          operator.value leftResult.type rightResult.type
-                          expected
-                          (relevantIntegerLiterals rightState
-                            allocated.integerLiterals.length
-                              [leftResult, rightResult])
-                          rightState with
-                      | error error =>
-                          simp [operatorSuccess, bind, Except.bind] at success
-                      | ok inferred =>
-                          simp only [operatorSuccess, bind, Except.bind]
-                            at success
-                          exact ⟨leftResult, leftState, rightResult, rightState,
-                            rfl, rightSuccess,
-                            .directFunction dispatchEq lookupEq operatorSuccess
-                              success⟩
+                      cases builtinEq : operatorBuiltin? context
+                          (binaryCallsFunctionInScope operator.value) name with
+                      | some function =>
+                          simp only [builtinEq] at success
+                          exact (recordBuiltinFunctionCall_bool_of_word_false
+                            (operatorBuiltin?_returnType builtinEq) success).elim
+                      | none =>
+                          simp only [builtinEq] at success
+                          cases operatorSuccess : inferBinaryOperator context
+                              operator.value leftResult.type rightResult.type
+                              expected
+                              (relevantIntegerLiterals rightState
+                                allocated.integerLiterals.length
+                                  [leftResult, rightResult])
+                              rightState with
+                          | error error =>
+                              simp [operatorSuccess, bind, Except.bind] at success
+                          | ok inferred =>
+                              simp only [operatorSuccess, bind, Except.bind]
+                                at success
+                              exact ⟨leftResult, leftState, rightResult, rightState,
+                                rfl, rightSuccess,
+                                .directFunction dispatchEq lookupEq operatorSuccess
+                                  success⟩
                   | cons head tail =>
                       simp only [lookupEq, bind, Except.bind] at success
                       cases selectionSuccess : selectFunctionCandidateFrom
@@ -9870,6 +9967,8 @@ private theorem inferFuel_expectedTypeCoherent_internal :
             (by assumption) extension
         | exact recordIndirectCall_application_apply_eq
             (by assumption) extension
+        | exact (recordBuiltinFunctionCall_bool_of_word_false
+            (operatorBuiltin?_returnType (by assumption)) (by assumption)).elim
         | simp_all [recordSelectedCall, recordSelectedCallResult,
             recordIndirectCall, recordExpression]
 
@@ -10543,16 +10642,33 @@ private theorem inferFuel_inferenceProperties_internal :
                 simp only [functionsResult, bind, Except.bind] at success
                 cases candidates with
                 | nil =>
-                    cases inferredResult : inferUnaryOperator context
-                        operator.value inferredOperand.type expected
-                        integerLiterals operandState with
-                    | error error =>
-                        simp [integerLiterals, inferredResult, bind,
-                          Except.bind] at success
-                    | ok inferred =>
-                        simp only [integerLiterals, inferredResult, bind,
-                          Except.bind] at success
-                        exact finishInferred inferred inferredResult success
+                    cases builtinResult : operatorBuiltin? context
+                        (unaryCallsFunctionInScope operator.value) name with
+                    | some function =>
+                        simp only [builtinResult] at success
+                        have builtinProperties :=
+                          recordBuiltinFunctionCall_inferenceProperties
+                            operandProperties.2.1
+                            (by
+                              intro argument member
+                              simp only [List.mem_singleton] at member
+                              subst argument
+                              exact operandProperties.2.2)
+                            expectedAtOperand success
+                        exact ⟨prefixProgress.trans builtinProperties.1,
+                          builtinProperties.2⟩
+                    | none =>
+                        simp only [builtinResult] at success
+                        cases inferredResult : inferUnaryOperator context
+                            operator.value inferredOperand.type expected
+                            integerLiterals operandState with
+                        | error error =>
+                            simp [integerLiterals, inferredResult, bind,
+                              Except.bind] at success
+                        | ok inferred =>
+                            simp only [integerLiterals, inferredResult, bind,
+                              Except.bind] at success
+                            exact finishInferred inferred inferredResult success
                 | cons candidate rest =>
                     cases selectionResult : selectFunctionCandidateFrom context
                         name (candidate :: rest) [inferredOperand]
@@ -10694,16 +10810,24 @@ private theorem inferFuel_inferenceProperties_internal :
                     simp only [functionsResult, bind, Except.bind] at success
                     cases candidates with
                     | nil =>
-                        cases inferredResult : inferBinaryOperator context
-                            operator.value inferredLeft.type inferredRight.type
-                            expected integerLiterals rightState with
-                        | error error =>
-                            simp [integerLiterals, inferredResult, bind,
-                              Except.bind] at success
-                        | ok inferred =>
-                            simp only [integerLiterals, inferredResult, bind,
-                              Except.bind] at success
-                            exact finishInferred inferred inferredResult success
+                        cases builtinResult : operatorBuiltin? context
+                            (binaryCallsFunctionInScope operator.value) name with
+                        | some function =>
+                            simp only [builtinResult] at success
+                            exact (recordBuiltinFunctionCall_bool_of_word_false
+                              (operatorBuiltin?_returnType builtinResult) success).elim
+                        | none =>
+                            simp only [builtinResult] at success
+                            cases inferredResult : inferBinaryOperator context
+                                operator.value inferredLeft.type inferredRight.type
+                                expected integerLiterals rightState with
+                            | error error =>
+                                simp [integerLiterals, inferredResult, bind,
+                                  Except.bind] at success
+                            | ok inferred =>
+                                simp only [integerLiterals, inferredResult, bind,
+                                  Except.bind] at success
+                                exact finishInferred inferred inferredResult success
                     | cons candidate rest =>
                         cases selectionResult : selectFunctionCandidateFrom
                             context name (candidate :: rest)
@@ -14385,6 +14509,9 @@ private theorem inferFuel_preserves_lexicalScope_internal :
         all_goals try
           exact (recordSelectedCall_lexicalScope _ _ _ _ _).trans
             (selectionScope.trans throughOperand)
+        all_goals try
+          exact (recordBuiltinFunctionCall_lexicalScope (by assumption)).trans
+            throughOperand
         all_goals simp_all [State.lexicalScope]
         all_goals grind
   case case13 =>
@@ -14450,16 +14577,24 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                     simp only [functionsResult, bind, Except.bind] at success
                     cases candidates with
                     | nil =>
-                        cases inferredResult : inferBinaryOperator context
-                            operator.value inferredLeft.type inferredRight.type
-                            expected integerLiterals rightState with
-                        | error error =>
-                            simp [integerLiterals, inferredResult, bind,
-                              Except.bind] at success
-                        | ok inferred =>
-                            simp only [integerLiterals, inferredResult, bind,
-                              Except.bind] at success
-                            exact finishInferred inferred inferredResult success
+                        cases builtinResult : operatorBuiltin? context
+                            (binaryCallsFunctionInScope operator.value) name with
+                        | some function =>
+                            simp only [builtinResult] at success
+                            exact (recordBuiltinFunctionCall_bool_of_word_false
+                              (operatorBuiltin?_returnType builtinResult) success).elim
+                        | none =>
+                            simp only [builtinResult] at success
+                            cases inferredResult : inferBinaryOperator context
+                                operator.value inferredLeft.type inferredRight.type
+                                expected integerLiterals rightState with
+                            | error error =>
+                                simp [integerLiterals, inferredResult, bind,
+                                  Except.bind] at success
+                            | ok inferred =>
+                                simp only [integerLiterals, inferredResult, bind,
+                                  Except.bind] at success
+                                exact finishInferred inferred inferredResult success
                     | cons candidate rest =>
                         cases selectionResult : selectFunctionCandidateFrom
                             context name (candidate :: rest)

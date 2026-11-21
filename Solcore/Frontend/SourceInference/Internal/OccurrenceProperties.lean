@@ -4897,16 +4897,25 @@ private theorem inference_anchoredNodePrefixExtends :
                 simp only [functionsResult, bind, Except.bind] at success
                 cases candidates with
                 | nil =>
-                    cases inferredResult : inferUnaryOperator context
-                        operator.value inferredOperand.type expected
-                        integerLiterals operandState with
-                    | error error =>
-                        simp [integerLiterals, inferredResult, bind,
-                          Except.bind] at success
-                    | ok inferred =>
-                        simp only [integerLiterals, inferredResult, bind,
-                          Except.bind] at success
-                        exact finishInferred inferred inferredResult success
+                    cases builtinResult : operatorBuiltin? context
+                        (unaryCallsFunctionInScope operator.value) name with
+                    | some function =>
+                        simp only [builtinResult] at success
+                        exact throughOperand.trans
+                          (recordBuiltinFunctionCall_anchoredNodePrefixExtends
+                            success)
+                    | none =>
+                        simp only [builtinResult] at success
+                        cases inferredResult : inferUnaryOperator context
+                            operator.value inferredOperand.type expected
+                            integerLiterals operandState with
+                        | error error =>
+                            simp [integerLiterals, inferredResult, bind,
+                              Except.bind] at success
+                        | ok inferred =>
+                            simp only [integerLiterals, inferredResult, bind,
+                              Except.bind] at success
+                            exact finishInferred inferred inferredResult success
                 | cons candidate rest =>
                     cases selectionResult : selectFunctionCandidateFrom context
                         name (candidate :: rest) [inferredOperand]
@@ -5013,16 +5022,25 @@ private theorem inference_anchoredNodePrefixExtends :
                     simp only [functionsResult, bind, Except.bind] at success
                     cases candidates with
                     | nil =>
-                        cases inferredResult : inferBinaryOperator context
-                            operator.value inferredLeft.type inferredRight.type
-                            expected integerLiterals rightState with
-                        | error error =>
-                            simp [integerLiterals, inferredResult, bind,
-                              Except.bind] at success
-                        | ok inferred =>
-                            simp only [integerLiterals, inferredResult, bind,
-                              Except.bind] at success
-                            exact finishInferred inferred inferredResult success
+                        cases builtinResult : operatorBuiltin? context
+                            (binaryCallsFunctionInScope operator.value) name with
+                        | some function =>
+                            simp only [builtinResult] at success
+                            exact throughArguments.trans
+                              (recordBuiltinFunctionCall_anchoredNodePrefixExtends
+                                success)
+                        | none =>
+                            simp only [builtinResult] at success
+                            cases inferredResult : inferBinaryOperator context
+                                operator.value inferredLeft.type inferredRight.type
+                                expected integerLiterals rightState with
+                            | error error =>
+                                simp [integerLiterals, inferredResult, bind,
+                                  Except.bind] at success
+                            | ok inferred =>
+                                simp only [integerLiterals, inferredResult, bind,
+                                  Except.bind] at success
+                                exact finishInferred inferred inferredResult success
                     | cons candidate rest =>
                         cases selectionResult : selectFunctionCandidateFrom
                             context name (candidate :: rest)

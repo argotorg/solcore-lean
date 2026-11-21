@@ -230,6 +230,10 @@ theorem unary_suffix_progress
   cases dispatch with
   | directFunction _ _ accepted recorded => exact finish _ accepted recorded
   | traitMethod _ accepted recorded => exact finish _ accepted recorded
+  | builtinFunction _ _ _ recorded =>
+      exact (recordBuiltinFunctionCall_inferenceProperties ready
+        (by intro argument member; cases List.mem_singleton.mp member; exact below)
+        expectedBelow recorded).1
   | @selectedFunction name head tail attempt _ lookup selected recorded =>
       have cataloged := functionsNamed_success_subset_catalog lookup
       have properties := selectFunctionCandidateFrom_inferenceProperties ready

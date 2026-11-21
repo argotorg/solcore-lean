@@ -915,6 +915,19 @@ theorem actualInferExprFuelRetainedSoundness_unary {fuel : Nat}
         expectedBelow expectedAdmissible finalPreserved rawProper integerPatternsSubset integerLiteralsSubset requirementsSubset
         retained coercionsRetained operatorsRetained childrenRetained covered semanticPreserved actualCovered
         allocationEq operandSuccess operatorSuccess recorded
+  | builtinFunction dispatch lookup builtin recorded =>
+      have argumentsSuccess : Detail.inferExprsFuel (fuel + 1) inferenceContext [operandExpression] allocated =
+          .ok ([operand], operandState) := by
+        cases fuel with
+        | zero => simp [Detail.inferExprFuel] at operandSuccess
+        | succ fuel => simp [Detail.inferExprsFuel, operandSuccess, bind, Except.bind, pure, Except.pure]
+      exact actualBuiltinCall_typing recursive argumentsSuccess recorded resources interfaces
+        resultSubstitutionExtension signaturesEq ownerEq typeParametersEq assumptionsEq signatureFormation
+        functionsCanonical catalog canonical (invariant.allocateExpressionId allocationEq) actual
+        (operational.allocateExpressionId allocationEq)
+        (by simpa only [allocateExpressionId_inferenceNext_eq allocationEq] using expectedBelow)
+        expectedAdmissible finalPreserved rawProper integerPatternsSubset integerLiteralsSubset requirementsSubset
+        retained coercionsRetained operatorsRetained childrenRetained covered semanticPreserved actualCovered
   | selectedFunction dispatch lookup selected recorded =>
       have argumentsSuccess : Detail.inferExprsFuel (fuel + 1) inferenceContext [operandExpression] allocated =
           .ok ([operand], operandState) := by

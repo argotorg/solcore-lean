@@ -122,6 +122,8 @@ theorem inferExprFuelLedgerPreservation_step
     | directFunction _ _ operation recorded
     | traitMethod _ operation recorded =>
       exact (operandTracked.inferUnaryOperator operation).recordExpressionWithExpected recorded
+    | builtinFunction _ _ _ recorded =>
+      exact operandTracked.recordBuiltinFunctionCall recorded
     | selectedFunction _ _ selected recorded =>
       change RecursiveLedgerInvariant (inferred, final).2 pending
       rw [← recorded]

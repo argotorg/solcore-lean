@@ -8,7 +8,8 @@ wildcard and hiding imports, the 26 pure ones as builtins, the other 55 refused 
 used. Each case is a source upstream's pinned checker was probed with, and gives upstream's
 verdict; an accepted one runs at 9 and 2^256 − 1 and gives the results upstream's checked Hull
 gives. Until qualified access and std beside std.opcodes follow upstream, six forms stay as they
-were (`testFormsAsBefore`).
+were (`testFormsAsBefore`). Operators beside a bound name follow upstream's three kinds
+(`testOperators`).
 -/
 
 set_option autoImplicit false
@@ -153,6 +154,28 @@ private def testRefused : IO Unit := do
   expectRefused "a plain import, a bare call" ["import std.opcodes;"] [] "div(a0, 4)" "check"
   expectRefused "no import, a qualified call" [] [] "std.opcodes.div(a0, 4)" "check"
 
+/-- Operators beside the names an import of `std.opcodes` binds, as upstream gives them. `<` and
+`!` call the `lt` and `not` in scope, `<` with a bool expected, so a bound `lt` refuses `<` in a
+condition, and `!` is the bound `not`: refused on a bool, upstream's results on a word. Trait
+methods (`>>`, `%`) and the builtins `&&` and `||` see no bound name and keep Lean's builtins,
+where upstream needs std's traits. -/
+private def testOperators : IO Unit := do
+  expectRefused "< beside a selected lt" ["import { lt } from std.opcodes;"] []
+    "(a0 < 10) ? 1 : 0" "check"
+  expectRefused "< beside a wildcard" ["import * from std.opcodes;"] [] "(a0 < 10) ? 1 : 0" "check"
+  expectRefused "! in a condition beside a selected not" ["import { not } from std.opcodes;"] []
+    "(!(a0 == 9)) ? 1 : 0" "check"
+  expectResults "! on a word beside a selected not" ["import { not } from std.opcodes;"] [] "!a0"
+    [maximum - 9, 0]
+  expectResults "!! on a word" ["import { not } from std.opcodes;"] [] "!!a0" [9, maximum]
+  expectResults "! on a word as an argument" ["import * from std.opcodes;"] [] "add(!a0, 1)"
+    [maximum - 8, 1]
+  expectResults ">> beside a selected shr" ["import { shr } from std.opcodes;"] [] "a0 >> 2"
+    [2, maximum / 4]
+  expectResults "% beside a selected mod" ["import { mod } from std.opcodes;"] [] "a0 % 4" [1, 3]
+  expectResults "&& and || beside selected and and or" ["import { and, or } from std.opcodes;"] []
+    "((true && true) || false) ? 1 : 0" [1, 1]
+
 /-- The six forms that differ from upstream as they did before `std.opcodes` was a module of the
 load: qualified access after a plain import, and std beside std.opcodes. -/
 private def testFormsAsBefore : IO Unit := do
@@ -173,6 +196,7 @@ def run : IO Unit := do
   testAccepted
   testRefused
   testFormsAsBefore
-  IO.println "std.opcodes imports: accepted forms at upstream's results, refused forms, six as before GREEN"
+  testOperators
+  IO.println "std.opcodes imports and operators: upstream's forms and results, six as before GREEN"
 
 end Tests.StdOpcodes

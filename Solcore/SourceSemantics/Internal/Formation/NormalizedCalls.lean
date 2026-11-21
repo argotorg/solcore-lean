@@ -1301,11 +1301,26 @@ theorem inferExprFuel_unary_formation
         simp only [functionsRun] at success
         cases candidates with
         | nil =>
-          cases operatorRun : inferUnaryOperator context operator.value operandValue.type expected literals operandState with
-          | error error => simp [literals, operatorRun] at success
-          | ok inferred =>
-            simp only [literals, operatorRun] at success
-            exact finish inferred operatorRun success
+          cases builtinRun : operatorBuiltin? context (unaryCallsFunctionInScope operator.value) name with
+          | some function =>
+            simp only [builtinRun] at success
+            have builtinProperties := recordBuiltinFunctionCall_inferenceProperties operandProperties.2.1
+              (by intro argument member; cases List.mem_singleton.mp member; exact operandProperties.2.2)
+              expectedOperand success
+            have operandContinuation := continuation.trans builtinProperties.1.substitution_extends
+            have fields := recordBuiltinFunctionCall_normalized_fields success
+            have operandCapture : NoCaptureNodes outer operandState.nodes := by
+              unfold NoCaptureNodes at captures ⊢
+              rwa [fields.2.2] at captures
+            have prior := earlier operandContinuation operandCapture
+            exact recordBuiltinFunctionCall_normalized_formation formation prior.2 success
+          | none =>
+            simp only [builtinRun] at success
+            cases operatorRun : inferUnaryOperator context operator.value operandValue.type expected literals operandState with
+            | error error => simp [literals, operatorRun] at success
+            | ok inferred =>
+              simp only [literals, operatorRun] at success
+              exact finish inferred operatorRun success
         | cons candidate rest =>
           cases selected : selectFunctionCandidateFrom context name (candidate :: rest)
               [operandValue] literals id expected operandState with
@@ -1411,11 +1426,18 @@ theorem inferExprFuel_binary_formation
           simp only [functionsRun] at success
           cases candidates with
           | nil =>
-            cases operatorRun : inferBinaryOperator context operator.value leftValue.type rightValue.type expected literals rightState with
-            | error error => simp [literals, operatorRun] at success
-            | ok inferred =>
-              simp only [literals, operatorRun] at success
-              exact finish inferred operatorRun success
+            cases builtinRun : operatorBuiltin? context (binaryCallsFunctionInScope operator.value) name with
+            | some function =>
+              simp only [builtinRun] at success
+              exact (recordBuiltinFunctionCall_bool_of_word_false
+                (operatorBuiltin?_returnType builtinRun) success).elim
+            | none =>
+              simp only [builtinRun] at success
+              cases operatorRun : inferBinaryOperator context operator.value leftValue.type rightValue.type expected literals rightState with
+              | error error => simp [literals, operatorRun] at success
+              | ok inferred =>
+                simp only [literals, operatorRun] at success
+                exact finish inferred operatorRun success
           | cons candidate rest =>
             cases selected : selectFunctionCandidateFrom context name (candidate :: rest)
                 [leftValue, rightValue] literals id (some .bool) rightState with

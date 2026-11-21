@@ -2060,11 +2060,21 @@ mutual
           | .function name =>
               match ← functionsNamed context name with
               | [] =>
-                  let inferred ← inferUnaryOperator context operator.value
-                    operand.type expected integerLiterals state
-                  recordExpressionWithExpected context expression id
-                    inferred.type (.unary operator.value operand.id)
-                    inferred.requirements expected inferred.state
+                  match operatorBuiltin? context
+                      (unaryCallsFunctionInScope operator.value) name with
+                  | some function =>
+                      let callee : Syntax.Expr := {
+                        span := operator.span
+                        value := .identifier { span := operator.span, value := name }
+                      }
+                      recordBuiltinFunctionCall expression callee name function
+                        [operand] id expected state
+                  | none =>
+                      let inferred ← inferUnaryOperator context operator.value
+                        operand.type expected integerLiterals state
+                      recordExpressionWithExpected context expression id
+                        inferred.type (.unary operator.value operand.id)
+                        inferred.requirements expected inferred.state
               | candidates =>
                   let attempt ← selectFunctionCandidateFrom context name
                     candidates [operand] integerLiterals id expected state
@@ -2090,11 +2100,23 @@ mutual
           | .function name =>
               match ← functionsNamed context name with
               | [] =>
-                  let inferred ← inferBinaryOperator context operator.value
-                    left.type right.type expected integerLiterals state
-                  recordExpressionWithExpected context expression id inferred.type
-                    (.binary left.id operator.value right.id)
-                    inferred.requirements expected inferred.state
+                  match operatorBuiltin? context
+                      (binaryCallsFunctionInScope operator.value) name with
+                  | some function =>
+                      -- Upstream calls the function with a bool expected. Each of the 26 gives a
+                      -- word, so the call is refused, as upstream refuses it.
+                      let callee : Syntax.Expr := {
+                        span := operator.span
+                        value := .identifier { span := operator.span, value := name }
+                      }
+                      recordBuiltinFunctionCall expression callee name function
+                        [left, right] id (some .bool) state
+                  | none =>
+                      let inferred ← inferBinaryOperator context operator.value
+                        left.type right.type expected integerLiterals state
+                      recordExpressionWithExpected context expression id inferred.type
+                        (.binary left.id operator.value right.id)
+                        inferred.requirements expected inferred.state
               | candidates =>
                   let attempt ← selectFunctionCandidateFrom context name
                     candidates [left, right] integerLiterals id (some .bool)

@@ -722,6 +722,18 @@ theorem unary
   cases dispatch with
   | directFunction _ _ operatorAccepted recorded => exact finish _ operatorAccepted recorded
   | traitMethod _ operatorAccepted recorded => exact finish _ operatorAccepted recorded
+  | builtinFunction _ _ _ recorded =>
+      have argumentsBelow : ∀ argument ∈ [value], argument.type.VariablesBelow state.inference.next := by
+        intro argument member
+        cases List.mem_singleton.mp member
+        exact childProperties.2.2
+      have argumentsSafe : ∀ argument ∈ [value], Safe binder.scheme.quantified state argument.type := by
+        intro argument member
+        cases List.mem_singleton.mp member
+        exact childSafe
+      have recordedLife := lifetime.recordBuiltin childProperties.2.1 argumentsBelow childExpected
+        argumentsSafe expectedSafe recorded
+      exact recordedLife.restrict_outputs (by intro type member; exact List.mem_append_right _ member)
   | @selectedFunction name head tail attempt _ lookup selected recorded =>
       have cataloged := functionsNamed_success_subset_catalog lookup
       have argumentsBelow : ∀ argument ∈ [value], argument.type.VariablesBelow state.inference.next := by

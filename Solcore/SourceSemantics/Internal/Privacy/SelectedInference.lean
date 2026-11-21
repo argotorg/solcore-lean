@@ -867,14 +867,28 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                 simp only [functionsResult] at success
                 cases candidates with
                 | nil =>
-                    cases inferredResult : inferUnaryOperator context
-                        operator.value inferredOperand.type expected
-                        integerLiterals operandState with
-                    | error error =>
-                        simp [integerLiterals, inferredResult] at success
-                    | ok inferred =>
-                        simp only [integerLiterals, inferredResult] at success
-                        exact finishInferred inferred inferredResult success
+                    cases builtinResult : operatorBuiltin? context
+                        (unaryCallsFunctionInScope operator.value) name with
+                    | some function =>
+                        simp only [builtinResult] at success
+                        have builtin := recordBuiltinFunctionCall_private
+                          (by intro argument member; have same := List.mem_singleton.mp member; subst argument; exact operandPrivacy.2.1)
+                          expectedSafeAtOperand operandPrivacy.2.2.1 success
+                        refine ⟨beforeOperand.trans builtin.1, builtin.2.1, builtin.2.2.1, ?_⟩
+                        intro row member fresh
+                        exact new_requirements_trans operandPrivacy.2.2.2
+                          (fun row member fresh => absurd (builtin.2.2.2 ▸ member) fresh)
+                          builtin.1 row member (by simpa only [allocationPrivacy.2.2] using fresh)
+                    | none =>
+                        simp only [builtinResult] at success
+                        cases inferredResult : inferUnaryOperator context
+                            operator.value inferredOperand.type expected
+                            integerLiterals operandState with
+                        | error error =>
+                            simp [integerLiterals, inferredResult] at success
+                        | ok inferred =>
+                            simp only [integerLiterals, inferredResult] at success
+                            exact finishInferred inferred inferredResult success
                 | cons candidate rest =>
                     cases selectionResult : selectFunctionCandidateFrom context
                         name (candidate :: rest) [inferredOperand]
@@ -1038,14 +1052,22 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                     simp only [functionsResult] at success
                     cases candidates with
                     | nil =>
-                        cases inferredResult : inferBinaryOperator context
-                            operator.value inferredLeft.type inferredRight.type
-                            expected integerLiterals rightState with
-                        | error error =>
-                            simp [integerLiterals, inferredResult] at success
-                        | ok inferred =>
-                            simp only [integerLiterals, inferredResult] at success
-                            exact finishInferred inferred inferredResult success
+                        cases builtinResult : operatorBuiltin? context
+                            (binaryCallsFunctionInScope operator.value) name with
+                        | some function =>
+                            simp only [builtinResult] at success
+                            exact (recordBuiltinFunctionCall_bool_of_word_false
+                              (operatorBuiltin?_returnType builtinResult) success).elim
+                        | none =>
+                            simp only [builtinResult] at success
+                            cases inferredResult : inferBinaryOperator context
+                                operator.value inferredLeft.type inferredRight.type
+                                expected integerLiterals rightState with
+                            | error error =>
+                                simp [integerLiterals, inferredResult] at success
+                            | ok inferred =>
+                                simp only [integerLiterals, inferredResult] at success
+                                exact finishInferred inferred inferredResult success
                     | cons candidate rest =>
                         cases selectionResult : selectFunctionCandidateFrom
                             context name (candidate :: rest)

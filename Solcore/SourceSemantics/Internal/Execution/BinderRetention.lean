@@ -146,6 +146,8 @@ theorem unary
   cases dispatch with
   | directFunction _ _ accepted recorded => exact finish _ accepted recorded
   | traitMethod _ accepted recorded => exact finish _ accepted recorded
+  | builtinFunction _ _ _ recorded =>
+    exact (LocalGeneralizationEvents.Progress.recordBuiltinFunctionCall recorded).retained
   | @selectedFunction name head tail attempt _ lookup selected recorded =>
     let callee : Syntax.Expr := {
       span := operator.span
