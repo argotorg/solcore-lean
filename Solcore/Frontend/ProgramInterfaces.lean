@@ -988,6 +988,22 @@ inductive ProgramInterfaceError where
       (owner : Workspace.ModuleId)
       (nameSpace : ProgramDeclarationNamespace)
       (name : String)
+  /-- A selective import that lists one source name twice or binds one local name twice, or a
+  hiding clause that hides one name twice, as upstream's `SC0117` refuses it. -/
+  | duplicateImportName
+      (owner : Workspace.ModuleId)
+      (name : String)
+  /-- A local name that selected or wildcard imports bring from two or more modules, in any
+  import group and used or not, as upstream's `SC0120` refuses it. -/
+  | ambiguousImport
+      (owner : Workspace.ModuleId)
+      (name : String)
+      (targets : List Workspace.ModuleId)
+  /-- A plain or namespace import's qualifier beside a value of the module of the same name,
+  declared or imported, as upstream's `SC0121` refuses it. -/
+  | importQualifierConflict
+      (owner : Workspace.ModuleId)
+      (name : String)
   deriving Repr, DecidableEq
 
 namespace ProgramDeclaration
@@ -1562,8 +1578,7 @@ private def moduleContribution
       (fun (contribution : Contribution) declaration =>
     processExport environment interfaces module locals imported.entities
       contribution declaration) ({} : Contribution)
-  { exported with errors := imported.errors ++
-      importConflicts environment interfaces module locals ++ exported.errors }
+  { exported with errors := imported.errors ++ exported.errors }
 
 private def closureRound
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces) :
@@ -1621,6 +1636,13 @@ def buildProgramInterfaces (environment : ProgramEnvironment) :
   | .ok interfaces =>
       let errors := finalErrors environment interfaces
       if errors.isEmpty then .ok interfaces else .error errors
+
+/-- The converged public interfaces, beside every module's interface errors. -/
+private def programInterfacesWithErrors (environment : ProgramEnvironment) :
+    Except ProgramInterfaceError (ProgramInterfaces × List ProgramInterfaceError) := do
+  let interfaces ← closeInterfaces environment (closureFuel environment)
+    (emptyInterfaces environment)
+  pure (interfaces, finalErrors environment interfaces)
 
 end Solcore.Frontend
 end
@@ -1709,9 +1731,11 @@ inductive ProgramLoadError where
       (source : Workspace.SourceId)
       (error : Syntax.Unchecked.Error)
   | environment (error : ProgramEnvironmentError)
-  /-- Imports that upstream refuses where they are: an unknown module, an unknown selected or
-  hidden item (`SC0110`), and a name an import brings beside a declaration of the module
-  (`SC0108`) (`programImportErrors`). -/
+  /-- Imports that upstream refuses where they are, in the modules reachable from the entry: an
+  unknown module, an unknown selected or hidden item (`SC0110`), a name an import brings beside
+  a declaration of the module (`SC0108`), a name listed twice in one import (`SC0117`), a name
+  from two modules (`SC0120`), and a qualifier beside a value (`SC0121`)
+  (`programImportErrors`). -/
   | imports (errors : List ProgramInterfaceError)
   deriving Repr
 
@@ -1778,17 +1802,152 @@ def upstreamStandardModulePaths : List (List String) :=
 
 /-- Whether a load reports an interface error where the import is, as upstream reports it: an
 unknown module other than one of upstream's std modules, an unknown selected or hidden item,
-and an import beside a declaration. The other errors are reported where a name resolves. -/
+and the import rules (`importRuleErrors`). The other errors are reported where a name
+resolves. -/
 def ProgramInterfaceError.reportedAtLoad : ProgramInterfaceError → Bool
   | .unknownModule _ components => !upstreamStandardModulePaths.contains components
-  | .unknownImportName _ _ _ | .importedNameConflict _ _ _ => true
+  | .unknownImportName _ _ _ | .importedNameConflict _ _ _ | .duplicateImportName _ _
+  | .ambiguousImport _ _ _ | .importQualifierConflict _ _ => true
   | .unknownExportName _ _ | .unknownExportConstructor _ _ _ | .fixedPointExhausted => false
 
-/-- The import errors of a program that its load reports, in `buildProgramInterfaces`' order. -/
-def programImportErrors (environment : ProgramEnvironment) : List ProgramInterfaceError :=
-  match buildProgramInterfaces environment with
-  | .ok _ => []
-  | .error errors => errors.filter ProgramInterfaceError.reportedAtLoad
+/-- The module an interface error is in. -/
+def ProgramInterfaceError.owner? : ProgramInterfaceError → Option Workspace.ModuleId
+  | .unknownModule owner _ | .unknownImportName owner _ _ | .unknownExportName owner _
+  | .unknownExportConstructor owner _ _ | .importedNameConflict owner _ _
+  | .duplicateImportName owner _ | .ambiguousImport owner _ _
+  | .importQualifierConflict owner _ => some owner
+  | .fixedPointExhausted => none
+
+/-- The modules that a module's imports and re-exports name, where they resolve. -/
+def programModuleReferences (environment : ProgramEnvironment) (module : ProgramModule) :
+    List Workspace.ModuleId :=
+  module.source.items.flatMap fun item =>
+    match item.value with
+    | .importDecl declaration =>
+        (resolveProgramModulePath? environment module.id (importPath declaration)).toList
+    | .exportDecl declaration =>
+        let paths : List Syntax.QualifiedName := match declaration.value with
+          | .local items => items.elements.filterMap fun item =>
+              match item.value with
+              | .moduleWildcard path _ => some path
+              | .name _ => none
+          | .module path => [path]
+          | .moduleAs path _ => [path]
+          | .itemsFrom path _ => [path]
+        paths.filterMap (resolveProgramExportPath? environment module.id)
+    | _ => []
+
+private def reachableFrom (environment : ProgramEnvironment) :
+    Nat → List Workspace.ModuleId → List Workspace.ModuleId
+  | 0, seen => seen
+  | fuel + 1, seen =>
+      let edges (id : Workspace.ModuleId) : List Workspace.ModuleId :=
+        match environment.modules.find? fun module => decide (module.id = id) with
+        | some module => programModuleReferences environment module
+        | none => []
+      let added := ((seen.flatMap edges).filter fun id => !seen.contains id).eraseDups
+      if added.isEmpty then seen else reachableFrom environment fuel (seen ++ added)
+
+/-- The modules reachable from `entry` through the modules that imports and re-exports name, as
+upstream's `reachable_modules` walks them. Upstream validates only these. -/
+def reachableProgramModules (environment : ProgramEnvironment) (entry : Workspace.ModuleId) :
+    List Workspace.ModuleId :=
+  reachableFrom environment (environment.modules.length + 1) [entry]
+
+/-- Upstream's `SC0117`: a selective import that lists one source name twice or binds one local
+name twice, and a hiding clause that hides one name twice, once per name. It reads only the
+import, so it holds for a module the load does not resolve too. -/
+private def duplicateImportNames (module : ProgramModule) : List ProgramInterfaceError :=
+  let repeated (names : List String) : List String :=
+    (names.zipIdx.filter fun (name, index) => (names.take index).contains name).map (·.1)
+  let names := (importsIn module).flatMap fun declaration =>
+    match declaration.value with
+    | .selected selection _ hidingClause =>
+        let items := selection.elements.toList
+        let sources := items.map fun item => selectorSpelling item.value.source
+        let locals := items.map fun item =>
+          item.value.alias.map (·.value) |>.getD (selectorSpelling item.value.source)
+        repeated sources ++ repeated locals ++ repeated (hiddenNames hidingClause)
+    | .wildcard _ hidingClause => repeated (hiddenNames hidingClause)
+    | _ => []
+  names.eraseDups.map (.duplicateImportName module.id ·)
+
+/-- Upstream's `SC0120`: a local name that selected or wildcard imports bring from two or more
+modules, in any import group and used or not. Two imports of one module are no ambiguity; a
+module counts by the import that names it, so a re-export beside its origin is one. -/
+private def ambiguousImports (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
+    (module : ProgramModule) : List ProgramInterfaceError :=
+  let brought := (importsIn module).flatMap fun declaration =>
+    match declaration.value with
+    | .wildcard _ _ | .selected _ _ _ =>
+        match resolveProgramModulePath? environment module.id (importPath declaration) with
+        | none => []
+        | some target =>
+            (processImport environment interfaces module.id declaration).entities.map
+              fun entity => (entity.localName, target)
+    | _ => []
+  (brought.map (·.1)).eraseDups.filterMap fun name =>
+    let targets := ((brought.filter (·.1 == name)).map (·.2)).eraseDups
+    if targets.length ≥ 2 then some (.ambiguousImport module.id name targets) else none
+
+/-- The qualifiers a plain or namespace import binds: a namespace import's alias, or a plain
+import's last path component and the first component of the path it is seen by, a leading
+`lib` and an external library's name dropped. -/
+private def importQualifiers (declaration : Syntax.ImportDecl) : List String :=
+  match declaration.value with
+  | .plain path =>
+      let components := programModulePathComponents path
+      let seen :=
+        if components.length > 1 &&
+            (path.value.externalMarker.isSome || components.head? == some "lib") then
+          components.drop 1
+        else components
+      (seen.getLast?.toList ++ seen.head?.toList).eraseDups
+  | .namespace _ alias => [alias.value]
+  | _ => []
+
+/-- Upstream's `SC0121`: a plain or namespace import's qualifier beside a value of the module of
+the same name, declared or brought by a selected or wildcard import. A module counts where the
+load resolves it or where it is one of upstream's std modules, whose path alone gives the
+qualifier. -/
+private def importQualifierConflicts (environment : ProgramEnvironment)
+    (interfaces : ProgramInterfaces) (module : ProgramModule) : List ProgramInterfaceError :=
+  let qualifiers := (importsIn module).flatMap fun declaration =>
+    let path := importPath declaration
+    if (resolveProgramModulePath? environment module.id path).isSome ||
+        upstreamStandardModulePaths.contains (programModulePathComponents path) then
+      importQualifiers declaration
+    else []
+  let values := ((environment.declarationsIn module.id).filterMap fun declaration =>
+      if declaration.nameSpace == some .value then declaration.name else none) ++
+    ((importsIn module).flatMap fun declaration =>
+      (processImport environment interfaces module.id declaration).entities.filterMap
+        fun entity =>
+          if entity.declaration.nameSpace == some .value then some entity.localName else none)
+  (qualifiers.eraseDups.filter values.contains).map (.importQualifierConflict module.id ·)
+
+/-- The import rules a load checks in each module, as upstream's validation does: a name brought
+beside a declaration (`SC0108`), a name listed twice (`SC0117`), a name from two modules
+(`SC0120`) and a qualifier beside a value (`SC0121`). -/
+private def importRuleErrors (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
+    (module : ProgramModule) : List ProgramInterfaceError :=
+  importConflicts environment interfaces module (localEntities environment module.id) ++
+    duplicateImportNames module ++ ambiguousImports environment interfaces module ++
+    importQualifierConflicts environment interfaces module
+
+/-- The import errors of a program that its load reports, for the modules reachable from its
+entry, as upstream validates only those: the interface errors reported where the import is, in
+`buildProgramInterfaces`' order, then each module's import rules. -/
+def programImportErrors (environment : ProgramEnvironment) (entry : Workspace.ModuleId) :
+    List ProgramInterfaceError :=
+  let reachable := reachableProgramModules environment entry
+  match programInterfacesWithErrors environment with
+  | .error _ => []
+  | .ok (interfaces, errors) =>
+      errors.filter (fun error =>
+          error.reportedAtLoad && error.owner?.any reachable.contains) ++
+        (environment.modules.filter fun module => reachable.contains module.id).flatMap
+          (importRuleErrors environment interfaces)
 
 /-- Parse and catalog an already validated workspace, and refuse the imports upstream refuses
 where they are. -/
@@ -1799,7 +1958,7 @@ def loadValidatedProgram
   if parseErrors.isEmpty then
     match buildProgramEnvironment sources with
     | .ok environment =>
-        match programImportErrors environment with
+        match programImportErrors environment workspace.entry.toModuleId with
         | [] => .ok { workspace, sources, environment }
         | errors => .error [.imports errors]
     | .error errors => .error (errors.map ProgramLoadError.environment)
@@ -1828,7 +1987,7 @@ theorem loadValidatedProgram_success_environment
         cases environmentResult : buildProgramEnvironment sources with
         | error errors => simp [environmentResult] at success
         | ok environment =>
-            cases importErrors : programImportErrors environment with
+            cases importErrors : programImportErrors environment workspace.entry.toModuleId with
             | nil =>
                 simp only [environmentResult, importErrors, Except.ok.injEq] at success
                 subst loaded

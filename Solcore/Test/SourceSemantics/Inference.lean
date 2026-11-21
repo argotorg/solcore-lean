@@ -3065,11 +3065,14 @@ private def testAmbiguousCoercionTrait : IO Unit := do
     ]
     externalLibraries := []
   }
+  -- Two wildcard imports that bring `Coerce` from two modules are refused where they are, as
+  -- upstream's `SC0120` refuses them, before any body reaches the trait.
   match SourceInference.loadAndCheckProgram raw with
   | .error errors =>
       assertTrue (errors.any fun error => match error with
-        | .body { error := .ambiguousOperatorTrait "Coerce" candidates, .. } =>
-            candidates.length == 2
+        | .loading (.imports imports) => imports.any fun error => match error with
+          | .ambiguousImport _ "Coerce" targets => targets.length == 2
+          | _ => false
         | _ => false) "ambiguous Coerce declarations lost their diagnostic"
   | .ok _ => throw (IO.userError "ambiguous Coerce declaration was selected")
 
