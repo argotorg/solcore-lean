@@ -8,13 +8,14 @@ case's own direct Core result: a returned Word with the Word, and a native panic
 session decodes to upstream's revert data, with the revert's output.
 
 Admission is a versioned predicate decided before the native tool runs. It reads the case's
-provenance (its emitter, the Core operations of its program and its plan's integer types), the
-adapter's reading of the source (one contract with functions only, no storage field, `uint256`
-parameters) and, for memory arrays, the source's array forms (std's array traits and a `lidx`
-call with an integer literal index are not admitted). Cases that are not admitted are counted by
-reason. A native rejection, crash or different observation of an admitted case is a finding,
-never an exclusion; the known differences from upstream are findings under their own labels. Out
-of fuel and timeouts are inconclusive.
+provenance (its emitter and the Core operations of its program), the adapter's reading of the source
+(one contract with functions only, no storage field, `uint256` parameters, no call of std's
+`tobool`) and, for memory arrays, the source's array forms (std's array traits and a `lidx` call
+with an integer literal index are not admitted). The adapter keeps the source's imports of
+`std.opcodes`, whose pure functions the native frontend provides. Cases that are not admitted are
+counted by reason. A native rejection, crash or different observation of an admitted case is a
+finding, never an exclusion; the known differences from upstream are findings under their own
+labels. Out of fuel and timeouts are inconclusive.
 
 Cases come from the pure runner's own preparation (`semantic-campaign.py`, with the arguments
 `semantic-suite.py` gives each profile), for the fixed corpora or a seeded random draw; preparation
@@ -54,8 +55,8 @@ runner = suite.pure_campaign
 SCHEMA = "solcore-lean.semantic-native.v1"
 REQUEST_SCHEMA = "solcore-lean.semantic-native-request.v1"
 RESULT_SCHEMA = "solcore-lean.semantic-native-result.v1"
-ADMISSION = "native-admission-v3"
-ADAPTER = "native-lift-v1"
+ADMISSION = "native-admission-v4"
+ADAPTER = "native-lift-v2"
 COMPARISON = "native-compare-v1"
 TOOL = ROOT / ".lake/build/bin/semantic-native-tool"
 SCRIPTS = ("semantic-native.py", "semantic-suite.py", "semantic-campaign.py", "semantic-differential.py",
@@ -66,32 +67,30 @@ WRAPPER = "sc_native_"
 PROFILE_SECONDS = 900.0
 PROFILE_DISK_BYTES = 256 * 1024**2
 
-# Core operations that the G0-derived emitters write as std.opcodes aliases (`sc_div`, ...), and Core sums, which
-# they write as upstream's builtin `sum<a, b>` with unqualified `inl` and `inr`: the native frontend has neither.
-OPCODE_ALIASES = frozenset(("binary:wordDiv", "binary:wordSdiv", "binary:wordMod", "binary:wordSmod",
-                            "binary:wordPow", "binary:wordSignExtend", "binary:wordSgt", "binary:wordShl",
-                            "binary:wordShr", "binary:wordSar", "binary:wordByte", "ternary:wordAddMod",
-                            "ternary:wordMulMod", "unary:wordClz"))
+# Core sums, which the G0-derived emitters write as upstream's builtin `sum<a, b>` with unqualified `inl` and `inr`:
+# the native frontend has neither. Their std.opcodes aliases (`sc_div`, ...) and the plans' `signextend` for signed
+# narrow types come from the import the adapter keeps.
 SUMS = frozenset(("inLeft", "inRight", "case"))
-# Signed types narrower than 256 bits, for which the integer and array plans' emitters import std.opcodes' `signextend`.
-SIGNED_NARROW = frozenset(f"int{bits}" for bits in range(8, 256, 8))
-# Each admitted emitter: the Core operations that exclude a case, and the provenance key and dimension of its plan's
-# integer types, if it has any.
+# Each admitted emitter, with the Core operations that exclude a case.
 EMITTERS = {
-    **{version: (OPCODE_ALIASES | SUMS, None) for version in (
+    **{version: SUMS for version in (
         "solcore-source-g0-v2", "solcore-source-input-v2", "solcore-source-functions-v2",
         "solcore-source-mutation-v2", "solcore-source-aggregates-v3", "solcore-source-aggregate-call-graphs-v2",
         "solcore-source-call-graphs-v2", "solcore-source-call-graph-loops-v2", "solcore-source-closures-v3",
         "solcore-source-generics-v3", "solcore-source-loops-v3", "solcore-source-nested-loops-v2",
         "solcore-source-recursion-v2", "solcore-source-recursive-loops-v2", "solcore-source-loop-closures-v2",
         "solcore-source-primitives-v2")},
-    "solcore-source-shifts-v2": (frozenset(("binary:wordSignExtend",)), ("shiftShapes", "values")),
-    "solcore-source-checked-arithmetic-v2": (frozenset(), ("checkedArithmeticShapes", "types")),
-    "solcore-source-enums-v2": (frozenset(), None),
-    "solcore-source-closure-captures-v2": (frozenset(), None),
-    "solcore-source-closure-factories-v2": (frozenset(), None),
-    "solcore-source-memory-arrays-v2": (frozenset(), ("memoryArrayShapes", "types")),
+    "solcore-source-shifts-v2": frozenset(),
+    "solcore-source-checked-arithmetic-v2": frozenset(),
+    "solcore-source-enums-v2": frozenset(),
+    "solcore-source-closure-captures-v2": frozenset(),
+    "solcore-source-closure-factories-v2": frozenset(),
+    "solcore-source-memory-arrays-v2": frozenset(),
 }
+# A call of std's `tobool(x: word) returns (bool)`, which the G0-derived emitters wrap around `sgt`'s word: std is not
+# a module of the native load, so a source that calls it and does not define it is not admitted.
+TOBOOL_CALL = re.compile(r"\btobool\s*\(")
+TOBOOL_DEFINITION = re.compile(r"\bfunction\s+tobool\b")
 # The array forms of the array emitters' sources that this version does not admit, each a reason, in this order:
 # std's array traits, which row 4's Lean side leaves out (its lengths are compiler forms, and it declares no std
 # trait), then a `lidx` call whose index is an integer literal, which Lean leaves open where upstream gives it
@@ -136,6 +135,8 @@ KNOWN = {
 }
 
 STD_IMPORT = re.compile(r"^[ \t]*import\b[^;\n]*\bstd\b[^;\n]*;[ \t]*$", re.M)
+# An import of `std.opcodes`, which the native load resolves, so the adapter keeps it.
+STD_OPCODES_IMPORT = re.compile(r"\bstd\s*\.\s*opcodes\s*;[ \t]*$")
 CONTRACT = re.compile(r"^[ \t]*contract\s+([A-Za-z_]\w*)\s*(?:<[^>{]*>)?\s*\{", re.M)
 FUNCTION = re.compile(r"function\s+([A-Za-z_]\w*)\s*(?:<[^>(]*>)?\s*\(")
 FIELD = re.compile(r"[A-Za-z_]\w*\s*:[^;{}]*;", re.S)
@@ -323,10 +324,11 @@ def array_forms(source: str) -> dict[str, list[str]]:
 
 
 def lift(source: str, method: str) -> dict:
-    """native-lift-v1 on a case's source: its std imports dropped, each line kept as an empty line, and its one
-    contract's functions moved to the top level without their visibility and mutability words, then a Word entry
-    of `method` appended. Gives the lifted source and the entry's name, or the reason it cannot."""
-    text = STD_IMPORT.sub("", source)
+    """native-lift-v2 on a case's source: its std imports other than those of `std.opcodes` dropped, each line kept
+    as an empty line, and its one contract's functions moved to the top level without their visibility and
+    mutability words, then a Word entry of `method` appended. Gives the lifted source and the entry's name, or the
+    reason it cannot."""
+    text = STD_IMPORT.sub(lambda match: match.group(0) if STD_OPCODES_IMPORT.search(match.group(0)) else "", source)
     contracts = list(CONTRACT.finditer(text))
     if len(contracts) != 1:
         return {"reason": "contract shape", "detail": f"{len(contracts)} contracts"}
@@ -384,7 +386,7 @@ def arguments(contract: dict, count: int) -> list[str] | None:
 
 
 def admission(case: dict) -> dict:
-    """native-admission-v3, decided from the case alone before any native run: the program the native tool reads
+    """native-admission-v4, decided from the case alone before any native run: the program the native tool reads
     with the case's arguments, or the first reason in a fixed order that the case is not admitted."""
     def refuse(reason: str, detail=None) -> dict:
         return {"admitted": False, "reason": reason, "detail": detail}
@@ -393,15 +395,9 @@ def admission(case: dict) -> dict:
     emitter = provenance.get("emitterVersion")
     if emitter not in EMITTERS:
         return refuse("emitter", emitter)
-    excluded, plan = EMITTERS[emitter]
-    found = sorted(operations(case.get("program")) & excluded)
+    found = sorted(operations(case.get("program")) & EMITTERS[emitter])
     if found:
-        return refuse("std.opcodes operation" if set(found) & OPCODE_ALIASES else "sum", ", ".join(found))
-    if plan:
-        shapes = provenance.get(plan[0]) if isinstance(provenance.get(plan[0]), dict) else {}
-        narrow = sorted(set(shapes.get(plan[1]) or ()) & SIGNED_NARROW)
-        if narrow:
-            return refuse("signed narrow type", ", ".join(narrow))
+        return refuse("sum", ", ".join(found))
     if not isinstance(case.get("source"), str) or "sourceBundle" in case or "sources" in case:
         return refuse("sources")
     contract = case.get("contract") if isinstance(case.get("contract"), dict) else {}
@@ -416,6 +412,9 @@ def admission(case: dict) -> dict:
     words = arguments(contract, lifted["parameters"])
     if words is None:
         return refuse("calldata")
+    code = code_only(lifted["source"])
+    if TOBOOL_CALL.search(code) and not TOBOOL_DEFINITION.search(code):
+        return refuse("std's tobool")
     forms = array_forms(case["source"]) if emitter in ARRAY_EMITTERS else {}
     for reason in ARRAY_REASONS:
         if reason in forms:

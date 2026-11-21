@@ -90,13 +90,18 @@ class AdmissionTests(unittest.TestCase):
         self.assertEqual(native.operations(program),
                          {"apply", "lambda", "binary:wordDiv", "var", "word", "case", "inLeft", "unary:wordNot"})
 
-    def test_the_adapter_lifts_the_contract_drops_std_imports_and_appends_a_word_entry(self):
+    def test_the_adapter_lifts_the_contract_drops_std_imports_but_std_opcodes_and_appends_a_word_entry(self):
         lifted = native.lift(SOURCE, "run")
         self.assertIsNone(lifted["reason"])
         text = lifted["source"]
-        self.assertTrue(text.startswith("pragma solcore;\n\n\n\n\nfunction sc_fn0"))
-        self.assertNotIn("import", text)
+        self.assertTrue(text.startswith("pragma solcore;\n\n\nimport { div as sc_div, mod as sc_mod } from "
+                                        "std.opcodes;\n\nfunction sc_fn0"))
+        self.assertEqual(text.count("import"), 1)
         self.assertNotIn("contract", text)
+        kept = native.lift(SOURCE.replace("import * from std.dispatch;", "import std.opcodes;\nimport * from "
+                                          "std.unchecked.signed;"), "run")["source"]
+        self.assertIn("\nimport std.opcodes;\n\nimport { div as sc_div", kept)
+        self.assertNotIn("unchecked", kept)
         self.assertNotIn("public", text)
         self.assertIn("function run(input: uint256)  returns (uint256) {", text)
         self.assertIn("// the method, with a brace { in its comment", text)
@@ -126,16 +131,24 @@ class AdmissionTests(unittest.TestCase):
         self.assertEqual(decided(), "admitted")
         self.assertEqual(decided(emitter="solcore-source-assembly-v2"), "emitter")
         self.assertEqual(decided(emitter="solcore-source-unknown-v9"), "emitter")
-        self.assertEqual(decided(program=binary("wordDiv")), "std.opcodes operation")
+        # std.opcodes' aliases and the plans' `signextend` come from the import the adapter keeps.
+        self.assertEqual(decided(program=binary("wordDiv")), "admitted")
         self.assertEqual(decided(program={"tag": "case", "scrutinee": {"tag": "inLeft"}}), "sum")
-        self.assertEqual(decided(program={"tag": "inRight", "value": binary("wordSmod")}), "std.opcodes operation")
+        self.assertEqual(decided(program={"tag": "inRight", "value": binary("wordSmod")}), "sum")
         shifts = "solcore-source-shifts-v2"
         self.assertEqual(decided(emitter=shifts, program=binary("wordShl")), "admitted")
-        self.assertEqual(decided(emitter=shifts, program=binary("wordSignExtend")), "std.opcodes operation")
-        self.assertEqual(decided(emitter=shifts, shiftShapes={"values": ["int8"]}), "signed narrow type")
+        self.assertEqual(decided(emitter=shifts, program=binary("wordSignExtend")), "admitted")
+        self.assertEqual(decided(emitter=shifts, shiftShapes={"values": ["int8"]}), "admitted")
         arithmetic = "solcore-source-checked-arithmetic-v2"
-        self.assertEqual(decided(emitter=arithmetic, checkedArithmeticShapes={"types": ["int16"]}),
-                         "signed narrow type")
+        self.assertEqual(decided(emitter=arithmetic, checkedArithmeticShapes={"types": ["int16"]}), "admitted")
+        # std's `tobool`, called and not defined, in code and not in a comment.
+        called = "let sc_x: word = Typedef.rep(input);\n        let sc_b: bool = tobool(sc_x);"
+        tobool = SOURCE.replace("let sc_x: word = Typedef.rep(input);", called)
+        self.assertEqual(decided(source=tobool), "std's tobool")
+        self.assertEqual(decided(source=SOURCE.replace("// the method,", "// tobool(sc_x), the method,")), "admitted")
+        defined = tobool.replace("\ncontract", "\nfunction tobool(x: word) returns (bool) {\n    return x != 0;\n}\n"
+                                                "\ncontract")
+        self.assertEqual(decided(source=defined), "admitted")
         self.assertEqual(decided(emitter=arithmetic, checkedArithmeticShapes={"types": ["uint16", "int256"]}),
                          "admitted")
         self.assertEqual(decided(emitter="solcore-source-enums-v2", program={"tag": "case"}), "admitted")
@@ -176,7 +189,7 @@ class AdmissionTests(unittest.TestCase):
         self.assertEqual(decided(edited("let sc_s0 = sc_tail(sc_a0, 1);", helper=tail)), "admitted")
         for index in ("sc_k0", "uint256(1)", "sc_k0 + 1"):
             self.assertEqual(decided(edited(f"sc_put(lidx(sc_a0, {index}), sc_v1);", helper=put)), "admitted", index)
-        self.assertEqual(decided(types=["int8"]), ("signed narrow type", "int8"))
+        self.assertEqual(decided(types=["int8"]), "admitted")
         storage = ARRAYS.replace("{\n    function run", "{\n    sc_st: uint64[];\n    function run")
         self.assertEqual(decided(storage.replace("return uint256", "sc_st.setLength(2);\n        return uint256")),
                          ("storage field", "1 fields"))
@@ -184,13 +197,12 @@ class AdmissionTests(unittest.TestCase):
         self.assertEqual(decided(edited(helper=get)), ("std's array trait", "RValueIdxAccess, ridx"))
         literal = edited("sc_put(lidx(sc_a0, 1), sc_v1);", "sc_put(lidx(sc_a0 , 0x1), sc_v1);", helper=put)
         self.assertEqual(decided(literal), ("literal lidx index", "lidx(sc_a0, 0x1), lidx(sc_a0, 1)"))
-        # The first reason in a fixed order: the plan's types and the lift's, then std's array traits, then a literal
-        # `lidx` index.
+        # The first reason in a fixed order: the lift's, then std's array traits, then a literal `lidx` index.
         self.assertEqual(decided(edited("sc_put(lidx(sc_a0, 1), sc_v1);", helper=length + put))[0],
                          "std's array trait")
         stored = storage.replace("return uint256", "sc_put(lidx(sc_a0, 1), sc_v1);\n        return uint256")
         self.assertEqual(decided(stored)[0], "storage field")
-        self.assertEqual(decided(literal, types=["int16"])[0], "signed narrow type")
+        self.assertEqual(decided(literal, types=["int16"])[0], "literal lidx index")
 
     def test_a_literal_lidx_index_is_an_integer_literal_argument_at_the_calls_own_depth(self):
         for code, found in (("lidx(m, 0)", ["lidx(m, 0)"]), ("lidx( g[1] ,5 )", ["lidx(g[1], 5)"]),
@@ -300,7 +312,8 @@ class RunTests(unittest.TestCase):
         rejected = SOURCE.replace("sc_fn0(sc_x)", "sc_fn0(sc_x) /* REJECTED */")
         cases = [make_case(data=calldata(7)), make_case(data=calldata(8), core=returned("9")),
                  make_case(source=rejected), make_case(source=rejected, data=calldata(5)),
-                 make_case(emitter="solcore-source-halt-v2"), make_case(program=binary("wordMod"))]
+                 make_case(emitter="solcore-source-halt-v2"),
+                 make_case(program={"tag": "case", "scrutinee": {"tag": "inLeft"}})]
         args, suite_args = self.arguments()
         args.output.mkdir()
         run = native.NativeRun(args, suite_args)
@@ -310,7 +323,7 @@ class RunTests(unittest.TestCase):
         counts = run.profiles["runtime-functions"]["counts"]
         self.assertEqual(counts, {"cases": 6, "generationExcluded": 1, "notAdmitted": 2, "admitted": 4, "programs": 2,
                                   "agree": 1, "mismatch": 1, "rejected": 2, "inconclusive": 0, "unexecuted": 0})
-        self.assertEqual(run.profiles["runtime-functions"]["reasons"], {"emitter": 1, "std.opcodes operation": 1})
+        self.assertEqual(run.profiles["runtime-functions"]["reasons"], {"emitter": 1, "sum": 1})
         self.assertEqual([program["cases"] for program in run.programs], [[0, 1], [2, 3]])
         findings = sorted(run.findings.values(), key=lambda item: item["kind"])
         self.assertEqual([(item["kind"], item["count"], item["known"]) for item in findings],
@@ -375,7 +388,7 @@ class RunTests(unittest.TestCase):
                                 "--profile", "runtime-word"])
         check = json.loads(output.getvalue())
         self.assertEqual((code, check["status"], sorted(check["corpora"])), (0, "ready", ["runtime-word"]))
-        self.assertEqual(check["versions"], {"admission": "native-admission-v3", "adapter": "native-lift-v1",
+        self.assertEqual(check["versions"], {"admission": "native-admission-v4", "adapter": "native-lift-v2",
                                              "comparison": "native-compare-v1"})
         self.assertEqual(sorted(check["scripts"]), sorted(native.SCRIPTS))
         args, _ = native.parse_args(["--check", "--mode", "random", "--seed", "5"])
