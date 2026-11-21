@@ -1279,12 +1279,33 @@ inductive InputRep : BuiltinFunctionId → List Dynamic.Value → Value → Prop
   | integerLt (left right : Int) : InputRep .integerLt [.integer left, .integer right] (.pair (.integer left) (.integer right))
   | integerMul (left right : Int) : InputRep .integerMul [.integer left, .integer right] (.pair (.integer left) (.integer right))
   | wordToInteger (value : Word) : InputRep .wordToInteger [.word value] (.word value)
+  /-- An opcode's words, packed as `packArguments` packs them. -/
+  | opcodeUnary {op : WordOpcode} (unary : op.arity = 1) (value : Word) :
+      InputRep (.wordOpcode op) [.word value] (.word value)
+  | opcodeBinary {op : WordOpcode} (binary : op.arity = 2) (left right : Word) :
+      InputRep (.wordOpcode op) [.word left, .word right] (.pair (.word left) (.word right))
+  | opcodeTernary {op : WordOpcode} (ternary : op.arity = 3) (first second third : Word) :
+      InputRep (.wordOpcode op) [.word first, .word second, .word third]
+        (.pair (.word first) (.pair (.word second) (.word third)))
 
 theorem InputRep.runtime_hasType {function : BuiltinFunctionId} {arguments : List Dynamic.Value}
     {input : Value} (represented : InputRep function arguments input)
     (world : StoreTyping) (definitions : DataEnvironment) :
     RuntimeValueHasType world input (SourceCoreInteger.builtinParameter function) definitions := by
-  cases represented <;> first | exact .pair .integer .integer | exact .integer | exact .word
+  cases represented with
+  | @opcodeUnary op unary => cases op <;> first | exact absurd unary (by decide) | exact .word
+  | @opcodeBinary op binary => cases op <;> first | exact absurd binary (by decide) | exact .pair .word .word
+  | @opcodeTernary op ternary =>
+    cases op <;> first | exact absurd ternary (by decide) | exact .pair .word (.pair .word .word)
+  | _ => first | exact .pair .integer .integer | exact .integer | exact .word
+
+/-- A comparison's truth as the word 1 or 0. -/
+theorem boolToWord_evaluates {environment : Environment} {store : Store} {condition : Expr}
+    {truth : Bool} (evaluated : Evaluates environment store condition (.bool truth) store) :
+    Evaluates environment store (Expr.boolToWord condition) (.word (Dynamic.opcodeFlag truth)) store := by
+  cases truth
+  · exact .ifFalse evaluated .word
+  · exact .ifTrue evaluated .word
 
 /-- Source builtin application determines a concrete evaluation of the actual
 body; no compiler or primitive implementation is placed in the source relation. -/
@@ -1311,6 +1332,27 @@ theorem InputRep.body_meaning {function : BuiltinFunctionId} {arguments : List D
     exact ⟨_, _, .integerMul left right, .integer _, .inRight (.binary (.first (.var rfl)) (.second (.var rfl)) rfl)⟩
   | wordToInteger value =>
     exact ⟨_, _, .wordToInteger value, .integer _, .inRight (.unary (.var rfl) rfl)⟩
+  | @opcodeUnary op unary value =>
+    cases op <;> first
+      | exact absurd unary (by decide)
+      | exact ⟨_, _, .wordOpcode rfl, .word _, .inRight (.unary (.var rfl) rfl)⟩
+      | exact ⟨_, _, .wordOpcode rfl, .word _, .inRight (boolToWord_evaluates (.binary (.var rfl) .word rfl))⟩
+  | @opcodeBinary op binary left right =>
+    cases op <;> first
+      | exact absurd binary (by decide)
+      | exact ⟨_, _, .wordOpcode rfl, .word _,
+          .inRight (.binary (.first (.var rfl)) (.second (.var rfl)) rfl)⟩
+      | exact ⟨_, _, .wordOpcode rfl, .word _,
+          .inRight (.binary (.second (.var rfl)) (.first (.var rfl)) rfl)⟩
+      | exact ⟨_, _, .wordOpcode rfl, .word _,
+          .inRight (boolToWord_evaluates (.binary (.first (.var rfl)) (.second (.var rfl)) rfl))⟩
+      | exact ⟨_, _, .wordOpcode rfl, .word _,
+          .inRight (boolToWord_evaluates (.binary (.second (.var rfl)) (.first (.var rfl)) rfl))⟩
+  | @opcodeTernary op ternary first second third =>
+    cases op <;> first
+      | exact absurd ternary (by decide)
+      | exact ⟨_, _, .wordOpcode rfl, .word _, .inRight (.ternary (.first (.var rfl))
+          (.first (.second (.var rfl))) (.second (.second (.var rfl))) rfl)⟩
 
 /-- A completed actual builtin body reconstructs its independent source result
 and leaves the entire native store unchanged. -/
@@ -1438,7 +1480,16 @@ private theorem types_exclude_mismatch {values : List Dynamic.Value} {types : Li
 theorem InputRep.source_argument_types {function : BuiltinFunctionId} {arguments : List Dynamic.Value} {input : Value}
     (inputs : InputRep function arguments input) :
     ListRel Dynamic.ValueRuntimeType arguments function.parameterTypes := by
-  cases inputs <;> first
+  cases inputs with
+  | @opcodeUnary op unary =>
+    cases op <;> first | exact absurd unary (by decide) | exact .cons (.word _) .nil
+  | @opcodeBinary op binary =>
+    cases op <;> first | exact absurd binary (by decide) | exact .cons (.word _) (.cons (.word _) .nil)
+  | @opcodeTernary op ternary =>
+    cases op <;> first
+      | exact absurd ternary (by decide)
+      | exact .cons (.word _) (.cons (.word _) (.cons (.word _) .nil))
+  | _ => first
     | exact .cons (.integer _) (.cons (.integer _) .nil)
     | exact .cons (.integer _) .nil
     | exact .cons (.word _) .nil
@@ -1451,7 +1502,7 @@ theorem InputRep.excludes_callable_fault {function : BuiltinFunctionId} {argumen
   cases fault with
   | notCallable invalid => exact invalid trivial
   | builtinArity mismatch =>
-    cases inputs <;> exact mismatch rfl
+    cases inputs <;> first | exact mismatch rfl | simp_all [BuiltinFunctionId.parameterTypes]
   | builtinArgumentType _ mismatch => exact types_exclude_mismatch (InputRep.source_argument_types inputs) mismatch
   | builtinFaults fault => cases inputs <;> cases fault
 end Solcore.SourceSemantics.CoreLowering.BuiltinCalls
@@ -1472,16 +1523,21 @@ def argumentTypes : BuiltinFunctionId → List Ty
   | .wordFromInteger => [.integer]
   -- A conversion is no closure; its argument has no integer representation.
   | .fixedFromWord _ | .fixedToWord _ | .wordIdentity => [.integer]
+  | .wordOpcode op => List.replicate op.arity .word
   | _ => [.integer, .integer]
 
 theorem argumentTypes_project {checked : SourceCoreCompatibleCatalog.Checked}
     (function : BuiltinFunctionId) (closure : function.conversion? = none) :
     function.parameterTypes.mapM checked.catalog.project = .ok (argumentTypes function) := by
-  cases function <;> first | rfl | simp [BuiltinFunctionId.conversion?] at closure
+  cases function
+  case wordOpcode op => cases op <;> rfl
+  all_goals first | rfl | simp [BuiltinFunctionId.conversion?] at closure
 
 theorem argumentTypes_pack (function : BuiltinFunctionId) :
     SourceCoreCompatibleCatalog.packTypes (argumentTypes function) = SourceCoreInteger.builtinParameter function := by
-  cases function <;> rfl
+  cases function
+  case wordOpcode op => cases op <;> rfl
+  all_goals rfl
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} {registry : SourceCoreRawMetadata.Registry}
   {ambient : AmbientDefinitions checked.catalog.definitions} {functions : FunctionModel checked.catalog ambient}
@@ -1496,6 +1552,22 @@ theorem input_of_values
       (argumentTypes function)) :
     InputRep function arguments (packValues values) := by
   cases function
+  case wordOpcode op =>
+    cases op <;> cases represented with
+    | cons head tail =>
+      obtain ⟨a, rfl, rfl⟩ := CompatiblePlaceModifier.word_fields observations head
+      first
+      | (cases tail; exact .opcodeUnary rfl a)
+      | cases tail with
+        | cons secondRep rest =>
+          obtain ⟨b, rfl, rfl⟩ := CompatiblePlaceModifier.word_fields observations secondRep
+          first
+          | (cases rest; exact .opcodeBinary rfl a b)
+          | cases rest with
+            | cons thirdRep last =>
+              obtain ⟨c, rfl, rfl⟩ := CompatiblePlaceModifier.word_fields observations thirdRep
+              cases last
+              exact .opcodeTernary rfl a b c
   all_goals cases represented with
   | cons head tail =>
     first
@@ -1528,7 +1600,12 @@ theorem result_represents {function : BuiltinFunctionId} {arguments : List Dynam
     (represented : IntegerPrimitives.ResultRepresents sourceResult nativeResult) :
     ValueRep checked registry functions mapping world function.returnType sourceResult nativeResult
       (SourceCoreInteger.builtinResult function) := by
-  cases inputs <;> cases applied <;> cases represented <;> first
+  cases applied with
+  | wordOpcode applies =>
+    obtain ⟨_, word, _, _, _, rfl⟩ := Dynamic.wordOpcodeValue_inv applies
+    cases represented
+    exact .word _
+  | _ => cases inputs <;> cases represented <;> first
     | exact .integer _
     | exact .bool _
     | exact .word _

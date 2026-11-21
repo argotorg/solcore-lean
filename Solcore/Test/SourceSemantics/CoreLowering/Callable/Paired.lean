@@ -1245,11 +1245,12 @@ private def testNative (site : Callsite) (id : Core.Word) (reason : Option Nat) 
     let result := if failure then Core.Value.inLeft .word (.word (word 72)) else
       match reason with | none => .inRight .word (.word (word 7)) | some reason => .inLeft .word (.word (word reason))
     let store := [Core.Value.word (word (if failure then 11 else trace))]
-    assertTrue (program.runStateful 200 == .done result store)
+    -- An unknown id walks every gate of the callsite's first chain, the 33 builtins' among them.
+    assertTrue (program.runStateful 400 == .done result store)
       "callable adapter changed callee/stage/argument/arity/body order"
     match program.runStateful 12 with
     | .outOfFuel checkpoint =>
-        assertTrue (Core.runStateful 188 checkpoint == .done result store)
+        assertTrue (Core.runStateful 388 checkpoint == .done result store)
           "callable adapter checkpoint changed guards or store"
     | _ => throw (IO.userError "callable adapter must suspend at fuel twelve")
 

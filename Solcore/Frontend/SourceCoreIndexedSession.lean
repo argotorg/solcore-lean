@@ -3084,8 +3084,8 @@ private theorem builtin_factory_shape {compiled : SourceCoreUnifiedCompilation.C
   change actual = function at rowFunction
   subst actual
   have inventory : BuiltinFunctionId.all.zipIdx.find? (fun item => decide (item.1 = function)) =
-      some (function, index) := by
-    cases function <;> simp_all [BuiltinFunctionId.all, List.zipIdx]
+      some (function, index) :=
+    BuiltinFunctionId.find?_zipIdx_of_mem member
   have identityFound : Core.Word.ofNat? (compiled.indexed.base.globals.length + index + 1) = some identity := by
     unfold callableIdentity at number
     split at number

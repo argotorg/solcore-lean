@@ -206,6 +206,7 @@ set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.CallableSpecializationEquality
 open Frontend SourceInference
 
+deriving instance ReflBEq, LawfulBEq for WordOpcode
 deriving instance ReflBEq, LawfulBEq for BuiltinFunctionId
 deriving instance ReflBEq, LawfulBEq for BuiltinTraitId
 deriving instance ReflBEq, LawfulBEq for ProgramTraitId

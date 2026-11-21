@@ -59,6 +59,7 @@ import Solcore.Test.SourceSemantics.CoreLowering.Recursive.NamedExpressions
 import Solcore.Test.SourceSemantics.CoreLowering.Recursive.NamedPublic
 import Solcore.Test.SourceSemantics.Semantics
 import Solcore.Test.SourceSemantics.IntegerBitNot
+import Solcore.Test.SourceSemantics.WordOpcodes
 import Solcore
 import Solcore.Test.TypeSystem.Inference
 import Solcore.Test.SourceSemantics.SemanticsSubstitution
@@ -1387,6 +1388,7 @@ private def coreRuntimeUnificationTests : IO Unit := do
   SourceCoreRecursiveNamedExpressions.run
   SourceCoreProtectedNamedPlaces.run
   SourceSemanticsIntegerBitNot.run
+  Tests.WordOpcodes.run
   SourceCoreCompatiblePlaceKeyTyping.run
   SourceCoreCompatiblePlaceOrder.run
   SourceCoreCompatibleMixedPaths.run

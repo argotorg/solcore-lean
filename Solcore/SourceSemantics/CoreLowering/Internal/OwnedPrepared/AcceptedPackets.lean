@@ -487,7 +487,7 @@ private theorem builtin_native_type {function : Dynamic.BuiltinFunction}
 
 private theorem builtin_native_count (function : BuiltinFunctionId) :
     (CompatibleBuiltinMeaning.argumentTypes function).length = function.parameterTypes.length := by
-  cases function <;> rfl
+  cases function <;> first | rfl | (rename_i op; cases op <;> rfl)
 
 private theorem values_represents
     {functions : FunctionModel compiled.compatible.checked.catalog

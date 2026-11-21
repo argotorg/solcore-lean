@@ -693,7 +693,7 @@ theorem applied {program : Program} {stages : Staging.Recursive.Registry} {invoc
       simp only [BuiltinFunctionId.conversion?, Option.some.injEq] at conversion
       subst conversion
       exact .representation canonical
-    | wordToInteger => simp [BuiltinFunctionId.conversion?] at conversion
+    | wordToInteger | wordOpcode _ => simp [BuiltinFunctionId.conversion?] at conversion
   | builtinArity mismatch =>
     have count := congrArg List.length shape
     simp at count

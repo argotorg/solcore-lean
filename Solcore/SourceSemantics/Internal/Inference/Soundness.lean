@@ -22140,7 +22140,7 @@ theorem recordBuiltinFunctionCall_success_expressionTypingBase
       function := by
     refine .intro (name := name) finalCalleeContains ?_ ?_ ?_ ?_
     · rfl
-    · cases function <;> rfl
+    · cases function <;> first | rfl | (rename_i op; cases op <;> rfl)
     · rfl
     · rfl
   have argumentTypesEq :=

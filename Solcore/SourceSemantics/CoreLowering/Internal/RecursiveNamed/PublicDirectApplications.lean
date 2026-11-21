@@ -675,7 +675,7 @@ theorem reflects_packed_at_arity {invocation : Staging.Recursive.Scope}
   obtain ⟨sources, values, nativeTypesRow, rows, packing, packedEq, packedType⟩ :=
     RecursivePublicPackedArguments.values function.parameterTypes packed
   have expectedLength : function.parameterTypes.length = (CompatibleBuiltinMeaning.argumentTypes function).length := by
-    cases function <;> rfl
+    cases function <;> first | rfl | (rename_i op; cases op <;> rfl)
   have nativeRow : nativeTypesRow = CompatibleBuiltinMeaning.argumentTypes function :=
     CallableIndexedOwnedStoredArgumentAlignment.native_rows_of_bundle
       (rows.length.2.2.symm.trans expectedLength)
@@ -741,7 +741,7 @@ theorem preserves_packed {invocation : Staging.Recursive.Scope} {tail : Environm
   obtain ⟨decodedSources, values, nativeTypesRow, rows, decodedPacking, packedEq, packedType⟩ :=
     RecursivePublicPackedArguments.values function.parameterTypes packed
   have expectedLength : function.parameterTypes.length = (CompatibleBuiltinMeaning.argumentTypes function).length := by
-    cases function <;> rfl
+    cases function <;> first | rfl | (rename_i op; cases op <;> rfl)
   have nativeRow : nativeTypesRow = CompatibleBuiltinMeaning.argumentTypes function :=
     CallableIndexedOwnedStoredArgumentAlignment.native_rows_of_bundle
       (rows.length.2.2.symm.trans expectedLength)

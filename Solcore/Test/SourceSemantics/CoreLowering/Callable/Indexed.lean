@@ -650,7 +650,9 @@ def run : IO Unit := do
           observed := (function, value, other) :: observed
         | _ => pure ()
       | _ => pure ()
-  SourceCompilerFeatureSupport.require (observed.length == BuiltinFunctionId.all.length) "builtin fixture missed an accepted branch"
+  -- The fixture names each builtin by its bare name; an opcode has none.
+  SourceCompilerFeatureSupport.require (observed.length == (BuiltinFunctionId.all.filter (·.opcode?.isNone)).length)
+    "builtin fixture missed an accepted branch"
   for (left, a, _) in observed do
     for (right, b, _) in observed do
       if SourceCoreInteger.builtinParameter left == SourceCoreInteger.builtinParameter right &&

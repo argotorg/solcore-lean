@@ -493,7 +493,7 @@ private theorem prefixed_typed {definitions : DataEnvironment} {world : StoreTyp
 
 private theorem contracted_rename (function : BuiltinFunctionId) (identity contract : Word) (ξ : Renaming) :
     (contracted function identity contract).rename ξ = contracted function identity contract := by
-  cases function <;> rfl
+  cases function <;> first | rfl | (rename_i op; cases op <;> rfl)
 
 private theorem call_rename (function : BuiltinFunctionId) (identity contract unknown : Word)
     (arguments : Expr) (ξ : Renaming) :
@@ -734,7 +734,7 @@ private theorem native_type {function : Dynamic.BuiltinFunction} {carrier : Valu
 
 private theorem native_count (function : BuiltinFunctionId) :
     (CompatibleBuiltinMeaning.argumentTypes function).length = function.parameterTypes.length := by
-  cases function <;> rfl
+  cases function <;> first | rfl | (rename_i op; cases op <;> rfl)
 
 private theorem values_represents
     {functions : FunctionModel compiled.compatible.checked.catalog

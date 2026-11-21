@@ -36,10 +36,11 @@ def spelling : BuiltinFunctionId → String
   | .fixedFromWord type => type.name
   | .fixedToWord _ => "Typedef.rep"
   | .wordIdentity => "Typedef"
+  | .wordOpcode op => "std.opcodes." ++ op.name
 
 /-- Exact compiler-function spellings remain pairwise distinct. -/
 theorem all_spellings_nodup : (all.map spelling).Nodup := by
-  simp [all, spelling]
+  simp [all, spelling, WordOpcode.all, WordOpcode.name]
 
 /-- Fixed source parameter types of one compiler-provided function. -/
 def parameterTypes : BuiltinFunctionId → List TypeSystem.Ty
@@ -53,6 +54,7 @@ def parameterTypes : BuiltinFunctionId → List TypeSystem.Ty
   | .fixedFromWord _ => [TypeSystem.Ty.word]
   | .fixedToWord type => [TypeSystem.Ty.fixed type]
   | .wordIdentity => [TypeSystem.Ty.word]
+  | .wordOpcode op => List.replicate op.arity TypeSystem.Ty.word
 
 /-- Fixed source result type of one compiler-provided function. -/
 def returnType : BuiltinFunctionId → TypeSystem.Ty
@@ -64,7 +66,7 @@ def returnType : BuiltinFunctionId → TypeSystem.Ty
   | .integerMul => TypeSystem.Ty.integer
   | .wordToInteger => TypeSystem.Ty.integer
   | .fixedFromWord type => TypeSystem.Ty.fixed type
-  | .fixedToWord _ | .wordIdentity => TypeSystem.Ty.word
+  | .fixedToWord _ | .wordIdentity | .wordOpcode _ => TypeSystem.Ty.word
 
 /-- Exact monomorphic function type of one compiler-provided function. -/
 def type (function : BuiltinFunctionId) : TypeSystem.Ty :=
@@ -78,9 +80,11 @@ def scheme (function : BuiltinFunctionId) : TypeSystem.Scheme :=
 end BuiltinFunctionId
 
 /-- Resolve the deliberately small exact bare compiler-function namespace: the
-closures by their spelling, then the conversions by their type's name. -/
+closures by their spelling, then the conversions by their type's name. An
+opcode has no bare name. -/
 def builtinFunctionNamed? (name : String) : Option BuiltinFunctionId :=
-  match BuiltinFunctionId.all.find? fun function => function.spelling == name with
+  match BuiltinFunctionId.all.find? fun function =>
+      function.opcode?.isNone && function.spelling == name with
   | some function => some function
   | none => (TypeSystem.FixedInteger.ofName? name).map .fixedFromWord
 

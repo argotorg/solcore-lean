@@ -805,7 +805,7 @@ theorem recordBuiltinFunctionCall_expressionTypingBase_actual
       function := by
     refine .intro (name := name) finalCalleeContains ?_ ?_ ?_ ?_
     · rfl
-    · cases function <;> rfl
+    · cases function <;> first | rfl | (rename_i op; cases op <;> rfl)
     · rfl
     · rfl
   have argumentTypesEq :=
@@ -828,7 +828,7 @@ theorem recordBuiltinFunctionCall_expressionTypingBase_actual
   have finalTypeEq : substitution.apply recorded.1.type =
       function.returnType := by
     rw [resultTypeEq]
-    cases function <;> rfl
+    cases function <;> first | rfl | (rename_i op; cases op <;> rfl)
   refine .intro rawCallContains rfl formType rawAdmissible ?_
   apply ExpressionRequirementPlan.Valid.ordinary
   · simp [RequirementIdsValid]

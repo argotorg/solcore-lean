@@ -1405,7 +1405,7 @@ private def testBuiltinCatalog : IO Unit := do
     .integerMul,
     .wordToInteger
   ]
-  assertTrue (decide (BuiltinFunctionId.all = expected) &&
+  assertTrue (decide (BuiltinFunctionId.all = expected ++ WordOpcode.all.map .wordOpcode) &&
       decide expected.Nodup &&
       decide (expected.map BuiltinFunctionId.spelling).Nodup)
     "builtin function catalog changed order or retained duplicates"
@@ -2753,7 +2753,7 @@ private def mismatchedBuiltin : BuiltinFunctionId → BuiltinFunctionId
   | .wordToInteger => .wordFromInteger
   | .integerSub => .integerAdd
   | .wordFromInteger => .integerAdd
-  | .fixedFromWord _ | .fixedToWord _ | .wordIdentity => .wordToInteger
+  | .fixedFromWord _ | .fixedToWord _ | .wordIdentity | .wordOpcode _ => .wordToInteger
 
 private def testExpandedBinaryBaseline (fixture : BinaryFixture) : IO Unit := do
   let leftRequirement := fixture.leftResolution.requirement

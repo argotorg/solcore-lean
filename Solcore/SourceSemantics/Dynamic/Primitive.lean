@@ -1101,6 +1101,88 @@ theorem word_meaning_logicalNot (operandType : Option TypeSystem.Ty) :
 
 end UnaryValueApplies
 
+/-- A comparison opcode's word: 1 when it holds and 0 otherwise, as EVM gives it. -/
+def opcodeFlag : Bool → Core.Word
+  | true => Core.Word.ofNatModulo 1
+  | false => Core.Word.zero
+
+/-- One of `std.opcodes`' pure functions on its words, in EVM's operand order,
+through `Core.Word`'s function for the opcode: `shl`, `shr` and `sar` take the
+shift first, as EVM does, and a comparison gives the word 1 or 0. None at
+another number of words. -/
+def _root_.Solcore.Frontend.WordOpcode.apply : WordOpcode → List Core.Word → Option Core.Word
+  | .add, [a, b] => some (a.add b)
+  | .mul, [a, b] => some (a.mul b)
+  | .sub, [a, b] => some (a.sub b)
+  | .div, [a, b] => some (a.udiv b)
+  | .sdiv, [a, b] => some (a.sdiv b)
+  | .mod, [a, b] => some (a.umod b)
+  | .smod, [a, b] => some (a.smod b)
+  | .addmod, [a, b, n] => some (a.addMod b n)
+  | .mulmod, [a, b, n] => some (a.mulMod b n)
+  | .exp, [a, b] => some (a.pow b)
+  | .signextend, [i, x] => some (i.signExtend x)
+  | .lt, [a, b] => some (opcodeFlag (decide (b > a)))
+  | .gt, [a, b] => some (opcodeFlag (decide (a > b)))
+  | .slt, [a, b] => some (opcodeFlag (b.signedGt a))
+  | .sgt, [a, b] => some (opcodeFlag (a.signedGt b))
+  | .eq, [a, b] => some (opcodeFlag (a == b))
+  | .iszero, [a] => some (opcodeFlag (a == Core.Word.zero))
+  | .and, [a, b] => some (a.bitAnd b)
+  | .or, [a, b] => some (a.bitOr b)
+  | .xor, [a, b] => some (a.bitXor b)
+  | .not, [a] => some a.bitNot
+  | .byte, [i, x] => some (i.byteAt x)
+  | .shl, [shift, x] => some (x.shiftLeft shift)
+  | .shr, [shift, x] => some (x.shiftRight shift)
+  | .sar, [shift, x] => some (x.shiftArithmeticRight shift)
+  | .clz, [a] => some a.clz
+  | _, _ => none
+
+/-- An opcode applies to as many words as it takes. -/
+theorem _root_.Solcore.Frontend.WordOpcode.apply_length {op : WordOpcode} {words : List Core.Word}
+    {result : Core.Word} (applied : op.apply words = some result) : words.length = op.arity := by
+  unfold WordOpcode.apply at applied
+  split at applied <;> first | rfl | cases applied
+
+/-- The words of a list of source values, when each is a word. -/
+def opcodeWords : List Value → Option (List Core.Word)
+  | [] => some []
+  | .word word :: rest => (opcodeWords rest).map (word :: ·)
+  | _ :: _ => none
+
+theorem opcodeWords_words (words : List Core.Word) : opcodeWords (words.map .word) = some words := by
+  induction words with
+  | nil => rfl
+  | cons word rest ih => simp [opcodeWords, ih]
+
+theorem opcodeWords_sound {arguments : List Value} {words : List Core.Word}
+    (found : opcodeWords arguments = some words) : arguments = words.map .word := by
+  induction arguments generalizing words with
+  | nil => cases found; rfl
+  | cons argument rest ih =>
+    cases argument <;> simp only [opcodeWords, Option.map_eq_some_iff, reduceCtorEq] at found
+    obtain ⟨tail, tailFound, rfl⟩ := found
+    simp [ih tailFound]
+
+/-- An opcode on source values: its word on words, and nothing otherwise. -/
+def wordOpcodeValue (op : WordOpcode) (arguments : List Value) : Option Value :=
+  (opcodeWords arguments).bind fun words => (op.apply words).map .word
+
+/-- An opcode's arguments are as many words as it takes, and its result is a word. -/
+theorem wordOpcodeValue_inv {op : WordOpcode} {arguments : List Value} {result : Value}
+    (applies : wordOpcodeValue op arguments = some result) :
+    ∃ words word, arguments = words.map .word ∧ words.length = op.arity ∧
+      op.apply words = some word ∧ result = .word word := by
+  simp only [wordOpcodeValue, Option.bind_eq_some_iff, Option.map_eq_some_iff] at applies
+  obtain ⟨words, found, word, applied, rfl⟩ := applies
+  exact ⟨words, word, opcodeWords_sound found, WordOpcode.apply_length applied, applied, rfl⟩
+
+/-- An opcode on words is its word on them. -/
+theorem wordOpcodeValue_words {op : WordOpcode} {words : List Core.Word} {word : Core.Word}
+    (applied : op.apply words = some word) : wordOpcodeValue op (words.map .word) = some (.word word) := by
+  simp [wordOpcodeValue, opcodeWords_words, applied]
+
 /-- Application of one compiler-provided source function. -/
 inductive BuiltinApplies : BuiltinFunctionId → List Value → Value → Prop where
   | integerSub (left right : Int) :
@@ -1135,6 +1217,10 @@ inductive BuiltinApplies : BuiltinFunctionId → List Value → Value → Prop w
   /-- `Typedef.abs` and `Typedef.rep` at `word`. -/
   | wordIdentity (value : Core.Word) :
       BuiltinApplies .wordIdentity [.word value] (.word value)
+  /-- One of `std.opcodes`' pure functions on its words (`WordOpcode.apply`). -/
+  | wordOpcode {op : WordOpcode} {arguments : List Value} {result : Value}
+      (applies : wordOpcodeValue op arguments = some result) :
+      BuiltinApplies (.wordOpcode op) arguments result
 
 /-- The failure of one compiler-provided source function: a conversion of a
 word that is not canonical for its type. -/
@@ -1174,13 +1260,21 @@ theorem functional
     (leftApplication : BuiltinApplies function arguments left)
     (rightApplication : BuiltinApplies function arguments right) :
     left = right := by
-  cases leftApplication <;> cases rightApplication <;> rfl
+  cases leftApplication with
+  | wordOpcode leftApplies =>
+    cases rightApplication with
+    | wordOpcode rightApplies => exact Option.some.inj (leftApplies.symm.trans rightApplies)
+  | _ => cases rightApplication <;> rfl
 
 theorem argument_count
     {function : BuiltinFunctionId} {arguments : List Value} {result : Value}
     (application : BuiltinApplies function arguments result) :
     arguments.length = function.parameterTypes.length := by
-  cases application <;> rfl
+  cases application with
+  | wordOpcode applies =>
+    obtain ⟨words, _, rfl, length, _⟩ := wordOpcodeValue_inv applies
+    simp [BuiltinFunctionId.parameterTypes, length]
+  | _ => rfl
 
 end BuiltinApplies
 

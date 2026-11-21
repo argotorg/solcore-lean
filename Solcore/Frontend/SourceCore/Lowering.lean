@@ -2583,15 +2583,57 @@ theorem binary_hasType {definitions : Core.DataEnvironment} {scope : Core.Contex
     | exact Core.LocalPrimitiveResults.binaryWith_hasType (by constructor) leftTyped rightTyped
         (strictBinaryBody_hasType _)
 
+/-- The packed type of an opcode's words, as `packArguments` packs them: one
+word, a pair, or a word and a pair. -/
+def opcodeParameter (op : WordOpcode) : Core.Ty :=
+  match op.arity with
+  | 1 => .word
+  | 2 => .product .word .word
+  | _ => .product .word (.product .word .word)
+
+/-- An opcode's closure body over its packed words at `.var 0`: its Core
+primitive, `shl`, `shr` and `sar` taking Core's operands in Core's order, the
+value first, and a comparison giving its truth as the word 1 or 0. -/
+def opcodeBody : WordOpcode → Core.Expr
+  | .add => .binary .wordAdd (.first (.var 0)) (.second (.var 0))
+  | .mul => .binary .wordMul (.first (.var 0)) (.second (.var 0))
+  | .sub => .binary .wordSub (.first (.var 0)) (.second (.var 0))
+  | .div => .binary .wordDiv (.first (.var 0)) (.second (.var 0))
+  | .sdiv => .binary .wordSdiv (.first (.var 0)) (.second (.var 0))
+  | .mod => .binary .wordMod (.first (.var 0)) (.second (.var 0))
+  | .smod => .binary .wordSmod (.first (.var 0)) (.second (.var 0))
+  | .addmod => .ternary .wordAddMod (.first (.var 0)) (.first (.second (.var 0)))
+      (.second (.second (.var 0)))
+  | .mulmod => .ternary .wordMulMod (.first (.var 0)) (.first (.second (.var 0)))
+      (.second (.second (.var 0)))
+  | .exp => .binary .wordPow (.first (.var 0)) (.second (.var 0))
+  | .signextend => .binary .wordSignExtend (.first (.var 0)) (.second (.var 0))
+  | .lt => Core.Expr.boolToWord (.binary .wordGt (.second (.var 0)) (.first (.var 0)))
+  | .gt => Core.Expr.boolToWord (.binary .wordGt (.first (.var 0)) (.second (.var 0)))
+  | .slt => Core.Expr.boolToWord (.binary .wordSgt (.second (.var 0)) (.first (.var 0)))
+  | .sgt => Core.Expr.boolToWord (.binary .wordSgt (.first (.var 0)) (.second (.var 0)))
+  | .eq => Core.Expr.boolToWord (.binary .wordEq (.first (.var 0)) (.second (.var 0)))
+  | .iszero => Core.Expr.boolToWord (.binary .wordEq (.var 0) (.word Core.Word.zero))
+  | .and => .binary .wordAnd (.first (.var 0)) (.second (.var 0))
+  | .or => .binary .wordOr (.first (.var 0)) (.second (.var 0))
+  | .xor => .binary .wordXor (.first (.var 0)) (.second (.var 0))
+  | .not => .unary .wordNot (.var 0)
+  | .byte => .binary .wordByte (.first (.var 0)) (.second (.var 0))
+  | .shl => .binary .wordShl (.second (.var 0)) (.first (.var 0))
+  | .shr => .binary .wordShr (.second (.var 0)) (.first (.var 0))
+  | .sar => .binary .wordSar (.second (.var 0)) (.first (.var 0))
+  | .clz => .unary .wordClz (.var 0)
+
 def builtinParameter : BuiltinFunctionId → Core.Ty
   | .wordToInteger => .word
   | .wordFromInteger => .integer
   -- Unused: a conversion is lowered where it is called, never as a closure.
   | .fixedFromWord _ | .fixedToWord _ | .wordIdentity => .integer
+  | .wordOpcode op => opcodeParameter op
   | _ => .product .integer .integer
 
 def builtinResult : BuiltinFunctionId → Core.Ty
-  | .wordFromInteger => .word
+  | .wordFromInteger | .wordOpcode _ => .word
   | .integerEq | .integerLt => .bool
   | _ => .integer
 
@@ -2605,6 +2647,7 @@ def builtinBody : BuiltinFunctionId → Core.Expr
   | .wordToInteger => .unary .wordToInteger (.var 0)
   -- Unused: a conversion is lowered where it is called (`builtinConversion`), never as a closure.
   | .fixedFromWord _ | .fixedToWord _ | .wordIdentity => .var 0
+  | .wordOpcode op => opcodeBody op
 
 def builtinClosure (function : BuiltinFunctionId) : Core.Expr :=
   .lambda (builtinParameter function) (Core.LanguageResult.resultType (builtinResult function))
@@ -2641,7 +2684,20 @@ def builtinConversion : TypeSystem.Ty → Core.Expr → Core.Expr
 theorem builtinClosure_hasType {definitions : Core.DataEnvironment} {scope : Core.Context}
     (function : BuiltinFunctionId) : Core.HasType scope (builtinClosure function)
       (.function (builtinParameter function) (Core.LanguageResult.resultType (builtinResult function))) definitions := by
-  cases function <;>
+  cases function
+  case wordOpcode op =>
+    cases op <;>
+      apply Core.HasType.lambda (by repeat constructor) (by repeat constructor) <;>
+        apply Core.LanguageResult.success_hasType <;> first
+          | exact .binary (.first (.var rfl)) (.second (.var rfl))
+          | exact .binary (.second (.var rfl)) (.first (.var rfl))
+          | exact .unary (.var rfl)
+          | exact .ternary (.first (.var rfl)) (.first (.second (.var rfl)))
+              (.second (.second (.var rfl)))
+          | exact .ifE (.binary (.first (.var rfl)) (.second (.var rfl))) .word .word
+          | exact .ifE (.binary (.second (.var rfl)) (.first (.var rfl))) .word .word
+          | exact .ifE (.binary (.var rfl) .word) .word .word
+  all_goals
     apply Core.HasType.lambda (by repeat constructor) (by repeat constructor) <;>
       apply Core.LanguageResult.success_hasType <;> first
         | exact .binary (.first (.var rfl)) (.second (.var rfl))

@@ -1302,7 +1302,7 @@ private theorem contracted_typed {definitions : DataEnvironment} {world : StoreT
 
 private theorem contracted_rename (function : BuiltinFunctionId) (identity contract : Word) (ξ : Renaming) :
     (Protocol.contracted function identity contract).rename ξ = Protocol.contracted function identity contract := by
-  cases function <;> rfl
+  cases function <;> first | rfl | (rename_i op; cases op <;> rfl)
 
 private theorem call_rename (function : BuiltinFunctionId) (identity contract unknown : Word)
     (arguments : Expr) (ξ : Renaming) :

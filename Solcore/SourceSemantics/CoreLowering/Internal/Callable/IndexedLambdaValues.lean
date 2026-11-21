@@ -442,6 +442,12 @@ private theorem projected {catalog : SourceCoreCompatibleCatalog.Catalog}
       (CallableContract.functionType (SourceCoreInteger.builtinParameter function) (SourceCoreInteger.builtinResult function)) := by
   cases function
   case fixedFromWord | fixedToWord | wordIdentity => simp [BuiltinFunctionId.conversion?] at closure
+  case wordOpcode op =>
+    cases op <;> simp [BuiltinFunctionId.type, BuiltinFunctionId.parameterTypes,
+      BuiltinFunctionId.returnType, WordOpcode.arity, List.replicate, TypeSystem.Ty.productMany,
+      TypeSystem.Ty.word, SourceCoreCompatibleCatalog.Catalog.project,
+      SourceCoreCompatibleCatalog.Catalog.functionType, profile, SourceCoreInteger.builtinParameter,
+      SourceCoreInteger.builtinResult, SourceCoreInteger.opcodeParameter]
   all_goals simp [BuiltinFunctionId.type, BuiltinFunctionId.parameterTypes, BuiltinFunctionId.returnType,
     TypeSystem.Ty.productMany, TypeSystem.Ty.integer, TypeSystem.Ty.word, TypeSystem.Ty.bool, SourceCoreCompatibleCatalog.Catalog.project, SourceCoreCompatibleCatalog.Catalog.functionType,
     profile, SourceCoreInteger.builtinParameter, SourceCoreInteger.builtinResult]

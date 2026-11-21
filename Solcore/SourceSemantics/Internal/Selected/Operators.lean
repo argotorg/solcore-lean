@@ -303,7 +303,9 @@ theorem
       allocationEq lookupEq notBoolean functionsEq builtinEq success
   have fixedType : finalized.substitution.apply function.type =
       function.type := by
-    cases function <;>
+    cases function
+    case wordOpcode op => cases op <;> rfl
+    all_goals
       simp [BuiltinFunctionId.type, BuiltinFunctionId.parameterTypes,
         BuiltinFunctionId.returnType, Ty.productMany]
   have formType : ExpressionFormHasRawType semanticSource active

@@ -630,6 +630,43 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend
 
+/-- The 26 pure word functions of upstream's `std.opcodes`, each one EVM opcode
+on words, in the opcodes' order. -/
+inductive WordOpcode where
+  | add | mul | sub | div | sdiv | mod | smod | addmod | mulmod | exp | signextend
+  | lt | gt | slt | sgt | eq | iszero | and | or | xor | not | byte | shl | shr | sar | clz
+  deriving Repr, BEq, DecidableEq
+
+namespace WordOpcode
+
+/-- The opcodes in their order. -/
+def all : List WordOpcode :=
+  [.add, .mul, .sub, .div, .sdiv, .mod, .smod, .addmod, .mulmod, .exp, .signextend,
+    .lt, .gt, .slt, .sgt, .eq, .iszero, .and, .or, .xor, .not, .byte, .shl, .shr, .sar, .clz]
+
+/-- The opcode's name, as `std.opcodes` exports it. -/
+def name : WordOpcode → String
+  | .add => "add" | .mul => "mul" | .sub => "sub" | .div => "div" | .sdiv => "sdiv"
+  | .mod => "mod" | .smod => "smod" | .addmod => "addmod" | .mulmod => "mulmod"
+  | .exp => "exp" | .signextend => "signextend" | .lt => "lt" | .gt => "gt"
+  | .slt => "slt" | .sgt => "sgt" | .eq => "eq" | .iszero => "iszero" | .and => "and"
+  | .or => "or" | .xor => "xor" | .not => "not" | .byte => "byte" | .shl => "shl"
+  | .shr => "shr" | .sar => "sar" | .clz => "clz"
+
+/-- The number of words the opcode takes. -/
+def arity : WordOpcode → Nat
+  | .iszero | .not | .clz => 1
+  | .addmod | .mulmod => 3
+  | _ => 2
+
+theorem all_complete (op : WordOpcode) : op ∈ all := by
+  cases op <;> simp [all]
+
+theorem all_nodup : all.Nodup := by
+  decide
+
+end WordOpcode
+
 /-- Compiler-provided functions that do not have source declaration identities. -/
 inductive BuiltinFunctionId where
   | integerSub
@@ -651,17 +688,25 @@ inductive BuiltinFunctionId where
   upstream's `default impl<t> Typedef<t, t>` gives it. A conversion, so not in
   `all`. -/
   | wordIdentity
+  /-- One of upstream's `std.opcodes` pure word functions: a closure over its
+  Core primitive. It has no bare spelling; only `std.opcodes` would name it. -/
+  | wordOpcode (op : WordOpcode)
   deriving Repr, BEq, DecidableEq
 
 namespace BuiltinFunctionId
 
 /-- Compiler functions implemented by the current frontend as closures, in
-stable append-only introduction order. Name lookup derives from this list and
-from the twelve types' names, so extending the identity type cannot silently
-leave a separate hand-written lookup chain stale. -/
+stable append-only introduction order, the opcodes last. Name lookup derives
+from this list and from the twelve types' names, so extending the identity
+type cannot silently leave a separate hand-written lookup chain stale. -/
 def all : List BuiltinFunctionId :=
   [.integerSub, .wordFromInteger, .integerAdd, .integerEq, .integerLt,
-    .integerMul, .wordToInteger]
+    .integerMul, .wordToInteger] ++ WordOpcode.all.map .wordOpcode
+
+/-- The opcode a closure applies, if it is one. -/
+def opcode? : BuiltinFunctionId → Option WordOpcode
+  | .wordOpcode op => some op
+  | _ => none
 
 /-- The type a conversion gives, or none for a closure. A conversion is
 lowered where it is called: the word checked against the type at a fixed-width
@@ -675,22 +720,40 @@ def conversion? : BuiltinFunctionId → Option TypeSystem.Ty
 conversion. -/
 theorem all_complete (function : BuiltinFunctionId) :
     function ∈ all ∨ ∃ type, function.conversion? = some type := by
-  cases function <;> simp [all, conversion?]
+  cases function <;> simp [all, conversion?, WordOpcode.all_complete]
 
 /-- The catalog's closures are no conversions. -/
 theorem conversion?_of_mem {function : BuiltinFunctionId} (member : function ∈ all) :
     function.conversion? = none := by
-  cases function <;> simp_all [all, conversion?]
+  cases function <;> first | rfl | simp_all [all]
 
 /-- A function found in the catalog's numbering is no conversion. -/
 theorem conversion?_of_inventory {function : BuiltinFunctionId} {index : Nat}
     (inventory : all.zipIdx.find? (fun item => decide (item.1 = function)) = some (function, index)) :
-    function.conversion? = none := by
-  cases function <;> simp_all [all, conversion?]
+    function.conversion? = none :=
+  conversion?_of_mem (List.mem_of_find?_eq_some inventory |> List.fst_mem_of_mem_zipIdx)
 
 /-- The append-only compiler-function catalog contains no repeated identity. -/
 theorem all_nodup : all.Nodup := by
-  simp [all]
+  decide
+
+/-- The catalog's numbering finds each of its closures at its own index. -/
+theorem find?_zipIdx_of_mem {function : BuiltinFunctionId} {index : Nat}
+    (member : (function, index) ∈ all.zipIdx) :
+    all.zipIdx.find? (fun item => decide (item.1 = function)) = some (function, index) := by
+  cases found : all.zipIdx.find? (fun item => decide (item.1 = function)) with
+  | none =>
+    rw [List.find?_eq_none] at found
+    exact absurd (by simp) (found _ member)
+  | some item =>
+    obtain ⟨actual, other⟩ := item
+    have same : actual = function := by simpa using List.find?_some found
+    subst same
+    have first := List.mk_mem_zipIdx_iff_getElem?.mp (List.mem_of_find?_eq_some found)
+    have second := List.mk_mem_zipIdx_iff_getElem?.mp member
+    have equal := (List.getElem?_inj (List.getElem?_eq_some_iff.mp first).1 all_nodup).mp
+      (first.trans second.symm)
+    rw [equal]
 
 end BuiltinFunctionId
 

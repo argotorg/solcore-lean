@@ -875,6 +875,12 @@ end ShortCircuits
 
 namespace BuiltinApplies
 
+private theorem words_have_types {context : Context} {heap : Heap} (words : List Core.Word) :
+    ValuesHaveTypes context heap (words.map .word) (List.replicate words.length .word) := by
+  induction words with
+  | nil => exact .nil
+  | cons word rest ih => exact .cons (.word _) ih
+
 theorem preserves
     {context : Context} {heap : Heap} {function : BuiltinFunctionId}
     {arguments : List Value} {result : Value}
@@ -884,6 +890,11 @@ theorem preserves
   cases application with
   | fixedFromWord canonical => exact ⟨.cons (.word _) .nil, .fixed _ canonical⟩
   | fixedToWord canonical => exact ⟨.cons (.fixed _ canonical) .nil, .word _⟩
+  | wordOpcode applies =>
+    obtain ⟨words, word, rfl, length, _, rfl⟩ := wordOpcodeValue_inv applies
+    refine ⟨?_, .word _⟩
+    simp only [BuiltinFunctionId.parameterTypes, ← length]
+    exact words_have_types words
   | _ =>
     constructor <;>
     repeat' first | exact .nil | apply ValuesHaveTypes.cons | constructor

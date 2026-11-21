@@ -194,6 +194,12 @@ theorem apply_productMany (substitution : ParameterSubstitution)
           rw [induction]
           rfl
 
+/-- Substitution fixes every builtin's parameter types: they are closed. -/
+theorem map_apply_builtinParameterTypes (substitution : ParameterSubstitution)
+    (function : BuiltinFunctionId) :
+    function.parameterTypes.map substitution.apply = function.parameterTypes := by
+  cases function <;> simp [BuiltinFunctionId.parameterTypes]
+
 theorem apply_applyMany (substitution : ParameterSubstitution)
     (head : Ty) (arguments : List Ty) :
     substitution.apply (Ty.applyMany head arguments) =
@@ -3364,7 +3370,8 @@ theorem ReferenceHasRawType.applyParameters
   | builtinFunction function =>
       cases function <;> simp [applyReferenceResolution,
         BuiltinFunctionId.type, BuiltinFunctionId.parameterTypes,
-        BuiltinFunctionId.returnType] <;> exact .builtinFunction _
+        BuiltinFunctionId.returnType, StructuralSubstitution.apply_productMany] <;>
+        exact .builtinFunction _
   | builtinBoolean value =>
       simpa [applyReferenceResolution] using
         (ReferenceHasRawType.builtinBoolean
@@ -3711,7 +3718,8 @@ theorem DirectBuiltinCalleeValid.applyParameters
       rw [hType]
       unfold BuiltinFunctionId.type
       rw [StructuralSubstitution.apply_function,
-        StructuralSubstitution.apply_productMany]
+        StructuralSubstitution.apply_productMany,
+        StructuralSubstitution.map_apply_builtinParameterTypes]
       cases function <;> rfl
 
 theorem DirectCallRequirementsValid.applyParameters
@@ -4530,7 +4538,8 @@ theorem ReferenceUseValid.applyParameters
   | builtinFunction function =>
       cases function <;> simp [applyReferenceResolution,
         BuiltinFunctionId.type, BuiltinFunctionId.parameterTypes,
-        BuiltinFunctionId.returnType] <;> exact .builtinFunction _
+        BuiltinFunctionId.returnType, StructuralSubstitution.apply_productMany] <;>
+        exact .builtinFunction _
   | builtinBoolean value =>
       simpa [applyReferenceResolution] using
         (ReferenceUseValid.builtinBoolean
@@ -5171,6 +5180,7 @@ theorem StatementsHaveType.applyParameters
       StructuralSubstitution.DirectBuiltinCalleeValid.applyParameters
         (substitution := substitution) calleeValid
     have argumentsAfter := argumentsInduction catalog contextValid
+    rw [StructuralSubstitution.map_apply_builtinParameterTypes] at argumentsAfter
     cases function <;>
       simpa [BuiltinFunctionId.parameterTypes, BuiltinFunctionId.returnType,
         applyExpressionForm, applyExpressionRequirementPlan,
@@ -6678,6 +6688,12 @@ structure ContextSubstitutionValid (substitution : Substitution)
     substitution.apply (.function parameter result) =
       .function (substitution.apply parameter)
         (substitution.apply result) := rfl
+
+/-- Substitution fixes every builtin's parameter types: they are closed. -/
+theorem map_apply_builtinParameterTypes (substitution : Substitution)
+    (function : BuiltinFunctionId) :
+    function.parameterTypes.map substitution.apply = function.parameterTypes := by
+  cases function <;> simp [BuiltinFunctionId.parameterTypes]
 
 @[simp] theorem apply_product (substitution : Substitution)
     (left right : Ty) :
@@ -11784,7 +11800,7 @@ theorem DirectBuiltinCalleeValid.applySubstitution
       change substitution.apply node.type = function.type
       rw [typeEq]
       unfold BuiltinFunctionId.type
-      rw [apply_function, apply_productMany]
+      rw [apply_function, apply_productMany, map_apply_builtinParameterTypes]
       cases function <;> rfl
 
 /-- Flexible substitution preserves the semantic split between selected-result
@@ -12606,6 +12622,7 @@ theorem StatementsHaveType.applySubstitution
       DirectBuiltinCalleeValid.applySubstitution
         (substitution := substitution) calleeValid
     have argumentsAfter := argumentsInduction targetContext catalog contextValid
+    rw [map_apply_builtinParameterTypes] at argumentsAfter
     cases function <;>
       simpa [BuiltinFunctionId.parameterTypes, BuiltinFunctionId.returnType,
         ExpressionForm.applySubstitution, applyExpressionRequirementPlan,
