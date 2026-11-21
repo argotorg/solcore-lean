@@ -1980,16 +1980,17 @@ recorded step agreed on all four paths and met its recorded expectation. Known f
 
 `scripts/semantic-native.py` takes the pure runner's own cases, the fixed corpora or a draw seeded
 as `semantic-suite.py` seeds it (`--mode random --seed N`), and runs each admitted case through
-`semantic-native-tool`. The case's source is lifted out of its contract by `native-lift-v1`, a Word
-entry for its method is appended, and the program is compiled once and run once per input. The
-path is opt-in: no suite or CI job runs it, and the fuzz driver runs it only with
+`semantic-native-tool`. The case's source is lifted out of its contract by `native-lift-v2`, which
+keeps its imports of `std.opcodes` and drops std's other imports, a Word entry for its method is
+appended, and the program is compiled once and run once per input. The path is opt-in: no suite
+or CI job runs it, and the fuzz driver runs it only with
 `--backend native` ([continuous fuzzing](SEMANTIC_CI.md#continuous-fuzzing)).
 
-- **Admission** (`native-admission-v3`) is decided from the case alone, before any native run: its
-  emitter, the Core operations of its program, its plan's integer types, and the adapter's reading
-  of the source, which must be one contract with functions only, no storage field and `uint256`
-  parameters. A memory-array source must not use std's array traits or a literal `lidx` index.
-  Cases that are not admitted are counted by reason.
+- **Admission** (`native-admission-v4`) is decided from the case alone, before any native run: its
+  emitter, the Core operations of its program, and the adapter's reading of the source, which
+  must be one contract with functions only, no storage field, `uint256` parameters and no call
+  of std's `tobool`. A memory-array source must not use std's array traits or a literal `lidx`
+  index. Cases that are not admitted are counted by reason.
 - **Comparison** (`native-compare-v1`): a returned Word against direct Core's, and the revert data
   of a native panic, which the native session decodes, against direct Core's revert output. Out of
   fuel and timeouts are inconclusive.

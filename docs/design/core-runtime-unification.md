@@ -252,7 +252,8 @@ Direct calls are in [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/A
   `CellAwarePublicAcceptedCallRoot` relates a call-containing row to the unchanged public root in
   both directions (`checkpoint_has_sufficient_fuel_selected`, `checkpoint_reflects_selected`), and
   `CellAwarePublicAcceptedCallForward.first_value_selected` takes a returning trace to a successful
-  public resumption. The body runs on the slot-retaining protocol from the root's physical cache
+  public resumption, and `first_fault_selected` takes a faulting trace to a failed one whose token
+  represents the fault. The body runs on the slot-retaining protocol from the root's physical cache
   and capture. Its expression meaning is an input, which `expressions_of_family` gives at every
   grade from the row's extended roots, its call authority and a family of callee rows.
 
@@ -329,7 +330,11 @@ program.
   callee body's derivation is smaller than the call's, so `bodies` lifts every admitted callee's
   body by one strong induction on the size, and `body` gives the sized staged trace of a
   call-containing function body. The admitted callees' static receipts are a premise (`Callees`).
-- Fault executions are not lifted.
+- **Fault lifting.** `CellAwareInvocationAcceptedFaultLifting`, in the same file, lifts the
+  original fault executions of the same bodies with the same reason and heap (`body_fault`). The
+  staged traces express every reason but a type mismatch and a missing declaration
+  (`Expressible`). The direct calls must have plain callee nodes (`CalleesPlain`, a finite
+  check), because the Source's fault rule after a call's arguments does not record its callee.
 
 ### Instances
 
@@ -350,15 +355,19 @@ program.
   uses are general over the subset and the shape.
 - **One call.** The test
   [Accepted/OneCall](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/OneCall.lean) compiles
-  a five-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
-  `identity(value)`, `twice` returns `identity(identity(value))`, `narrow` returns `uint8(value)`
-  and `roundTrip` returns `Typedef.rep(uint8(value))`. Its `accepted_call` meets every premise of
+  an eight-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
+  `identity(value)`, `twice` returns `identity(identity(value))`, `narrow` returns `uint8(value)`,
+  `roundTrip` returns `Typedef.rep(uint8(value))`, and `doubled`, `shifted` and `flipped` update a
+  `uint8` local in place with `+=`, `<<=` and `~`. Its `accepted_call` meets every premise of
   `CellAwarePublicAcceptedCallForward.first_value_selected`,
   `CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected` and
   `checkpoint_reflects_selected` at `relay`'s first public call, at `twice`'s, where the inner
   call's result is the outer call's argument, and at `narrow`'s and `roundTrip`'s at a canonical
   word. At a dirty word, `accepted_reflection` meets the reflection's premises at both, and the
-  call fails with the dirty-integer reason. The fixture
+  call fails with the dirty-integer reason. At the faulting words of `narrow`, `doubled`,
+  `shifted` and `flipped`, `accepted_failure` lifts the row's original Source fault and meets
+  every premise of `first_fault_selected`: the actual call fails with the token of the Source
+  fault, the dirty-integer reason or `0x11` from `doubled`'s checked `+=`. The fixture
   [Accepted/Fixture](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/Fixture.lean) builds
   the family rows and the callees' receipts from runtime checks of every cache row and a complete
   inventory (`WholeInventory.family_row`, `WholeInventory.callees`), and the staged trace is lifted
@@ -400,8 +409,7 @@ On the accepted-body route above, the next connected steps are:
   - Instantiate the theorems at a body with declarations, assignments, conditionals, operators and
     pairs. This needs a fixture with the older root's receipts and an independent Source trace of
     that body, or a proof-producing Source evaluator for the closed subset.
-  - Extend the shape, its coverage and the lifting to fault outcomes, projected writes, tail
-    values and loops.
+  - Extend the shape, its coverage and the lifting to projected writes, tail values and loops.
   - Carry the accepted instance model through public histories, so that later calls chain.
   - Issue program support from the compiler receipt for every accepted program, rather than from an
     observation of its typings.
