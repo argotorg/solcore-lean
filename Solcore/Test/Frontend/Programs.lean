@@ -351,7 +351,8 @@ private def testTraitPredicateInstantiation : IO Unit := do
     "impl Eq<Word> {}",
     "impl Ord<Word> where Word: Eq {",
     "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let implementation ← implementationForTrait program "Ord"
   let evidence ← selectedEvidenceFor program implementation
@@ -404,7 +405,8 @@ private def testTraitPredicateParameterOrder : IO Unit := do
     "impl Rel<Word, Bool> {}",
     "impl Route<Word, Bool> where Word: Rel<Bool> {",
     "  function route(value: Word) returns (Bool) { return true; }",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let implementation ← implementationForTrait program "Route"
   let evidence ← selectedEvidenceFor program implementation
@@ -437,7 +439,8 @@ private def testUnclosedTraitPredicateRejection : IO Unit := do
     "impl Eq<Word> {}",
     "impl Ord<Word> where Word: Eq {",
     "  function gt(left: Word, right: Word) returns (Bool) { return true; }",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let implementation ← implementationForTrait program "Ord"
   let evidence ← selectedEvidenceFor program implementation
@@ -684,7 +687,8 @@ private def testImplementationPredicateEvidence : IO Unit := do
     "impl Eq<Word> {}",
     "impl Add<Word> where Word: Eq {",
     "  function add(left: Word, right: Word) returns (Word) { return left; }",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let add ← match program.signatures.traits.filter fun trait =>
       trait.name == "Add" with
@@ -1614,7 +1618,8 @@ private def testDefaultForTypeParameter : IO Unit := do
         "trait Add<T> { function add(left: T, right: T) returns (T); }",
         "default impl<T> Add<T> { function add(left: T, right: T) returns (T) { return right; } }",
         "impl<T> Add<T> where T: BitNot { function add(left: T, right: T) returns (T) { return ~left; } }",
-        "function flip<T>(x: T, y: T) returns (T) where T: BitNot { return x + y; }"])] do
+        "function flip<T>(x: T, y: T) returns (T) where T: BitNot { return x + y; }",
+        "pragma no-patterson-condition;"])] do
     match ← acceptedDefaultEvidence label "flip" lines with
     | .implementation _ => pure ()
     | evidence => throw (IO.userError s!"{label} gave {reprStr evidence}")
@@ -1999,7 +2004,8 @@ private def checkedMethodWorkspace : Workspace.RawWorkspace :=
     "  function second(value: T) returns (T) {",
     "    return useImpl(useTrait(value));",
     "  }",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
 
 private def testImplementationMethodsCheckedInSourceOrder : IO Unit := do
@@ -4042,7 +4048,8 @@ private def testMethodCatalog : IO Unit := do
     "  function add(left: Word, right: Word) returns (Word) where Word: Marker {",
     "    return left - right;",
     "  }",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let environment ← catalog [source]
   let marker ← declarationNamed environment "Marker"
@@ -4229,7 +4236,8 @@ private def testTraitPredicateContainmentAllowsReorderingAndExtras : IO Unit := 
       "trait Second<T> {}",
       "trait Extra<T> {}",
       "trait Required<T> where T: First, T: Second {}",
-      "impl Required<Word> where Word: Extra, Word: Second, Word: First {}"
+      "impl Required<Word> where Word: Extra, Word: Second, Word: First {}",
+      "pragma no-patterson-condition;"
     ])
   let environment ← catalog [source]
   match buildProgramSignatures environment with
@@ -4393,7 +4401,8 @@ private def testImplMethodPredicateRule : IO Unit := do
       "impl<A> D<Box<A>> { function d(x: Box<A>) returns (Word) { return 7; } }",
       "impl<A> H<Box<A>> where Box<A>: D {",
       "  function h(x: Box<A>) returns (Word) where Box<A>: D { return 8; }",
-      "}"]))
+      "}",
+      "pragma no-patterson-condition;"]))
   assertTrue (superclass.map List.length == [0, 1])
     "a restated trait where predicate was not kept"
   -- The body sees only the predicates its method declares: an omitted
@@ -4531,6 +4540,164 @@ private def testOrphanImplementationRule : IO Unit := do
     assertTrue (orphanCount files == some expected)
       s!"{label}: expected {expected} orphan implementations, got {reprStr (checkProgram (orphanWorkspace files))}"
 
+/-- Upstream's checks of an implementation's head and declared conditions
+(`SC0219`, `SC0212`, `SC0213`) with the two pragmas that lift the last two:
+its uitests `invalid_default_instance`, `coverage_condition`,
+`coverage_condition_alias_expansion`, `patterson_condition` and
+`imported_pragma_does_not_suppress_local`, its fixtures
+`structured_default_instance_head_is_allowed_only_when_it_contains_a_type_variable`,
+`global_coverage_pragma` and `class_scoped_patterson_pragma`, and the shapes
+measured at the pin. -/
+private def testDeclarationConditions : IO Unit := do
+  let base := [
+    "pragma solcore;",
+    "trait Neg<T> {}",
+    "trait Pick<T> {}",
+    "trait Conv<A, B> {}",
+    "trait C3<A, B, C> {}",
+    "trait Up<T> {}",
+    "trait Down<T> where T: Up {}",
+    "enum Box<A> { Box(A) }",
+    "enum Coin { Head }"]
+  let errorsOf (lines : List String) : IO (List ProgramSignatureError) := do
+    match ← defaultOverlapSignatures (String.intercalate "\n" (base ++ lines)) with
+    | .ok _ => pure []
+    | .error errors => pure errors
+  let isDefault : ProgramSignatureError → Bool
+    | .invalidDefaultImplementation _ => true
+    | _ => false
+  let isCoverage : ProgramSignatureError → Bool
+    | .coverageCondition _ _ => true
+    | _ => false
+  let isPatterson : ProgramSignatureError → Bool
+    | .pattersonCondition _ => true
+    | _ => false
+  let cases : List (String × List String × Option (ProgramSignatureError → Bool)) := [
+    -- SC0219: a default implementation's subject holds a type parameter.
+    ("invalid_default_instance", ["trait C<A> {}", "default impl C<Word> {}"], some isDefault),
+    ("a closed nominal default", ["default impl Pick<Box<Word>> {}"], some isDefault),
+    ("an open nominal default", ["default impl<A> Pick<Box<A>> {}"], none),
+    ("a default at a parameter", ["default impl<A> Pick<A> {}"], none),
+    ("a default at a pair with a parameter", ["default impl<A> Pick<(Word, A)> {}"], none),
+    ("a closed subject beside an open argument",
+      ["pragma no-coverage-condition;", "default impl<A> Conv<Word, A> {}"], some isDefault),
+    ("a closed default under every pragma", ["pragma no-patterson-condition;",
+      "pragma no-coverage-condition;", "pragma no-bounded-variable-condition;",
+      "default impl Pick<Word> {}"], some isDefault),
+    -- SC0212: the other arguments' parameters occur in the subject.
+    ("coverage_condition", ["enum Holder<A> { Holder(Word) }", "trait MyClass<A, B> {}",
+      "impl<A, B> MyClass<Holder<A>, B> {}"], some isCoverage),
+    ("global_coverage_pragma", ["pragma no-coverage-condition;",
+      "enum Holder<A> { Holder(Word) }", "trait MyClass<A, B> {}",
+      "impl<A, B> MyClass<Holder<A>, B> {}"], none),
+    ("a coverage pragma for the trait",
+      ["pragma no-coverage-condition Conv;", "impl<A, B> Conv<A, B> {}"], none),
+    ("a coverage pragma for another trait",
+      ["pragma no-coverage-condition Pick;", "impl<A, B> Conv<A, B> {}"], some isCoverage),
+    ("the Patterson pragma",
+      ["pragma no-patterson-condition;", "impl<A, B> Conv<A, B> {}"], some isCoverage),
+    ("coverage_condition_alias_expansion", ["type Phantom(A) = Word;",
+      "trait MyClass<A, B> {}", "impl<A> MyClass<Phantom<A>, A> {}"], some isCoverage),
+    ("an argument's parameter in the subject", ["impl<A> Conv<Box<A>, A> {}"], none),
+    ("a closed subject", ["impl<A> Conv<Word, A> {}"], some isCoverage),
+    ("a parameter between other arguments", ["impl<A, B> C3<Box<A>, B, B> {}"], some isCoverage),
+    -- SC0213: each declared condition is smaller than the head.
+    ("patterson_condition", ["trait C1<U> {}", "trait C2<U> {}",
+      "impl<U> C1<U> where U: C1, U: C2 {}"], some isPatterson),
+    ("class_scoped_patterson_pragma", ["pragma no-patterson-condition C1;",
+      "trait C1<U> {}", "trait C2<U> {}", "impl<U> C1<U> where U: C1, U: C2 {}"], none),
+    ("a Patterson pragma for every trait",
+      ["pragma no-patterson-condition;", "impl<A> Pick<A> where A: Neg {}"], none),
+    ("a Patterson pragma for the condition's trait",
+      ["pragma no-patterson-condition Neg;", "impl<A> Pick<A> where A: Neg {}"], some isPatterson),
+    ("a smaller condition", ["impl<A> Pick<Box<A>> where A: Neg {}"], none),
+    ("a condition as large as the head", ["impl<A> Pick<Box<A>> where Box<A>: Neg {}"], some isPatterson),
+    ("one condition too large", ["impl<A> Pick<Box<A>> where A: Neg, Box<A>: Neg {}"], some isPatterson),
+    ("the head's other arguments", ["impl<A> Conv<A, Word> where A: Neg {}"], none),
+    ("a pair head", ["impl<A, B> Pick<(A, B)> where A: Conv<B> {}"], none),
+    ("a triple, as nested pairs", ["impl<A, B, C> Pick<(A, B, C)> where (A, B): Conv<C> {}"], none),
+    ("an array, as memory<DynArray<T>>", ["impl Pick<uint256[]> where Box<uint256>: Neg {}"], none),
+    ("an array as large as its condition",
+      ["impl Pick<uint256[]> where Box<Box<uint256>>: Neg {}"], some isPatterson),
+    ("a function type's parameter",
+      ["impl<A> Pick<function(A) returns (Word)> where Box<Box<A>>: Neg {}"], some isPatterson),
+    ("a function type's tuple parameter",
+      ["impl<A, B> Pick<function((A, B)) returns (Word)> where Box<Box<Box<Box<A>>>>: Neg {}"],
+      some isPatterson),
+    ("a function type's smaller tuple parameter",
+      ["impl<A, B> Pick<function((A, B)) returns (Word)> where Box<Box<Box<A>>>: Neg {}"], none),
+    -- Lean resolves `function(A, B)` as `function((A, B))` and `function()` as
+    -- `function(())`, so it counts their parameters as one tuple, where
+    -- upstream refuses these two.
+    ("a function type's two parameters, counted as a tuple",
+      ["impl<A, B> Pick<function(A, B) returns (Word)> where Box<Box<Box<A>>>: Neg {}"], none),
+    ("a function type with no parameter, counted as ()",
+      ["impl<A> Pick<function() returns (A)> where Box<A>: Neg {}"], none),
+    ("a default's condition", ["default impl<A> Pick<A> where A: Neg {}"], some isPatterson),
+    ("an implied superclass", ["impl<A> Up<Box<A>> {}", "impl<A> Down<Box<A>> {}"], none),
+    ("a restated superclass",
+      ["impl<A> Up<Box<A>> {}", "impl<A> Down<Box<A>> where Box<A>: Up {}"], some isPatterson),
+    ("a closed head's restated superclass",
+      ["impl Up<Coin> {}", "impl Down<Coin> where Coin: Up {}"], some isPatterson)]
+  for (label, lines, expected) in cases do
+    let errors ← errorsOf lines
+    match expected with
+    | none => assertTrue errors.isEmpty s!"{label} was refused: {reprStr errors}"
+    | some expected =>
+        assertTrue (errors.length == 1 && errors.all expected)
+          s!"{label} gave {reprStr errors}"
+  -- The coverage error names the parameter its subject lacks.
+  match ← errorsOf ["impl<A, B> Conv<Box<A>, B> {}"] with
+  | [.coverageCondition _ [parameter]] =>
+      assertTrue (parameter.index == 1) s!"the coverage error named {reprStr parameter}"
+  | errors => throw (IO.userError s!"an undetermined parameter gave {reprStr errors}")
+  -- A closed default with an open argument fails both, as upstream reports.
+  let both ← errorsOf ["default impl<A> Conv<Word, A> {}"]
+  assertTrue (both.length == 2 && both.any isDefault && both.any isCoverage)
+    s!"a closed default with an open argument gave {reprStr both}"
+  -- A pragma lifts its own module's implementations only.
+  let lib (pragma : List String) := ("lib.solc", pragma ++ ["export {Neg, Pick};",
+    "trait Neg<T> {}", "trait Pick<T> {}", "impl<A> Pick<A> where A: Neg {}"])
+  match checkProgram (orphanWorkspace [lib ["pragma no-patterson-condition;"],
+      ("main.solc", ["import * from lib;"])]) with
+  | .ok _ => pure ()
+  | .error errors => throw (IO.userError
+      s!"a pragma beside its implementation did not lift it: {reprStr errors}")
+  match checkProgram (orphanWorkspace [lib [],
+      ("main.solc", ["pragma no-patterson-condition;", "import * from lib;"])]) with
+  | .error [.signature (.pattersonCondition implementation)] =>
+      assertTrue (implementation.moduleId.path.segments.map (·.text) == ["lib"])
+        "an importer's pragma lifted another module's implementation"
+  | result => throw (IO.userError s!"an importer's pragma gave {reprStr result}")
+  match checkProgram (orphanWorkspace [
+      ("pragma_scope_lib.solc", ["export {helper};", "pragma no-patterson-condition C;",
+        "function helper() returns (Word) { return 1; }"]),
+      ("main.solc", ["import pragma_scope_lib;", "enum List<A> { Nil, Cons(A, List<A>) }",
+        "trait C<A, B, D> {}", "impl<A, B> C<List<B>, A, List<A>> {}",
+        "impl<X> C<X, Word, Word> where X: C<Word, Word> {}"])]) with
+  | .error errors =>
+      -- Upstream also reports the two heads' overlap (`SC0218`), which Lean
+      -- does not check.
+      assertTrue (errors.length == 2 &&
+          errors.any (fun | .signature (.coverageCondition _ _) => true | _ => false) &&
+          errors.any (fun | .signature (.pattersonCondition _) => true | _ => false))
+        s!"imported_pragma_does_not_suppress_local gave {reprStr errors}"
+  | .ok _ => throw (IO.userError "imported_pragma_does_not_suppress_local was accepted")
+  -- The measure: `T[]` as std's `memory<DynArray<T>>`, a pair as std's pair,
+  -- and a function type's parameters, held as one product, at least as many
+  -- and at most as one tuple.
+  let word := TypeSystem.Ty.word
+  let pair := TypeSystem.Ty.product word word
+  for (label, lower, type, expected) in [
+      ("an array", false, TypeSystem.Ty.array word, 3),
+      ("a pair", true, pair, 3),
+      ("two parameters at the least", true, .function pair word, 4),
+      ("two parameters at the most", false, .function pair word, 5),
+      ("no parameter at the least", true, .function .unit word, 2),
+      ("no parameter at the most", false, .function .unit word, 3)] do
+    assertTrue (pattersonTypeMeasure lower false type == expected)
+      s!"{label} measured {pattersonTypeMeasure lower false type}"
+
 private def testAmbiguousTrait : IO Unit := do
   let left ← parsed "left.solc" "export {Shared}; trait Shared<T> {}"
   let right ← parsed "right.solc" "export {Shared}; trait Shared<T> {}"
@@ -4578,6 +4745,7 @@ def testProgramSignatures : IO Unit := do
   ProgramSignatures.testImplMethodPredicateRule
   ProgramSignatures.testOverlappingDefaultRule
   ProgramSignatures.testOrphanImplementationRule
+  ProgramSignatures.testDeclarationConditions
   ProgramSignatures.testAmbiguousTrait
   ProgramSignatures.testStrictTraitVisibility
 

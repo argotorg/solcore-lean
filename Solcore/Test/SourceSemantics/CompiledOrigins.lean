@@ -52,7 +52,8 @@ private def workspace : Workspace.RawWorkspace := {
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
     "return result; } }",
 
-    "function entry(flag: Bool) returns (Word, Bool) { return flag; }"]}] }
+    "function entry(flag: Bool) returns (Word, Bool) { return flag; }",
+    "pragma no-coverage-condition;"]}] }
 
 def main : IO Unit := do
   let checked ← match checkProgram workspace 4096 with
@@ -254,7 +255,8 @@ private def workspace : Workspace.RawWorkspace := {
     "return result; }",
     "trait Coerce<From, To> { function coerce(value: From) returns (To); }",
     "impl Coerce<Bool, (Word, Bool)> { function coerce(value: Bool) returns ((Word, Bool)) { return run(value); } }",
-    "function entry(flag: Bool) returns (Word, Bool) { return flag; }"]}] }
+    "function entry(flag: Bool) returns (Word, Bool) { return flag; }",
+    "pragma no-coverage-condition;"]}] }
 
 def main : IO Unit := do
   let checked ← match checkProgram workspace 4096 with
@@ -615,7 +617,8 @@ def workspace : Workspace.RawWorkspace := {
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
-    "return result; }"]}] }
+    "return result; }",
+    "pragma no-coverage-condition;"]}] }
 
 private def hasEmitter (catalog : List Resolved.DeclarationId) (nodes : List Node) (requirement : RequirementId) : Bool :=
   nodes.any fun node => match node with
@@ -712,7 +715,8 @@ def workspace : Workspace.RawWorkspace := {
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
-    "return result; }"]}] }
+    "return result; }",
+    "pragma no-coverage-condition;"]}] }
 
 private def hasEmitter (nodes : List Node) (requirement : RequirementId) : Bool :=
   nodes.any fun node => match node with
@@ -787,7 +791,8 @@ def workspace : Workspace.RawWorkspace := {
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
-    "return result; }"]}] }
+    "return result; }",
+    "pragma no-coverage-condition;"]}] }
 
 private def hasEmitter (catalog : List Resolved.DeclarationId) (nodes : List Node) (requirement : Requirement) : Bool :=
   nodes.any fun node => match node with
@@ -893,7 +898,8 @@ def workspace : Workspace.RawWorkspace := {
     "let outer = lam(value, tag) { let prior = true; let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, before);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
-    "return result; }"]}] }
+    "return result; }",
+    "pragma no-coverage-condition;"]}] }
 
 def main : IO Unit := do
   let .ok program := checkProgram workspace 4096 | throw (IO.userError "checker rejected")
@@ -956,7 +962,8 @@ def workspace : Workspace.RawWorkspace := {
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
-    "return result; }"]}] }
+    "return result; }",
+    "pragma no-coverage-condition;"]}] }
 
 private def hasEmitter (nodes : List Node) (requirement : RequirementId) : Bool :=
   nodes.any fun node => match node with
@@ -1053,7 +1060,8 @@ def workspace : Workspace.RawWorkspace := {
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let discarded = keep(2, true); } else { let discarded = keep(3, false); }",
-    "return result; }"]}] }
+    "return result; }",
+    "pragma no-coverage-condition;"]}] }
 
 private def hasEmitter (catalog : List Resolved.DeclarationId) (nodes : List Node) (requirement : RequirementId) : Bool :=
   nodes.any fun node => match node with
@@ -1205,7 +1213,8 @@ private def workspace (body : List String) : Workspace.RawWorkspace := {
   mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" ([
     "trait Rel<A, B> {}",
     "impl<A, B> Rel<A, B> {}",
-    "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }"
+    "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
+    "pragma no-coverage-condition;"
   ] ++ body)}] }
 
 private def references (compiled : SourceCoreCompiler.Compiled) : IO Nat := do
@@ -1302,7 +1311,8 @@ def workspace : Workspace.RawWorkspace := {
     "function keep<A, B>(first: A, second: B) returns (B) where A: Rel<B> { return second; }",
     "function run(flag: Bool) returns (Word, Bool) {",
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
-    "return outer(1, flag); }"]}] }
+    "return outer(1, flag); }",
+    "pragma no-coverage-condition;"]}] }
 
 private def inspect (compiled : SourceCoreCompiler.Compiled) : IO Unit := do
   let mut qualifiedCount := 0
@@ -2246,7 +2256,8 @@ def workspace : Workspace.RawWorkspace := {
     "let outer = lam(value, tag) { let inner = lam(item) { return keep(value, item); }; let touched = inner(true); return (value, tag); };",
     "let result = outer(1, flag);",
     "if (flag) { let two: Word = 2; let discarded = keep(two, true); } else { let three: Word = 3; let discarded = keep(three, false); }",
-    "return result; }"]}] }
+    "return result; }",
+    "pragma no-coverage-condition;"]}] }
 
 private def hasEmitter (catalog : List Resolved.DeclarationId) (nodes : List Node) (requirement : RequirementId) : Bool :=
   nodes.any fun node => match node with

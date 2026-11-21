@@ -1032,7 +1032,8 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
     "}",
     "function greaterEntry(left: Word, right: Word) returns (Bool) {",
     "  return greaterWithEvidence(left, right);",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let ne ← signatureNamedWithGenericArity program "ne" 1
   let lt ← signatureNamedWithGenericArity program "lt" 1
@@ -1183,7 +1184,8 @@ private def testTraitPredicateIsStaticMethodAssumption : IO Unit := do
     "}",
     "function entry(left: Word, right: Word) returns (Bool) {",
     "  return greaterWithEvidence(left, right);",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let entry ← signatureNamed program "entry"
   let greater ← signatureNamed program "greaterWithEvidence"
@@ -1260,7 +1262,8 @@ private def testMissingConsumedTraitPredicateEvidence : IO Unit := do
     "}",
     "function entry(left: Word, right: Word) returns (Bool) {",
     "  return greaterWithEvidence(left, right);",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let entry ← signatureNamed program "entry"
   let eq ← match program.signatures.traits.filter fun trait =>
@@ -1332,7 +1335,8 @@ private def testConsumedTraitPredicateEvidence : IO Unit := do
     "}",
     "function entry(left: Word, right: Word) returns (Bool) {",
     "  return greaterWithEvidence(left, right);",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let entry ← signatureNamed program "entry"
   let equal ← signatureNamed program "equalWithEvidence"
@@ -1380,7 +1384,8 @@ private def testGenericTraitPredicateEvidence : IO Unit := do
     "}",
     "function entry(left: Word, right: Word) returns (Bool) {",
     "  return greaterWithEvidence(left, right);",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let entry ← signatureNamed program "entry"
   let outcome ← runOrThrow "generic trait predicate evidence" program
@@ -1423,7 +1428,8 @@ private def testImplementationPredicateEvidence : IO Unit := do
     "}",
     "function entry(left: Word, right: Word) returns (Word) {",
     "  return addWithEvidence(left, right);",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let entry ← signatureNamed program "entry"
   let equal ← signatureNamed program "equalWithEvidence"
@@ -1474,7 +1480,8 @@ private def testGenericImplementationPredicateEvidence : IO Unit := do
     "}",
     "function entry(left: Word, right: Word) returns (Word) {",
     "  return addWithEvidence(left, right);",
-    "}"
+    "}",
+    "pragma no-patterson-condition;"
   ])
   let entry ← signatureNamed program "entry"
   let add ← signatureNamed program "addWithEvidence"

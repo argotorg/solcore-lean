@@ -602,7 +602,7 @@ private def testDefaultImplementationCoercionPriority : IO Unit := do
     "trait Coerce<From, To> {}",
     "enum A { Only }",
     "enum B { Only }",
-    "default impl Coerce<A, B> {}",
+    "default impl<T> Coerce<T, B> {}",
     "impl Coerce<A, B> {}",
     "function accept(value: B) returns (B) { return value; }",
     "function convert(value: A) returns (B) { return accept(value); }"
@@ -631,7 +631,7 @@ private def testDefaultImplementationCoercionPriority : IO Unit := do
     "enum A { Only }",
     "enum B { Only }",
     "enum Missing { Only }",
-    "default impl Coerce<A, B> {}",
+    "default impl<T> Coerce<T, B> {}",
     "impl Coerce<A, B> where Missing: Ready {}",
     "function accept(value: B) returns (B) { return value; }",
     "function convert(value: A) returns (B) { return accept(value); }"

@@ -533,7 +533,8 @@ private def source : String := String.intercalate "\n" [
   "  let apply = lam(inner: Word) -> Word { return inner; };",
   "  return apply(value);",
   "}",
-  "function spin(value: Word) returns (Word) { return spin(value); }"
+  "function spin(value: Word) returns (Word) { return spin(value); }",
+  "pragma no-patterson-condition;"
 ]
 
 private def testNominalConstructionAndRecursiveCalls

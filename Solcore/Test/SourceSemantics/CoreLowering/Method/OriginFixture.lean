@@ -1018,7 +1018,8 @@ def content : String := String.intercalate "\n" [
   "function wordRoot(value: Word, next: Word, flag: Bool) returns (function() returns (Word)) { return make(value, next, flag); }",
   "function boolRoot(value: Bool, next: Bool, flag: Bool) returns (function() returns (Bool)) { return make(value, next, flag); }",
   "function useWord(f: function() returns (Word)) returns (Word) { return f(); }",
-  "function useBool(f: function() returns (Bool)) returns (Bool) { return f(); }"]
+  "function useBool(f: function() returns (Bool)) returns (Bool) { return f(); }",
+  "pragma no-patterson-condition;"]
 
 
 def workspace : Workspace.RawWorkspace := {

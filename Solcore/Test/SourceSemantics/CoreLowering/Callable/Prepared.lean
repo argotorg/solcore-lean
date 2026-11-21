@@ -575,7 +575,8 @@ private def content := String.intercalate "\n" [
   "function binary(a: Word, b: Bool) returns ((Word, Bool)) { let left: (Word, Bool) = (a, b); let right: (Word, Bool) = (7, false); return via(left, right); }",
   "function unary(a: Word, b: Bool) returns ((Word, Bool)) { let value: (Word, Bool) = (a, b); return ~value; }",
   "function coerced(a: Word, b: Bool) returns (Word) { let value: (Word, Bool) = (a, b); return value + value; }",
-  "function firstFault() returns ((Word, Bool)) { let left: (Word, Bool); let right: (Word, Bool) = (7, false); return left + right; }"
+  "function firstFault() returns ((Word, Bool)) { let left: (Word, Bool); let right: (Word, Bool) = (7, false); return left + right; }",
+  "pragma no-patterson-condition;"
 ]
 
 /-- Marker children audit the real lowering branch and its exact ordered call
@@ -1750,7 +1751,8 @@ private def content (mode : Nat) : String := String.intercalate "\n" [
     (if mode == 2 then "let secondGap: Word; return secondGap;" else "return 19;") ++ " } }",
   "function root(a: Word, b: Bool) returns (Word) { " ++
     (if mode == 3 then "let rawGap: (Word, Bool);" else "let rawGap: (Word, Bool) = (a, b);") ++
-    " let right: (Word, Bool) = (7, false); return rawGap + right; }"
+    " let right: (Word, Bool) = (7, false); return rawGap + right; }",
+  "pragma no-patterson-condition;"
 ]
 
 private def inspect (cached : SourceCoreUnifiedCompilation.Compiled) : IO Unit := do

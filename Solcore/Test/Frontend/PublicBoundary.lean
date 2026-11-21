@@ -53,6 +53,10 @@ example :=
 example :=
   @Solcore.Frontend.ProgramCheckError.missingSuperclassInstance
 example := @Solcore.Frontend.impliedConditions
+example := @Solcore.Frontend.ProgramSignatureError.invalidDefaultImplementation
+example := @Solcore.Frontend.ProgramSignatureError.coverageCondition
+example := @Solcore.Frontend.ProgramSignatureError.pattersonCondition
+example := @Solcore.Frontend.pattersonTypeMeasure
 example := @Solcore.Frontend.buildProgramSignatures_success_implRules_eq
 example := @Solcore.Frontend.buildProgramSignatures_success_implRule_mem_iff
 example := @Solcore.Frontend.ProgramContractSignature

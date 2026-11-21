@@ -1028,6 +1028,16 @@ inductive ProgramSignatureError where
   /-- An implementation away from its trait's module and from the module of the
   type at its subject's coherence head (`SC0246`). -/
   | orphanImplementation (implementation : Resolved.DeclarationId)
+  /-- A default implementation whose subject, the trait's main argument, holds
+  no type parameter (`SC0219`). -/
+  | invalidDefaultImplementation (implementation : Resolved.DeclarationId)
+  /-- An implementation whose trait's other arguments hold parameters that its
+  subject does not, the coverage condition (`SC0212`). -/
+  | coverageCondition (implementation : Resolved.DeclarationId)
+      (undetermined : List TypeSystem.TypeParameterId)
+  /-- An implementation with a declared condition no smaller than its head, the
+  Patterson condition (`SC0213`). -/
+  | pattersonCondition (implementation : Resolved.DeclarationId)
   | duplicateDataConstructor
       (dataType : Resolved.DeclarationId) (name : String)
       (firstIndex duplicateIndex : Nat)
@@ -1058,6 +1068,9 @@ private def programSignatureErrorDeclaration :
   | .implementationParameterNotInHead implementation _ => implementation
   | .overlappingDefaultImplementation implementation _ => implementation
   | .orphanImplementation implementation => implementation
+  | .invalidDefaultImplementation implementation => implementation
+  | .coverageCondition implementation _ => implementation
+  | .pattersonCondition implementation => implementation
   | .duplicateDataConstructor dataType _ _ _ => dataType
 
 private def declarationParameters
@@ -2606,6 +2619,88 @@ private def orphanImplementationErrors (environment : ProgramEnvironment)
     if owners.any fun owner => nextTo implementation.id.moduleId owner.moduleId then none
     else some (ProgramSignatureError.orphanImplementation implementation.id)
 
+/-- A type's size as upstream's `Ty::measure` counts it for the Patterson
+condition: one for a parameter or a constructor and one more for each part, with
+`T[]` as std's `memory<DynArray<T>>`, a product as std's pair, and each of a
+function type's parameters. Lean's function type holds its parameters as one
+product, so `function(a, b)` and `function((a, b))` resolve alike, as do
+`function()` and `function(())`. With `lower`, a product or `()` among a
+function type's parameters (`inParameters`) counts as several parameters or
+none, the least upstream can count; without it, as one tuple, the most. -/
+def pattersonTypeMeasure (lower : Bool) : Bool → TypeSystem.Ty → Nat
+  | true, .constructor (.builtin .unit) => if lower then 0 else 1
+  | true, .product left right =>
+      if lower then
+        pattersonTypeMeasure lower false left + pattersonTypeMeasure lower true right
+      else 1 + pattersonTypeMeasure lower false left + pattersonTypeMeasure lower false right
+  | _, .constructor (.builtin .memoryArray) => 2
+  | _, .parameter _ | _, .variable _ | _, .constructor _ | _, .error => 1
+  | _, .application function argument =>
+      pattersonTypeMeasure lower false function + pattersonTypeMeasure lower false argument
+  | _, .function parameter result =>
+      1 + pattersonTypeMeasure lower true parameter + pattersonTypeMeasure lower false result
+  | _, .product left right | _, .mapping left right =>
+      1 + pattersonTypeMeasure lower false left + pattersonTypeMeasure lower false right
+  | _, .proxy inner | _, .comptime inner => 1 + pattersonTypeMeasure lower false inner
+
+/-- A predicate's size, its subject's and its arguments', as upstream's
+`Pred::measure` counts it. -/
+def pattersonPredicateMeasure (lower : Bool) (predicate : ProgramPredicate) : Nat :=
+  ((predicate.subject :: predicate.arguments).map (pattersonTypeMeasure lower false)).sum
+
+/-- Whether a module's pragma `name` lifts a check for `trait`, the name its
+implementation's head writes: with no items for every trait, and otherwise for
+the traits it names, as upstream's `PragmaEscape` reads it. -/
+private def pragmaLifts (environment : ProgramEnvironment) (module : Workspace.ModuleId)
+    (name trait : String) : Bool :=
+  match environment.modules.find? fun candidate => decide (candidate.id = module) with
+  | none => false
+  | some module => module.source.items.any fun item =>
+      match item.value with
+      | .pragmaDecl declaration =>
+          declaration.value.name.value == name &&
+            (declaration.value.items.isEmpty ||
+              declaration.value.items.any fun named => named.value == trait)
+      | _ => false
+
+/-- Upstream's checks of an implementation's head and declared conditions
+(`check_instance_soundness`), on the resolved types, so aliases are expanded:
+- `SC0219`: a default implementation's subject, the trait's main argument, holds
+  a type parameter;
+- `SC0212`, the coverage condition: each parameter of the trait's other
+  arguments occurs in the subject, unless the module's `no-coverage-condition`
+  pragma lifts it for the trait;
+- `SC0213`, the Patterson condition: each declared condition, without the
+  trait's where predicates that it implies, is smaller than the head, unless the
+  module's `no-patterson-condition` pragma lifts it for the trait. A condition
+  is measured with the fewest parameters and the head with the most
+  (`pattersonTypeMeasure`), so a function type there never refuses what
+  upstream accepts. -/
+private def implementationConditionErrors (environment : ProgramEnvironment)
+    (implementations : List ProgramImplementationSignature) :
+    List ProgramSignatureError :=
+  implementations.flatMap fun implementation =>
+    let head := implementation.head
+    let lifts (pragma : String) : Bool :=
+      pragmaLifts environment implementation.id.moduleId pragma
+        implementation.source.value.traitName.value
+    let subjectParameters :=
+      TypedTraitResolution.predicateParameters { head with arguments := [] }
+    let undetermined := (TypedTraitResolution.predicateParameters head).filter
+      fun parameter => !subjectParameters.contains parameter
+    let headMeasure := pattersonPredicateMeasure false head
+    let tooLarge := implementation.declaredWherePredicates.any fun condition =>
+      headMeasure ≤ pattersonPredicateMeasure true condition
+    (if implementation.isDefault && subjectParameters.isEmpty then
+        [ProgramSignatureError.invalidDefaultImplementation implementation.id]
+      else []) ++
+    (if !undetermined.isEmpty && !lifts "no-coverage-condition" then
+        [ProgramSignatureError.coverageCondition implementation.id undetermined]
+      else []) ++
+    (if tooLarge && !lifts "no-patterson-condition" then
+        [ProgramSignatureError.pattersonCondition implementation.id]
+      else [])
+
 /-- Resolve every top-level function signature and implementation rule.
 Independent declaration failures are accumulated in source order. -/
 def buildProgramSignatures (environment : ProgramEnvironment) :
@@ -2619,7 +2714,8 @@ def buildProgramSignatures (environment : ProgramEnvironment) :
     | _ => true
   let collectedErrors := traitState.errors ++ nonCascadingErrors ++
     overlappingDefaultErrors [] state.implementations ++
-    orphanImplementationErrors environment state.implementations
+    orphanImplementationErrors environment state.implementations ++
+    implementationConditionErrors environment state.implementations
   let errors := environment.declarations.flatMap fun declaration =>
     collectedErrors.filter fun error =>
       decide (programSignatureErrorDeclaration error = declaration.id)
