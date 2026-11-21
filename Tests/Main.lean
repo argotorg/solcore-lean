@@ -2278,6 +2278,7 @@ def main : IO UInt32 := do
   Tests.SourceCoreAcceptedOneCall.AcceptedTailRuntime.run
   Tests.SourceCoreAcceptedOneCall.AcceptedMappingRuntime.run
   Tests.SourceCoreAcceptedOneCall.AcceptedBuiltinRuntime.run
+  Tests.SourceCoreAcceptedOneCall.AcceptedOpcodeRuntime.run
   Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run
   Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run
   Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run
