@@ -7389,6 +7389,43 @@ private def runSuperclassesOfGivens : IO Unit := do
     session := completed.session
   IO.println "SOURCE_CORE_SUPERCLASSES_OF_GIVENS_PASS: a superclass of a function's given, and of an implementation's condition, is a given its caller proves, as upstream projects it, so at a type with its own implementation that one runs, where check or compile refused before, and at a type only the default covers the default runs"
 
+private def impliedSuperclassesWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := []
+  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+    "pragma solcore;",
+    "trait BitNot<T> { function bnot(value: T) returns (T); }",
+    "trait Sub<T> where T: BitNot { function sub(left: T, right: T) returns (T); }",
+    "default impl<T> BitNot<T> { function bnot(value: T) returns (T) { return value; } }",
+    "enum Coin { Head, Tail }",
+    "impl BitNot<Coin> { function bnot(value: Coin) returns (Coin) { match (value) { case Coin.Head { return Coin.Tail; } case Coin.Tail { return Coin.Head; } } } }",
+    "enum Plain { Head, Tail }",
+    "impl Sub<Coin> { function sub(left: Coin, right: Coin) returns (Coin) { return ~left; } }",
+    "impl Sub<Plain> { function sub(left: Plain, right: Plain) returns (Plain) { return ~left; } }",
+    "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+    "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
+    "function viaSub<T>(x: T) returns (T) where T: Sub { return ~x; }",
+    "function viaCoin() returns (Word) { return coin(viaSub(Coin.Head)); }",
+    "function viaPlain() returns (Word) { return plain(viaSub(Plain.Head)); }",
+    "function subCoin() returns (Word) { return coin(Coin.Head - Coin.Tail); }",
+    "function subPlain() returns (Word) { return plain(Plain.Head - Plain.Tail); }"] }]
+}
+
+private def runImpliedSuperclasses : IO Unit := do
+  let program ← get "implied superclasses check" (checkProgram impliedSuperclassesWorkspace)
+  let names := ["viaCoin", "viaPlain", "subCoin", "subPlain"]
+  let compiled ← get "implied superclasses compilation"
+    (compile impliedSuperclassesWorkspace (← names.mapM (seed program)))
+  let mut session ← boot (← compiled.open)
+  for (index, expected) in ([(0, 2), (1, 1), (2, 2), (3, 1)] : List (Nat × Nat)) do
+    let key ← match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError "implied superclasses root missing")
+    let completed ← execute session key []
+    require (completed.value == word expected)
+      s!"{names[index]!} gave {reprStr completed.value}"
+    session := completed.session
+  IO.println "SOURCE_CORE_IMPLIED_SUPERCLASSES_PASS: an implementation that does not restate its trait's superclass is checked where it is declared, as upstream's SC0248, and its body and its callers use that superclass's implementation at the type, its own at a type that has one and the default at a type that only the default covers"
+
 private def runDefaultForTypeParameter : IO Unit := do
   let program ← get "default for a type parameter check" (checkProgram defaultForTypeParameterWorkspace)
   let names := ["viaCoin", "viaPlain", "viaSecond", "viaBoxed"]
@@ -7719,6 +7756,7 @@ def run : IO Unit := do
   runDefaultForTypeParameter
   runGivenBelowAnImplementation
   runSuperclassesOfGivens
+  runImpliedSuperclasses
 
 end Tests.SourceCoreExecution
 end

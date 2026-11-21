@@ -1829,6 +1829,77 @@ private def testSuperclassesOfGivens : IO Unit := do
       s!"an implementation that restates a superclass had the wrong failure: {reprStr errors}")
   | .ok _ => throw (IO.userError "an implementation that restates a superclass was accepted")
 
+/-- Row 13's third step: an implementation need not restate its trait's where
+predicates, and each that it does not state must be provided where it is
+declared, its conditions as the givens, as upstream's `SC0248` checks. The
+head's superclasses count as its own conditions for its methods' predicates
+(`SC0249`). -/
+private def testSuperclassInstances : IO Unit := do
+  let bitNot := "trait BitNot<T> { function bnot(value: T) returns (T); }"
+  let sub := "trait Sub<T> where T: BitNot { function sub(left: T, right: T) returns (T); }"
+  let box := "enum Box<A> { Wrap(A) }"
+  let coin := "enum Coin { Head, Tail }"
+  let coinBitNot := "impl BitNot<Coin> { function bnot(value: Coin) returns (Coin) { return value; } }"
+  let defaultBitNot := "default impl<T> BitNot<T> { function bnot(value: T) returns (T) { return value; } }"
+  let accepted (label : String) (lines : List String) : IO Unit := do
+    match checkProgram (singleSourceWorkspace (String.intercalate "\n" lines)) with
+    | .ok _ => pure ()
+    | .error errors => throw (IO.userError s!"{label} was refused: {reprStr errors}")
+  let refused (label : String) (lines : List String) (reason : SuperclassFailure)
+      (count : Nat) : IO Unit := do
+    match checkProgram (singleSourceWorkspace (String.intercalate "\n" lines)) with
+    | .error errors =>
+        let missing := errors.filter fun error => match error with
+          | .missingSuperclassInstance _ _ actual => actual == reason
+          | _ => false
+        assertTrue (missing.length == count && errors.length == count)
+          s!"{label} had the wrong failure: {reprStr errors}"
+    | .ok _ => throw (IO.userError s!"{label} was accepted")
+  accepted "an implementation that does not restate a provided superclass"
+    [bitNot, sub, coin, coinBitNot,
+      "impl Sub<Coin> { function sub(left: Coin, right: Coin) returns (Coin) { return ~left; } }"]
+  -- Upstream's `missing_superclass_instance`, without its derived `Ord`.
+  refused "the uitest" [bitNot, sub, box, "enum T { T }", "enum Pair<A> { Two(A, A) }",
+      "impl Sub<T> { function sub(left: T, right: T) returns (T) { return left; } }",
+      "impl<A> BitNot<Box<A>> where A: BitNot { function bnot(value: Box<A>) returns (Box<A>) { return value; } }",
+      "impl<A> Sub<Box<A>> where A: Sub { function sub(left: Box<A>, right: Box<A>) returns (Box<A>) { return left; } }",
+      "impl<A> Sub<Pair<A>> where A: Sub { function sub(left: Pair<A>, right: Pair<A>) returns (Pair<A>) { return left; } }",
+      "trait D<T> where T: BitNot {}",
+      "impl<A> D<A> {}"] .noImplementation 3
+  -- An ordinary head that unifies blocks the default (step 2's `v3`).
+  refused "a default beside an ordinary head" [bitNot, sub, box, defaultBitNot,
+      "impl BitNot<Box<Word>> { function bnot(value: Box<Word>) returns (Box<Word>) { return value; } }",
+      "impl<A> Sub<Box<A>> { function sub(left: Box<A>, right: Box<A>) returns (Box<A>) { return left; } }"]
+    .noImplementation 1
+  accepted "a default alone" [bitNot, sub, box, defaultBitNot,
+    "impl<A> Sub<Box<A>> { function sub(left: Box<A>, right: Box<A>) returns (Box<A>) { return left; } }"]
+  -- Defaults are checked too, and no default decides a type parameter.
+  refused "a default without its superclass" [bitNot, sub,
+      "default impl<T> Sub<T> { function sub(left: T, right: T) returns (T) { return left; } }"]
+    .noImplementation 1
+  refused "a default whose superclass only a default provides" [bitNot, sub, defaultBitNot,
+      "default impl<T> Sub<T> { function sub(left: T, right: T) returns (T) { return left; } }"]
+    .noImplementation 1
+  -- Two conditions reach the superclass's own condition.
+  refused "conditions that restate a superclass" [bitNot, box,
+      "trait Add<T> where T: BitNot { function add(left: T, right: T) returns (T); }",
+      "trait Mul<T> where T: BitNot { function mul(left: T, right: T) returns (T); }",
+      "impl<A> BitNot<Box<A>> where A: BitNot { function bnot(value: Box<A>) returns (Box<A>) { return value; } }",
+      "impl<A> Mul<Box<A>> where A: Add, A: BitNot { function mul(left: Box<A>, right: Box<A>) returns (Box<A>) { return left; } }"]
+    .ambiguous 1
+  accepted "a method predicate that the head's superclass provides" [bitNot, sub, coin, coinBitNot,
+    "impl Sub<Coin> { function sub(left: Coin, right: Coin) returns (Coin) where Coin: BitNot { return left; } }"]
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" [bitNot, box,
+      "trait Mid<T> where T: BitNot { function mid(value: T) returns (T); }",
+      "trait Down<T> where T: Mid { function down(value: T) returns (T); }",
+      "impl<A> BitNot<Box<A>> { function bnot(value: Box<A>) returns (Box<A>) { return value; } }",
+      "impl<A> Mid<Box<A>> { function mid(value: Box<A>) returns (Box<A>) { return value; } }",
+      "impl<A> Down<Box<A>> { function down(value: Box<A>) returns (Box<A>) where Box<A>: BitNot { return value; } }"])) with
+  | .error [.signature (.implMethodUndeclaredPredicate _ _ _)] => pure ()
+  | .error errors => throw (IO.userError
+      s!"a method predicate that only follows had the wrong failure: {reprStr errors}")
+  | .ok _ => throw (IO.userError "a method predicate that only follows was accepted")
+
 private def testStageClassification : IO Unit := do
   let missingEntry := {
     singleSourceWorkspace "function ok() { return; }" with
@@ -1869,14 +1940,16 @@ private def testPhantomImplementationParameterRejection : IO Unit := do
   | .ok _ => throw (IO.userError
       "a phantom implementation parameter reached body checking")
 
-private def testMissingImplementationTraitPredicateRejection : IO Unit := do
+/-- Upstream's `SC0248`: an implementation whose head's superclass no
+implementation provides is refused where it is declared, while one whose
+superclass is provided need not restate it. -/
+private def testMissingSuperclassInstanceRejection : IO Unit := do
   match checkProgram (singleSourceWorkspace (String.intercalate "\n" [
       "trait Marker<T> {}",
       "trait Required<T> where T: Marker {}",
       "impl Required<Word> {}"
     ])) with
-  | .error [.signature
-        (.missingImplementationTraitPredicate implementation predicate)] =>
+  | .error [.missingSuperclassInstance implementation predicate .noImplementation] =>
       match predicate.trait with
       | .declaration trait =>
           assertTrue (decide (
@@ -1884,13 +1957,22 @@ private def testMissingImplementationTraitPredicateRejection : IO Unit := do
               trait.declarationIndex = 1 ∧
               trait.moduleId = implementation.moduleId ∧
               predicate.subject = .word ∧ predicate.arguments = []))
-            "missing trait predicate lost its instantiated stable identities"
+            "missing superclass lost its instantiated stable identities"
       | .builtin _ => throw (IO.userError
           "source trait requirement was reported as a builtin predicate")
   | .error errors => throw (IO.userError
-      s!"missing trait predicate had the wrong pipeline error: {reprStr errors}")
+      s!"missing superclass had the wrong pipeline error: {reprStr errors}")
   | .ok _ => throw (IO.userError
-      "an implementation missing a trait-level requirement reached body checking")
+      "an implementation without its superclass reached body checking")
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" [
+      "trait Marker<T> {}",
+      "trait Required<T> where T: Marker {}",
+      "impl Marker<Word> {}",
+      "impl Required<Word> {}"
+    ])) with
+  | .ok _ => pure ()
+  | .error errors => throw (IO.userError
+      s!"an implementation whose superclass is provided was refused: {reprStr errors}")
 
 private def checkedMethodWorkspace : Workspace.RawWorkspace :=
   singleSourceWorkspace (String.intercalate "\n" [
@@ -2072,9 +2154,10 @@ def testProgramChecking : IO Unit := do
   testGivenBelowAnImplementation
   testDefaultTierBlocking
   testSuperclassesOfGivens
+  testSuperclassInstances
   testStageClassification
   testPhantomImplementationParameterRejection
-  testMissingImplementationTraitPredicateRejection
+  testMissingSuperclassInstanceRejection
   testImplementationMethodsCheckedInSourceOrder
   testFunctionAndMethodErrorsAccumulate
   testMethodNoSolution
@@ -4119,20 +4202,25 @@ private def testFailures : IO Unit := do
     | .implementationParameterNotInHead implementation parameter =>
         decide (parameter.owner = implementation ∧ parameter.index = 1)
     | _ => false
-  expectSingleError (String.intercalate "\n" [
+  -- An implementation need not restate its trait's where predicates: they
+  -- become implied conditions, which `SC0248` checks where it is declared.
+  let implied ← parsed "implied.solc" (String.intercalate "\n" [
     "trait Marker<T> {}",
     "trait Required<T> where T: Marker {}",
-    "impl Required<Word> {}"
-  ]) fun error => match error with
-    | .missingImplementationTraitPredicate implementation predicate =>
-        match predicate.trait with
-        | .declaration trait => decide (
-            implementation.declarationIndex = 2 ∧
-            trait.declarationIndex = 0 ∧
-            trait.moduleId = implementation.moduleId ∧
-            predicate.subject = .word ∧ predicate.arguments = [])
-        | .builtin _ => false
-    | _ => false
+    "impl Required<Word> {}"])
+  match buildProgramSignatures (← catalog [implied]) with
+  | .ok signatures =>
+      match signatures.implementations with
+      | [implementation] =>
+          assertTrue (implementation.declaredWherePredicates.isEmpty &&
+              implementation.wherePredicates.length == 1 &&
+              implementation.wherePredicates.all fun predicate =>
+                predicate.subject == .word && predicate.arguments.isEmpty)
+            "an unstated superclass did not become an implied condition"
+      | implementations => throw (IO.userError
+          s!"expected one implementation, found {implementations.length}")
+  | .error errors => throw (IO.userError
+      s!"an implementation without its trait's where predicates was refused: {reprStr errors}")
 
 private def testTraitPredicateContainmentAllowsReorderingAndExtras : IO Unit := do
   let source ← parsed "predicates.solc"

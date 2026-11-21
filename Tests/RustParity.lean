@@ -57,7 +57,7 @@ private def loadStage : ProgramLoadError → String
 
 private def checkStage : ProgramCheckError → String
   | .loading error => loadStage error
-  | .signature _ => "signatures"
+  | .signature _ | .missingSuperclassInstance _ _ _ => "signatures"
   | .signatureFormation _ => "signature-formation"
   | .inference _ | .methodInference _ _ => "inference"
   | .noSolution _ _ | .methodNoSolution _ _ => "trait-resolution"

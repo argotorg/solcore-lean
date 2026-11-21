@@ -43,6 +43,17 @@ structure CheckedProgram where
   methods : List CheckedImplementationMethod := []
   deriving Repr
 
+/-- Why an implementation's superclass is not provided where it is declared,
+as upstream's `SC0248` gives the reason. -/
+inductive SuperclassFailure where
+  /-- No implementation or condition provides it. -/
+  | noImplementation
+  /-- More than one implementation or condition provides it. -/
+  | ambiguous
+  /-- The trait search gave up proving it. -/
+  | gaveUp
+  deriving Repr, BEq, DecidableEq
+
 /-- Stage-preserving failures from validation through trait-constrained body
 inference.  `noSolution` and `inconclusive` remain distinct because the latter
 must not be treated as a negative trait answer. -/
@@ -68,6 +79,13 @@ inductive ProgramCheckError where
       (method : ProgramImplMethodId)
       (reason : TraitResolution.InconclusiveReason
         ProgramTraitId TypeSystem.Ty ProgramImplId)
+  /-- Upstream's `SC0248` (`7bdd9a0a`): a direct superclass of the
+  implementation's head that its conditions do not state, and that is not
+  provided where it is declared. -/
+  | missingSuperclassInstance
+      (implementation : Resolved.DeclarationId)
+      (superclass : ProgramPredicate)
+      (reason : SuperclassFailure)
   /-- Upstream's `SC0208` for a goal that two of the function's declared
   givens reach (`reachedByTwoGivens`). -/
   | ambiguousGiven
@@ -531,10 +549,52 @@ def ambiguousGivenErrors (signatures : ProgramSignatures)
       (ambiguousGivenUse? signatures declared method.checked).map
         (ProgramCheckError.methodAmbiguousGiven method.id)
 
+/-- Whether one direct superclass of an implementation's head, which its
+conditions do not state, is provided where the implementation is declared:
+solved from its declared conditions, closed under their superclasses, as the
+givens, through the default tier's rule and row 10's (`defaultForParameter?`),
+and reached by at most one of those conditions, below as at the top. -/
+def superclassFailure? (signatures : ProgramSignatures)
+    (implementation : ProgramImplementationSignature)
+    (superclass : ProgramPredicate) : Option SuperclassFailure :=
+  let declared := implementation.declaredWherePredicates
+  if reachedByTwoGivens signatures.traits declared superclass then some .ambiguous
+  else
+    let givens := superclassClosure signatures.traits declared
+    match (TypedTraitResolution.resolve signatures.resolutionRules 32 superclass
+        givens).outcome with
+    | .success evidence =>
+        match ambiguousGivenIn signatures declared evidence with
+        | some _ => some .ambiguous
+        | none =>
+            match SourceInference.Detail.defaultForParameter?
+                signatures.resolutionRules givens evidence with
+            | some _ => some .noImplementation
+            | none => none
+    | .noSolution => some .noImplementation
+    | .inconclusive (.ambiguous _ _ _) => some .ambiguous
+    | .inconclusive _ => some .gaveUp
+
+/-- Upstream's `SC0248` over the catalog: each implementation, defaults
+included, must provide every direct superclass of its head that its conditions
+do not state, since an implementation can be used as each of them. Lean adds
+those superclasses to its conditions (`impliedConditions`), so its use sites
+prove them; this check is upstream's, at the declaration. -/
+def missingSuperclassErrors (signatures : ProgramSignatures) :
+    List ProgramCheckError :=
+  signatures.implementations.flatMap fun implementation =>
+    let unstated := (superclassPredicatesIn signatures.traits implementation.head).filter
+      fun superclass => !implementation.declaredWherePredicates.contains superclass
+    unstated.filterMap fun superclass =>
+      (superclassFailure? signatures implementation superclass).map
+        (ProgramCheckError.missingSuperclassInstance implementation.id superclass)
+
 /-- Check an already loaded program while retaining its environment and the
-resolved signature/implementation catalog in the successful result. Once every
-body is checked, a goal that two declared givens reach is refused where it is
-used (`ambiguousGivenErrors`). -/
+resolved signature/implementation catalog in the successful result. Each
+implementation's superclasses are checked where it is declared
+(`missingSuperclassErrors`) before any body. Once every body is checked, a goal
+that two declared givens reach is refused where it is used
+(`ambiguousGivenErrors`). -/
 def checkLoadedProgram (loaded : LoadedProgram) (fuel : Nat := 1024) :
     ProgramCheckResult :=
   match buildProgramSignatures loaded.environment with
@@ -544,6 +604,9 @@ def checkLoadedProgram (loaded : LoadedProgram) (fuel : Nat := 1024) :
       | .error errors =>
           .error (errors.map ProgramCheckError.signatureFormation)
       | .ok () =>
+        match missingSuperclassErrors signatures with
+        | _ :: _ => .error (missingSuperclassErrors signatures)
+        | [] =>
           let functions := SourceInference.checkFunctionBodies loaded.environment
             signatures fuel
           let methods := checkImplementationMethodBodies loaded.environment
@@ -591,6 +654,10 @@ private theorem checkLoadedProgram_success_components
           simp [checkLoadedProgram, signaturesResult, formationResult] at success
       | ok formationUnit =>
           cases formationUnit
+          cases superclassResult : missingSuperclassErrors signatures
+          case cons error rest =>
+            simp [checkLoadedProgram, signaturesResult, formationResult,
+              superclassResult] at success
           cases functionsResult : SourceInference.checkFunctionBodies
               loaded.environment signatures fuel with
           | error functionErrors =>
@@ -598,27 +665,27 @@ private theorem checkLoadedProgram_success_components
                   loaded.environment signatures fuel with
               | error methodErrors =>
                   simp [checkLoadedProgram, signaturesResult, formationResult,
-                    functionsResult, methodsResult] at success
+                    superclassResult, functionsResult, methodsResult] at success
               | ok methods =>
                   simp [checkLoadedProgram, signaturesResult, formationResult,
-                    functionsResult, methodsResult] at success
+                    superclassResult, functionsResult, methodsResult] at success
           | ok functions =>
               cases methodsResult : checkImplementationMethodBodies
                   loaded.environment signatures fuel with
               | error methodErrors =>
                   simp [checkLoadedProgram, signaturesResult, formationResult,
-                    functionsResult, methodsResult] at success
+                    superclassResult, functionsResult, methodsResult] at success
               | ok methods =>
                   cases ambiguity : ambiguousGivenErrors signatures functions methods with
                   | nil =>
                       simp [checkLoadedProgram, signaturesResult, formationResult,
-                        functionsResult, methodsResult, ambiguity] at success
+                        superclassResult, functionsResult, methodsResult, ambiguity] at success
                       subst checked
                       exact ⟨signatures, functions, methods, rfl, formationResult,
                         functionsResult, methodsResult, rfl⟩
                   | cons error rest =>
                       simp [checkLoadedProgram, signaturesResult, formationResult,
-                        functionsResult, methodsResult, ambiguity] at success
+                        superclassResult, functionsResult, methodsResult, ambiguity] at success
 
 /-- A successful loaded-program check retains the exact environment supplied
 by the loader. -/

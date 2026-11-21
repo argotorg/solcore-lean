@@ -51,7 +51,8 @@ example :=
 example :=
   @Solcore.Frontend.ProgramSignatureError.implementationParameterNotInHead
 example :=
-  @Solcore.Frontend.ProgramSignatureError.missingImplementationTraitPredicate
+  @Solcore.Frontend.ProgramCheckError.missingSuperclassInstance
+example := @Solcore.Frontend.impliedConditions
 example := @Solcore.Frontend.buildProgramSignatures_success_implRules_eq
 example := @Solcore.Frontend.buildProgramSignatures_success_implRule_mem_iff
 example := @Solcore.Frontend.ProgramContractSignature

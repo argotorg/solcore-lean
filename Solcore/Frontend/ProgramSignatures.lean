@@ -766,7 +766,7 @@ def closeUnderSuperclasses (traits : List ProgramTraitSignature)
     ProgramImplementationSignature := {
   implementation with
   wherePredicates := superclassClosure traits implementation.wherePredicates
-  declaredWherePredicates := implementation.wherePredicates
+  declaredWherePredicates := implementation.declaredWherePredicates
 }
 
 @[simp] theorem closeUnderSuperclasses_id (traits : List ProgramTraitSignature)
@@ -1021,9 +1021,6 @@ inductive ProgramSignatureError where
   | implementationParameterNotInHead
       (implementation : Resolved.DeclarationId)
       (parameter : TypeSystem.TypeParameterId)
-  | missingImplementationTraitPredicate
-      (implementation : Resolved.DeclarationId)
-      (predicate : ProgramPredicate)
   /-- A default implementation whose head overlaps an earlier default's of the
   same trait while one of the two has no where predicates (`SC0247`). -/
   | overlappingDefaultImplementation
@@ -1059,7 +1056,6 @@ private def programSignatureErrorDeclaration :
   | .implMethodUndeclaredPredicate method _ _ => method.implementation
   | .traitCatalogUnavailable implementation _ => implementation
   | .implementationParameterNotInHead implementation _ => implementation
-  | .missingImplementationTraitPredicate implementation _ => implementation
   | .overlappingDefaultImplementation implementation _ => implementation
   | .orphanImplementation implementation => implementation
   | .duplicateDataConstructor dataType _ _ _ => dataType
@@ -2349,6 +2345,33 @@ private theorem validatedAndAttachedImplMethods_matchTrait
     subst selected
     exact ⟨method, methodMember, selectedId⟩
 
+/-- An implementation's conditions, then the trait's where predicates at its head
+that they do not state: an implicit restatement, as upstream reads an impl's
+superclasses. `SC0248` checks the implied ones where the implementation is
+declared (`missingSuperclassErrors`). -/
+def impliedConditions (conditions required : List ProgramPredicate) :
+    List ProgramPredicate :=
+  conditions ++ required.filter fun predicate =>
+    !conditions.any fun condition => decide (condition = predicate)
+
+theorem mem_impliedConditions_of_required {conditions required : List ProgramPredicate}
+    {predicate : ProgramPredicate} (member : predicate ∈ required) :
+    predicate ∈ impliedConditions conditions required := by
+  unfold impliedConditions
+  by_cases stated : predicate ∈ conditions
+  · exact List.mem_append_left _ stated
+  · refine List.mem_append_right _ (List.mem_filter.mpr ⟨member, ?_⟩)
+    have unstated : (conditions.any fun condition => decide (condition = predicate)) = false := by
+      rw [List.any_eq_false]
+      intro condition conditionMember equal
+      exact stated (of_decide_eq_true equal ▸ conditionMember)
+    simp [unstated]
+
+theorem mem_impliedConditions_of_mem {conditions required : List ProgramPredicate}
+    {predicate : ProgramPredicate} (member : predicate ∈ conditions) :
+    predicate ∈ impliedConditions conditions required :=
+  List.mem_append_left _ member
+
 private def implementationSignatureOfDeclaration
     (environment : ProgramEnvironment) (declaration : ProgramDeclaration)
     (traits : List ProgramTraitSignature) (source : Syntax.ImplDecl) :
@@ -2379,12 +2402,10 @@ private def implementationSignatureOfDeclaration
     traitSignature.parameters.zip (subject :: arguments)
   let requiredPredicates := traitSignature.wherePredicates.map
     (ProgramPredicate.applyParameters substitution)
-  validateContained
-    (ProgramSignatureError.missingImplementationTraitPredicate declaration.id)
-    wherePredicates requiredPredicates
+  let conditions := impliedConditions wherePredicates requiredPredicates
   let unmatchedMethods ← unmatchedImplMethodsOfDeclaration environment
     declaration scope source.value.methods 0 []
-  validateRequiredImplMethods declaration.id substitution wherePredicates
+  validateRequiredImplMethods declaration.id substitution conditions
     traitSignature.methods unmatchedMethods
   let methods ← attachTraitMethods traitSignature.methods unmatchedMethods
   pure {
@@ -2392,7 +2413,8 @@ private def implementationSignatureOfDeclaration
     isDefault := source.value.defaultMarker.isSome
     parameters
     head
-    wherePredicates
+    wherePredicates := conditions
+    declaredWherePredicates := wherePredicates
     methods
     source
   }
@@ -3032,14 +3054,9 @@ private theorem implementationSignatureOfDeclaration_success_header
                     (resolvedSubject :: resolvedArguments)
                 let requiredPredicates := traitSignature.wherePredicates.map
                   (ProgramPredicate.applyParameters substitution)
-                apply Except.SuccessSatisfies.bind_property
-                  (validateContained
-                    (ProgramSignatureError.missingImplementationTraitPredicate
-                      declaration.id)
-                    wherePredicates requiredPredicates) _
-                  (Except.SuccessSatisfies.of_success _
-                    (fun _ resultEq => validateContained_success resultEq))
-                intro predicatesChecked predicatesContained
+                have predicatesContained : ∀ predicate, predicate ∈ requiredPredicates →
+                    predicate ∈ impliedConditions wherePredicates requiredPredicates :=
+                  fun _ member => mem_impliedConditions_of_required member
                 apply Except.SuccessSatisfies.bind_property
                   (unmatchedImplMethodsOfDeclaration environment declaration
                     (ProgramTypeScope.ofDeclaration declaration)
@@ -3138,8 +3155,6 @@ private theorem implementationSignatureOfDeclaration_success_method_catalog
                       decide (candidate.id = trait)) traitEq
                   exact of_decide_eq_true traitMatches
                 have traitStructure := traitStructures traitSignature traitMember
-                apply Except.SuccessSatisfies.bind
-                intro predicatesChecked
                 apply Except.SuccessSatisfies.bind_property
                   (unmatchedImplMethodsOfDeclaration environment declaration
                     (ProgramTypeScope.ofDeclaration declaration)
@@ -3150,16 +3165,18 @@ private theorem implementationSignatureOfDeclaration_success_method_catalog
                 have validationFacts : Except.SuccessSatisfies
                     (fun _ : Unit =>
                       validateRequiredImplMethods declaration.id substitution
-                        wherePredicates traitSignature.methods unmatchedMethods =
-                          .ok ())
+                        (impliedConditions wherePredicates requiredPredicates)
+                        traitSignature.methods unmatchedMethods = .ok ())
                     (validateRequiredImplMethods declaration.id substitution
-                      wherePredicates traitSignature.methods unmatchedMethods) :=
+                      (impliedConditions wherePredicates requiredPredicates)
+                      traitSignature.methods unmatchedMethods) :=
                   Except.SuccessSatisfies.of_success _ (fun result resultEq => by
                     cases result
                     exact resultEq)
                 apply Except.SuccessSatisfies.bind_property
                   (validateRequiredImplMethods declaration.id substitution
-                    wherePredicates traitSignature.methods unmatchedMethods) _
+                    (impliedConditions wherePredicates requiredPredicates)
+                    traitSignature.methods unmatchedMethods) _
                   validationFacts
                 intro methodsChecked validationSuccess
                 cases methodsChecked
