@@ -307,7 +307,7 @@ theorem inferExprFuel_builtin_normalized_formation
     (notLocal : allocated.lookupBinder? name.value = none)
     (notBoolean : (name.value == "true" || name.value == "false") = false)
     (functions : Detail.functionsNamed context name.value = .ok [])
-    (builtin : builtinFunctionNamed? name.value = some function)
+    (builtin : Detail.builtinNamed? context name.value = some function)
     (expectedFormed : ∀ type ∈ expected, TypeAdmissible semantic (outer.apply type))
     (continuation : outer.SemanticallyExtends result.2.inference.substitution)
     (accepted : Detail.inferExprFuel (fuel + 1) context expression expected initial = .ok result) :

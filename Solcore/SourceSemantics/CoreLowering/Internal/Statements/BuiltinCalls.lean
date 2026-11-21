@@ -90,7 +90,7 @@ inductive Reference (callables : SourceCoreFunctions.CallablePolicy) (compilatio
     (source : TypedSource) (node : ExpressionNode) (name : String) (function : BuiltinFunctionId) :
     SourceCoreBasic.LoweredExpr → Prop where
   | intro {index : Nat} {identity : Word} {expression : Expr}
-      (spelling : name = function.spelling) (sourceType : node.type = function.type)
+      (spelling : function.namedBy name = true) (sourceType : node.type = function.type)
       (inventory : BuiltinFunctionId.all.zipIdx.find? (fun item => decide (item.1 = function)) = some (function, index))
       (identitySelected : Word.ofNat? (compilation.globals.length + index + 1) = some identity)
       (decorated : callables.decorateCallable compilation source node (.builtin function)
@@ -105,7 +105,7 @@ theorem reference_of_accepted
     {lowered : SourceCoreBasic.LoweredExpr}
     (accepted : SourceCoreFunctions.builtinReference callables compilation source node name function = .ok lowered) :
     Reference callables compilation source node name function lowered := by
-  by_cases spelling : name = function.spelling
+  by_cases spelling : function.namedBy name = true
   · by_cases sourceType : node.type = function.type
     · cases inventory : BuiltinFunctionId.all.zipIdx.find? (fun item => decide (item.1 = function)) with
       | none => simp [SourceCoreFunctions.builtinReference, spelling, sourceType, inventory, throw, throwThe, MonadExceptOf.throw, bind, Except.bind, pure, Except.pure] at accepted
@@ -118,8 +118,8 @@ theorem reference_of_accepted
         | none => simp [SourceCoreFunctions.builtinReference, spelling, sourceType, inventory, selected, throw, throwThe, MonadExceptOf.throw, bind, Except.bind, pure, Except.pure] at accepted
         | some identity =>
           simp only [SourceCoreFunctions.builtinReference, spelling, sourceType, ne_eq,
-            not_true_eq_false, decide_false, Bool.false_or, Bool.false_eq_true, ↓reduceIte,
-            inventory, selected, bind, Except.bind, pure, Except.pure] at accepted
+            not_true_eq_false, decide_false, Bool.not_true, Bool.false_or, Bool.false_eq_true,
+            ↓reduceIte, inventory, selected, bind, Except.bind, pure, Except.pure] at accepted
           obtain ⟨expression, decorated, accepted⟩ := bind_ok accepted
           cases accepted
           exact .intro spelling sourceType inventory selected decorated

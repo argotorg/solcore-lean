@@ -2017,7 +2017,7 @@ mutual
               else do
                 match ← functionsNamed context name.value with
                 | [] =>
-                    match builtinFunctionNamed? name.value with
+                    match builtinNamed? context name.value with
                     | some function =>
                         recordExpressionWithExpected context expression id
                           function.type
@@ -2241,7 +2241,7 @@ mutual
                           let candidates ← functionsNamed context name
                           match candidates with
                           | [] =>
-                              match builtinFunctionNamed? name with
+                              match builtinNamed? context name with
                               | some function =>
                                   recordBuiltinFunctionCall expression callee name
                                     function arguments id expected state

@@ -88,7 +88,7 @@ theorem inferExprFuelLedgerPreservation_step
         | ok candidates =>
           cases candidates with
           | nil =>
-            cases builtin : builtinFunctionNamed? name.value with
+            cases builtin : Detail.builtinNamed? context name.value with
             | none =>
               simp [Detail.inferExprFuel, allocation, form, found, boolean,
                 functions, builtin, bind, Except.bind] at accepted

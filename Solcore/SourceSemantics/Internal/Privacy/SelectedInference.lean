@@ -651,7 +651,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         simp only [functionsResult] at success
         cases candidates with
         | nil =>
-            cases builtinResult : builtinFunctionNamed? name.value with
+            cases builtinResult : builtinNamed? context name.value with
             | none => simp [builtinResult] at success
             | some function =>
                 simp only [builtinResult] at success

@@ -318,7 +318,7 @@ theorem inferExprFuel_success_builtinFunctionIdentifier_record
     (notBoolean :
       (name.value == "true" || name.value == "false") = false)
     (functionsEq : functionsNamed context name.value = .ok [])
-    (builtinEq : builtinFunctionNamed? name.value = some function)
+    (builtinEq : builtinNamed? context name.value = some function)
     (success : inferExprFuel (fuel + 1) context expression expected initial =
       .ok result) :
     recordExpressionWithExpected context expression id function.type
@@ -10370,7 +10370,7 @@ private theorem inferFuel_inferenceProperties_internal :
         simp only [functionsResult, bind, Except.bind] at success
         cases candidates with
         | nil =>
-            cases builtinResult : builtinFunctionNamed? name.value with
+            cases builtinResult : builtinNamed? context name.value with
             | none => simp [builtinResult] at success
             | some function =>
                 simp only [builtinResult] at success
@@ -12555,7 +12555,7 @@ private theorem inferFuel_inferenceProperties_internal :
                                     cases candidates with
                                     | nil =>
                                         cases builtinEq :
-                                            builtinFunctionNamed? name with
+                                            builtinNamed? context name with
                                         | none =>
                                             simp only [builtinEq] at success
                                             cases copyEq : toArrayCall name
@@ -14881,7 +14881,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                     cases candidates with
                                     | nil =>
                                         cases builtinEq :
-                                            builtinFunctionNamed? name with
+                                            builtinNamed? context name with
                                         | none =>
                                             simp only [builtinEq] at success
                                             cases copyEq : toArrayCall name

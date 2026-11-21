@@ -3507,7 +3507,7 @@ theorem
       (name.value == "true" || name.value == "false") = false)
     (functionsEq : Detail.functionsNamed inferenceContext name.value =
       .ok [])
-    (builtinEq : Frontend.builtinFunctionNamed? name.value = some function)
+    (builtinEq : Detail.builtinNamed? inferenceContext name.value = some function)
     (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
       expected initial = .ok (inferred, resultState))
     (resultSubstitutionExtension :

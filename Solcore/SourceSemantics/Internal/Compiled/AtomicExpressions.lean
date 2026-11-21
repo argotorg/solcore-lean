@@ -80,7 +80,7 @@ theorem expressionRetained_identifier {name : Syntax.Identifier}
       | ok candidates =>
         cases candidates with
         | nil =>
-          cases builtin : builtinFunctionNamed? name.value with
+          cases builtin : Detail.builtinNamed? inferenceContext name.value with
           | none =>
             simp [Detail.inferExprFuel, allocationEq, expressionEq, found, boolean,
               functions, builtin, bind, Except.bind] at success

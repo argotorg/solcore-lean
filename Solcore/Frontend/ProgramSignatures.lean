@@ -38,6 +38,11 @@ def spelling : BuiltinFunctionId → String
   | .wordIdentity => "Typedef"
   | .wordOpcode op => "std.opcodes." ++ op.name
 
+/-- Whether a reference's name may denote the function: its spelling, or any name for an opcode,
+which an import of `std.opcodes` binds, an alias among them. -/
+def namedBy (function : BuiltinFunctionId) (name : String) : Bool :=
+  name == function.spelling || function.opcode?.isSome
+
 /-- Exact compiler-function spellings remain pairwise distinct. -/
 theorem all_spellings_nodup : (all.map spelling).Nodup := by
   simp [all, spelling, WordOpcode.all, WordOpcode.name]

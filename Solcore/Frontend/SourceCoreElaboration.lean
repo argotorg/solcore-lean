@@ -997,7 +997,7 @@ private def validateBuiltinFunctionCallWith {error : Type}
       if actual != function then
         failWith lift calleeSite
           (.builtinFunctionCalleeIdentityMismatch function actual)
-      else if name != function.spelling then
+      else if !function.namedBy name then
         failWith lift calleeSite
           (.builtinFunctionCalleeSpellingMismatch function function.spelling
             name)

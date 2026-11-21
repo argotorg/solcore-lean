@@ -665,6 +665,10 @@ theorem all_complete (op : WordOpcode) : op ∈ all := by
 theorem all_nodup : all.Nodup := by
   decide
 
+/-- The opcode a `std.opcodes` name denotes, if it is one of the 26. -/
+def ofName? (name : String) : Option WordOpcode :=
+  all.find? (·.name == name)
+
 end WordOpcode
 
 /-- Compiler-provided functions that do not have source declaration identities. -/
@@ -1200,6 +1204,31 @@ private def hiddenNames (clause : Option Syntax.HidingClause) : List String :=
   | none => []
   | some clause => clause.value.names.toList.map selectorSpelling
 
+/-- The functions upstream's `std.opcodes` exports (`std/opcodes.sol` at `d1b5ac28`), in its
+order: the 26 pure word functions, which are builtins (`WordOpcode`), and 55 that read or change
+memory, storage, the environment or control flow, which Lean refuses where they are used. -/
+def standardOpcodeNames : List String :=
+  ["stop", "add", "mul", "sub", "div", "sdiv", "mod", "smod", "addmod", "mulmod", "exp",
+    "signextend", "lt", "gt", "slt", "sgt", "eq", "iszero", "and", "or", "xor", "not", "byte",
+    "shl", "shr", "sar", "clz", "keccak256", "address", "balance", "origin", "caller", "callvalue",
+    "calldataload", "calldatasize", "calldatacopy", "codesize", "codecopy", "gasprice",
+    "extcodesize", "extcodecopy", "returndatasize", "returndatacopy", "extcodehash", "blockhash",
+    "coinbase", "timestamp", "number", "prevrandao", "gaslimit", "chainid", "selfbalance",
+    "basefee", "blobhash", "blobbasefee", "pop", "mload", "mstore", "mstore8", "sload", "sstore",
+    "msize", "gas", "tload", "tstore", "mcopy", "log0", "log1", "log2", "log3", "log4", "create",
+    "call", "callcode", "return_", "delegatecall", "create2", "staticcall", "revert_", "invalid",
+    "selfdestruct"]
+
+/-- The identity that stands for upstream's `std.opcodes`, a standard module Lean has no source
+for: an import of it binds its functions (`standardOpcodeNames`), the 26 pure ones to builtins. -/
+def standardOpcodesModule : Workspace.ModuleId :=
+  ⟨.standard, ⟨[⟨"opcodes", by decide⟩], by simp⟩⟩
+
+/-- Whether an import's path names upstream's `std.opcodes`. It stands for that module where no
+module of the program resolves at the path. -/
+def isStandardOpcodesPath (path : Syntax.ModulePath) : Bool :=
+  path.value.externalMarker.isNone && programModulePathComponents path == ["std", "opcodes"]
+
 private def publicAsVisible
     (interface : ProgramInterface) (hidden : List String) :
     List VisibleEntity :=
@@ -1250,7 +1279,11 @@ private def processImport
   let path := match declaration.value with
     | .plain path | .namespace path _ | .wildcard path _ | .selected _ path _ => path
   match resolveProgramModulePath? environment owner path with
-  | none => { errors := [.unknownModule owner (programModulePathComponents path)] }
+  | none =>
+      -- An import of upstream's `std.opcodes` binds builtins, not declarations: the load checks
+      -- it (`standardOpcodeImportErrors`) and the import tables bind it (`buildProgramImports`).
+      if isStandardOpcodesPath path then {}
+      else { errors := [.unknownModule owner (programModulePathComponents path)] }
   | some target =>
       let interface := interfaceOf interfaces target
       match declaration.value with
@@ -1854,6 +1887,61 @@ def reachableProgramModules (environment : ProgramEnvironment) (entry : Workspac
     List Workspace.ModuleId :=
   reachableFrom environment (environment.modules.length + 1) [entry]
 
+/-- Whether an import names upstream's `std.opcodes` where no module of the program resolves. -/
+def isStandardOpcodesImport (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
+    (declaration : Syntax.ImportDecl) : Bool :=
+  isStandardOpcodesPath (importPath declaration) &&
+    (resolveProgramModulePath? environment owner (importPath declaration)).isNone
+
+/-- The names a selected or wildcard import of upstream's `std.opcodes` binds, each with the
+function it denotes: its selected functions under their aliases, or all of them, less the hidden
+ones. A name it does not export binds nothing (`standardOpcodeImportErrors`). -/
+def standardOpcodeBindings (declaration : Syntax.ImportDecl) : List (String × String) :=
+  match declaration.value with
+  | .selected selection _ hidingClause =>
+      let hidden := hiddenNames hidingClause
+      selection.elements.toList.filterMap fun item =>
+        let source := selectorSpelling item.value.source
+        let localName := item.value.alias.map (·.value) |>.getD source
+        if standardOpcodeNames.contains source &&
+            !(hidden.contains source || hidden.contains localName) then
+          some (localName, source)
+        else none
+  | .wildcard _ hidingClause =>
+      let hidden := hiddenNames hidingClause
+      standardOpcodeNames.filterMap fun name =>
+        if hidden.contains name then none else some (name, name)
+  | _ => []
+
+/-- The names a module's imports of upstream's `std.opcodes` bind. -/
+private def standardOpcodeNamesBound (environment : ProgramEnvironment) (module : ProgramModule) :
+    List String :=
+  (importsIn module).flatMap fun declaration =>
+    if isStandardOpcodesImport environment module.id declaration then
+      (standardOpcodeBindings declaration).map (·.1)
+    else []
+
+/-- Upstream's `SC0110` and `SC0108` for an import of `std.opcodes`: a selected or hidden name
+it does not export, and a name it binds beside a value the module declares. -/
+private def standardOpcodeImportErrors (environment : ProgramEnvironment) (module : ProgramModule) :
+    List ProgramInterfaceError :=
+  let unknown (name : String) : Option ProgramInterfaceError :=
+    if standardOpcodeNames.contains name then none
+    else some (.unknownImportName module.id standardOpcodesModule name)
+  let unknownNames := (importsIn module).flatMap fun declaration =>
+    if isStandardOpcodesImport environment module.id declaration then
+      match declaration.value with
+      | .selected selection _ hidingClause =>
+          (selection.elements.toList.filterMap fun item =>
+            unknown (selectorSpelling item.value.source)) ++ (hiddenNames hidingClause).filterMap unknown
+      | .wildcard _ hidingClause => (hiddenNames hidingClause).filterMap unknown
+      | _ => []
+    else []
+  let declared := (environment.declarationsIn module.id).filterMap fun declaration =>
+    if declaration.nameSpace == some .value then declaration.name else none
+  unknownNames ++ ((standardOpcodeNamesBound environment module).eraseDups.filter
+    declared.contains).map (.importedNameConflict module.id .value ·)
+
 /-- Upstream's `SC0117`: a selective import that lists one source name twice or binds one local
 name twice, and a hiding clause that hides one name twice, once per name. It reads only the
 import, so it holds for a module the load does not resolve too. -/
@@ -1881,7 +1969,10 @@ private def ambiguousImports (environment : ProgramEnvironment) (interfaces : Pr
     match declaration.value with
     | .wildcard _ _ | .selected _ _ _ =>
         match resolveProgramModulePath? environment module.id (importPath declaration) with
-        | none => []
+        | none =>
+            if isStandardOpcodesPath (importPath declaration) then
+              (standardOpcodeBindings declaration).map fun (name, _) => (name, standardOpcodesModule)
+            else []
         | some target =>
             (processImport environment interfaces module.id declaration).entities.map
               fun entity => (entity.localName, target)
@@ -1923,7 +2014,8 @@ private def importQualifierConflicts (environment : ProgramEnvironment)
     ((importsIn module).flatMap fun declaration =>
       (processImport environment interfaces module.id declaration).entities.filterMap
         fun entity =>
-          if entity.declaration.nameSpace == some .value then some entity.localName else none)
+          if entity.declaration.nameSpace == some .value then some entity.localName else none) ++
+    standardOpcodeNamesBound environment module
   (qualifiers.eraseDups.filter values.contains).map (.importQualifierConflict module.id ·)
 
 /-- The import rules a load checks in each module, as upstream's validation does: a name brought
@@ -1932,7 +2024,8 @@ beside a declaration (`SC0108`), a name listed twice (`SC0117`), a name from two
 private def importRuleErrors (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (module : ProgramModule) : List ProgramInterfaceError :=
   importConflicts environment interfaces module (localEntities environment module.id) ++
-    duplicateImportNames module ++ ambiguousImports environment interfaces module ++
+    standardOpcodeImportErrors environment module ++ duplicateImportNames module ++
+    ambiguousImports environment interfaces module ++
     importQualifierConflicts environment interfaces module
 
 /-- The import errors of a program that its load reports, for the modules reachable from its

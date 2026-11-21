@@ -1156,7 +1156,7 @@ theorem inferExprFuel_call_fixes_protected
                             cases candidates with
                             | nil =>
                                 cases builtinEq :
-                                    builtinFunctionNamed? name with
+                                    builtinNamed? context name with
                                 | none =>
                                     simp only [builtinEq] at success
                                     cases copyEq : toArrayCall name

@@ -3124,7 +3124,7 @@ def lambdaParameters (policy : Policy) (source : TypedSource) : Scope → List T
 /-- Actual builtin metadata lowering, exposed for compiler certificates. -/
 def builtinReference (callables : CallablePolicy) (context : Context) (source : TypedSource) (node : ExpressionNode)
     (name : String) (function : BuiltinFunctionId) : Except Error LoweredExpr := do
-  if name ≠ function.spelling || node.type ≠ function.type then
+  if !function.namedBy name || node.type ≠ function.type then
     throw (.unsupportedExpression node.id node.form)
   let index ← match BuiltinFunctionId.all.zipIdx.find? (fun item => decide (item.1 = function)) with
     | some item => pure item.2

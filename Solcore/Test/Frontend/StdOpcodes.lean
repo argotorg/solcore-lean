@@ -1,0 +1,178 @@
+import Solcore.Frontend.SourceCompiler
+
+/-!
+# `std.opcodes` imports
+
+Upstream's `std.opcodes` as a module of the load: its 81 functions bound by selected, aliased,
+wildcard and hiding imports, the 26 pure ones as builtins, the other 55 refused where they are
+used. Each case is a source upstream's pinned checker was probed with, and gives upstream's
+verdict; an accepted one runs at 9 and 2^256 − 1 and gives the results upstream's checked Hull
+gives. Until qualified access and std beside std.opcodes follow upstream, six forms stay as they
+were (`testFormsAsBefore`).
+-/
+
+set_option autoImplicit false
+
+namespace Tests.StdOpcodes
+
+open Solcore Solcore.Frontend
+
+private def assertTrue (condition : Bool) (label : String) : IO Unit := do
+  unless condition do
+    throw (IO.userError label)
+
+private def maximum : Nat := 2 ^ 256 - 1
+
+private def library : String := String.intercalate "\n" [
+  "pragma solcore;",
+  "export { add, f };",
+  "function add(x: word, y: word) returns (word) { return y; }",
+  "function f(x: word) returns (word) { return x; }"]
+
+private def workspace (imports declarations : List String) (body : String) :
+    Workspace.RawWorkspace := {
+  entry := "main.solc"
+  mainSources := [
+    { path := "main.solc", content := String.intercalate "\n" (["pragma solcore;"] ++ imports ++
+        declarations ++ [s!"function main(a0: word) returns (word) \{ return {body}; }"]) },
+    { path := "lib.solc", content := library }]
+  externalLibraries := []
+}
+
+/-- The function `main` loaded, checked, compiled and run at each input, or the stage that
+refused it. -/
+private def runMain (raw : Workspace.RawWorkspace) (inputs : List Nat) : IO (Except String (List Nat)) := do
+  let loaded ← match loadProgram raw with
+    | .ok loaded => pure loaded
+    | .error _ => return .error "load"
+  let checked ← match checkLoadedProgram loaded 4096 with
+    | .ok checked => pure checked
+    | .error _ => return .error "check"
+  let seed := SourceCompiler.Seed.named loaded.workspace.entry.toModuleId "main"
+  let options : SourceCompiler.Options :=
+    {checkingFuel := 4096, compilationFuel := 4096, specializationBudget := 1024}
+  let compiled ← match SourceCompiler.compileChecked checked [seed] options with
+    | .ok compiled => pure compiled
+    | .error _ => return .error "compile"
+  let key ← match compiled.keys with
+    | [key] => pure key
+    | _ => return .error "keys"
+  let artifact ← compiled.open
+  let bootstrap ← artifact.bootstrap
+  let session ← match bootstrap.resume 1000000 with
+    | .ready session => pure session
+    | _ => return .error "boot"
+  let mut results := []
+  for input in inputs do
+    match ← session.run key [.word (Core.Word.ofNatModulo input)]
+        {inputValidationFuel := 4096, outputValidationFuel := 4096, executionFuel := 1000000} with
+    | .ok (.succeeded completion) => match completion.value with
+      | .word word => results := results ++ [word.val]
+      | _ => return .error "value"
+    | _ => return .error "run"
+  return .ok results
+
+private def expectResults (label : String) (imports declarations : List String) (body : String)
+    (expected : List Nat) : IO Unit := do
+  let found ← runMain (workspace imports declarations body) [9, maximum]
+  assertTrue (match found with | .ok results => results == expected | .error _ => false)
+    s!"{label}: expected {expected}, got {reprStr found}"
+
+private def expectRefused (label : String) (imports declarations : List String) (body : String)
+    (stage : String) : IO Unit := do
+  let found ← runMain (workspace imports declarations body) [9]
+  assertTrue (match found with | .error refused => refused == stage | .ok _ => false)
+    s!"{label}: expected a refusal at {stage}, got {reprStr found}"
+
+private def localDiv : String := "function div(x: word, y: word) returns (word) { return x; }"
+
+private def apply : String :=
+  "function apply(g: function (word, word) returns (word), x: word) returns (word) { return g(x, 4); }"
+
+/-- Forms upstream accepts, with its results at 9 and 2^256 − 1. -/
+private def testAccepted : IO Unit := do
+  let quarter := [2, maximum / 4]
+  expectResults "selected" ["import { div } from std.opcodes;"] [] "div(a0, 4)" quarter
+  expectResults "aliased" ["import { div as sc_div } from std.opcodes;"] [] "sc_div(a0, 4)" quarter
+  expectResults "wildcard" ["import * from std.opcodes;"] [] "div(a0, 4)" quarter
+  expectResults "wildcard hiding one, another used" ["import * from std.opcodes hiding { div };"] []
+    "mod(a0, 4)" [1, 3]
+  expectResults "wildcard hiding one, a local of it" ["import * from std.opcodes hiding { div };"]
+    [localDiv] "div(a0, 4)" [9, maximum]
+  expectResults "an alias, a local of the original name"
+    ["import { div as sc_div } from std.opcodes;"] [localDiv] "sc_div(div(a0, 4), 2)"
+    [4, maximum / 2]
+  expectResults "an effectful function imported, unused" ["import { mload } from std.opcodes;"] []
+    "a0" [9, maximum]
+  expectResults "a wildcard, nothing used" ["import * from std.opcodes;"] [] "a0" [9, maximum]
+  expectResults "the same item in two imports"
+    ["import { div } from std.opcodes;", "import { div } from std.opcodes;"] [] "div(a0, 4)" quarter
+  expectResults "one alias in two imports, the first kept"
+    ["import { div as h } from std.opcodes;", "import { mod as h } from std.opcodes;"] []
+    "h(a0, 4)" quarter
+  expectResults "a wildcard, then an alias of another function"
+    ["import * from std.opcodes;", "import { mod as div } from std.opcodes;"] [] "div(a0, 4)" quarter
+  expectResults "an effectful and a pure function, the pure used"
+    ["import { mload, div } from std.opcodes;"] [] "div(a0, 4)" quarter
+  expectResults "an aliased opcode as a function value"
+    ["import { div as sc_div } from std.opcodes;"] [apply] "apply(sc_div, a0)" quarter
+  expectResults "a wildcard opcode as a function value" ["import * from std.opcodes;"] [apply]
+    "apply(shr, a0)" [0, 0]
+
+/-- Forms upstream refuses, refused at the load or where the name is used. -/
+private def testRefused : IO Unit := do
+  expectRefused "an alias, the original used" ["import { div as sc_div } from std.opcodes;"] []
+    "div(a0, 4)" "check"
+  expectRefused "a wildcard hiding one, it used" ["import * from std.opcodes hiding { div };"] []
+    "div(a0, 4)" "check"
+  expectRefused "a wildcard and a local of an export" ["import * from std.opcodes;"] [localDiv]
+    "div(a0, 4)" "load"
+  expectRefused "a wildcard and a local named like an effectful export"
+    ["import * from std.opcodes;"] ["function mload(x: word) returns (word) { return x; }"] "a0"
+    "load"
+  expectRefused "a selected function and a local of its name" ["import { div } from std.opcodes;"]
+    [localDiv] "div(a0, 4)" "load"
+  expectRefused "an unknown item" ["import { nosuch } from std.opcodes;"] [] "a0" "load"
+  expectRefused "an unknown hidden item" ["import * from std.opcodes hiding { nosuch };"] [] "a0"
+    "load"
+  expectRefused "an effectful function used" ["import { mload } from std.opcodes;"] [] "mload(a0)"
+    "check"
+  expectRefused "one item twice" ["import { div, div } from std.opcodes;"] [] "div(a0, 4)" "load"
+  expectRefused "one item and its alias" ["import { div, div as d } from std.opcodes;"] []
+    "d(div(a0, 4), 2)" "load"
+  expectRefused "one alias twice" ["import { div as h, mod as h } from std.opcodes;"] []
+    "h(a0, 4)" "load"
+  expectRefused "one name from std.opcodes and a user module"
+    ["import { add } from std.opcodes;", "import { add } from lib;"] [] "a0" "load"
+  expectRefused "the same, used" ["import { add } from std.opcodes;", "import { add } from lib;"] []
+    "add(a0, 4)" "load"
+  expectRefused "two wildcards sharing a name" ["import * from std.opcodes;", "import * from lib;"] []
+    "a0" "load"
+  expectRefused "a plain import and a local of its qualifier" ["import std.opcodes;"]
+    ["function opcodes(x: word) returns (word) { return x; }"] "opcodes(a0)" "load"
+  expectRefused "a plain import, a bare call" ["import std.opcodes;"] [] "div(a0, 4)" "check"
+  expectRefused "no import, a qualified call" [] [] "std.opcodes.div(a0, 4)" "check"
+
+/-- The six forms that differ from upstream as they did before `std.opcodes` was a module of the
+load: qualified access after a plain import, and std beside std.opcodes. -/
+private def testFormsAsBefore : IO Unit := do
+  expectRefused "a plain import, a qualified call" ["import std.opcodes;"] [] "opcodes.div(a0, 4)"
+    "check"
+  expectRefused "a plain import, a fully qualified call" ["import std.opcodes;"] []
+    "std.opcodes.div(a0, 4)" "check"
+  expectRefused "a qualified opcode as a function value" ["import std.opcodes;"] [apply]
+    "apply(opcodes.sub, a0)" "check"
+  expectResults "std and std.opcodes wildcards, nothing used"
+    ["import * from std;", "import * from std.opcodes;"] [] "a0" [9, maximum]
+  expectRefused "a std wildcard, a std.opcodes function used"
+    ["import * from std;", "import { div } from std.opcodes;"] [] "div(a0, 4)" "check"
+  expectRefused "a std.dispatch wildcard, a std.opcodes function used"
+    ["import * from std.dispatch;", "import { div } from std.opcodes;"] [] "div(a0, 4)" "check"
+
+def run : IO Unit := do
+  testAccepted
+  testRefused
+  testFormsAsBefore
+  IO.println "std.opcodes imports: accepted forms at upstream's results, refused forms, six as before GREEN"
+
+end Tests.StdOpcodes

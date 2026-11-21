@@ -45,6 +45,13 @@ structure ProgramImportedValue where
   declaration : ProgramDeclaration
   deriving Repr
 
+/-- One unqualified spelling that an import of upstream's `std.opcodes` binds to one of its
+functions (`standardOpcodeNames`). -/
+structure ProgramImportedBuiltin where
+  localName : String
+  function : String
+  deriving Repr, DecidableEq
+
 /-- Direct visibility contributed by all imports in one source module. -/
 structure ProgramImports where
   hasImports : Bool := false
@@ -53,6 +60,7 @@ structure ProgramImports where
   types : List ProgramImportedType := []
   traits : List ProgramImportedTrait := []
   values : List ProgramImportedValue := []
+  builtins : List ProgramImportedBuiltin := []
   deriving Repr
 
 /-- Import construction failures which cannot be interpreted as name absence. -/
@@ -293,11 +301,29 @@ private def keepFirstBindings (earlier : List EarlierBinding) (target : Workspac
      traits.filterMap (fun row => bindingOf target row.localName row.declaration) ++
      values.filterMap (fun row => bindingOf target row.localName row.declaration))
 
+/-- An import of upstream's `std.opcodes`: the functions it binds, less the names an earlier import
+of it bound, as upstream keeps the first. Its plain and namespace forms bind nothing yet. -/
+private def processStandardOpcodesImport (earlier : List EarlierBinding)
+    (visibility : ProgramImports) (declaration : Syntax.ImportDecl) :
+    ProgramImports × List EarlierBinding :=
+  let bindings := (standardOpcodeBindings declaration).filter fun (localName, _) =>
+    !earlier.any fun binding => binding.localName == localName &&
+      binding.group == .value && decide (binding.target = standardOpcodesModule)
+  ({ visibility with
+      builtins := visibility.builtins ++ bindings.map fun (localName, function) =>
+        { localName, function } },
+    bindings.map fun (localName, _) =>
+      { localName, group := .value, target := standardOpcodesModule })
+
 private def processImport
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (importer : Workspace.ModuleId) (earlier : List EarlierBinding)
     (visibility : ProgramImports) (declaration : Syntax.ImportDecl) :
     List ProgramImportError × ProgramImports × List EarlierBinding :=
+  if isStandardOpcodesImport environment importer declaration then
+    let (visibility, bindings) := processStandardOpcodesImport earlier visibility declaration
+    ([], visibility, bindings)
+  else
   match declaration.value with
   | .plain path =>
       match resolveProgramImportModule environment importer path with
@@ -398,6 +424,10 @@ def traitsNamed (visibility : ProgramImports) (name : String) :
   deduplicateDeclarationsAux [] <|
     visibility.traits.filterMap fun imported =>
       if imported.localName == name then some imported.declaration else none
+
+/-- The `std.opcodes` functions an import binds the name to. -/
+def builtinsNamed (visibility : ProgramImports) (name : String) : List String :=
+  (visibility.builtins.filter (·.localName == name)).map (·.function)
 
 /-- Unqualified imported value candidates in declaration/import order.
 All distinct declarations in an imported overload set are retained. -/

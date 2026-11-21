@@ -38,6 +38,17 @@ def functionsNamed (context : Context) (name : String) :
     | .ok visibility =>
         .ok (signaturesForDeclarations context (visibility.valuesNamed name))
 
+/-- The builtin a name denotes: one of the 26 that an import of upstream's `std.opcodes` binds
+the name to, then a bare compiler function (`builtinFunctionNamed?`). A name bound to one of
+`std.opcodes`' other functions denotes none, so it is refused where it is used. -/
+def builtinNamed? (context : Context) (name : String) : Option BuiltinFunctionId :=
+  match buildProgramImports context.environment context.scope.currentModule with
+  | .ok visibility =>
+      match visibility.builtinsNamed name with
+      | [] => builtinFunctionNamed? name
+      | function :: _ => (WordOpcode.ofName? function).map .wordOpcode
+  | .error _ => builtinFunctionNamed? name
+
 def qualifiedFunctionsNamed (context : Context)
     (namespacePath : List String) (name : String) :
     Except Error (Option (List ProgramFunctionSignature)) :=
