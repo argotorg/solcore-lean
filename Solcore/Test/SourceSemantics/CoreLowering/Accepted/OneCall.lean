@@ -12,15 +12,17 @@ argument is another direct call, both at a `Word` parameter; `narrow` returns
 `Typedef.rep(uint8(value))`, the word of that value; `doubled` converts its
 parameter to a `uint8` local `x`, adds `x` to it in place and returns it, `shifted` shifts such
 an `x` left in place by the parameter, a `Word` amount, and `flipped` applies `~` to such an `x` in
-place; `tailed`'s body is `identity(value)` as its final value. Runtime checks place every
-expression node of the nine rows among the nested sites that call `identity`'s
+place; `tailed`'s body is `identity(value)` as its final value; `stored` declares a local mapping
+`table`, assigns its parameter at `table[value]` and returns `table[value]`. Runtime checks place every
+expression node of the ten rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
-`relay`, `twice`, `tailed`, `narrow` and `roundTrip` (at words canonical for `uint8`) are lifted to
-staged traces, and the call root's theorems apply at the first public call of
+`relay`, `twice`, `tailed`, `stored`, `narrow` and `roundTrip` (at words canonical for `uint8`) are
+lifted to staged traces, and the call root's theorems apply at the first public call of
 each in both directions: the actual resumption succeeds, and actual native
-completion reconstructs a staged Source execution. At other words the call
+completion reconstructs a staged Source execution. `stored`'s index read returns the word its
+assignment wrote, not the default. At other words the call
 root's reflection applies to `narrow` and `roundTrip`, and the actual
 resumption fails with the dirty-integer reason. At every word the call root's
 reflection applies to `doubled`: below 128 the actual resumption returns the sum,
@@ -36,17 +38,20 @@ represents the Source fault.
 Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.twice_source`,
 `Tests.SourceCoreAcceptedOneCall.tailed_source`,
+`Tests.SourceCoreAcceptedOneCall.stored_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_source`,
 `Tests.SourceCoreAcceptedOneCall.roundTrip_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_fault`,
 `Tests.SourceCoreAcceptedOneCall.initializer_fault`,
 `Tests.SourceCoreAcceptedOneCall.doubled_panic`,
 `Tests.SourceCoreAcceptedOneCall.accepted_call`,
+`Tests.SourceCoreAcceptedOneCall.accepted_call_with_locals`,
 `Tests.SourceCoreAcceptedOneCall.accepted_reflection`,
 `Tests.SourceCoreAcceptedOneCall.accepted_failure` and the runtime checks
 `Tests.SourceCoreAcceptedOneCall.AcceptedCallRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedNestedCallRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedTailRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedMappingRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run`,
@@ -56,7 +61,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 -/
 
 section
-/-! The program and the declarative typing of its nine functions, constructed
+/-! The program and the declarative typing of its ten functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -76,7 +81,9 @@ def workspace : Workspace.RawWorkspace := {
     "function doubled(value: Word) returns (uint8) { let x: uint8 = uint8(value); x += x; return x; }",
     "function shifted(value: Word) returns (uint8) { let x: uint8 = uint8(value); x <<= value; return x; }",
     "function flipped(value: Word) returns (uint8) { let x: uint8 = uint8(value); x ~=; return x; }",
-    "function tailed(value: Word) returns (Word) { identity(value) }" ]}] }
+    "function tailed(value: Word) returns (Word) { identity(value) }",
+    "function stored(value: Word) returns (Word) { let table: mapping(Word => Word); table[value] = value; " ++
+      "return table[value]; }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -1026,6 +1033,202 @@ def observeFlipped (function : CheckedFunction) (signature : ProgramFunctionSign
     targetOwner, targetDistinct, targetOrdinary, initializedType, assignmentType, returnedType, targetRoot,
     targetType, targetBare, assignmentRequirements⟩
 
+/-- The nodes of `stored`'s body: the declaration of its local mapping `table`, `table[value] = value`,
+whose key and right side read the parameter, and the return of `table[value]`, the index of a read of
+`table` by a third read of the parameter, found by following the statement graph. -/
+structure StoredParts (source : TypedSource) where
+  binder : TypedBinder
+  table : TypedBinder
+  keyRead : Tests.SourceCoreNamedBranch.Read source binder .word
+  rightRead : Tests.SourceCoreNamedBranch.Read source binder .word
+  baseRead : Tests.SourceCoreNamedBranch.Read source table (.mapping .word .word)
+  indexKey : Tests.SourceCoreNamedBranch.Read source binder .word
+  index : ExpressionNode
+  declared : StatementNode
+  assignment : StatementNode
+  resolution : AssignmentResolution
+  returned : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement declared.id, .statement assignment.id, .statement returned.id]
+  declaredFound : source.lookupStatement? declared.id = some declared
+  declaredForm : declared.form = .letDecl table none
+  assignmentFound : source.lookupStatement? assignment.id = some assignment
+  assignmentForm : assignment.form = .assignValue resolution .equal rightRead.node.id
+  targetRoot : resolution.target.root = table.id
+  targetProjections : resolution.target.projections = [.index keyRead.node.id]
+  targetType : resolution.target.type = .word
+  indexFound : source.lookupExpression? index.id = some index
+  indexForm : index.form = .index baseRead.node.id indexKey.node.id
+  indexRaw : index.rawType = .word
+  indexType : index.type = .word
+  indexRequirements : index.requirements = []
+  indexCoercions : index.coercions = []
+  returnedFound : source.lookupStatement? returned.id = some returned
+  returnedForm : returned.form = .returnStmt (some index.id)
+
+def observeStoredParts (source : TypedSource) : IO (StoredParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "stored input")
+  let [.statement declaredId, .statement assignmentId, .statement returnedId] := source.roots
+    | throw (IO.userError "stored roots")
+  let some declared := source.lookupStatement? declaredId | throw (IO.userError "stored let")
+  let some assignment := source.lookupStatement? assignmentId | throw (IO.userError "stored assignment")
+  let some returned := source.lookupStatement? returnedId | throw (IO.userError "stored return")
+  let .letDecl table none := declared.form | throw (IO.userError "stored let form")
+  let .assignValue resolution .equal rightId := assignment.form | throw (IO.userError "stored assignment form")
+  let [.index keyId] := resolution.target.projections | throw (IO.userError "stored target projections")
+  let .returnStmt (some indexId) := returned.form | throw (IO.userError "stored return form")
+  let some keyNode := source.lookupExpression? keyId | throw (IO.userError "stored key")
+  let some rightNode := source.lookupExpression? rightId | throw (IO.userError "stored right side")
+  let some index := source.lookupExpression? indexId | throw (IO.userError "stored index")
+  let .index baseId indexKeyId := index.form | throw (IO.userError "stored index form")
+  let some baseNode := source.lookupExpression? baseId | throw (IO.userError "stored base")
+  let some indexKeyNode := source.lookupExpression? indexKeyId | throw (IO.userError "stored index key")
+  let keyRead ← Tests.SourceCoreNamedBranch.observeRead source binder keyNode .word
+  let rightRead ← Tests.SourceCoreNamedBranch.observeRead source binder rightNode .word
+  let baseRead ← Tests.SourceCoreNamedBranch.observeRead source table baseNode (.mapping .word .word)
+  let indexKey ← Tests.SourceCoreNamedBranch.observeRead source binder indexKeyNode .word
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "stored inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement declared.id, .statement assignment.id, .statement returned.id])
+    "stored roots shape"
+  let ⟨declaredFound⟩ ← observed (source.lookupStatement? declared.id = some declared) "stored declaredFound"
+  let ⟨declaredForm⟩ ← observed (declared.form = .letDecl table none) "stored declaredForm"
+  let ⟨assignmentFound⟩ ← observed (source.lookupStatement? assignment.id = some assignment) "stored assignmentFound"
+  let ⟨assignmentForm⟩ ← observed (assignment.form = .assignValue resolution .equal rightRead.node.id)
+    "stored assignmentForm"
+  let ⟨targetRoot⟩ ← observed (resolution.target.root = table.id) "stored targetRoot"
+  let ⟨targetProjections⟩ ← observed (resolution.target.projections = [.index keyRead.node.id])
+    "stored targetProjections"
+  let ⟨targetType⟩ ← observed (resolution.target.type = .word) "stored targetType"
+  let ⟨indexFound⟩ ← observed (source.lookupExpression? index.id = some index) "stored indexFound"
+  let ⟨indexForm⟩ ← observed (index.form = .index baseRead.node.id indexKey.node.id) "stored indexForm"
+  let ⟨indexRaw⟩ ← observed (index.rawType = .word) "stored indexRaw"
+  let ⟨indexType⟩ ← observed (index.type = .word) "stored indexType"
+  let ⟨indexRequirements⟩ ← observed (index.requirements = []) "stored indexRequirements"
+  let ⟨indexCoercions⟩ ← observed (index.coercions = []) "stored indexCoercions"
+  let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "stored returnedFound"
+  let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some index.id)) "stored returnedForm"
+  return ⟨binder, table, keyRead, rightRead, baseRead, indexKey, index, declared, assignment, resolution, returned,
+    inputs, roots, declaredFound, declaredForm, assignmentFound, assignmentForm, targetRoot, targetProjections,
+    targetType, indexFound, indexForm, indexRaw, indexType, indexRequirements, indexCoercions, returnedFound,
+    returnedForm⟩
+
+/-- `stored`'s body: `let table: mapping(Word => Word)`, `table[value] = value` through the local's
+index and the return of `table[value]`. -/
+structure StoredShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : StoredParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  binderScheme : parts.binder.scheme = .mono .word
+  binderRequirements : parts.binder.schemeRequirements = []
+  tableScheme : parts.table.scheme = .mono (.mapping .word .word)
+  tableRequirements : parts.table.schemeRequirements = []
+  tableOwner : parts.table.id.owner = function.typedBody.owner
+  tableDistinct : parts.table.id ≠ parts.binder.id
+  declaredType : parts.declared.type = .unit
+  assignmentType : parts.assignment.type = .unit
+  returnedType : parts.returned.type = .word
+  assignmentRequirements : parts.resolution.requirements = []
+
+theorem StoredShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : StoredShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.declared.id, shape.parts.assignment.id, shape.parts.returned.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := true, control := .returned}
+  let ordinary : StatementFacts := {type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit}
+  refine ⟨BodyFacts.cons ordinary (BodyFacts.cons ordinary (BodyFacts.singleton facts)), rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have mapping : TypeAdmissible lexical (.mapping .word .word) :=
+      ⟨binders, .mapping (.builtin .word) (.builtin .word)⟩
+    let locals := lexical.withLocal shape.parts.table.id shape.parts.table.scheme shape.parts.table.schemeRequirements
+    have tableExtended : BinderExtends function.typedBody.owner lexical shape.parts.table locals := by
+      apply BinderExtends.intro
+      · exact {
+          owned := shape.tableOwner
+          scheme := shape.tableScheme.symm ▸ SchemeWellFormed.monoAdmissible mapping
+          quantified_fresh := by rw [shape.tableScheme]; simp [SchemeQuantifiersFresh, TypeSystem.Scheme.mono]
+          monomorphic_requirements_empty := fun _ => shape.tableRequirements }
+      · cases head
+        simp [LocalFresh, Context.withLocal, checkedBodyContext, declarationContext,
+          Context.ofSignatures, Context.forDeclaration, Context.withAssumptions,
+          Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.tableDistinct]
+    have localWord : TypeAdmissible locals .word := ⟨binders, .builtin .word⟩
+    have localMapping : TypeAdmissible locals (.mapping .word .word) :=
+      ⟨binders, .mapping (.builtin .word) (.builtin .word)⟩
+    have declaredTyped : StatementHasType function.typedBody ⟨.word, 0⟩ lexical shape.parts.declared.id locals
+        ordinary := by
+      apply StatementHasType.letUninitialized (lookupStatement?_sound shape.parts.declaredFound)
+        shape.parts.declaredForm
+      · rw [shape.tableScheme]; rfl
+      · rw [shape.tableScheme]; rfl
+      · exact tableExtended
+      · exact shape.declaredType
+    have parameterLookup : locals.LocalLookup shape.parts.binder.id shape.parts.binder.scheme :=
+      .tail shape.tableDistinct head.local_self
+    have parameterRequirements :
+        locals.LocalSchemeRequirementsLookup shape.parts.binder.id shape.parts.binder.schemeRequirements :=
+      .tail shape.tableDistinct head.local_scheme_requirements_self
+    have keyTyped := shape.parts.keyRead.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have rightTyped := shape.parts.rightRead.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have writable : WritableLocal locals shape.parts.resolution.target.root (.mapping .word .word) := by
+      rw [shape.parts.targetRoot]
+      exact .intro tableExtended.local_self (shape.tableScheme.symm ▸ SchemeWellFormed.monoAdmissible localMapping)
+        (by rw [shape.tableScheme]; rfl) (by rw [shape.tableScheme]; rfl)
+    have assignmentTyped : SourceAssignmentHasType function.typedBody locals shape.parts.resolution .equal
+        shape.parts.rightRead.node.id :=
+      .equal (.intro writable (by rw [shape.parts.targetProjections]; exact .index keyTyped (.nil _))
+        shape.parts.targetType) rightTyped shape.assignmentRequirements
+    have assignedTyped : StatementHasType function.typedBody ⟨.word, 0⟩ locals shape.parts.assignment.id locals
+        ordinary :=
+      .assignValue (lookupStatement?_sound shape.parts.assignmentFound) shape.parts.assignmentForm assignmentTyped
+        shape.assignmentType
+    have baseTyped := shape.parts.baseRead.typed shape.tableScheme shape.tableRequirements localMapping
+      tableExtended.local_self tableExtended.local_scheme_requirements_self
+    have indexKeyTyped := shape.parts.indexKey.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have indexTyped : ExpressionHasType function.typedBody locals shape.parts.index.id shape.parts.index.type := by
+      refine .intro (lookupExpression?_sound shape.parts.indexFound)
+        (shape.parts.indexForm ▸ ExpressionFormHasRawType.index baseTyped indexKeyTyped) shape.parts.indexRaw
+        localWord (Eq.mp (congrArg (TypeAdmissible locals) shape.parts.indexType.symm) localWord) ?_
+      rw [shape.parts.indexRequirements, shape.parts.indexCoercions, shape.parts.indexType]
+      exact .ordinary (by intro id member; cases member) (.nil _) rfl
+    rw [shape.parts.indexType] at indexTyped
+    exact ⟨_, .cons declaredTyped (.cons assignedTyped (.singleton (.returnValue
+      (lookupStatement?_sound shape.parts.returnedFound) shape.parts.returnedForm indexTyped shape.returnedType)))⟩
+
+def observeStored (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (StoredShape function signature) := do
+  let parts ← observeStoredParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "stored parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "stored inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "stored returns"
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "stored binderScheme"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "stored binderRequirements"
+  let ⟨tableScheme⟩ ← observed (parts.table.scheme = .mono (.mapping .word .word)) "stored tableScheme"
+  let ⟨tableRequirements⟩ ← observed (parts.table.schemeRequirements = []) "stored tableRequirements"
+  let ⟨tableOwner⟩ ← observed (parts.table.id.owner = function.typedBody.owner) "stored tableOwner"
+  let ⟨tableDistinct⟩ ← observed (parts.table.id ≠ parts.binder.id) "stored tableDistinct"
+  let ⟨declaredType⟩ ← observed (parts.declared.type = .unit) "stored declaredType"
+  let ⟨assignmentType⟩ ← observed (parts.assignment.type = .unit) "stored assignmentType"
+  let ⟨returnedType⟩ ← observed (parts.returned.type = .word) "stored returnedType"
+  let ⟨assignmentRequirements⟩ ← observed (parts.resolution.requirements = []) "stored assignmentRequirements"
+  return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, tableScheme, tableRequirements,
+    tableOwner, tableDistinct, declaredType, assignmentType, returnedType, assignmentRequirements⟩
+
 /-- Two members of a list of signatures whose ids are distinct are equal when
 their ids are. -/
 private theorem signature_of_id {signatures : List ProgramFunctionSignature}
@@ -1052,9 +1255,9 @@ def observeWellFormed {program : CheckedProgram}
     IO (PLift (ProgramWellFormed (Program.ofChecked program))) := do
   match functions : program.functions, signatures : program.signatures.functions with
   | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction,
-      shiftedFunction, flippedFunction, tailedFunction],
+      shiftedFunction, flippedFunction, tailedFunction, storedFunction],
     [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature,
-      shiftedSignature, flippedSignature, tailedSignature] =>
+      shiftedSignature, flippedSignature, tailedSignature, storedSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
@@ -1064,6 +1267,7 @@ def observeWellFormed {program : CheckedProgram}
     let shiftedShape ← observeShifted shiftedFunction shiftedSignature
     let flippedShape ← observeFlipped flippedFunction flippedSignature
     let tailedShape ← observeTailed tailedFunction tailedSignature identitySignature
+    let storedShape ← observeStored storedFunction storedSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -1076,6 +1280,7 @@ def observeWellFormed {program : CheckedProgram}
     let ⟨shiftedDeclaration⟩ ← observed (shiftedFunction.declaration = shiftedSignature.id) "calls shiftedDeclaration"
     let ⟨flippedDeclaration⟩ ← observed (flippedFunction.declaration = flippedSignature.id) "calls flippedDeclaration"
     let ⟨tailedDeclaration⟩ ← observed (tailedFunction.declaration = tailedSignature.id) "calls tailedDeclaration"
+    let ⟨storedDeclaration⟩ ← observed (storedFunction.declaration = storedSignature.id) "calls storedDeclaration"
     let ⟨distinct⟩ ← observed ((program.signatures.functions.map (·.id)).Nodup) "calls distinct signatures"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
@@ -1085,7 +1290,7 @@ def observeWellFormed {program : CheckedProgram}
             actual.declaration = signature.id → candidate = signature := fun signatureMember same =>
           signature_of_id distinct candidateMember signatureMember (declared.symm.trans same)
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
-        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
         · obtain rfl := selects (by simp [signatures]) identityDeclaration
           exact identityShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) relayDeclaration
@@ -1104,6 +1309,8 @@ def observeWellFormed {program : CheckedProgram}
           exact flippedShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) tailedDeclaration
           exact tailedShape.statementTyping program.signatures (by simp [signatures])
+        · obtain rfl := selects (by simp [signatures]) storedDeclaration
+          exact storedShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -1112,11 +1319,12 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the nine functions and their original Source
+/-! The cache rows of the ten functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `tailed` ends in the direct call of `identity` with
-its parameter as its final value, `narrow` returns the conversion of its parameter,
+its parameter as its final value, `stored` returns its parameter from the index of its local mapping
+where its assignment put it, `narrow` returns the conversion of its parameter,
 and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
 a given body invocation. At a word not canonical for `uint8` the conversions of `narrow`, `doubled`,
 `shifted` and `flipped` fault with the dirty-integer reason, and at a canonical word whose double is
@@ -1138,6 +1346,10 @@ def wordEnvironment (binder : TypedBinder) (before : Dynamic.Heap) : Dynamic.Env
 /-- A heap with one more initialized `uint8` cell. -/
 def byteHeap (before : Dynamic.Heap) (word : Core.Word) : Dynamic.Heap :=
   ⟨before.cells ++ [{type := .fixed ⟨false, .w8⟩, value := some (.word word)}]⟩
+
+/-- A heap with one more `mapping(Word => Word)` cell. -/
+def mappingHeap (before : Dynamic.Heap) (value : Option Dynamic.Value) : Dynamic.Heap :=
+  ⟨before.cells ++ [{type := .mapping .word .word, value := value}]⟩
 
 /-- `identity`'s cache row: its `Word` parameter, the read of it and the return
 of the read. -/
@@ -1332,6 +1544,20 @@ def observeFlippedBody (source : TypedSource) : IO (FlippedBody source) := do
   let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "flipped row binderScheme"
   let ⟨targetScheme⟩ ← observed (parts.target.scheme = .mono (.fixed ⟨false, .w8⟩)) "flipped row targetScheme"
   return ⟨parts, binderScheme, targetScheme⟩
+
+/-- `stored`'s cache row: the nodes of its body, its `Word` parameter and its local mapping. -/
+structure StoredBody (source : TypedSource) where
+  parts : StoredParts source
+  binderScheme : parts.binder.scheme = .mono .word
+  tableScheme : parts.table.scheme = .mono (.mapping .word .word)
+  tableDistinct : parts.table.id ≠ parts.binder.id
+
+def observeStoredBody (source : TypedSource) : IO (StoredBody source) := do
+  let parts ← observeStoredParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "stored row binderScheme"
+  let ⟨tableScheme⟩ ← observed (parts.table.scheme = .mono (.mapping .word .word)) "stored row tableScheme"
+  let ⟨tableDistinct⟩ ← observed (parts.table.id ≠ parts.binder.id) "stored row tableDistinct"
+  return ⟨parts, binderScheme, tableScheme, tableDistinct⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
 theorem read_value {source : TypedSource} {binder : TypedBinder}
@@ -1603,18 +1829,112 @@ theorem DoubledBody.panic {source : TypedSource} (body : DoubledBody source) {pr
   exact .tail declared (.head (.assignValue (lookupStatement?_sound body.parts.assignmentFound)
     body.parts.assignmentForm (.panic resolve right allocation.reads_new rfl .initialized .nil panics)))
 
+private theorem write_last (cells : List Dynamic.Cell) (old next : Dynamic.Cell) :
+    Dynamic.Heap.CellsWrite (cells ++ [old]) cells.length next (cells ++ [next]) := by
+  induction cells with
+  | nil => exact .head
+  | cons head rest ih => exact .tail ih
+
+/-- The read of a local evaluates to its cell's value. -/
+theorem local_value {source : TypedSource} {binder : TypedBinder} {type : TypeSystem.Ty}
+    (read : Tests.SourceCoreNamedBranch.Read source binder type) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) {environment : Dynamic.Environment}
+    {heap : Dynamic.Heap} {location : Dynamic.Location} {value : Dynamic.Value}
+    (lookup : Dynamic.Environment.LooksUp environment binder.id location)
+    (reads : Dynamic.Heap.Reads heap location {type := type, value := some value}) :
+    Dynamic.ExpressionEvaluates program context evidence source environment heap read.node.id value heap := by
+  apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound read.found)
+  · rw [read.form]
+    exact .local (by rw [read.requirements, read.coercions]; rfl) lookup reads rfl rfl
+  · rw [read.coercions]
+    exact .nil
+
+/-- `stored`'s body returns its parameter's word: its local mapping starts empty, `table[value] = value`
+inserts the word at itself in place of the default, and the index read finds it. The local's context is a
+binder extension of the body's. -/
+theorem StoredBody.trace {source : TypedSource} (body : StoredBody source) {program : SourceSemantics.Program}
+    {context localContext : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment)
+    (before : Dynamic.Heap) (extension : BinderExtends source.owner context body.parts.table localContext)
+    (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.declared.id, body.parts.assignment.id, body.parts.returned.id]
+      localContext (.returned (.word word))
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word word)]))) := by
+  let root : Dynamic.Location := ⟨(wordHeap before word).cells.length⟩
+  let environment : Dynamic.Environment := (body.parts.table.id, root) :: wordEnvironment body.parts.binder before
+  have parameterAllocation : Dynamic.Heap.Allocates before .word (some (.word word)) ⟨before.cells.length⟩
+      (wordHeap before word) := .append
+  have allocation : Dynamic.Heap.Allocates (wordHeap before word) (.mapping .word .word) none root
+      (mappingHeap (wordHeap before word) none) := .append
+  have stored : Dynamic.Heap.Allocates (wordHeap before word) (.mapping .word .word)
+      (some (.mapping .word .word [(.word word, .word word)])) root
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word word)]))) := .append
+  have parameterLookup : Dynamic.Environment.LooksUp environment body.parts.binder.id ⟨before.cells.length⟩ :=
+    .tail body.tableDistinct .head
+  have declared : Dynamic.StatementExecutes program context evidence source
+      (wordEnvironment body.parts.binder before) (wordHeap before word) body.parts.declared.id localContext
+      (.fallthrough environment) (mappingHeap (wordHeap before word) none) :=
+    .letUninitialized (lookupStatement?_sound body.parts.declaredFound) body.parts.declaredForm
+      (by rw [body.tableScheme]; rfl) extension (by rw [body.tableScheme]; exact allocation)
+  have resolve : Dynamic.SourcePlaceResolves program localContext evidence source environment
+      (mappingHeap (wordHeap before word) none) body.parts.resolution.target
+      {location := root, rootType := .mapping .word .word, valueType := body.parts.resolution.target.type,
+        projections := [.index (.word word)], selected := some (.word Core.Word.zero)}
+      (mappingHeap (wordHeap before word) none) := by
+    apply Dynamic.SourcePlaceResolves.intro (initialCell := {type := .mapping .word .word, value := none})
+      (currentCell := {type := .mapping .word .word, value := none})
+    · rw [body.parts.targetRoot]
+      exact .head
+    · exact allocation.reads_new
+    · rw [body.parts.targetProjections]
+      exact .index (local_value body.parts.keyRead evidence parameterLookup
+        (allocation.preserves_read parameterAllocation.reads_new)) .nil
+    · exact allocation.reads_new
+    · exact .emptyMapping .word .word
+    · exact .indexDefault .nil .word .nil
+  have write : Dynamic.Heap.Writes (mappingHeap (wordHeap before word) none) root
+      (some (.mapping .word .word [(.word word, .word word)]))
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word word)]))) :=
+    .intro allocation.reads_new (write_last (wordHeap before word).cells _ _)
+  have assigned : Dynamic.StatementExecutes program localContext evidence source environment
+      (mappingHeap (wordHeap before word) none) body.parts.assignment.id localContext (.fallthrough environment)
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word word)]))) := by
+    apply Dynamic.StatementExecutes.assignValue (updatedRoot := .mapping .word .word [(.word word, .word word)])
+      (lookupStatement?_sound body.parts.assignmentFound) body.parts.assignmentForm
+    refine .intro resolve (local_value body.parts.rightRead evidence parameterLookup
+      (allocation.preserves_read parameterAllocation.reads_new)) ?_
+    exact .intro allocation.reads_new rfl (.emptyMapping .word .word)
+      (.indexDefault .nil .word (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl))
+        (.equal _ _))) (.append .nil)) write
+  have indexed : Dynamic.ExpressionEvaluates program localContext evidence source environment
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word word)])))
+      body.parts.index.id (.word word)
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word word)]))) := by
+    apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound body.parts.indexFound)
+    · rw [body.parts.indexForm]
+      exact .indexFound (by rw [body.parts.indexRequirements, body.parts.indexCoercions]; rfl)
+        (local_value body.parts.baseRead evidence .head stored.reads_new)
+        (local_value body.parts.indexKey evidence parameterLookup (stored.preserves_read parameterAllocation.reads_new))
+        (.head (.refl (.word word)))
+    · rw [body.parts.indexCoercions]
+      exact .nil
+  exact .cons declared (.cons assigned (.singleton (lookupStatement?_sound body.parts.returnedFound)
+    (by rw [body.parts.returnedForm]; intro id impossible; cases impossible)
+    (.returnValue (lookupStatement?_sound body.parts.returnedFound) body.parts.returnedForm indexed)))
+
 end Tests.SourceCoreAcceptedOneCall
 end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the nine rows among the nested sites or their callees
+every expression node of the ten rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
-receipts. The original Source executions of `relay`, `twice`, `tailed`, `narrow` and
+receipts. The original Source executions of `relay`, `twice`, `tailed`, `stored`, `narrow` and
 `roundTrip`, whose calls run `identity`'s body instance, are lifted through the checked
 shapes, and with the existing start receipts the call root's theorems apply at
-the first public call of each in both directions. The call root's reflection
+the first public call of each in both directions; `stored`'s execution ends in its local's
+context (`accepted_call_with_locals`). The call root's reflection
 needs no Source execution (`accepted_reflection`). At a faulting word the
 row's original Source fault is lifted to a staged fault trace, given that the
 direct calls of the row and of `identity` have plain callees, and the call
@@ -1886,6 +2206,32 @@ theorem doubled_panic (selected : SelectedInventory whole row)
       rw [doubledBody.targetScheme] at polymorphic
       exact absurd rfl polymorphic
 
+/-- The original Source execution of `stored`'s body at its header returns its
+parameter's word, which its index read finds where the assignment through the
+same index put it. The local's binder extension comes from the header's typing
+certificate. -/
+theorem stored_source (selected : SelectedInventory whole row) (storedBody : StoredBody row.original.function.typedBody)
+    (certified : SelectedCompilationNamedSourceTyping.Certified selected.packet.header) (word : Core.Word) :
+    ∃ finalContext, Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment storedBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      finalContext (.returned (.word word))
+      (mappingHeap (wordHeap ⟨[]⟩ word) (some (.mapping .word .word [(.word word, .word word)]))) := by
+  have body := three_body selected storedBody.parts.roots
+  have unique : NodeOccurrencesUnique row.original.function.typedBody :=
+    selected.source_eq ▸ selected.packet.header.unique
+  obtain ⟨_final, _facts, typed, _completes⟩ := certified.statements
+  rw [body, selected.source_eq] at typed
+  cases typed with
+  | cons head _ =>
+    obtain ⟨node, contains, formTyped⟩ := Dynamic.StatementHasType.formTyping head
+    cases Option.some.inj ((lookupStatement?_complete unique contains).symm.trans storedBody.parts.declaredFound)
+    rw [storedBody.parts.declaredForm] at formTyped
+    cases formTyped with
+    | letUninitialized _ extension =>
+      rw [body, selected.source_eq]
+      exact ⟨_, storedBody.trace selected.packet.header.function.evidence ⟨[]⟩ extension word⟩
+
 /-- The callee premise of the fault lifting for the family that admits
 `identity`'s retained instantiation: its body instance is its header's, whose
 Source is `identity`'s cache row. -/
@@ -1934,13 +2280,9 @@ structure AcceptedCall (selected : SelectedInventory whole row) (word : Word)
       Staging.Recursive.BodyResult selected.packet.header.function.resultType outcome
         (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome)
 
-/-- Every premise is an original checked or static observation, a runtime check
-of the program's rows, an actual public start, or the row's original Source
-execution after the allocation of its `Word` parameter. The body's
-accepted-expression meaning comes from the family of the checked rows, and the
-staged Source trace is lifted from the original execution through the checked
-shape, with the admitted callees' static receipts from the inventory. -/
-theorem accepted_call (selected : SelectedInventory whole row) {called : DeclarationInstantiation → Prop}
+/-- `accepted_call` at an original Source execution that ends in any context,
+as one of a body with local declarations does. -/
+theorem accepted_call_with_locals (selected : SelectedInventory whole row) {called : DeclarationInstantiation → Prop}
     (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
     (admitted : ∀ {instantiation}, called instantiation →
       ∃ callee : Row fixture, instantiation = CallableNamedCanonicalOrder.retainedInstantiation callee.original)
@@ -1949,11 +2291,12 @@ theorem accepted_call (selected : SelectedInventory whole row) {called : Declara
     (started : Started fixture row.original.key [.word word])
     (callableProfile : fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true)
     {binder : TypedBinder} (inputs : row.original.function.typedBody.inputs = [binder])
-    (scheme : binder.scheme = .mono .word) {result : Word} {after : Dynamic.Heap}
+    (scheme : binder.scheme = .mono .word) {finalContext : SourceSemantics.Context} {result : Word}
+    {after : Dynamic.Heap}
     (sourceTrace : Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
       selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
       (wordEnvironment binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
-      selected.packet.header.context (.returned (.word result)) after) :
+      finalContext (.returned (.word result)) after) :
     Nonempty (AcceptedCall selected word started) := by
   obtain ⟨types, allocated⟩ := word_parameter selected inputs scheme ⟨[]⟩ word
   have support := SelectedCompilationNamedSupport.Support.of_program wellFormed
@@ -2021,6 +2364,29 @@ theorem accepted_call (selected : SelectedInventory whole row) {called : Declara
         (CellAwarePublicAcceptedCallRoot.expressions_of_family callableProfile initial.issued prepared
           selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows)
     exact ⟨sidecar, size, environment, bound, finalContext, outcome, after, allocated, staged, result⟩
+
+/-- Every premise is an original checked or static observation, a runtime check
+of the program's rows, an actual public start, or the row's original Source
+execution after the allocation of its `Word` parameter. The body's
+accepted-expression meaning comes from the family of the checked rows, and the
+staged Source trace is lifted from the original execution through the checked
+shape, with the admitted callees' static receipts from the inventory. -/
+theorem accepted_call (selected : SelectedInventory whole row) {called : DeclarationInstantiation → Prop}
+    (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
+    (admitted : ∀ {instantiation}, called instantiation →
+      ∃ callee : Row fixture, instantiation = CallableNamedCanonicalOrder.retainedInstantiation callee.original)
+    (word : Word)
+    (wellFormed : ProgramWellFormed (Program.ofChecked fixture.recipe.compiled.sourceProgram))
+    (started : Started fixture row.original.key [.word word])
+    (callableProfile : fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true)
+    {binder : TypedBinder} (inputs : row.original.function.typedBody.inputs = [binder])
+    (scheme : binder.scheme = .mono .word) {result : Word} {after : Dynamic.Heap}
+    (sourceTrace : Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.word result)) after) :
+    Nonempty (AcceptedCall selected word started) :=
+  accepted_call_with_locals selected calls admitted word wellFormed started callableProfile inputs scheme sourceTrace
 
 /-- The first public call of a row with the conclusion of the call root's
 checkpoint reflection theorem alone. -/
@@ -2294,6 +2660,36 @@ def run : IO Unit := do
   IO.println "ACCEPTED_TAIL_PUBLIC_PASS"
 
 end AcceptedTailRuntime
+
+namespace AcceptedMappingRuntime
+
+/-- As `AcceptedCallRuntime.run`, at `stored`, whose index read of its local
+mapping finds the word that its assignment through the same index wrote, at
+words other than the default. -/
+def run : IO Unit := do
+  let observed ← observe
+  let stored ← observeRow observed.fixture "stored"
+  let storedBody ← observeStoredBody stored.original.function.typedBody
+  for word in [Word.ofNatModulo 7, Word.maximum] do
+    let started ← observeStarted observed.fixture stored.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole stored),
+        Nonempty (AcceptedCall selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select stored
+      obtain ⟨_, sourceTrace⟩ := stored_source selected storedBody
+        ((SelectedCompilationNamedSupport.Support.of_program observed.wellFormed).certified selected.packet.header)
+        word
+      exact ⟨whole, selected, accepted_call_with_locals selected observed.calls
+        (fun admits => ⟨observed.identity, admits⟩) word observed.wellFormed started observed.callableProfile
+        storedBody.parts.inputs storedBody.binderScheme sourceTrace⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .succeeded returned =>
+      unless returned.value == .word word do throw (IO.userError "accepted mapping output changed")
+    | _ => throw (IO.userError "accepted mapping did not succeed")
+  IO.println "ACCEPTED_MAPPING_PUBLIC_PASS"
+
+end AcceptedMappingRuntime
 
 namespace AcceptedConversionRuntime
 
