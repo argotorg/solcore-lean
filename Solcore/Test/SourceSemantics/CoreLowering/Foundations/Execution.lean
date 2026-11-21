@@ -7426,6 +7426,35 @@ private def runImpliedSuperclasses : IO Unit := do
     session := completed.session
   IO.println "SOURCE_CORE_IMPLIED_SUPERCLASSES_PASS: an implementation that does not restate its trait's superclass is checked where it is declared, as upstream's SC0248, and its body and its callers use that superclass's implementation at the type, its own at a type that has one and the default at a type that only the default covers"
 
+private def literalElementRefsWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := []
+  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+    "pragma solcore;",
+    "function bump(r: memref<uint256>) { let v: uint256 = CanStore.load(r); CanStore.store(r, v + uint256(1)); return; }",
+    "function viaLet() returns (uint256) { let m: uint256[] = new uint256[](3); let r = lidx(m, 1); bump(r); return m[uint256(1)]; }",
+    "function viaCall() returns (uint256) { let m: uint256[] = new uint256[](3); bump(lidx(m, 1)); return m[uint256(1)]; }",
+    "function viaStore() returns (uint256) { let m: uint256[] = new uint256[](3); CanStore.store(lidx(m, 1), uint256(7)); return m[uint256(1)]; }",
+    "function viaLoad() returns (uint256) { let m: uint256[] = new uint256[](3); m[uint256(1)] = uint256(9); return CanStore.load(lidx(m, 1)); }",
+    "function pastTheEnd() returns (uint256) { let m: uint256[] = new uint256[](3); bump(lidx(m, 3)); return m[uint256(0)]; }"] }]
+}
+
+private def runLiteralElementRefs : IO Unit := do
+  let program ← get "literal element references check" (checkProgram literalElementRefsWorkspace)
+  let names := ["viaLet", "viaCall", "viaStore", "viaLoad", "pastTheEnd"]
+  let compiled ← get "literal element references compilation"
+    (compile literalElementRefsWorkspace (← names.mapM (seed program)))
+  let mut session ← boot (← compiled.open)
+  let key (index : Nat) : IO Key := match compiled.keys[index]? with
+    | some key => pure key
+    | none => throw (IO.userError "literal element references root missing")
+  for (index, expected) in ([(0, 1), (1, 1), (2, 7), (3, 9)] : List (Nat × Nat)) do
+    let completed ← execute session (← key index) []
+    require (completed.value == word expected)
+      s!"{names[index]!} gave {reprStr completed.value}"
+    session := completed.session
+  let _ ← panics session (← key 4) [] SourceCorePanics.outOfBounds "pastTheEnd"
+  IO.println "SOURCE_CORE_LITERAL_ELEMENT_REFS_PASS: a literal lidx index takes uint256 as a read's does, as upstream's literal in lidx's generic bound does, in a let, as an argument and under CanStore.store and CanStore.load, and one past the array's end panics with 0x32"
+
 private def runDefaultForTypeParameter : IO Unit := do
   let program ← get "default for a type parameter check" (checkProgram defaultForTypeParameterWorkspace)
   let names := ["viaCoin", "viaPlain", "viaSecond", "viaBoxed"]
@@ -7757,6 +7786,7 @@ def run : IO Unit := do
   runGivenBelowAnImplementation
   runSuperclassesOfGivens
   runImpliedSuperclasses
+  runLiteralElementRefs
 
 end Tests.SourceCoreExecution
 end

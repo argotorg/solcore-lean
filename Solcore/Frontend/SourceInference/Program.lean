@@ -442,10 +442,11 @@ def forItemMentions (state : State) (typeVar : TypeVarId) : ForItemForm → Bool
 
 /-- Whether a type variable occurs in an operand type of a unary or binary
 operator (a builtin operator deferred on an open literal, or a comparison), in
-the index type of a memory array read or the type of a memory array literal's
-element, or in the target type of a compound assignment that takes its target's
-type or of an in-place `~`, a statement's or a `for` item's: upstream reads
-`x op= e` as `x = x op e` and `x ~=` as `x = ~x`. -/
+the index type of a memory array read or of `lidx(a, i)`, or the type of a
+memory array literal's element, or in the target type of a compound assignment
+that takes its target's type or of an in-place `~`, a statement's or a `for`
+item's: upstream reads `x op= e` as `x = x op e` and `x ~=` as `x = ~x`, and
+gives a literal in `lidx`'s generic bound `uint256`. -/
 def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
   let mentions (operand : ExpressionId) : Bool :=
     match expressionTypeAt? state operand with
@@ -458,6 +459,7 @@ def operatorMentions (state : State) (typeVar : TypeVarId) : Bool :=
         | .unary _ operand => mentions operand
         | .binary left _ right => mentions left || mentions right
         | .arrayIndex _ index => mentions index
+        | .elementRef _ index => mentions index
         | .arrayLiteral _ elements => elements.any mentions
         | _ => false
     | .statement node =>
@@ -720,9 +722,8 @@ def validateShiftOperands (state : State) (node : ExpressionNode) : Except Error
 of the twelve types, as upstream's read takes it as `Typedef<word>`. Another
 type, such as `bool` or `integer`, is rejected with `operatorNotSupported
 "Typedef"`, as upstream's `bool: Typedef<word>` fails. `lidx(a, i)`'s index is
-checked the same way, as std's `LValueIdxAccess` takes it; no default reaches
-it, since `operatorMentions` does not name it, so an open literal index stays
-ambiguous, as upstream finds it. -/
+checked the same way, as std's `LValueIdxAccess` takes it, and an open literal
+index takes `uint256` as a read's does (`operatorMentions`). -/
 def validateArrayIndex (state : State) (node : ExpressionNode) : Except Error Unit :=
   match node.form with
   | .arrayIndex _ index | .elementRef _ index =>

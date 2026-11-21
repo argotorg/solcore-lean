@@ -1831,9 +1831,10 @@ private def testSliceCopies : IO Unit := do
 
 /-- `lidx(a, i)` is a memref to an element of a memory array, at the memref of
 the array's element type, with an index of `uint256`, of another of the twelve
-types or of `word`; it is rejected on a slice or a word, with a `bool` index,
-with an index literal that nothing fixes, which upstream finds ambiguous too, on
-an array whose type is still open there, and as a value. -/
+types or of `word`, an index literal that nothing else fixes taking `uint256`
+as upstream's does in `lidx`'s generic bound; it is rejected on a slice or a
+word, with a `bool` index, on an array whose type is still open there, and as a
+value. -/
 private def testElementRefs : IO Unit := do
   let functions ← check "element references" (String.intercalate "\n" [
     "function refs(m: uint256[], rows: uint256[][], i: uint256) returns (uint256) {",
@@ -1868,11 +1869,17 @@ private def testElementRefs : IO Unit := do
   expectInferenceError "a bool memref index"
     "function bad(m: uint256[]) returns (uint256) { let r = lidx(m, true); return 0; }"
     fun error => error == .operatorNotSupported "Typedef" .bool
-  expectInferenceError "a memref index literal that nothing fixes"
-    "function bad(m: uint256[]) returns (uint256) { let r = lidx(m, 1); return 0; }"
-    fun error => match error with
-      | .ambiguousIntegerLiteral _ => true
-      | _ => false
+  let literalFunctions ← check "a literal memref index"
+    "function ok(m: uint256[]) returns (uint256) { let r = lidx(m, 1); return 0; }"
+  let literalIndexes := literalFunctions.flatMap fun function =>
+    function.typedBody.nodes.filterMap fun
+      | .expression { form := .elementRef _ index, .. } =>
+          function.typedBody.nodes.findSome? fun
+            | .expression node => if node.id == index then some node.type else none
+            | .statement _ => none
+      | _ => none
+  assertTrue (decide (literalIndexes = [uint256]))
+    s!"a literal memref index did not take uint256: {reprStr literalIndexes}"
   expectInferenceError "a memref into an array still open"
     "function bad(m: uint256[]) returns (uint256) { let at = lam(a) { return lidx(a, uint256(1)); }; let r = at(m); return 0; }"
     fun error => match error with
@@ -1883,8 +1890,9 @@ private def testElementRefs : IO Unit := do
       error == .unknownVariable "lidx"
 
 /-- `CanStore.load(r)` loads the element a memref refers to, at the memref's
-element type, an array included; it is rejected on an array, on a word, on a
-memref whose type is still open there, and as a value. -/
+element type, an array included, its memref from a literal index too; it is
+rejected on an array, on a word, on a memref whose type is still open there,
+and as a value. -/
 private def testMemrefLoads : IO Unit := do
   let functions ← check "memref loads" (String.intercalate "\n" [
     "function loads(m: uint256[], rows: uint256[][], i: uint256) returns (uint256) {",
@@ -1903,6 +1911,11 @@ private def testMemrefLoads : IO Unit := do
   let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
   assertTrue (decide (loads = [uint256, .array uint256]))
     s!"CanStore.load did not type its loads at their memrefs' elements: {reprStr loads}"
+  -- A literal index's memref is typed where the call is, so a load through it
+  -- is accepted; upstream refuses it (`SC0299`) while the memref waits for the
+  -- index.
+  let _ ← check "a load through a literal index"
+    "function ok(m: uint256[]) returns (uint256) { return CanStore.load(lidx(m, 1)); }"
   expectInferenceError "a load of an array"
     "function bad(m: uint256[]) returns (uint256) { let v = CanStore.load(m); return 0; }"
     fun error => error == .operatorNotSupported "CanStore" (.array uint256)
@@ -1919,8 +1932,9 @@ private def testMemrefLoads : IO Unit := do
     fun error => error == .unsupportedExpression "field"
 
 /-- `CanStore.store(r, v)` stores a value of its memref's element type at `()`,
-an open literal taking that type; it is rejected on an array, with a value of
-another type, on a memref whose type is still open there, and as a value. -/
+an open literal taking that type, its memref from a literal index too; it is
+rejected on an array, with a value of another type, on a memref whose type is
+still open there, and as a value. -/
 private def testMemrefStores : IO Unit := do
   let functions ← check "memref stores" (String.intercalate "\n" [
     "function stores(m: uint8[], i: uint256, v: uint8) returns (uint256) {",
@@ -1943,6 +1957,9 @@ private def testMemrefStores : IO Unit := do
   let uint256 : TypeSystem.Ty := .fixed ⟨false, .w256⟩
   assertTrue (decide (stores = [(.unit, some uint8), (.unit, some uint8)]))
     s!"CanStore.store did not type its stores and their values: {reprStr stores}"
+  -- As a load's, upstream refuses this (`SC0299`).
+  let _ ← check "a store through a literal index"
+    "function ok(m: uint256[]) returns (uint256) { CanStore.store(lidx(m, 1), uint256(7)); return 0; }"
   expectInferenceError "a store into an array"
     "function bad(m: uint256[]) returns (uint256) { CanStore.store(m, uint256(1)); return 0; }"
     fun error => error == .operatorNotSupported "CanStore" (.array uint256)
