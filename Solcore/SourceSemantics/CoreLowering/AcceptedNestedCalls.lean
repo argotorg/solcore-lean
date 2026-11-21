@@ -5,7 +5,8 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedConversions
 
 Extends the expression closure of named-row bodies to direct calls at every
 expression position: inside operators, conditionals, groups and pairs, and as
-the arguments of other direct calls, and to the builtin conversions there. Closes a family of such rows by one strong induction on the grade.
+the arguments of other direct calls, and to the builtin conversions and the
+mapping indices there. Closes a family of such rows by one strong induction on the grade.
 
 Main declarations:
 - `CellAwareInvocationAcceptedNestedTrees.Nested`, the sites, and
@@ -56,7 +57,8 @@ open CallableIndexedOwnedPreparedStagedDirectCallAuthority (Port)
 
 /-- Sites of the nested closure: the first subset's forms with nested
 children, direct calls with nested arguments whose instantiation the caller's
-family admits, and builtin conversions with a nested argument. -/
+family admits, builtin conversions with a nested argument, and mapping indices
+with a nested base and key. -/
 inductive Nested {checked : SourceCoreCompatibleCatalog.Checked}
     (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
     (source : TypedSource) (called : DeclarationInstantiation → Prop) : ExpressionId → Prop where
@@ -87,12 +89,17 @@ inductive Nested {checked : SourceCoreCompatibleCatalog.Checked}
   | conversion {id callee argument function target}
       (site : ConversionSite prepared named source id callee argument function target)
       (child : Nested prepared named source called argument) : Nested prepared named source called id
+  | index {id base key} (site : Site prepared named source id) (form : site.node.form = .index base key)
+      (first : Nested prepared named source called base) (second : Nested prepared named source called key) :
+      Nested prepared named source called id
 
 /-- Static receipts at nested sites. The forms of the first subset keep the
 receipts of `CellAwareInvocationAcceptedExpressionTrees.Tree` with nested
 children; a call keeps the compiler's direct-call receipt, the authority of the
 selected header and the receipt of every argument at its lowered code; a
-conversion keeps its node's metadata at `word` and its argument's receipt. -/
+conversion keeps its node's metadata at `word` and its argument's receipt; an
+index keeps the compiler's index header, its key's node, the base's mapping
+type and the receipts of its base and key. -/
 inductive NestedTree (whole : SourceCoreUnifiedCompilation.Compiled)
     (headers : List (CallableIndexedOwnedFunctionValues.Header whole (Program.ofChecked whole.sourceProgram)))
     (called : DeclarationInstantiation → Prop) (compilation : SourceCoreFunctions.Context)
@@ -186,6 +193,18 @@ inductive NestedTree (whole : SourceCoreUnifiedCompilation.Compiled)
         argument ⟨.word, argumentCode⟩) :
       NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id
         ⟨.word, SourceCoreInteger.builtinConversion target argumentCode⟩
+  | index {id node base key baseNode keyNode layout comparison first second}
+      (header : CompatibleExpressionIndices.Header (.initial whole.compatible.checked) source id base node baseNode
+        layout comparison first second)
+      (keyFound : source.lookupExpression? key = some keyNode) (form : node.form = .index base key)
+      (sourceType : baseNode.type = .mapping keyNode.type node.type)
+      (baseTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope base
+        first)
+      (keyTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope key
+        second) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id
+        ⟨layout.valueType, SourceCoreCompatibleDataExpressions.index layout comparison.expression first.expression
+          second.expression (reasonAt id)⟩
 
 section Embedding
 variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
@@ -219,6 +238,7 @@ theorem nested_found {id : ExpressionId} (nested : Nested prepared named source 
   | group site _ _ | pair site _ _ _ => exact ⟨_, site.found⟩
   | call site _ _ => exact ⟨_, site.found⟩
   | conversion site _ => exact ⟨_, site.found⟩
+  | index site _ _ _ => exact ⟨_, site.found⟩
 
 end Embedding
 
@@ -258,6 +278,9 @@ theorem projected
   | conversion metadata _ _ _ _ =>
     cases Option.some.inj (found.symm.trans metadata.found)
     exact metadata.projected
+  | index header _ _ _ _ _ =>
+    cases Option.some.inj (found.symm.trans header.metadata.found)
+    exact header.metadata.projected
 
 end Projection
 
@@ -567,6 +590,28 @@ theorem of_nested {id : ExpressionId}
       exact .conversion metadata site.form site.conversion ⟨_, argumentFound⟩
         (ih argumentFound (CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique
           argumentsTyped (List.mem_singleton_self _) argumentFound) generated)
+  | index site form first second firstIH secondIH =>
+    have same := Option.some.inj (site.found.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      obtain ⟨keyType, baseTyped, keyTyped⟩ :=
+        CompatibleExpressionIndices.index_source_types unique site.found form site.coercions typed
+      obtain ⟨baseNode, baseContains, baseType⟩ := baseTyped.stored_type
+      obtain ⟨keyNode, keyContains, keyNodeType⟩ := keyTyped.stored_type
+      have baseFound := lookupExpression?_complete unique baseContains
+      have keyFound := lookupExpression?_complete unique keyContains
+      rw [← baseType] at baseTyped
+      rw [← keyNodeType] at keyTyped
+      obtain ⟨layout, comparison, firstCode, secondCode, rfl, header, firstGenerated, secondGenerated⟩ :=
+        CompatibleExpressionIndices.index_of_functions (policy := namedPolicy generation rootFuel)
+          (body := namedLowerBody generation) (context := context whole.indexed named)
+          (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt)
+          site.found baseFound form (site_special generation rootFuel site) (CellAwareNamedExpressionPolicies.read generation site rootFuel)
+          (GeneralizedLocalInitializerCompilation.namedPolicy_recipe generation rootFuel).leafLowerer accepted
+      exact .index header keyFound form (by rw [baseType, keyNodeType])
+        (firstIH baseFound baseTyped firstGenerated) (secondIH keyFound keyTyped secondGenerated)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedTrees
 end
@@ -576,9 +621,11 @@ section
 existing heads with the meaning of their own children, by structural
 recursion on the tree; a call uses the direct-call head, with the meaning of
 its argument receipts and its evidence from the call's empty requirements; a
-conversion uses the conversion head, with the dirty-integer token law. The
-application of each admitted callee header below the grade is the input that
-the row lemma supplies. -/
+conversion uses the conversion head, with the dirty-integer token law; an index
+uses the index head, with the key equality of the function model and the
+missing-default fault of its header (`MissingDefaults`). The application of
+each admitted callee header below the grade is the input that the row lemma
+supplies. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -650,6 +697,43 @@ private theorem arguments_rel {source : TypedSource} {scope : SourceCoreLocalCel
     obtain ⟨node, nodeFound⟩ := found pair.1 (List.of_mem_zip member).1
     exact ⟨node, nodeFound, rfl, member⟩
 
+/-- The missing-default fault of every index header of a Source, at its
+reason, as a fault relation decodes it. -/
+def MissingDefaults (compiled : SourceCoreUnifiedCompilation.Compiled) (registry : SourceCoreRawMetadata.Registry)
+    (functions : FunctionModel compiled.compatible.checked.catalog
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+    (source : TypedSource) (reasonAt : ExpressionId → Word) (faults : RecursiveStageMeaning.FaultRep) : Prop :=
+  ∀ {id base key : ExpressionId} {node baseNode keyNode : ExpressionNode} {layout : Core.OrderedMapping.Layout}
+    {comparison : SourceCoreCompatibleDataEquality.Prepared compiled.compatible.checked}
+    {first second : SourceCoreBasic.LoweredExpr}
+    (header : CompatibleExpressionIndices.Header (.initial compiled.compatible.checked) source id base node baseNode
+      layout comparison first second),
+    source.lookupExpression? key = some keyNode → node.form = .index base key →
+    ∀ mapping world baseSource keySource baseValue,
+      CompatibleExpressionIndices.MissingPolicy (keyNode := keyNode) (registry := registry) header functions mapping
+        world baseSource keySource baseValue (reasonAt id) (fun error token => faults (.semantic error) token)
+
+/-- A named row's issuer and the public receiver give the missing-default
+fault of every index header of the row's Source. -/
+theorem missingDefaults {compiled : SourceCoreUnifiedCompilation.Compiled}
+    {named : SourceCoreGeneralFunctions.Function} {reasonAt : ExpressionId → Word}
+    (issuer : CellAwareNamedDiagnosticIssuer.Named compiled.indexed named reasonAt)
+    (record : SourceCompilationPlan.exactSpecialization compiled.indexed.base.plan named.signature.key =
+      .ok named.specialized)
+    {source : TypedSource} (sourceEq : source = CallableIndexedNamedGeneration.source named)
+    (unique : NodeOccurrencesUnique source)
+    {completion : CallableIndexedOwnedPublicFaultReceivers.Receiver compiled.indexed}
+    (receiver : CallableIndexedOwnedPublicFaultReceiverTables.IssuedAt compiled.indexed completion.entry
+      completion.result.context.registry completion.result.extension completion.result.diagnostics)
+    (functions : FunctionModel compiled.compatible.checked.catalog
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed)) :
+    MissingDefaults compiled completion.result.context.registry functions source reasonAt
+      (CallableIndexedOwnedPublicDecodedStagedCallFaults.faults completion.result.diagnostics) := by
+  intro id base key node baseNode keyNode layout comparison first second header keyFound form mapping world
+    baseSource keySource baseValue
+  obtain ⟨port⟩ := CellAwareNamedIndexDiagnostics.ready issuer record sourceEq unique header
+  exact port.missing receiver functions keyFound form mapping world baseSource keySource baseValue
+
 variable {compiled : SourceCoreUnifiedCompilation.Compiled}
   {headers : List (Header compiled (Program.ofChecked compiled.sourceProgram))}
   {keys : List (Key compiled (Program.ofChecked compiled.sourceProgram))}
@@ -663,6 +747,9 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
     CallableIndexedOwnedPhysicalGlobals.Authority compiled current.mapping current.store)
   (functions : FunctionModel compiled.compatible.checked.catalog
     (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+  (functionLeaves : CompatibleEquality.FunctionObservations compiled.compatible.checked.catalog functions identities)
+  (functionTypes : FunctionRuntimeViews functions)
   {rawRegistry : SourceCoreRawMetadata.Registry}
   (extension : SourceCoreRawMetadata.Extends
     (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked).registry rawRegistry)
@@ -681,6 +768,7 @@ variable {compiled : SourceCoreUnifiedCompilation.Compiled}
       (SourceCoreCompatibleValues.Context.initial compiled.compatible.checked)
       invocation.source context reasonAt scope id lowered →
     ∀ location, faults (.semantic (.uninitializedLocation location)) (reasonAt id))
+  (missing : MissingDefaults compiled rawRegistry functions invocation.source reasonAt faults)
   (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked compiled.sourceProgram)
     registry)
   (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
@@ -695,7 +783,8 @@ private theorem product_values :
   intro mapping world leftType rightType left right first second firstType secondType firstValue secondValue
   exact .product firstValue secondValue
 
-include callerBridge keyPhysical cache extension sameLedger uninitialized selectedBodies wellFormed runtime covers in
+include callerBridge keyPhysical cache faithful functionLeaves functionTypes extension sameLedger uninitialized missing
+  selectedBodies wellFormed runtime covers in
 /-- Every nested receipt tree preserves its staged Source execution at every
 grade, given the application of every admitted callee header below the
 grade. -/
@@ -847,8 +936,28 @@ theorem preserves_nested_tree [RecursiveStageMeaning.FaultTokens faults]
     exact CellAwareInvocationAcceptedConversions.preserves callerBridge.forgetSlots functions
       ⟨metadata.found, form, metadata.coercions, metadata.requirements, conversion, argumentFound⟩
       unique selectedBodies runtime covers size children ⟨rfl, rfl, rfl⟩
+  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType
+      baseTree keyTree baseIH keyIH =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base key first second) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl first => obtain ⟨rfl, rfl⟩ := first; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr second => obtain ⟨rfl, rfl⟩ := second; intro _; exact keyIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationIndexBounds.preserves_selected callerBridge.forgetSlots functions faults unique
+      selectedBodies runtime covers header keyFound form sourceType faithful functionLeaves functionTypes
+      ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ (missing header keyFound form) size children ⟨rfl, rfl, rfl⟩
 
-include callerBridge keyPhysical cache extension sameLedger uninitialized selectedBodies wellFormed runtime covers in
+include callerBridge keyPhysical cache faithful functionLeaves functionTypes extension sameLedger uninitialized missing
+  selectedBodies wellFormed runtime covers in
 /-- Native completion of every nested receipt tree reconstructs its staged
 Source execution, given the native application of every admitted callee
 header below the grade. -/
@@ -995,6 +1104,25 @@ theorem reflects_nested_tree [RecursiveStageMeaning.FaultTokens faults]
     exact CellAwareInvocationAcceptedConversions.reflects callerBridge.forgetSlots functions
       ⟨metadata.found, form, metadata.coercions, metadata.requirements, conversion, argumentFound⟩
       unique selectedBodies runtime covers size children ⟨rfl, rfl, rfl⟩
+  | @index id node base key baseNode keyNode layout comparison first second header keyFound form sourceType
+      baseTree keyTree baseIH keyIH =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base key first second) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl first => obtain ⟨rfl, rfl⟩ := first; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr second => obtain ⟨rfl, rfl⟩ := second; intro _; exact keyIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationIndexBounds.reflects_selected callerBridge.forgetSlots functions faults unique
+      selectedBodies runtime covers header keyFound form sourceType faithful functionLeaves functionTypes
+      ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ (missing header keyFound form) size children ⟨rfl, rfl, rfl⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedBounds
 end
@@ -1081,6 +1209,11 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
     (reads : CellAwareInvocationAcceptedExpressions.Reads (rowIndex generation record) faults)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (functionLeaves : CompatibleEquality.FunctionObservations whole.compatible.checked.catalog functions identities)
+    (functionTypes : FunctionRuntimeViews functions)
+    (missing : CellAwareInvocationAcceptedNestedBounds.MissingDefaults whole receiving functions invocation.source
+      (rowIndex generation record).reasonAt faults)
     (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked whole.sourceProgram)
       registry)
     (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
@@ -1117,9 +1250,9 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults]
     exact CellAwareInvocationAcceptedNestedBounds.preserves_nested_tree (attachment := fun _ _ _ => True)
       (compilation := CallableIndexedNamedGeneration.context whole.indexed named) owner
       (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations) keyPhysical
-      (fun state => state.physical) functions extension sameLedger faults uninitialized selectedBodies wellFormed
-      sourceRuntime covers tree size applications ⟨rfl, rfl, rfl⟩ found typed environments heaps locals agrees
-      actualTyped initial admitted authority physical
+      (fun state => state.physical) functions faithful functionLeaves functionTypes extension sameLedger faults
+      uninitialized missing selectedBodies wellFormed sourceRuntime covers tree size applications ⟨rfl, rfl, rfl⟩
+      found typed environments heaps locals agrees actualTyped initial admitted authority physical
 
 /-- Every completed native run of an accepted nested site reconstructs an
 independent Source grade, outcome and reached heap. -/
@@ -1129,6 +1262,11 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
     (reads : CellAwareInvocationAcceptedExpressions.Reads (rowIndex generation record) faults)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (functionLeaves : CompatibleEquality.FunctionObservations whole.compatible.checked.catalog functions identities)
+    (functionTypes : FunctionRuntimeViews functions)
+    (missing : CellAwareInvocationAcceptedNestedBounds.MissingDefaults whole receiving functions invocation.source
+      (rowIndex generation record).reasonAt faults)
     (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked whole.sourceProgram)
       registry)
     (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
@@ -1165,9 +1303,9 @@ theorem reflects [RecursiveStageMeaning.FaultTokens faults]
     exact CellAwareInvocationAcceptedNestedBounds.reflects_nested_tree (attachment := fun _ _ _ => True)
       (compilation := CallableIndexedNamedGeneration.context whole.indexed named) owner
       (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations) keyPhysical
-      (fun state => state.physical) functions extension sameLedger faults uninitialized selectedBodies wellFormed
-      sourceRuntime covers tree size applications ⟨rfl, rfl, rfl⟩ found typed environments heaps locals agrees
-      actualTyped initial admitted authority physical
+      (fun state => state.physical) functions faithful functionLeaves functionTypes extension sameLedger faults
+      uninitialized missing selectedBodies wellFormed sourceRuntime covers tree size applications ⟨rfl, rfl, rfl⟩
+      found typed environments heaps locals agrees actualTyped initial admitted authority physical
 
 /-- A named row whose accepted expressions are all nested sites discharges the
 accepted-expression input of the statement closure on the slot-retaining
@@ -1180,6 +1318,11 @@ theorem expressions [RecursiveStageMeaning.FaultTokens faults]
     (extension : SourceCoreRawMetadata.Extends
       (SourceCoreCompatibleValues.Context.initial whole.compatible.checked).registry receiving)
     (reads : CellAwareInvocationAcceptedExpressions.Reads (rowIndex generation record) faults)
+    {identities : Dynamic.Value → Word → Prop} (faithful : DataEquality.IdentityFaithful identities)
+    (functionLeaves : CompatibleEquality.FunctionObservations whole.compatible.checked.catalog functions identities)
+    (functionTypes : FunctionRuntimeViews functions)
+    (missing : CellAwareInvocationAcceptedNestedBounds.MissingDefaults whole receiving functions invocation.source
+      (rowIndex generation record).reasonAt faults)
     (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies (Program.ofChecked whole.sourceProgram)
       registry)
     (wellFormed : ProgramWellFormed (Program.ofChecked whole.sourceProgram))
@@ -1197,13 +1340,15 @@ theorem expressions [RecursiveStageMeaning.FaultTokens faults]
   refine ⟨?_, ?_⟩
   · intro size smaller scope id lowered generated
     exact preserves generation record called owner keyPhysical registry invocation faults fuel sourceEq extension
-      reads selectedBodies wellFormed runtime covers sameLedger ports size
+      reads faithful functionLeaves functionTypes missing selectedBodies wellFormed runtime covers sameLedger ports
+      size
       (fun header member admitted below less => (applications header member admitted).1 below
         (Nat.lt_trans less smaller))
       ⟨generated, closed fuel scope id lowered generated⟩
   · intro size smaller scope id lowered generated
     exact reflects generation record called owner keyPhysical registry invocation faults fuel sourceEq extension
-      reads selectedBodies wellFormed runtime covers sameLedger ports size
+      reads faithful functionLeaves functionTypes missing selectedBodies wellFormed runtime covers sameLedger ports
+      size
       (fun header member admitted below less => (applications header member admitted).2 below
         (Nat.lt_trans less smaller))
       ⟨generated, closed fuel scope id lowered generated⟩
@@ -1354,6 +1499,10 @@ theorem expressions (size : Nat) :
       stages child faults row.closed size (row_source row selected) completion.result.extension
       (CellAwareInvocationAcceptedNamedInvocation.reads row.generation row.record row.issuer receiver
         (row_unique support row))
+      (CallableIndexedLambdaValues.identity_faithful whole.indexed) (CellAwarePhysicalFunctionOrigins.observations profile)
+      (CellAwarePhysicalFunctionOrigins.runtime_views profile)
+      (CellAwareInvocationAcceptedNestedBounds.missingDefaults row.issuer row.record (row_source row selected)
+        ((row_source row selected) ▸ row_unique support row) receiver rootFunctions)
       support.registryBodies wellFormed row.ports applications
 
 include profile receiver support artifact checked wellFormed rows in
@@ -1457,6 +1606,10 @@ def nested? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared
         let ⟨first⟩ ← nested? prepared named source called fuel left
         let ⟨second⟩ ← nested? prepared named source called fuel right
         pure ⟨.pair site form first second⟩
+      | .index base key => do
+        let ⟨first⟩ ← nested? prepared named source called fuel base
+        let ⟨second⟩ ← nested? prepared named source called fuel key
+        pure ⟨.index site form first second⟩
       | _ => none
     | none =>
       match directSite? prepared named source id with
@@ -1558,6 +1711,8 @@ theorem transport {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Pr
       arguments
   | conversion site _ child =>
     exact .conversion (CellAwareInvocationAcceptedConversionSites.transport keyEq assumptions site) child
+  | index site form _ _ first second =>
+    exact .index (CellAwareInvocationAcceptedSubsetCheck.transportSite keyEq site) form first second
 
 /-- A named row whose every expression node is a nested site, a reference site
 or a conversion's callee has every accepted expression a nested site. -/

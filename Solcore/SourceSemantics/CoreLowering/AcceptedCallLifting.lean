@@ -521,7 +521,8 @@ staged executions. A direct call's original rule runs the callee body, so the
 lifting is one strong induction on the size of the original derivation across
 bodies: at a call of a given size, the callee body's derivation is smaller, and
 its lifting below that size gives the staged global application. A
-conversion's original rule applies its builtin as the staged rule does. Inside one
+conversion's original rule applies its builtin as the staged rule does, and a
+mapping index's original rules give the staged index outcome. Inside one
 body, a nested site is lifted by induction on the site, over the sized
 derivations of its operands, branches, elements and arguments. The admitted
 callees are static inputs (`Callees`): the registry scope of each callee's
@@ -850,6 +851,28 @@ theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Stag
       cases node_unique unique found contains
       rw [site.form] at formEq
       cases formEq
+  | index site form _ _ base key =>
+    intro size context environment before after value within trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | indexFound _ first second lookup =>
+      exact .indexResult (occurrence site form (fun _ _ same => by cases same))
+        (base (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first)
+        (key (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) second) (.found rfl lookup)
+    | indexDefault _ first second absent defaulted =>
+      exact .indexResult (occurrence site form (fun _ _ same => by cases same))
+        (base (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first)
+        (key (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) second) (.default rfl absent defaulted)
 
 /-- The value lifting of every nested site below a size, given the lifting of
 the callee bodies below it. -/
@@ -1437,6 +1460,50 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
       | builtinArgumentType arity mismatch =>
         exact .builtinApplied callOccurrence stagedArguments (.builtinType arity mismatch)
       | builtinFaults failed => exact .builtinApplied callOccurrence stagedArguments (.builtinFault failed)
+  | index site form baseNested keyNested base key =>
+    intro size context environment before after reason within signatures expressible trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, CellAwareInvocationAcceptedCallLifting.requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | indexBase _ failed =>
+      exact .indexBaseFault (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (base (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible failed)
+    | indexKey _ first failed =>
+      exact .indexKeyFault (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (nested_value prepared unique bodies baseNested (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first)
+        (key (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible failed)
+    | indexShape _ first second notMapping =>
+      exact .indexResult (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (nested_value prepared unique bodies baseNested (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first)
+        (nested_value prepared unique bodies keyNested (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) second) (.shape notMapping)
+    | indexKeyType _ first second actual mismatch =>
+      exact .indexResult (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (nested_value prepared unique bodies baseNested (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first)
+        (nested_value prepared unique bodies keyNested (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) second) (.keyType rfl actual mismatch)
+    | indexDefaultUnavailable _ first second keyTyped absent unavailable =>
+      exact .indexResult (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (nested_value prepared unique bodies baseNested (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first)
+        (nested_value prepared unique bodies keyNested (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) second)
+        (.unavailable rfl keyTyped absent unavailable)
 
 /-- The fault lifting of every nested site below a size, given that the
 Source's direct calls have plain callees and the value and fault liftings of

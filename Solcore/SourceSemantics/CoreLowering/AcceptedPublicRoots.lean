@@ -720,6 +720,12 @@ theorem expressions_of_family {called : DeclarationInstantiation → Prop}
     closed size sourceEq completion.result.extension
     (CellAwareInvocationAcceptedNamedInvocation.reads prepared.compilation
       (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned) issuer receiver unique)
+    (CallableIndexedLambdaValues.identity_faithful whole.indexed)
+    (CellAwarePhysicalFunctionOrigins.observations callableProfile)
+    (CellAwarePhysicalFunctionOrigins.runtime_views callableProfile)
+    (CellAwareInvocationAcceptedNestedBounds.missingDefaults issuer
+      (CellAwareInvocationAcceptedNamedHeaders.record prepared aligned) sourceEq (sourceEq ▸ unique) receiver
+      rootFunctions)
     support.registryBodies wellFormed ports
     (fun callee member admitted =>
       ⟨fun smaller _ => CellAwareInvocationAcceptedCallFamily.preserves callableProfile receiver support artifact
