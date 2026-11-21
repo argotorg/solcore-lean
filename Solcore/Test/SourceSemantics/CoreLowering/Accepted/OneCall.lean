@@ -1026,6 +1026,26 @@ def observeFlipped (function : CheckedFunction) (signature : ProgramFunctionSign
     targetOwner, targetDistinct, targetOrdinary, initializedType, assignmentType, returnedType, targetRoot,
     targetType, targetBare, assignmentRequirements⟩
 
+/-- Two members of a list of signatures whose ids are distinct are equal when
+their ids are. -/
+private theorem signature_of_id {signatures : List ProgramFunctionSignature}
+    (distinct : (signatures.map (·.id)).Nodup) {first second : ProgramFunctionSignature}
+    (firstMember : first ∈ signatures) (secondMember : second ∈ signatures) (same : first.id = second.id) :
+    first = second := by
+  induction signatures with
+  | nil => cases firstMember
+  | cons head rest ih =>
+    obtain ⟨fresh, restDistinct⟩ := List.nodup_cons.mp distinct
+    cases firstMember with
+    | head =>
+      cases secondMember with
+      | head => rfl
+      | tail _ secondRest => exact absurd (List.mem_map.mpr ⟨second, secondRest, same.symm⟩) fresh
+    | tail _ firstRest =>
+      cases secondMember with
+      | head => exact absurd (List.mem_map.mpr ⟨first, firstRest, same⟩) fresh
+      | tail _ secondRest => exact ih restDistinct firstRest secondRest
+
 /-- The declarative typing of the complete checked program. -/
 def observeWellFormed {program : CheckedProgram}
     (checked : checkProgram workspace options.checkingFuel = .ok program) :
@@ -1056,131 +1076,34 @@ def observeWellFormed {program : CheckedProgram}
     let ⟨shiftedDeclaration⟩ ← observed (shiftedFunction.declaration = shiftedSignature.id) "calls shiftedDeclaration"
     let ⟨flippedDeclaration⟩ ← observed (flippedFunction.declaration = flippedSignature.id) "calls flippedDeclaration"
     let ⟨tailedDeclaration⟩ ← observed (tailedFunction.declaration = tailedSignature.id) "calls tailedDeclaration"
-    let ⟨identityRelay⟩ ← observed (identitySignature.id ≠ relaySignature.id) "calls identityRelay"
-    let ⟨identityTwice⟩ ← observed (identitySignature.id ≠ twiceSignature.id) "calls identityTwice"
-    let ⟨relayTwice⟩ ← observed (relaySignature.id ≠ twiceSignature.id) "calls relayTwice"
-    let ⟨identityNarrow⟩ ← observed (identitySignature.id ≠ narrowSignature.id) "calls identityNarrow"
-    let ⟨relayNarrow⟩ ← observed (relaySignature.id ≠ narrowSignature.id) "calls relayNarrow"
-    let ⟨twiceNarrow⟩ ← observed (twiceSignature.id ≠ narrowSignature.id) "calls twiceNarrow"
-    let ⟨identityRoundTrip⟩ ← observed (identitySignature.id ≠ roundTripSignature.id) "calls identityRoundTrip"
-    let ⟨relayRoundTrip⟩ ← observed (relaySignature.id ≠ roundTripSignature.id) "calls relayRoundTrip"
-    let ⟨twiceRoundTrip⟩ ← observed (twiceSignature.id ≠ roundTripSignature.id) "calls twiceRoundTrip"
-    let ⟨narrowRoundTrip⟩ ← observed (narrowSignature.id ≠ roundTripSignature.id) "calls narrowRoundTrip"
-    let ⟨identityDoubled⟩ ← observed (identitySignature.id ≠ doubledSignature.id) "calls identityDoubled"
-    let ⟨relayDoubled⟩ ← observed (relaySignature.id ≠ doubledSignature.id) "calls relayDoubled"
-    let ⟨twiceDoubled⟩ ← observed (twiceSignature.id ≠ doubledSignature.id) "calls twiceDoubled"
-    let ⟨narrowDoubled⟩ ← observed (narrowSignature.id ≠ doubledSignature.id) "calls narrowDoubled"
-    let ⟨roundTripDoubled⟩ ← observed (roundTripSignature.id ≠ doubledSignature.id) "calls roundTripDoubled"
-    let ⟨identityShifted⟩ ← observed (identitySignature.id ≠ shiftedSignature.id) "calls identityShifted"
-    let ⟨relayShifted⟩ ← observed (relaySignature.id ≠ shiftedSignature.id) "calls relayShifted"
-    let ⟨twiceShifted⟩ ← observed (twiceSignature.id ≠ shiftedSignature.id) "calls twiceShifted"
-    let ⟨narrowShifted⟩ ← observed (narrowSignature.id ≠ shiftedSignature.id) "calls narrowShifted"
-    let ⟨roundTripShifted⟩ ← observed (roundTripSignature.id ≠ shiftedSignature.id) "calls roundTripShifted"
-    let ⟨doubledShifted⟩ ← observed (doubledSignature.id ≠ shiftedSignature.id) "calls doubledShifted"
-    let ⟨identityFlipped⟩ ← observed (identitySignature.id ≠ flippedSignature.id) "calls identityFlipped"
-    let ⟨relayFlipped⟩ ← observed (relaySignature.id ≠ flippedSignature.id) "calls relayFlipped"
-    let ⟨twiceFlipped⟩ ← observed (twiceSignature.id ≠ flippedSignature.id) "calls twiceFlipped"
-    let ⟨narrowFlipped⟩ ← observed (narrowSignature.id ≠ flippedSignature.id) "calls narrowFlipped"
-    let ⟨roundTripFlipped⟩ ← observed (roundTripSignature.id ≠ flippedSignature.id) "calls roundTripFlipped"
-    let ⟨doubledFlipped⟩ ← observed (doubledSignature.id ≠ flippedSignature.id) "calls doubledFlipped"
-    let ⟨shiftedFlipped⟩ ← observed (shiftedSignature.id ≠ flippedSignature.id) "calls shiftedFlipped"
-    let ⟨identityTailed⟩ ← observed (identitySignature.id ≠ tailedSignature.id) "calls identityTailed"
-    let ⟨relayTailed⟩ ← observed (relaySignature.id ≠ tailedSignature.id) "calls relayTailed"
-    let ⟨twiceTailed⟩ ← observed (twiceSignature.id ≠ tailedSignature.id) "calls twiceTailed"
-    let ⟨narrowTailed⟩ ← observed (narrowSignature.id ≠ tailedSignature.id) "calls narrowTailed"
-    let ⟨roundTripTailed⟩ ← observed (roundTripSignature.id ≠ tailedSignature.id) "calls roundTripTailed"
-    let ⟨doubledTailed⟩ ← observed (doubledSignature.id ≠ tailedSignature.id) "calls doubledTailed"
-    let ⟨shiftedTailed⟩ ← observed (shiftedSignature.id ≠ tailedSignature.id) "calls shiftedTailed"
-    let ⟨flippedTailed⟩ ← observed (flippedSignature.id ≠ tailedSignature.id) "calls flippedTailed"
+    let ⟨distinct⟩ ← observed ((program.signatures.functions.map (·.id)).Nodup) "calls distinct signatures"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
         intro actual member candidate candidateMember accepted
         have declared := checkFunctionBody_success_declaration accepted
+        have selects : ∀ {signature}, signature ∈ program.signatures.functions →
+            actual.declaration = signature.id → candidate = signature := fun signatureMember same =>
+          signature_of_id distinct candidateMember signatureMember (declared.symm.trans same)
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
-        simp only [signatures, List.mem_cons, List.not_mem_nil, or_false] at candidateMember
-        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-          rcases candidateMember with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-        · exact identityShape.statementTyping program.signatures
-        · exact False.elim (identityRelay (identityDeclaration.symm.trans declared))
-        · exact False.elim (identityTwice (identityDeclaration.symm.trans declared))
-        · exact False.elim (identityNarrow (identityDeclaration.symm.trans declared))
-        · exact False.elim (identityRoundTrip (identityDeclaration.symm.trans declared))
-        · exact False.elim (identityDoubled (identityDeclaration.symm.trans declared))
-        · exact False.elim (identityShifted (identityDeclaration.symm.trans declared))
-        · exact False.elim (identityFlipped (identityDeclaration.symm.trans declared))
-        · exact False.elim (identityTailed (identityDeclaration.symm.trans declared))
-        · exact False.elim (identityRelay (declared.symm.trans relayDeclaration))
-        · exact relayShape.statementTyping program.signatures (by simp [signatures])
-        · exact False.elim (relayTwice (relayDeclaration.symm.trans declared))
-        · exact False.elim (relayNarrow (relayDeclaration.symm.trans declared))
-        · exact False.elim (relayRoundTrip (relayDeclaration.symm.trans declared))
-        · exact False.elim (relayDoubled (relayDeclaration.symm.trans declared))
-        · exact False.elim (relayShifted (relayDeclaration.symm.trans declared))
-        · exact False.elim (relayFlipped (relayDeclaration.symm.trans declared))
-        · exact False.elim (relayTailed (relayDeclaration.symm.trans declared))
-        · exact False.elim (identityTwice (declared.symm.trans twiceDeclaration))
-        · exact False.elim (relayTwice (declared.symm.trans twiceDeclaration))
-        · exact twiceShape.statementTyping program.signatures (by simp [signatures])
-        · exact False.elim (twiceNarrow (twiceDeclaration.symm.trans declared))
-        · exact False.elim (twiceRoundTrip (twiceDeclaration.symm.trans declared))
-        · exact False.elim (twiceDoubled (twiceDeclaration.symm.trans declared))
-        · exact False.elim (twiceShifted (twiceDeclaration.symm.trans declared))
-        · exact False.elim (twiceFlipped (twiceDeclaration.symm.trans declared))
-        · exact False.elim (twiceTailed (twiceDeclaration.symm.trans declared))
-        · exact False.elim (identityNarrow (declared.symm.trans narrowDeclaration))
-        · exact False.elim (relayNarrow (declared.symm.trans narrowDeclaration))
-        · exact False.elim (twiceNarrow (declared.symm.trans narrowDeclaration))
-        · exact narrowShape.statementTyping program.signatures
-        · exact False.elim (narrowRoundTrip (narrowDeclaration.symm.trans declared))
-        · exact False.elim (narrowDoubled (narrowDeclaration.symm.trans declared))
-        · exact False.elim (narrowShifted (narrowDeclaration.symm.trans declared))
-        · exact False.elim (narrowFlipped (narrowDeclaration.symm.trans declared))
-        · exact False.elim (narrowTailed (narrowDeclaration.symm.trans declared))
-        · exact False.elim (identityRoundTrip (declared.symm.trans roundTripDeclaration))
-        · exact False.elim (relayRoundTrip (declared.symm.trans roundTripDeclaration))
-        · exact False.elim (twiceRoundTrip (declared.symm.trans roundTripDeclaration))
-        · exact False.elim (narrowRoundTrip (declared.symm.trans roundTripDeclaration))
-        · exact roundTripShape.statementTyping program.signatures
-        · exact False.elim (roundTripDoubled (roundTripDeclaration.symm.trans declared))
-        · exact False.elim (roundTripShifted (roundTripDeclaration.symm.trans declared))
-        · exact False.elim (roundTripFlipped (roundTripDeclaration.symm.trans declared))
-        · exact False.elim (roundTripTailed (roundTripDeclaration.symm.trans declared))
-        · exact False.elim (identityDoubled (declared.symm.trans doubledDeclaration))
-        · exact False.elim (relayDoubled (declared.symm.trans doubledDeclaration))
-        · exact False.elim (twiceDoubled (declared.symm.trans doubledDeclaration))
-        · exact False.elim (narrowDoubled (declared.symm.trans doubledDeclaration))
-        · exact False.elim (roundTripDoubled (declared.symm.trans doubledDeclaration))
-        · exact doubledShape.statementTyping program.signatures
-        · exact False.elim (doubledShifted (doubledDeclaration.symm.trans declared))
-        · exact False.elim (doubledFlipped (doubledDeclaration.symm.trans declared))
-        · exact False.elim (doubledTailed (doubledDeclaration.symm.trans declared))
-        · exact False.elim (identityShifted (declared.symm.trans shiftedDeclaration))
-        · exact False.elim (relayShifted (declared.symm.trans shiftedDeclaration))
-        · exact False.elim (twiceShifted (declared.symm.trans shiftedDeclaration))
-        · exact False.elim (narrowShifted (declared.symm.trans shiftedDeclaration))
-        · exact False.elim (roundTripShifted (declared.symm.trans shiftedDeclaration))
-        · exact False.elim (doubledShifted (declared.symm.trans shiftedDeclaration))
-        · exact shiftedShape.statementTyping program.signatures
-        · exact False.elim (shiftedFlipped (shiftedDeclaration.symm.trans declared))
-        · exact False.elim (shiftedTailed (shiftedDeclaration.symm.trans declared))
-        · exact False.elim (identityFlipped (declared.symm.trans flippedDeclaration))
-        · exact False.elim (relayFlipped (declared.symm.trans flippedDeclaration))
-        · exact False.elim (twiceFlipped (declared.symm.trans flippedDeclaration))
-        · exact False.elim (narrowFlipped (declared.symm.trans flippedDeclaration))
-        · exact False.elim (roundTripFlipped (declared.symm.trans flippedDeclaration))
-        · exact False.elim (doubledFlipped (declared.symm.trans flippedDeclaration))
-        · exact False.elim (shiftedFlipped (declared.symm.trans flippedDeclaration))
-        · exact flippedShape.statementTyping program.signatures
-        · exact False.elim (flippedTailed (flippedDeclaration.symm.trans declared))
-        · exact False.elim (identityTailed (declared.symm.trans tailedDeclaration))
-        · exact False.elim (relayTailed (declared.symm.trans tailedDeclaration))
-        · exact False.elim (twiceTailed (declared.symm.trans tailedDeclaration))
-        · exact False.elim (narrowTailed (declared.symm.trans tailedDeclaration))
-        · exact False.elim (roundTripTailed (declared.symm.trans tailedDeclaration))
-        · exact False.elim (doubledTailed (declared.symm.trans tailedDeclaration))
-        · exact False.elim (shiftedTailed (declared.symm.trans tailedDeclaration))
-        · exact False.elim (flippedTailed (declared.symm.trans tailedDeclaration))
-        · exact tailedShape.statementTyping program.signatures (by simp [signatures])
+        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        · obtain rfl := selects (by simp [signatures]) identityDeclaration
+          exact identityShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) relayDeclaration
+          exact relayShape.statementTyping program.signatures (by simp [signatures])
+        · obtain rfl := selects (by simp [signatures]) twiceDeclaration
+          exact twiceShape.statementTyping program.signatures (by simp [signatures])
+        · obtain rfl := selects (by simp [signatures]) narrowDeclaration
+          exact narrowShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) roundTripDeclaration
+          exact roundTripShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) doubledDeclaration
+          exact doubledShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) shiftedDeclaration
+          exact shiftedShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) flippedDeclaration
+          exact flippedShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) tailedDeclaration
+          exact tailedShape.statementTyping program.signatures (by simp [signatures])
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
