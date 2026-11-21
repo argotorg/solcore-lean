@@ -7,7 +7,8 @@ import Solcore.SourceSemantics.Staging.Erasure
 # Accepted bodies: shapes and lifted traces
 
 The premises of the accepted-body theorems, produced at an actual program: a shape that
-can be checked on the Source, and a staged trace lifted from an independent execution.
+can be checked on the Source, and a staged trace lifted from an independent execution. The
+shape includes a function body's final value.
 
 Main declarations:
 - `CellAwareInvocationAcceptedBodyShape.Shape` and
@@ -23,7 +24,8 @@ section
 -- leanmerge: from Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedBodyShape
 /-! Source statement lists that the accepted-body route closes at named rows:
 value and unit returns, monomorphic declarations, bare assignments and bare
-in-place `~` the compiler refines, expression statements, blocks and conditionals, each with
+in-place `~` the compiler refines, expression statements, blocks and conditionals, and a
+function body's final value of its declared type, each with
 its expressions in a given predicate. `Shape` recognizes these lists on the
 Source; `covered` shows that every refined accepted tree of such a list is
 covered by the statement closure, and `shapeWith?` recognizes them on an
@@ -38,8 +40,9 @@ open AcceptedNamedBodyFlow (Tree Assignable BitNotAssignable)
 open CellAwareInvocationAcceptedFlow (Covered)
 
 /-- Statement lists of the supported forms. A list may end without returning
-only as a branch or block body, or in a Unit function; every expression of the
-list satisfies `child`. -/
+only as a branch or block body, or in a Unit function, and a function body may
+end in a value whose node has the expected type; every expression of the list
+satisfies `child`. -/
 inductive Shape (source : TypedSource) (expected : TypeSystem.Ty) (child : ExpressionId → Prop) :
     Bool → List StatementId → Prop where
   | nil {mode : Bool} (allowed : mode = false ∨ expected = .unit) : Shape source expected child mode []
@@ -82,6 +85,23 @@ inductive Shape (source : TypedSource) (expected : TypeSystem.Ty) (child : Expre
       (test : child condition) (left : Shape source expected child false thenBody)
       (right : Shape source expected child false (elseBody.getD []))
       (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
+  | tail {id : StatementId} {node : StatementNode} {expression : ExpressionId}
+      (found : source.lookupStatement? id = some node) (form : node.form = .expression expression false)
+      (typed : ∀ expressionNode, source.lookupExpression? expression = some expressionNode →
+        expressionNode.type = expected)
+      (value : child expression) : Shape source expected child true [id]
+
+/-- Proof-producing recognition of a final value's node of the expected type,
+as `Covered` asks. -/
+def tailTyped? (source : TypedSource) (expected : TypeSystem.Ty) (expression : ExpressionId) :
+    Option (PLift (∀ expressionNode, source.lookupExpression? expression = some expressionNode →
+      expressionNode.type = expected)) :=
+  match found : source.lookupExpression? expression with
+  | some node =>
+    if typed : node.type = expected then
+      some ⟨fun other same => by cases same; exact typed⟩
+    else none
+  | none => none
 
 /-- Proof-producing recognition of a bare assignment the compiler refines. -/
 def assignable? (source : TypedSource) (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) :
@@ -157,6 +177,13 @@ def shapeWith? (source : TypedSource) (expected : TypeSystem.Ty) (child : Expres
         let ⟨value⟩ ← child? expression
         let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
         pure ⟨.discarded found form value tail⟩
+      | .expression expression false =>
+        match mode, rest with
+        | true, [] => do
+          let ⟨value⟩ ← child? expression
+          let ⟨typed⟩ ← tailTyped? source expected expression
+          pure ⟨.tail found form typed value⟩
+        | _, _ => none
       | .block statements => do
         let ⟨inner⟩ ← shapeWith? source expected child child? fuel false statements
         let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
@@ -211,6 +238,7 @@ private theorem head_expanded {source : TypedSource} {expected : TypeSystem.Ty} 
   | discarded found form => exact ⟨_, found, by rw [form]; rfl⟩
   | block found form => exact ⟨_, found, by rw [form]; rfl⟩
   | conditional found form => exact ⟨_, found, by rw [form]; rfl⟩
+  | tail found form => exact ⟨_, found, by rw [form]; rfl⟩
 
 variable {whole : SourceCoreUnifiedCompilation.Compiled} {bodyRelation : ActualBodyInvocation.BodyRelation}
 
@@ -372,6 +400,27 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
       clear leftIH rightIH tailIH ready
+      simp_all
+  | tailValue read form _ _ _ _ =>
+    intro _ shape
+    cases shape with
+    | tail found form' typed _ =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      rw [form] at form'
+      cases form'
+      rw [← sameSource]
+      exact typed
+    | _ =>
+      exfalso
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
+      simp_all
+  | valueDiscard read form notTail _ _ _ _ _ =>
+    intro _ shape
+    cases shape with
+    | tail => exact absurd notTail (by decide)
+    | _ =>
+      exfalso
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
       simp_all
   | boundary read outside =>
     intro _ shape
@@ -806,7 +855,8 @@ private theorem sequence {mode : Bool} {id : StatementId} {rest : List Statement
     | terminal head terminal => exact stop head terminal
 
 /-- An ordinary execution of a supported statement list whose expressions are
-subset sites is a staged execution with the same context, outcome and heap. -/
+subset sites is a staged execution with the same context, outcome and heap. A
+function body's final value is the staged final value. -/
 theorem statements (unique : NodeOccurrencesUnique scope.source) {mode : Bool} {statements : List StatementId}
     (shape : Shape scope.source expected (Subset prepared named scope.source) mode statements) :
     ∀ {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
@@ -949,6 +999,18 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {mode : Bool} {
       | breaking => exact .ifBreaking (lookupStatement?_sound found) form tested staged
       | continuing => exact .ifContinuing (lookupStatement?_sound found) form tested staged
       | fault => exact .ifFault (lookupStatement?_sound found) form tested staged
+  | tail found form _ value =>
+    intro context environment before after finalContext outcome original
+    unfold Original at original
+    cases original with
+    | tailExpression contains formEq evaluate =>
+      obtain rfl := same_node unique found contains
+      rw [form] at formEq
+      cases formEq
+      exact .tail (lookupStatement?_sound found) form (expression_value unique value evaluate)
+    | singleton contains notTail _ =>
+      obtain rfl := same_node unique found contains
+      exact absurd form (notTail _)
 
 /-- An ordinary function-body execution of a supported list whose expressions
 are subset sites is a staged execution with the same context, outcome and heap,

@@ -12,12 +12,12 @@ argument is another direct call, both at a `Word` parameter; `narrow` returns
 `Typedef.rep(uint8(value))`, the word of that value; `doubled` converts its
 parameter to a `uint8` local `x`, adds `x` to it in place and returns it, `shifted` shifts such
 an `x` left in place by the parameter, a `Word` amount, and `flipped` applies `~` to such an `x` in
-place. Runtime checks place every
-expression node of the eight rows among the nested sites that call `identity`'s
+place; `tailed`'s body is `identity(value)` as its final value. Runtime checks place every
+expression node of the nine rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
-`relay`, `twice`, `narrow` and `roundTrip` (at words canonical for `uint8`) are lifted to
+`relay`, `twice`, `tailed`, `narrow` and `roundTrip` (at words canonical for `uint8`) are lifted to
 staged traces, and the call root's theorems apply at the first public call of
 each in both directions: the actual resumption succeeds, and actual native
 completion reconstructs a staged Source execution. At other words the call
@@ -35,6 +35,7 @@ represents the Source fault.
 
 Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.twice_source`,
+`Tests.SourceCoreAcceptedOneCall.tailed_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_source`,
 `Tests.SourceCoreAcceptedOneCall.roundTrip_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_fault`,
@@ -45,6 +46,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.accepted_failure` and the runtime checks
 `Tests.SourceCoreAcceptedOneCall.AcceptedCallRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedNestedCallRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedTailRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run`,
@@ -54,7 +56,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 -/
 
 section
-/-! The program and the declarative typing of its eight functions, constructed
+/-! The program and the declarative typing of its nine functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -73,7 +75,8 @@ def workspace : Workspace.RawWorkspace := {
     "function roundTrip(value: Word) returns (Word) { return Typedef.rep(uint8(value)); }",
     "function doubled(value: Word) returns (uint8) { let x: uint8 = uint8(value); x += x; return x; }",
     "function shifted(value: Word) returns (uint8) { let x: uint8 = uint8(value); x <<= value; return x; }",
-    "function flipped(value: Word) returns (uint8) { let x: uint8 = uint8(value); x ~=; return x; }" ]}] }
+    "function flipped(value: Word) returns (uint8) { let x: uint8 = uint8(value); x ~=; return x; }",
+    "function tailed(value: Word) returns (Word) { identity(value) }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -207,6 +210,81 @@ def observeRelay (function : CheckedFunction) (signature identity : ProgramFunct
     "relay statementFound"
   let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some call.value.node.id)) "relay statementForm"
   let ⟨statementType⟩ ← observed (statement.type = .word) "relay statementType"
+  return ⟨binder, read, call, statement, parameters, inputTypes, returns, inputs, binderScheme, binderRequirements,
+    binderOrdinary, roots, statementFound, statementForm, statementType⟩
+
+/-- `tailed`'s body: the read of its parameter, the direct call of `identity`
+with it, and the call as the body's final value. -/
+structure TailedShape (function : CheckedFunction) (signature identity : ProgramFunctionSignature) where
+  binder : TypedBinder
+  read : Tests.SourceCoreNamedBranch.Read function.typedBody binder .word
+  call : Tests.SourceCoreDirectCalls.DirectCall function.typedBody identity read.node.id .word
+  statement : StatementNode
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  inputs : function.typedBody.inputs = [binder]
+  binderScheme : binder.scheme = .mono .word
+  binderRequirements : binder.schemeRequirements = []
+  binderOrdinary : binder.comptime = false
+  roots : function.typedBody.roots = [.statement statement.id]
+  statementFound : function.typedBody.lookupStatement? statement.id = some statement
+  statementForm : statement.form = .expression call.value.node.id false
+  statementType : statement.type = .word
+
+theorem TailedShape.statementTyping {function : CheckedFunction} {signature identity : ProgramFunctionSignature}
+    (shape : TailedShape function signature identity) (signatures : ProgramSignatures)
+    (identityMember : identity ∈ signatures.functions) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.statement.id] := statementRoots_injective (roots.symm.trans shape.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := false, control := .ordinary .word}
+  refine ⟨BodyFacts.singleton facts, rfl, ?_⟩
+  intro lexical extension
+  rw [shape.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have fields : lexical.signatures = signatures := by
+      rw [head.context_fields.1]
+      rfl
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have read := shape.read.typed scheme shape.binderRequirements word head.local_self head.local_scheme_requirements_self
+    have called := shape.call.typed (fields ▸ identityMember) word read
+    exact ⟨_, .singleton (.expressionValue (lookupStatement?_sound shape.statementFound)
+      shape.statementForm called shape.statementType)⟩
+
+def observeTailed (function : CheckedFunction) (signature identity : ProgramFunctionSignature) :
+    IO (TailedShape function signature identity) := do
+  let [binder] := function.typedBody.inputs | throw (IO.userError "tailed input")
+  let [.statement statementId] := function.typedBody.roots | throw (IO.userError "tailed roots")
+  let some statement := function.typedBody.lookupStatement? statementId | throw (IO.userError "tailed statement")
+  let .expression valueId false := statement.form | throw (IO.userError "tailed final value")
+  let some valueNode := function.typedBody.lookupExpression? valueId | throw (IO.userError "tailed call node")
+  let .call calleeId [readId] _ := valueNode.form | throw (IO.userError "tailed call form")
+  let some calleeNode := function.typedBody.lookupExpression? calleeId | throw (IO.userError "tailed callee")
+  let some readNode := function.typedBody.lookupExpression? readId | throw (IO.userError "tailed read")
+  let read ← Tests.SourceCoreNamedBranch.observeRead function.typedBody binder readNode .word
+  let call ← Tests.SourceCoreDirectCalls.observeDirect function.typedBody identity read.node.id calleeNode valueNode
+    .word
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "tailed parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "tailed inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "tailed returns"
+  let ⟨inputs⟩ ← observed (function.typedBody.inputs = [binder]) "tailed inputs"
+  let ⟨binderScheme⟩ ← observed (binder.scheme = .mono .word) "tailed binderScheme"
+  let ⟨binderRequirements⟩ ← observed (binder.schemeRequirements = []) "tailed binderRequirements"
+  let ⟨binderOrdinary⟩ ← observed (binder.comptime = false) "tailed binderOrdinary"
+  let ⟨roots⟩ ← observed (function.typedBody.roots = [.statement statement.id]) "tailed roots shape"
+  let ⟨statementFound⟩ ← observed (function.typedBody.lookupStatement? statement.id = some statement)
+    "tailed statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .expression call.value.node.id false) "tailed statementForm"
+  let ⟨statementType⟩ ← observed (statement.type = .word) "tailed statementType"
   return ⟨binder, read, call, statement, parameters, inputTypes, returns, inputs, binderScheme, binderRequirements,
     binderOrdinary, roots, statementFound, statementForm, statementType⟩
 
@@ -954,9 +1032,9 @@ def observeWellFormed {program : CheckedProgram}
     IO (PLift (ProgramWellFormed (Program.ofChecked program))) := do
   match functions : program.functions, signatures : program.signatures.functions with
   | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction,
-      shiftedFunction, flippedFunction],
+      shiftedFunction, flippedFunction, tailedFunction],
     [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature,
-      shiftedSignature, flippedSignature] =>
+      shiftedSignature, flippedSignature, tailedSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
@@ -965,6 +1043,7 @@ def observeWellFormed {program : CheckedProgram}
     let doubledShape ← observeDoubled doubledFunction doubledSignature
     let shiftedShape ← observeShifted shiftedFunction shiftedSignature
     let flippedShape ← observeFlipped flippedFunction flippedSignature
+    let tailedShape ← observeTailed tailedFunction tailedSignature identitySignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -976,6 +1055,7 @@ def observeWellFormed {program : CheckedProgram}
     let ⟨doubledDeclaration⟩ ← observed (doubledFunction.declaration = doubledSignature.id) "calls doubledDeclaration"
     let ⟨shiftedDeclaration⟩ ← observed (shiftedFunction.declaration = shiftedSignature.id) "calls shiftedDeclaration"
     let ⟨flippedDeclaration⟩ ← observed (flippedFunction.declaration = flippedSignature.id) "calls flippedDeclaration"
+    let ⟨tailedDeclaration⟩ ← observed (tailedFunction.declaration = tailedSignature.id) "calls tailedDeclaration"
     let ⟨identityRelay⟩ ← observed (identitySignature.id ≠ relaySignature.id) "calls identityRelay"
     let ⟨identityTwice⟩ ← observed (identitySignature.id ≠ twiceSignature.id) "calls identityTwice"
     let ⟨relayTwice⟩ ← observed (relaySignature.id ≠ twiceSignature.id) "calls relayTwice"
@@ -1004,14 +1084,22 @@ def observeWellFormed {program : CheckedProgram}
     let ⟨roundTripFlipped⟩ ← observed (roundTripSignature.id ≠ flippedSignature.id) "calls roundTripFlipped"
     let ⟨doubledFlipped⟩ ← observed (doubledSignature.id ≠ flippedSignature.id) "calls doubledFlipped"
     let ⟨shiftedFlipped⟩ ← observed (shiftedSignature.id ≠ flippedSignature.id) "calls shiftedFlipped"
+    let ⟨identityTailed⟩ ← observed (identitySignature.id ≠ tailedSignature.id) "calls identityTailed"
+    let ⟨relayTailed⟩ ← observed (relaySignature.id ≠ tailedSignature.id) "calls relayTailed"
+    let ⟨twiceTailed⟩ ← observed (twiceSignature.id ≠ tailedSignature.id) "calls twiceTailed"
+    let ⟨narrowTailed⟩ ← observed (narrowSignature.id ≠ tailedSignature.id) "calls narrowTailed"
+    let ⟨roundTripTailed⟩ ← observed (roundTripSignature.id ≠ tailedSignature.id) "calls roundTripTailed"
+    let ⟨doubledTailed⟩ ← observed (doubledSignature.id ≠ tailedSignature.id) "calls doubledTailed"
+    let ⟨shiftedTailed⟩ ← observed (shiftedSignature.id ≠ tailedSignature.id) "calls shiftedTailed"
+    let ⟨flippedTailed⟩ ← observed (flippedSignature.id ≠ tailedSignature.id) "calls flippedTailed"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
         intro actual member candidate candidateMember accepted
         have declared := checkFunctionBody_success_declaration accepted
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
         simp only [signatures, List.mem_cons, List.not_mem_nil, or_false] at candidateMember
-        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-          rcases candidateMember with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+          rcases candidateMember with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
         · exact identityShape.statementTyping program.signatures
         · exact False.elim (identityRelay (identityDeclaration.symm.trans declared))
         · exact False.elim (identityTwice (identityDeclaration.symm.trans declared))
@@ -1020,6 +1108,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (identityDoubled (identityDeclaration.symm.trans declared))
         · exact False.elim (identityShifted (identityDeclaration.symm.trans declared))
         · exact False.elim (identityFlipped (identityDeclaration.symm.trans declared))
+        · exact False.elim (identityTailed (identityDeclaration.symm.trans declared))
         · exact False.elim (identityRelay (declared.symm.trans relayDeclaration))
         · exact relayShape.statementTyping program.signatures (by simp [signatures])
         · exact False.elim (relayTwice (relayDeclaration.symm.trans declared))
@@ -1028,6 +1117,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (relayDoubled (relayDeclaration.symm.trans declared))
         · exact False.elim (relayShifted (relayDeclaration.symm.trans declared))
         · exact False.elim (relayFlipped (relayDeclaration.symm.trans declared))
+        · exact False.elim (relayTailed (relayDeclaration.symm.trans declared))
         · exact False.elim (identityTwice (declared.symm.trans twiceDeclaration))
         · exact False.elim (relayTwice (declared.symm.trans twiceDeclaration))
         · exact twiceShape.statementTyping program.signatures (by simp [signatures])
@@ -1036,6 +1126,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (twiceDoubled (twiceDeclaration.symm.trans declared))
         · exact False.elim (twiceShifted (twiceDeclaration.symm.trans declared))
         · exact False.elim (twiceFlipped (twiceDeclaration.symm.trans declared))
+        · exact False.elim (twiceTailed (twiceDeclaration.symm.trans declared))
         · exact False.elim (identityNarrow (declared.symm.trans narrowDeclaration))
         · exact False.elim (relayNarrow (declared.symm.trans narrowDeclaration))
         · exact False.elim (twiceNarrow (declared.symm.trans narrowDeclaration))
@@ -1044,6 +1135,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (narrowDoubled (narrowDeclaration.symm.trans declared))
         · exact False.elim (narrowShifted (narrowDeclaration.symm.trans declared))
         · exact False.elim (narrowFlipped (narrowDeclaration.symm.trans declared))
+        · exact False.elim (narrowTailed (narrowDeclaration.symm.trans declared))
         · exact False.elim (identityRoundTrip (declared.symm.trans roundTripDeclaration))
         · exact False.elim (relayRoundTrip (declared.symm.trans roundTripDeclaration))
         · exact False.elim (twiceRoundTrip (declared.symm.trans roundTripDeclaration))
@@ -1052,6 +1144,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (roundTripDoubled (roundTripDeclaration.symm.trans declared))
         · exact False.elim (roundTripShifted (roundTripDeclaration.symm.trans declared))
         · exact False.elim (roundTripFlipped (roundTripDeclaration.symm.trans declared))
+        · exact False.elim (roundTripTailed (roundTripDeclaration.symm.trans declared))
         · exact False.elim (identityDoubled (declared.symm.trans doubledDeclaration))
         · exact False.elim (relayDoubled (declared.symm.trans doubledDeclaration))
         · exact False.elim (twiceDoubled (declared.symm.trans doubledDeclaration))
@@ -1060,6 +1153,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact doubledShape.statementTyping program.signatures
         · exact False.elim (doubledShifted (doubledDeclaration.symm.trans declared))
         · exact False.elim (doubledFlipped (doubledDeclaration.symm.trans declared))
+        · exact False.elim (doubledTailed (doubledDeclaration.symm.trans declared))
         · exact False.elim (identityShifted (declared.symm.trans shiftedDeclaration))
         · exact False.elim (relayShifted (declared.symm.trans shiftedDeclaration))
         · exact False.elim (twiceShifted (declared.symm.trans shiftedDeclaration))
@@ -1068,6 +1162,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (doubledShifted (declared.symm.trans shiftedDeclaration))
         · exact shiftedShape.statementTyping program.signatures
         · exact False.elim (shiftedFlipped (shiftedDeclaration.symm.trans declared))
+        · exact False.elim (shiftedTailed (shiftedDeclaration.symm.trans declared))
         · exact False.elim (identityFlipped (declared.symm.trans flippedDeclaration))
         · exact False.elim (relayFlipped (declared.symm.trans flippedDeclaration))
         · exact False.elim (twiceFlipped (declared.symm.trans flippedDeclaration))
@@ -1076,6 +1171,16 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (doubledFlipped (declared.symm.trans flippedDeclaration))
         · exact False.elim (shiftedFlipped (declared.symm.trans flippedDeclaration))
         · exact flippedShape.statementTyping program.signatures
+        · exact False.elim (flippedTailed (flippedDeclaration.symm.trans declared))
+        · exact False.elim (identityTailed (declared.symm.trans tailedDeclaration))
+        · exact False.elim (relayTailed (declared.symm.trans tailedDeclaration))
+        · exact False.elim (twiceTailed (declared.symm.trans tailedDeclaration))
+        · exact False.elim (narrowTailed (declared.symm.trans tailedDeclaration))
+        · exact False.elim (roundTripTailed (declared.symm.trans tailedDeclaration))
+        · exact False.elim (doubledTailed (declared.symm.trans tailedDeclaration))
+        · exact False.elim (shiftedTailed (declared.symm.trans tailedDeclaration))
+        · exact False.elim (flippedTailed (declared.symm.trans tailedDeclaration))
+        · exact tailedShape.statementTyping program.signatures (by simp [signatures])
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -1084,10 +1189,11 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the eight functions and their original Source
+/-! The cache rows of the nine functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
-`identity` with that call, `narrow` returns the conversion of its parameter,
+`identity` with that call, `tailed` ends in the direct call of `identity` with
+its parameter as its final value, `narrow` returns the conversion of its parameter,
 and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
 a given body invocation. At a word not canonical for `uint8` the conversions of `narrow`, `doubled`,
 `shifted` and `flipped` fault with the dirty-integer reason, and at a canonical word whose double is
@@ -1163,6 +1269,24 @@ structure TwiceBody (fixture : CompiledFixture workspace options) (target : Decl
   innerSelects : parts.inner.instantiation = target
   outerSelects : parts.outer.instantiation = target
 
+/-- `tailed`'s cache row: its `Word` parameter, the read of it, the direct call
+of `identity` with the read at the instantiation `target`, and the call as the
+body's final value. -/
+structure TailedBody (fixture : CompiledFixture workspace options) (target : DeclarationInstantiation)
+    (source : TypedSource) where
+  identity : ProgramFunctionSignature
+  member : identity ∈ fixture.recipe.compiled.sourceProgram.signatures.functions
+  binder : TypedBinder
+  read : Tests.SourceCoreNamedBranch.Read source binder .word
+  call : Tests.SourceCoreDirectCalls.DirectCall source identity read.node.id .word
+  selects : call.instantiation = target
+  statement : StatementNode
+  inputs : source.inputs = [binder]
+  binderScheme : binder.scheme = .mono .word
+  roots : source.roots = [.statement statement.id]
+  statementFound : source.lookupStatement? statement.id = some statement
+  statementForm : statement.form = .expression call.value.node.id false
+
 private def identitySignature (fixture : CompiledFixture workspace options) :
     IO {identity : ProgramFunctionSignature // identity ∈ fixture.recipe.compiled.sourceProgram.signatures.functions} := do
   match found : fixture.recipe.compiled.sourceProgram.signatures.functions.find?
@@ -1186,6 +1310,30 @@ def observeRelayBody (fixture : CompiledFixture workspace options) (target : Dec
     "relay row statementFound"
   let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some call.value.node.id))
     "relay row statementForm"
+  return ⟨identity, member, binder, read, call, selects, statement, inputs, binderScheme, roots, statementFound,
+    statementForm⟩
+
+def observeTailedBody (fixture : CompiledFixture workspace options) (target : DeclarationInstantiation)
+    (source : TypedSource) : IO (TailedBody fixture target source) := do
+  let ⟨identity, member⟩ ← identitySignature fixture
+  let [binder] := source.inputs | throw (IO.userError "tailed row input")
+  let [.statement statementId] := source.roots | throw (IO.userError "tailed row roots")
+  let some statement := source.lookupStatement? statementId | throw (IO.userError "tailed row statement")
+  let .expression valueId false := statement.form | throw (IO.userError "tailed row final value")
+  let some valueNode := source.lookupExpression? valueId | throw (IO.userError "tailed row call node")
+  let .call calleeId [readId] _ := valueNode.form | throw (IO.userError "tailed row call form")
+  let some calleeNode := source.lookupExpression? calleeId | throw (IO.userError "tailed row callee")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "tailed row read")
+  let read ← Tests.SourceCoreNamedBranch.observeRead source binder readNode .word
+  let call ← Tests.SourceCoreDirectCalls.observeDirect source identity read.node.id calleeNode valueNode .word
+  let ⟨selects⟩ ← observed (call.instantiation = target) "tailed row call target"
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "tailed row inputs"
+  let ⟨binderScheme⟩ ← observed (binder.scheme = .mono .word) "tailed row binderScheme"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "tailed row roots shape"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement)
+    "tailed row statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .expression call.value.node.id false)
+    "tailed row statementForm"
   return ⟨identity, member, binder, read, call, selects, statement, inputs, binderScheme, roots, statementFound,
     statementForm⟩
 
@@ -1347,6 +1495,20 @@ theorem RelayBody.trace {fixture : CompiledFixture workspace options} {target : 
     cases impossible
   · exact .returnValue (lookupStatement?_sound body.statementFound) body.statementForm
       (call_value body.call (read_value body.read evidence before word) valid applies)
+
+/-- `tailed`'s body ends in the value of its direct call, given the call's
+validity and its global application. -/
+theorem TailedBody.trace {fixture : CompiledFixture workspace options} {target : DeclarationInstantiation}
+    {source : TypedSource} (body : TailedBody fixture target source) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (word : Core.Word) (valid : SourceSemantics.DeclarationInstantiation.Valid context body.call.instantiation)
+    {after : Dynamic.Heap}
+    (applies : Dynamic.CallableApplies program context evidence [] (wordHeap before word)
+      (.global ⟨body.call.instantiation, []⟩) [.word word] (.word word) after) :
+    Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.binder before)
+      (wordHeap before word) [body.statement.id] context (.returned (.word word)) after :=
+  .tailExpression (lookupStatement?_sound body.statementFound) body.statementForm
+    (call_value body.call (read_value body.read evidence before word) valid applies)
 
 /-- `twice`'s body returns the value of its outer call, given both calls'
 validity and global applications. -/
@@ -1523,11 +1685,11 @@ end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the eight rows among the nested sites or their callees
+every expression node of the nine rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
-receipts. The original Source executions of `relay`, `twice`, `narrow` and `roundTrip`,
-whose calls run `identity`'s body instance, are lifted through the checked
+receipts. The original Source executions of `relay`, `twice`, `tailed`, `narrow` and
+`roundTrip`, whose calls run `identity`'s body instance, are lifted through the checked
 shapes, and with the existing start receipts the call root's theorems apply at
 the first public call of each in both directions. The call root's reflection
 needs no Source execution (`accepted_reflection`). At a faulting word the
@@ -1689,6 +1851,29 @@ theorem twice_source (selected : SelectedInventory whole row) {identity : Row fi
       selected.packet.header.function.evidence (wordHeap ⟨[]⟩ word) word)
     (identity_applies identitySelected calls identityBody twiceBody.outerSelects selected.packet.header.context
       selected.packet.header.function.evidence (wordHeap (wordHeap ⟨[]⟩ word) word) word)
+
+/-- The original Source execution of `tailed`'s body at its header: its final
+value is the direct call's, whose global application runs `identity`'s body
+instance, its header's Source body, at the empty dictionary. -/
+theorem tailed_source (selected : SelectedInventory whole row) {identity : Row fixture}
+    (identitySelected : SelectedInventory whole identity) {called : DeclarationInstantiation → Prop}
+    (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
+    (identityBody : IdentityBody identity.original.function.typedBody)
+    (tailedBody : TailedBody fixture (CallableNamedCanonicalOrder.retainedInstantiation identity.original)
+      row.original.function.typedBody)
+    (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment tailedBody.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.word word)) (wordHeap (wordHeap ⟨[]⟩ word) word) := by
+  have member : tailedBody.identity ∈ selected.packet.header.context.signatures.functions := by
+    rw [header_signatures selected.packet.header]
+    exact tailedBody.member
+  rw [single_body selected tailedBody.roots, selected.source_eq]
+  exact tailedBody.trace selected.packet.header.function.evidence ⟨[]⟩ word
+    (call_valid tailedBody.call member)
+    (identity_applies identitySelected calls identityBody tailedBody.selects selected.packet.header.context
+      selected.packet.header.function.evidence (wordHeap ⟨[]⟩ word) word)
 
 /-- The original Source execution of `narrow`'s body at its header, at a word
 canonical for `uint8`. -/
@@ -2158,6 +2343,34 @@ def run : IO Unit := do
   IO.println "ACCEPTED_NESTED_CALL_PUBLIC_PASS"
 
 end AcceptedNestedCallRuntime
+
+namespace AcceptedTailRuntime
+
+/-- As `AcceptedCallRuntime.run`, at `tailed`, whose body ends in the direct
+call of `identity` as its final value. -/
+def run : IO Unit := do
+  let observed ← observe
+  let tailed ← observeRow observed.fixture "tailed"
+  let tailedBody ← observeTailedBody observed.fixture
+    (CallableNamedCanonicalOrder.retainedInstantiation observed.identity.original) tailed.original.function.typedBody
+  for word in [Word.zero, Word.ofNatModulo 7] do
+    let started ← observeStarted observed.fixture tailed.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole tailed),
+        Nonempty (AcceptedCall selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select tailed
+      obtain ⟨identitySelected⟩ := whole.select observed.identity
+      exact ⟨whole, selected, accepted_call selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile tailedBody.inputs tailedBody.binderScheme
+        (tailed_source selected identitySelected observed.calls observed.identityBody tailedBody word)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .succeeded returned =>
+      unless returned.value == .word word do throw (IO.userError "accepted tail value output changed")
+    | _ => throw (IO.userError "accepted tail value did not succeed")
+  IO.println "ACCEPTED_TAIL_PUBLIC_PASS"
+
+end AcceptedTailRuntime
 
 namespace AcceptedConversionRuntime
 

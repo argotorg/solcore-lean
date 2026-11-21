@@ -499,6 +499,18 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {child : Expres
       | breaking => exact .ifBreaking (lookupStatement?_sound found) form tested staged
       | continuing => exact .ifContinuing (lookupStatement?_sound found) form tested staged
       | fault => exact .ifFault (lookupStatement?_sound found) form tested staged
+  | tail found form _ value =>
+    intro size context environment before after finalContext outcome within original
+    unfold Original at original
+    cases original with
+    | tailExpression contains formEq evaluate =>
+      obtain rfl := same_node unique found contains
+      rw [form] at formEq
+      cases formEq
+      exact .tail (lookupStatement?_sound found) form (lift value (Nat.lt_of_lt_of_le below_one within) evaluate)
+    | singleton contains notTail _ =>
+      obtain rfl := same_node unique found contains
+      exact absurd form (notTail _)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedSizedLifting
 end
@@ -1577,9 +1589,9 @@ private theorem bitNotted_fault_inv (unique : NodeOccurrencesUnique source)
     obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
     simp_all
 
-private theorem discarded_fault_inv (unique : NodeOccurrencesUnique source)
-    (found : source.lookupStatement? id = some node) {expression : ExpressionId}
-    (form : node.form = .expression expression true)
+private theorem expression_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) {expression : ExpressionId} {semicolon : Bool}
+    (form : node.form = .expression expression semicolon)
     (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
       reason after) :
     ∃ child, child < size ∧ SourceExecutionSize.ExpressionFaults program child context evidence source environment
@@ -1878,7 +1890,7 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
       exact .discard (lookupStatement?_sound found) form (lift value (by omega) evaluate)
         (tailIH (by omega) signatures expressible next)
     · intro context environment before after headSize headBelow signatures fault
-      obtain ⟨_, childBelow, fault⟩ := discarded_fault_inv unique found form fault
+      obtain ⟨_, childBelow, fault⟩ := expression_fault_inv unique found form fault
       exact .expressionFault (lookupStatement?_sound found) form
         (faultLift value (by omega) signatures expressible fault)
   | block found form inner _ innerIH tailIH =>
@@ -1940,6 +1952,23 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
       · simp [Expressible] at expressible
       · exact .ifFault (lookupStatement?_sound found) form (lift test (by omega) evaluate)
           (branchFault (by omega) signatures failed)
+  | tail found form _ value =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    unfold FaultOriginal at original
+    cases original with
+    | singleton fault =>
+      obtain ⟨_, childBelow, fault⟩ := expression_fault_inv unique found form fault
+      exact .expressionFault (lookupStatement?_sound found) form
+        (faultLift value (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+          omega) signatures expressible fault)
+    | tailExpression contains formEq fault =>
+      obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+      rw [form] at formEq
+      cases formEq
+      exact .expressionFault (lookupStatement?_sound found) form
+        (faultLift value (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_one within)
+          signatures expressible fault)
 
 /-- Every admitted callee's original body fault is a staged fault execution
 at every size: the strong induction on the size across bodies that lifts
