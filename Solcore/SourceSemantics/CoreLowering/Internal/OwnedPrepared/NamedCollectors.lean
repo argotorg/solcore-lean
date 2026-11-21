@@ -207,7 +207,7 @@ theorem operands_of_diagnostic
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
     {site assignment operator rhs}
     (origin : AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs)
-    (profile : operator = .equal ∨ assignment.target.type = .word) :
+    (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) :
     AssignmentOperandDiagnostics.OperandsLaw
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) operator
       (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator) := by
@@ -305,7 +305,7 @@ theorem collected_of_imperative
     {faults : FunctionCalls.FaultRep}
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
@@ -399,7 +399,7 @@ def of_imperative_compiler
     (receipt : Receipt header)
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
@@ -452,7 +452,7 @@ def of_compiler
     (receipt : Receipt header)
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
@@ -517,7 +517,7 @@ def of_imperative_compiler
     (receipt : Receipt header)
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
@@ -1362,7 +1362,7 @@ def of_imperative_compiler
     (receipt : Receipt header)
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs header.function.source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →

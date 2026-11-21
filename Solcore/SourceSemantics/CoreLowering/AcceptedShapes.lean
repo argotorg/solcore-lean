@@ -82,7 +82,7 @@ inductive Shape (source : TypedSource) (expected : TypeSystem.Ty) (child : Expre
 /-- Proof-producing recognition of a bare assignment the compiler refines. -/
 def assignable? (source : TypedSource) (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) :
     Option (PLift (Assignable source assignment operator)) :=
-  if operatorOk : operator = .equal ∨ assignment.target.type = .word then
+  if operatorOk : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type then
     match bare : assignment.target.projections with
     | [] =>
       match root : SourceCoreDataPlaces.rootBinder source assignment.target.root with

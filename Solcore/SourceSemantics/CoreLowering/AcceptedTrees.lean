@@ -44,7 +44,7 @@ structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : Typed
   invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Syntax.ValueAssignOp → Word
   missing : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
   matched : AssignmentPolicy policy values invalidProjection invalidOperand missing
-  sourceProfile : operator = .equal ∨ assignment.target.type = .word
+  sourceProfile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type
   bare : assignment.target.projections = []
   accepted : SourceCoreLoops.assignValue policy fuel source scope site assignment operator rhs
     output next reasonAt = .ok code
@@ -66,8 +66,8 @@ structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : Typed
   childType : child.type = place.route.leafType
   operatorType : operator = .equal ∨ place.route.leafType = .word ∨ place.route.leafType = .integer ∧ operator.wordOnly = false
   emitted : code = execute place (.var index) (SourceCoreCalls.packArguments []) child.expression
-    next output (binaryOperator (place.route.leafType = .integer) operator) false
-    (invalidOperand site assignment.target.root operator)
+    next output (assignmentModifier assignment.target.type (place.route.leafType = .integer) operator) false
+    (invalidOperand site assignment.target.root operator) (SourceCoreDataPlaces.placeWrap assignment.target.type operator false)
 
 /-- Callback equality comes from the compiler policy, before its accepted
 action is inverted. No right-hand syntax or execution law is an input. -/
@@ -80,7 +80,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     {output : Ty} {next code : Expr} {reasonAt : ExpressionId → Word}
     (matched : AssignmentPolicy policy values invalidProjection invalidOperand missing)
-    (sourceProfile : operator = .equal ∨ assignment.target.type = .word)
+    (sourceProfile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
     (bare : assignment.target.projections = [])
     (accepted : SourceCoreLoops.assignValue policy fuel source scope site assignment operator rhs
       output next reasonAt = .ok code) :
@@ -94,8 +94,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
       generated, childType, operatorType, emitted⟩ := CompatibleBareAssignment.of_lower bare lowered
   exact ⟨⟨values, invalidProjection, invalidOperand, missing, matched, sourceProfile, bare, accepted, lowered,
     binder, declaration, place, index, child, rootType, rawType, slot, layout, generated,
-    childType, operatorType,
-    by rw [emitted, assignmentModifier_plain (checkedCompound_of_sourceProfile sourceProfile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_sourceProfile sourceProfile)]⟩⟩
+    childType, operatorType, emitted⟩⟩
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedBareAssignmentReceipt
 end
@@ -122,7 +121,7 @@ structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : Typed
   invalidOperand : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Syntax.ValueAssignOp → Word
   missing : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
   matched : AssignmentPolicy policy values invalidProjection invalidOperand missing
-  sourceProfile : operator = .equal ∨ assignment.target.type = .word
+  sourceProfile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type
   projected : assignment.target.projections ≠ []
   accepted : SourceCoreLoops.assignValue policy fuel source scope site assignment operator rhs
     output next reasonAt = .ok code
@@ -150,8 +149,8 @@ structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : Typed
   childType : child.type = place.route.leafType
   operatorType : operator = .equal ∨ place.route.leafType = .word ∨ place.route.leafType = .integer ∧ operator.wordOnly = false
   emitted : code = execute place (.var index) (SourceCoreCalls.packArguments keys) child.expression
-    next output (binaryOperator (place.route.leafType = .integer) operator) false
-    (invalidOperand site assignment.target.root operator)
+    next output (assignmentModifier assignment.target.type (place.route.leafType = .integer) operator) false
+    (invalidOperand site assignment.target.root operator) (SourceCoreDataPlaces.placeWrap assignment.target.type operator false)
 
 /-- The same successful compiler callback supplies its original route,
 ordered keys and RHS. Repeated key occurrences remain repeated actions. -/
@@ -164,7 +163,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     {output : Ty} {next code : Expr} {reasonAt : ExpressionId → Word}
     (matched : AssignmentPolicy policy values invalidProjection invalidOperand missing)
-    (sourceProfile : operator = .equal ∨ assignment.target.type = .word)
+    (sourceProfile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
     (projected : assignment.target.projections ≠ [])
     (routed : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections
@@ -197,8 +196,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
         CompatiblePlaceCompilerCertificates.PreparedPath.key_ids path,
         child, generated, ?_, operatorType, ?_⟩⟩
       · simpa only [routeType] using childType.symm
-      · simp only [routeType, Option.isNone_some, placeModifier, Bool.false_eq_true, ↓reduceIte,
-          assignmentModifier_plain (checkedCompound_of_sourceProfile sourceProfile), SourceCoreDataPlaces.placeWrap_plain (checkedCompound_of_sourceProfile sourceProfile)]
+      · simp only [routeType, Option.isNone_some, placeModifier, Bool.false_eq_true, ↓reduceIte]
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedProjectedAssignmentReceipt
 end
@@ -447,14 +445,16 @@ structure Binding (policy : SourceCoreLoops.Policy) (source : TypedSource) where
 /-- Bare value writes retain the original declaration type as well as native layout. -/
 def Assignable (source : TypedSource) (assignment : AssignmentResolution)
     (operator : Solcore.Syntax.ValueAssignOp) : Prop :=
-  (operator = .equal ∨ assignment.target.type = .word) ∧ assignment.target.projections = [] ∧
+  ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) ∧
+    assignment.target.projections = [] ∧
     ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       binder.scheme.body = assignment.target.type
 
 /-- Projected writes keep their root declaration distinct from the selected leaf. -/
 def ProjectedAssignable (source : TypedSource) (assignment : AssignmentResolution)
     (operator : Solcore.Syntax.ValueAssignOp) : Prop :=
-  (operator = .equal ∨ assignment.target.type = .word) ∧ assignment.target.projections ≠ [] ∧
+  ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) ∧
+    assignment.target.projections ≠ [] ∧
     ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type
 

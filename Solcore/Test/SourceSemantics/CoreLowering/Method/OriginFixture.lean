@@ -3009,8 +3009,8 @@ theorem MethodShape.body_shape :
   .initialized shape.initializedFound shape.initializedForm
     (.initialized shape.flagInitializedFound shape.flagInitializedForm
       (.whileLoop shape.loopFound shape.loopForm
-        (.assign shape.assignmentFound shape.assignmentForm (.inl rfl) shape.targetBare
-          (.assign shape.flagAssignmentFound shape.flagAssignmentForm (.inl rfl) shape.flagTargetBare .nil))
+        (.assign shape.assignmentFound shape.assignmentForm (.inl (.inl rfl)) shape.targetBare
+          (.assign shape.flagAssignmentFound shape.flagAssignmentForm (.inl (.inl rfl)) shape.flagTargetBare .nil))
         (.returnValue [] shape.statementFound shape.statementForm)))
 
 def MethodShape.childIds : List ExpressionId :=
@@ -3121,7 +3121,7 @@ include nodes
 
 theorem MethodShape.local_assignable :
     Assignable function.typedBody shape.resolution .equal := by
-  refine ⟨.inl rfl, shape.targetBare, ?_⟩
+  refine ⟨.inl (.inl rfl), shape.targetBare, ?_⟩
   intro binder found
   rw [shape.targetRoot, shape.saved_declaration nodes] at found
   cases Except.ok.inj found
@@ -3130,7 +3130,7 @@ theorem MethodShape.local_assignable :
 
 theorem MethodShape.flag_assignable :
     Assignable function.typedBody shape.flagResolution .equal := by
-  refine ⟨.inl rfl, shape.flagTargetBare, ?_⟩
+  refine ⟨.inl (.inl rfl), shape.flagTargetBare, ?_⟩
   intro binder found
   rw [shape.flagTargetRoot, shape.flag_declaration nodes] at found
   cases Except.ok.inj found
@@ -3851,8 +3851,8 @@ theorem SelectedRelayShape.body_shape :
     CallableIndexedOwnedPreparedStagedBranchingTree.Shape function.typedBody true shape.body :=
   .initialized shape.initializedFound shape.initializedForm
     (.whileLoop shape.loopFound shape.loopForm
-      (.assign shape.assignmentFound shape.assignmentForm (.inl rfl) shape.targetBare
-        (.assign shape.flagAssignmentFound shape.flagAssignmentForm (.inl rfl) shape.flagTargetBare .nil))
+      (.assign shape.assignmentFound shape.assignmentForm (.inl (.inl rfl)) shape.targetBare
+        (.assign shape.flagAssignmentFound shape.flagAssignmentForm (.inl (.inl rfl)) shape.flagTargetBare .nil))
       (.returnValue [] shape.statementFound shape.statementForm))
 
 def SelectedRelayShape.childIds : List ExpressionId :=
@@ -3987,7 +3987,7 @@ theorem SelectedRelayShape.compiler_requirements :
 
 theorem SelectedRelayShape.local_assignable :
     Assignable function.typedBody shape.resolution .equal := by
-  refine ⟨.inl rfl, shape.targetBare, ?_⟩
+  refine ⟨.inl (.inl rfl), shape.targetBare, ?_⟩
   intro binder found
   rw [shape.targetRoot, shape.local_declaration nodes] at found
   cases Except.ok.inj found
@@ -3996,7 +3996,7 @@ theorem SelectedRelayShape.local_assignable :
 
 theorem SelectedRelayShape.flag_assignable :
     Assignable function.typedBody shape.flagResolution .equal := by
-  refine ⟨.inl rfl, shape.flagTargetBare, ?_⟩
+  refine ⟨.inl (.inl rfl), shape.flagTargetBare, ?_⟩
   intro binder found
   rw [shape.flagTargetRoot, shape.flag_declaration nodes] at found
   cases Except.ok.inj found

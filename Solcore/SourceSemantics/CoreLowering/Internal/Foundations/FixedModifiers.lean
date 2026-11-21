@@ -12,7 +12,8 @@ and the profile that admits them beside `AssignmentProfile`. The data and compat
 use them.
 
 Main declarations:
-- `FixedCompoundAssignment` and `WideAssignmentProfile`, the profile with these targets;
+- `FixedCompoundAssignment` and `WideAssignmentProfile`, the profile with these targets, and
+  `decidableFixedCompoundAssignment`, its check;
 - `leaf`, the word Core's modifier computes, and `modified_evaluates` and
   `compatible_modified_evaluates`, its evaluation in each place compiler;
 - `applies_leaf`, an applied source operation gives that word;
@@ -396,6 +397,38 @@ abbrev FixedCompoundAssignment (operator : Syntax.ValueAssignOp) (target : TypeS
 /-- `AssignmentProfile` on a target's metadata view, or `FixedCompoundAssignment` at its own type. -/
 abbrev WideAssignmentProfile (operator : Syntax.ValueAssignOp) (target : TypeSystem.Ty) : Prop :=
   AssignmentProfile operator (SourceCoreRawMetadata.runtimeType target) ∨ FixedCompoundAssignment operator target
+
+/-- `TypeSystem.Ty.fixedInteger?` finds exactly the twelve types. -/
+theorem fixedInteger?_eq_some {target : TypeSystem.Ty} {type : TypeSystem.FixedInteger} :
+    target.fixedInteger? = some type ↔ target = .fixed type := by
+  constructor
+  · intro found
+    unfold TypeSystem.Ty.fixedInteger? at found
+    split at found
+    · cases found
+      rfl
+    · cases found
+  · rintro rfl
+    rfl
+
+/-- Whether a type is one of the twelve, so the recognizers can check `FixedCompoundAssignment`. -/
+instance decidableFixedTarget (target : TypeSystem.Ty) : Decidable (∃ type, target = .fixed type) :=
+  match found : target.fixedInteger? with
+  | some type => isTrue ⟨type, fixedInteger?_eq_some.mp found⟩
+  | none => isFalse fun ⟨_, same⟩ => by
+    have absent := (fixedInteger?_eq_some.mpr same).symm.trans found
+    cases absent
+
+instance decidableFixedCompoundOperator (operator : Syntax.ValueAssignOp) :
+    Decidable (FixedCompoundAssignmentOperator operator) := by
+  cases operator
+  all_goals first
+    | exact isTrue (by constructor)
+    | exact isFalse (by intro kind; cases kind)
+
+instance decidableFixedCompoundAssignment (operator : Syntax.ValueAssignOp) (target : TypeSystem.Ty) :
+    Decidable (FixedCompoundAssignment operator target) :=
+  inferInstanceAs (Decidable ((∃ type, target = .fixed type) ∧ FixedCompoundAssignmentOperator operator))
 
 end Solcore.SourceSemantics.CoreLowering
 end

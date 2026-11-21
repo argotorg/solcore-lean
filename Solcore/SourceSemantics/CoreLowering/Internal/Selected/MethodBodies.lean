@@ -2393,7 +2393,7 @@ theorem collected
     {faults : FunctionCalls.FaultRep}
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs principal.sourceBody.source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (invalidOperand principal site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment →
@@ -2457,7 +2457,7 @@ theorem of_compiler
     {stages : Staging.Recursive.Registry} {semanticFaults : FunctionCalls.FaultRep}
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs principal.sourceBody.source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (invalidOperand principal site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment →
@@ -2668,7 +2668,7 @@ theorem of_actual_with_evidence
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) := by
   have operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs principal.sourceBody.source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw
         (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) operator
         (GenericAssignmentDiagnostics.token principal.cached.compilation.own.assignments site assignment.target.root operator) := by

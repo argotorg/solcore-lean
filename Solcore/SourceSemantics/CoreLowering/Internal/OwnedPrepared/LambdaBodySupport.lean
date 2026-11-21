@@ -831,7 +831,7 @@ theorem of_branching
   rw [← source] at assignmentPrepared
   have operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs function.source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (if operator = .equal then Word.zero else compilation.own.assignments.reasonAt site assignment.target.root (.value operator)) := by
     intro site assignment operator rhs occurrence rawProfile

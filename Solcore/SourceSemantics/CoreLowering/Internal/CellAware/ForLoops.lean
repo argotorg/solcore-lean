@@ -506,7 +506,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
   | assign {assignment operator rhs rhsNode binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (targetType : binder.scheme.body = assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
       (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type) (value : approved rhs)
@@ -515,7 +515,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
   | assignProjected {assignment operator rhs rhsNode binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
@@ -574,7 +574,7 @@ def scan? (source : TypedSource) {approved : ExpressionId → Prop}
     match declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root with
     | .error _ => none
     | .ok binder =>
-      if profile : operator = .equal ∨ assignment.target.type = .word then
+      if profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type then
         match rhsFound : source.lookupExpression? rhs with
         | none => none
         | some rhsNode =>
@@ -624,7 +624,7 @@ inductive Syntax (source : TypedSource) (approved : ExpressionId → Prop) :
   | assign {context final assignment operator rhs node binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (targetType : binder.scheme.body = assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (bare : assignment.target.projections = [])
       (found : source.lookupExpression? rhs = some node)
       (sourceType : AssignedRhsView operator assignment.target.type node.type)
@@ -636,7 +636,7 @@ inductive Syntax (source : TypedSource) (approved : ExpressionId → Prop) :
   | assignProjected {context final assignment operator rhs rhsNode binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)

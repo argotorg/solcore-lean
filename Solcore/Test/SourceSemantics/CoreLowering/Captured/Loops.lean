@@ -1259,8 +1259,8 @@ theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : Obser
     CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .initialized observed.shape.initializedFound observed.shape.initializedForm
     (.forLoop observed.shape.loopFound observed.shape.loopForm (.initialized .nil)
-      (.assign (.inl rfl) observed.shape.postBare .nil)
-      (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare .nil)
+      (.assign (.inl (.inl rfl)) observed.shape.postBare .nil)
+      (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl (.inl rfl)) observed.shape.targetBare .nil)
       (.returnValue [] observed.shape.innerReturnFound observed.shape.innerReturnForm))
 
 def ObservedFactory.readIds {fixture : CompiledFixture} (observed : ObservedFactory fixture) : List ExpressionId :=
@@ -3496,8 +3496,8 @@ theorem ObservedFactory.flag_declaration {fixture : CompiledFixture} (observed :
 theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : ObservedFactory fixture) :
     CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .whileLoop observed.shape.loopFound observed.shape.loopForm
-    (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare
-      (.assign observed.shape.flagAssignmentFound observed.shape.flagAssignmentForm (.inl rfl) observed.shape.flagTargetBare .nil))
+    (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl (.inl rfl)) observed.shape.targetBare
+      (.assign observed.shape.flagAssignmentFound observed.shape.flagAssignmentForm (.inl (.inl rfl)) observed.shape.flagTargetBare .nil))
     (.returnValue [] observed.shape.innerReturnFound observed.shape.innerReturnForm)
 
 def ObservedFactory.readIds {fixture : CompiledFixture} (observed : ObservedFactory fixture) : List ExpressionId :=

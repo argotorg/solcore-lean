@@ -202,7 +202,7 @@ theorem Choice.Issued.operands {named : Named} {choice : Choice code (stages := 
     {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     (origin : AssignmentDiagnosticOrigins.Occurs function.source site assignment operator rhs)
-    (profile : operator = .equal ∨ assignment.target.type = .word) :
+    (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) :
     AssignmentOperandDiagnostics.OperandsLaw
       (CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics) operator
       (choice.invalidOperand site assignment.target.root operator) := by
@@ -298,7 +298,7 @@ theorem collected
     {faults : FunctionCalls.FaultRep}
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs function.source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (choice.invalidOperand site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs function.source site assignment →

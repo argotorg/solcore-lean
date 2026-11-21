@@ -1734,7 +1734,7 @@ theorem collected
     (reached : ∀ id ∈ items.flatMap ForItemForm.references, Reaches source roots id)
     {fuel : Nat} {type : Ty} {code : Expr} {nativeType : Ty} {parentSite : SourceCoreElaboration.ErrorSite}
     (operands : ∀ {assignment operator rhs}, .assignValue assignment operator rhs ∈ items →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator (invalidOperand parentSite assignment.target.root operator))
     (unary : ∀ {assignment}, .assignBitNot assignment ∈ items → assignment.target.type = .word →
       faults (.invalidUnaryOperand .bitNot) (invalidUnary parentSite assignment.target.root))
@@ -2187,7 +2187,7 @@ theorem collected_at
     {faults : FunctionCalls.FaultRep}
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator (invalidOperand site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs source site assignment →
       assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot) (invalidUnary site assignment.target.root))
@@ -3039,7 +3039,7 @@ theorem collected
     {faults : FunctionCalls.FaultRep}
     (operands : ∀ {site assignment operator rhs},
       AssignmentDiagnosticOrigins.Occurs source site assignment operator rhs →
-      (operator = .equal ∨ assignment.target.type = .word) →
+      ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator (invalidOperand site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs source site assignment →
       assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot) (invalidUnary site assignment.target.root))

@@ -37,7 +37,7 @@ def OperandLaw (source : TypedSource)
     (faults : FunctionCalls.FaultRep) : Prop :=
   ∀ {site assignment operator rhs},
     AssignmentDiagnosticOrigins.Occurs source site assignment operator rhs →
-    (operator = .equal ∨ assignment.target.type = .word) →
+    ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
     AssignmentOperandDiagnostics.OperandsLaw faults operator
       (invalidOperand site assignment.target.root operator)
 
@@ -679,7 +679,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
   | assign {assignment operator rhs rhsNode binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (targetType : binder.scheme.body = assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
       (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type) (value : approved rhs)
@@ -694,7 +694,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
   | assignProjected {assignment operator rhs rhsNode binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
@@ -751,7 +751,7 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
     (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
     (targetType : binder.scheme.body = assignment.target.type)
     (bare : assignment.target.projections = [])
-    (sourceProfile : operator = .equal ∨ assignment.target.type = .word)
+    (sourceProfile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
     (typed : SourceAssignmentHasType source context assignment operator rhs) :
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       SourceProjectionsHaveType source context actual.scheme.body assignment.target.projections assignment.target.type) ∧
@@ -760,21 +760,20 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
     AssignedOperandTyped source context operator rhs assignment.target.type ∧
     WideAssignmentProfile operator assignment.target.type := by
   have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
-      AssignedOperandTyped source context operator rhs type ∧ (operator = .equal ∨ type = .word) := by
+      AssignedOperandTyped source context operator rhs type ∧
+      ((operator = .equal ∨ type = .word) ∨ FixedCompoundAssignment operator type) := by
     cases typed with
-    | equal place value _ => exact ⟨_, place, .of_type value, .inl rfl⟩
-    | wordCompound _ place value _ => exact ⟨_, place, .of_type value, .inr rfl⟩
-    | fixedCompound kind place value _ =>
-      rcases sourceProfile with rfl | word
-      · cases kind
-      · cases word.symm.trans place.type_eq
+    | equal place value _ => exact ⟨_, place, .of_type value, .inl (.inl rfl)⟩
+    | wordCompound _ place value _ => exact ⟨_, place, .of_type value, .inl (.inr rfl)⟩
+    | fixedCompound kind place value _ => exact ⟨_, place, .of_type value, .inr ⟨⟨_, rfl⟩, kind⟩⟩
     | shiftCompound kind place targetKind value amount _ =>
-      -- A Word target's shift amount keeps its own type.
-      rcases sourceProfile with rfl | word
+      -- A Word target's shift amount keeps its own type; no fixed-width compound operator shifts.
+      rcases sourceProfile with (rfl | word) | ⟨_, fixedKind⟩
       · cases kind
       · cases targetKind with
         | fixed type => cases word.symm.trans place.type_eq
-        | word => exact ⟨_, place, ⟨_, value, .shiftAmount kind rfl amount⟩, .inr rfl⟩
+        | word => exact ⟨_, place, ⟨_, value, .shiftAmount kind rfl amount⟩, .inl (.inr rfl)⟩
+      · cases kind <;> cases fixedKind
   obtain ⟨type, place, value, profile⟩ := original
   cases place with
   | intro writable projections target =>
@@ -788,9 +787,10 @@ theorem assignment_facts {source : TypedSource} {context : SourceSemantics.Conte
         rw [bare] at projections
         cases projections
         exact targetType.symm ▸ target.symm ▸ writable
-      · rcases profile with equal | word
+      · rcases profile with (equal | word) | fixed
         · exact .inl (.inl equal)
         · exact .inl (.inr (.inl (by rw [target, word]; rfl)))
+        · exact .inr (by rw [target]; exact fixed)
 
 /-- Mapping paths derive the writable declaration from the original key types. -/
 theorem projected_assignment_facts {source : TypedSource} {context : SourceSemantics.Context}
@@ -799,7 +799,7 @@ theorem projected_assignment_facts {source : TypedSource} {context : SourceSeman
     (unique : NodeOccurrencesUnique source)
     (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
     (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
-    (sourceProfile : operator = .equal ∨ assignment.target.type = .word)
+    (sourceProfile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
     (typed : SourceAssignmentHasType source context assignment operator rhs) :
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       SourceProjectionsHaveType source context actual.scheme.body assignment.target.projections assignment.target.type) ∧
@@ -808,21 +808,20 @@ theorem projected_assignment_facts {source : TypedSource} {context : SourceSeman
     AssignedOperandTyped source context operator rhs assignment.target.type ∧
     WideAssignmentProfile operator assignment.target.type := by
   have original : ∃ type, SourcePlaceHasType source context assignment.target type ∧
-      AssignedOperandTyped source context operator rhs type ∧ (operator = .equal ∨ type = .word) := by
+      AssignedOperandTyped source context operator rhs type ∧
+      ((operator = .equal ∨ type = .word) ∨ FixedCompoundAssignment operator type) := by
     cases typed with
-    | equal place value _ => exact ⟨_, place, .of_type value, .inl rfl⟩
-    | wordCompound _ place value _ => exact ⟨_, place, .of_type value, .inr rfl⟩
-    | fixedCompound kind place value _ =>
-      rcases sourceProfile with rfl | word
-      · cases kind
-      · cases word.symm.trans place.type_eq
+    | equal place value _ => exact ⟨_, place, .of_type value, .inl (.inl rfl)⟩
+    | wordCompound _ place value _ => exact ⟨_, place, .of_type value, .inl (.inr rfl)⟩
+    | fixedCompound kind place value _ => exact ⟨_, place, .of_type value, .inr ⟨⟨_, rfl⟩, kind⟩⟩
     | shiftCompound kind place targetKind value amount _ =>
-      -- A Word target's shift amount keeps its own type.
-      rcases sourceProfile with rfl | word
+      -- A Word target's shift amount keeps its own type; no fixed-width compound operator shifts.
+      rcases sourceProfile with (rfl | word) | ⟨_, fixedKind⟩
       · cases kind
       · cases targetKind with
         | fixed type => cases word.symm.trans place.type_eq
-        | word => exact ⟨_, place, ⟨_, value, .shiftAmount kind rfl amount⟩, .inr rfl⟩
+        | word => exact ⟨_, place, ⟨_, value, .shiftAmount kind rfl amount⟩, .inl (.inr rfl)⟩
+      · cases kind <;> cases fixedKind
   obtain ⟨type, place, value, profile⟩ := original
   cases place with
   | intro writable projections target =>
@@ -835,9 +834,10 @@ theorem projected_assignment_facts {source : TypedSource} {context : SourceSeman
       · intro actual actualFound
         cases Except.ok.inj (declaration.symm.trans actualFound)
         exact same ▸ writable
-      · rcases profile with equal | word
+      · rcases profile with (equal | word) | fixed
         · exact .inl (.inl equal)
         · exact .inl (.inr (.inl (by rw [target, word]; rfl)))
+        · exact .inr (by rw [target]; exact fixed)
 
 /-- Actual original unary typing supplies the declared writable root. -/
 theorem bitNot_facts {source : TypedSource} {context : SourceSemantics.Context}
@@ -1118,7 +1118,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (targetType : binder.scheme.body = assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
       (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type) (value : approved rhs)
@@ -1137,7 +1137,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
@@ -1546,7 +1546,7 @@ def scan? (source : TypedSource) {approved : ExpressionId → Prop}
             pure ⟨.whileLoop found form conditionFound conditionType approved inner remaining⟩
           else none
       | .assignValue assignment operator rhs =>
-        if profile : operator = .equal ∨ assignment.target.type = .word then
+        if profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type then
           if bare : assignment.target.projections = [] then
             match declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root with
             | .error _ => none

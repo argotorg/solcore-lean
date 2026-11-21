@@ -75,7 +75,7 @@ private def allProof? {α : Type} (predicate : α → Prop)
 
 def assignment? (source : TypedSource) (assignment : AssignmentResolution)
     (operator : Solcore.Syntax.ValueAssignOp) : Option (PLift (Assignable source assignment operator)) := do
-  if profile : operator = .equal ∨ assignment.target.type = .word then
+  if profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type then
     if bare : assignment.target.projections = [] then
       match found : SourceCoreDataPlaces.rootBinder source assignment.target.root with
       | .error _ => none
@@ -91,7 +91,7 @@ def assignment? (source : TypedSource) (assignment : AssignmentResolution)
 
 def projectedAssignment? (source : TypedSource) (assignment : AssignmentResolution)
     (operator : Solcore.Syntax.ValueAssignOp) : Option (PLift (ProjectedAssignable source assignment operator)) := do
-  if profile : operator = .equal ∨ assignment.target.type = .word then
+  if profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type then
     if projected : assignment.target.projections ≠ [] then
       match found : SourceCoreDataPlaces.rootBinder source assignment.target.root with
       | .error _ => none

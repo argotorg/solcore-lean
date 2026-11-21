@@ -9,8 +9,9 @@ import Solcore.Test.SourceSemantics.CoreLowering.Builtin
 function, and `twice` returns `identity(identity(value))`, a direct call whose
 argument is another direct call, both at a `Word` parameter; `narrow` returns
 `uint8(value)`, a conversion of its `Word` parameter, and `roundTrip` returns
-`Typedef.rep(uint8(value))`, the word of that value. Runtime checks place every
-expression node of the five rows among the nested sites that call `identity`'s
+`Typedef.rep(uint8(value))`, the word of that value; `doubled` converts its
+parameter to a `uint8` local `x`, adds `x` to it in place and returns it. Runtime checks place every
+expression node of the six rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
@@ -19,7 +20,10 @@ staged traces, and the call root's theorems apply at the first public call of
 each in both directions: the actual resumption succeeds, and actual native
 completion reconstructs a staged Source execution. At other words the call
 root's reflection applies to `narrow` and `roundTrip`, and the actual
-resumption fails with the dirty-integer reason.
+resumption fails with the dirty-integer reason. At every word the call root's
+reflection applies to `doubled`: below 128 the actual resumption returns the sum,
+from 128 the checked `+=` panics with `0x11`, and at a word outside `uint8` the
+conversion fails with the dirty-integer reason.
 
 Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.twice_source`,
@@ -29,12 +33,13 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.accepted_reflection` and the runtime checks
 `Tests.SourceCoreAcceptedOneCall.AcceptedCallRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedNestedCallRuntime.run`,
-`Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run` and
-`Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`.
+`Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run` and
+`Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run`.
 -/
 
 section
-/-! The program and the declarative typing of its five functions, constructed
+/-! The program and the declarative typing of its six functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -50,7 +55,8 @@ def workspace : Workspace.RawWorkspace := {
     "function relay(value: Word) returns (Word) { return identity(value); }",
     "function twice(value: Word) returns (Word) { return identity(identity(value)); }",
     "function narrow(value: Word) returns (uint8) { return uint8(value); }",
-    "function roundTrip(value: Word) returns (Word) { return Typedef.rep(uint8(value)); }" ]}] }
+    "function roundTrip(value: Word) returns (Word) { return Typedef.rep(uint8(value)); }",
+    "function doubled(value: Word) returns (uint8) { let x: uint8 = uint8(value); x += x; return x; }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -420,18 +426,189 @@ def observeRoundTrip (function : CheckedFunction) (signature : ProgramFunctionSi
   return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, binderOrdinary,
     statementType⟩
 
+/-- The nodes of `doubled`'s body: the read of its parameter, `uint8(value)` initializing the local
+`x`, `x += x` and the return of `x`, found by following the statement graph. -/
+structure DoubledParts (source : TypedSource) where
+  binder : TypedBinder
+  target : TypedBinder
+  read : Tests.SourceCoreNamedBranch.Read source binder .word
+  converted : Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedFromWord ⟨false, .w8⟩) read.node.id
+  rightRead : Tests.SourceCoreNamedBranch.Read source target (.fixed ⟨false, .w8⟩)
+  returnRead : Tests.SourceCoreNamedBranch.Read source target (.fixed ⟨false, .w8⟩)
+  initialized : StatementNode
+  assignment : StatementNode
+  resolution : AssignmentResolution
+  returned : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement initialized.id, .statement assignment.id, .statement returned.id]
+  initializedFound : source.lookupStatement? initialized.id = some initialized
+  initializedForm : initialized.form = .letDecl target (some converted.value.node.id)
+  assignmentFound : source.lookupStatement? assignment.id = some assignment
+  assignmentForm : assignment.form = .assignValue resolution .add rightRead.node.id
+  returnedFound : source.lookupStatement? returned.id = some returned
+  returnedForm : returned.form = .returnStmt (some returnRead.node.id)
+
+def observeDoubledParts (source : TypedSource) : IO (DoubledParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "doubled input")
+  let [.statement initializedId, .statement assignmentId, .statement returnedId] := source.roots
+    | throw (IO.userError "doubled roots")
+  let some initialized := source.lookupStatement? initializedId | throw (IO.userError "doubled let")
+  let some assignment := source.lookupStatement? assignmentId | throw (IO.userError "doubled assignment")
+  let some returned := source.lookupStatement? returnedId | throw (IO.userError "doubled return")
+  let .letDecl target (some valueId) := initialized.form | throw (IO.userError "doubled let form")
+  let .assignValue resolution .add rightId := assignment.form | throw (IO.userError "doubled assignment form")
+  let .returnStmt (some returnId) := returned.form | throw (IO.userError "doubled return form")
+  let some valueNode := source.lookupExpression? valueId | throw (IO.userError "doubled conversion node")
+  let .call calleeId [readId] _ := valueNode.form | throw (IO.userError "doubled conversion form")
+  let some calleeNode := source.lookupExpression? calleeId | throw (IO.userError "doubled callee")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "doubled read")
+  let some rightNode := source.lookupExpression? rightId | throw (IO.userError "doubled right read")
+  let some returnNode := source.lookupExpression? returnId | throw (IO.userError "doubled returned read")
+  let read ← Tests.SourceCoreNamedBranch.observeRead source binder readNode .word
+  let converted ← observeConversion source (.fixedFromWord ⟨false, .w8⟩) read.node.id calleeNode valueNode
+  let rightRead ← Tests.SourceCoreNamedBranch.observeRead source target rightNode (.fixed ⟨false, .w8⟩)
+  let returnRead ← Tests.SourceCoreNamedBranch.observeRead source target returnNode (.fixed ⟨false, .w8⟩)
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "doubled inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement initialized.id, .statement assignment.id, .statement returned.id])
+    "doubled roots shape"
+  let ⟨initializedFound⟩ ← observed (source.lookupStatement? initialized.id = some initialized) "doubled initializedFound"
+  let ⟨initializedForm⟩ ← observed (initialized.form = .letDecl target (some converted.value.node.id))
+    "doubled initializedForm"
+  let ⟨assignmentFound⟩ ← observed (source.lookupStatement? assignment.id = some assignment) "doubled assignmentFound"
+  let ⟨assignmentForm⟩ ← observed (assignment.form = .assignValue resolution .add rightRead.node.id)
+    "doubled assignmentForm"
+  let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "doubled returnedFound"
+  let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some returnRead.node.id)) "doubled returnedForm"
+  return ⟨binder, target, read, converted, rightRead, returnRead, initialized, assignment, resolution, returned,
+    inputs, roots, initializedFound, initializedForm, assignmentFound, assignmentForm, returnedFound, returnedForm⟩
+
+/-- `doubled`'s body: `let x: uint8 = uint8(value)`, the checked `x += x` at the fixed-width local and
+the return of `x`. -/
+structure DoubledShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : DoubledParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.fixed ⟨false, .w8⟩]
+  binderScheme : parts.binder.scheme = .mono .word
+  binderRequirements : parts.binder.schemeRequirements = []
+  targetScheme : parts.target.scheme = .mono (.fixed ⟨false, .w8⟩)
+  targetRequirements : parts.target.schemeRequirements = []
+  targetOwner : parts.target.id.owner = function.typedBody.owner
+  targetDistinct : parts.target.id ≠ parts.binder.id
+  targetOrdinary : parts.target.comptime = false
+  initializedType : parts.initialized.type = .unit
+  assignmentType : parts.assignment.type = .unit
+  returnedType : parts.returned.type = .fixed ⟨false, .w8⟩
+  targetRoot : parts.resolution.target.root = parts.target.id
+  targetType : parts.resolution.target.type = .fixed ⟨false, .w8⟩
+  targetBare : parts.resolution.target.projections = []
+  assignmentRequirements : parts.resolution.requirements = []
+
+theorem DoubledShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : DoubledShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.initialized.id, shape.parts.assignment.id, shape.parts.returned.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts :=
+    {type := .fixed ⟨false, .w8⟩, hasValue := true, sawReturn := true, control := .returned}
+  let ordinary : StatementFacts := {type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit}
+  refine ⟨BodyFacts.cons ordinary (BodyFacts.cons ordinary (BodyFacts.singleton facts)), rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have narrow : TypeAdmissible lexical (.fixed ⟨false, .w8⟩) := ⟨binders, .builtin (.fixed ⟨false, .w8⟩)⟩
+    have read := shape.parts.read.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have converted : ExpressionHasType function.typedBody lexical shape.parts.converted.value.node.id
+        (.fixed ⟨false, .w8⟩) := shape.parts.converted.typed rfl narrow read
+    let locals := lexical.withLocal shape.parts.target.id shape.parts.target.scheme shape.parts.target.schemeRequirements
+    have targetExtended : BinderExtends function.typedBody.owner lexical shape.parts.target locals := by
+      apply BinderExtends.intro
+      · exact {
+          owned := shape.targetOwner
+          scheme := shape.targetScheme.symm ▸ SchemeWellFormed.monoAdmissible narrow
+          quantified_fresh := by rw [shape.targetScheme]; simp [SchemeQuantifiersFresh, TypeSystem.Scheme.mono]
+          monomorphic_requirements_empty := fun _ => shape.targetRequirements }
+      · cases head
+        simp [LocalFresh, Context.withLocal, checkedBodyContext, declarationContext,
+          Context.ofSignatures, Context.forDeclaration, Context.withAssumptions,
+          Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.targetDistinct]
+    have localNarrow : TypeAdmissible locals (.fixed ⟨false, .w8⟩) := ⟨binders, .builtin (.fixed ⟨false, .w8⟩)⟩
+    have initializedTyped : StatementHasType function.typedBody ⟨.fixed ⟨false, .w8⟩, 0⟩ lexical
+        shape.parts.initialized.id locals ordinary := by
+      apply StatementHasType.letInitialized (lookupStatement?_sound shape.parts.initializedFound)
+        shape.parts.initializedForm
+      · simpa only [shape.targetScheme, TypeSystem.Scheme.mono] using converted
+      · rw [shape.targetScheme]; rfl
+      · rw [shape.targetScheme]; rfl
+      · exact targetExtended
+      · exact shape.initializedType
+    have writable : WritableLocal locals shape.parts.resolution.target.root (.fixed ⟨false, .w8⟩) := by
+      rw [shape.targetRoot]
+      exact .intro targetExtended.local_self (shape.targetScheme.symm ▸ SchemeWellFormed.monoAdmissible localNarrow)
+        (by rw [shape.targetScheme]; rfl) (by rw [shape.targetScheme]; rfl)
+    have rightTyped := shape.parts.rightRead.typed shape.targetScheme shape.targetRequirements localNarrow
+      targetExtended.local_self targetExtended.local_scheme_requirements_self
+    have assignmentTyped : SourceAssignmentHasType function.typedBody locals shape.parts.resolution .add
+        shape.parts.rightRead.node.id :=
+      .fixedCompound .add (.intro writable (by rw [shape.targetBare]; exact .nil _) shape.targetType) rightTyped
+        shape.assignmentRequirements
+    have assignedTyped : StatementHasType function.typedBody ⟨.fixed ⟨false, .w8⟩, 0⟩ locals
+        shape.parts.assignment.id locals ordinary :=
+      .assignValue (lookupStatement?_sound shape.parts.assignmentFound) shape.parts.assignmentForm assignmentTyped
+        shape.assignmentType
+    have returnedValue := shape.parts.returnRead.typed shape.targetScheme shape.targetRequirements localNarrow
+      targetExtended.local_self targetExtended.local_scheme_requirements_self
+    exact ⟨_, .cons initializedTyped (.cons assignedTyped (.singleton (.returnValue
+      (lookupStatement?_sound shape.parts.returnedFound) shape.parts.returnedForm returnedValue shape.returnedType)))⟩
+
+def observeDoubled (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (DoubledShape function signature) := do
+  let parts ← observeDoubledParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "doubled parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "doubled inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.fixed ⟨false, .w8⟩]) "doubled returns"
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "doubled binderScheme"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "doubled binderRequirements"
+  let ⟨targetScheme⟩ ← observed (parts.target.scheme = .mono (.fixed ⟨false, .w8⟩)) "doubled targetScheme"
+  let ⟨targetRequirements⟩ ← observed (parts.target.schemeRequirements = []) "doubled targetRequirements"
+  let ⟨targetOwner⟩ ← observed (parts.target.id.owner = function.typedBody.owner) "doubled targetOwner"
+  let ⟨targetDistinct⟩ ← observed (parts.target.id ≠ parts.binder.id) "doubled targetDistinct"
+  let ⟨targetOrdinary⟩ ← observed (parts.target.comptime = false) "doubled targetOrdinary"
+  let ⟨initializedType⟩ ← observed (parts.initialized.type = .unit) "doubled initializedType"
+  let ⟨assignmentType⟩ ← observed (parts.assignment.type = .unit) "doubled assignmentType"
+  let ⟨returnedType⟩ ← observed (parts.returned.type = .fixed ⟨false, .w8⟩) "doubled returnedType"
+  let ⟨targetRoot⟩ ← observed (parts.resolution.target.root = parts.target.id) "doubled targetRoot"
+  let ⟨targetType⟩ ← observed (parts.resolution.target.type = .fixed ⟨false, .w8⟩) "doubled targetType"
+  let ⟨targetBare⟩ ← observed (parts.resolution.target.projections = []) "doubled targetBare"
+  let ⟨assignmentRequirements⟩ ← observed (parts.resolution.requirements = []) "doubled assignmentRequirements"
+  return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, targetScheme, targetRequirements,
+    targetOwner, targetDistinct, targetOrdinary, initializedType, assignmentType, returnedType, targetRoot,
+    targetType, targetBare, assignmentRequirements⟩
+
 /-- The declarative typing of the complete checked program. -/
 def observeWellFormed {program : CheckedProgram}
     (checked : checkProgram workspace options.checkingFuel = .ok program) :
     IO (PLift (ProgramWellFormed (Program.ofChecked program))) := do
   match functions : program.functions, signatures : program.signatures.functions with
-  | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction],
-    [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature] =>
+  | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction],
+    [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
     let narrowShape ← observeNarrow narrowFunction narrowSignature
     let roundTripShape ← observeRoundTrip roundTripFunction roundTripSignature
+    let doubledShape ← observeDoubled doubledFunction doubledSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -440,6 +617,7 @@ def observeWellFormed {program : CheckedProgram}
     let ⟨narrowDeclaration⟩ ← observed (narrowFunction.declaration = narrowSignature.id) "calls narrowDeclaration"
     let ⟨roundTripDeclaration⟩ ← observed (roundTripFunction.declaration = roundTripSignature.id)
       "calls roundTripDeclaration"
+    let ⟨doubledDeclaration⟩ ← observed (doubledFunction.declaration = doubledSignature.id) "calls doubledDeclaration"
     let ⟨identityRelay⟩ ← observed (identitySignature.id ≠ relaySignature.id) "calls identityRelay"
     let ⟨identityTwice⟩ ← observed (identitySignature.id ≠ twiceSignature.id) "calls identityTwice"
     let ⟨relayTwice⟩ ← observed (relaySignature.id ≠ twiceSignature.id) "calls relayTwice"
@@ -450,39 +628,55 @@ def observeWellFormed {program : CheckedProgram}
     let ⟨relayRoundTrip⟩ ← observed (relaySignature.id ≠ roundTripSignature.id) "calls relayRoundTrip"
     let ⟨twiceRoundTrip⟩ ← observed (twiceSignature.id ≠ roundTripSignature.id) "calls twiceRoundTrip"
     let ⟨narrowRoundTrip⟩ ← observed (narrowSignature.id ≠ roundTripSignature.id) "calls narrowRoundTrip"
+    let ⟨identityDoubled⟩ ← observed (identitySignature.id ≠ doubledSignature.id) "calls identityDoubled"
+    let ⟨relayDoubled⟩ ← observed (relaySignature.id ≠ doubledSignature.id) "calls relayDoubled"
+    let ⟨twiceDoubled⟩ ← observed (twiceSignature.id ≠ doubledSignature.id) "calls twiceDoubled"
+    let ⟨narrowDoubled⟩ ← observed (narrowSignature.id ≠ doubledSignature.id) "calls narrowDoubled"
+    let ⟨roundTripDoubled⟩ ← observed (roundTripSignature.id ≠ doubledSignature.id) "calls roundTripDoubled"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
         intro actual member candidate candidateMember accepted
         have declared := checkFunctionBody_success_declaration accepted
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
         simp only [signatures, List.mem_cons, List.not_mem_nil, or_false] at candidateMember
-        rcases member with rfl | rfl | rfl | rfl | rfl <;>
-          rcases candidateMember with rfl | rfl | rfl | rfl | rfl
+        rcases member with rfl | rfl | rfl | rfl | rfl | rfl <;>
+          rcases candidateMember with rfl | rfl | rfl | rfl | rfl | rfl
         · exact identityShape.statementTyping program.signatures
         · exact False.elim (identityRelay (identityDeclaration.symm.trans declared))
         · exact False.elim (identityTwice (identityDeclaration.symm.trans declared))
         · exact False.elim (identityNarrow (identityDeclaration.symm.trans declared))
         · exact False.elim (identityRoundTrip (identityDeclaration.symm.trans declared))
+        · exact False.elim (identityDoubled (identityDeclaration.symm.trans declared))
         · exact False.elim (identityRelay (declared.symm.trans relayDeclaration))
         · exact relayShape.statementTyping program.signatures (by simp [signatures])
         · exact False.elim (relayTwice (relayDeclaration.symm.trans declared))
         · exact False.elim (relayNarrow (relayDeclaration.symm.trans declared))
         · exact False.elim (relayRoundTrip (relayDeclaration.symm.trans declared))
+        · exact False.elim (relayDoubled (relayDeclaration.symm.trans declared))
         · exact False.elim (identityTwice (declared.symm.trans twiceDeclaration))
         · exact False.elim (relayTwice (declared.symm.trans twiceDeclaration))
         · exact twiceShape.statementTyping program.signatures (by simp [signatures])
         · exact False.elim (twiceNarrow (twiceDeclaration.symm.trans declared))
         · exact False.elim (twiceRoundTrip (twiceDeclaration.symm.trans declared))
+        · exact False.elim (twiceDoubled (twiceDeclaration.symm.trans declared))
         · exact False.elim (identityNarrow (declared.symm.trans narrowDeclaration))
         · exact False.elim (relayNarrow (declared.symm.trans narrowDeclaration))
         · exact False.elim (twiceNarrow (declared.symm.trans narrowDeclaration))
         · exact narrowShape.statementTyping program.signatures
         · exact False.elim (narrowRoundTrip (narrowDeclaration.symm.trans declared))
+        · exact False.elim (narrowDoubled (narrowDeclaration.symm.trans declared))
         · exact False.elim (identityRoundTrip (declared.symm.trans roundTripDeclaration))
         · exact False.elim (relayRoundTrip (declared.symm.trans roundTripDeclaration))
         · exact False.elim (twiceRoundTrip (declared.symm.trans roundTripDeclaration))
         · exact False.elim (narrowRoundTrip (declared.symm.trans roundTripDeclaration))
         · exact roundTripShape.statementTyping program.signatures
+        · exact False.elim (roundTripDoubled (roundTripDeclaration.symm.trans declared))
+        · exact False.elim (identityDoubled (declared.symm.trans doubledDeclaration))
+        · exact False.elim (relayDoubled (declared.symm.trans doubledDeclaration))
+        · exact False.elim (twiceDoubled (declared.symm.trans doubledDeclaration))
+        · exact False.elim (narrowDoubled (declared.symm.trans doubledDeclaration))
+        · exact False.elim (roundTripDoubled (declared.symm.trans doubledDeclaration))
+        · exact doubledShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -491,7 +685,7 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the five functions and their original Source
+/-! The cache rows of the six functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `narrow` returns the conversion of its parameter,
@@ -619,6 +813,19 @@ def observeRoundTripBody (source : TypedSource) : IO (RoundTripBody source) := d
   let parts ← observeRoundTripParts source
   let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "roundTrip row binderScheme"
   return ⟨parts, binderScheme⟩
+
+/-- `doubled`'s cache row: its one `Word` parameter. -/
+structure DoubledBody (source : TypedSource) where
+  binder : TypedBinder
+  inputs : source.inputs = [binder]
+  binderScheme : binder.scheme = .mono .word
+
+def observeDoubledBody (source : TypedSource) : IO (DoubledBody source) := do
+  match inputs : source.inputs with
+  | [binder] =>
+    let ⟨binderScheme⟩ ← observed (binder.scheme = .mono .word) "doubled row binderScheme"
+    return ⟨binder, inputs, binderScheme⟩
+  | _ => throw (IO.userError "doubled row inputs changed")
 
 /-- The read of a parameter at the next cell of a heap. -/
 theorem read_value {source : TypedSource} {binder : TypedBinder}
@@ -783,7 +990,7 @@ end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the five rows among the nested sites or their callees
+every expression node of the six rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
 receipts. The original Source executions of `relay`, `twice`, `narrow` and `roundTrip`,
@@ -1317,6 +1524,43 @@ def run : IO Unit := do
   IO.println "ACCEPTED_REPRESENTATION_PUBLIC_PASS"
 
 end AcceptedRepresentationRuntime
+
+namespace AcceptedFixedCompoundRuntime
+
+/-- At `doubled`, whose body converts its `Word` parameter to a `uint8` local `x`, adds `x` to it with
+the checked `+=` and returns it. The call root's reflection applies at every word. Below 128 the actual
+resumption returns the sum; from 128 the `+=` panics with `0x11`; at a word that is not canonical for
+`uint8` the conversion fails with the dirty-integer reason. -/
+def run : IO Unit := do
+  let observed ← observe
+  let doubled ← observeRow observed.fixture "doubled"
+  let doubledBody ← observeDoubledBody doubled.original.function.typedBody
+  let cases : List (Word × Option Word) :=
+    [(Word.zero, some Word.zero), (Word.ofNatModulo 7, some (Word.ofNatModulo 14)),
+     (Word.ofNatModulo 127, some (Word.ofNatModulo 254)), (Word.ofNatModulo 128, none),
+     (Word.ofNatModulo 255, none), (Word.ofNatModulo 256, none), (Word.maximum, none)]
+  for entry in cases do
+    let word := entry.1
+    let sum := entry.2
+    let started ← observeStarted observed.fixture doubled.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole doubled),
+        Nonempty (AcceptedReflection selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select doubled
+      exact ⟨whole, selected, accepted_reflection selected observed.calls word observed.wellFormed started
+        observed.callableProfile doubledBody.inputs doubledBody.binderScheme⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    let expectedReason :=
+      if word.val < 256 then SourceCorePanics.reason SourceCorePanics.arithmetic else SourceCorePanics.dirtyReason
+    match sum, result.val with
+    | some value, .succeeded returned =>
+      unless returned.value == .word value do throw (IO.userError "accepted fixed-width compound output changed")
+    | none, .failed reason _ =>
+      unless reason == expectedReason do throw (IO.userError "accepted fixed-width compound failure changed")
+    | _, _ => throw (IO.userError "accepted fixed-width compound outcome changed")
+  IO.println "ACCEPTED_FIXED_COMPOUND_PUBLIC_PASS"
+
+end AcceptedFixedCompoundRuntime
 
 end Tests.SourceCoreAcceptedOneCall
 end

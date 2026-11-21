@@ -475,10 +475,13 @@ theorem operands {source : TypedSource} {first : Nat} {table : SourceCoreAssignm
     {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
     {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
     (origin : AssignmentDiagnosticOrigins.Occurs source site assignment operator rhs)
-    (profile : operator = .equal ∨ assignment.target.type = .word) :
+    (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) :
     AssignmentOperandDiagnostics.OperandsLaw faults operator
       (GenericAssignmentDiagnostics.token table site assignment.target.root operator) :=
-  operands_target prepared included origin (profile.imp_right fun word => by rw [word]; rfl)
+  operands_target prepared included origin (by
+    rcases profile with narrow | ⟨⟨_, fixed⟩, _⟩
+    · exact narrow.imp_right fun word => by rw [word]; rfl
+    · rw [fixed]; exact .inr rfl)
 
 end Solcore.SourceSemantics.CoreLowering.PreparedBranchingAssignmentDiagnostics
 end

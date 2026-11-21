@@ -1188,7 +1188,7 @@ theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : Obser
     CallableIndexedOwnedPreparedStagedBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .block observed.shape.blockFound observed.shape.blockForm
     (.initialized observed.shape.initializedFound observed.shape.initializedForm
-      (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare .nil))
+      (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl (.inl rfl)) observed.shape.targetBare .nil))
     (.returnValue [] observed.shape.statementFound observed.shape.statementForm)
 
 def ObservedFactory.readIds {fixture : CompiledFixture} (observed : ObservedFactory fixture) : List ExpressionId :=
@@ -4257,7 +4257,7 @@ theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : Obser
     have same : arm = observed.shape.arm := by simpa only [observed.shape.arms, List.mem_singleton] using member
     subst arm
     rw [observed.shape.armBody]
-    exact .assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare .nil
+    exact .assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl (.inl rfl)) observed.shape.targetBare .nil
   · intro statements present
     simp [observed.shape.noDefault] at present
   · exact .returnValue [] observed.shape.statementFound observed.shape.statementForm

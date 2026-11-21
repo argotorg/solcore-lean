@@ -1181,9 +1181,9 @@ theorem ObservedFactory.seed_declaration {fixture : CompiledFixture} (observed :
 theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : ObservedFactory fixture) :
     CallableIndexedOwnedPreparedStagedLegacyBranchingTree.Shape observed.row.function.typedBody true observed.shape.body :=
   .conditional observed.shape.branchFound observed.shape.branchForm
-    (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare .nil)
+    (.assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl (.inl rfl)) observed.shape.targetBare .nil)
     (.initialized observed.shape.initializedFound observed.shape.initializedForm
-      (.assign observed.shape.elseAssignmentFound observed.shape.elseAssignmentForm (.inl rfl) observed.shape.elseTargetBare .nil))
+      (.assign observed.shape.elseAssignmentFound observed.shape.elseAssignmentForm (.inl (.inl rfl)) observed.shape.elseTargetBare .nil))
     (.conditional observed.shape.earlyBranchFound observed.shape.earlyBranchForm
       (.returnValue [] observed.shape.earlyReturnFound observed.shape.earlyReturnForm) .nil
       (.returnValue [] observed.shape.innerReturnFound observed.shape.innerReturnForm))
@@ -3444,7 +3444,7 @@ theorem ObservedFactory.body_shape {fixture : CompiledFixture} (observed : Obser
     have same : arm = observed.shape.arm := by simpa only [observed.shape.arms, List.mem_singleton] using member
     subst arm
     rw [observed.shape.armBody]
-    exact .assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl rfl) observed.shape.targetBare .nil
+    exact .assign observed.shape.assignmentFound observed.shape.assignmentForm (.inl (.inl rfl)) observed.shape.targetBare .nil
   · intro statements present
     simp [observed.shape.noDefault] at present
   · exact .returnValue [] observed.shape.innerReturnFound observed.shape.innerReturnForm

@@ -4554,8 +4554,8 @@ section
 proofs: the compiler body profile (`AcceptedCompilerBodyProfile.validate`, whose
 `~=` profiles are `BitNotAssignable` and `ProjectedBitNotAssignable`) admits a
 bare `w ~=;` and a mapping element's `m[k] ~=;`. A fixed-width target is
-compiled but outside them, as step 3d's compound targets are: those profiles take
-only a Word target. (The invocation body shape, `shape?`, has no `~=` form.) -/
+compiled but outside them: those profiles take only a Word target. (The
+invocation body shape, `shape?`, has no `~=` form.) -/
 set_option autoImplicit false
 namespace Tests.SourceCoreBitNotSubset
 open Solcore Frontend SourceInference SourceSemantics CoreLowering

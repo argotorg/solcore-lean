@@ -145,7 +145,7 @@ inductive Scan (locals : Catalog) (caller : Key) (active : Substitution)
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (targetType : binder.scheme.body = assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
       (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type) (value : approved rhs)
@@ -163,7 +163,7 @@ inductive Scan (locals : Catalog) (caller : Key) (active : Substitution)
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
@@ -265,7 +265,7 @@ def scan? (locals : Catalog) (caller : Key) (active : Substitution)
         match declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root with
         | .error _ => none
         | .ok binder =>
-          if profile : operator = .equal ∨ assignment.target.type = .word then
+          if profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type then
             match rhsFound : source.lookupExpression? rhs with
             | none => none
             | some rhsNode =>
@@ -431,7 +431,7 @@ inductive Syntax (locals : Catalog) (caller : Key) (active : Substitution)
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (targetType : binder.scheme.body = assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (bare : assignment.target.projections = [])
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
       (rhsType : AssignedRhsView operator assignment.target.type rhsNode.type)
@@ -450,7 +450,7 @@ inductive Syntax (locals : Catalog) (caller : Key) (active : Substitution)
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator rhs)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
-      (profile : operator = .equal ∨ assignment.target.type = .word)
+      (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type)
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (rhsFound : source.lookupExpression? rhs = some rhsNode)
@@ -1361,9 +1361,10 @@ theorem collected
       have tailTyped := TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)
       obtain ⟨first, tablePrepared⟩ := assignmentsPrepared
       have rawProfile : AssignmentProfile operator assignment.target.type ∨ FixedCompoundAssignment operator assignment.target.type := by
-        rcases profile with equal | word
+        rcases profile with (equal | word) | fixed
         · exact .inl (.inl equal)
         · exact .inl (.inr (.inl word))
+        · exact .inr fixed
       have operands := GenericAssignmentDiagnostics.prepared_operands tablePrepared
         (lookupStatement?_sound found).1 (.statement form) rawProfile
       rw [(lookupStatement?_sound found).2, ← token] at operands
@@ -1401,9 +1402,10 @@ theorem collected
       have tailTyped := TypedImperative.Native.execute_continuation (emitted ▸ nativeTyped)
       obtain ⟨first, tablePrepared⟩ := assignmentsPrepared
       have rawProfile : AssignmentProfile operator assignment.target.type ∨ FixedCompoundAssignment operator assignment.target.type := by
-        rcases profile with equal | word
+        rcases profile with (equal | word) | fixed
         · exact .inl (.inl equal)
         · exact .inl (.inr (.inl word))
+        · exact .inr fixed
       have operands := GenericAssignmentDiagnostics.prepared_operands tablePrepared
         (lookupStatement?_sound found).1 (.statement form) rawProfile
       rw [(lookupStatement?_sound found).2, ← token] at operands
