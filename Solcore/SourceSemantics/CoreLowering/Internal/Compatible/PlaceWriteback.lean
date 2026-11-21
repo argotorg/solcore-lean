@@ -412,30 +412,77 @@ theorem wide_outcome
       rw [FixedCompoundModifier.compatible_assignmentModifier]
       exact FixedCompoundModifier.guard_agrees kind leftWord rightWord
 
+/-- The outcome of `wide_outcome` with the right-hand side at its own type (`AssignedRhsView`): at
+the leaf's runtime type, or a shift's amount, whose word the shift reads. The profile has no shift at
+a fixed-width target yet, so an amount there does not arise. -/
+theorem assigned_outcome
+    (observations : FunctionObservations checked.catalog functions identities)
+    {targetType leaf rhsType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
+    {operator : Syntax.ValueAssignOp}
+    (profile : WideAssignmentProfile operator targetType)
+    (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType targetType)
+    (leftRep : ValueRep checked registry functions mapping world leaf left leftCore type)
+    (rhsView : AssignedRhsView operator leaf rhsType)
+    (rightRep : ValueRep checked registry functions mapping world rhsType right rightCore type)
+    {environment : Environment} {snapshot rhs : Expr}
+    (snapshotSelected : Selects environment snapshot (.inRight .unit leftCore))
+    (rightSelected : Selects environment rhs rightCore) (store : Store) (invalid : Word) :
+    ∃ result value,
+      Evaluates environment store
+        (modified type (assignmentModifier targetType (type = .integer) operator) false snapshot rhs invalid
+          (SourceCoreDataPlaces.placeWrap targetType operator false)) (.inRight .word value) store ∧
+      RuntimeValueHasType world value type ambient.definitions ∧
+      ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right ∧
+      (∀ other, Dynamic.CompoundAssignmentApplies targetType operator (some left) right other →
+        other = result ∧ ValueRep checked registry functions mapping world leaf result value type) ∧
+      ∀ {leftType : Ty}, FixedCompoundModifier.Agreement targetType operator (some left) right result
+        (assignmentModifier targetType (type = .integer) operator) (.inRight leftType leftCore) rightCore := by
+  cases rhsView with
+  | same view =>
+    exact wide_outcome observations profile leafView leftRep (.compatible view rightRep) snapshotSelected
+      rightSelected store invalid
+  | shiftAmount shift leafWord amount =>
+    exact wide_outcome observations profile leafView leftRep
+      ((AssignedRhsView.shiftAmount shift leafWord amount).rep
+        (fun _ leafFixed _ => by cases leafWord.symm.trans leafFixed) rightRep)
+      snapshotSelected rightSelected store invalid
+  | fixedShiftAmount shift leafFixed _ =>
+    exfalso
+    have view : SourceCoreRawMetadata.runtimeType targetType = .fixed _ := leafView.symm.trans leafFixed
+    rcases profile with (equal | word | ⟨integer, _⟩) | ⟨_, kind⟩
+    · subst equal
+      cases shift
+    · cases view.symm.trans word
+    · cases view.symm.trans integer
+    · cases shift <;> cases kind
+
 /-- Represented initialized operands are never invalid over the wider profile. -/
 theorem wide_valid
     (observations : FunctionObservations checked.catalog functions identities)
-    {targetType leaf : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
+    {targetType leaf rhsType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
     {operator : Syntax.ValueAssignOp}
     (profile : WideAssignmentProfile operator targetType)
     (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType targetType)
     (leftRep : ValueRep checked registry functions mapping world leaf left leftCore type)
-    (rightRep : ValueRep checked registry functions mapping world leaf right rightCore type) :
+    (rhsView : AssignedRhsView operator leaf rhsType)
+    (rightRep : ValueRep checked registry functions mapping world rhsType right rightCore type) :
     ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right := by
-  obtain ⟨_, _, _, _, valid, _⟩ := wide_outcome observations profile leafView leftRep rightRep
+  obtain ⟨_, _, _, _, valid, _⟩ := assigned_outcome observations profile leafView leftRep rhsView rightRep
     (environment := [rightCore, .inRight .unit leftCore]) (.var (index := 1) rfl) (.var (index := 0) rfl) [] Word.zero
   exact valid
 
-/-- The success direction over the wider profile: an applied source operation is the leaf the
-native modifier computes, represented at `leaf`, and the check after the setter writes. -/
+/-- The success direction over the wider profile, with the right-hand side at its own type: an
+applied source operation is the leaf the native modifier computes, represented at `leaf`, and the
+check after the setter writes. -/
 theorem wide_preserves
     (observations : FunctionObservations checked.catalog functions identities)
-    {targetType leaf : TypeSystem.Ty} {type : Ty} {left right result : Dynamic.Value} {leftCore rightCore : Value}
+    {targetType leaf rhsType : TypeSystem.Ty} {type : Ty} {left right result : Dynamic.Value} {leftCore rightCore : Value}
     {operator : Syntax.ValueAssignOp}
     (profile : WideAssignmentProfile operator targetType)
     (leafView : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType targetType)
     (leftRep : ValueRep checked registry functions mapping world leaf left leftCore type)
-    (rightRep : ValueRep checked registry functions mapping world leaf right rightCore type)
+    (rhsView : AssignedRhsView operator leaf rhsType)
+    (rightRep : ValueRep checked registry functions mapping world rhsType right rightCore type)
     (applied : Dynamic.CompoundAssignmentApplies targetType operator (some left) right result)
     {environment : Environment} {snapshot rhs : Expr}
     (snapshotSelected : Selects environment snapshot (.inRight .unit leftCore))
@@ -452,7 +499,7 @@ theorem wide_preserves
             final after ↔
           Evaluates (updated :: value :: rightCore :: .inRight leftType leftCore :: binders) store write final after := by
   obtain ⟨actual, value, evaluated, _, valid, unique, agreement⟩ :=
-    wide_outcome observations profile leafView leftRep rightRep snapshotSelected rightSelected store invalid
+    assigned_outcome observations profile leafView leftRep rhsView rightRep snapshotSelected rightSelected store invalid
   obtain ⟨same, related⟩ := unique result applied
   subst same
   refine ⟨value, related, evaluated, valid, fun {leftType} => ?_⟩
@@ -887,8 +934,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       CompatiblePlaceRhs.preserves resolution meaning rhsGenerated found environments locals (.value evaluate)
     cases represented : rhsResult.represented with
     | @value _ rightValue rightRep =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-        rhsView.rep (by simpa only [payloadModel, rhsCoreType] using rightRep)
+      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.leafType :=
+        by simpa only [payloadModel, rhsCoreType] using rightRep
       have snapshotRep := rhsResult.saved_snapshot
       have keyRep := resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
       have reference := resolution.reference.extend rhsResult.maps rhsResult.worlds
@@ -901,7 +948,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
         obtain ⟨replacement, applies, changed⟩ := DataPlaceAssignmentWriteBack.replacement_of_update update
         rw [resolution.selectedEq] at applies
         obtain ⟨replacementValue, replacementRep, modifiedEvaluated, _, guarded⟩ :=
-          CompatiblePlaceModifier.wide_preserves observations operatorProfile leafView snapshotRep rightRep applies
+          CompatiblePlaceModifier.wide_preserves observations operatorProfile leafView snapshotRep rhsView rightRep applies
             (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
               (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
             (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -1289,8 +1336,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     CompatiblePlaceRhs.preserves resolution meaning rhsGenerated found environments locals (.value evaluate)
   cases represented : rhsResult.represented with
   | @value _ rightValue rightRep =>
-    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      rhsView.rep (by simpa only [payloadModel, rhsCoreType] using rightRep)
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.leafType :=
+      by simpa only [payloadModel, rhsCoreType] using rightRep
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep := resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
     have reference := resolution.reference.extend rhsResult.maps rhsResult.worlds
@@ -1299,7 +1346,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     have cellEq := sourceRead.functional latest.read
     have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
     obtain ⟨replacement, replacementValue, modifiedEvaluated, replacementTyped, _⟩ :=
-      CompatiblePlaceModifier.wide_outcome observations operatorProfile leafView snapshotRep rightRep
+      CompatiblePlaceModifier.assigned_outcome observations operatorProfile leafView snapshotRep rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand

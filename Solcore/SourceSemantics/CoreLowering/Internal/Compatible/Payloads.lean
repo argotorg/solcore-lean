@@ -16,7 +16,8 @@ This file stays below the compiler's encoder, because this relation is stated in
 section
 /-! How an assignment's right-hand side stands for the value its operation
 reads at the target: at the target's runtime type, or, for a compound shift at
-a Word target, as an amount of its own type whose word the shift reads. -/
+a Word or a fixed-width target, as an amount of its own type whose word the
+shift reads. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics
 open Frontend Frontend.SourceInference
@@ -24,11 +25,14 @@ open Frontend Frontend.SourceInference
 /-- How a right-hand side at type `rhs` stands for the value that the
 assignment `operator` reads at the leaf type `leaf`: at the leaf's runtime
 type, or, for a compound shift, as an amount (`ShiftAmountType`) whose word a
-Word leaf reads. -/
+Word leaf or a fixed-width one reads. A fixed-width leaf does not take the
+amount at its own type, since the amount need not be canonical there. -/
 inductive AssignedRhsView (operator : Syntax.ValueAssignOp) (leaf rhs : TypeSystem.Ty) : Prop where
   | same (view : SourceCoreRawMetadata.runtimeType leaf = SourceCoreRawMetadata.runtimeType rhs)
   | shiftAmount (shift : ShiftCompoundAssignmentOperator operator)
       (leafWord : SourceCoreRawMetadata.runtimeType leaf = .word) (amount : ShiftAmountType rhs)
+  | fixedShiftAmount (shift : ShiftCompoundAssignmentOperator operator) {type : TypeSystem.FixedInteger}
+      (leafFixed : SourceCoreRawMetadata.runtimeType leaf = .fixed type) (amount : ShiftAmountType rhs)
 
 /-- An assignment's right-hand side is typed at a type that stands for the
 target's: the target's own type, or a compound shift's amount type. -/
@@ -43,6 +47,7 @@ theorem AssignedRhsView.transport {operator : Syntax.ValueAssignOp} {leaf target
   cases rhsView with
   | same same => exact .same (view.trans same)
   | shiftAmount shift targetWord amount => exact .shiftAmount shift (view.trans targetWord) amount
+  | fixedShiftAmount shift targetFixed amount => exact .fixedShiftAmount shift (view.trans targetFixed) amount
 
 /-- A right-hand side typed at the target's own type. -/
 theorem AssignedOperandTyped.of_type {source : TypedSource} {context : SourceSemantics.Context}
@@ -87,7 +92,7 @@ private def shiftAmountType? (rhs : TypeSystem.Ty) : Option (PLift (ShiftAmountT
     | _ => none
 
 /-- The view the statement checkers accept, decided: the target's own type, or
-a compound shift's amount at a Word target. -/
+a compound shift's amount at a Word or a fixed-width target. -/
 def AssignedRhsView.decide? (operator : Syntax.ValueAssignOp) (leaf rhs : TypeSystem.Ty) :
     Option (PLift (AssignedRhsView operator leaf rhs)) :=
   if same : rhs = leaf then some ⟨.same (congrArg SourceCoreRawMetadata.runtimeType same.symm)⟩
@@ -97,7 +102,17 @@ def AssignedRhsView.decide? (operator : Syntax.ValueAssignOp) (leaf rhs : TypeSy
     | .shiftRight => (shiftAmountType? rhs).map fun ⟨amount⟩ => ⟨.shiftAmount .shiftRight leafWord amount⟩
     | .equal | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr
     | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide | .uncheckedModulo => none
-  else none
+  else
+    match leafFixed : SourceCoreRawMetadata.runtimeType leaf with
+    | .constructor (.builtin (.fixed type)) =>
+      match operator with
+      | .shiftLeft => (shiftAmountType? rhs).map fun ⟨amount⟩ =>
+          ⟨.fixedShiftAmount .shiftLeft (type := type) leafFixed amount⟩
+      | .shiftRight => (shiftAmountType? rhs).map fun ⟨amount⟩ =>
+          ⟨.fixedShiftAmount .shiftRight (type := type) leafFixed amount⟩
+      | .equal | .add | .subtract | .multiply | .divide | .modulo | .bitAnd | .bitXor | .bitOr
+      | .uncheckedAdd | .uncheckedSubtract | .uncheckedMultiply | .uncheckedDivide | .uncheckedModulo => none
+    | _ => none
 
 end Solcore.SourceSemantics
 end
@@ -397,11 +412,45 @@ private theorem unsigned_word_fields {sourceType : TypeSystem.Ty} {type : TypeSy
       cases view
   | nil | cons | empty | entry | absent | present => trivial
 
-/-- A right-hand side's value stands at the leaf: through the runtime view, or,
-for a shift amount, as the word it is. -/
+/-- A value represented at `word` is a word, at Core type `word`. -/
+private theorem word_view_fields {sourceType : TypeSystem.Ty}
+    {source : Dynamic.Value} {value : Value} {coreType : Ty}
+    (related : ValueRep checked registry functions mapping world sourceType source value coreType)
+    (view : SourceCoreRawMetadata.runtimeType sourceType = .word) :
+    ∃ word, source = .word word ∧ value = .word word ∧ coreType = .word := by
+  revert view
+  induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
+    (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
+  | word word => intro _; exact ⟨word, rfl, rfl, rfl⟩
+  | compatible same _ ih => intro view; exact ih (same.symm.trans view)
+  | @constructed metadata id tag sources values types _ _ _ projected _ _ _ =>
+      intro view
+      have scalar : checked.catalog.project metadata.resultType = .ok .word := by
+        rw [← checked.catalog.project_runtimeType, view]
+        rfl
+      cases Except.ok.inj (projected.symm.trans scalar)
+  | unit | bool | integer | fixed | product | function | proxy | mappingValue =>
+      intro view
+      cases view
+  | nil | cons | empty | entry | absent | present => trivial
+
+/-- A shift amount's value is a word, at Core type `word`. -/
+theorem _root_.Solcore.SourceSemantics.ShiftAmountType.word_fields {rhs : TypeSystem.Ty}
+    {source : Dynamic.Value} {value : Value} {type : Ty} (amount : ShiftAmountType rhs)
+    (related : ValueRep checked registry functions mapping world rhs source value type) :
+    ∃ word, source = .word word ∧ value = .word word ∧ type = .word := by
+  cases amount with
+  | word => exact word_view_fields related rfl
+  | unsigned _ => exact unsigned_word_fields related rfl
+
+/-- Away from a shift at a fixed-width leaf, a right-hand side's value stands at
+the leaf: through the runtime view, or, for a shift amount at a Word leaf, as
+the word it is. -/
 theorem _root_.Solcore.SourceSemantics.AssignedRhsView.rep {operator : Syntax.ValueAssignOp}
     {leaf rhs : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
     (view : AssignedRhsView operator leaf rhs)
+    (notFixedShift : ∀ type, SourceCoreRawMetadata.runtimeType leaf = .fixed type →
+      ¬ ShiftCompoundAssignmentOperator operator)
     (related : ValueRep checked registry functions mapping world rhs source value type) :
     ValueRep checked registry functions mapping world leaf source value type := by
   cases view with
@@ -409,11 +458,9 @@ theorem _root_.Solcore.SourceSemantics.AssignedRhsView.rep {operator : Syntax.Va
   | shiftAmount _ leafWord amount =>
       have wordView : SourceCoreRawMetadata.runtimeType leaf =
           SourceCoreRawMetadata.runtimeType TypeSystem.Ty.word := leafWord
-      cases amount with
-      | word => exact .compatible wordView related
-      | unsigned _ =>
-          obtain ⟨word, rfl, rfl, rfl⟩ := unsigned_word_fields related rfl
-          exact .compatible wordView (.word word)
+      obtain ⟨word, rfl, rfl, rfl⟩ := amount.word_fields related
+      exact .compatible wordView (.word word)
+  | fixedShiftAmount shift leafFixed _ => exact (notFixedShift _ leafFixed shift).elim
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePayload
 end

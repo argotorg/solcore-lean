@@ -1259,9 +1259,9 @@ theorem preserves_write_fault [RecursiveStageMeaning.FaultTokens faults] (budget
     have ordinaryRhs := rhsResult.to_ordinary_value
     cases failed with
     | operands read rootType initialValue pathRead invalidOperands =>
-      have rightRep : ValueRep compiled.compatible.checked registry functions rhsMap rhsWorld leaf right native prepared.route.leafType :=
-        rightView.rep (by simpa only [payloadModel, renamed, rightType] using rightRep)
-      have valid := CompatiblePlaceModifier.wide_valid observations profile leafView ordinaryRhs.saved_snapshot rightRep
+      have rightRep : ValueRep compiled.compatible.checked registry functions rhsMap rhsWorld node.type right native prepared.route.leafType :=
+        by simpa only [payloadModel, renamed, rightType] using rightRep
+      have valid := CompatiblePlaceModifier.wide_valid observations profile leafView ordinaryRhs.saved_snapshot rightView rightRep
       rw [resolution.selectedEq] at invalidOperands
       exact (valid invalidOperands).elim
     | panic read rootType initialValue pathRead panics =>
@@ -1447,13 +1447,13 @@ theorem reflects_bounded [RecursiveStageMeaning.FaultTokens faults] (budget : Na
         obtain ⟨rhsState, rhsRelated⟩ := rhsPost
         obtain ⟨rightTyped, middleTyped⟩ := result.sourcePost _ rfl
         have plainRhs := result.to_ordinary_value
-        have rightRep : CompatiblePayload.ValueRep compiled.compatible.checked registry functions finalMap finalWorld leaf right rightValue prepared.route.leafType :=
-          rightView.rep (by simpa only [payloadModel, rightType] using payload)
+        have rightRep : CompatiblePayload.ValueRep compiled.compatible.checked registry functions finalMap finalWorld node.type right rightValue prepared.route.leafType :=
+          by simpa only [payloadModel, rightType] using payload
         let rightExecution : CompatibleCellPlaceRhsReflection.Execution compiled.compatible.checked registry functions (GeneralizedLocalDescriptorHeap.cellModel (payloadModel compiled.compatible.checked registry functions) (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment) program context
             invocation.evidence invocation.source (fun reason token => faults (.semantic reason) token) environment
             prepared (renamedCodes codes ξ) sourceTypes assignment.target leaf _ actual store mapping world before _
-            resolution rhs node (renamed lowered ξ) :=
-          ⟨right, rightValue, after, _, finalMap, finalWorld, plainRhs, rightRep⟩
+            resolution rhs node (renamed lowered ξ) operator :=
+          ⟨right, rightValue, after, _, finalMap, finalWorld, plainRhs, rightRep, rightView⟩
         obtain ⟨resolveSize, resolve⟩ := SourceExecutionSize.SourcePlaceResolves.has_size
           (snapshot.resolves (CellAwareStagedProjectedPrefix.values_plain keyTrace))
         obtain ⟨plainRhsSize, plainRhsTrace⟩ := SourceExecutionSize.ExpressionEvaluates.has_size result.trace.sound.value_plain

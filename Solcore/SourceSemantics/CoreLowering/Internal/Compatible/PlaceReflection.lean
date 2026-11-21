@@ -42,7 +42,8 @@ structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Regist
     (initialStore : Store) (initialMap : LocationMap) (initialWorld : StoreTyping) (before targetHeap : Dynamic.Heap)
     (resolution : CompatiblePlaceResolution.Execution checked registry functions prepared codes sourceTypes place leaf target
       coreEnvironment initialStore initialMap initialWorld before targetHeap)
-    (id : ExpressionId) (node : ExpressionNode) (lowered : SourceCoreBasic.LoweredExpr) where
+    (id : ExpressionId) (node : ExpressionNode) (lowered : SourceCoreBasic.LoweredExpr)
+    (operator : Syntax.ValueAssignOp) where
   right : Dynamic.Value
   value : Value
   heap : Dynamic.Heap
@@ -51,7 +52,9 @@ structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Regist
   world : StoreTyping
   meaning : CompatiblePlaceRhs.Result (program := program) (context := context) (evidence := evidence) (source := source)
     (faults := faults) resolution id node lowered environment (.value right) heap (.inRight .word value) store mapping world
-  related : ValueRep checked registry functions mapping world leaf right value prepared.route.leafType
+  /-- The right-hand side at its own type, which stands for what the operator reads at the leaf. -/
+  related : ValueRep checked registry functions mapping world node.type right value prepared.route.leafType
+  view : AssignedRhsView operator leaf node.type
 
 inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
     {ambient : AmbientDefinitions checked.catalog.definitions}
@@ -78,7 +81,7 @@ inductive Result (checked : Checked) (registry : SourceCoreRawMetadata.Registry)
       (resolution : CompatiblePlaceResolution.Execution checked registry functions prepared codes sourceTypes place leaf target
         coreEnvironment store mapping world before targetHeap)
       (right : Execution checked registry functions program context evidence source faults environment prepared codes sourceTypes place leaf target
-        coreEnvironment store mapping world before targetHeap resolution rhs node lowered)
+        coreEnvironment store mapping world before targetHeap resolution rhs node lowered operator)
       (continuation : Evaluates (rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
         (.inRight .unit resolution.snapshot) right.value coreEnvironment) right.store
         (remainder prepared (SourceCoreCalls.packArguments codes).type next outputType modifier invalid wrap) result finalStore) :
@@ -145,7 +148,8 @@ theorem reflects {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
             mapping := rhsMap
             world := rhsWorld
             meaning := rhsResult
-            related := rhsView.rep (by simpa only [payloadModel, coreType] using payload) } remaining
+            related := by simpa only [payloadModel, coreType] using payload
+            view := rhsView } remaining
 
 end Solcore.SourceSemantics.CoreLowering.CompatiblePlaceRhsReflection
 end
@@ -547,7 +551,7 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
       coreEnvironment store mapping world before targetHeap)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (right : CompatiblePlaceRhsReflection.Execution compilation.checked registry functions program context evidence source faults environment
-      prepared codes sourceTypes place leaf target coreEnvironment store mapping world before targetHeap resolution rhs node lowered)
+      prepared codes sourceTypes place leaf target coreEnvironment store mapping world before targetHeap resolution rhs node lowered operator)
     {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
     (completed : Evaluates (rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
       (.inRight .unit resolution.snapshot) right.value coreEnvironment) right.store
@@ -566,7 +570,7 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
   obtain ⟨latest⟩ := right.meaning.latest
   have cellType : latest.cell.type = target.rootType := latest.type.trans targetType.symm
   obtain ⟨replacement, replacementValue, modified, replacementTyped, _, unique, agreement⟩ :=
-    CompatiblePlaceModifier.wide_outcome observations profile leafView snapshotRep right.related
+    CompatiblePlaceModifier.assigned_outcome observations profile leafView snapshotRep right.view right.related
       (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
         (.inRight .unit resolution.snapshot) right.value coreEnvironment)
       (.var (index := 1) rfl) (.var (index := 0) rfl) right.store invalid

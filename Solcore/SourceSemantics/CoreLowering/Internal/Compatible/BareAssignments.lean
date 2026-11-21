@@ -487,14 +487,15 @@ theorem assignmentModifier_some (target : TypeSystem.Ty) (integer : Bool) {opera
 /-- Over the wider profile, at the target's type: an absent compound snapshot fails after the RHS has
 completed, and otherwise the modifier gives a leaf, the source's only result when it applies the
 operation, and the check after the setter agrees with the source. -/
-theorem modifier_total_wide {targetType sourceType : TypeSystem.Ty} {type : Ty} {initial : Option Dynamic.Value}
+theorem modifier_total_wide {targetType sourceType rhsType : TypeSystem.Ty} {type : Ty} {initial : Option Dynamic.Value}
     {snapshot rightCore : Value} {right : Dynamic.Value} {operator : Syntax.ValueAssignOp}
     {identities : Dynamic.Value → Word → Prop}
     (observations : FunctionObservations checked.catalog functions identities)
     (profile : WideAssignmentProfile operator targetType)
     (leafView : SourceCoreRawMetadata.runtimeType sourceType = SourceCoreRawMetadata.runtimeType targetType)
     (saved : SnapshotRep checked registry functions mapping world sourceType type initial snapshot)
-    (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
+    (rhsView : AssignedRhsView operator sourceType rhsType)
+    (rightRep : ValueRep checked registry functions mapping world rhsType right rightCore type)
     {environment : Environment} {snapshotExpression rightExpression : Expr}
     (snapshotSelected : DataEquality.Selects environment snapshotExpression snapshot)
     (rightSelected : DataEquality.Selects environment rightExpression rightCore) (store : Store) (invalid : Word) :
@@ -513,8 +514,8 @@ theorem modifier_total_wide {targetType sourceType : TypeSystem.Ty} {type : Ty} 
   cases saved with
   | present related =>
     obtain ⟨result, value, evaluated, typed, _, unique, agreement⟩ :=
-      CompatiblePlaceModifier.wide_outcome observations profile leafView related rightRep snapshotSelected rightSelected
-        store invalid
+      CompatiblePlaceModifier.assigned_outcome observations profile leafView related rhsView rightRep snapshotSelected
+        rightSelected store invalid
     exact .inr ⟨result, value, typed, unique, agreement, evaluated⟩
   | absent =>
     by_cases equal : operator = .equal
@@ -525,7 +526,7 @@ theorem modifier_total_wide {targetType sourceType : TypeSystem.Ty} {type : Ty} 
         .inRight (rightSelected.evaluates store)⟩
       rw [Dynamic.CompoundAssignmentApplies.eq_of_plain plain] at applied
       cases applied
-      exact ⟨rfl, rightRep⟩
+      exact ⟨rfl, rhsView.rep (fun _ _ shift => by cases shift) rightRep⟩
     · refine .inl ⟨.uninitialized equal, ?_⟩
       obtain ⟨modifier, chosen⟩ := assignmentModifier_some targetType (type = .integer) equal
       rw [chosen]
@@ -564,7 +565,8 @@ theorem commit_with_write_wide {compilation : SourceCoreCompatibleDataPlaces.Con
     (rhs : RhsResult (program := program) (context := context) (evidence := evidence) (source := source)
       (faults := faults) (id := id) (node := node) (lowered := lowered) snapshot (.value right) rhsHeap
         (.inRight .word rightValue) rhsStore rhsMap rhsWorld)
-    (rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType)
+    {rhsType : TypeSystem.Ty}
+    (rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld rhsType right rightValue prepared.route.rootType)
     (replacement : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType)
     (applied : Dynamic.CompoundAssignmentApplies place.type operator snapshot.initial right updated)
     (modified : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
@@ -724,10 +726,10 @@ theorem reflects_reachable_wide
     | value payload =>
       rename_i right
       rename_i rhsStore
-      have rightRep : ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      have rightRep : ValueRep compilation.checked registry functions finalMap finalWorld node.type right rightValue prepared.route.rootType :=
+        by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload
       have saved := snapshot.represented.extend result.maps result.worlds
-      have modifier := modifier_total_wide observations profile leafView saved rightRep
+      have modifier := modifier_total_wide observations profile leafView saved rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid
       rcases modifier with ⟨invalidOperands, failed⟩ | ⟨updated, updatedValue, _, unique, agreement, modified⟩
@@ -1647,17 +1649,59 @@ theorem wide_outcome
       rw [FixedCompoundModifier.compatible_assignmentModifier]
       exact FixedCompoundModifier.guard_agrees kind leftWord rightWord
 
+/-- `wide_outcome` with the right-hand side at its own type (`AssignedRhsView`): at the leaf's
+runtime type, or a shift's amount, whose word the shift reads. The profile has no shift at a
+fixed-width target yet, so an amount there does not arise. -/
+theorem assigned_outcome
+    {targetType sourceType rhsType : TypeSystem.Ty} {type : Ty} {left right : Dynamic.Value} {leftCore rightCore : Value}
+    {operator : Syntax.ValueAssignOp}
+    (profile : (operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word) ∨
+      FixedCompoundAssignment operator targetType)
+    (leafView : SourceCoreRawMetadata.runtimeType sourceType = SourceCoreRawMetadata.runtimeType targetType)
+    (leftRep : ValueRep checked registry functions mapping world sourceType left leftCore type)
+    (rhsView : AssignedRhsView operator sourceType rhsType)
+    (rightRep : ValueRep checked registry functions mapping world rhsType right rightCore type)
+    {environment : Environment} {snapshot rhs : Expr}
+    (snapshotSelected : DataEquality.Selects environment snapshot (.inRight .unit leftCore))
+    (rightSelected : DataEquality.Selects environment rhs rightCore) (store : Store) (invalid : Word) :
+    ∃ result value,
+      Evaluates environment store
+        (modified type (assignmentModifier targetType (type = .integer) operator) false snapshot rhs invalid
+          (SourceCoreDataPlaces.placeWrap targetType operator false)) (.inRight .word value) store ∧
+      RuntimeValueHasType world value type ambient.definitions ∧
+      ¬ Dynamic.AssignmentOperandsInvalid operator (some left) right ∧
+      (∀ other, Dynamic.CompoundAssignmentApplies targetType operator (some left) right other →
+        other = result ∧ ValueRep checked registry functions mapping world sourceType result value type) ∧
+      ∀ {leftType : Ty}, FixedCompoundModifier.Agreement targetType operator (some left) right result
+        (assignmentModifier targetType (type = .integer) operator) (.inRight leftType leftCore) rightCore := by
+  cases rhsView with
+  | same view =>
+    exact wide_outcome profile leafView leftRep (.compatible view rightRep) snapshotSelected rightSelected store invalid
+  | shiftAmount shift leafWord amount =>
+    exact wide_outcome profile leafView leftRep
+      ((AssignedRhsView.shiftAmount shift leafWord amount).rep
+        (fun _ leafFixed _ => by cases leafWord.symm.trans leafFixed) rightRep)
+      snapshotSelected rightSelected store invalid
+  | fixedShiftAmount shift leafFixed _ =>
+    exfalso
+    rcases profile with (equal | word) | ⟨_, kind⟩
+    · subst equal
+      cases shift
+    · cases word.symm.trans leafFixed
+    · cases shift <;> cases kind
+
 /-- `CompatibleBareAssignment.modifier_total_wide` over the staged bare profile widened by the
 fixed-width compound assignments, without a callable observation: an absent compound snapshot fails
 after the RHS, and otherwise the modifier gives a leaf, the source's only result when it applies the
 operation, and the check after the setter agrees with the source. -/
-theorem modifier_total_wide {targetType sourceType : TypeSystem.Ty} {type : Ty} {initial : Option Dynamic.Value}
+theorem modifier_total_wide {targetType sourceType rhsType : TypeSystem.Ty} {type : Ty} {initial : Option Dynamic.Value}
     {snapshot rightCore : Value} {right : Dynamic.Value} {operator : Syntax.ValueAssignOp}
     (profile : (operator = .equal ∨ SourceCoreRawMetadata.runtimeType sourceType = .word) ∨
       FixedCompoundAssignment operator targetType)
     (leafView : SourceCoreRawMetadata.runtimeType sourceType = SourceCoreRawMetadata.runtimeType targetType)
     (saved : SnapshotRep checked registry functions mapping world sourceType type initial snapshot)
-    (rightRep : ValueRep checked registry functions mapping world sourceType right rightCore type)
+    (rhsView : AssignedRhsView operator sourceType rhsType)
+    (rightRep : ValueRep checked registry functions mapping world rhsType right rightCore type)
     {environment : Environment} {snapshotExpression rightExpression : Expr}
     (snapshotSelected : DataEquality.Selects environment snapshotExpression snapshot)
     (rightSelected : DataEquality.Selects environment rightExpression rightCore) (store : Store) (invalid : Word) :
@@ -1676,7 +1720,7 @@ theorem modifier_total_wide {targetType sourceType : TypeSystem.Ty} {type : Ty} 
   cases saved with
   | present related =>
     obtain ⟨result, value, evaluated, typed, _, unique, agreement⟩ :=
-      wide_outcome profile leafView related rightRep snapshotSelected rightSelected store invalid
+      assigned_outcome profile leafView related rhsView rightRep snapshotSelected rightSelected store invalid
     exact .inr ⟨result, value, typed, unique, agreement, evaluated⟩
   | absent =>
     by_cases equal : operator = .equal
@@ -1687,7 +1731,7 @@ theorem modifier_total_wide {targetType sourceType : TypeSystem.Ty} {type : Ty} 
         .inRight (rightSelected.evaluates store)⟩
       rw [Dynamic.CompoundAssignmentApplies.eq_of_plain plain] at applied
       cases applied
-      exact ⟨rfl, rightRep⟩
+      exact ⟨rfl, rhsView.rep (fun _ _ shift => by cases shift) rightRep⟩
     · refine .inl ⟨.uninitialized equal, ?_⟩
       obtain ⟨modifier, chosen⟩ := assignmentModifier_some targetType (type = .integer) equal
       rw [chosen]

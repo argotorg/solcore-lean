@@ -381,7 +381,7 @@ inductive RhsResultAt {Records : Type v} (protocol : ProtectedStateTransition.Pr
       (resolution : CompatiblePlaceResolution.Execution checked registry functions prepared codes sourceTypes place leaf target
         coreEnvironment store mapping world before targetHeap)
       (right : CompatiblePlaceRhsReflection.Execution checked registry functions program context evidence source faults environment prepared codes sourceTypes place leaf target
-        coreEnvironment store mapping world before targetHeap resolution rhs node lowered)
+        coreEnvironment store mapping world before targetHeap resolution rhs node lowered operator)
       {rhsSize : Nat}
       (rhsTrace : SourceExecutionSize.ExpressionEvaluates program rhsSize context evidence source environment targetHeap rhs right.right right.heap)
       (bounded : remainingSize < size)
@@ -941,14 +941,14 @@ theorem preserves_prefix_bounded_with_rhs (budget : Nat)
         (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) (.value evaluated)
     cases related : result.represented with
     | @value _ rightValue payload =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      have rightRep := payload
+      simp only [payloadModel, rhsCore, ← layout.sameType] at rightRep
       have saved := snapshot.represented.extend result.maps result.worlds
       cases written with
       | intro read sameType initial update written =>
         cases update with
         | leaf applied =>
-          rcases modifier_total_wide observations profile leafView saved rightRep
+          rcases modifier_total_wide observations profile leafView saved rhsView rightRep
             (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
             (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
             ⟨invalidOperands, _⟩ | ⟨replacement, updatedValue, _, unique, outcome, modified⟩
@@ -1193,9 +1193,9 @@ theorem preserves_fault_reachable_bounded_with_rhs (budget : Nat)
         (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) (.value evaluated)
     cases represented : result.represented with
     | @value _ rightValue payload =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
-      rcases modifier_total_wide observations profile leafView (snapshot.represented.extend result.maps result.worlds) rightRep
+      have rightRep := payload
+      simp only [payloadModel, rhsCore, ← layout.sameType] at rightRep
+      rcases modifier_total_wide observations profile leafView (snapshot.represented.extend result.maps result.worlds) rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
           ⟨_, failed⟩ | ⟨_, _, _, _, outcome, _⟩
@@ -1217,9 +1217,9 @@ theorem preserves_fault_reachable_bounded_with_rhs (budget : Nat)
         (Nat.lt_of_lt_of_le (SourceExecutionSize.child_lt_stepSize (by simp)) bounded) (.value evaluated)
     cases represented : result.represented with
     | @value _ rightValue payload =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
-      rcases modifier_total_wide observations profile leafView (snapshot.represented.extend result.maps result.worlds) rightRep
+      have rightRep := payload
+      simp only [payloadModel, rhsCore, ← layout.sameType] at rightRep
+      rcases modifier_total_wide observations profile leafView (snapshot.represented.extend result.maps result.worlds) rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
           ⟨invalidOperands, _⟩ | ⟨_, updatedValue, _, _, outcome, modified⟩

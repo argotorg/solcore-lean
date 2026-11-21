@@ -87,7 +87,7 @@ theorem reflects_ready_sized_with_diagnostics {compilation : SourceCoreCompatibl
       coreEnvironment store mapping world before targetHeap)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (right : CompatiblePlaceRhsReflection.Execution compilation.checked registry functions program context evidence source faults environment
-      prepared (renamedCodes codes ξ) sourceTypes place leaf target coreEnvironment store mapping world before targetHeap resolution rhs node lowered)
+      prepared (renamedCodes codes ξ) sourceTypes place leaf target coreEnvironment store mapping world before targetHeap resolution rhs node lowered operator)
     (rhsTrace : SourceExecutionSize.ExpressionEvaluates program rhsSize context evidence source environment targetHeap rhs right.right right.heap)
     (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
     (rhsState : protocol.State ⟨scope, right.mapping, right.world, right.heap, right.store, canonical⟩)
@@ -115,7 +115,7 @@ theorem reflects_ready_sized_with_diagnostics {compilation : SourceCoreCompatibl
   obtain ⟨latest⟩ := right.meaning.latest
   have cellType : latest.cell.type = target.rootType := latest.type.trans targetType.symm
   obtain ⟨replacement, replacementValue, modified, replacementTyped, _, unique, agreement⟩ :=
-    CompatiblePlaceModifier.wide_outcome observations profile leafView snapshotRep right.related
+    CompatiblePlaceModifier.assigned_outcome observations profile leafView snapshotRep right.view right.related
       (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
         (.inRight .unit resolution.snapshot) right.value coreEnvironment)
       (.var (index := 1) rfl) (.var (index := 0) rfl) right.store invalid
@@ -270,7 +270,7 @@ theorem reflects_ready_sized {compilation : SourceCoreCompatibleDataPlaces.Conte
       coreEnvironment store mapping world before targetHeap)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (right : CompatiblePlaceRhsReflection.Execution compilation.checked registry functions program context evidence source faults environment
-      prepared (renamedCodes codes ξ) sourceTypes place leaf target coreEnvironment store mapping world before targetHeap resolution rhs node lowered)
+      prepared (renamedCodes codes ξ) sourceTypes place leaf target coreEnvironment store mapping world before targetHeap resolution rhs node lowered operator)
     (rhsTrace : SourceExecutionSize.ExpressionEvaluates program rhsSize context evidence source environment targetHeap rhs right.right right.heap)
     (initialState : protocol.State ⟨scope, mapping, world, before, store, canonical⟩)
     (rhsState : protocol.State ⟨scope, right.mapping, right.world, right.heap, right.store, canonical⟩)
@@ -322,7 +322,7 @@ theorem reflects_ready_sized {compilation : SourceCoreCompatibleDataPlaces.Conte
       coreEnvironment store mapping world before targetHeap)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (right : CompatiblePlaceRhsReflection.Execution compilation.checked registry functions program context evidence source faults environment
-      prepared (renamedCodes codes ξ) sourceTypes place leaf target coreEnvironment store mapping world before targetHeap resolution rhs node lowered)
+      prepared (renamedCodes codes ξ) sourceTypes place leaf target coreEnvironment store mapping world before targetHeap resolution rhs node lowered operator)
     (rhsTrace : SourceExecutionSize.ExpressionEvaluates program rhsSize context evidence source environment targetHeap rhs right.right right.heap)
     {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
     (completed : CoreProof.EvaluationSize size (rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
@@ -369,7 +369,7 @@ theorem reflects_ready {compilation : SourceCoreCompatibleDataPlaces.Context}
       coreEnvironment store mapping world before targetHeap)
     {rhs : ExpressionId} {node : ExpressionNode} {lowered : SourceCoreBasic.LoweredExpr}
     (right : CompatiblePlaceRhsReflection.Execution compilation.checked registry functions program context evidence source faults environment
-      prepared (renamedCodes codes ξ) sourceTypes place leaf target coreEnvironment store mapping world before targetHeap resolution rhs node lowered)
+      prepared (renamedCodes codes ξ) sourceTypes place leaf target coreEnvironment store mapping world before targetHeap resolution rhs node lowered operator)
     {next : Expr} {outputType : Ty} {invalid : Word} {result : Value}
     (completed : Evaluates (rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
       (.inRight .unit resolution.snapshot) right.value coreEnvironment) right.store
@@ -463,7 +463,8 @@ private theorem rhs_reflects {checked : Checked} {registry : SourceCoreRawMetada
             mapping := rhsMap
             world := rhsWorld
             meaning := rhsResult
-            related := rhsView.rep (by simpa only [payloadModel, renamed, coreType] using payload) } remaining
+            related := by simpa only [payloadModel, renamed, coreType] using payload
+            view := rhsView } remaining
 
 theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
@@ -907,8 +908,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     CompatibleRenamedPlaceRhs.preserves resolution meaning rhsGenerated found environments agrees actualTyped locals (.value evaluate)
   cases represented : rhsResult.represented with
   | @value _ rightValue rightRep =>
-    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.leafType :=
+      by simpa only [payloadModel, renamed, rhsCoreType] using rightRep
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
       simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
@@ -918,7 +919,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     have cellEq := sourceRead.functional latest.read
     have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
     obtain ⟨replacement, replacementValue, modifiedEvaluated, replacementTyped, _⟩ :=
-      CompatiblePlaceModifier.wide_outcome observations operatorProfile leafView snapshotRep rightRep
+      CompatiblePlaceModifier.assigned_outcome observations operatorProfile leafView snapshotRep rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -1063,8 +1064,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     CompatibleRenamedPlaceRhs.preserves resolution meaning rhsGenerated found environments agrees actualTyped locals (.value evaluate)
   cases represented : rhsResult.represented with
   | @value _ rightValue rightRep =>
-    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.leafType :=
+      by simpa only [payloadModel, renamed, rhsCoreType] using rightRep
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
       simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
@@ -1074,7 +1075,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     have cellEq := sourceRead.functional latest.read
     have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
     obtain ⟨replacement, replacementValue, modifiedEvaluated, replacementTyped, _, _, agreement⟩ :=
-      CompatiblePlaceModifier.wide_outcome observations operatorProfile leafView snapshotRep rightRep
+      CompatiblePlaceModifier.assigned_outcome observations operatorProfile leafView snapshotRep rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -1253,9 +1254,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       CompatibleRenamedPlaceRhs.preserves resolution meaning rhsGenerated found environments agrees actualTyped locals (.value evaluate)
     cases represented : rhsResult.represented with
     | @value _ rightValue rightRep =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf _ rightValue prepared.route.leafType :=
-        rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
-      have valid := CompatiblePlaceModifier.wide_valid observations operatorProfile leafView rhsResult.saved_snapshot rightRep
+      simp only [payloadModel, renamed, rhsCoreType] at rightRep
+      have valid := CompatiblePlaceModifier.wide_valid observations operatorProfile leafView rhsResult.saved_snapshot rhsView rightRep
       rw [resolution.selectedEq] at invalidOperands
       exact (valid invalidOperands).elim
   | panic resolve evaluate currentRead _ initialValue pathRead panics =>
@@ -1349,14 +1349,14 @@ theorem preserves_prefix
       rhs_preserves snapshot meaning generated found environments heaps locals agrees actualTyped (.value evaluated)
     cases related : result.represented with
     | @value _ rightValue payload =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      have rightRep := payload
+      simp only [payloadModel, rhsCore, ← layout.sameType] at rightRep
       have saved := snapshot.represented.extend result.maps result.worlds
       cases written with
       | intro read sameType initial update written =>
         cases update with
         | leaf applied =>
-          rcases modifier_total_wide observations profile leafView saved rightRep
+          rcases modifier_total_wide observations profile leafView saved rhsView rightRep
             (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
             (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
             ⟨invalidOperands, _⟩ | ⟨replacement, updatedValue, _, unique, outcome, modified⟩
@@ -1461,9 +1461,9 @@ theorem preserves_fault_reachable
       rhs_preserves snapshot meaning generated found environments heaps locals agrees actualTyped (.value evaluated)
     cases represented : result.represented with
     | @value _ rightValue payload =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
-      rcases modifier_total_wide observations profile leafView (snapshot.represented.extend result.maps result.worlds) rightRep
+      have rightRep := payload
+      simp only [payloadModel, rhsCore, ← layout.sameType] at rightRep
+      rcases modifier_total_wide observations profile leafView (snapshot.represented.extend result.maps result.worlds) rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
           ⟨_, failed⟩ | ⟨_, _, _, _, outcome, _⟩
@@ -1483,9 +1483,9 @@ theorem preserves_fault_reachable
       rhs_preserves snapshot meaning generated found environments heaps locals agrees actualTyped (.value evaluated)
     cases represented : result.represented with
     | @value _ rightValue payload =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType _ rightValue prepared.route.rootType :=
-        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
-      rcases modifier_total_wide observations profile leafView (snapshot.represented.extend result.maps result.worlds) rightRep
+      have rightRep := payload
+      simp only [payloadModel, rhsCore, ← layout.sameType] at rightRep
+      rcases modifier_total_wide observations profile leafView (snapshot.represented.extend result.maps result.worlds) rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
           ⟨invalidOperands, _⟩ | ⟨_, updatedValue, _, _, outcome, modified⟩

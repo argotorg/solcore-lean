@@ -560,7 +560,7 @@ inductive RhsResultAt (size : Nat) (checked : Checked) (registry : SourceCoreRaw
       (resolution : CompatiblePlaceResolution.Execution checked registry functions prepared codes sourceTypes place leaf target
         coreEnvironment store mapping world before targetHeap)
       (right : CompatiblePlaceRhsReflection.Execution checked registry functions program context evidence source faults environment prepared codes sourceTypes place leaf target
-        coreEnvironment store mapping world before targetHeap resolution rhs node lowered)
+        coreEnvironment store mapping world before targetHeap resolution rhs node lowered operator)
       {rhsSize : Nat}
       (rhsTrace : SourceExecutionSize.ExpressionEvaluates program rhsSize context evidence source environment targetHeap rhs right.right right.heap)
       (bounded : remainingSize < size)

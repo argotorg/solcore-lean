@@ -686,7 +686,8 @@ theorem rhs_reflects_bounded_with_rhs (budget size : Nat) {checked : Checked} {r
               mapping := rhsMap
               world := rhsWorld
               meaning := rhsResult
-              related := rhsView.rep (by simpa only [payloadModel, renamed, coreType] using payload) } sourceRhs (by omega) remaining ⟨rhsState, protocol.trans resolutionRelated rhsRelated⟩
+              related := by simpa only [payloadModel, renamed, coreType] using payload
+              view := rhsView } sourceRhs (by omega) remaining ⟨rhsState, protocol.trans resolutionRelated rhsRelated⟩
 
 private theorem rhs_reflects_bounded (budget size : Nat) {checked : Checked} {registry : SourceCoreRawMetadata.Registry}
     {ambient : AmbientDefinitions checked.catalog.definitions}

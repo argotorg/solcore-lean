@@ -2089,6 +2089,7 @@ theorem source_profile
       cases view with
       | same view => exact .inl (.inr (view.trans (congrArg SourceCoreRawMetadata.runtimeType storedType)))
       | shiftAmount shift _ _ => cases kind <;> cases shift
+      | fixedShiftAmount shift _ _ => cases kind <;> cases shift
   | fixedCompound kind targetTyped _ _ => exact .inr ⟨⟨_, targetTyped.type_eq⟩, kind⟩
   | shiftCompound kind _ _ rhsTyped amount _ =>
       rcases profile with narrow | ⟨_, fixedKind⟩
@@ -2104,6 +2105,7 @@ theorem source_profile
           cases view with
           | same view => cases amount <;> cases view.symm.trans (leafView.trans integer)
           | shiftAmount _ leafWord _ => cases leafWord.symm.trans (leafView.trans integer)
+          | fixedShiftAmount _ leafFixed _ => cases leafFixed.symm.trans (leafView.trans integer)
       · cases kind <;> cases fixedKind
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedBareAssignmentAdmission

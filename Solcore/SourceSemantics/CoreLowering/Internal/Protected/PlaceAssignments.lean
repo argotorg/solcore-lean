@@ -1470,8 +1470,8 @@ theorem preserves_prefix_bounded_with_producers (budget : Nat) {compilation : So
       rhsMeaning resolve.sound resolution resolutionState resolutionRelated (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) (.value evaluate)
     cases represented : rhsResult.represented with
     | @value _ rightValue rightRep =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-        rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.leafType :=
+        by simpa only [payloadModel, renamed, rhsCoreType] using rightRep
       obtain ⟨rhsState, rhsRelated⟩ := rhsPost
       have snapshotRep := rhsResult.saved_snapshot
       have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
@@ -1486,7 +1486,7 @@ theorem preserves_prefix_bounded_with_producers (budget : Nat) {compilation : So
         obtain ⟨replacement, applies, changed⟩ := DataPlaceAssignmentWriteBack.replacement_of_update update
         rw [resolution.selectedEq] at applies
         obtain ⟨replacementValue, replacementRep, modifiedEvaluated, _, guarded⟩ :=
-          CompatiblePlaceModifier.wide_preserves observations operatorProfile leafView snapshotRep rightRep applies
+          CompatiblePlaceModifier.wide_preserves observations operatorProfile leafView snapshotRep rhsView rightRep applies
             (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
               (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
             (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -2899,8 +2899,8 @@ theorem preserves_bounded_with_producers_with_receipt (budget : Nat) {compilatio
   cases represented : rhsResult.represented with
   | @value _ rightValue rightRep =>
     obtain ⟨rhsState, rhsRelated⟩ := rhsPost
-    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.leafType :=
+      by simpa only [payloadModel, renamed, rhsCoreType] using rightRep
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
       simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
@@ -2910,7 +2910,7 @@ theorem preserves_bounded_with_producers_with_receipt (budget : Nat) {compilatio
     have cellEq := sourceRead.functional latest.read
     have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
     obtain ⟨replacement, replacementValue, modifiedEvaluated, replacementTyped, _⟩ :=
-      CompatiblePlaceModifier.wide_outcome observations operatorProfile leafView snapshotRep rightRep
+      CompatiblePlaceModifier.assigned_outcome observations operatorProfile leafView snapshotRep rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -3385,8 +3385,8 @@ theorem preserves_bounded_with_producers (budget : Nat) {compilation : SourceCor
   cases represented : rhsResult.represented with
   | @value _ rightValue rightRep =>
     obtain ⟨rhsState, rhsRelated⟩ := rhsPost
-    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.leafType :=
+      by simpa only [payloadModel, renamed, rhsCoreType] using rightRep
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
       simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
@@ -3396,7 +3396,7 @@ theorem preserves_bounded_with_producers (budget : Nat) {compilation : SourceCor
     have cellEq := sourceRead.functional latest.read
     have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
     obtain ⟨replacement, replacementValue, modifiedEvaluated, replacementTyped, _, _, agreement⟩ :=
-      CompatiblePlaceModifier.wide_outcome observations operatorProfile leafView snapshotRep rightRep
+      CompatiblePlaceModifier.assigned_outcome observations operatorProfile leafView snapshotRep rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -3609,9 +3609,8 @@ theorem preserves_bounded_with_producers_with_diagnostics (budget : Nat) {compil
       rhsMeaning resolve.sound resolution resolutionState resolutionRelated (by simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at bounded; omega) (.value evaluate)
     cases represented : rhsResult.represented with
     | @value _ rightValue rightRep =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf _ rightValue prepared.route.leafType :=
-        rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
-      have valid := CompatiblePlaceModifier.wide_valid observations operatorProfile leafView rhsResult.saved_snapshot rightRep
+      simp only [payloadModel, renamed, rhsCoreType] at rightRep
+      have valid := CompatiblePlaceModifier.wide_valid observations operatorProfile leafView rhsResult.saved_snapshot rhsView rightRep
       rw [resolution.selectedEq] at invalidOperands
       exact (valid invalidOperands).elim
   | panic resolve evaluate currentRead _ initialValue pathRead panics =>
@@ -4039,10 +4038,10 @@ theorem reflects_reachable_bounded_with_rhs (budget : Nat)
     | value payload =>
       rename_i right
       rename_i rhsStore
-      have rightRep : ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-        rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+      have rightRep : ValueRep compilation.checked registry functions finalMap finalWorld node.type right rightValue prepared.route.rootType :=
+        by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload
       have saved := snapshot.represented.extend result.maps result.worlds
-      have modifier := modifier_total_wide observations profile leafView saved rightRep
+      have modifier := modifier_total_wide observations profile leafView saved rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid
       rcases modifier with ⟨invalidOperands, failed⟩ | ⟨updated, updatedValue, _, unique, outcome, modified⟩

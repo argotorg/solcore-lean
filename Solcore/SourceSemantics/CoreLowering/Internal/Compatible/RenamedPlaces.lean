@@ -704,8 +704,8 @@ theorem preserves_prefix_wide {compilation : SourceCoreCompatibleDataPlaces.Cont
       CompatibleRenamedPlaceRhs.preserves resolution meaning rhsGenerated found environments agrees actualTyped locals (.value evaluate)
     cases represented : rhsResult.represented with
     | @value _ rightValue rightRep =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-        rhsView.rep (by simpa only [payloadModel, renamed, rhsCoreType] using rightRep)
+      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.leafType :=
+        by simpa only [payloadModel, renamed, rhsCoreType] using rightRep
       have snapshotRep := rhsResult.saved_snapshot
       have keyRep : DataExpressionSequence.Values (payloadModel compilation.checked registry functions) rhsMap rhsWorld sourceTypes (codes.map (·.type)) resolution.sources resolution.values := by
         simpa only [renamedCodes_types] using resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
@@ -719,7 +719,7 @@ theorem preserves_prefix_wide {compilation : SourceCoreCompatibleDataPlaces.Cont
         obtain ⟨replacement, applies, changed⟩ := DataPlaceAssignmentWriteBack.replacement_of_update update
         rw [resolution.selectedEq] at applies
         obtain ⟨replacementValue, replacementRep, modifiedEvaluated, _, guarded⟩ :=
-          CompatiblePlaceModifier.wide_preserves observations operatorProfile leafView snapshotRep rightRep applies
+          CompatiblePlaceModifier.wide_preserves observations operatorProfile leafView snapshotRep rhsView rightRep applies
             (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
               (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
             (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand

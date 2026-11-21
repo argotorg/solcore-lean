@@ -507,7 +507,8 @@ theorem cell_commit_with_write_wide {compilation : SourceCoreCompatibleDataPlace
     (rhs : CellRhsResult (cells := cells) (instances := instances) (program := program) (context := context) (evidence := evidence) (source := source)
       (faults := faults) (id := id) (node := node) (lowered := lowered) snapshot (.value right) rhsHeap
         (.inRight .word rightValue) rhsStore rhsMap rhsWorld)
-    (rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType)
+    {rhsType : TypeSystem.Ty}
+    (rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld rhsType right rightValue prepared.route.rootType)
     (replacement : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType updated updatedValue prepared.route.rootType)
     (applied : Dynamic.CompoundAssignmentApplies place.type operator snapshot.initial right updated)
     (modified : Evaluates (rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual) rhsStore
@@ -1778,7 +1779,8 @@ structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Regist
     (initialStore : Store) (initialMap : LocationMap) (initialWorld : StoreTyping) (before targetHeap : Dynamic.Heap)
     (resolution : CompatibleCellPlaceResolution.Execution checked registry functions cells instances prepared codes sourceTypes place leaf target
       coreEnvironment initialStore initialMap initialWorld before targetHeap)
-    (id : ExpressionId) (node : ExpressionNode) (lowered : SourceCoreBasic.LoweredExpr) where
+    (id : ExpressionId) (node : ExpressionNode) (lowered : SourceCoreBasic.LoweredExpr)
+    (operator : Syntax.ValueAssignOp) where
   right : Dynamic.Value
   value : Value
   heap : Dynamic.Heap
@@ -1787,7 +1789,9 @@ structure Execution (checked : Checked) (registry : SourceCoreRawMetadata.Regist
   world : StoreTyping
   meaning : CompatibleCellPlaceRhs.Result (program := program) (context := context) (evidence := evidence) (source := source)
     (faults := faults) resolution id node lowered environment (.value right) heap (.inRight .word value) store mapping world
-  related : ValueRep checked registry functions mapping world leaf right value prepared.route.leafType
+  /-- The right-hand side at its own type, which stands for what the operator reads at the leaf. -/
+  related : ValueRep checked registry functions mapping world node.type right value prepared.route.leafType
+  view : AssignedRhsView operator leaf node.type
 
 
 end Solcore.SourceSemantics.CoreLowering.CompatibleCellPlaceRhsReflection

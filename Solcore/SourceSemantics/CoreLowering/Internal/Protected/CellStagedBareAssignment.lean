@@ -199,15 +199,15 @@ theorem reflects_with_rhs (budget : Nat)
       | value payload =>
           rename_i right
           rename_i rhsStore
-          have rightRep : ValueRep compilation.checked registry functions finalMap finalWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-            rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+          have rightRep : ValueRep compilation.checked registry functions finalMap finalWorld node.type right rightValue prepared.route.rootType :=
+            by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload
           have plain := cell_rhs_of_expression snapshot ordinaryCells ordinary
             (faults := fun _ _ => False) (.value result.trace.sound.value_plain) result.evaluated
             (.value payload) result.heaps result.maps result.worlds result.frame result.metadata result.effect
           obtain ⟨latest⟩ := plain.latest
           obtain ⟨initialValue, initialized⟩ := cell_initial latest.related
           rcases CompatibleBareWordModifier.modifier_total_wide profile leafView
-            (snapshot.represented.extend result.maps result.worlds) rightRep
+            (snapshot.represented.extend result.maps result.worlds) rhsView rightRep
             (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
             (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
               ⟨invalidOperands, failed⟩ | ⟨replacement, updatedValue, _, unique, agreement, modified⟩
@@ -337,8 +337,8 @@ theorem preserves_value_with_rhs
   cases related : result.represented with
   | value payload =>
     rename_i rightValue
-    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-      rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.rootType :=
+      by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload
     have plain := cell_rhs_of_expression snapshot ordinaryCells ordinary
       (faults := fun _ _ => False) (.value sourceTrace.sound.value_plain) result.evaluated
       (.value payload) result.heaps result.maps result.worlds result.frame result.metadata result.effect
@@ -347,7 +347,7 @@ theorem preserves_value_with_rhs
       cases update with
       | leaf applied =>
         rcases CompatibleBareWordModifier.modifier_total_wide profile leafView
-          (snapshot.represented.extend result.maps result.worlds) rightRep
+          (snapshot.represented.extend result.maps result.worlds) rhsView rightRep
           (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
           (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
             ⟨invalidOperands, _⟩ | ⟨replacement, updatedValue, _, unique, agreement, modified⟩
@@ -461,10 +461,10 @@ theorem preserves_operands_with_rhs
   cases result.represented with
   | value payload =>
     rename_i rightValue
-    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-      rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.rootType :=
+      by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload
     rcases CompatibleBareWordModifier.modifier_total_wide profile leafView
-      (snapshot.represented.extend result.maps result.worlds) rightRep
+      (snapshot.represented.extend result.maps result.worlds) rhsView rightRep
       (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
       (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
         ⟨_, failed⟩ | ⟨_, _, _, _, agreement, _⟩
@@ -530,14 +530,14 @@ theorem preserves_panic_with_rhs
   cases related : result.represented with
   | value payload =>
     rename_i rightValue
-    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld prepared.route.rootSourceType right rightValue prepared.route.rootType :=
-      rhsView.rep (by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload)
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.rootType :=
+      by simpa only [payloadModel, rhsCore, ← layout.sameType] using payload
     have plain := cell_rhs_of_expression snapshot ordinaryCells ordinary
       (faults := fun _ _ => False) (.value result.trace.sound.value_plain) result.evaluated
       (.value payload) result.heaps result.maps result.worlds result.frame result.metadata result.effect
     obtain ⟨latest⟩ := plain.latest
     rcases CompatibleBareWordModifier.modifier_total_wide profile leafView
-      (snapshot.represented.extend result.maps result.worlds) rightRep
+      (snapshot.represented.extend result.maps result.worlds) rhsView rightRep
       (environment := rhsEnvironment prepared.route.rootType snapshot.target .unit snapshot.value rightValue actual)
       (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalid with
         ⟨invalidOperands, _⟩ | ⟨_, updatedValue, _, _, agreement, modified⟩

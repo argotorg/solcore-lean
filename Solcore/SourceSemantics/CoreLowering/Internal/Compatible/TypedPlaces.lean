@@ -682,8 +682,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     CompatibleTypedPlaceRhs.preserves resolution meaning rhsGenerated found environments locals (.value evaluate)
   cases represented : rhsResult.represented with
   | @value _ rightValue rightRep =>
-    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      rhsView.rep (by simpa only [payloadModel, rhsCoreType] using rightRep)
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.leafType :=
+      by simpa only [payloadModel, rhsCoreType] using rightRep
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep := resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
     have reference := resolution.reference.extend rhsResult.maps rhsResult.worlds
@@ -692,7 +692,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     have cellEq := sourceRead.functional latest.read
     have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
     obtain ⟨replacement, replacementValue, modifiedEvaluated, replacementTyped, _⟩ :=
-      CompatiblePlaceModifier.wide_outcome observations operatorProfile leafView snapshotRep rightRep
+      CompatiblePlaceModifier.assigned_outcome observations operatorProfile leafView snapshotRep rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -827,8 +827,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     CompatibleTypedPlaceRhs.preserves resolution meaning rhsGenerated found environments locals (.value evaluate)
   cases represented : rhsResult.represented with
   | @value _ rightValue rightRep =>
-    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-      rhsView.rep (by simpa only [payloadModel, rhsCoreType] using rightRep)
+    have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.leafType :=
+      by simpa only [payloadModel, rhsCoreType] using rightRep
     have snapshotRep := rhsResult.saved_snapshot
     have keyRep := resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
     have reference := resolution.reference.extend rhsResult.maps rhsResult.worlds
@@ -837,7 +837,7 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
     have cellEq := sourceRead.functional latest.read
     have cellType : cell.type = prepared.route.rootSourceType := cellEq ▸ latest.type
     obtain ⟨replacement, replacementValue, modifiedEvaluated, replacementTyped, _, _, agreement⟩ :=
-      CompatiblePlaceModifier.wide_outcome observations operatorProfile leafView snapshotRep rightRep
+      CompatiblePlaceModifier.assigned_outcome observations operatorProfile leafView snapshotRep rhsView rightRep
         (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
           (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
         (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -1010,9 +1010,8 @@ theorem preserves {compilation : SourceCoreCompatibleDataPlaces.Context}
       CompatibleTypedPlaceRhs.preserves resolution meaning rhsGenerated found environments locals (.value evaluate)
     cases represented : rhsResult.represented with
     | @value _ rightValue rightRep =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf _ rightValue prepared.route.leafType :=
-        rhsView.rep (by simpa only [payloadModel, rhsCoreType] using rightRep)
-      have valid := CompatiblePlaceModifier.wide_valid observations operatorProfile leafView rhsResult.saved_snapshot rightRep
+      simp only [payloadModel, rhsCoreType] at rightRep
+      have valid := CompatiblePlaceModifier.wide_valid observations operatorProfile leafView rhsResult.saved_snapshot rhsView rightRep
       rw [resolution.selectedEq] at invalidOperands
       exact (valid invalidOperands).elim
   | panic resolve evaluate currentRead _ initialValue pathRead panics =>
@@ -1338,8 +1337,8 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
       CompatibleTypedPlaceRhs.preserves resolution meaning rhsGenerated found environments locals (.value evaluate)
     cases represented : rhsResult.represented with
     | @value _ rightValue rightRep =>
-      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld leaf right rightValue prepared.route.leafType :=
-        rhsView.rep (by simpa only [payloadModel, rhsCoreType] using rightRep)
+      have rightRep : ValueRep compilation.checked registry functions rhsMap rhsWorld node.type right rightValue prepared.route.leafType :=
+        by simpa only [payloadModel, rhsCoreType] using rightRep
       have snapshotRep := rhsResult.saved_snapshot
       have keyRep := resolution.keysRelated.extend rhsResult.maps rhsResult.worlds
       have reference := resolution.reference.extend rhsResult.maps rhsResult.worlds
@@ -1352,7 +1351,7 @@ theorem preserves_prefix {compilation : SourceCoreCompatibleDataPlaces.Context}
         obtain ⟨replacement, applies, changed⟩ := DataPlaceAssignmentWriteBack.replacement_of_update update
         rw [resolution.selectedEq] at applies
         obtain ⟨replacementValue, replacementRep, modifiedEvaluated, _, guarded⟩ :=
-          CompatiblePlaceModifier.wide_preserves observations operatorProfile leafView snapshotRep rightRep applies
+          CompatiblePlaceModifier.wide_preserves observations operatorProfile leafView snapshotRep rhsView rightRep applies
             (environment := rhsEnvironment prepared.route.rootType resolution.target (packValues resolution.values)
               (.inRight .unit resolution.snapshot) rightValue coreEnvironment)
             (.var (index := 1) rfl) (.var (index := 0) rfl) rhsStore invalidOperand
@@ -1484,7 +1483,8 @@ private theorem rhs_reflects {checked : Checked} {registry : SourceCoreRawMetada
             mapping := rhsMap
             world := rhsWorld
             meaning := rhsResult
-            related := rhsView.rep (by simpa only [payloadModel, coreType] using payload) } remaining
+            related := by simpa only [payloadModel, coreType] using payload
+            view := rhsView } remaining
 
 theorem reflects {compilation : SourceCoreCompatibleDataPlaces.Context}
     {registry : SourceCoreRawMetadata.Registry} {ambient : AmbientDefinitions compilation.checked.catalog.definitions}
