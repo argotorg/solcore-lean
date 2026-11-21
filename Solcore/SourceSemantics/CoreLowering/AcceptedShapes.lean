@@ -23,10 +23,10 @@ Main declarations:
 section
 -- leanmerge: from Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedBodyShape
 /-! Source statement lists that the accepted-body route closes at named rows:
-value and unit returns, monomorphic declarations, bare assignments and bare
-in-place `~` the compiler refines, expression statements, blocks and conditionals, and a
-function body's final value of its declared type, each with
-its expressions in a given predicate. `Shape` recognizes these lists on the
+value and unit returns, monomorphic declarations, bare assignments, assignments
+through mapping indices and bare in-place `~` the compiler refines, expression
+statements, blocks and conditionals, and a function body's final value of its
+declared type, each with its expressions in a given predicate. `Shape` recognizes these lists on the
 Source; `covered` shows that every refined accepted tree of such a list is
 covered by the statement closure, and `shapeWith?` recognizes them on an
 actually compiled row with the expressions a given check admits; `shape?` is
@@ -36,7 +36,7 @@ set_option Elab.async false
 set_option maxHeartbeats 4000000
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedBodyShape
 open Core Frontend SourceInference
-open AcceptedNamedBodyFlow (Tree Assignable BitNotAssignable)
+open AcceptedNamedBodyFlow (Tree Assignable ProjectedAssignable BitNotAssignable)
 open CellAwareInvocationAcceptedFlow (Covered)
 
 /-- Statement lists of the supported forms. A list may end without returning
@@ -66,6 +66,13 @@ inductive Shape (source : TypedSource) (expected : TypeSystem.Ty) (child : Expre
       {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {expression : ExpressionId}
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator expression)
       (assignable : Assignable source assignment operator) (value : child expression)
+      (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
+  | projectedAssigned {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+      {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {expression : ExpressionId}
+      (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator expression)
+      (assignable : ProjectedAssignable source assignment operator)
+      (keys : ∀ projection ∈ assignment.target.projections, ∃ key, projection = .index key ∧ child key)
+      (value : child expression)
       (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
   | bitNotted {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
       {assignment : AssignmentResolution} (found : source.lookupStatement? id = some node)
@@ -118,6 +125,57 @@ def assignable? (source : TypedSource) (assignment : AssignmentResolution) (oper
     | _ :: _ => none
   else none
 
+/-- Proof-producing recognition of a mapping route. -/
+def route? (source : TypedSource) : (root : TypeSystem.Ty) → (projections : List PlaceProjection) →
+    (leaf : TypeSystem.Ty) → Option (PLift (AcceptedProjectedAssignmentRoute.Route source root projections leaf))
+  | root, [], leaf => if same : root = leaf then some ⟨by subst same; exact .nil⟩ else none
+  | .mapping keyType valueType, .index key :: rest, leaf =>
+    match found : source.lookupExpression? key with
+    | some node =>
+      if same : node.type = keyType then do
+        let ⟨tail⟩ ← route? source valueType rest leaf
+        pure ⟨.index found same tail⟩
+      else none
+    | none => none
+  | _, _, _ => none
+
+/-- Proof-producing recognition of an assignment through mapping indices the
+compiler refines. -/
+def projectedAssignable? (source : TypedSource) (assignment : AssignmentResolution)
+    (operator : Syntax.ValueAssignOp) : Option (PLift (ProjectedAssignable source assignment operator)) :=
+  if operatorOk : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type then
+    if projected : assignment.target.projections ≠ [] then
+      match root : SourceCoreDataPlaces.rootBinder source assignment.target.root with
+      | .ok binder => do
+        let ⟨route⟩ ← route? source binder.scheme.body assignment.target.projections assignment.target.type
+        pure ⟨⟨operatorOk, projected, fun other found => by rw [root] at found; cases found; exact route⟩⟩
+      | .error _ => some ⟨⟨operatorOk, projected, fun other found => by rw [root] at found; cases found⟩⟩
+    else none
+  else none
+
+/-- Proof-producing recognition of a path of mapping indices whose keys `child?`
+admits. -/
+def indexKeys? {child : ExpressionId → Prop} (child? : (id : ExpressionId) → Option (PLift (child id))) :
+    (projections : List PlaceProjection) →
+      Option (PLift (∀ projection ∈ projections, ∃ key, projection = .index key ∧ child key))
+  | [] => some ⟨fun _ member => by cases member⟩
+  | .index key :: rest => do
+    let ⟨head⟩ ← child? key
+    let ⟨tail⟩ ← indexKeys? child? rest
+    pure ⟨fun projection member => by
+      rcases List.mem_cons.mp member with same | member
+      · exact ⟨key, same, head⟩
+      · exact tail projection member⟩
+  | _ :: _ => none
+
+/-- A path of mapping indices has no element projection. -/
+theorem indices_no_element {child : ExpressionId → Prop} {projections leading : List PlaceProjection}
+    {index : ExpressionId} (keys : ∀ projection ∈ projections, ∃ key, projection = .index key ∧ child key) :
+    projections ≠ leading ++ [.element index] := by
+  intro same
+  obtain ⟨key, wrong, _⟩ := keys (.element index) (by rw [same]; simp)
+  cases wrong
+
 /-- Proof-producing recognition of a bare in-place `~` the compiler refines. -/
 def bitNotAssignable? (source : TypedSource) (assignment : AssignmentResolution) :
     Option (PLift (BitNotAssignable source assignment)) :=
@@ -164,11 +222,18 @@ def shapeWith? (source : TypedSource) (expected : TypeSystem.Ty) (child : Expres
           let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
           pure ⟨.uninitialized found form monomorphic tail⟩
         | _ :: _ => none
-      | .assignValue assignment operator expression => do
-        let ⟨assignable⟩ ← assignable? source assignment operator
-        let ⟨value⟩ ← child? expression
-        let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
-        pure ⟨.assigned found form assignable value tail⟩
+      | .assignValue assignment operator expression =>
+        match assignable? source assignment operator with
+        | some ⟨assignable⟩ => do
+          let ⟨value⟩ ← child? expression
+          let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+          pure ⟨.assigned found form assignable value tail⟩
+        | none => do
+          let ⟨assignable⟩ ← projectedAssignable? source assignment operator
+          let ⟨keys⟩ ← indexKeys? child? assignment.target.projections
+          let ⟨value⟩ ← child? expression
+          let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+          pure ⟨.projectedAssigned found form assignable keys value tail⟩
       | .assignBitNot assignment => do
         let ⟨assignable⟩ ← bitNotAssignable? source assignment
         let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
@@ -234,6 +299,7 @@ private theorem head_expanded {source : TypedSource} {expected : TypeSystem.Ty} 
   | declared found form => exact ⟨_, found, by rw [form]; rfl⟩
   | uninitialized found form => exact ⟨_, found, by rw [form]; rfl⟩
   | assigned found form => exact ⟨_, found, by rw [form]; rfl⟩
+  | projectedAssigned found form => exact ⟨_, found, by rw [form]; rfl⟩
   | bitNotted found form => exact ⟨_, found, by rw [form]; rfl⟩
   | discarded found form => exact ⟨_, found, by rw [form]; rfl⟩
   | block found form => exact ⟨_, found, by rw [form]; rfl⟩
@@ -302,6 +368,11 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       rw [form] at form'
       cases form'
       exact absurd (.inl assignable) ready.1
+    | projectedAssigned found form' assignable _ _ _ =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      rw [form] at form'
+      cases form'
+      exact absurd (.inr assignable) ready.1
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
@@ -313,6 +384,9 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     | assigned found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       exact ⟨sameSource, ih ready tail⟩
+    | projectedAssigned found _ _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
@@ -322,6 +396,9 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     intro ready shape
     cases shape with
     | assigned found _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready tail⟩
+    | projectedAssigned found _ _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       exact ⟨sameSource, ih ready tail⟩
     | _ =>
@@ -594,10 +671,12 @@ section
 executions. Every statement of `CellAwareInvocationAcceptedBodyShape.Shape`
 runs the same rule in both semantics once its subset expressions are staged:
 declarations allocate the same cell, a bare assignment resolves its target
-without changing the heap and writes it by the same rule, and blocks and
-conditional arms restore their entry bindings while keeping their heap. Each
-control outcome is carried unchanged, with the context, environment and heap
-of the original execution. Fault executions are not lifted here. -/
+without changing the heap and writes it by the same rule, an assignment
+through mapping indices evaluates its keys in order before the same snapshot
+and write, and blocks and conditional arms restore their entry bindings while
+keeping their heap. Each control outcome is carried unchanged, with the
+context, environment and heap of the original execution. Fault executions are
+not lifted here. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -806,6 +885,50 @@ variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared ch
   {named : SourceCoreGeneralFunctions.Function} {program : Program} {registry : Staging.Recursive.Registry}
   {scope : Staging.Recursive.Scope} {expected : TypeSystem.Ty}
 
+/-- The Source's evaluation of a path of mapping indices whose keys are subset
+sites is the staged evaluation of its keys, in order. -/
+private theorem projections_values (unique : NodeOccurrencesUnique scope.source) {context : SourceSemantics.Context}
+    {environment : Dynamic.Environment} :
+    ∀ {projections : List PlaceProjection},
+    (∀ projection ∈ projections, ∃ key, projection = .index key ∧ Subset prepared named scope.source key) →
+    ∀ {before after : Dynamic.Heap} {evaluated : List Dynamic.EvaluatedProjection},
+      Dynamic.SourceProjectionsEvaluate program context scope.evidence scope.source environment before projections
+        evaluated after →
+      ∃ values, Staging.Recursive.Expressions program registry scope context environment before
+          (Staging.Recursive.ProjectedTarget.keys projections) (.values values) after ∧
+        Staging.Recursive.ProjectedTarget.Values projections values evaluated := by
+  intro projections
+  induction projections with
+  | nil =>
+    intro _ before after evaluated evaluate
+    cases evaluate
+    exact ⟨[], .nil, .nil⟩
+  | cons projection rest ih =>
+    intro keys before after evaluated evaluate
+    obtain ⟨key, rfl, site⟩ := keys projection List.mem_cons_self
+    cases evaluate with
+    | index head tail =>
+      obtain ⟨values, staged, ordered⟩ := ih (fun other member => keys other (List.mem_cons_of_mem _ member)) tail
+      exact ⟨_ :: values, .cons (expression_value unique site head) staged, .index ordered⟩
+
+/-- The Source's resolution of a place through mapping indices whose keys are
+subset sites is the staged evaluation of its keys followed by its staged
+snapshot. -/
+private theorem projected_target (unique : NodeOccurrencesUnique scope.source) {context : SourceSemantics.Context}
+    {environment : Dynamic.Environment} {place : PlaceResolution}
+    (keys : ∀ projection ∈ place.projections, ∃ key, projection = .index key ∧ Subset prepared named scope.source key)
+    {before after : Dynamic.Heap} {target : Dynamic.ResolvedPlace}
+    (resolve : Dynamic.SourcePlaceResolves program context scope.evidence scope.source environment before place target
+      after) :
+    ∃ values, Staging.Recursive.Expressions program registry scope context environment before
+        (Staging.Recursive.ProjectedTarget.keys place.projections) (.values values) after ∧
+      Staging.Recursive.ProjectedTarget.Snapshot environment before after place values target := by
+  cases resolve with
+  | intro lookup initialRead evaluate currentRead initialValue selection =>
+    obtain ⟨values, staged, ordered⟩ := projections_values unique keys evaluate
+    exact ⟨values, staged, .intro lookup initialRead ordered currentRead initialValue selection⟩
+  | element projectionsEq => exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
+
 /-- One statement followed by the rest of its list. A falling-through head runs
 the rest; a terminal head ends the list. Both compiler modes share this
 sequencing, except for the function body's implicit final value, which the
@@ -921,6 +1044,21 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {mode : Bool} {
         obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve
         exact .assignBare (lookupStatement?_sound found) form snapshot (expression_value unique value evaluate)
           write (tailIH next)
+    · intro context environment before finalContext outcome after head terminal
+      obtain ⟨_, _, _, same⟩ := assigned_inv unique found form head
+      subst same
+      cases terminal
+  | projectedAssigned found form assignable keys value _ tailIH =>
+    intro context environment before after finalContext outcome
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after head next
+      obtain ⟨_, executes, rfl, same⟩ := assigned_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve evaluate write =>
+        obtain ⟨values, staged, snapshot⟩ := projected_target unique keys resolve
+        exact .assignProjected (lookupStatement?_sound found) form assignable.2.1 staged snapshot
+          (expression_value unique value evaluate) write (tailIH next)
     · intro context environment before finalContext outcome after head terminal
       obtain ⟨_, _, _, same⟩ := assigned_inv unique found form head
       subst same

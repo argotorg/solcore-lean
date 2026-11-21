@@ -335,6 +335,56 @@ private theorem sequence {mode : Bool} {id : StatementId} {rest : List Statement
     | cons head next => exact step below_left below_right head next
     | terminal head terminal => exact stop below_one head terminal
 
+/-- The sized Source evaluation of a path of mapping indices whose keys `child`
+admits is the staged evaluation of its keys, in order, given the lifting of
+`child` below the size. -/
+private theorem projections_values {child : ExpressionId → Prop} {bound : Nat}
+    (lift : ChildLifts program registry scope child bound) {context : SourceSemantics.Context}
+    {environment : Dynamic.Environment} :
+    ∀ {projections : List PlaceProjection},
+    (∀ projection ∈ projections, ∃ key, projection = .index key ∧ child key) →
+    ∀ {size : Nat} {before after : Dynamic.Heap} {evaluated : List Dynamic.EvaluatedProjection}, size ≤ bound →
+      SourceExecutionSize.SourceProjectionsEvaluate program size context scope.evidence scope.source environment
+        before projections evaluated after →
+      ∃ values, Staging.Recursive.Expressions program registry scope context environment before
+          (Staging.Recursive.ProjectedTarget.keys projections) (.values values) after ∧
+        Staging.Recursive.ProjectedTarget.Values projections values evaluated := by
+  intro projections
+  induction projections with
+  | nil =>
+    intro _ size before after evaluated _ evaluate
+    cases evaluate
+    exact ⟨[], .nil, .nil⟩
+  | cons projection rest ih =>
+    intro keys size before after evaluated within evaluate
+    obtain ⟨key, rfl, admitted⟩ := keys projection List.mem_cons_self
+    cases evaluate with
+    | index head tail =>
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+      obtain ⟨values, staged, ordered⟩ :=
+        ih (fun other member => keys other (List.mem_cons_of_mem _ member)) (by omega) tail
+      exact ⟨_ :: values, .cons (lift admitted (by omega) head) staged, .index ordered⟩
+
+/-- The sized Source resolution of a place through mapping indices whose keys
+`child` admits is the staged evaluation of its keys followed by its staged
+snapshot, given the lifting of `child` below the size. -/
+private theorem projected_target {child : ExpressionId → Prop} {bound : Nat}
+    (lift : ChildLifts program registry scope child bound) {context : SourceSemantics.Context}
+    {environment : Dynamic.Environment} {place : PlaceResolution}
+    (keys : ∀ projection ∈ place.projections, ∃ key, projection = .index key ∧ child key)
+    {size : Nat} {before after : Dynamic.Heap} {target : Dynamic.ResolvedPlace} (within : size ≤ bound)
+    (resolve : SourceExecutionSize.SourcePlaceResolves program size context scope.evidence scope.source environment
+      before place target after) :
+    ∃ values, Staging.Recursive.Expressions program registry scope context environment before
+        (Staging.Recursive.ProjectedTarget.keys place.projections) (.values values) after ∧
+      Staging.Recursive.ProjectedTarget.Snapshot environment before after place values target := by
+  cases resolve with
+  | intro lookup initialRead evaluate currentRead initialValue selection =>
+    simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+    obtain ⟨values, staged, ordered⟩ := projections_values lift keys (by omega) evaluate
+    exact ⟨values, staged, .intro lookup initialRead ordered currentRead initialValue selection⟩
+  | element projectionsEq => exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
+
 /-- A sized ordinary execution of a supported statement list is a staged
 execution with the same context, outcome and heap, given the lifting of its
 expressions below the size. -/
@@ -413,6 +463,23 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {child : Expres
             simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
             omega) evaluate)
           write (tailIH (by omega) next)
+    · intro context environment before finalContext outcome after _ _ head terminal
+      obtain ⟨_, _, _, _, _, same⟩ := assigned_inv unique found form head
+      subst same
+      cases terminal
+  | projectedAssigned found form assignable keys value _ tailIH =>
+    intro size context environment before after finalContext outcome within
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after headSize
+        tailSize headBelow tailBelow head next
+      obtain ⟨_, _, childBelow, executes, rfl, same⟩ := assigned_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve evaluate write =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        obtain ⟨values, staged, snapshot⟩ := projected_target lift keys (by omega) resolve
+        exact .assignProjected (lookupStatement?_sound found) form assignable.2.1 staged snapshot
+          (lift value (by omega) evaluate) write (tailIH (by omega) next)
     · intro context environment before finalContext outcome after _ _ head terminal
       obtain ⟨_, _, _, _, _, same⟩ := assigned_inv unique found form head
       subst same
@@ -1522,9 +1589,10 @@ section
 /-! Original fault executions of supported statement lists are staged fault
 executions with the same reason and heap, given the value and fault liftings
 of their expressions below the size. A statement faults in its expression, its
-bare target or its inner list, or a falling-through statement is followed by
-a fault in the rest of its list; the staged rule of the same form carries the
-fault, at the context, environment and heap of the original execution. -/
+target, bare or through mapping indices, or its inner list, or a
+falling-through statement is followed by a fault in the rest of its list; the
+staged rule of the same form carries the fault, at the context, environment
+and heap of the original execution. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -1774,6 +1842,38 @@ private theorem bare_target_fault {mode : Bool} {id : StatementId} {rest : List 
     rw [bare] at projectionsEq
     simp at projectionsEq
 
+/-- A sized Source fault in a path of mapping indices whose keys `child` admits
+is a staged fault of its keys, given the value and fault liftings of `child`
+below the size. -/
+private theorem projections_fault {child : ExpressionId → Prop} {bound : Nat}
+    (lift : ChildLifts program registry scope child bound)
+    (faultLift : ChildFaultLifts program registry scope child bound) {context : SourceSemantics.Context}
+    {environment : Dynamic.Environment} :
+    ∀ {projections : List PlaceProjection},
+    (∀ projection ∈ projections, ∃ key, projection = .index key ∧ child key) →
+    ∀ {size : Nat} {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}, size ≤ bound →
+      context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.SourceProjectionsFault program size context scope.evidence scope.source environment
+        before projections reason after →
+      Staging.Recursive.Expressions program registry scope context environment before
+        (Staging.Recursive.ProjectedTarget.keys projections) (.fault (.semantic reason)) after := by
+  intro projections
+  induction projections with
+  | nil =>
+    intro _ size before after reason _ _ _ failed
+    cases failed
+  | cons projection rest ih =>
+    intro keys size before after reason within signatures expressible failed
+    obtain ⟨key, rfl, admitted⟩ := keys projection List.mem_cons_self
+    cases failed with
+    | indexHead failed =>
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+      exact .headFault (faultLift admitted (by omega) signatures expressible failed)
+    | indexTail head failed =>
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+      exact .tailFault (lift admitted (by omega) head)
+        (ih (fun other member => keys other (List.mem_cons_of_mem _ member)) (by omega) signatures expressible failed)
+
 /-- One statement followed by the rest of its list, over sized fault
 derivations. A faulting head ends the list at its context; a falling-through
 head is followed by a fault in the rest. -/
@@ -1928,6 +2028,81 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
         obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
         cases snapshot
         cases failed
+  | projectedAssigned found form assignable keys value _ tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, _, childBelow, executes, rfl, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.assigned_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve evaluate write =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        obtain ⟨values, staged, snapshot⟩ :=
+          CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+        exact .assignProjected (lookupStatement?_sound found) form assignable.2.1 staged snapshot
+          (lift value (by omega) evaluate) write (tailIH (by omega) signatures expressible next)
+    · intro context environment before after headSize headBelow signatures fault
+      have contains := lookupStatement?_sound found
+      obtain ⟨_, childBelow, fault⟩ := assigned_fault_inv unique found form fault
+      cases fault with
+      | target failed =>
+        cases failed with
+        | unbound missing => exact .assignProjectedRootFault contains form assignable.2.1 (.unbound missing)
+        | dangling lookup missing =>
+          exact .assignProjectedRootFault contains form assignable.2.1 (.dangling lookup missing)
+        | projectionExpression lookup read failed =>
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+          exact .assignProjectedKeysFault contains form assignable.2.1 (.intro lookup read)
+            (projections_fault lift faultLift keys (by omega) signatures expressible failed)
+        | danglingAfterProjections lookup read evaluate missing =>
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+          obtain ⟨values, staged, ordered⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+          exact .assignProjectedGetterFault contains form assignable.2.1 staged (.dangling lookup read ordered missing)
+        | projectionRead lookup initialRead evaluate currentRead initialValue failed =>
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+          obtain ⟨values, staged, ordered⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+          exact .assignProjectedGetterFault contains form assignable.2.1 staged
+            (.projection lookup initialRead ordered currentRead initialValue failed)
+        | uninitialized lookup initialRead evaluate currentRead empty notMapping nonempty =>
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+          obtain ⟨values, staged, ordered⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+          exact .assignProjectedGetterFault contains form assignable.2.1 staged
+            (.uninitialized lookup initialRead ordered currentRead empty notMapping nonempty)
+        | elementPrefix projectionsEq _
+        | elementIndex projectionsEq _ _
+        | elementIndexType projectionsEq _ _ _ _
+        | elementOutOfBounds projectionsEq _ _ _ _ _ _
+        | elementUninitialized projectionsEq _ _ =>
+          exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
+      | rhs resolve failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        obtain ⟨values, staged, snapshot⟩ :=
+          CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+        exact .assignProjectedRhsFault contains form assignable.2.1 staged snapshot
+          (faultLift value (by omega) signatures expressible failed)
+      | operands resolve evaluate currentRead rootType initialValue pathRead invalid =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        obtain ⟨values, staged, snapshot⟩ :=
+          CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+        exact .assignProjectedWriteFault contains form assignable.2.1 staged snapshot (lift value (by omega) evaluate)
+          (.operands currentRead rootType initialValue pathRead invalid)
+      | panic resolve evaluate currentRead rootType initialValue pathRead panics =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        obtain ⟨values, staged, snapshot⟩ :=
+          CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+        exact .assignProjectedWriteFault contains form assignable.2.1 staged snapshot (lift value (by omega) evaluate)
+          (.panic currentRead rootType initialValue pathRead panics)
+      | structuralUpdate resolve evaluate currentRead rootType initialValue failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        obtain ⟨values, staged, snapshot⟩ :=
+          CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+        exact .assignProjectedWriteFault contains form assignable.2.1 staged snapshot (lift value (by omega) evaluate)
+          (.structural currentRead rootType initialValue failed)
   | bitNotted found form assignable _ tailIH =>
     intro size context environment before after finalContext reason within signatures expressible original
     refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
