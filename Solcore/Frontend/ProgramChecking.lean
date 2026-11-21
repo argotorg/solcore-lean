@@ -68,6 +68,16 @@ inductive ProgramCheckError where
       (method : ProgramImplMethodId)
       (reason : TraitResolution.InconclusiveReason
         ProgramTraitId TypeSystem.Ty ProgramImplId)
+  /-- Upstream's `SC0208` for a goal that two of the function's declared
+  givens reach (`reachedByTwoGivens`). -/
+  | ambiguousGiven
+      (declaration : Resolved.DeclarationId)
+      (predicate : ProgramPredicate)
+  /-- Upstream's `SC0208` for a goal that two of the method's declared givens
+  reach. -/
+  | methodAmbiguousGiven
+      (method : ProgramImplMethodId)
+      (predicate : ProgramPredicate)
   deriving Repr
 
 /-- The observable result of checking one raw workspace. -/
@@ -427,8 +437,104 @@ theorem checkImplementationMethodBodies_success_member
       exact ⟨implementation, method, trait, catalogMember.1,
         catalogMember.2, traitLookup, idEq, bodySuccess⟩
 
+/-- The requirements that a function's closure under superclasses adds to a
+call of it, or a reference to it, after the callee's own `where` predicates.
+Upstream projects them from those predicates' dictionaries and never solves
+them where the call is, so they meet no ambiguity check. -/
+def impliedCallRequirements (signatures : ProgramSignatures)
+    (body : SourceInference.TypedSource) : List SourceInference.RequirementId :=
+  body.nodes.flatMap fun
+    | .expression node =>
+        let callee := match node.form with
+          | .call _ _ (.declaration instantiation) => some instantiation
+          | .reference _ (.declaration instantiation) => some instantiation
+          | _ => none
+        match callee with
+        | some instantiation =>
+            match signatures.functions.find? fun signature =>
+                decide (signature.id = instantiation.declaration) with
+            | some signature =>
+                let coercions := node.coercions.flatMap (·.requirements)
+                let own := node.requirements.filter fun id => !coercions.contains id
+                if own.length == instantiation.predicates.length then
+                  own.drop signature.declaredPredicates.length
+                else []
+            | none => []
+        | none => []
+    | .statement _ => []
+
+mutual
+
+/-- The first given leaf of retained evidence whose goal two declared givens
+reach, below each implementation through its own conditions only: the
+conditions its closure under superclasses adds are projected upstream, never
+solved where it is used. -/
+def ambiguousGivenIn (signatures : ProgramSignatures)
+    (declared : List ProgramPredicate) :
+    TypedTraitResolution.Evidence → Option ProgramPredicate
+  | .byAssumption goal =>
+      if reachedByTwoGivens signatures.traits declared goal then some goal else none
+  | .byImpl _ implementation premises =>
+      let own := match implementation with
+        | .declaration id => match signatures.implementation? id with
+            | some signature => signature.declaredWherePredicates.length
+            | none => premises.length
+        | .builtin _ => premises.length
+      ambiguousGivenInPremises signatures declared own premises
+
+/-- The same for the first `own` premises, in order. -/
+def ambiguousGivenInPremises (signatures : ProgramSignatures)
+    (declared : List ProgramPredicate) :
+    Nat → List TypedTraitResolution.Evidence → Option ProgramPredicate
+  | _, [] => none
+  | 0, _ :: _ => none
+  | own + 1, evidence :: rest =>
+      match ambiguousGivenIn signatures declared evidence with
+      | some goal => some goal
+      | none => ambiguousGivenInPremises signatures declared own rest
+
+end
+
+/-- The first goal of a checked body that two of its declared givens reach,
+among its requirements other than those a callee's closure adds. -/
+def ambiguousGivenUse? (signatures : ProgramSignatures)
+    (declared : List ProgramPredicate) (function : SourceInference.CheckedFunction) :
+    Option ProgramPredicate :=
+  let implied := impliedCallRequirements signatures function.typedBody
+  function.solvedRequirements.findSome? fun requirement =>
+    if implied.contains requirement.id then none
+    else match requirement.evidence with
+      | .assumption goal =>
+          if reachedByTwoGivens signatures.traits declared goal then some goal else none
+      | .implementation evidence => ambiguousGivenIn signatures declared evidence
+
+/-- Upstream's projection ambiguity (`SC0208`) in every checked body, functions
+first, then methods, whose declared givens are the implementation's conditions
+and the method's predicates as written. -/
+def ambiguousGivenErrors (signatures : ProgramSignatures)
+    (functions : List SourceInference.CheckedFunction)
+    (methods : List CheckedImplementationMethod) : List ProgramCheckError :=
+  (functions.filterMap fun function =>
+      let declared := match signatures.functions.find? fun signature =>
+          decide (signature.id = function.declaration) with
+        | some signature => signature.declaredPredicates
+        | none => []
+      (ambiguousGivenUse? signatures declared function).map
+        (ProgramCheckError.ambiguousGiven function.declaration)) ++
+    methods.filterMap fun method =>
+      let declared :=
+        match signatures.implementation? method.id.implementation,
+            signatures.implMethod? method.id with
+        | some implementation, some implMethod =>
+            implementation.declaredWherePredicates ++ implMethod.wherePredicates
+        | _, _ => []
+      (ambiguousGivenUse? signatures declared method.checked).map
+        (ProgramCheckError.methodAmbiguousGiven method.id)
+
 /-- Check an already loaded program while retaining its environment and the
-resolved signature/implementation catalog in the successful result. -/
+resolved signature/implementation catalog in the successful result. Once every
+body is checked, a goal that two declared givens reach is refused where it is
+used (`ambiguousGivenErrors`). -/
 def checkLoadedProgram (loaded : LoadedProgram) (fuel : Nat := 1024) :
     ProgramCheckResult :=
   match buildProgramSignatures loaded.environment with
@@ -443,12 +549,15 @@ def checkLoadedProgram (loaded : LoadedProgram) (fuel : Nat := 1024) :
           let methods := checkImplementationMethodBodies loaded.environment
             signatures fuel
           match functions, methods with
-          | .ok functions, .ok methods => .ok {
-              environment := loaded.environment
-              signatures
-              functions
-              methods
-            }
+          | .ok functions, .ok methods =>
+              match ambiguousGivenErrors signatures functions methods with
+              | [] => .ok {
+                  environment := loaded.environment
+                  signatures
+                  functions
+                  methods
+                }
+              | errors => .error errors
           | .error functionErrors, .ok _ =>
               .error (functionErrors.map classifyFunctionError)
           | .ok _, .error methodErrors => .error methodErrors
@@ -500,11 +609,16 @@ private theorem checkLoadedProgram_success_components
                   simp [checkLoadedProgram, signaturesResult, formationResult,
                     functionsResult, methodsResult] at success
               | ok methods =>
-                  simp [checkLoadedProgram, signaturesResult, formationResult,
-                    functionsResult, methodsResult] at success
-                  subst checked
-                  exact ⟨signatures, functions, methods, rfl, formationResult,
-                    functionsResult, methodsResult, rfl⟩
+                  cases ambiguity : ambiguousGivenErrors signatures functions methods with
+                  | nil =>
+                      simp [checkLoadedProgram, signaturesResult, formationResult,
+                        functionsResult, methodsResult, ambiguity] at success
+                      subst checked
+                      exact ⟨signatures, functions, methods, rfl, formationResult,
+                        functionsResult, methodsResult, rfl⟩
+                  | cons error rest =>
+                      simp [checkLoadedProgram, signaturesResult, formationResult,
+                        functionsResult, methodsResult, ambiguity] at success
 
 /-- A successful loaded-program check retains the exact environment supplied
 by the loader. -/

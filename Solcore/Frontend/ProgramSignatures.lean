@@ -381,6 +381,11 @@ structure ProgramFunctionSignature where
   returnTypes : List TypeSystem.Ty
   returnComptime : Bool
   scheme : ConstrainedDeclarationScheme
+  /-- The `where` predicates as written. `scheme.predicates` closes them under
+  their superclasses: the body assumes the closure and its callers prove it,
+  as upstream's local givens give their superclasses. These are the givens
+  that upstream counts when two of them reach one goal. -/
+  declaredPredicates : List ProgramPredicate := scheme.predicates
   source : Syntax.FunctionDecl
   deriving Repr
 
@@ -481,6 +486,68 @@ structure ProgramTraitSignature where
   source : Syntax.TraitDecl
   deriving Repr
 
+/-- A predicate's direct superclasses: its trait's own where predicates at the
+predicate's arguments. -/
+def superclassPredicatesIn (traits : List ProgramTraitSignature)
+    (predicate : ProgramPredicate) : List ProgramPredicate :=
+  match predicate.trait with
+  | .declaration id =>
+      match traits.find? fun trait => decide (trait.id = id) with
+      | some trait => trait.wherePredicates.map
+          (ProgramPredicate.applyParameters
+            (trait.parameters.zip (predicate.subject :: predicate.arguments)))
+      | none => []
+  | .builtin _ => []
+
+/-- The predicates and, transitively, their superclasses, in the order they are
+first reached, within `fuel` rounds. -/
+def closeUnderSuperclasses (traits : List ProgramTraitSignature) :
+    Nat → List ProgramPredicate → List ProgramPredicate
+  | 0, predicates => predicates
+  | fuel + 1, predicates =>
+      let added := ((predicates.flatMap (superclassPredicatesIn traits)).filter
+        fun predicate => !predicates.contains predicate).eraseDups
+      if added.isEmpty then predicates
+      else closeUnderSuperclasses traits fuel (predicates ++ added)
+
+/-- The closure of predicates under their superclasses, one round per trait and
+one more. -/
+def superclassClosure (traits : List ProgramTraitSignature)
+    (predicates : List ProgramPredicate) : List ProgramPredicate :=
+  closeUnderSuperclasses traits (traits.length + 1) predicates
+
+theorem mem_closeUnderSuperclasses_of_mem {traits : List ProgramTraitSignature} :
+    ∀ {fuel : Nat} {predicates : List ProgramPredicate} {predicate : ProgramPredicate},
+      predicate ∈ predicates → predicate ∈ closeUnderSuperclasses traits fuel predicates
+  | 0, _, _, member => member
+  | fuel + 1, predicates, predicate, member => by
+      simp only [closeUnderSuperclasses]
+      split
+      · exact member
+      · exact mem_closeUnderSuperclasses_of_mem (List.mem_append_left _ member)
+
+theorem mem_superclassClosure_of_mem {traits : List ProgramTraitSignature}
+    {predicates : List ProgramPredicate} {predicate : ProgramPredicate}
+    (member : predicate ∈ predicates) : predicate ∈ superclassClosure traits predicates :=
+  mem_closeUnderSuperclasses_of_mem member
+
+/-- The declared givens that reach a goal, directly or through their
+superclasses, each counted once. -/
+def givensReaching (traits : List ProgramTraitSignature)
+    (declared : List ProgramPredicate) (goal : ProgramPredicate) :
+    List ProgramPredicate :=
+  declared.eraseDups.filter fun given =>
+    (superclassClosure traits [given]).contains goal
+
+/-- Upstream's projection ambiguity (`SC0208`), the one place Lean tests it: a
+goal that two different declared givens reach, directly or through their
+superclasses, is ambiguous where it is used. Upstream ranks every answer rooted
+at a local given alike, so a given that states the superclass is one more
+candidate, while paths from one given and equal givens are one. -/
+def reachedByTwoGivens (traits : List ProgramTraitSignature)
+    (declared : List ProgramPredicate) (goal : ProgramPredicate) : Bool :=
+  1 < (givensReaching traits declared goal).length
+
 /-- Structural facts fixed by trait-method collection itself.  These do not
 depend on the later declarative judgments for method types or predicates. -/
 structure TraitSignatureStructuralWellFormed
@@ -503,6 +570,10 @@ structure ProgramImplementationSignature where
   parameters : List TypeSystem.TypeParameterId
   head : ProgramPredicate
   wherePredicates : List ProgramPredicate
+  /-- The `where` predicates as written. `wherePredicates` closes them under
+  their superclasses: the premises that use sites prove and that method bodies
+  assume. -/
+  declaredWherePredicates : List ProgramPredicate := wherePredicates
   methods : List ProgramImplMethodSignature
   source : Syntax.ImplDecl
   deriving Repr
@@ -667,6 +738,7 @@ def functionSignatureOfMethod
       (TypeSystem.Ty.productMany method.parameterTypes)
       (TypeSystem.Ty.productMany method.returnTypes)
   }
+  declaredPredicates := implementation.declaredWherePredicates ++ method.wherePredicates
   source := method.source.value.declaration
 }
 
@@ -684,9 +756,74 @@ def functionSignatureOfMethodWithTrait
       signature.scheme with
       predicates := implementation.methodAssumptions trait method
     }
+    declaredPredicates := implementation.declaredWherePredicates ++ method.wherePredicates
   }
 
+/-- Close the implementation's conditions under their superclasses, keeping
+them as written in `declaredWherePredicates`. -/
+def closeUnderSuperclasses (traits : List ProgramTraitSignature)
+    (implementation : ProgramImplementationSignature) :
+    ProgramImplementationSignature := {
+  implementation with
+  wherePredicates := superclassClosure traits implementation.wherePredicates
+  declaredWherePredicates := implementation.wherePredicates
+}
+
+@[simp] theorem closeUnderSuperclasses_id (traits : List ProgramTraitSignature)
+    (implementation : ProgramImplementationSignature) :
+    (implementation.closeUnderSuperclasses traits).id = implementation.id := rfl
+
 end ProgramImplementationSignature
+
+/-- The closure keeps every condition, so the trait's restated where
+predicates stay among them. -/
+theorem ImplementationSignatureHeadValidated.closeUnderSuperclasses
+    {traits catalog : List ProgramTraitSignature}
+    {signature : ProgramImplementationSignature}
+    (validated : ImplementationSignatureHeadValidated traits signature) :
+    ImplementationSignatureHeadValidated traits
+      (signature.closeUnderSuperclasses catalog) := by
+  obtain ⟨parameters, trait, member, headTrait, required⟩ := validated
+  exact ⟨parameters, trait, member, headTrait, fun predicate requiredMember =>
+    mem_superclassClosure_of_mem (required predicate requiredMember)⟩
+
+/-- The closure keeps every condition, so each method's predicates stay among
+the provided ones. -/
+theorem ImplementationSignatureMethodCatalogValidated.closeUnderSuperclasses
+    {traits catalog : List ProgramTraitSignature}
+    {signature : ProgramImplementationSignature}
+    (validated : ImplementationSignatureMethodCatalogValidated traits signature) :
+    ImplementationSignatureMethodCatalogValidated traits
+      (signature.closeUnderSuperclasses catalog) := by
+  obtain ⟨trait, member, headTrait, methods, complete⟩ := validated
+  refine ⟨trait, member, headTrait, fun method methodMember => ?_, complete⟩
+  obtain ⟨traitMethod, traitMember, idEq, nameEq, parameters, returns,
+    parameterComptime, returnComptime, predicates⟩ := methods method methodMember
+  refine ⟨traitMethod, traitMember, idEq, nameEq, parameters, returns,
+    parameterComptime, returnComptime, fun predicate predicateMember => ?_⟩
+  rcases List.mem_append.mp (predicates predicate predicateMember) with inherited | own
+  · exact List.mem_append_left _ inherited
+  · exact List.mem_append_right _ (mem_superclassClosure_of_mem own)
+
+namespace ProgramFunctionSignature
+
+/-- Close the function's predicates under their superclasses, keeping them as
+written in `declaredPredicates`. -/
+def closeUnderSuperclasses (traits : List ProgramTraitSignature)
+    (signature : ProgramFunctionSignature) : ProgramFunctionSignature := {
+  signature with
+  scheme := {
+    signature.scheme with
+    predicates := superclassClosure traits signature.scheme.predicates
+  }
+  declaredPredicates := signature.scheme.predicates
+}
+
+@[simp] theorem closeUnderSuperclasses_id (traits : List ProgramTraitSignature)
+    (signature : ProgramFunctionSignature) :
+    (signature.closeUnderSuperclasses traits).id = signature.id := rfl
+
+end ProgramFunctionSignature
 
 /-- The declarations needed by source expression inference, trait search, and
 later trait-evidence execution. `functions` and `implRules` remain source-only
@@ -2465,11 +2602,14 @@ def buildProgramSignatures (environment : ProgramEnvironment) :
     collectedErrors.filter fun error =>
       decide (programSignatureErrorDeclaration error = declaration.id)
   if errors.isEmpty then
+    let implementations := state.implementations.map
+      (ProgramImplementationSignature.closeUnderSuperclasses traitState.traits)
     .ok {
-      functions := state.functions
-      implRules := state.implementations.map (ProgramImplementationSignature.implRule)
+      functions := state.functions.map
+        (ProgramFunctionSignature.closeUnderSuperclasses traitState.traits)
+      implRules := implementations.map (ProgramImplementationSignature.implRule)
       traits := traitState.traits
-      implementations := state.implementations
+      implementations
       dataTypes := state.dataTypes
       contracts := state.contracts
     }
@@ -3829,7 +3969,7 @@ theorem buildProgramSignatures_success_declaration_ids_nodup
   split at success
   · injection success with signaturesEq
     subst signatures
-    simpa [traitState, state] using collectedNodup
+    simpa [traitState, state, List.map_map, Function.comp_def] using collectedNodup
   · simp at success
 
 /-- Internal collector boundary used by `ProgramSignaturesProperties`: every
@@ -3860,10 +4000,14 @@ theorem buildProgramSignatures_success_parameter_state
   · injection success with signaturesEq
     subst signatures
     exact {
-      functions := signatureParameters.functions
+      functions := fun signature member => by
+        obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+        exact signatureParameters.functions original originalMember
       dataTypes := signatureParameters.dataTypes
       traits := traitParameters
-      implementations := signatureParameters.implementations
+      implementations := fun signature member => by
+        obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+        exact signatureParameters.implementations original originalMember
       contracts := signatureParameters.contracts
     }
   · simp at success
@@ -3894,7 +4038,9 @@ theorem buildProgramSignatures_success_function_shape_state
   split at success
   · injection success with signaturesEq
     subst signatures
-    exact signatureFacts.functionShapes
+    intro signature member
+    obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+    exact signatureFacts.functionShapes original originalMember
   · simp at success
 
 /-- Internal collector boundary used by `ProgramSignaturesProperties`: every
@@ -3946,7 +4092,9 @@ theorem buildProgramSignatures_success_implementation_structure_state
   split at success
   · injection success with signaturesEq
     subst signatures
-    exact signatureFacts.implementationShapes
+    intro signature member
+    obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+    exact { signatureFacts.implementationShapes original originalMember with }
   · simp at success
 
 /-- Internal collector boundary used by `ProgramSignaturesProperties`: every
@@ -3972,7 +4120,9 @@ theorem buildProgramSignatures_success_implementation_head_validated_state
   split at success
   · injection success with signaturesEq
     subst signatures
-    exact signatureFacts.implementationHeads
+    intro signature member
+    obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+    exact (signatureFacts.implementationHeads original originalMember).closeUnderSuperclasses
   · simp at success
 
 /-- Internal collector boundary used by `ProgramSignaturesProperties`: every
@@ -3999,7 +4149,9 @@ theorem buildProgramSignatures_success_implementation_method_catalog_state
   split at success
   · injection success with signaturesEq
     subst signatures
-    exact signatureFacts.implementationMethods
+    intro signature member
+    obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+    exact (signatureFacts.implementationMethods original originalMember).closeUnderSuperclasses
   · simp at success
 
 /-- Internal collector boundary used by `ProgramSignaturesProperties`: every

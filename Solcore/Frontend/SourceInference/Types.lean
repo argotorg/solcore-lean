@@ -557,29 +557,11 @@ def coherenceParameter? : Ty → Option TypeParameterId
   | .product first _ => coherenceParameter? first
   | _ => none
 
-/-- A trait's own where predicates, its superclasses, at a predicate's
-arguments. -/
-def superclassPredicates (signatures : ProgramSignatures)
-    (predicate : ProgramPredicate) : List ProgramPredicate :=
-  match predicate.trait with
-  | .declaration id =>
-      match signatures.trait? id with
-      | some trait => trait.wherePredicates.map
-          (ProgramPredicate.applyParameters
-            (trait.parameters.zip (predicate.subject :: predicate.arguments)))
-      | none => []
-  | .builtin _ => []
-
 /-- The predicates that upstream's solver proves from a body's givens alone:
 the givens and, transitively, their superclasses, within `fuel` rounds. -/
-def providedPredicates (signatures : ProgramSignatures) :
-    Nat → List ProgramPredicate → List ProgramPredicate
-  | 0, provided => provided
-  | fuel + 1, provided =>
-      let added := ((provided.flatMap (superclassPredicates signatures)).filter
-        fun predicate => !provided.contains predicate).eraseDups
-      if added.isEmpty then provided
-      else providedPredicates signatures fuel (provided ++ added)
+def providedPredicates (signatures : ProgramSignatures) (fuel : Nat)
+    (provided : List ProgramPredicate) : List ProgramPredicate :=
+  closeUnderSuperclasses signatures.traits fuel provided
 
 mutual
 
@@ -624,9 +606,9 @@ end
 
 /-- Solve one normalized goal: an exactly matching assumption, or else trait
 resolution, which takes a goal below the top from an equal assumption first,
-as upstream's local givens do, and keeps the default tier for a goal that the
-assumptions' superclasses provide.  Its evidence is refused when it decides a
-goal with a default that upstream does not use for a type parameter
+as upstream's local givens do.  The assumptions are the body's `where`
+predicates closed under their superclasses.  Its evidence is refused when it
+decides a goal with a default that upstream does not use for a type parameter
 (`defaultForParameter?`). -/
 def solveNormalizedPredicate (context : Context) (state : State)
     (goal : ProgramPredicate) : Except Error PredicateEvidence :=
@@ -634,10 +616,7 @@ def solveNormalizedPredicate (context : Context) (state : State)
     .ok (.assumption goal)
   else
     match TypedTraitResolution.resolve context.signatures.resolutionRules
-        context.traitDepth goal (context.assumptions.map (applyPredicate state))
-        (providedPredicates context.signatures
-          (context.signatures.traits.length + 1)
-          (context.assumptions.map (applyPredicate state))) with
+        context.traitDepth goal (context.assumptions.map (applyPredicate state)) with
     | { outcome := .success evidence, .. } =>
         match defaultForParameter? context.signatures.resolutionRules
             (providedPredicates context.signatures

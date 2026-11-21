@@ -1315,22 +1315,16 @@ def nonDefaultHeadUnifies (rules : List ImplRule) (goal : Predicate) : Bool :=
   rules.any fun rule => !rule.isDefault && headCanUnify rule goal
 
 /-- Build a typed resolution program in declaration order, with the checked
-body's givens and upstream's default blocking. A goal in `provided`, which the
-givens' superclasses provide, is not blocked: upstream decides it by a
-projection, which Lean does not have yet, and the default stands in for it, as
-row 10's rule allows. -/
-def programOfRules (rules : List ImplRule) (givens : List Predicate := [])
-    (provided : List Predicate := []) : Program :=
-  { rules, matchHead := headMatcher, givens
-    blocksDefaults := fun goal =>
-      !provided.contains goal && nonDefaultHeadUnifies rules goal }
+body's givens and upstream's default blocking. -/
+def programOfRules (rules : List ImplRule) (givens : List Predicate := []) : Program :=
+  { rules, matchHead := headMatcher, givens, blocksDefaults := nonDefaultHeadUnifies rules }
 
 /-- Run typed trait resolution with an implementation-chain depth bound, a goal
 equal to one of `givens` decided by it at any depth. -/
 def resolve (rules : List ImplRule) (maxDepth : Nat) (goal : Predicate)
-    (givens : List Predicate := []) (provided : List Predicate := []) :
+    (givens : List Predicate := []) :
     TraitResolution.Report TraitId Ty ImplId :=
-  TraitResolution.resolve (programOfRules rules givens provided) maxDepth goal
+  TraitResolution.resolve (programOfRules rules givens) maxDepth goal
 
 end Solcore.Frontend.TypedTraitResolution
 

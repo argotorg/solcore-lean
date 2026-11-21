@@ -1594,19 +1594,21 @@ private def testDefaultForTypeParameter : IO Unit := do
     match ← acceptedDefaultEvidence label "flip" (defaultBitNot ++ [function]) with
     | .implementation (.byImpl _ (.declaration _) []) => pure ()
     | evidence => throw (IO.userError s!"{label} gave {reprStr evidence}")
-  -- Goals that upstream decides from the body's givens, a projection or an
-  -- ordinary implementation, which this rule leaves alone: a given below an
-  -- implementation, which the given decides; a superclass of a given, where
-  -- the default stands in for upstream's projection and `impl BitNot<Coin>`
-  -- does not block it; and a goal that an ordinary implementation matches.
+  -- A superclass of a given is a given, as upstream projects it.
+  match ← acceptedDefaultEvidence "a superclass of a given" "flip" (defaultBitNot ++ [
+      "trait Sub<T> where T: BitNot { function sub(left: T, right: T) returns (T); }",
+      "function flip<T>(x: T) returns (T) where T: Sub { return ~x; }"]) with
+  | .assumption _ => pure ()
+  | evidence => throw (IO.userError s!"a superclass of a given gave {reprStr evidence}")
+  -- Goals that upstream decides from the body's givens or an ordinary
+  -- implementation, which this rule leaves alone: a given below an
+  -- implementation, which the given decides, and a goal that an ordinary
+  -- implementation matches.
   for (label, lines) in [
       ("a given below an implementation", defaultBitNot ++ [
         "trait Add<T> { function add(left: T, right: T) returns (T); }",
         "impl<A> Add<Box<A>> where A: BitNot { function add(left: Box<A>, right: Box<A>) returns (Box<A>) { match (left) { case Box.Wrap(x) { return Box.Wrap(~x); } } } }",
         "function flip<T>(x: Box<T>) returns (Box<T>) where T: BitNot { return x + x; }"]),
-      ("a superclass of a given", defaultBitNot ++ [
-        "trait Sub<T> where T: BitNot { function sub(left: T, right: T) returns (T); }",
-        "function flip<T>(x: T) returns (T) where T: Sub { return ~x; }"]),
       ("a goal that an ordinary implementation matches", [
         "trait BitNot<T> { function bnot(value: T) returns (T); }",
         "trait Add<T> { function add(left: T, right: T) returns (T); }",
@@ -1750,6 +1752,82 @@ private def testDefaultTierBlocking : IO Unit := do
       "function needConv<A, B>(x: A, y: B) returns (Word) where A: Conv<B> { return 5; }",
       "function run(w: Word, v: Word) returns (Word) { return needConv(Box.Wrap(w), v); }"]
     [("run", "D")]
+
+/-- Row 13's second step: a body's givens are closed under their superclasses,
+as upstream projects a superclass from a local given, and a goal that two
+different declared givens reach, directly or through superclasses, is refused
+where it is used (`SC0208`). Paths from one given, and equal givens, are one;
+the superclasses that a callee's or an implementation's closure adds are never
+checked where it is used. -/
+private def testSuperclassesOfGivens : IO Unit := do
+  let bitNot := "trait BitNot<T> { function bnot(value: T) returns (T); }"
+  let siblings := [bitNot,
+    "trait Add<T> where T: BitNot { function add(left: T, right: T) returns (T); }",
+    "trait Sub<T> where T: BitNot { function sub(left: T, right: T) returns (T); }",
+    "enum Box<A> { Wrap(A) }"]
+  let chain := [bitNot,
+    "trait Add<T> where T: BitNot { function add(left: T, right: T) returns (T); }",
+    "trait Sub<T> where T: Add { function sub(left: T, right: T) returns (T); }"]
+  let mul := "trait Mul<T> { function mul(left: T, right: T) returns (T); }"
+  let generic := "impl<A> BitNot<A> { function bnot(value: A) returns (A) { return value; } }"
+  let projecting := "impl<A> Mul<Box<A>> where A: Add { function mul(left: Box<A>, right: Box<A>) returns (Box<A>) { match (left) { case Box.Wrap(y) { return Box.Wrap(~y); } } } }"
+  for (label, lines) in [
+      ("a superclass of a superclass", chain ++ [
+        "function f<T>(x: T) returns (T) where T: Sub { return ~x; }"]),
+      ("a superclass on another subject", [bitNot, "enum Shell<A> { Wrap(A) }",
+        "trait Down<T> where Shell<T>: BitNot { function down(value: T) returns (T); }",
+        "function f<T>(x: T) returns (Shell<T>) where T: Down { return ~Shell.Wrap(x); }"]),
+      ("an implementation's body", siblings ++ [mul, projecting]),
+      ("two paths that the body never uses", siblings ++ [
+        "function f<T>(x: T) returns (T) where T: Add, T: Sub { return x + x; }"]),
+      ("two paths from one given", siblings ++ [
+        "trait Both<T> where T: Add, T: Sub { function both(value: T) returns (T); }",
+        "function f<T>(x: T) returns (T) where T: Both { return ~x; }"]),
+      ("one given twice", siblings ++ [
+        "function f<T>(x: T) returns (T) where T: Add, T: Add { return ~x; }"]),
+      ("a given that only its own trait reaches", chain ++ [
+        "function f<T>(x: T) returns (T) where T: Sub, T: Add { return x - x; }"]),
+      ("a projection beside a generic implementation", siblings ++ [generic,
+        "function f<T>(x: T) returns (T) where T: Add { return ~x; }"]),
+      ("a given beside a generic implementation", siblings ++ [generic,
+        "function f<T>(x: T) returns (T) where T: BitNot { return ~x; }"]),
+      ("a callee's superclass that two of the caller's givens reach", siblings ++ [
+        "function g<T>(x: T) returns (T) where T: Add { return ~x; }",
+        "function f<U>(y: U) returns (U) where U: Add, U: Sub { return g(y); }"]),
+      ("an implementation's added superclass that two of the caller's givens reach",
+        siblings ++ [mul, projecting,
+        "function f<U>(y: Box<U>) returns (Box<U>) where U: Add, U: Sub { return y * y; }"])] do
+    match checkProgram (singleSourceWorkspace (String.intercalate "\n" lines)) with
+    | .ok _ => pure ()
+    | .error errors => throw (IO.userError s!"{label} was refused: {reprStr errors}")
+  for (label, lines) in [
+      ("two subclass givens", siblings ++ [
+        "function f<T>(x: T) returns (T) where T: Add, T: Sub { return ~x; }"]),
+      ("two subclass givens and the superclass", siblings ++ [
+        "function f<T>(x: T) returns (T) where T: Add, T: Sub, T: BitNot { return ~x; }"]),
+      ("a subclass given and the superclass", siblings ++ [
+        "function f<T>(x: T) returns (T) where T: Add, T: BitNot { return ~x; }"]),
+      ("a chain's middle", chain ++ [
+        "function f<T>(x: T) returns (T) where T: Sub, T: Add { return x + x; }"]),
+      ("a chain's top", chain ++ [
+        "function f<T>(x: T) returns (T) where T: Sub, T: Add { return ~x; }"]),
+      ("two projections beside a generic implementation", siblings ++ [generic,
+        "function f<T>(x: T) returns (T) where T: Add, T: Sub { return ~x; }"]),
+      ("a goal below an implementation", siblings ++ [mul,
+        "impl<A> Mul<Box<A>> where A: BitNot { function mul(left: Box<A>, right: Box<A>) returns (Box<A>) { return left; } }",
+        "function f<T>(x: Box<T>) returns (Box<T>) where T: Add, T: BitNot { return x * x; }"])] do
+    match checkProgram (singleSourceWorkspace (String.intercalate "\n" lines)) with
+    | .error [.ambiguousGiven _ predicate] =>
+        assertTrue (match predicate.subject with | .parameter _ => true | _ => false)
+          s!"{label} was refused at {reprStr predicate}"
+    | .error errors => throw (IO.userError s!"{label} had the wrong failure: {reprStr errors}")
+    | .ok _ => throw (IO.userError s!"{label} was accepted")
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" (siblings ++ [mul,
+      "impl<A> Mul<Box<A>> where A: Add, A: BitNot { function mul(left: Box<A>, right: Box<A>) returns (Box<A>) { match (left) { case Box.Wrap(y) { return Box.Wrap(~y); } } } }"]))) with
+  | .error [.methodAmbiguousGiven _ _] => pure ()
+  | .error errors => throw (IO.userError
+      s!"an implementation that restates a superclass had the wrong failure: {reprStr errors}")
+  | .ok _ => throw (IO.userError "an implementation that restates a superclass was accepted")
 
 private def testStageClassification : IO Unit := do
   let missingEntry := {
@@ -1993,6 +2071,7 @@ def testProgramChecking : IO Unit := do
   testDefaultForTypeParameter
   testGivenBelowAnImplementation
   testDefaultTierBlocking
+  testSuperclassesOfGivens
   testStageClassification
   testPhantomImplementationParameterRejection
   testMissingImplementationTraitPredicateRejection

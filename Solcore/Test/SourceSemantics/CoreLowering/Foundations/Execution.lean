@@ -7347,6 +7347,48 @@ private def runGivenBelowAnImplementation : IO Unit := do
     session := completed.session
   IO.println "SOURCE_CORE_GIVEN_BELOW_AN_IMPLEMENTATION_PASS: a condition of an implementation, and of an ordinary generic one beside a default, comes from the body's where predicate, as upstream's local givens do, so at a type with its own implementation the caller's runs, where compile refused before, and at a type that only the default covers the default runs"
 
+private def superclassesOfGivensWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := []
+  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+    "pragma solcore;",
+    -- Upstream needs it for the restated closed conditions (`SC0213`).
+    "pragma no-patterson-condition;",
+    "trait BitNot<T> { function bnot(value: T) returns (T); }",
+    "trait Sub<T> where T: BitNot { function sub(left: T, right: T) returns (T); }",
+    "trait Mul<T> { function mul(left: T, right: T) returns (T); }",
+    "default impl<T> BitNot<T> { function bnot(value: T) returns (T) { return value; } }",
+    "enum Coin { Head, Tail }",
+    "impl BitNot<Coin> { function bnot(value: Coin) returns (Coin) { match (value) { case Coin.Head { return Coin.Tail; } case Coin.Tail { return Coin.Head; } } } }",
+    "enum Plain { Head, Tail }",
+    "enum Box<A> { Wrap(A) }",
+    "impl Sub<Coin> where Coin: BitNot { function sub(left: Coin, right: Coin) returns (Coin) { return left; } }",
+    "impl Sub<Plain> where Plain: BitNot { function sub(left: Plain, right: Plain) returns (Plain) { return left; } }",
+    "impl<A> Mul<Box<A>> where A: Sub { function mul(left: Box<A>, right: Box<A>) returns (Box<A>) { match (left) { case Box.Wrap(x) { return Box.Wrap(~x); } } } }",
+    "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+    "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
+    "function viaSub<T>(x: T) returns (T) where T: Sub { return ~x; }",
+    "function viaCoin() returns (Word) { return coin(viaSub(Coin.Head)); }",
+    "function viaPlain() returns (Word) { return plain(viaSub(Plain.Head)); }",
+    "function boxedCoin() returns (Word) { match (Box.Wrap(Coin.Head) * Box.Wrap(Coin.Tail)) { case Box.Wrap(c) { return coin(c); } } }",
+    "function boxedPlain() returns (Word) { match (Box.Wrap(Plain.Head) * Box.Wrap(Plain.Tail)) { case Box.Wrap(p) { return plain(p); } } }"] }]
+}
+
+private def runSuperclassesOfGivens : IO Unit := do
+  let program ← get "superclasses of givens check" (checkProgram superclassesOfGivensWorkspace)
+  let names := ["viaCoin", "viaPlain", "boxedCoin", "boxedPlain"]
+  let compiled ← get "superclasses of givens compilation"
+    (compile superclassesOfGivensWorkspace (← names.mapM (seed program)))
+  let mut session ← boot (← compiled.open)
+  for (index, expected) in ([(0, 2), (1, 1), (2, 2), (3, 1)] : List (Nat × Nat)) do
+    let key ← match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError "superclasses of givens root missing")
+    let completed ← execute session key []
+    require (completed.value == word expected)
+      s!"{names[index]!} gave {reprStr completed.value}"
+    session := completed.session
+  IO.println "SOURCE_CORE_SUPERCLASSES_OF_GIVENS_PASS: a superclass of a function's given, and of an implementation's condition, is a given its caller proves, as upstream projects it, so at a type with its own implementation that one runs, where check or compile refused before, and at a type only the default covers the default runs"
+
 private def runDefaultForTypeParameter : IO Unit := do
   let program ← get "default for a type parameter check" (checkProgram defaultForTypeParameterWorkspace)
   let names := ["viaCoin", "viaPlain", "viaSecond", "viaBoxed"]
@@ -7676,6 +7718,7 @@ def run : IO Unit := do
   runImplMethodPredicates
   runDefaultForTypeParameter
   runGivenBelowAnImplementation
+  runSuperclassesOfGivens
 
 end Tests.SourceCoreExecution
 end

@@ -1055,7 +1055,7 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
       operandType := .word
       inputs := [.word (word 1), .word (word 2)]
       expected := false
-      requirementCount := 1
+      requirementCount := 2
     },
     {
       entryName := "lessEqualEntry"
@@ -1063,7 +1063,7 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
       operandType := .word
       inputs := [.word (word 2), .word (word 1)]
       expected := true
-      requirementCount := 1
+      requirementCount := 2
     },
     {
       entryName := "greaterEqualEntry"
@@ -1071,7 +1071,7 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
       operandType := .word
       inputs := [.word (word 1), .word (word 2)]
       expected := true
-      requirementCount := 1
+      requirementCount := 2
     },
     {
       entryName := "logicalAndEntry"
@@ -1098,6 +1098,11 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
     | [trait] => pure trait
     | traits => throw (IO.userError
         s!"Ord dispatch: expected one trait, found {traits.length}")
+  let eqTrait ← match program.signatures.traits.filter fun trait =>
+      trait.name == "Eq" with
+    | [trait] => pure trait
+    | traits => throw (IO.userError
+        s!"Ord dispatch: expected one Eq trait, found {traits.length}")
   let greater ← signatureNamed program "greaterWithEvidence"
   let greaterEntry ← signatureNamed program "greaterEntry"
   let namedGt ← signatureNamedWithGenericArity program "gt" 0
@@ -1140,9 +1145,11 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
         specialized.declaration == namedGt.id) &&
       specializedGreater.any fun specialized =>
         decide (specialized.key.arguments = [.word] ∧
-          specialized.assumptions.length = 1 ∧
+          specialized.assumptions.length = 2 ∧
           specialized.assumptions.all fun predicate =>
-            predicate.trait = ord.id ∧ predicate.subject = .word))
+            predicate.subject = .word) &&
+          specialized.assumptions.map (·.trait) ==
+            [.declaration ord.id, .declaration eqTrait.id])
     "source > selected the named gt decoy or lost its Ord specialization"
   let greaterLinked ← linkOrThrow "Ord.gt dispatch" program greaterOutcome
   let greaterKey : SourceSpecialization.SpecializationKey := {
@@ -1215,9 +1222,10 @@ private def testTraitPredicateIsStaticMethodAssumption : IO Unit := do
         s!"static trait predicate: expected a complete plan, found {reprStr other}")
   let specializedGreater := plan.specializations.find? fun specialized =>
     specialized.declaration == greater.id
+  -- `T: Ord`'s superclass `T: Eq` is a given too, which the caller proves.
   assertTrue (specializedGreater.any fun specialized =>
-      decide (specialized.assumptions = [implementation.head]))
-    "Ord specialization lost its sole explicit Ord<Word> assumption"
+      decide (specialized.assumptions = [implementation.head, eqWord]))
+    "Ord specialization lost its explicit Ord<Word> assumption and its Eq<Word> superclass"
   let linked ← linkOrThrow "static trait predicate assumption" program outcome
   let key : SourceSpecialization.SpecializationKey := {
     declaration := entry.id
