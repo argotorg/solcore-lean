@@ -266,12 +266,12 @@ Each rejects its slice, array or memref when that operand's type is still open t
 | Call | Found when | Its operands, once inferred | Typed form, at |
 | --- | --- | --- | --- |
 | `toArray(s)` | no source function, local or compiler function has the name | a slice, whose base's view gives the copy's element | `ExpressionForm.toArray`, an array of that element |
-| `lidx(a, i)` | the same holds for `lidx` | a memory array, and an index that waits for finalization as a read's, with no default for an open literal | `ExpressionForm.elementRef`, the memref of the array's element |
+| `lidx(a, i)` | the same holds for `lidx` | a memory array, and an index that waits for finalization as a read's, an open literal taking `uint256` | `ExpressionForm.elementRef`, the memref of the array's element |
 | `CanStore.load(r)` | no namespace or local is named `CanStore` | a memref | `ExpressionForm.memrefLoad`, the memref's element |
 | `CanStore.store(r, v)` | the same holds | a memref, and a value whose type unifies with the memref's element | `ExpressionForm.memrefStore`, `()` |
 
-So `toArray(m[1:3])` has the type `uint256[]` where `m` has, `lidx(m, 1)` is rejected as ambiguous
-(difference 25), and `CanStore.store(r, 7)` stores a `uint8` where `r` has the type
+So `toArray(m[1:3])` has the type `uint256[]` where `m` has, `lidx(m, 1)`'s index has the type
+`uint256` (difference 25), and `CanStore.store(r, 7)` stores a `uint8` where `r` has the type
 `memref<uint8>`.
 
 ### Source semantics
@@ -434,6 +434,8 @@ as row 1's fixture ports do.
   and `slices([10,20,30,40]) -> [20,30]` as 20 at index 0, 30 at 1 and `0x32` at 2.
 - `runArrayElementCases` holds Lean's own array cases. Among them, `compoundTwice()` gives 105,
   where upstream gives 205 (difference 1), and `plainOnce()` gives 107, as upstream does.
+- `runLiteralElementRefs` runs `lidx` at a literal index through a `let`, a call, `CanStore.store`
+  and `CanStore.load`, and past the array's end with `0x32`.
 
 ## Decisions
 
@@ -659,17 +661,18 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
     and `let put = CanStore.store;` applied to the same memref and `uint256(5)`. The value's type,
     unlike the memref's, may still be open: it unifies with the element. Both drivers reject a value
     of another type, the pinned driver with SC0207.
-25. **A literal `lidx` index has no default.** `lidx(m, 1)` is rejected with
-    `ambiguousIntegerLiteral` wherever it is, as in `let r = lidx(m, 1);` or `bump(lidx(m, 1))`. The
-    pinned driver gives the literal `uint256`, as it does a literal in a generic call's bound, and
-    accepts both. It rejects `CanStore.store(lidx(m, 1), v)` and `CanStore.load(lidx(m, 1))` with
-    SC0299, since the memref's type is still open there. `lidx(m, uint256(1))` types in both.
+25. **A literal `lidx` index takes `uint256`, under `CanStore` too.** As a read's index does, it
+    takes `uint256` wherever the call is: in `let r = lidx(m, 1);`, `bump(lidx(m, 1))`,
+    `CanStore.store(lidx(m, 1), v)` and `CanStore.load(lidx(m, 1))`. The pinned driver gives the
+    literal `uint256` in the first two, as it does a literal in a generic call's bound. It rejects
+    the last two with SC0299, since the memref's type is still open there. Lean's memref takes its
+    type from the array alone, so both are typed where the call is.
 
-Differences 9 to 13 change only a diagnostic or the room of a resource limit, and 8 and 14 to 25
-only reject some programs that upstream accepts. None of them changes what an accepted program
-means. Difference 1 does, by the user's decision 3. Deferring the choice to finalization could lift
-differences 14, 15, 18 and 19 and the first rejection in 22 to 24, as it could the open `Typedef`
-call. Nothing schedules it.
+Differences 9 to 13 change only a diagnostic or the room of a resource limit, 8 and 14 to 24 only
+reject some programs that upstream accepts, and 25 only accepts two forms that upstream rejects.
+None of them changes what an accepted program means. Difference 1 does, by the user's decision 3.
+Deferring the choice to finalization could lift differences 14, 15, 18 and 19 and the first
+rejection in 22 to 24, as it could the open `Typedef` call. Nothing schedules it.
 
 ## What remains
 

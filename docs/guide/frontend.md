@@ -35,7 +35,8 @@ the load refuses the imports that upstream refuses where they are (`programImpor
 brought beside a declaration of the module, an unknown item, a name listed twice, a name brought
 from two modules, a qualifier beside a value of that name, and an unknown module other than one
 of upstream's std modules. An import of `std.opcodes` binds upstream's 81 names, of which the 26
-pure functions are builtins (`builtinNamed?`). `SourceCoreCompiler.compileChecked` then
+pure functions are builtins (`builtinNamed?`), and `!` and `<` call the `not` and `lt` that it
+binds, as upstream's do (`operatorBuiltin?`). `SourceCoreCompiler.compileChecked` then
 plans the specializations of the requested roots, validates the plan, and compiles one cached Core
 artifact. `SourceCoreExecution.prepare` turns that artifact into the recipe that sessions run.
 

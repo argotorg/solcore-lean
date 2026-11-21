@@ -241,7 +241,9 @@ Direct calls are in [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/A
   one another, so a call may also be an operand, a branch, a pair element or another call's
   argument; the family takes rows whose accepted expressions are nested sites (`ClosedNested`).
   The builtin conversions are nested sites too, with the dirty-integer revert's token law as an
-  instance argument (`CellAwareInvocationAcceptedConversionFaults.DirtyToken`).
+  instance argument (`CellAwareInvocationAcceptedConversionFaults.DirtyToken`). So are mapping
+  indices (`Nested.index`), whose key equality and missing-default fault the family derives from
+  the callable profile and the row's issuer.
 - **Authority.** `CellAwareInvocationAcceptedCallAuthority` derives `Ports` from a complete
   inventory: a call receipt's global slot names an indexed function, and the inventory's header for
   that index gives the `Port`.
@@ -306,8 +308,10 @@ program.
   ([AcceptedShapes](../../Solcore/SourceSemantics/CoreLowering/AcceptedShapes.lean)), recognizes on
   the Source statement lists of value and unit returns, monomorphic declarations, bare assignments
   that the compiler refines (`Assignable`), bare in-place `~` that it refines
-  (`BitNotAssignable`), expression statements, blocks and conditionals, with every expression in
-  a given predicate. A list that may end without returning is a branch or block
+  (`BitNotAssignable`), assignments through mapping indices that it refines
+  (`ProjectedAssignable`), expression statements, blocks, conditionals and a function body's
+  final value whose node has the declared result type (`Shape.tail`), with every expression and
+  key in a given predicate. A list that may end without returning is a branch or block
   body, or belongs to a Unit function. `covered` shows that every refined accepted tree of such a
   list is covered; a refined tree keeps the unrefined assignment branch only for writes that are not
   `ValueAssignable`, and the unrefined `~=` branch only for those that are not `UnaryAssignable`.
@@ -330,6 +334,9 @@ program.
   callee body's derivation is smaller than the call's, so `bodies` lifts every admitted callee's
   body by one strong induction on the size, and `body` gives the sized staged trace of a
   call-containing function body. The admitted callees' static receipts are a premise (`Callees`).
+  An assignment through mapping indices lifts to the staged `assignProjected`, with its keys and
+  `ProjectedTarget.Snapshot` from the Source's place resolution (`projected_target`), and each of
+  its faults to the staged rule at the same point.
 - **Fault lifting.** `CellAwareInvocationAcceptedFaultLifting`, in the same file, lifts the
   original fault executions of the same bodies with the same reason and heap (`body_fault`). The
   staged traces express every reason but a type mismatch and a missing declaration
@@ -355,19 +362,23 @@ program.
   uses are general over the subset and the shape.
 - **One call.** The test
   [Accepted/OneCall](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/OneCall.lean) compiles
-  an eight-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
+  a ten-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
   `identity(value)`, `twice` returns `identity(identity(value))`, `narrow` returns `uint8(value)`,
-  `roundTrip` returns `Typedef.rep(uint8(value))`, and `doubled`, `shifted` and `flipped` update a
-  `uint8` local in place with `+=`, `<<=` and `~`. Its `accepted_call` meets every premise of
+  `roundTrip` returns `Typedef.rep(uint8(value))`, `doubled`, `shifted` and `flipped` update a
+  `uint8` local in place with `+=`, `<<=` and `~`, `tailed` ends in `identity(value)` as its final
+  value, and `stored` assigns its parameter at `table[value]` of a local mapping and returns
+  `table[value]`. Its `accepted_call` meets every premise of
   `CellAwarePublicAcceptedCallForward.first_value_selected`,
   `CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected` and
-  `checkpoint_reflects_selected` at `relay`'s first public call, at `twice`'s, where the inner
-  call's result is the outer call's argument, and at `narrow`'s and `roundTrip`'s at a canonical
-  word. At a dirty word, `accepted_reflection` meets the reflection's premises at both, and the
-  call fails with the dirty-integer reason. At the faulting words of `narrow`, `doubled`,
-  `shifted` and `flipped`, `accepted_failure` lifts the row's original Source fault and meets
-  every premise of `first_fault_selected`: the actual call fails with the token of the Source
-  fault, the dirty-integer reason or `0x11` from `doubled`'s checked `+=`. The fixture
+  `checkpoint_reflects_selected` at `relay`'s and `tailed`'s first public calls, at `twice`'s,
+  where the inner call's result is the outer call's argument, and at `narrow`'s and `roundTrip`'s
+  at a canonical word. At `stored`, `accepted_call_with_locals` meets them with a Source execution
+  that ends in the local's context. At a dirty word, `accepted_reflection` meets the reflection's
+  premises at `narrow` and `roundTrip`, and the call fails with the dirty-integer reason. At the
+  faulting words of `narrow`, `doubled`, `shifted` and `flipped`, `accepted_failure` lifts the
+  row's original Source fault and meets every premise of `first_fault_selected`: the actual call
+  fails with the token of the Source fault, the dirty-integer reason or `0x11` from `doubled`'s
+  checked `+=`. The fixture
   [Accepted/Fixture](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/Fixture.lean) builds
   the family rows and the callees' receipts from runtime checks of every cache row and a complete
   inventory (`WholeInventory.family_row`, `WholeInventory.callees`), and the staged trace is lifted
@@ -396,20 +407,21 @@ On the accepted-body route above, the next connected steps are:
     available Source input.
 - **Extend the expression closure beyond its first subset**, over the same actual accepted
   expression compiler.
-  - Direct calls and the builtin conversions at any expression position are closed over
-    families of rows, with call authority from a complete inventory. They are connected at the
-    public root in both directions, original traces of call-containing bodies are lifted, and a
-    program with a call, a nested call, a conversion and `Typedef.rep` of a conversion
-    instantiates both directions.
-  - Next come indirect calls, the other builtin calls, methods, indices, tuples, constructors,
-    generalized reads, closures and coercions.
+  - Direct calls, the builtin conversions and mapping indices at any expression position are
+    closed over families of rows, with call authority from a complete inventory. They are
+    connected at the public root in both directions, original traces of call-containing bodies
+    are lifted, and a program with a call, a nested call, a conversion, `Typedef.rep` of a
+    conversion and an index read after a write through the same index instantiates both
+    directions.
+  - Next come indirect calls, the other builtin calls, methods, array indices, tuples,
+    constructors, generalized reads, closures and coercions.
   - Expressions of contextual closures need the relation between the compiler view and the Source
     that their writes and matches also need.
 - **Strengthen the named-row public connection.**
   - Instantiate the theorems at a body with declarations, assignments, conditionals, operators and
     pairs. This needs a fixture with the older root's receipts and an independent Source trace of
     that body, or a proof-producing Source evaluator for the closed subset.
-  - Extend the shape, its coverage and the lifting to projected writes, tail values and loops.
+  - Extend the shape, its coverage and the lifting to projected in-place `~` and loops.
   - Carry the accepted instance model through public histories, so that later calls chain.
   - Issue program support from the compiler receipt for every accepted program, rather than from an
     observation of its typings.

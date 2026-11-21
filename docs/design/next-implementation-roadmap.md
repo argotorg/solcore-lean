@@ -55,8 +55,9 @@ obligations. None follows from agreement in a test corpus.
   ([Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal)).
   - Done: statement closure over the actual compiler tree; a first expression subset and
     statement shape for named rows, connected to the unchanged public root; one concrete instance
-    (`AcceptedTick` in `Generalized/Export`); direct calls and the builtin conversions at any
-    expression position, closed by one size induction over a family of rows; call authority from
+    (`AcceptedTick` in `Generalized/Export`); direct calls, the builtin conversions and mapping
+    indices at any expression position, closed by one size induction over a family of rows, and
+    final values and assignments through mapping indices in the shape; call authority from
     a complete inventory; and the public root in both directions for call-containing rows
     (`CellAwarePublicAcceptedCallRoot`), with their original traces lifted and instances at a
     call, a nested call, a conversion and `Typedef.rep` of a conversion (`Accepted/OneCall`); and
@@ -124,12 +125,11 @@ The last two are recorded without investigation, and the generators avoid them.
    is used, as upstream reports it (`SC0208`), so a body cannot use a superclass that its
    `where` clause states beside the subclass. The superclasses of a method's own `where`
    predicates are still open. Lean keeps ignoring `#[derive]`. Then Lean follows upstream in
-   three more places:
+   two more places:
    - a match's exhaustiveness: today Lean counts constructors only for a scrutinee of a nominal
      type, so an exhaustive match over a pair needs a `_` arm. Lean also reads a `true` or
      `false` pattern as a variable, so that arm matches every value, where upstream matches
      the boolean;
-   - a literal `lidx` index, which gets `uint256` as a read's index does;
    - the Patterson, coverage and closed-default conditions (`SC0213`, `SC0212`, `SC0219`), with
      upstream's two pragmas.
 
@@ -137,8 +137,8 @@ The last two are recorded without investigation, and the generators avoid them.
    upstream's are builtins.
 2. **Meaning proofs.** The rest of native Source goal two
    ([remaining work](core-runtime-unification.md#remaining-work-for-the-second-goal)). Row 1 has
-   no leftover, and the faults of call-containing rows are lifted. Next come tail values, then
-   mapping indices with projected writes.
+   no leftover, and the faults, the final values and the mapping indices of call-containing rows
+   are lifted, with assignments through mapping indices. Next come builtin closures, then loops.
 3. **Lean's native frontend as a fourth differential path.** The harness runs the admitted pure
    cases through the native pipeline, alone or as the fuzz driver's `native` run kind, memory
    arrays with their slices and memrefs among them. Lean's imports follow upstream's `SC0108`,
@@ -147,11 +147,12 @@ The last two are recorded without investigation, and the generators avoid them.
    and of two imports that bind one name from one module the first is kept. The load resolves
    `std.opcodes` with its 81 names: selected, aliased, wildcard and hiding imports bind them,
    the 26 pure functions are builtins, and the others are refused where they are used. The
-   harness admits the cases that import them. Beside an unqualified `lt` or `not` from the
-   module, Lean's `<` and `!` are still its builtins, where upstream calls the imported
-   function; that fix is next. Then come qualified access to the module, std beside
-   `std.opcodes`, and the export checks. Two imports under one qualifier (`SC0116`) and a module
-   that re-exports two traits of one name (`SC0111`) are still accepted.
+   harness admits the cases that import them. Beside a name that such an import binds, Lean's
+   operators follow upstream's: `<` and `!` call the bound `lt` and `not`, so `<` is refused
+   (each of the 26 gives a word where `<` wants a bool), and the trait methods and `&&` and `||`
+   see no bound name. Next come qualified access to the module, std beside `std.opcodes`, and
+   the export checks. Two imports under one qualifier (`SC0116`) and a module that re-exports
+   two traits of one name (`SC0111`) are still accepted.
 
 ### Then
 
