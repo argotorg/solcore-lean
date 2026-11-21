@@ -33,7 +33,8 @@ structure ImplRule (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
   head : Predicate Trait Ty
   wherePredicates : List (Predicate Trait Ty)
   /-- A default implementation participates only when the ordinary tier has a
-  definite `noSolution`.  The default preserves existing rule literals. -/
+  definite `noSolution` and no non-default head can describe the goal
+  (`Program.blocksDefaults`).  The default preserves existing rule literals. -/
   isDefault : Bool := false
   deriving Repr, BEq, DecidableEq
 
@@ -61,6 +62,11 @@ structure Program (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
   equal goal at any depth, before the implementations, as upstream's local
   givens do. -/
   givens : List (Predicate Trait Ty) := []
+  /-- Whether a non-default implementation's head can describe the goal once
+  the variables of both are bound, as upstream's `has_non_default_unifying_head`
+  asks: such a goal takes no default, whether that implementation's conditions
+  hold or not. -/
+  blocksDefaults : Predicate Trait Ty → Bool := fun _ => false
 
 variable {Trait : Type u} {Ty : Type v} {ImplId : Type w}
 
@@ -86,10 +92,12 @@ namespace Program
     (goal : Predicate Trait Ty) : List (Candidate Trait Ty ImplId) :=
   (program.candidates goal).filter fun candidate => !candidate.isDefault
 
-/-- Matching default implementations in their declaration order. -/
+/-- Matching default implementations in their declaration order, none when a
+non-default implementation's head can describe the goal. -/
 @[reducible] def defaultCandidates (program : Program Trait Ty ImplId)
     (goal : Predicate Trait Ty) : List (Candidate Trait Ty ImplId) :=
-  (program.candidates goal).filter fun candidate => candidate.isDefault
+  if program.blocksDefaults goal then [] else
+    (program.candidates goal).filter fun candidate => candidate.isDefault
 
 end Program
 
@@ -376,9 +384,10 @@ end Detail
 /-- Resolve one trait obligation with a maximum implementation-chain depth.
 A goal equal to one of the program's givens is decided by it, at any depth,
 before any implementation.  The ordinary implementation tier is exhaustive and
-has priority over the defaults.  The default
-tier is searched only after ordinary resolution establishes a definite
-`noSolution`; any ordinary ambiguity or incomplete search blocks fallback.
+has priority over the defaults.  The default tier is searched only after
+ordinary resolution establishes a definite `noSolution`, and only when no
+non-default implementation's head can describe the goal; any ordinary ambiguity
+or incomplete search blocks fallback.
 Completed success and no-solution entries are tabled. Cycles, depth exhaustion,
 ambiguity, and searches that might still hide a competing implementation remain
 explicitly inconclusive. -/
@@ -1288,17 +1297,40 @@ theorem matchImplHead?_certificate
 def headMatcher : TraitResolution.HeadMatcher TraitId Ty ImplId :=
   matchImplHead?
 
+/-- Whether an implementation's head can describe the goal once the goal's own
+variables and parameters are bound too, as upstream's `head_can_unify` treats
+the goal's variables as bindable. The goal's parameters become fresh variables,
+and the rule is freshened apart from them. -/
+def headCanUnify (rule : ImplRule) (goal : Predicate) : Bool :=
+  let (opening, _) :=
+    parameterFresheningSubstitution (predicateParameters goal) (predicateNextVariable goal)
+  let opened := applyParameterSubstitution opening goal
+  match headConstraints? (freshenRuleFor rule opened).head opened with
+  | none => false
+  | some constraints => (Unification.unify constraints).toOption.isSome
+
+/-- Upstream's `has_non_default_unifying_head`: some non-default rule's head
+can describe the goal, which then takes no default. -/
+def nonDefaultHeadUnifies (rules : List ImplRule) (goal : Predicate) : Bool :=
+  rules.any fun rule => !rule.isDefault && headCanUnify rule goal
+
 /-- Build a typed resolution program in declaration order, with the checked
-body's givens. -/
-def programOfRules (rules : List ImplRule) (givens : List Predicate := []) : Program :=
-  { rules, matchHead := headMatcher, givens }
+body's givens and upstream's default blocking. A goal in `provided`, which the
+givens' superclasses provide, is not blocked: upstream decides it by a
+projection, which Lean does not have yet, and the default stands in for it, as
+row 10's rule allows. -/
+def programOfRules (rules : List ImplRule) (givens : List Predicate := [])
+    (provided : List Predicate := []) : Program :=
+  { rules, matchHead := headMatcher, givens
+    blocksDefaults := fun goal =>
+      !provided.contains goal && nonDefaultHeadUnifies rules goal }
 
 /-- Run typed trait resolution with an implementation-chain depth bound, a goal
 equal to one of `givens` decided by it at any depth. -/
 def resolve (rules : List ImplRule) (maxDepth : Nat) (goal : Predicate)
-    (givens : List Predicate := []) :
+    (givens : List Predicate := []) (provided : List Predicate := []) :
     TraitResolution.Report TraitId Ty ImplId :=
-  TraitResolution.resolve (programOfRules rules givens) maxDepth goal
+  TraitResolution.resolve (programOfRules rules givens provided) maxDepth goal
 
 end Solcore.Frontend.TypedTraitResolution
 

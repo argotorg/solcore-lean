@@ -623,7 +623,9 @@ private def testDefaultImplementationCoercionPriority : IO Unit := do
       throw (IO.userError
         s!"unexpected ordinary/default coercion evidence: {implementations.length}/{evidence.length}")
 
-  let fallbackFixture ← check (String.intercalate "\n" [
+  -- An ordinary head that unifies blocks the default even when its condition
+  -- fails, as upstream's `has_non_default_unifying_head` does.
+  let fallbackSource := String.intercalate "\n" [
     "trait Ready<T> {}",
     "trait Coerce<From, To> {}",
     "enum A { Only }",
@@ -633,22 +635,16 @@ private def testDefaultImplementationCoercionPriority : IO Unit := do
     "impl Coerce<A, B> where Missing: Ready {}",
     "function accept(value: B) returns (B) { return value; }",
     "function convert(value: A) returns (B) { return accept(value); }"
-  ])
-  let fallbackConvert ← checkedNamed fallbackFixture "convert"
-  let fallbackA ← namedType fallbackFixture.environment "A"
-  let fallbackB ← namedType fallbackFixture.environment "B"
-  let fallbackCoerce ← namedTrait fallbackFixture.environment "Coerce"
-  let fallbackPredicate :=
-    coercionPredicate fallbackCoerce fallbackA fallbackB
-  match implementationIds fallbackFixture.environment,
-      fallbackConvert.evidence with
-  | defaultImpl :: _ordinaryImpl :: [], [evidence] =>
-      assertTrue (decide (fallbackConvert.predicates = [fallbackPredicate]) &&
-          isImplementationEvidence fallbackPredicate defaultImpl evidence)
-        "a failed ordinary coercion premise did not fall back to the default tier"
-  | implementations, evidence =>
-      throw (IO.userError
-        s!"unexpected fallback coercion evidence: {implementations.length}/{evidence.length}")
+  ]
+  match SourceInference.loadAndCheckProgram (workspace fallbackSource) with
+  | .error errors =>
+      assertTrue (errors.any fun error => match error with
+        | .body { error := .noTraitImplementation predicate, .. } =>
+            predicate.arguments.length == 1
+        | _ => false)
+        s!"a failed ordinary coercion premise was refused otherwise: {reprStr errors}"
+  | .ok _ => throw (IO.userError
+      "a failed ordinary coercion premise fell back to the default tier")
 
 private def testIrrelevantAmbiguousBranchDoesNotBlock : IO Unit := do
   let fixture ← check (String.intercalate "\n" [

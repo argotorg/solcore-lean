@@ -1403,26 +1403,37 @@ private def testInconclusive : IO Unit := do
       s!"overlapping impls had the wrong failure class: {reprStr errors}")
   | .ok _ => throw (IO.userError "overlapping Add implementations were selected")
 
-private def defaultImplementationWorkspace : Workspace.RawWorkspace := {
+/-- The default priority program. Its conditional `Bool` implementation needs
+`pragma no-patterson-condition` upstream (`SC0213`). -/
+private def defaultImplementationLines : List String := [
+  "pragma no-patterson-condition;",
+  "trait Ready<T> {}",
+  "trait Select<T> {}",
+  "default impl<T> Select<T> {}",
+  "impl Select<Word> {}",
+  "impl Select<Bool> where Bool: Ready {}",
+  "enum Coin { Head }",
+  "function select<T>(value: T) returns (T) where T: Select { return value; }",
+  "function selectWord(value: Word) returns (Word) { return select(value); }",
+  "function selectCoin(value: Coin) returns (Coin) { return select(value); }"]
+
+private def defaultImplementationWorkspace (extra : List String := []) :
+    Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [{
     path := "main.solc"
-    content := "pragma solcore;\n" ++ String.intercalate "\n" [
-      "trait Ready<T> {}",
-      "trait Select<T> {}",
-      "default impl<T> Select<T> {}",
-      "impl Select<Word> {}",
-      "impl Select<Bool> where Bool: Ready {}",
-      "function select<T>(value: T) returns (T) where T: Select { return value; }",
-      "function selectWord(value: Word) returns (Word) { return select(value); }",
-      "function selectBool(value: Bool) returns (Bool) { return select(value); }"
-    ]
+    content := "pragma solcore;\n" ++
+      String.intercalate "\n" (defaultImplementationLines ++ extra)
   }]
   externalLibraries := []
 }
 
+/-- An ordinary implementation outranks a matching default, and a default
+decides a goal that no ordinary head can describe. An ordinary head that
+unifies with the goal blocks the defaults even when its condition fails, as
+upstream's `has_non_default_unifying_head` does. -/
 private def testDefaultImplementationPriority : IO Unit := do
-  let checked ← match checkProgram defaultImplementationWorkspace with
+  let checked ← match checkProgram (defaultImplementationWorkspace) with
     | .ok checked => pure checked
     | .error errors => throw (IO.userError
         s!"default implementation program failed: {reprStr errors}")
@@ -1434,11 +1445,6 @@ private def testDefaultImplementationPriority : IO Unit := do
       !implementation.isDefault && implementation.head.subject == .word with
     | some implementation => pure implementation
     | none => throw (IO.userError "specific Word implementation was not retained")
-  let failedBoolSpecific ← match checked.signatures.implementations.find?
-      fun implementation =>
-        !implementation.isDefault && implementation.head.subject == .bool with
-    | some implementation => pure implementation
-    | none => throw (IO.userError "conditional Bool implementation was not retained")
   let checkedNamed (name : String) := checked.functions.find? fun function =>
     match checked.environment.declaration? function.declaration with
     | some declaration => declaration.name == some name
@@ -1446,9 +1452,9 @@ private def testDefaultImplementationPriority : IO Unit := do
   let wordFunction ← match checkedNamed "selectWord" with
     | some function => pure function
     | none => throw (IO.userError "selectWord was not checked")
-  let boolFunction ← match checkedNamed "selectBool" with
+  let coinFunction ← match checkedNamed "selectCoin" with
     | some function => pure function
-    | none => throw (IO.userError "selectBool was not checked")
+    | none => throw (IO.userError "selectCoin was not checked")
   match wordFunction.solvedRequirements with
   | [{ evidence := .implementation
         (.byImpl _ (.declaration implementation) []), .. }] =>
@@ -1456,14 +1462,22 @@ private def testDefaultImplementationPriority : IO Unit := do
         "a matching default implementation displaced the ordinary Word implementation"
   | requirements => throw (IO.userError
       s!"selectWord evidence changed: {reprStr requirements}")
-  match boolFunction.solvedRequirements with
+  match coinFunction.solvedRequirements with
   | [{ evidence := .implementation
         (.byImpl _ (.declaration implementation) []), .. }] =>
-      assertTrue (decide (implementation = fallback.id ∧
-          implementation ≠ failedBoolSpecific.id))
-        "default implementation was not selected after the ordinary candidate failed"
+      assertTrue (decide (implementation = fallback.id))
+        "the default implementation did not decide a goal no ordinary head describes"
   | requirements => throw (IO.userError
-      s!"selectBool evidence changed: {reprStr requirements}")
+      s!"selectCoin evidence changed: {reprStr requirements}")
+  match checkProgram (defaultImplementationWorkspace
+      ["function selectBool(value: Bool) returns (Bool) { return select(value); }"]) with
+  | .error [.noSolution _ predicate] =>
+      assertTrue (predicate.subject == .bool)
+        s!"selectBool was refused at another goal: {reprStr predicate}"
+  | .error errors => throw (IO.userError
+      s!"selectBool had the wrong failure: {reprStr errors}")
+  | .ok _ => throw (IO.userError
+      "a failed ordinary condition fell back to the default tier")
 
 private def singleSourceWorkspace (content : String) : Workspace.RawWorkspace := {
   entry := "main.solc"
@@ -1580,11 +1594,11 @@ private def testDefaultForTypeParameter : IO Unit := do
     match ← acceptedDefaultEvidence label "flip" (defaultBitNot ++ [function]) with
     | .implementation (.byImpl _ (.declaration _) []) => pure ()
     | evidence => throw (IO.userError s!"{label} gave {reprStr evidence}")
-  -- Goals that upstream decides from the body's givens or an ordinary
-  -- implementation, where Lean's resolution, which reads the givens only at
-  -- the top, keeps the default it used before: a given below an
-  -- implementation, a superclass of a given, and a goal that an ordinary
-  -- implementation matches.
+  -- Goals that upstream decides from the body's givens, a projection or an
+  -- ordinary implementation, which this rule leaves alone: a given below an
+  -- implementation, which the given decides; a superclass of a given, where
+  -- the default stands in for upstream's projection and `impl BitNot<Coin>`
+  -- does not block it; and a goal that an ordinary implementation matches.
   for (label, lines) in [
       ("a given below an implementation", defaultBitNot ++ [
         "trait Add<T> { function add(left: T, right: T) returns (T); }",
@@ -1638,6 +1652,104 @@ private def testGivenBelowAnImplementation : IO Unit := do
     "function flip<T>(x: T, y: T) returns (T) where T: BitNot { return x + y; }"]
   assertTrue (givenPremise evidence)
     s!"the ordinary implementation was not selected: {reprStr evidence}"
+
+mutual
+/-- The tiers an accepted requirement's evidence selects: `I` an ordinary
+implementation, `D` a default, then its premises in parentheses. -/
+private def evidenceTiers (checked : CheckedProgram) :
+    TypedTraitResolution.Evidence → String
+  | .byAssumption _ => "given"
+  | .byImpl _ (.builtin _) _ => "builtin"
+  | .byImpl _ (.declaration id) premises =>
+      let tier := match checked.signatures.implementations.find? (·.id == id) with
+        | some implementation => if implementation.isDefault then "D" else "I"
+        | none => "?"
+      if premises.isEmpty then tier
+      else tier ++ "(" ++ evidenceTierList checked premises ++ ")"
+
+private def evidenceTierList (checked : CheckedProgram) :
+    List TypedTraitResolution.Evidence → String
+  | [] => ""
+  | [evidence] => evidenceTiers checked evidence
+  | evidence :: rest =>
+      evidenceTiers checked evidence ++ "," ++ evidenceTierList checked rest
+end
+
+/-- The default tier, as upstream's `has_non_default_unifying_head`: a goal
+that a non-default implementation's head can describe, the goal's own
+parameters bound too, takes no default, whether that implementation's
+conditions hold or not. Each goal is decided so, a premise as well. -/
+private def testDefaultTierBlocking : IO Unit := do
+  let base := [
+    "trait Fee<T> { function fee(x: T) returns (Word); }",
+    "trait Mark<T> { function mark(x: T) returns (Word); }",
+    "enum Box<A> { Wrap(A) }",
+    "enum Pack<A> { Put(A) }",
+    "default impl<T> Fee<T> { function fee(x: T) returns (Word) { return 11; } }",
+    "function needFee<T>(x: T) returns (Word) where T: Fee { return 5; }"]
+  let conditional :=
+    "impl<A> Fee<Box<A>> where A: Mark { function fee(x: Box<A>) returns (Word) { return 22; } }"
+  let closedBox :=
+    "impl Fee<Box<Word>> { function fee(x: Box<Word>) returns (Word) { return 22; } }"
+  let markWord := "impl Mark<Word> { function mark(x: Word) returns (Word) { return 1; } }"
+  let packed :=
+    "impl<A> Fee<Pack<A>> where A: Fee { function fee(x: Pack<A>) returns (Word) { return 33; } }"
+  let generic := "function viaGeneric<T>(x: Box<T>) returns (Word) { return needFee(x); }"
+  let refused : List (String × List String × (TypeSystem.Ty → Bool)) := [
+    ("a matching head whose condition fails", base ++ [conditional,
+        "function run(w: Word) returns (Word) { return needFee(Box.Wrap(w)); }"],
+      fun | .application _ .word => true | _ => false),
+    ("a closed head that a generic goal unifies with", base ++ [closedBox, generic],
+      fun | .application _ (.parameter _) => true | _ => false),
+    ("a conditional head at a generic goal", base ++ [conditional, markWord, generic],
+      fun | .application _ (.parameter _) => true | _ => false),
+    ("a premise that a closed head unifies with", base ++ [packed, closedBox,
+        "function viaPacked<T>(x: Pack<Box<T>>) returns (Word) { return needFee(x); }"],
+      fun | .application _ (.application _ (.parameter _)) => true | _ => false)]
+  for (label, lines, expected) in refused do
+    let subject ← refusedDefaultSubject label lines
+    assertTrue (expected subject) s!"{label} was refused at {reprStr subject}"
+  let selects (label : String) (lines : List String) (expected : List (String × String)) :
+      IO Unit := do
+    match checkProgram (singleSourceWorkspace (String.intercalate "\n" lines)) with
+    | .error errors => throw (IO.userError s!"{label} was refused: {reprStr errors}")
+    | .ok checked =>
+        for (name, tiers) in expected do
+          let function ← match checked.functions.find? fun function =>
+              match checked.environment.declaration? function.declaration with
+              | some declaration => declaration.name == some name
+              | none => false with
+            | some function => pure function
+            | none => throw (IO.userError s!"{label}: `{name}` was not checked")
+          let selected := function.solvedRequirements.filterMap fun requirement =>
+            match requirement.evidence with
+            | .implementation evidence => some (evidenceTiers checked evidence)
+            | .assumption _ => some "given"
+          assertTrue (selected == [tiers])
+            s!"{label}: `{name}` selected {reprStr selected}, not {tiers}"
+  selects "no head that a closed goal unifies with" (base ++ [closedBox,
+      "function wrapped(w: Word) returns (Word) { return needFee(Pack.Put(w)); }",
+      "function boxed(w: Word) returns (Word) { return needFee(Box.Wrap(w)); }"])
+    [("wrapped", "D"), ("boxed", "I")]
+  selects "no head that a generic goal unifies with" (base ++ [closedBox,
+      "function viaGeneric<T>(x: Pack<T>) returns (Word) { return needFee(x); }"])
+    [("viaGeneric", "D")]
+  selects "a given that proves the matching head's condition" (base ++ [conditional, markWord,
+      "function viaGiven<T>(x: Box<T>) returns (Word) where T: Mark { return needFee(x); }"])
+    [("viaGiven", "I(given)")]
+  selects "a premise that no head unifies with" (base ++ [packed, closedBox,
+      "function closed(b: Bool) returns (Word) { return needFee(Pack.Put(Box.Wrap(b))); }",
+      "function premise(b: Bool) returns (Word) { return needFee(Box.Wrap(b)); }"])
+    [("closed", "I(D)"), ("premise", "D")]
+  -- The whole head is unified, its other arguments too.
+  selects "a head whose other argument differs" [
+      "trait Conv<A, B> { function conv(x: A, y: B) returns (Word); }",
+      "enum Box<A> { Wrap(A) }",
+      "default impl<A> Conv<A, Word> { function conv(x: A, y: Word) returns (Word) { return 11; } }",
+      "impl Conv<Box<Word>, Bool> { function conv(x: Box<Word>, y: Bool) returns (Word) { return 22; } }",
+      "function needConv<A, B>(x: A, y: B) returns (Word) where A: Conv<B> { return 5; }",
+      "function run(w: Word, v: Word) returns (Word) { return needConv(Box.Wrap(w), v); }"]
+    [("run", "D")]
 
 private def testStageClassification : IO Unit := do
   let missingEntry := {
@@ -1880,6 +1992,7 @@ def testProgramChecking : IO Unit := do
   testDefaultImplementationPriority
   testDefaultForTypeParameter
   testGivenBelowAnImplementation
+  testDefaultTierBlocking
   testStageClassification
   testPhantomImplementationParameterRejection
   testMissingImplementationTraitPredicateRejection

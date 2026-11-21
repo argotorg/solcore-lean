@@ -18489,7 +18489,10 @@ theorem solveNormalizedPredicate_sound
   | false =>
       cases resolved : TypedTraitResolution.resolve
           context.signatures.resolutionRules context.traitDepth goal
-          (context.assumptions.map (Detail.applyPredicate state)) with
+          (context.assumptions.map (Detail.applyPredicate state))
+          (Detail.providedPredicates context.signatures
+            (context.signatures.traits.length + 1)
+            (context.assumptions.map (Detail.applyPredicate state))) with
       | mk outcome statistics =>
           cases outcome with
           | noSolution =>
@@ -18513,6 +18516,9 @@ theorem solveNormalizedPredicate_sound
                       (rules := context.signatures.resolutionRules)
                       (maxDepth := context.traitDepth)
                       (givens := context.assumptions.map (Detail.applyPredicate state))
+                      (provided := Detail.providedPredicates context.signatures
+                        (context.signatures.traits.length + 1)
+                        (context.assumptions.map (Detail.applyPredicate state)))
                       (goal := goal)
                       (retained := evidence)
                       (by simp [resolved])

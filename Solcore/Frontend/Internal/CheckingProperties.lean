@@ -366,7 +366,10 @@ theorem defaultCandidate_originates
     {candidate : Candidate Trait Ty ImplId}
     (member : candidate ∈ program.defaultCandidates goal) :
     CandidateOriginates program goal candidate := by
-  exact candidate_originates (List.mem_filter.mp member).1
+  simp only [Program.defaultCandidates] at member
+  split at member
+  · cases member
+  · exact candidate_originates (List.mem_filter.mp member).1
 
 end Program
 

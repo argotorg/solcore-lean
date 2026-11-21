@@ -624,8 +624,9 @@ end
 
 /-- Solve one normalized goal: an exactly matching assumption, or else trait
 resolution, which takes a goal below the top from an equal assumption first,
-as upstream's local givens do.  Its evidence is refused when it decides a goal
-with a default that upstream does not use for a type parameter
+as upstream's local givens do, and keeps the default tier for a goal that the
+assumptions' superclasses provide.  Its evidence is refused when it decides a
+goal with a default that upstream does not use for a type parameter
 (`defaultForParameter?`). -/
 def solveNormalizedPredicate (context : Context) (state : State)
     (goal : ProgramPredicate) : Except Error PredicateEvidence :=
@@ -633,7 +634,10 @@ def solveNormalizedPredicate (context : Context) (state : State)
     .ok (.assumption goal)
   else
     match TypedTraitResolution.resolve context.signatures.resolutionRules
-        context.traitDepth goal (context.assumptions.map (applyPredicate state)) with
+        context.traitDepth goal (context.assumptions.map (applyPredicate state))
+        (providedPredicates context.signatures
+          (context.signatures.traits.length + 1)
+          (context.assumptions.map (applyPredicate state))) with
     | { outcome := .success evidence, .. } =>
         match defaultForParameter? context.signatures.resolutionRules
             (providedPredicates context.signatures
