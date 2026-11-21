@@ -8,7 +8,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.SourceExecution
 Original Source executions of call-containing bodies are staged executions.
 The lifting of `CellAwareInvocationAcceptedStatementLifting` runs over sized
 derivations, and a direct call's callee body, whose derivation is smaller than
-the call's, is lifted by one strong induction on the size across bodies.
+the call's, is lifted by one strong induction on the size across bodies. Their
+fault executions are staged fault executions with the same reason, for every
+reason the staged traces express.
 
 Main declarations:
 - `CellAwareInvocationAcceptedSizedLifting.statements`, the sized lifting of a
@@ -19,7 +21,13 @@ Main declarations:
 - `CellAwareInvocationAcceptedCallLifting.bodies` and
   `CellAwareInvocationAcceptedCallLifting.body`, the induction across bodies and
   the staged trace of a call-containing body, given the static receipts of the
-  admitted callees (`Callees`).
+  admitted callees (`Callees`);
+- `CellAwareInvocationAcceptedFaultLifting.nested_fault`,
+  `CellAwareInvocationAcceptedFaultLifting.statements_fault`,
+  `CellAwareInvocationAcceptedFaultLifting.bodies_fault` and
+  `CellAwareInvocationAcceptedFaultLifting.body_fault`, the same for fault
+  executions with an `Expressible` reason, given that the direct calls have
+  plain callees (`CalleesPlain`).
 -/
 
 section
@@ -29,7 +37,8 @@ executions, given the lifting of their expressions below the size. This is
 `SourceExecutionSize`: every child derivation has a smaller size than its
 statement, so a child lifting below the size of a list is enough to lift the
 list. Every control outcome is carried unchanged, with the context, environment
-and heap of the original execution. Fault executions are not lifted here. -/
+and heap of the original execution. Fault executions are lifted by
+`CellAwareInvocationAcceptedFaultLifting`. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -505,8 +514,8 @@ body, a nested site is lifted by induction on the site, over the sized
 derivations of its operands, branches, elements and arguments. The admitted
 callees are static inputs (`Callees`): the registry scope of each callee's
 global view at the empty dictionary and the shape of its body, whose
-expressions are nested sites of its own cache row. Fault executions are not
-lifted here. -/
+expressions are nested sites of its own cache row. Fault executions are lifted
+by `CellAwareInvocationAcceptedFaultLifting`. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -885,4 +894,1107 @@ theorem body {scope : Staging.Recursive.Scope} {source : TypedSource} {evidence 
     (CellAwareInvocationAcceptedSizedLifting.statements unique lift shape (Nat.le_refl size) sized)
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedCallLifting
+end
+
+section
+/-! Original fault executions of bodies whose expressions are nested sites are
+staged fault executions with the same reason and heap. A fault keeps its reason
+from the innermost failing rule to the body, and the staged traces express
+every reason but two (`Expressible`): a type mismatch, since a condition whose
+value is not a boolean has no staged rule, and a missing declaration, since a
+call of a function without a catalogued body has none. A direct call's staged
+rules read its callee's occurrence, which the original rule of a fault after
+its arguments does not record, so the Source's direct calls are required to
+have a plain callee node (`CalleesPlain`, a finite check); a missing node is
+then excluded, as every site is a node of the Source. They also read the
+validity of the call's instantiation at the caller's context, which holds at a
+monomorphic instantiation once that context keeps the program's signatures. A
+callee body's fault is lifted by the strong induction on the size that lifts
+its values. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxHeartbeats 4000000
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedFaultLifting
+open Core Frontend SourceInference
+open CallableIndexedNamedGeneration (Prepared)
+open CellAwareInvocationAcceptedNestedTrees (Nested)
+open CellAwareInvocationAcceptedCallLifting (BodiesLift evidence_nil nested_value)
+
+/-- The fault reasons that the staged traces express: all but a type mismatch
+and a missing declaration. -/
+def Expressible : Dynamic.SemanticFault → Prop
+  | .typeMismatch _ _ | .missingDeclaration _ => False
+  | _ => True
+
+/-- A node that refers to `instantiation` at `target` without requirements or
+coercions. -/
+def CalleeAt (target : ExpressionId) (instantiation : DeclarationInstantiation) : Node → Bool
+  | .expression callee =>
+    decide (callee.id = target) && callee.requirements.isEmpty && callee.coercions.isEmpty &&
+      match callee.form with
+      | .reference _ (.declaration other) => decide (other = instantiation)
+      | _ => false
+  | .statement _ => false
+
+/-- A direct call at a node has its callee among `nodes`. -/
+def CalleePlainAt (nodes : List Node) : Node → Bool
+  | .expression caller =>
+    match caller.form with
+    | .call target _ (.declaration instantiation) => nodes.any (CalleeAt target instantiation)
+    | _ => true
+  | .statement _ => true
+
+/-- Every direct call of a Source has a callee node that refers to the call's
+declaration without requirements or coercions. -/
+def CalleesPlain (source : TypedSource) : Prop :=
+  source.nodes.all (CalleePlainAt source.nodes) = true
+
+section Sites
+variable {program : Program} {scope : Staging.Recursive.Scope}
+
+private theorem atomic_form {form : ExpressionForm} (atomic : CompatibleExpressionLiterals.Atomic form) :
+    Staging.Recursive.AtomicForm form := by
+  cases atomic <;> constructor
+
+private theorem atomic_not_local {form : ExpressionForm} (atomic : CompatibleExpressionLiterals.Atomic form)
+    (name : String) (binder : Resolved.LocalId) : form ≠ .reference name (.local binder) := by
+  cases atomic <;> intro same <;> cases same
+
+private theorem calleeAt_sound {target : ExpressionId} {instantiation : DeclarationInstantiation} {node : Node}
+    (found : CalleeAt target instantiation node = true) :
+    ∃ (callee : ExpressionNode) (name : String), node = .expression callee ∧ callee.id = target ∧
+      callee.form = .reference name (.declaration instantiation) ∧ callee.requirements = [] ∧
+      callee.coercions = [] := by
+  cases node with
+  | statement _ => simp [CalleeAt] at found
+  | expression callee =>
+    simp only [CalleeAt] at found
+    cases form : callee.form with
+    | reference name resolution =>
+      cases resolution with
+      | declaration other =>
+        rw [form] at found
+        simp only [Bool.and_eq_true, decide_eq_true_eq, List.isEmpty_iff] at found
+        obtain ⟨⟨⟨idEq, requirements⟩, coercions⟩, same⟩ := found
+        exact ⟨callee, name, rfl, idEq, by rw [form, same], requirements, coercions⟩
+      | _ =>
+        rw [form] at found
+        simp at found
+    | _ =>
+      rw [form] at found
+      simp at found
+
+/-- A direct call's callee is an occurrence without requirements or
+coercions. -/
+private theorem callee_occurrence (plain : CalleesPlain scope.source)
+    {id callee : ExpressionId} {ids : List ExpressionId} {instantiation : DeclarationInstantiation}
+    {node : ExpressionNode} (contains : ContainsExpression scope.source id node)
+    (form : node.form = .call callee ids (.declaration instantiation)) :
+    ∃ name, Staging.Recursive.Occurrence scope callee (.reference name (.declaration instantiation)) := by
+  have atCaller := List.all_eq_true.mp plain (.expression node) contains.1
+  simp only [CalleePlainAt, form] at atCaller
+  obtain ⟨calleeNode, member, found⟩ := List.any_eq_true.mp atCaller
+  obtain ⟨calleeExpression, name, rfl, idEq, calleeForm, requirements, coercions⟩ := calleeAt_sound found
+  exact ⟨name, calleeExpression, ⟨member, idEq⟩, calleeForm, requirements, coercions⟩
+
+/-- A monomorphic instantiation of a program function is valid at every context
+with the program's signatures. -/
+private theorem valid_at {context : SourceSemantics.Context}
+    {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance}
+    (signatures : context.signatures = program.signatures)
+    (substitution : instantiation.parameterSubstitution = [])
+    (instantiates : Dynamic.FunctionInstantiates program instantiation bodyInstance) :
+    SourceSemantics.DeclarationInstantiation.Valid context instantiation := by
+  cases instantiates with
+  | intro _ _ _ _ valid =>
+    cases valid with
+    | intro signature member declaration exactness _ type predicates parameterComptime returnComptime =>
+      refine .intro signature (by rw [signatures]; exact member) declaration exactness ?_ type predicates
+        parameterComptime returnComptime
+      intro parameter replacement inMember
+      rw [substitution] at inMember
+      cases inMember
+
+/-- The empty dictionary covers the body of a program function whose
+instantiation has no predicates. -/
+private theorem covers_nil {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance}
+    (instantiates : Dynamic.FunctionInstantiates program instantiation bodyInstance)
+    (predicates : instantiation.predicates = []) :
+    Dynamic.EvidenceEnvironment.Covers bodyInstance.context [] := by
+  cases instantiates with
+  | intro _ _ _ _ _ _ _ contextEq =>
+    rw [contextEq]
+    refine ⟨fun _ _ looks => (by cases looks), ?_⟩
+    intro predicate member
+    simp [declarationContext, SourceSemantics.Context.withResidualTypeVariables,
+      SourceSemantics.Context.withSolvedRequirements, SourceSemantics.Context.withAssumptions,
+      predicates] at member
+
+/-- A program function's body context keeps the program's signatures. -/
+private theorem body_signatures {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance}
+    (instantiates : Dynamic.FunctionInstantiates program instantiation bodyInstance) :
+    bodyInstance.context.signatures = program.signatures := by
+  cases instantiates with
+  | intro _ _ _ _ _ _ _ contextEq =>
+    rw [contextEq]
+    rfl
+
+/-- A sized fault at a node without coercions that is not a local read faults
+in the node's form below the same size. -/
+private theorem form_fault (unique : NodeOccurrencesUnique scope.source)
+    {id : ExpressionId} {node : ExpressionNode} (found : scope.source.lookupExpression? id = some node)
+    (coercions : node.coercions = []) (notLocal : ∀ name binder, node.form ≠ .reference name (.local binder))
+    {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
+    (trace : SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment
+      before id reason after) :
+    ∃ formSize, formSize < size ∧ SourceExecutionSize.ExpressionFormFaults program formSize context
+      scope.evidence scope.source environment before node.form node.requirements [] reason after := by
+  have contains := lookupExpression?_sound found
+  cases trace with
+  | missing absent => exact (Dynamic.ExpressionAbsentIn.excludes_contains absent contains).elim
+  | form traceFound fault =>
+    cases CellAwareInvocationAcceptedCallLifting.node_unique unique traceFound contains
+    rw [coercions] at fault
+    exact ⟨_, SourceExecutionSize.child_lt_stepSize (by simp), fault⟩
+  | coercion traceFound _ fault =>
+    cases CellAwareInvocationAcceptedCallLifting.node_unique unique traceFound contains
+    rw [coercions] at fault
+    cases fault
+  | generalizedLocalRequirement traceFound formEq =>
+    cases CellAwareInvocationAcceptedCallLifting.node_unique unique traceFound contains
+    exact absurd formEq (notLocal _ _)
+  | generalizedLocalCoercion traceFound formEq =>
+    cases CellAwareInvocationAcceptedCallLifting.node_unique unique traceFound contains
+    exact absurd formEq (notLocal _ _)
+
+end Sites
+
+variable {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked)
+  (program : Program) (registry : Staging.Recursive.Registry) (called : DeclarationInstantiation → Prop)
+
+/-- The staged fault lifting of the expressions that `child` admits, below a
+size, at contexts with the program's signatures. -/
+def ChildFaultLifts (scope : Staging.Recursive.Scope) (child : ExpressionId → Prop) (bound : Nat) : Prop :=
+  ∀ {id : ExpressionId}, child id → ∀ {size : Nat} {context : SourceSemantics.Context}
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault},
+    size < bound → context.signatures = program.signatures → Expressible reason →
+    SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before id
+      reason after →
+    Staging.Recursive.Expression program registry scope context environment before id (.fault (.semantic reason)) after
+
+/-- The direct calls of every admitted callee's body have plain callees. -/
+def CalleesFault : Prop :=
+  ∀ {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance},
+    called instantiation → Dynamic.FunctionInstantiates program instantiation bodyInstance →
+    CalleesPlain bodyInstance.source
+
+/-- Every admitted callee's original body fault with an expressible reason
+below a size, at a context with the program's signatures, is a staged fault
+execution in the registry scope of its global view. -/
+def BodiesFaultLift (bound : Nat) : Prop :=
+  ∀ {instantiation : DeclarationInstantiation} {bodyInstance : Dynamic.BodyInstance} {roots : List StatementId},
+    called instantiation → Dynamic.FunctionInstantiates program instantiation bodyInstance →
+    Dynamic.StatementRoots bodyInstance.source.roots roots →
+    ∃ child : Staging.Recursive.Scope,
+      registry.Closure (Staging.Recursive.globalView bodyInstance [] roots) child ∧
+      ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+        {before after : Dynamic.Heap} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault},
+        size < bound → context.signatures = program.signatures → Expressible reason →
+        SourceExecutionSize.FunctionStatementsFault program size context [] bodyInstance.source environment before
+          roots finalContext reason after →
+        Staging.Recursive.StatementsIn program registry true child context environment before roots finalContext
+          (.fault (.semantic reason)) after
+
+variable {program registry called}
+
+/-- The fault executions of argument lists whose elements lift. -/
+private theorem arguments_fault {scope : Staging.Recursive.Scope} {bound : Nat} :
+    ∀ {ids : List ExpressionId},
+    (∀ argument ∈ ids, ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+      SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
+        argument value after →
+      Staging.Recursive.Expression program registry scope context environment before argument (.value value) after) →
+    (∀ argument ∈ ids, ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}, size ≤ bound →
+      context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before
+        argument reason after →
+      Staging.Recursive.Expression program registry scope context environment before argument
+        (.fault (.semantic reason)) after) →
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}, size ≤ bound →
+      context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.ExpressionsFault program size context scope.evidence scope.source environment before ids
+        reason after →
+      Staging.Recursive.Expressions program registry scope context environment before ids
+        (.fault (.semantic reason)) after := by
+  intro ids
+  induction ids with
+  | nil =>
+    intro _ _ size context environment before after reason _ _ _ failed
+    cases failed
+  | cons head rest ih =>
+    intro values faults size context environment before after reason within signatures expressible failed
+    cases failed with
+    | head fault =>
+      exact .headFault (faults head List.mem_cons_self (by
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+        omega) signatures expressible fault)
+    | tail first tail =>
+      exact .tailFault
+        (values head List.mem_cons_self (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+          omega) first)
+        (ih (fun argument member => values argument (List.mem_cons_of_mem _ member))
+          (fun argument member => faults argument (List.mem_cons_of_mem _ member)) (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+          omega) signatures expressible tail)
+
+/-- A sized fault execution of a nested site with an expressible reason, at a
+context with the program's signatures, is a staged fault execution with the
+same reason and heap, given that the Source's direct calls have plain callees
+and the value and fault liftings of the admitted callee bodies below a bound
+of its size. -/
+theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
+    (unique : NodeOccurrencesUnique scope.source) (plain : CalleesPlain scope.source) {bound : Nat}
+    (bodies : BodiesLift program registry called bound) (faults : BodiesFaultLift program registry called bound)
+    {id : ExpressionId} (nested : Nested prepared named scope.source called id) :
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}, size ≤ bound →
+      context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before id
+        reason after →
+      Staging.Recursive.Expression program registry scope context environment before id
+        (.fault (.semantic reason)) after := by
+  induction nested with
+  | literal site atomic =>
+    intro size context environment before after reason _ _ _ trace
+    exact Staging.Recursive.Lifting.atomic_nonlocal unique (lookupExpression?_sound site.found)
+      (atomic_form atomic) site.coercions (atomic_not_local atomic) (.fault trace.sound)
+  | read site form =>
+    intro size context environment before after reason _ _ _ trace
+    have contains := lookupExpression?_sound site.found
+    cases trace with
+    | missing absent => exact (Dynamic.ExpressionAbsentIn.excludes_contains absent contains).elim
+    | form found raw =>
+      cases CellAwareInvocationAcceptedCallLifting.node_unique unique found contains
+      rw [site.coercions] at raw
+      exact .atomicFault contains (by rw [form]; exact .reference _ _) site.coercions raw.sound
+    | coercion found _ failed =>
+      cases CellAwareInvocationAcceptedCallLifting.node_unique unique found contains
+      rw [site.coercions] at failed
+      cases failed
+    | generalizedLocalRequirement found formEq layout lookup read descriptor contextFields selection failed =>
+      cases CellAwareInvocationAcceptedCallLifting.node_unique unique found contains
+      exact .generalizedLocalRequirement contains formEq layout lookup read descriptor contextFields selection
+        failed
+    | generalizedLocalCoercion found _ _ _ _ _ _ _ failed =>
+      cases CellAwareInvocationAcceptedCallLifting.node_unique unique found contains
+      rw [site.coercions] at failed
+      cases failed
+  | unary site form operandNested child =>
+    intro size context environment before after reason within signatures expressible trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, CellAwareInvocationAcceptedCallLifting.requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | unaryOperand _ operand =>
+      exact .unaryOperandFault (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (child (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible operand)
+    | unaryApply layout operand applies =>
+      have empty := CompatibleExpressionPrimitives.no_owned layout
+      subst empty
+      cases applies with
+      | primitive invalid =>
+        exact .unaryInvalid (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+          (nested_value prepared unique bodies operandNested (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+            omega) operand) invalid
+      | requirement failed => cases failed
+      | method _ selected _ => cases selected
+  | binary site form leftNested rightNested left right =>
+    intro size context environment before after reason within signatures expressible trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, CellAwareInvocationAcceptedCallLifting.requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | binaryLeft _ first =>
+      exact .binaryLeftFault (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (left (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible first)
+    | binaryLeftOperand _ first invalid =>
+      exact .binaryLeftInvalid (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (nested_value prepared unique bodies leftNested (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first) invalid
+    | binaryRight _ first continues second =>
+      exact .binaryRightFault (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (nested_value prepared unique bodies leftNested (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first) continues
+        (right (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible second)
+    | binaryApply layout first continues second applies =>
+      have empty := CompatibleExpressionPrimitives.no_owned layout
+      subst empty
+      have stagedLeft := nested_value prepared unique bodies leftNested (by
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        omega) first
+      have stagedRight := nested_value prepared unique bodies rightNested (by
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        omega) second
+      cases applies with
+      | primitive invalid =>
+        exact .binaryInvalid (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same)) stagedLeft continues
+          stagedRight invalid
+      | panic panics =>
+        exact .binaryPanic (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same)) stagedLeft continues
+          stagedRight panics
+      | requirement failed => cases failed
+      | method _ selected _ => cases selected
+  | conditional site form testNested _ _ test yes no =>
+    intro size context environment before after reason within signatures expressible trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, CellAwareInvocationAcceptedCallLifting.requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | conditionalCondition _ first =>
+      exact .conditionalFault (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (test (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible first)
+    | conditionalType _ _ _ _ => simp [Expressible] at expressible
+    | conditionalTrueBranch _ first second =>
+      exact .conditional (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (nested_value prepared unique bodies testNested (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first)
+        (yes (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible second)
+    | conditionalFalseBranch _ first second =>
+      exact .conditional (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (nested_value prepared unique bodies testNested (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) first)
+        (no (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible second)
+  | group site form _ child =>
+    intro size context environment before after reason within signatures expressible trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, CellAwareInvocationAcceptedCallLifting.requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | group _ inner =>
+      exact .group (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+        (child (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible inner)
+  | pair site form leftNested _ left right =>
+    intro size context environment before after reason within signatures expressible trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, CellAwareInvocationAcceptedCallLifting.requirements_of site form (fun _ _ same => by cases same)] at raw
+    cases raw with
+    | tuple _ elements =>
+      cases elements with
+      | head first =>
+        exact .pairLeftFault (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+          (left (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+            omega) signatures expressible first)
+      | tail first rest =>
+        cases rest with
+        | head second =>
+          exact .pairRightFault (CellAwareInvocationAcceptedCallLifting.occurrence site form (fun _ _ same => by cases same))
+            (nested_value prepared unique bodies leftNested (by
+              simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+              omega) first)
+            (right (by
+              simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+              omega) signatures expressible second)
+        | tail _ rest => cases rest
+  | @call id callee ids instantiation site selected argumentsNested arguments =>
+    intro size context environment before after reason within signatures expressible trace
+    have contains := lookupExpression?_sound site.found
+    obtain ⟨name, calleeOccurrence⟩ := callee_occurrence plain contains site.form
+    have callOccurrence : Staging.Recursive.Occurrence scope id (.call callee ids (.declaration instantiation)) :=
+      ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [site.form] at same; cases same) trace
+    rw [site.form, site.requirements] at raw
+    cases raw with
+    | directCalleeMissing absent =>
+      obtain ⟨_, calleeContains, _⟩ := calleeOccurrence
+      exact (Dynamic.ExpressionAbsentIn.excludes_contains absent calleeContains).elim
+    | directArguments _ _ failed =>
+      exact .directArgumentsFault callOccurrence calleeOccurrence
+        (arguments_fault (fun argument member => nested_value prepared unique bodies (argumentsNested argument member))
+          arguments (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible failed)
+    | directRequirements _ failed =>
+      rw [site.monomorphic.predicates] at failed
+      cases failed
+    | directApply evaluated produced failed =>
+      have stagedArguments := CellAwareInvocationAcceptedCallLifting.arguments_value (registry := registry)
+        (fun argument member => nested_value prepared unique bodies (argumentsNested argument member)) (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) evaluated
+      have nilEvidence := evidence_nil (site.monomorphic.predicates ▸ produced)
+      subst nilEvidence
+      cases failed with
+      | notCallable invalid => exact (invalid trivial).elim
+      | globalSignatureMissing _ => simp [Expressible] at expressible
+      | globalBodyMissing _ => simp [Expressible] at expressible
+      | globalArity instantiates mismatch =>
+        exact .directApplied callOccurrence calleeOccurrence
+          (valid_at signatures site.monomorphic.substitution instantiates) stagedArguments produced
+          (.globalArity instantiates mismatch)
+      | globalBody instantiates _ failed =>
+        have valid := valid_at signatures site.monomorphic.substitution instantiates
+        have covers := covers_nil instantiates site.monomorphic.predicates
+        cases failed with
+        | arity mismatch =>
+          exact .directApplied callOccurrence calleeOccurrence valid stagedArguments produced
+            (.globalArity instantiates mismatch)
+        | statements rootsEq parameters allocate failed =>
+          obtain ⟨child, closure, lifts⟩ := faults selected instantiates rootsEq
+          have staged := lifts (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+            omega)
+            ((SourceSemantics.StructuralSubstitution.MonoBindersExtend.signatures_eq parameters).trans
+              (body_signatures instantiates))
+            expressible failed
+          exact .directApplied callOccurrence calleeOccurrence valid stagedArguments produced
+            (.global instantiates covers rootsEq closure parameters allocate staged .fault)
+        | controlEscape rootsEq parameters allocate execute escaped =>
+          obtain ⟨child, closure, lifts⟩ := bodies selected instantiates rootsEq
+          have staged := lifts (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+            omega) execute
+          rcases escaped with ⟨escapedEnvironment, rfl⟩ | ⟨escapedEnvironment, rfl⟩
+          · exact .directApplied callOccurrence calleeOccurrence valid stagedArguments produced
+              (.global instantiates covers rootsEq closure parameters allocate staged .breaking)
+          · exact .directApplied callOccurrence calleeOccurrence valid stagedArguments produced
+              (.global instantiates covers rootsEq closure parameters allocate staged .continuing)
+  | @conversion id callee argument function target site argumentNested child =>
+    intro size context environment before after reason within signatures expressible trace
+    have contains := lookupExpression?_sound site.found
+    have callOccurrence :
+        Staging.Recursive.Occurrence scope id (.call callee [argument] (.builtinFunction function)) :=
+      ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [site.form] at same; cases same) trace
+    rw [site.form, site.requirements] at raw
+    have values : ∀ other ∈ [argument], ∀ {size : Nat} {context : SourceSemantics.Context}
+        {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+        SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
+          before other value after →
+        Staging.Recursive.Expression program registry scope context environment before other (.value value)
+          after := by
+      intro other member
+      cases List.mem_singleton.mp member
+      exact nested_value prepared unique bodies argumentNested
+    cases raw with
+    | builtinArguments _ failed =>
+      exact .builtinArgumentsFault callOccurrence
+        (arguments_fault values (fun other member => by
+          cases List.mem_singleton.mp member
+          exact child) (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible failed)
+    | builtinApply _ evaluated failed =>
+      have stagedArguments := CellAwareInvocationAcceptedCallLifting.arguments_value (registry := registry)
+        values (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) evaluated
+      cases failed with
+      | notCallable invalid => exact (invalid trivial).elim
+      | builtinArity mismatch => exact .builtinApplied callOccurrence stagedArguments (.builtinArity mismatch)
+      | builtinArgumentType arity mismatch =>
+        exact .builtinApplied callOccurrence stagedArguments (.builtinType arity mismatch)
+      | builtinFaults failed => exact .builtinApplied callOccurrence stagedArguments (.builtinFault failed)
+
+/-- The fault lifting of every nested site below a size, given that the
+Source's direct calls have plain callees and the value and fault liftings of
+the callee bodies below it. -/
+theorem nested_fault_roots {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
+    (unique : NodeOccurrencesUnique scope.source) (plain : CalleesPlain scope.source) {bound : Nat}
+    (bodies : BodiesLift program registry called bound) (faults : BodiesFaultLift program registry called bound) :
+    ChildFaultLifts program registry scope (Nested prepared named scope.source called) bound := by
+  intro id nested size context environment before after reason below signatures expressible trace
+  exact nested_fault prepared unique plain bodies faults nested (Nat.le_of_lt below) signatures expressible trace
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedFaultLifting
+end
+
+section
+/-! Original fault executions of supported statement lists are staged fault
+executions with the same reason and heap, given the value and fault liftings
+of their expressions below the size. A statement faults in its expression, its
+bare target or its inner list, or a falling-through statement is followed by
+a fault in the rest of its list; the staged rule of the same form carries the
+fault, at the context, environment and heap of the original execution. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxHeartbeats 4000000
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedFaultLifting
+open Core Frontend SourceInference
+open CallableIndexedNamedGeneration (Prepared)
+open CellAwareInvocationAcceptedNestedTrees (Nested)
+open CellAwareInvocationAcceptedBodyShape (Shape)
+open CellAwareInvocationAcceptedSizedLifting (ChildLifts)
+open CellAwareInvocationAcceptedCallLifting (BodiesLift Callees)
+
+/-- The sized fault judgment of each compiler mode's statement lists. -/
+def FaultOriginal (program : Program) (size : Nat) : Bool → SourceSemantics.Context → Dynamic.EvidenceEnvironment →
+    TypedSource → Dynamic.Environment → Dynamic.Heap → List StatementId → SourceSemantics.Context →
+    Dynamic.SemanticFault → Dynamic.Heap → Prop
+  | true => SourceExecutionSize.FunctionStatementsFault program size
+  | false => SourceExecutionSize.StatementsFault program size
+
+section Inversion
+variable {program : Program} {source : TypedSource} {context : SourceSemantics.Context}
+  {evidence : Dynamic.EvidenceEnvironment} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+  {id : StatementId} {node : StatementNode} {reason : Dynamic.SemanticFault} {size : Nat}
+
+private theorem return_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) {expression : ExpressionId}
+    (form : node.form = .returnStmt (some expression))
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) :
+    ∃ child, child < size ∧ SourceExecutionSize.ExpressionFaults program child context evidence source environment
+      before expression reason after := by
+  cases fault with
+  | missing absent => exact (Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)).elim
+  | returnValue contains formEq fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, CellAwareInvocationAcceptedSizedLifting.below_one, fault⟩
+  | _ =>
+    exfalso
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
+
+private theorem return_unit_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) (form : node.form = .returnStmt none)
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) : False := by
+  cases fault with
+  | missing absent => exact Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)
+  | _ =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
+
+private theorem declared_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) {binder : TypedBinder} {expression : ExpressionId}
+    (form : node.form = .letDecl binder (some expression)) (monomorphic : binder.scheme.quantified = [])
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) :
+    ∃ child, child < size ∧ SourceExecutionSize.ExpressionFaults program child context evidence source environment
+      before expression reason after := by
+  cases fault with
+  | missing absent => exact (Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)).elim
+  | polymorphicLet contains formEq polymorphic _ =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact absurd monomorphic polymorphic
+  | letInitializer contains formEq _ fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, CellAwareInvocationAcceptedSizedLifting.below_one, fault⟩
+  | _ =>
+    exfalso
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
+
+private theorem uninitialized_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) {binder : TypedBinder}
+    (form : node.form = .letDecl binder none) (monomorphic : binder.scheme.quantified = [])
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) : False := by
+  cases fault with
+  | missing absent => exact Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)
+  | polymorphicLet contains formEq polymorphic _ =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact polymorphic monomorphic
+  | _ =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
+
+private theorem assigned_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {expression : ExpressionId}
+    (form : node.form = .assignValue assignment operator expression)
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) :
+    ∃ child, child < size ∧ SourceExecutionSize.SourcePlaceAssignmentFaults program child context evidence source
+      environment before assignment.target operator expression reason after := by
+  cases fault with
+  | missing absent => exact (Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)).elim
+  | assignValue contains formEq fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, CellAwareInvocationAcceptedSizedLifting.below_one, fault⟩
+  | _ =>
+    exfalso
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
+
+private theorem bitNotted_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) {assignment : AssignmentResolution}
+    (form : node.form = .assignBitNot assignment)
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) :
+    ∃ child, SourceExecutionSize.SourcePlaceBitNotFaults program child context evidence source environment before
+      assignment.target reason after := by
+  cases fault with
+  | missing absent => exact (Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)).elim
+  | assignBitNot contains formEq fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, fault⟩
+  | _ =>
+    exfalso
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
+
+private theorem discarded_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) {expression : ExpressionId}
+    (form : node.form = .expression expression true)
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) :
+    ∃ child, child < size ∧ SourceExecutionSize.ExpressionFaults program child context evidence source environment
+      before expression reason after := by
+  cases fault with
+  | missing absent => exact (Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)).elim
+  | expression contains formEq fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, CellAwareInvocationAcceptedSizedLifting.below_one, fault⟩
+  | _ =>
+    exfalso
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
+
+private theorem block_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) {statements : List StatementId}
+    (form : node.form = .block statements)
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) :
+    ∃ child innerContext, child < size ∧ SourceExecutionSize.StatementsFault program child context evidence source
+      environment before statements innerContext reason after := by
+  cases fault with
+  | missing absent => exact (Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)).elim
+  | block contains formEq fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, _, CellAwareInvocationAcceptedSizedLifting.below_one, fault⟩
+  | _ =>
+    exfalso
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
+
+private theorem conditional_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) {condition : ExpressionId} {thenBody : List StatementId}
+    {elseBody : Option (List StatementId)} (form : node.form = .ifThen condition thenBody elseBody)
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) :
+    (∃ test, test < size ∧ SourceExecutionSize.ExpressionFaults program test context evidence source environment
+      before condition reason after) ∨
+    (∃ expected actual, reason = .typeMismatch expected actual) ∨
+    (∃ test inner truth middle innerContext, test < size ∧ inner < size ∧
+      SourceExecutionSize.ExpressionEvaluates program test context evidence source environment before condition
+        (.bool truth) middle ∧
+      SourceExecutionSize.StatementsFault program inner context evidence source environment middle
+        (if truth then thenBody else elseBody.getD []) innerContext reason after) := by
+  cases fault with
+  | missing absent => exact (Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)).elim
+  | ifCondition contains formEq fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact .inl ⟨_, CellAwareInvocationAcceptedSizedLifting.below_one, fault⟩
+  | ifConditionType => exact .inr (.inl ⟨_, _, rfl⟩)
+  | ifTrueBody contains formEq test fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact .inr (.inr ⟨_, _, true, _, _, CellAwareInvocationAcceptedSizedLifting.below_left,
+      CellAwareInvocationAcceptedSizedLifting.below_right, test, fault⟩)
+  | ifFalseBody contains formEq test fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact .inr (.inr ⟨_, _, false, _, _, CellAwareInvocationAcceptedSizedLifting.below_left,
+      CellAwareInvocationAcceptedSizedLifting.below_right, test, fault⟩)
+  | _ =>
+    exfalso
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
+end Inversion
+
+variable {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked) {program : Program}
+  {registry : Staging.Recursive.Registry} {called : DeclarationInstantiation → Prop}
+  {scope : Staging.Recursive.Scope} {expected : TypeSystem.Ty}
+
+/-- An assignment whose bare target faults: its root is unbound or dangling. -/
+private theorem bare_target_fault {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
+    (contains : ContainsStatement scope.source id node) (form : node.form = .assignValue assignment operator rhs)
+    (bare : assignment.target.projections = [])
+    (failed : SourceExecutionSize.SourcePlaceFaults program size context scope.evidence scope.source environment
+      before assignment.target reason after) :
+    Staging.Recursive.StatementsIn program registry mode scope context environment before (id :: rest) context
+      (.fault (.semantic reason)) after := by
+  cases failed with
+  | unbound missing => exact .assignBareUnbound contains form bare missing
+  | dangling lookup missing => exact .assignBareDangling contains form bare lookup missing
+  | projectionExpression _ _ failed =>
+    rw [bare] at failed
+    cases failed
+  | danglingAfterProjections lookup _ evaluated missing =>
+    rw [bare] at evaluated
+    cases evaluated
+    exact .assignBareDangling contains form bare lookup missing
+  | projectionRead _ _ evaluated _ _ failed =>
+    rw [bare] at evaluated
+    cases evaluated
+    cases failed
+  | uninitialized _ _ evaluated _ _ _ projected =>
+    rw [bare] at evaluated
+    cases evaluated
+    exact absurd rfl projected
+  | elementPrefix projectionsEq _
+  | elementIndex projectionsEq _ _
+  | elementIndexType projectionsEq _ _ _ _
+  | elementOutOfBounds projectionsEq _ _ _ _ _ _
+  | elementUninitialized projectionsEq _ _ =>
+    rw [bare] at projectionsEq
+    simp at projectionsEq
+
+/-- One statement followed by the rest of its list, over sized fault
+derivations. A faulting head ends the list at its context; a falling-through
+head is followed by a fault in the rest. -/
+private theorem sequence_fault {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+    {size : Nat} {reason : Dynamic.SemanticFault} (unique : NodeOccurrencesUnique scope.source)
+    (found : scope.source.lookupStatement? id = some node)
+    (notTail : ∀ expression, node.form ≠ .expression expression false)
+    (step : ∀ {context environment before middleContext nextEnvironment middle finalContext after}
+        {headSize tailSize : Nat}, headSize < size → tailSize < size → context.signatures = program.signatures →
+      SourceExecutionSize.StatementExecutes program headSize context scope.evidence scope.source environment before id
+        middleContext (.fallthrough nextEnvironment) middle →
+      FaultOriginal program tailSize mode middleContext scope.evidence scope.source nextEnvironment middle rest
+        finalContext reason after →
+      Staging.Recursive.StatementsIn program registry mode scope context environment before (id :: rest)
+        finalContext (.fault (.semantic reason)) after)
+    (stop : ∀ {context environment before after} {headSize : Nat}, headSize < size →
+      context.signatures = program.signatures →
+      SourceExecutionSize.StatementFaults program headSize context scope.evidence scope.source environment before id
+        reason after →
+      Staging.Recursive.StatementsIn program registry mode scope context environment before (id :: rest)
+        context (.fault (.semantic reason)) after) :
+    ∀ {context environment before finalContext after}, context.signatures = program.signatures →
+      FaultOriginal program size mode context scope.evidence scope.source environment before (id :: rest)
+        finalContext reason after →
+      Staging.Recursive.StatementsIn program registry mode scope context environment before (id :: rest)
+        finalContext (.fault (.semantic reason)) after := by
+  intro context environment before finalContext after signatures original
+  cases mode with
+  | false =>
+    unfold FaultOriginal at original
+    cases original with
+    | head fault => exact stop CellAwareInvocationAcceptedSizedLifting.below_one signatures fault
+    | tail head next =>
+      exact step CellAwareInvocationAcceptedSizedLifting.below_left CellAwareInvocationAcceptedSizedLifting.below_right
+        signatures head next
+  | true =>
+    unfold FaultOriginal at original
+    cases original with
+    | singleton fault => exact stop CellAwareInvocationAcceptedSizedLifting.below_one signatures fault
+    | tailExpression contains form _ =>
+      obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+      exact absurd form (notTail _)
+    | head fault => exact stop CellAwareInvocationAcceptedSizedLifting.below_one signatures fault
+    | tail head next =>
+      exact step CellAwareInvocationAcceptedSizedLifting.below_left CellAwareInvocationAcceptedSizedLifting.below_right
+        signatures head next
+
+/-- A sized fault execution of a supported statement list with an expressible
+reason, at a context with the program's signatures, is a staged fault
+execution with the same context, reason and heap, given the value and fault
+liftings of its expressions below the size. -/
+theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : ExpressionId → Prop} {bound : Nat}
+    (lift : ChildLifts program registry scope child bound)
+    (faultLift : ChildFaultLifts program registry scope child bound) {mode : Bool} {statements : List StatementId}
+    (shape : Shape scope.source expected child mode statements) :
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault},
+      size ≤ bound → context.signatures = program.signatures → Expressible reason →
+      FaultOriginal program size mode context scope.evidence scope.source environment before statements finalContext
+        reason after →
+      Staging.Recursive.StatementsIn program registry mode scope context environment before statements finalContext
+        (.fault (.semantic reason)) after := by
+  induction shape with
+  | @nil mode _ =>
+    intro size context environment before after finalContext reason _ _ _ original
+    cases mode <;> unfold FaultOriginal at original <;> cases original
+  | returned found form value =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after _ _ _ _ _ head _
+      obtain ⟨_, _, _, _, _, impossible⟩ := CellAwareInvocationAcceptedSizedLifting.returned_inv unique found form head
+      cases impossible
+    · intro context environment before after headSize headBelow signatures fault
+      obtain ⟨_, childBelow, fault⟩ := return_fault_inv unique found form fault
+      exact .returnFault (lookupStatement?_sound found) form
+        (faultLift value (by omega) signatures expressible fault)
+  | returnUnit found form =>
+    intro size context environment before after finalContext reason _ signatures _ original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after _ _ _ _ _ head _
+      obtain ⟨_, impossible, _⟩ := CellAwareInvocationAcceptedSizedLifting.return_unit_inv unique found form head
+      cases impossible
+    · intro context environment before after _ _ _ fault
+      exact (return_unit_fault_inv unique found form fault).elim
+  | declared found form monomorphic value _ tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, _, _, _, childBelow, evaluate, extension, allocate, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.declared_inv unique found form monomorphic head
+      cases same
+      exact .letInitialized (lookupStatement?_sound found) form (lift value (by omega) evaluate)
+        monomorphic extension allocate
+        (tailIH (by omega) (extension.context_fields.1.trans signatures) expressible next)
+    · intro context environment before after headSize headBelow signatures fault
+      obtain ⟨_, childBelow, fault⟩ := declared_fault_inv unique found form monomorphic fault
+      exact .letFault (lookupStatement?_sound found) form monomorphic
+        (faultLift value (by omega) signatures expressible fault)
+  | uninitialized found form monomorphic _ tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, extension, allocate, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.uninitialized_inv unique found form head
+      cases same
+      exact .letUninitialized (lookupStatement?_sound found) form monomorphic extension allocate
+        (tailIH (by omega) (extension.context_fields.1.trans signatures) expressible next)
+    · intro context environment before after _ _ _ fault
+      exact (uninitialized_fault_inv unique found form monomorphic fault).elim
+  | assigned found form assignable value _ tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, _, childBelow, executes, rfl, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.assigned_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve evaluate write =>
+        obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+        exact .assignBare (lookupStatement?_sound found) form snapshot
+          (lift value (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+            omega) evaluate)
+          write (tailIH (by omega) signatures expressible next)
+    · intro context environment before after headSize headBelow signatures fault
+      have contains := lookupStatement?_sound found
+      obtain ⟨_, childBelow, fault⟩ := assigned_fault_inv unique found form fault
+      cases fault with
+      | target failed => exact bare_target_fault contains form assignable.2.1 failed
+      | rhs resolve failed =>
+        obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+        exact .assignBareFault contains form snapshot
+          (faultLift value (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+            omega) signatures expressible failed)
+      | operands resolve evaluate currentRead rootType initialValue pathRead invalid =>
+        obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+        exact .assignBareOperands contains form snapshot
+          (lift value (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+            omega) evaluate) currentRead rootType initialValue pathRead invalid
+      | panic resolve evaluate currentRead rootType initialValue pathRead panics =>
+        obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+        exact .assignBarePanic contains form snapshot
+          (lift value (by
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+            omega) evaluate) currentRead rootType initialValue pathRead panics
+      | structuralUpdate resolve _ _ _ _ failed =>
+        obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+        cases snapshot
+        cases failed
+  | bitNotted found form assignable _ tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, _, _, executes, rfl, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.bitNotted_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve write =>
+        obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+        exact .bitNotBare (lookupStatement?_sound found) form snapshot write
+          (tailIH (by omega) signatures expressible next)
+    · intro context environment before after _ _ _ fault
+      obtain ⟨_, fault⟩ := bitNotted_fault_inv unique found form fault
+      have unchanged := Staging.Recursive.bitNot_fault_heap assignable.2.1 fault.sound
+      subst unchanged
+      exact .bitNotBareFault (lookupStatement?_sound found) form assignable.2.1 fault.sound
+  | discarded found form value _ tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, _, childBelow, evaluate, rfl, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.discarded_inv unique found form head
+      cases same
+      exact .discard (lookupStatement?_sound found) form (lift value (by omega) evaluate)
+        (tailIH (by omega) signatures expressible next)
+    · intro context environment before after headSize headBelow signatures fault
+      obtain ⟨_, childBelow, fault⟩ := discarded_fault_inv unique found form fault
+      exact .expressionFault (lookupStatement?_sound found) form
+        (faultLift value (by omega) signatures expressible fault)
+  | block found form inner _ innerIH tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, _, innerOutcome, innerBelow, executes, rfl, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.block_inv unique found form head
+      cases innerOutcome with
+      | fallthrough innerEnvironment =>
+        cases same
+        exact .blockFallthrough (lookupStatement?_sound found) form
+          (CellAwareInvocationAcceptedSizedLifting.statements unique lift inner (by omega) executes)
+          (tailIH (by omega) signatures expressible next)
+      | _ => cases same
+    · intro context environment before after headSize headBelow signatures fault
+      obtain ⟨_, _, innerBelow, fault⟩ := block_fault_inv unique found form fault
+      exact .blockFault (lookupStatement?_sound found) form (innerIH (by omega) signatures expressible fault)
+  | @conditional mode id rest node condition thenBody elseBody found form test left right _ leftIH rightIH tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    have branch : ∀ {truth : Bool} {innerSize : Nat} {context environment before innerContext inner after},
+        innerSize ≤ bound →
+        SourceExecutionSize.StatementsExecute program innerSize context scope.evidence scope.source environment before
+          (if truth then thenBody else elseBody.getD []) innerContext inner after →
+        Staging.Recursive.StatementsIn program registry false scope context environment before
+          (if truth then thenBody else elseBody.getD []) innerContext
+          (CellAwareInvocationAcceptedStatementLifting.control inner) after := by
+      intro truth innerSize context environment before innerContext inner after within executes
+      cases truth
+      · exact CellAwareInvocationAcceptedSizedLifting.statements unique lift right within executes
+      · exact CellAwareInvocationAcceptedSizedLifting.statements unique lift left within executes
+    have branchFault : ∀ {truth : Bool} {innerSize : Nat} {context environment before innerContext after},
+        innerSize ≤ bound → context.signatures = program.signatures →
+        SourceExecutionSize.StatementsFault program innerSize context scope.evidence scope.source environment before
+          (if truth then thenBody else elseBody.getD []) innerContext reason after →
+        Staging.Recursive.StatementsIn program registry false scope context environment before
+          (if truth then thenBody else elseBody.getD []) innerContext (.fault (.semantic reason)) after := by
+      intro truth innerSize context environment before innerContext after within signatures failed
+      cases truth
+      · exact rightIH within signatures expressible failed
+      · exact leftIH within signatures expressible failed
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨rfl, _, _, truth, _, _, innerOutcome, testBelow, innerBelow, evaluate, executes, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.conditional_inv unique found form head
+      cases innerOutcome with
+      | fallthrough innerEnvironment =>
+        cases same
+        exact .ifFallthrough (lookupStatement?_sound found) form (lift test (by omega) evaluate)
+          (branch (by omega) executes) (tailIH (by omega) signatures expressible next)
+      | _ => cases same
+    · intro context environment before after headSize headBelow signatures fault
+      rcases conditional_fault_inv unique found form fault with
+        ⟨_, testBelow, failed⟩ | ⟨_, _, rfl⟩ | ⟨_, _, truth, _, _, testBelow, innerBelow, evaluate, failed⟩
+      · exact .ifConditionFault (lookupStatement?_sound found) form
+          (faultLift test (by omega) signatures expressible failed)
+      · simp [Expressible] at expressible
+      · exact .ifFault (lookupStatement?_sound found) form (lift test (by omega) evaluate)
+          (branchFault (by omega) signatures failed)
+
+/-- Every admitted callee's original body fault is a staged fault execution
+at every size: the strong induction on the size across bodies that lifts
+their values, given that their direct calls have plain callees. -/
+theorem bodies_fault (callees : Callees prepared program registry called)
+    (plain : CalleesFault program called) (bound : Nat) :
+    BodiesFaultLift program registry called bound := by
+  induction bound using Nat.strongRecOn with
+  | ind bound ih =>
+    intro instantiation bodyInstance statements admitted instantiates rootsEq
+    obtain ⟨child, named, expected, closure, unique, shape⟩ := callees admitted instantiates rootsEq
+    refine ⟨child, closure, ?_⟩
+    intro size context environment before after finalContext reason below signatures expressible trace
+    have sourceEq : child.source = bodyInstance.source := registry.source closure
+    have evidenceEq : child.evidence = [] := registry.evidence closure
+    have childUnique : NodeOccurrencesUnique child.source := sourceEq ▸ unique
+    have childPlain : CalleesPlain child.source := sourceEq ▸ plain admitted instantiates
+    have childShape : Shape child.source expected (Nested prepared named child.source called) true statements := by
+      rw [sourceEq]
+      exact shape
+    have values : BodiesLift program registry called size :=
+      CellAwareInvocationAcceptedCallLifting.bodies prepared callees size
+    refine statements_fault childUnique
+      (CellAwareInvocationAcceptedCallLifting.nested_roots prepared childUnique values)
+      (nested_fault_roots prepared childUnique childPlain values (ih size below)) childShape (Nat.le_refl size)
+      signatures expressible ?_
+    show SourceExecutionSize.FunctionStatementsFault program size context child.evidence child.source environment
+      before statements finalContext reason after
+    rw [sourceEq, evidenceEq]
+    exact trace
+
+/-- An ordinary function-body fault of a supported list whose expressions are
+nested sites, with an expressible reason at a context with the program's
+signatures, is a staged fault execution with the same context, reason and
+heap, at any scope with the execution's Source and evidence, given that the
+direct calls of the body and of the admitted callees have plain callees and
+the static receipts of the admitted callees. -/
+theorem body_fault {scope : Staging.Recursive.Scope} {source : TypedSource} {evidence : Dynamic.EvidenceEnvironment}
+    (sourceEq : scope.source = source) (evidenceEq : scope.evidence = evidence)
+    (unique : NodeOccurrencesUnique source) (plain : CalleesPlain source)
+    (callees : Callees prepared program registry called) (calleesPlain : CalleesFault program called)
+    {named : SourceCoreGeneralFunctions.Function} {expected : TypeSystem.Ty} {statements : List StatementId}
+    (shape : Shape source expected (Nested prepared named source called) true statements)
+    {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {finalContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault}
+    (signatures : context.signatures = program.signatures) (expressible : Expressible reason)
+    (trace : Dynamic.FunctionStatementsFault program context evidence source environment before statements
+      finalContext reason after) :
+    ∃ size, Staging.Recursive.Size.Statements program registry size scope context environment before statements
+      finalContext (.fault (.semantic reason)) after := by
+  subst sourceEq evidenceEq
+  obtain ⟨size, sized⟩ := SourceExecutionSize.FunctionStatementsFault.has_size trace
+  have values : BodiesLift program registry called size :=
+    CellAwareInvocationAcceptedCallLifting.bodies prepared callees size
+  exact Staging.Recursive.Size.Statements.of_trace
+    (statements_fault unique (CellAwareInvocationAcceptedCallLifting.nested_roots prepared unique values)
+      (nested_fault_roots prepared unique plain values (bodies_fault prepared callees calleesPlain size)) shape
+      (Nat.le_refl size) signatures expressible sized)
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedFaultLifting
 end
