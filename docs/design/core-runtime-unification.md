@@ -304,12 +304,13 @@ program.
 - **The body shape.** `Shape`, in `CellAwareInvocationAcceptedBodyShape`
   ([AcceptedShapes](../../Solcore/SourceSemantics/CoreLowering/AcceptedShapes.lean)), recognizes on
   the Source statement lists of value and unit returns, monomorphic declarations, bare assignments
-  that the compiler refines (`Assignable`), expression statements, blocks and conditionals, with
-  every expression in a given predicate. A list that may end without returning is a branch or block
+  that the compiler refines (`Assignable`), bare in-place `~` that it refines
+  (`BitNotAssignable`), expression statements, blocks and conditionals, with every expression in
+  a given predicate. A list that may end without returning is a branch or block
   body, or belongs to a Unit function. `covered` shows that every refined accepted tree of such a
   list is covered; a refined tree keeps the unrefined assignment branch only for writes that are not
-  `ValueAssignable`. `shape?` checks a shape with subset-site expressions on an actually compiled
-  row.
+  `ValueAssignable`, and the unrefined `~=` branch only for those that are not `UnaryAssignable`.
+  `shape?` checks a shape with subset-site expressions on an actually compiled row.
 - **The receipts.** `CellAwarePublicAcceptedNamedRoot.refined_body` refines the actual body receipt
   at a prepared header with the header's own assignment, bit-not and match policies.
   `CellAwarePublicAcceptedNamedRoot.compilation_receipts` derives the original compilation receipt
@@ -399,8 +400,8 @@ On the accepted-body route above, the next connected steps are:
   - Instantiate the theorems at a body with declarations, assignments, conditionals, operators and
     pairs. This needs a fixture with the older root's receipts and an independent Source trace of
     that body, or a proof-producing Source evaluator for the closed subset.
-  - Extend the shape, its coverage and the lifting to fault outcomes, projected writes, bit-not
-    updates, tail values and loops.
+  - Extend the shape, its coverage and the lifting to fault outcomes, projected writes, tail
+    values and loops.
   - Carry the accepted instance model through public histories, so that later calls chain.
   - Issue program support from the compiler receipt for every accepted program, rather than from an
     observation of its typings.

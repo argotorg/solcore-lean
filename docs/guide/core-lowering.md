@@ -141,6 +141,9 @@ Build the umbrella and work up from the lowest failing file: its importers fail 
     `<<=` and `>>=` (`ShiftCompoundAssignmentOperator`). A shift's amount keeps its own type at a
     `Word` target and at a fixed-width one (`AssignedRhsView`), and the place pipelines read it
     there (`CompatiblePlaceModifier.assigned_outcome`).
+  - In-place `~` carries `WideBitNotProfile` (`Foundations/FixedModifiers`): a `word` or `integer`
+    view, or a fixed-width target at its own type. At `uint8` … `uint128` the compiler keeps the
+    low bits of the leaf (`bitNotWrap`).
   - Public-API tests go in `Foundations/Execution`. The `example` in
     `Tests.SourceCorePrimitiveExpressions` (`Foundations/Statements`) runs every
     `StrictBinaryOperator` through `PrimitiveExpressions.lowerExpression_preserves`.

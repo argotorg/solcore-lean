@@ -163,8 +163,7 @@ rejected before the body runs, as a data-conversion error: the counterpart of st
 
 **Meaning proofs.** The operators, literals, unary minus and `case uint256(p)` at the twelve types
 are inside the meaning proofs, and so, on the accepted-body route, are the conversions. So are
-compound assignments at fixed-width targets, `<<=` and `>>=` included. In-place `~` there is
-compiled but outside them.
+compound assignments at fixed-width targets, `<<=` and `>>=` included, and in-place `~` there.
 
 **Tests.** `Tests.SourceCoreShiftExecution` and `Tests.SourceCoreUncheckedExecution` run shifts
 and blocks through the public API. `runUpstreamFixtures` in `Tests.SourceCoreFixedIntegerOperators`
@@ -474,10 +473,11 @@ inside the meaning proofs (`BinaryProfile.fixedDivision`).
   the snapshot (`BitNotSnapshot`), or on `uint8` … `uint128` Word's `~` masked to the low `N` bits,
   which `wrapLeaf` does to the leaf before the setter. Word's `~` alone would not keep a narrow
   target's heap well typed, so the staged rules read the write at `BitNotAssignmentApplies` too.
-- **Outside the meaning proofs** at fixed-width targets. The compiler profiles of `~=`
-  (`BitNotAssignable`, `ProjectedBitNotAssignable`) take only a `Word` target. `w ~=;` and
-  `m[k] ~=;` stay in the compiler body profile that the meaning proofs take, and an `int8` target
-  is outside it (`Tests.SourceCoreBitNotSubset`).
+- **Inside the meaning proofs** at fixed-width targets. The compiler profiles of `~=`
+  (`BitNotAssignable`, `ProjectedBitNotAssignable`) take a `Word` target or one of the twelve
+  types, so `w ~=;`, `m[k] ~=;` and an `int8` target's `r ~=;` stay in the compiler body profile
+  that the meaning proofs take (`Tests.SourceCoreBitNotSubset`). The heads hold
+  `WideBitNotProfile` at the target's type and emit the compiler's wrap (`bitNotWrap`).
 
 ### Row 1's conversions: a word becomes a value only when canonical
 
@@ -564,8 +564,6 @@ struct types, such as `case uint8(w)`, are rejected as upstream rejects them.
 
 ## What remains
 
-- **Meaning proofs.** One part is compiled but outside the meaning proofs: in-place `~` at
-  fixed-width targets, whose compiler profiles take only a `Word` target.
 - **Deferred `Typedef` resolution** at finalization (option A). It is not scheduled.
 - **`where` with the builtin `Int`**, a frontend gap older than row 1.
 - **Generic code**, such as `Typedef`'s identity at other types, which row 1 leaves out.

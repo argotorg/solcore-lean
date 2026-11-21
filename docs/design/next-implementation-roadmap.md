@@ -1,7 +1,7 @@
 # Next implementation roadmap
 
-Updated: 2026-11-21. Where the work stands, and the order of the next work, as the user approved
-it from 2026-11-17 to 2026-11-21. solcore-rs is pinned at `d1b5ac28`.
+Updated: 2026-11-22. Where the work stands, and the order of the next work, as the user approved
+it from 2026-11-17 to 2026-11-22. solcore-rs is pinned at `d1b5ac28`.
 
 ## Status at a glance
 
@@ -126,18 +126,20 @@ The last two are recorded without investigation, and the generators avoid them.
    - a literal `lidx` index, which gets `uint256` as a read's index does;
    - the Patterson, coverage and closed-default conditions (`SC0213`, `SC0212`, `SC0219`), with
      upstream's two pragmas.
-2. **Meaning proofs.** Row 1's leftover: in-place `~` at the twelve types
-   ([what remains](integer-types-unchecked-shifts.md#what-remains)). Then the rest of native
-   Source goal two.
+2. **Meaning proofs.** The rest of native Source goal two
+   ([remaining work](core-runtime-unification.md#remaining-work-for-the-second-goal)). Row 1 has
+   no leftover: in-place `~` at the twelve types is inside the meaning proofs.
 3. **Lean's native frontend as a fourth differential path.** The harness runs the admitted pure
    cases through the native pipeline, alone or as the fuzz driver's `native` run kind, memory
-   arrays with their slices and memrefs among them. Lean's imports follow upstream's `SC0108`
-   and `SC0110`, an unknown module is refused at the import, and of two imports that bind one
-   name from one module the first is kept. The 26 pure functions of `std.opcodes` are builtins
-   that no name reaches yet. Next, Lean's imports follow upstream's `SC0117`, `SC0120` for
-   unused names and `SC0121`. Then come the `std.opcodes` module with its selected, aliased and
-   wildcard imports, the harness's next admission, qualified access to the module, and the
-   export checks.
+   arrays with their slices and memrefs among them. Lean's imports follow upstream's `SC0108`,
+   `SC0110`, `SC0117`, `SC0120` (for unused names too) and `SC0121`, in the modules reachable
+   from the entry, as upstream checks only those. An unknown module is refused at the import,
+   and of two imports that bind one name from one module the first is kept. The load resolves
+   `std.opcodes` with its 81 names: selected, aliased, wildcard and hiding imports bind them,
+   the 26 pure functions are builtins, and the others are refused where they are used. Next is
+   the harness's next admission. Then come qualified access to the module, std beside
+   `std.opcodes`, and the export checks. Two imports under one qualifier (`SC0116`) are still
+   accepted.
 
 ### Then
 
@@ -175,7 +177,7 @@ code.
 
 | Row | Upstream change | Status | Fixtures |
 | ---: | --- | --- | --- |
-| 1 | Checked integer types and literal defaulting (#95): `uint8` to `uint256` and `int8` to `int256`, checked `+ - * / %` that panic with `0x11` or `0x12`, unary negation, range-checked literals, ABI validation of narrow integers, and an unconstrained literal defaulting to `uint256` instead of `word` | **Done.** The twelve types are builtins with comparisons, bitwise operators, checked and unchecked arithmetic, shifts and their compound forms, range-checked literals, the `uint256` default, the constructors from `word`, and `Typedef.abs` and `Typedef.rep` where the call's type is known. In-place `~` at the twelve types is compiled but outside the meaning proofs, and four differences from upstream remain ([integer note](integer-types-unchecked-shifts.md#semantics-in-lean), [differences](integer-types-unchecked-shifts.md#differences-from-upstream)). | `checked-arith`, `int-ops`, `issue92-checked-defaults`, `shift-operators`, `mini-erc20`, `deposit` |
+| 1 | Checked integer types and literal defaulting (#95): `uint8` to `uint256` and `int8` to `int256`, checked `+ - * / %` that panic with `0x11` or `0x12`, unary negation, range-checked literals, ABI validation of narrow integers, and an unconstrained literal defaulting to `uint256` instead of `word` | **Done.** The twelve types are builtins with comparisons, bitwise operators, checked and unchecked arithmetic, shifts and their compound forms, range-checked literals, the `uint256` default, the constructors from `word`, and `Typedef.abs` and `Typedef.rep` where the call's type is known. Four differences from upstream remain ([integer note](integer-types-unchecked-shifts.md#semantics-in-lean), [differences](integer-types-unchecked-shifts.md#differences-from-upstream)). | `checked-arith`, `int-ops`, `issue92-checked-defaults`, `shift-operators`, `mini-erc20`, `deposit` |
 | 2 | `unchecked` blocks (#119): `+ - * / %` inside a block resolve to `std.unchecked`'s wrapping instances, lexically | **Done** for `word` and the twelve types. `+ - * / %` and their compound forms wrap to the type's width, and `/ %` panic with `0x12` on a zero divisor ([unchecked blocks](integer-types-unchecked-shifts.md#unchecked-blocks-as-implemented)). | `unchecked-scope`, `shift-operators` |
 | 3 | Shift operators (#129): `<<` and `>>` with `Shl`, `Shr` and `ShiftAmount`, arithmetic `>>` for signed types, no revert, amounts of at least the width giving 0 or -1 | **Done** for `word` and the twelve types: `<<`, `>>`, `<<=` and `>>=` by a `word` or unsigned amount ([shifts](integer-types-unchecked-shifts.md#shifts-as-implemented)). | `shift-operators` |
 | 4 | Memory arrays, slices and panic codes (#145): `T[]`, `new T[](n)` zeroed, `a.length` and methods on any receiver, `a[i]` through a checked `memref`, read-only slices `a[s:e]`, memory arrays in the public ABI, `Panic(0x32)` for indices and slice bounds, `Panic(0x31)` for an empty pop, `Panic(0x41)` for allocation overflow | **Done for memory arrays in functions.** `T[]`, `new`, literals, reads, element writes and compound assignments, lengths, slices, `toArray(s)`, `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` are typed, have their source semantics and compile through the compatible profile, outside the meaning proofs. A compound assignment evaluates its element place once, by the user's decision, where upstream evaluates it twice. Storage and calldata arrays and `T[]` in the ABI wait for native contract storage and a calldata ABI ([memory arrays note](memory-arrays-slices.md), [differences](memory-arrays-slices.md#differences-from-upstream-that-lean-would-keep)). | `array-syntax`, `mem-array`, `array-slice`, `calldata-slice`, `memory-array-abi`, `user-collection-index`, `memory-allocation-bounds`, `allocator-bounds`, `abi-sum-padding`, `array-ops` |

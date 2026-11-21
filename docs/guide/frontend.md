@@ -30,9 +30,12 @@ The [umbrella](../../Solcore/Frontend.lean) imports the pipeline (through
 
 A program flows down this table. `checkProgram` loads it (validating the workspace, parsing each
 file through `Syntax/Unchecked`, building the declaration environment), resolves imports, types and
-signatures, and checks every function and method body. The load refuses, as upstream does, a name
-that an import brings beside a declaration of the module, an unknown item, and an unknown module
-other than one of upstream's std modules. `SourceCoreCompiler.compileChecked` then
+signatures, and checks every function and method body. In the modules reachable from the entry,
+the load refuses the imports that upstream refuses where they are (`programImportErrors`): a name
+brought beside a declaration of the module, an unknown item, a name listed twice, a name brought
+from two modules, a qualifier beside a value of that name, and an unknown module other than one
+of upstream's std modules. An import of `std.opcodes` binds upstream's 81 names, of which the 26
+pure functions are builtins (`builtinNamed?`). `SourceCoreCompiler.compileChecked` then
 plans the specializations of the requested roots, validates the plan, and compiles one cached Core
 artifact. `SourceCoreExecution.prepare` turns that artifact into the recipe that sessions run.
 
