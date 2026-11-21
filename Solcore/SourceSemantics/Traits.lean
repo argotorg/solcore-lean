@@ -432,7 +432,7 @@ end Entails
 
 /-- A raw implementation-evidence tree represents a semantic tree when it
 retains the same goals, implementation identities, order, and recursive
-shape. -/
+shape; a retained given is a semantic assumption. -/
 inductive ImplementationEvidenceRepresents :
     TypedTraitResolution.Evidence → TraitEvidence → Prop where
   | byImpl
@@ -445,6 +445,8 @@ inductive ImplementationEvidenceRepresents :
       ImplementationEvidenceRepresents
         (.byImpl goal implId retainedPremises)
         (.implementation goal implId semanticPremises)
+  | byAssumption {goal : ProgramPredicate} :
+      ImplementationEvidenceRepresents (.byAssumption goal) (.assumption goal)
 
 namespace ImplementationEvidenceRepresents
 
@@ -464,6 +466,9 @@ theorem functional
       | byImpl otherPremises =>
           rw [Forall₂ImplementationEvidenceRepresents.functional
             premises otherPremises]
+  | byAssumption =>
+      cases rightRepresents
+      rfl
 
 /-- Pointwise implementation representations preserve the functionality of
 the retained premise spine. -/
@@ -528,8 +533,7 @@ theorem goal_eq
   cases represents with
   | assumption => rfl
   | implementation implementationRepresents =>
-      cases implementationRepresents
-      rfl
+      cases implementationRepresents <;> rfl
 
 end PredicateEvidenceRepresents
 

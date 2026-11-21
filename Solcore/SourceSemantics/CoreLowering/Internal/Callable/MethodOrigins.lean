@@ -97,6 +97,10 @@ theorem resolve_of_resolved {goals : List ProgramPredicate} {dictionary : Dictio
       have goalEq : SourceCompilationPlan.runtimeEvidenceGoal raw = goal := by
         simpa only [CallableEvidenceEnvironment.evidence_goal] using valid.evidence_goal_eq
       cases raw with
+      | byAssumption actual =>
+          simp only [evidence] at valid
+          cases valid with
+          | assumption member => cases member
       | byImpl actual implementation premises =>
           simp only [SourceCompilationPlan.resolveRuntimeEvidenceEnvironment, head]
           change actual = goal at goalEq
@@ -346,6 +350,7 @@ abbrev Dictionary := SourceTypedRuntime.RuntimeEvidenceEnvironment
 
 def subtrees : Raw → List Raw
   | tree@(.byImpl _ _ premises) => tree :: premises.flatMap subtrees
+  | tree@(.byAssumption _) => [tree]
 
 theorem subtree_mem {raw : Raw} {tree : TraitEvidence}
     (subtree : EvidenceSubtree (evidence raw) tree) :
@@ -353,7 +358,7 @@ theorem subtree_mem {raw : Raw} {tree : TraitEvidence}
   generalize eq : evidence raw = root at subtree
   induction subtree generalizing raw with
   | self root =>
-    exact ⟨raw, by cases raw; simp [subtrees], eq⟩
+    exact ⟨raw, by cases raw <;> simp [subtrees], eq⟩
   | @premise goal implementation premises premise selected member _ induction =>
     cases raw with
     | byImpl rawGoal rawImplementation rawPremises =>
@@ -364,6 +369,8 @@ theorem subtree_mem {raw : Raw} {tree : TraitEvidence}
       refine ⟨found, ?_, foundEq⟩
       simpa only [subtrees] using List.mem_cons_of_mem (.byImpl rawGoal rawImplementation rawPremises)
         (List.mem_flatMap.mpr ⟨child, childMember, foundMember⟩)
+    | byAssumption rawGoal =>
+      simp [evidence] at eq
 
 private theorem lookup_member {caller : EvidenceEnvironment}
     {goal : ProgramPredicate} {tree : TraitEvidence}
@@ -389,8 +396,7 @@ theorem origin_member {caller roots : Dictionary}
     refine ⟨raw, List.mem_append_right _
       (List.mem_flatMap.mpr ⟨rawRoot, rawRootMember, rawMember⟩), ?_, rawEq⟩
     have goalEq := (congrArg TraitEvidence.goal rawEq).trans same
-    cases raw
-    simpa only [evidence, TraitEvidence.goal, SourceTypedRuntime.runtimeEvidenceGoal,
+    cases raw <;> simpa only [evidence, TraitEvidence.goal, SourceTypedRuntime.runtimeEvidenceGoal,
       SourceCompilationPlan.runtimeEvidenceGoal] using goalEq
 
 def Compatible (goals : List ProgramPredicate) (entries : Dictionary) : Prop :=

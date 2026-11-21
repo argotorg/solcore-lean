@@ -635,12 +635,14 @@ theorem success_not_validity (seed : SourceSpecialization.SpecializedFunction) (
 
 /-- No reordering or erasure of recursive premises occurs when closed trees
 are passed through the materializer's implementation branch. -/
-theorem deep_closed (caller : Dynamic.EvidenceEnvironment) (left right : TypedTraitResolution.Evidence) :
+theorem deep_closed (caller : Dynamic.EvidenceEnvironment) (left right : TypedTraitResolution.Evidence)
+    (leftClosed : closedTree left = true) (rightClosed : closedTree right = true) :
     Dynamic.EvidenceCloses caller
       (evidence (.byImpl goal (.builtin .intWord) [left, right]))
       (.implementation goal (.builtin .intWord) [evidence left, evidence right]) := by
   simpa only [CallableNamedMetadata.evidence, List.map_cons, List.map_nil] using
     closes_self caller (.byImpl goal (.builtin .intWord) [left, right])
+      (by simp [closedTree, closedTrees, leftClosed, rightClosed])
 
 private def workspace : Workspace.RawWorkspace := {
   entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
@@ -654,6 +656,7 @@ private def workspace : Workspace.RawWorkspace := {
 
 private def depth : TypedTraitResolution.Evidence → Nat
   | .byImpl _ _ premises => 1 + (premises.map depth).foldl Nat.max 0
+  | .byAssumption _ => 1
 
 private def audit (entry : SourceCompilerFeatureSupport.Entry) : IO Unit := do
   let prepared := entry.cached.indexed

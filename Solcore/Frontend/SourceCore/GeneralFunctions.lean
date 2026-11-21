@@ -453,6 +453,8 @@ mutual
     | .byImpl goal implementation premises =>
         .byImpl (TypedTraitResolution.applySubstitution substitution goal) implementation
           (applyEvidences substitution premises)
+    | .byAssumption goal =>
+        .byAssumption (TypedTraitResolution.applySubstitution substitution goal)
   def applyEvidences (substitution : Substitution) :
       List TypedTraitResolution.Evidence → List TypedTraitResolution.Evidence
     | [] => []
@@ -474,7 +476,7 @@ theorem applyPredicateEvidence_goal (substitution : Substitution) (evidence : Pr
       TypedTraitResolution.applySubstitution substitution evidence.goal := by
   cases evidence with
   | assumption goal => rfl
-  | implementation evidence => cases evidence; rfl
+  | implementation evidence => cases evidence <;> rfl
 
 theorem applySolvedRequirement_alignment (substitution : Substitution) (row : SolvedRequirement)
     (aligned : row.evidence.goal = row.predicate) :

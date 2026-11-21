@@ -77,6 +77,8 @@ inductive Error where
       (reason : TraitResolution.InconclusiveReason
         ProgramTraitId Ty ProgramImplId)
   | builtinImplementationNotExecutable (implementation : BuiltinImplId)
+  /-- Primary evidence that is a caller's given rather than an implementation. -/
+  | assumptionNotExecutable (goal : ProgramPredicate)
   | evidenceNotSelected
       (implementation : Resolved.DeclarationId) (goal : ProgramPredicate)
   | missingImplementation (implementation : Resolved.DeclarationId)
@@ -234,7 +236,7 @@ private def validateEvidencePremiseGoals
       Except Error Unit
   | _, [], [] => pure ()
   | index, predicate :: predicates, evidence :: rest => do
-      let .byImpl actual _ _ := evidence
+      let actual := evidence.goal
       unless actual = predicate do
         throw (.evidencePremiseGoalMismatch implementation index predicate actual)
       validateEvidencePremiseGoals implementation (index + 1) predicates rest
@@ -268,7 +270,7 @@ private def validateMethodEvidenceGoals (program : CheckedProgram)
       Except Error Unit
   | _, [], [] => pure ()
   | index, predicate :: predicates, evidence :: rest => do
-      let .byImpl actual _ _ := evidence
+      let actual := evidence.goal
       unless actual = predicate do
         throw (.methodEvidenceGoalMismatch method index predicate actual)
       match (TypedTraitResolution.resolve program.signatures.resolutionRules 32
@@ -390,6 +392,7 @@ def checkMethodWithEvidenceAndArity
     (expectedTraitArity : Nat) (expectedName : String) :
     Except Error CheckedMethod := do
   let .byImpl goal implementationId premises := evidence
+    | throw (.assumptionNotExecutable evidence.goal)
   let implementationId ← match implementationId with
     | .declaration id => pure id
     | .builtin id => throw (.builtinImplementationNotExecutable id)

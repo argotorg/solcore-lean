@@ -1273,6 +1273,7 @@ private def resolvedMethodTraitEvidence (program : CheckedProgram) :
           predicate).outcome with
       | .success evidence@(.byImpl goal _ _) =>
           if goal = predicate then .implementation evidence :: tail else tail
+      | .success (.byAssumption _)
       | .noSolution
       | .inconclusive _ => tail
 

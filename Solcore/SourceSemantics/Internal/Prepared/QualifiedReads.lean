@@ -590,7 +590,8 @@ theorem witness_template_member {caller : Specialized}
     simp only [bind, Except.bind, pure, Except.pure, throw, throwThe,
       MonadExceptOf.throw] at iteration
     split at iteration
-    · cases iteration
+    · split at iteration <;> try contradiction
+      cases iteration
       refine ⟨_, rfl, ?_⟩
       intro witness present
       rcases List.mem_append.mp present with old | fresh

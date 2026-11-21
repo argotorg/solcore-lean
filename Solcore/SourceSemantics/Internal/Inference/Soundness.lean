@@ -18488,7 +18488,8 @@ theorem solveNormalizedPredicate_sound
       exact ⟨assumption, member, of_decide_eq_true equal⟩
   | false =>
       cases resolved : TypedTraitResolution.resolve
-          context.signatures.resolutionRules context.traitDepth goal with
+          context.signatures.resolutionRules context.traitDepth goal
+          (context.assumptions.map (Detail.applyPredicate state)) with
       | mk outcome statistics =>
           cases outcome with
           | noSolution =>
@@ -18507,16 +18508,14 @@ theorem solveNormalizedPredicate_sound
               | none =>
                   simp [assumed, resolved, refused] at success
                   subst retained
-                  apply RetainedEvidenceValid.weakenAssumptions
-                    (smaller := [])
-                  · simp
-                  · exact
-                      TraitResolutionSoundness.resolve_success_retainedEvidenceValid
-                        (rules := context.signatures.resolutionRules)
-                        (maxDepth := context.traitDepth)
-                        (goal := goal)
-                        (retained := evidence)
-                        (by simp [resolved])
+                  exact
+                    TraitResolutionSoundness.resolve_success_retainedEvidenceValid
+                      (rules := context.signatures.resolutionRules)
+                      (maxDepth := context.traitDepth)
+                      (givens := context.assumptions.map (Detail.applyPredicate state))
+                      (goal := goal)
+                      (retained := evidence)
+                      (by simp [resolved])
 
 /-- `solvePredicate` first normalizes its source predicate and then delegates
 to `solveNormalizedPredicate`, so its successful result has the same retained

@@ -47,6 +47,7 @@ mutual
         simp only [applyEvidence,
           Frontend.SourceSpecialization.applyEvidence]
         rw [applyEvidences_frontend_eq substitution premises]
+    | byAssumption goal => rfl
 
   theorem applyEvidences_frontend_eq
       (substitution : ParameterSubstitution)

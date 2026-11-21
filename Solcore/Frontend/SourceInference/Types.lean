@@ -32,6 +32,7 @@ namespace PredicateEvidence
 def goal : PredicateEvidence → ProgramPredicate
   | .assumption predicate => predicate
   | .implementation (.byImpl predicate _ _) => predicate
+  | .implementation (.byAssumption predicate) => predicate
 
 end PredicateEvidence
 
@@ -593,6 +594,7 @@ an ordinary implementation or another default. -/
 def defaultForParameter? (rules : List ProgramImplRule)
     (provided : List ProgramPredicate) :
     TypedTraitResolution.Evidence → Option ProgramPredicate
+  | .byAssumption _ => none
   | .byImpl goal implId premises =>
       if provided.contains goal ||
           !(TypedTraitResolution.predicateVariables goal).isEmpty then
@@ -621,15 +623,17 @@ def defaultForParameterList? (rules : List ProgramImplRule)
 end
 
 /-- Solve one normalized goal: an exactly matching assumption, or else trait
-resolution, whose evidence is refused when it decides a goal with a default
-that upstream does not use for a type parameter (`defaultForParameter?`). -/
+resolution, which takes a goal below the top from an equal assumption first,
+as upstream's local givens do.  Its evidence is refused when it decides a goal
+with a default that upstream does not use for a type parameter
+(`defaultForParameter?`). -/
 def solveNormalizedPredicate (context : Context) (state : State)
     (goal : ProgramPredicate) : Except Error PredicateEvidence :=
   if requirementAssumption? context state goal then
     .ok (.assumption goal)
   else
     match TypedTraitResolution.resolve context.signatures.resolutionRules
-        context.traitDepth goal with
+        context.traitDepth goal (context.assumptions.map (applyPredicate state)) with
     | { outcome := .success evidence, .. } =>
         match defaultForParameter? context.signatures.resolutionRules
             (providedPredicates context.signatures

@@ -1603,6 +1603,42 @@ private def testDefaultForTypeParameter : IO Unit := do
     | .implementation _ => pure ()
     | evidence => throw (IO.userError s!"{label} gave {reprStr evidence}")
 
+/-- Row 13's first step, `n1`: a goal below an implementation's condition is
+decided by an equal `where` predicate of the body before any implementation,
+as upstream's local givens are, so the caller's evidence fills it. -/
+private def testGivenBelowAnImplementation : IO Unit := do
+  let boxed := [
+    "trait BitNot<T> { function bnot(value: T) returns (T); }",
+    "trait Add<T> { function add(left: T, right: T) returns (T); }",
+    "enum Box<A> { Wrap(A) }",
+    "impl<A> Add<Box<A>> where A: BitNot { function add(left: Box<A>, right: Box<A>) returns (Box<A>) { match (left) { case Box.Wrap(x) { return Box.Wrap(~x); } } } }",
+    "function twice<T>(x: Box<T>) returns (Box<T>) where T: BitNot { return x + x; }"]
+  let givenPremise : SourceInference.PredicateEvidence → Bool
+    | .implementation (.byImpl _ _ [.byAssumption given]) =>
+        match given.subject with
+        | .parameter _ => true
+        | _ => false
+    | _ => false
+  for (label, lines) in [
+      ("a given below an implementation, no default", boxed),
+      ("a given below an implementation, beside a default", boxed ++
+        ["default impl<T> BitNot<T> { function bnot(value: T) returns (T) { return value; } }"])] do
+    let evidence ← acceptedDefaultEvidence label "twice" lines
+    assertTrue (givenPremise evidence)
+      s!"{label}: the condition did not come from the given: {reprStr evidence}"
+  -- An ordinary generic implementation whose condition the given proves is
+  -- selected, not the default after it. Upstream needs the pragma for its
+  -- head (`SC0213`).
+  let evidence ← acceptedDefaultEvidence "an ordinary implementation's condition from a given" "flip" [
+    "pragma no-patterson-condition;",
+    "trait BitNot<T> { function bnot(value: T) returns (T); }",
+    "trait Add<T> { function add(left: T, right: T) returns (T); }",
+    "default impl<T> Add<T> { function add(left: T, right: T) returns (T) { return right; } }",
+    "impl<T> Add<T> where T: BitNot { function add(left: T, right: T) returns (T) { return ~left; } }",
+    "function flip<T>(x: T, y: T) returns (T) where T: BitNot { return x + y; }"]
+  assertTrue (givenPremise evidence)
+    s!"the ordinary implementation was not selected: {reprStr evidence}"
+
 private def testStageClassification : IO Unit := do
   let missingEntry := {
     singleSourceWorkspace "function ok() { return; }" with
@@ -1843,6 +1879,7 @@ def testProgramChecking : IO Unit := do
   testInconclusive
   testDefaultImplementationPriority
   testDefaultForTypeParameter
+  testGivenBelowAnImplementation
   testStageClassification
   testPhantomImplementationParameterRejection
   testMissingImplementationTraitPredicateRejection
@@ -4772,10 +4809,12 @@ theorem deep_same (depth : Nat) : (nest depth (leaf 1 2) == nest depth (leaf 1 2
 
 private inductive Previous where
   | byImpl (goal : Predicate Nat Nat) (implementation : Nat) (premises : List Previous)
+  | byAssumption (goal : Predicate Nat Nat)
   deriving BEq
 
 private def previous : Proof → Previous
   | .byImpl goal implementation premises => .byImpl goal implementation (premises.map previous)
+  | .byAssumption goal => .byAssumption goal
 
 private def check (name : String) (left right : Proof) (expected : Bool) : IO Unit := do
   let actual := left == right
@@ -4794,6 +4833,11 @@ def run : IO Unit := do
   check "premise length" (.byImpl ⟨0, 0, []⟩ 0 [leaf 1 1]) (.byImpl ⟨0, 0, []⟩ 0 []) false
   check "deep equality" (nest 128 (leaf 1 2)) (nest 128 (leaf 1 2)) true
   check "deep difference" (nest 128 (leaf 1 2)) (nest 128 (leaf 1 3)) false
+  check "given" (.byAssumption ⟨1, 2, [3]⟩) (.byAssumption ⟨1, 2, [3]⟩) true
+  check "given goal" (.byAssumption ⟨1, 2, [3]⟩) (.byAssumption ⟨1, 2, [4]⟩) false
+  check "given against implementation" (.byAssumption ⟨1, 2, [3]⟩) (leaf 1 2) false
+  check "given premise" (.byImpl ⟨0, 0, []⟩ 0 [.byAssumption ⟨1, 2, [3]⟩])
+    (.byImpl ⟨0, 0, []⟩ 0 [leaf 1 2]) false
   IO.println "[PASS] structural evidence equality"
 end Tests.TraitResolutionEvidenceEquality
 end

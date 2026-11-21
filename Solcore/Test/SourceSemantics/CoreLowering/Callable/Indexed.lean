@@ -1095,7 +1095,9 @@ def run : IO Unit := do
       let _ ← SourceCompilerFeatureSupport.get "authenticate full dictionary" (SourceCompilationPlan.validateAuthenticatedRuntimeEvidence sourceProgram.signatures signature.key record.assumptions evidence)
       if !evidence.isEmpty then
         evidenceCount := evidenceCount + 1
-        let changed := evidence.map fun | .byImpl goal _ premises => TraitResolution.Evidence.byImpl goal (.builtin .intWord) premises
+        let changed := evidence.map fun
+          | .byImpl goal _ premises => TraitResolution.Evidence.byImpl goal (.builtin .intWord) premises
+          | given => given
         SourceCompilerFeatureSupport.require (match SourceCompilationPlan.validateAuthenticatedRuntimeEvidence sourceProgram.signatures signature.key record.assumptions changed with | .error _ => true | .ok _ => false)
           "same goals with changed evidence trees were accepted"
       if header.parameterSubstitution.length > 1 then

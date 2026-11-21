@@ -132,14 +132,17 @@ mutual
 /-- A generic resolver evidence certificate reconstructs a represented
 semantic evidence tree and its declarative validity derivation. -/
 theorem resolutionEvidenceValid_sound
-    {rules : List ProgramImplRule} {goal : ProgramPredicate}
+    {rules : List ProgramImplRule} {givens : List ProgramPredicate}
+    {goal : ProgramPredicate}
     {retained : TypedTraitResolution.Evidence}
     (valid : TraitResolution.ResolutionEvidenceValid
-      (TypedTraitResolution.programOfRules rules) goal retained) :
+      (TypedTraitResolution.programOfRules rules givens) goal retained) :
     ∃ semantic,
       ImplementationEvidenceRepresents retained semantic ∧
-        EvidenceValid [] rules goal semantic := by
+        EvidenceValid givens rules goal semantic := by
   cases valid with
+  | byAssumption given =>
+      exact ⟨.assumption goal, .byAssumption, .assumption given⟩
   | byImpl rule_mem id_eq matched premises =>
       obtain ⟨semanticPremises, representsPremises, validPremises⟩ :=
         resolutionPremisesValid_sound premises
@@ -154,13 +157,14 @@ theorem resolutionEvidenceValid_sound
 /-- The premise-list certificate is converted pointwise while preserving the
 goal order and retained-evidence shape. -/
 theorem resolutionPremisesValid_sound
-    {rules : List ProgramImplRule} {goals : List ProgramPredicate}
+    {rules : List ProgramImplRule} {givens : List ProgramPredicate}
+    {goals : List ProgramPredicate}
     {retained : List TypedTraitResolution.Evidence}
     (valid : TraitResolution.ResolutionPremisesValid
-      (TypedTraitResolution.programOfRules rules) goals retained) :
+      (TypedTraitResolution.programOfRules rules givens) goals retained) :
     ∃ semantic,
       Forall₂ ImplementationEvidenceRepresents retained semantic ∧
-        Forall₂ (EvidenceValid [] rules) goals semantic := by
+        Forall₂ (EvidenceValid givens rules) goals semantic := by
   cases valid with
   | nil => exact ⟨[], .nil, .nil⟩
   | cons head tail =>
@@ -175,38 +179,39 @@ theorem resolutionPremisesValid_sound
 end
 
 /-- Successful typed resolution produces a represented semantic evidence tree
-that is valid independently of fuel, memoization, or resolver priority. -/
+that is valid independently of fuel, memoization, or resolver priority, its
+givens as the assumptions. -/
 theorem resolve_success_evidenceValid
-    {rules : List ProgramImplRule} {maxDepth : Nat}
+    {rules : List ProgramImplRule} {maxDepth : Nat} {givens : List ProgramPredicate}
     {goal : ProgramPredicate} {retained : TypedTraitResolution.Evidence}
-    (success : (TypedTraitResolution.resolve rules maxDepth goal).outcome =
+    (success : (TypedTraitResolution.resolve rules maxDepth goal givens).outcome =
       .success retained) :
     ∃ semantic,
       ImplementationEvidenceRepresents retained semantic ∧
-        EvidenceValid [] rules goal semantic := by
+        EvidenceValid givens rules goal semantic := by
   apply resolutionEvidenceValid_sound
   apply TraitResolution.resolve_success_sound
   simpa [TypedTraitResolution.resolve] using success
 
 /-- Successful typed resolution entails its goal in the declarative trait
-system with no explicit assumptions. -/
+system from its givens. -/
 theorem resolve_success_entails
-    {rules : List ProgramImplRule} {maxDepth : Nat}
+    {rules : List ProgramImplRule} {maxDepth : Nat} {givens : List ProgramPredicate}
     {goal : ProgramPredicate} {retained : TypedTraitResolution.Evidence}
-    (success : (TypedTraitResolution.resolve rules maxDepth goal).outcome =
+    (success : (TypedTraitResolution.resolve rules maxDepth goal givens).outcome =
       .success retained) :
-    Entails [] rules goal := by
+    Entails givens rules goal := by
   obtain ⟨semantic, _, valid⟩ := resolve_success_evidenceValid success
   exact ⟨semantic, valid⟩
 
 /-- The source-inference implementation wrapper around successful resolver
 evidence satisfies the retained-evidence bridge judgment. -/
 theorem resolve_success_retainedEvidenceValid
-    {rules : List ProgramImplRule} {maxDepth : Nat}
+    {rules : List ProgramImplRule} {maxDepth : Nat} {givens : List ProgramPredicate}
     {goal : ProgramPredicate} {retained : TypedTraitResolution.Evidence}
-    (success : (TypedTraitResolution.resolve rules maxDepth goal).outcome =
+    (success : (TypedTraitResolution.resolve rules maxDepth goal givens).outcome =
       .success retained) :
-    RetainedEvidenceValid [] rules goal
+    RetainedEvidenceValid givens rules goal
       (.implementation retained) := by
   obtain ⟨semantic, represents, valid⟩ :=
     resolve_success_evidenceValid success

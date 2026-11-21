@@ -38,6 +38,11 @@ private def evidenceDecEq : (left right : TypedTraitResolution.Evidence) → Dec
     letI : Decidable (premises = otherPremises) := evidenceListDecEq premises otherPremises
     simpa only [TraitResolution.Evidence.byImpl.injEq] using
       (inferInstance : Decidable (goal = otherGoal ∧ implementation = otherImplementation ∧ premises = otherPremises))
+  | .byAssumption goal, .byAssumption otherGoal => by
+    simpa only [TraitResolution.Evidence.byAssumption.injEq] using
+      (inferInstance : Decidable (goal = otherGoal))
+  | .byImpl _ _ _, .byAssumption _ => isFalse (by simp)
+  | .byAssumption _, .byImpl _ _ _ => isFalse (by simp)
 termination_by left _ => sizeOf left
 
 private def evidenceListDecEq : (left right : List TypedTraitResolution.Evidence) → Decidable (left = right)

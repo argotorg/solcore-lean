@@ -337,6 +337,8 @@ mutual
     | .byImpl goal implementation premises =>
         .byImpl (ProgramPredicate.applyParameters substitution goal)
           implementation (applyEvidences substitution premises)
+    | .byAssumption goal =>
+        .byAssumption (ProgramPredicate.applyParameters substitution goal)
 
   def applyEvidences (substitution : ParameterSubstitution) :
       List TypedTraitResolution.Evidence → List TypedTraitResolution.Evidence
@@ -403,6 +405,7 @@ mutual
       TypedTraitResolution.Evidence → List Ty
     | .byImpl goal _ premises =>
         predicateTypes goal ++ evidencesTypes premises
+    | .byAssumption goal => predicateTypes goal
 
   private def evidencesTypes :
       List TypedTraitResolution.Evidence → List Ty
@@ -1239,8 +1242,7 @@ theorem applyPredicateEvidence_goal (substitution : ParameterSubstitution)
   cases evidence with
   | assumption predicate => rfl
   | implementation evidence =>
-      cases evidence
-      rfl
+      cases evidence <;> rfl
 
 theorem applySolvedRequirement_goal_alignment
     (substitution : ParameterSubstitution)

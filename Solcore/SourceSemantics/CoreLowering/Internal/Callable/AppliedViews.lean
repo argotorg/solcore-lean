@@ -1681,6 +1681,8 @@ mutual
     | byImpl goal implementation premises =>
       simp only [FlexibleSubstitution.applyEvidence, predicate_function same,
         evidences_congr same premises]
+    | byAssumption goal =>
+      simp only [FlexibleSubstitution.applyEvidence, predicate_function same]
 
   private theorem evidences_congr {left right : Substitution}
       (same : ∀ metavariable, left.lookup? metavariable = right.lookup? metavariable)

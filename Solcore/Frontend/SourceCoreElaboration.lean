@@ -661,7 +661,7 @@ private def validateIntegerLiteralResolutionWith {error : Type}
             solved.evidence.goal)
       else
         match solved.evidence with
-        | .assumption _ =>
+        | .assumption _ | .implementation (.byAssumption _) =>
             failWith lift site
               (.unresolvedIntegerLiteralEvidence resolution.requirement)
         | .implementation (.byImpl _ implementation premises) =>
@@ -3994,6 +3994,7 @@ theorem validateWordIntegerLiteral_sound
                     · rename_i goal
                       split at checked
                       · simp [failWith] at checked
+                      · simp [failWith] at checked
                       · split at checked
                         · simp [failWith] at checked
                         · split at checked
@@ -4092,6 +4093,7 @@ theorem validateNativeIntegerLiteral_sound
                   split at checked
                   · simp [failWith] at checked
                   · split at checked
+                    · simp [failWith] at checked
                     · simp [failWith] at checked
                     · split at checked
                       · simp [failWith] at checked
@@ -4194,6 +4196,7 @@ theorem validateFixedIntegerLiteral_sound
                     · simp [failWith] at checked
                     · split at checked
                       · simp [failWith] at checked
+                      · simp [failWith] at checked
                       · split at checked
                         · simp [failWith] at checked
                         · split at checked
@@ -4282,6 +4285,7 @@ theorem validateNegativeWordIntegerLiteral_sound
                     · rename_i goal
                       split at checked
                       · simp [failWith] at checked
+                      · simp [failWith] at checked
                       · split at checked
                         · simp [failWith] at checked
                         · split at checked
@@ -4364,6 +4368,7 @@ theorem validateNegativeNativeIntegerLiteral_sound
                   split at checked
                   · simp [failWith] at checked
                   · split at checked
+                    · simp [failWith] at checked
                     · simp [failWith] at checked
                     · split at checked
                       · simp [failWith] at checked
@@ -4450,6 +4455,7 @@ theorem validateNegativeFixedIntegerLiteral_sound
                     split at checked
                     · simp [failWith] at checked
                     · split at checked
+                      · simp [failWith] at checked
                       · simp [failWith] at checked
                       · split at checked
                         · simp [failWith] at checked
@@ -4709,6 +4715,9 @@ private theorem literal_recheck {site otherSite : ErrorSite}
         | implementation proof =>
           cases proof with
           | byImpl goal impl premises =>
+            simp_all
+            repeat' (split at accepted <;> simp_all)
+          | byAssumption goal =>
             simp_all
             repeat' (split at accepted <;> simp_all)
 

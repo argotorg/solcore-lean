@@ -218,8 +218,8 @@ theorem selected_evidence_unique {signatures : ProgramSignatures} {key : Key} {i
             · rename_i sameR
               have same : l = r := (eq_of_beq sameL).symm.trans (eq_of_beq sameR)
               rw [same, ih first second]
-            · cases r; cases second
-          · cases l; cases first
+            · cases r <;> cases second
+          · cases l <;> cases first
 
 theorem selection_of_resolved {program : CheckedProgram} {key : Key}
     {predicates : List ProgramPredicate} {environment : SourceTypedRuntime.RuntimeEvidenceEnvironment}
@@ -234,6 +234,7 @@ theorem selection_of_resolved {program : CheckedProgram} {key : Key}
     · cases resolved
     · rename_i chosen resolution
       cases chosen with
+      | byAssumption goal => simp at resolved
       | byImpl goal implementation premises =>
         simp only at resolved
         split at resolved
@@ -263,6 +264,7 @@ theorem authenticated_evidence_eq {program : CheckedProgram} {key : Key}
 order and recursive premises. This function traverses metadata only. -/
 def evidence : TypedTraitResolution.Evidence → TraitEvidence
   | .byImpl goal implementation premises => .implementation goal implementation (premises.map evidence)
+  | .byAssumption goal => .assumption goal
 
 def environment (retained : SourceTypedRuntime.RuntimeEvidenceEnvironment) : Dynamic.EvidenceEnvironment :=
   retained.map fun item => (SourceTypedRuntime.runtimeEvidenceGoal item, evidence item)
@@ -272,6 +274,7 @@ theorem evidence_represents (retained : TypedTraitResolution.Evidence) :
   induction retained using TraitResolution.Evidence.rec
     (motive_2 := fun entries => Forall₂ ImplementationEvidenceRepresents entries (entries.map evidence)) with
   | byImpl goal implementation premises ih => simpa only [evidence] using (ImplementationEvidenceRepresents.byImpl (goal := goal) (implId := implementation) ih)
+  | byAssumption goal => simpa only [evidence] using (ImplementationEvidenceRepresents.byAssumption (goal := goal))
   | nil => exact .nil
   | cons head rest headIH restIH => exact .cons headIH restIH
 
@@ -424,7 +427,7 @@ open CallableNamedMetadata (evidence environment evidence_represents)
 
 @[simp] theorem evidence_goal (retained : TypedTraitResolution.Evidence) :
     (evidence retained).goal = SourceCompilationPlan.runtimeEvidenceGoal retained := by
-  cases retained; simp [evidence, TraitEvidence.goal, SourceCompilationPlan.runtimeEvidenceGoal]
+  cases retained <;> simp [evidence, TraitEvidence.goal, SourceCompilationPlan.runtimeEvidenceGoal]
 
 /-- The raw executable list is kept in full; equal goals do not identify trees. -/
 theorem lookup_of_find {available : SourceTypedRuntime.RuntimeEvidenceEnvironment}
@@ -458,14 +461,131 @@ theorem find_of_lookup {available : SourceTypedRuntime.RuntimeEvidenceEnvironmen
       obtain ⟨retained, chosen, same⟩ := ih found
       exact ⟨retained, by simp [different, chosen], same⟩
 
+mutual
+/-- Whether an implementation tree holds no given. -/
+def closedTree : TypedTraitResolution.Evidence → Bool
+  | .byImpl _ _ premises => closedTrees premises
+  | .byAssumption _ => false
+
+/-- Whether no tree of a premise spine holds a given. -/
+def closedTrees : List TypedTraitResolution.Evidence → Bool
+  | [] => true
+  | head :: rest => closedTree head && closedTrees rest
+end
+
 /-- Closed implementation trees contain no assumption leaves to replace. -/
-theorem closes_self (caller : EvidenceEnvironment) (retained : TypedTraitResolution.Evidence) :
+theorem closes_self (caller : EvidenceEnvironment) (retained : TypedTraitResolution.Evidence)
+    (closed : closedTree retained = true) :
     EvidenceCloses caller (evidence retained) (evidence retained) := by
   induction retained using TraitResolution.Evidence.rec
-    (motive_2 := fun entries => Forall₂ (EvidenceCloses caller) (entries.map evidence) (entries.map evidence)) with
-  | byImpl goal implementation premises ih => simpa only [evidence] using (EvidenceCloses.implementation (goal := goal) (implementation := implementation) ih)
+    (motive_2 := fun entries => closedTrees entries = true →
+      Forall₂ (EvidenceCloses caller) (entries.map evidence) (entries.map evidence)) with
+  | byImpl goal implementation premises ih =>
+      simpa only [evidence] using (EvidenceCloses.implementation (goal := goal)
+        (implementation := implementation) (ih (by simpa [closedTree] using closed)))
+  | byAssumption goal => simp [closedTree] at closed
   | nil => exact .nil
-  | cons head rest headIH restIH => exact .cons headIH restIH
+  | cons head rest headIH restIH =>
+      rename_i both
+      simp only [closedTrees, Bool.and_eq_true] at both
+      exact .cons (headIH both.1) (restIH both.2)
+
+mutual
+/-- The compiler's filling of a tree's givens from a dictionary is the semantic
+closure of the same tree by that dictionary. -/
+theorem closes_of_close {available : SourceTypedRuntime.RuntimeEvidenceEnvironment}
+    {raw closed : TypedTraitResolution.Evidence}
+    (success : SourceCompilationPlan.closeRuntimeEvidence available raw = .ok closed) :
+    EvidenceCloses (environment available) (evidence raw) (evidence closed) := by
+  cases raw with
+  | byAssumption goal =>
+      unfold SourceCompilationPlan.closeRuntimeEvidence at success
+      change (match available.find? (fun item =>
+          decide (SourceCompilationPlan.runtimeEvidenceGoal item = goal)) with
+        | some entry => Except.ok entry
+        | none => Except.error goal) = .ok closed at success
+      cases found : available.find? (fun item =>
+          decide (SourceCompilationPlan.runtimeEvidenceGoal item = goal)) with
+      | none => simp [found] at success
+      | some entry =>
+          simp only [found, Except.ok.injEq] at success
+          subst closed
+          simpa only [evidence] using EvidenceCloses.assumption (lookup_of_find found)
+  | byImpl goal implementation premises =>
+      unfold SourceCompilationPlan.closeRuntimeEvidence at success
+      cases tail : SourceCompilationPlan.closeRuntimeEvidenceList available premises with
+      | error missing => simp [tail, Functor.map, Except.map] at success
+      | ok closedPremises =>
+          simp only [tail, Functor.map, Except.map, Except.ok.injEq] at success
+          subst closed
+          simpa only [evidence] using (EvidenceCloses.implementation (goal := goal)
+            (implementation := implementation) (closes_of_close_list tail))
+
+/-- Pointwise filling is pointwise semantic closure. -/
+theorem closes_of_close_list {available : SourceTypedRuntime.RuntimeEvidenceEnvironment}
+    {raws closed : List TypedTraitResolution.Evidence}
+    (success : SourceCompilationPlan.closeRuntimeEvidenceList available raws = .ok closed) :
+    Forall₂ (EvidenceCloses (environment available)) (raws.map evidence) (closed.map evidence) := by
+  cases raws with
+  | nil =>
+      unfold SourceCompilationPlan.closeRuntimeEvidenceList at success
+      cases success
+      exact .nil
+  | cons head rest =>
+      unfold SourceCompilationPlan.closeRuntimeEvidenceList at success
+      cases headResult : SourceCompilationPlan.closeRuntimeEvidence available head with
+      | error missing => simp [headResult] at success
+      | ok closedHead =>
+          simp only [headResult] at success
+          cases tailResult : SourceCompilationPlan.closeRuntimeEvidenceList available rest with
+          | error missing => simp [tailResult, Functor.map, Except.map] at success
+          | ok closedTail =>
+              simp only [tailResult, Functor.map, Except.map, Except.ok.injEq] at success
+              subst closed
+              exact .cons (closes_of_close headResult) (closes_of_close_list tailResult)
+end
+
+mutual
+/-- An open tree whose closure by a valid dictionary is valid is itself valid
+once the dictionary's keys are assumptions. -/
+theorem opens_valid {caller : EvidenceEnvironment} {assumptions : List ProgramPredicate}
+    {rules : List ProgramImplRule} {goal : ProgramPredicate} {openTree closedTree : TraitEvidence}
+    (keys : ∀ goal, goal ∈ caller.map Prod.fst → goal ∈ assumptions)
+    (callerValid : caller.Valid rules)
+    (closes : EvidenceCloses caller openTree closedTree)
+    (valid : EvidenceValid [] rules goal closedTree) :
+    EvidenceValid assumptions rules goal openTree := by
+  cases closes with
+  | @assumption leaf entry found =>
+      have same : goal = leaf :=
+        valid.evidence_goal_eq.symm.trans (callerValid _ _ found).evidence_goal_eq
+      subst same
+      exact .assumption (keys _ found.key_mem)
+  | implementation premises =>
+      cases valid with
+      | implementation rule_mem id_eq head_instantiates premises_valid =>
+          exact .implementation rule_mem id_eq head_instantiates
+            (opens_valid_list keys callerValid premises premises_valid)
+
+/-- Pointwise opening of a premise spine. -/
+theorem opens_valid_list {caller : EvidenceEnvironment} {assumptions : List ProgramPredicate}
+    {rules : List ProgramImplRule} {goals : List ProgramPredicate}
+    {openTrees closedTrees : List TraitEvidence}
+    (keys : ∀ goal, goal ∈ caller.map Prod.fst → goal ∈ assumptions)
+    (callerValid : caller.Valid rules)
+    (closes : Forall₂ (EvidenceCloses caller) openTrees closedTrees)
+    (valid : Forall₂ (EvidenceValid [] rules) goals closedTrees) :
+    Forall₂ (EvidenceValid assumptions rules) goals openTrees := by
+  cases closes with
+  | nil =>
+      cases valid
+      exact .nil
+  | cons head tail =>
+      cases valid with
+      | cons headValid tailValid =>
+          exact .cons (opens_valid keys callerValid head headValid)
+            (opens_valid_list keys callerValid tail tailValid)
+end
 
 mutual
   theorem closes_functional {caller : EvidenceEnvironment} {openTree first second : TraitEvidence}
@@ -530,6 +650,7 @@ theorem resolved_valid {program : CheckedProgram} {key : SourceCompilationPlan.K
         rwa [represents.functional (evidence_represents _)] at nativeValid
       have goalEq := nativeValid.evidence_goal_eq
       cases chosen with
+      | byAssumption goal => simp at resolved
       | byImpl goal implementation premises =>
         simp only at resolved
         split at resolved
@@ -644,11 +765,19 @@ theorem cons_accepted {caller : SourceSpecialization.SpecializedFunction} {occur
       have matchedGoal : retained.goal = solvedPredicate := by simpa using equalGoal
       cases retained with
       | implementation raw =>
-        change (List.cons raw <$> SourceCompilationPlan.materializeCallEvidence caller occurrence available ids predicates) = .ok result at accepted
-        obtain ⟨tail, remaining, same⟩ := map_ok accepted
-        refine ⟨_, raw, tail, selected, matchedPredicate, closes_self _ raw, ?_, remaining, same⟩
-        cases raw
-        exact matchedGoal.trans matchedPredicate
+        change (match SourceCompilationPlan.closeRuntimeEvidence available raw with
+          | .ok closed => List.cons closed <$>
+              SourceCompilationPlan.materializeCallEvidence caller occurrence available ids predicates
+          | .error missing => .error (.missingRuntimeAssumptionEvidence caller.key occurrence id missing))
+            = .ok result at accepted
+        cases closing : SourceCompilationPlan.closeRuntimeEvidence available raw with
+        | error missing => simp [closing] at accepted
+        | ok closed =>
+          rw [closing] at accepted
+          obtain ⟨tail, remaining, same⟩ := map_ok accepted
+          refine ⟨_, closed, tail, selected, matchedPredicate, closes_of_close closing, ?_, remaining, same⟩
+          rw [SourceCompilationPlan.closeRuntimeEvidence_goal closing]
+          cases raw <;> exact matchedGoal.trans matchedPredicate
       | assumption goal =>
         change (match available.find? (fun item => decide (SourceCompilationPlan.runtimeEvidenceGoal item = goal)) with
           | some raw => List.cons raw <$> SourceCompilationPlan.materializeCallEvidence caller occurrence available ids predicates
@@ -797,7 +926,7 @@ theorem selection_valid {signatures : ProgramSignatures} {key : SourceCompilatio
             rw [represents.functional (evidence_represents selected)] at valid
             simpa only [equal] using valid
           exact .cons valid (ih accepted)
-        · cases raw; cases accepted
+        · cases raw <;> cases accepted
 
 theorem authenticated_valid {signatures : ProgramSignatures} {key : SourceCompilationPlan.Key}
     {predicates : List ProgramPredicate} {actual : SourceTypedRuntime.RuntimeEvidenceEnvironment}
@@ -815,6 +944,7 @@ assumption is justified by an actual caller dictionary key, not by its ID. -/
 theorem retained_of_closed {context : Context} {caller : EvidenceEnvironment}
     {row : SolvedRequirement} {result : TraitEvidence}
     (keys : ∀ goal, goal ∈ caller.map Prod.fst → goal ∈ context.assumptions)
+    (callerValid : caller.Valid context.signatures.resolutionRules)
     (goal : row.evidence.goal = row.predicate)
     (closed : EvidenceCloses caller (predicateEvidence row.evidence) result)
     (valid : EvidenceValid [] context.signatures.resolutionRules row.predicate result) :
@@ -831,16 +961,14 @@ theorem retained_of_closed {context : Context} {caller : EvidenceEnvironment}
           cases same
           exact .assumption (keys _ found.key_mem)))
     | implementation raw =>
-      have same := closes_functional closed (closes_self caller raw)
-      rw [same] at valid
       exact .intro (.intro (.implementation (evidence_represents raw))
-        (valid.weakenAssumptions (by simp)))
+        (opens_valid keys callerValid closed valid))
 
 private theorem predicate_goal (retained : PredicateEvidence) :
     (predicateEvidence retained).goal = retained.goal := by
   cases retained with
   | assumption goal => rfl
-  | implementation raw => cases raw; simp [predicateEvidence, evidence, TraitEvidence.goal, PredicateEvidence.goal]
+  | implementation raw => cases raw <;> simp [predicateEvidence, evidence, TraitEvidence.goal, PredicateEvidence.goal]
 
 /-- Only reached rows acquire validity. No validity premise is imposed on the
 whole ledger, including unbound local-scheme templates. -/
@@ -868,7 +996,7 @@ theorem produces_of_authenticated {caller : SourceSpecialization.SpecializedFunc
           have same := EvidenceCloses.goal_eq callerValid closed
           rw [evidence_goal, predicate_goal, headGoal] at same
           exact same.symm.trans rowGoal.symm
-        have retained := retained_of_closed keys openGoal closed (rowGoal ▸ valid)
+        have retained := retained_of_closed keys callerValid openGoal closed (rowGoal ▸ valid)
         change RequirementsProduceEnvironment context (environment available) (id :: ids) (predicate :: predicates)
           ((SourceCompilationPlan.runtimeEvidenceGoal head, evidence head) :: environment tail)
         rw [headGoal]

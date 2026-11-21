@@ -847,6 +847,8 @@ mutual
     | .byImpl goal implementation premises =>
         .byImpl (ProgramPredicate.applyParameters substitution goal)
           implementation (applyEvidences substitution premises)
+    | .byAssumption goal =>
+        .byAssumption (ProgramPredicate.applyParameters substitution goal)
 
   def applyEvidences (substitution : ParameterSubstitution) :
       List TypedTraitResolution.Evidence → List TypedTraitResolution.Evidence
@@ -898,6 +900,8 @@ mutual
     | .byImpl goal implementation premises =>
         .byImpl (TypedTraitResolution.applySubstitution substitution goal)
           implementation (applyEvidences substitution premises)
+    | .byAssumption goal =>
+        .byAssumption (TypedTraitResolution.applySubstitution substitution goal)
 
   /-- Pointwise flexible substitution of retained implementation premises. -/
   def applyEvidences (substitution : Substitution) :

@@ -766,6 +766,7 @@ mutual
     cases evidence with
     | byImpl goal implementation premises =>
       simp only [applyEvidence, predicate_congr same, evidences_congr same premises]
+    | byAssumption goal => simp only [applyEvidence, predicate_congr same]
 
   private theorem evidences_congr {left right : TypeSystem.ParameterSubstitution}
       (same : ∀ parameter, left.lookup? parameter = right.lookup? parameter)

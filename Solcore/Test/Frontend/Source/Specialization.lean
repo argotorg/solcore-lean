@@ -533,6 +533,7 @@ private def isImplementationEvidence
   | .implementation (.byImpl goal selected premises) =>
       decide (goal = predicate) && decide (selected = implementation) &&
         premises.isEmpty
+  | .implementation (.byAssumption _) => false
   | .assumption _ => false
 
 private def isAssumptionEvidence
@@ -996,6 +997,7 @@ private def solvedByBuiltinInt (target : Ty)
                 ProgramImplId.builtin .intWord
               else
                 ProgramImplId.builtin .intInteger
+    | .implementation (.byAssumption _) => false
     | .assumption _ => false
 
 private def expectInferenceError (label content : String)

@@ -57,6 +57,10 @@ abbrev HeadMatcher (Trait : Type u) (Ty : Type v) (ImplId : Type w) :=
 structure Program (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
   rules : List (ImplRule Trait Ty ImplId)
   matchHead : HeadMatcher Trait Ty ImplId
+  /-- Goals the checked body assumes, its `where` predicates: each decides an
+  equal goal at any depth, before the implementations, as upstream's local
+  givens do. -/
+  givens : List (Predicate Trait Ty) := []
 
 variable {Trait : Type u} {Ty : Type v} {ImplId : Type w}
 
@@ -90,12 +94,14 @@ namespace Program
 end Program
 
 /-- Executable evidence records the selected implementation and evidence for
-each instantiated where predicate in source order. -/
+each instantiated where predicate in source order, or that the goal is one of
+the program's givens, whose evidence the caller supplies. -/
 inductive Evidence (Trait : Type u) (Ty : Type v) (ImplId : Type w) where
   | byImpl
       (goal : Predicate Trait Ty)
       (implId : ImplId)
       (premises : List (Evidence Trait Ty ImplId))
+  | byAssumption (goal : Predicate Trait Ty)
   deriving Repr
 
 namespace Evidence
@@ -107,6 +113,8 @@ def beq [BEq Trait] [BEq Ty] [BEq ImplId] :
     Evidence Trait Ty ImplId → Evidence Trait Ty ImplId → Bool
   | .byImpl goal implementation premises, .byImpl otherGoal otherImplementation otherPremises =>
       goal == otherGoal && (implementation == otherImplementation && beqList premises otherPremises)
+  | .byAssumption goal, .byAssumption otherGoal => goal == otherGoal
+  | _, _ => false
 
 def beqList [BEq Trait] [BEq Ty] [BEq ImplId] :
     List (Evidence Trait Ty ImplId) → List (Evidence Trait Ty ImplId) → Bool
@@ -114,6 +122,11 @@ def beqList [BEq Trait] [BEq Ty] [BEq ImplId] :
   | first :: rest, other :: remaining => beq first other && beqList rest remaining
   | _, _ => false
 end
+
+/-- The goal at the root. -/
+def goal : Evidence Trait Ty ImplId → Predicate Trait Ty
+  | .byImpl goal _ _ => goal
+  | .byAssumption goal => goal
 
 end Evidence
 
@@ -151,6 +164,13 @@ theorem eq_of_beq [BEq Trait] [LawfulBEq Trait] [BEq Ty] [LawfulBEq Ty]
       simp only [beq, Bool.and_eq_true, beq_iff_eq] at same
       rcases same with ⟨rfl, rfl, tails⟩
       rw [list_eq_of_beq premises otherPremises tails]
+    | byAssumption otherGoal => simp [beq] at same
+  | byAssumption goal =>
+    cases right with
+    | byImpl otherGoal otherImplementation otherPremises => simp [beq] at same
+    | byAssumption otherGoal =>
+      simp only [beq, beq_iff_eq] at same
+      rw [same]
 
 theorem list_eq_of_beq [BEq Trait] [LawfulBEq Trait] [BEq Ty] [LawfulBEq Ty]
     [BEq ImplId] [LawfulBEq ImplId] (left right : List (Evidence Trait Ty ImplId))
@@ -170,6 +190,7 @@ theorem beq_self [BEq Trait] [LawfulBEq Trait] [BEq Ty] [LawfulBEq Ty]
     [BEq ImplId] [LawfulBEq ImplId] (value : Evidence Trait Ty ImplId) : beq value value = true := by
   cases value with
   | byImpl goal implementation premises => simp only [beq, BEq.rfl, Bool.true_and, list_beq_self premises]
+  | byAssumption goal => simp only [beq, BEq.rfl]
 
 theorem list_beq_self [BEq Trait] [LawfulBEq Trait] [BEq Ty] [LawfulBEq Ty]
     [BEq ImplId] [LawfulBEq ImplId] (values : List (Evidence Trait Ty ImplId)) : beqList values values = true := by
@@ -321,6 +342,8 @@ inductive PremiseOutcome
     Nat → List (Predicate Trait Ty) → SearchState Trait Ty ImplId →
       Predicate Trait Ty → Outcome Trait Ty ImplId × SearchState Trait Ty ImplId
   | fuel, active, state, goal =>
+      if decide (goal ∈ program.givens) then (.success (.byAssumption goal), state)
+      else
       match lookupMemo? goal state.memo with
       | some outcome =>
           (outcome, { state with statistics.memoHits := state.statistics.memoHits + 1 })
@@ -351,7 +374,9 @@ inductive PremiseOutcome
 end Detail
 
 /-- Resolve one trait obligation with a maximum implementation-chain depth.
-The ordinary implementation tier is exhaustive and has priority.  The default
+A goal equal to one of the program's givens is decided by it, at any depth,
+before any implementation.  The ordinary implementation tier is exhaustive and
+has priority over the defaults.  The default
 tier is searched only after ordinary resolution establishes a definite
 `noSolution`; any ordinary ambiguity or incomplete search blocks fallback.
 Completed success and no-solution entries are tabled. Cycles, depth exhaustion,
@@ -1263,14 +1288,17 @@ theorem matchImplHead?_certificate
 def headMatcher : TraitResolution.HeadMatcher TraitId Ty ImplId :=
   matchImplHead?
 
-/-- Build a typed resolution program in declaration order. -/
-def programOfRules (rules : List ImplRule) : Program :=
-  { rules, matchHead := headMatcher }
+/-- Build a typed resolution program in declaration order, with the checked
+body's givens. -/
+def programOfRules (rules : List ImplRule) (givens : List Predicate := []) : Program :=
+  { rules, matchHead := headMatcher, givens }
 
-/-- Run typed trait resolution with an implementation-chain depth bound. -/
-def resolve (rules : List ImplRule) (maxDepth : Nat) (goal : Predicate) :
+/-- Run typed trait resolution with an implementation-chain depth bound, a goal
+equal to one of `givens` decided by it at any depth. -/
+def resolve (rules : List ImplRule) (maxDepth : Nat) (goal : Predicate)
+    (givens : List Predicate := []) :
     TraitResolution.Report TraitId Ty ImplId :=
-  TraitResolution.resolve (programOfRules rules) maxDepth goal
+  TraitResolution.resolve (programOfRules rules givens) maxDepth goal
 
 end Solcore.Frontend.TypedTraitResolution
 

@@ -59,6 +59,9 @@ private theorem method_fields {program : CheckedProgram} {primary : RawEvidence}
       ∀ evidence ∈ method.declaredPremises,
         evidence ∈ method.methodPremises ∨ evidence ∈ method.implementationPremises := by
   cases primary with
+  | byAssumption goal =>
+    simp only [ExecutableImplMethods.checkMethodWithEvidenceAndArity] at accepted
+    cases accepted
   | byImpl goal implementation premises =>
     simp only [ExecutableImplMethods.checkMethodWithEvidenceAndArity] at accepted
     split at accepted <;> try contradiction
@@ -110,15 +113,18 @@ private theorem validated_requirement {program : CheckedProgram} {caller : Sourc
         | .noSolution => Except.error (SourceTypedRuntime.RuntimeError.callEvidenceResolutionNoSolution caller.key node.id id goal)
         | .inconclusive reason => .error (.callEvidenceResolutionInconclusive caller.key node.id id reason)
         | .success chosen => if chosen == selected then .ok () else
-            let .byImpl _ implementation _ := selected
-            .error (.callEvidenceNotSelected caller.key node.id id goal implementation)) = .ok () →
+            match selected with
+            | .byImpl _ implementation _ =>
+                .error (.callEvidenceNotSelected caller.key node.id id goal implementation)
+            | .byAssumption assumption =>
+                .error (.missingRuntimeAssumptionEvidence caller.key node.id id assumption)) = .ok () →
       EvidenceValid [] program.signatures.resolutionRules goal (evidence selected) := by
     intro selected validated
     have checked : SourceCompilationPlan.validateRuntimeEvidenceSelection program.signatures caller.key 0 [goal] [selected] = .ok () := by
       split at validated <;> try contradiction
       split at validated
       · simp only [SourceCompilationPlan.validateRuntimeEvidenceSelection, *, if_true]; rfl
-      · cases selected; cases validated
+      · cases selected <;> cases validated
     have valid := CallableAuthenticatedCallEvidence.selection_valid checked
     cases valid with
     | cons head tail => exact head
@@ -129,6 +135,7 @@ private theorem validated_requirement {program : CheckedProgram} {caller : Sourc
   cases retained : row.evidence with
   | implementation chosen =>
     simp only [retained] at accepted
+    split at accepted <;> try contradiction
     obtain ⟨_, validated, accepted⟩ := bind_ok accepted
     cases accepted
     exact finish _ validated
@@ -363,6 +370,9 @@ theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evi
     (accepted : ExecutableImplMethods.checkMethodWithEvidenceAndArity program primary evidence arity name = .ok method) :
     Nonempty (Selection program method) := by
   cases primary with
+  | byAssumption goal =>
+    simp only [ExecutableImplMethods.checkMethodWithEvidenceAndArity] at accepted
+    cases accepted
   | byImpl goal implementationId premises =>
     simp only [ExecutableImplMethods.checkMethodWithEvidenceAndArity] at accepted
     split at accepted <;> try contradiction
@@ -883,6 +893,9 @@ theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evi
     (accepted : ExecutableImplMethods.checkMethodWithEvidenceAndArity program primary evidence arity name = .ok method) :
     Nonempty (Selection program primary name method) := by
   cases primary with
+  | byAssumption goal =>
+    simp only [ExecutableImplMethods.checkMethodWithEvidenceAndArity] at accepted
+    cases accepted
   | byImpl goal implementationId premises =>
     simp only [ExecutableImplMethods.checkMethodWithEvidenceAndArity] at accepted
     split at accepted <;> try contradiction
@@ -928,16 +941,15 @@ theorem selection {program : CheckedProgram} {primary : TypedTraitResolution.Evi
         cases evidence with
         | nil => simp at lengths
         | cons raw remaining =>
-          cases raw with
-          | byImpl actual implementation premises =>
-            change (if actual = predicate then _ else Except.error
-              (ExecutableImplMethods.Error.methodEvidenceGoalMismatch declaration.id index predicate actual)) = .ok () at checked
-            obtain ⟨same, checked⟩ := require_ok checked
-            split at checked <;> try contradiction
-            split at checked <;> try contradiction
-            have tails : rest.length = remaining.length := by simpa using lengths
-            simpa only [List.map_cons, SourceCompilationPlan.runtimeEvidenceGoal, same] using
-              congrArg (List.cons predicate) (ih tails (index + 1) checked)
+          have goalEq : SourceCompilationPlan.runtimeEvidenceGoal raw = raw.goal := by cases raw <;> rfl
+          change (if raw.goal = predicate then _ else Except.error
+            (ExecutableImplMethods.Error.methodEvidenceGoalMismatch declaration.id index predicate raw.goal)) = .ok () at checked
+          obtain ⟨same, checked⟩ := require_ok checked
+          split at checked <;> try contradiction
+          split at checked <;> try contradiction
+          have tails : rest.length = remaining.length := by simpa using lengths
+          simpa only [List.map_cons, goalEq, same] using
+            congrArg (List.cons predicate) (ih tails (index + 1) checked)
     obtain ⟨_, _, accepted⟩ := bind_ok accepted
     obtain ⟨generic, genericChecked, accepted⟩ := bind_ok accepted
     obtain ⟨specialized, specializedChecked, accepted⟩ := bind_ok accepted
@@ -1192,6 +1204,7 @@ theorem materialized_operator {program : CheckedProgram} {caller : SourceSpecial
         | .inconclusive reason => Except.error (SourceTypedRuntime.RuntimeError.callEvidenceResolutionInconclusive caller.key node.id requirement reason)
         | .success raw => do
           let .byImpl actual _ _ := raw
+            | throw (SourceTypedRuntime.RuntimeError.callRequirementEvidenceGoalMismatch caller.key node.id requirement goal raw.goal)
           if actual != goal then throw (SourceTypedRuntime.RuntimeError.callRequirementEvidenceGoalMismatch caller.key node.id requirement goal actual)
           pure (raw :: (← _))) = .ok headers at headersAccepted
       split at headersAccepted <;> try contradiction
@@ -1249,6 +1262,9 @@ theorem caller_resolved {program : CheckedProgram} {key : SourceCompilationPlan.
     split at accepted <;> try contradiction
     rename_i chosen resolution
     cases chosen with
+    | byAssumption actual =>
+      simp only at accepted
+      cases accepted
     | byImpl actual implementation premises =>
       simp only at accepted
       split at accepted <;> try contradiction
@@ -1493,9 +1509,13 @@ theorem requirement_materialized {program : CheckedProgram} {caller : SourceSpec
   have matchedRetained : retained.goal = goal := by simpa using retainedEq
   cases retained with
   | implementation stored =>
+    dsimp only at accepted
+    split at accepted <;> try contradiction
+    rename_i closed closing
     obtain ⟨_, _, accepted⟩ := bind_ok accepted
     cases accepted
-    simp [SourceCompilationPlan.materializeCallEvidence, selected, matchedPredicate, matchedRetained, bind, Except.bind, pure, Except.pure]
+    simp [SourceCompilationPlan.materializeCallEvidence, selected, matchedPredicate, matchedRetained, bind, Except.bind,
+      pure, Except.pure, closing]
   | assumption assumed =>
     dsimp only at accepted
     split at accepted <;> try contradiction

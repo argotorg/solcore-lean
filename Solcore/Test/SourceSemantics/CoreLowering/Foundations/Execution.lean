@@ -7305,6 +7305,48 @@ private def defaultForTypeParameterWorkspace : Workspace.RawWorkspace := {
     "function viaBoxed() returns (Word) { match (boxed(Box.Wrap(Coin.Head))) { case Box.Wrap(c) { return coin(c); } } }"] }]
 }
 
+private def givenBelowAnImplementationWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := []
+  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+    "pragma solcore;",
+    -- Upstream needs it for `impl<T> Sub<T> where T: BitNot` (`SC0213`).
+    "pragma no-patterson-condition;",
+    "trait BitNot<T> { function bnot(value: T) returns (T); }",
+    "trait Add<T> { function add(left: T, right: T) returns (T); }",
+    "trait Sub<T> { function sub(left: T, right: T) returns (T); }",
+    "default impl<T> BitNot<T> { function bnot(value: T) returns (T) { return value; } }",
+    "enum Coin { Head, Tail }",
+    "impl BitNot<Coin> { function bnot(value: Coin) returns (Coin) { match (value) { case Coin.Head { return Coin.Tail; } case Coin.Tail { return Coin.Head; } } } }",
+    "enum Plain { Head, Tail }",
+    "enum Box<A> { Wrap(A) }",
+    "impl<A> Add<Box<A>> where A: BitNot { function add(left: Box<A>, right: Box<A>) returns (Box<A>) { match (left) { case Box.Wrap(x) { return Box.Wrap(~x); } } } }",
+    "default impl<T> Sub<T> { function sub(left: T, right: T) returns (T) { return right; } }",
+    "impl<T> Sub<T> where T: BitNot { function sub(left: T, right: T) returns (T) { return ~left; } }",
+    "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+    "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
+    "function twice<T>(x: Box<T>) returns (Box<T>) where T: BitNot { return x + x; }",
+    "function differ<T>(x: T, y: T) returns (T) where T: BitNot { return x - y; }",
+    "function boxedCoin() returns (Word) { match (twice(Box.Wrap(Coin.Head))) { case Box.Wrap(c) { return coin(c); } } }",
+    "function boxedPlain() returns (Word) { match (twice(Box.Wrap(Plain.Head))) { case Box.Wrap(p) { return plain(p); } } }",
+    "function differCoin() returns (Word) { return coin(differ(Coin.Head, Coin.Tail)); }"] }]
+}
+
+private def runGivenBelowAnImplementation : IO Unit := do
+  let program ← get "given below an implementation check" (checkProgram givenBelowAnImplementationWorkspace)
+  let names := ["boxedCoin", "boxedPlain", "differCoin"]
+  let compiled ← get "given below an implementation compilation"
+    (compile givenBelowAnImplementationWorkspace (← names.mapM (seed program)))
+  let mut session ← boot (← compiled.open)
+  for (index, expected) in ([(0, 2), (1, 1), (2, 2)] : List (Nat × Nat)) do
+    let key ← match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError "given below an implementation root missing")
+    let completed ← execute session key []
+    require (completed.value == word expected)
+      s!"{names[index]!} gave {reprStr completed.value}"
+    session := completed.session
+  IO.println "SOURCE_CORE_GIVEN_BELOW_AN_IMPLEMENTATION_PASS: a condition of an implementation, and of an ordinary generic one beside a default, comes from the body's where predicate, as upstream's local givens do, so at a type with its own implementation the caller's runs, where compile refused before, and at a type that only the default covers the default runs"
+
 private def runDefaultForTypeParameter : IO Unit := do
   let program ← get "default for a type parameter check" (checkProgram defaultForTypeParameterWorkspace)
   let names := ["viaCoin", "viaPlain", "viaSecond", "viaBoxed"]
@@ -7633,6 +7675,7 @@ def run : IO Unit := do
   runLayoutFixtures
   runImplMethodPredicates
   runDefaultForTypeParameter
+  runGivenBelowAnImplementation
 
 end Tests.SourceCoreExecution
 end

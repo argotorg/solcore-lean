@@ -46,6 +46,7 @@ namespace RuntimeEvidenceEnvironment
 def goals (environment : RuntimeEvidenceEnvironment) : List ProgramPredicate :=
   environment.map fun
     | .byImpl goal _ _ => goal
+    | .byAssumption goal => goal
 
 /-- The executable dictionary has exactly the goals, order, and multiplicity
 declared by the specialization about to execute. -/
@@ -579,6 +580,7 @@ private def exactCallSolvedRequirement
 def runtimeEvidenceGoal :
     TypedTraitResolution.Evidence → ProgramPredicate
   | .byImpl goal _ _ => goal
+  | .byAssumption goal => goal
 
 private def availableRuntimeEvidence?
     (environment : RuntimeEvidenceEnvironment)
@@ -593,6 +595,57 @@ private theorem availableRuntimeEvidence?_some_goal
     runtimeEvidenceGoal evidence = predicate := by
   have accepted := List.find?_some found
   exact of_decide_eq_true accepted
+
+mutual
+
+/-- Fill every given of an implementation evidence tree from the caller's
+closed dictionary, as `Dynamic.EvidenceCloses` does; the error is the first
+goal the dictionary does not hold. -/
+def closeRuntimeEvidence (available : RuntimeEvidenceEnvironment) :
+    TypedTraitResolution.Evidence → Except ProgramPredicate TypedTraitResolution.Evidence
+  | .byAssumption goal =>
+      match availableRuntimeEvidence? available goal with
+      | some evidence => .ok evidence
+      | none => .error goal
+  | .byImpl goal implementation premises =>
+      (TraitResolution.Evidence.byImpl goal implementation) <$>
+        closeRuntimeEvidenceList available premises
+
+/-- Fill each premise in order. -/
+def closeRuntimeEvidenceList (available : RuntimeEvidenceEnvironment) :
+    List TypedTraitResolution.Evidence →
+      Except ProgramPredicate (List TypedTraitResolution.Evidence)
+  | [] => .ok []
+  | evidence :: rest =>
+      match closeRuntimeEvidence available evidence with
+      | .error missing => .error missing
+      | .ok head => List.cons head <$> closeRuntimeEvidenceList available rest
+
+end
+
+/-- Filling the givens keeps the goal at the root. -/
+theorem closeRuntimeEvidence_goal
+    {available : RuntimeEvidenceEnvironment}
+    {raw closed : TypedTraitResolution.Evidence}
+    (success : closeRuntimeEvidence available raw = .ok closed) :
+    runtimeEvidenceGoal closed = runtimeEvidenceGoal raw := by
+  cases raw with
+  | byAssumption goal =>
+      unfold closeRuntimeEvidence at success
+      cases found : availableRuntimeEvidence? available goal with
+      | none => simp [found] at success
+      | some evidence =>
+          simp only [found, Except.ok.injEq] at success
+          subst closed
+          exact availableRuntimeEvidence?_some_goal available goal evidence found
+  | byImpl goal implementation premises =>
+      unfold closeRuntimeEvidence at success
+      cases tail : closeRuntimeEvidenceList available premises with
+      | error missing => simp [tail, Functor.map, Except.map] at success
+      | ok closedPremises =>
+          simp only [tail, Functor.map, Except.map, Except.ok.injEq] at success
+          subst closed
+          rfl
 
 /-- Exact pairing retained by the local-witness factory. Public for static
 metadata transport proofs; constructing it does not authenticate a witness. -/
@@ -674,7 +727,11 @@ def localRequirementWitnesses
   let mut witnesses := []
   for binding in bindings do
     let evidence ← match binding.actualSolved.evidence with
-      | .implementation evidence => pure evidence
+      | .implementation evidence =>
+          match closeRuntimeEvidence available evidence with
+          | .ok closed => pure closed
+          | .error missing => throw (.missingRuntimeAssumptionEvidence caller.key node.id
+              binding.actualRequirement missing)
       | .assumption assumption =>
           match availableRuntimeEvidence? available assumption with
           | some evidence => pure evidence
@@ -730,9 +787,11 @@ def validateRuntimeEvidenceSelection (signatures : ProgramSignatures)
             validateRuntimeEvidenceSelection signatures key (index + 1)
               predicates evidenceRest
           else
-            let .byImpl _ implementation _ := evidence
-            throw (.runtimeEvidenceNotSelected key index predicate
-              implementation)
+            match evidence with
+            | .byImpl _ implementation _ =>
+                throw (.runtimeEvidenceNotSelected key index predicate implementation)
+            | .byAssumption goal =>
+                throw (.runtimeEvidenceGoalMismatch key index predicate goal)
   | _, predicates, evidence =>
       throw (.runtimeEvidenceCountMismatch key predicates.length evidence.length)
 
@@ -761,6 +820,20 @@ private theorem validateRuntimeEvidenceGoals_success
       | cons evidence rest =>
           cases evidence with
           | byImpl goal implementation premises =>
+              by_cases same : goal = predicate
+              · have tailSuccess :
+                    validateRuntimeEvidenceGoals key (index + 1) predicates
+                      rest = .ok () := by
+                  simpa [validateRuntimeEvidenceGoals, runtimeEvidenceGoal,
+                    same] using success
+                have tail := induction (index := index + 1)
+                  (environment := rest) tailSuccess
+                unfold RuntimeEvidenceEnvironment.Matches
+                  RuntimeEvidenceEnvironment.goals at tail ⊢
+                simp [same, tail]
+              · simp [validateRuntimeEvidenceGoals, runtimeEvidenceGoal,
+                  same] at success
+          | byAssumption goal =>
               by_cases same : goal = predicate
               · have tailSuccess :
                     validateRuntimeEvidenceGoals key (index + 1) predicates
@@ -832,7 +905,11 @@ def materializeCallEvidence
         throw (.callRequirementEvidenceGoalMismatch caller.key occurrence
           requirement solved.predicate goal)
       let evidence ← match solved.evidence with
-        | .implementation evidence => pure evidence
+        | .implementation evidence =>
+            match closeRuntimeEvidence available evidence with
+            | .ok closed => pure closed
+            | .error missing => throw (.missingRuntimeAssumptionEvidence caller.key
+                occurrence requirement missing)
         | .assumption assumption =>
             match availableRuntimeEvidence? available assumption with
             | some evidence => pure evidence
@@ -913,23 +990,34 @@ theorem materializeCallEvidence_success_matches
                 exact Decidable.of_not_not (of_decide_eq_false goalRejected)
               cases solvedEvidence with
               | implementation evidence =>
-                  change (List.cons evidence <$>
-                    materializeCallEvidence caller occurrence available
-                      requirements predicates) = .ok result at success
-                  obtain ⟨tail, tailResult, resultEq⟩ :=
-                    exceptMap_eq_ok success
-                  subst result
-                  have tailMatches := inductionHypothesis
-                    (predicates := predicates) (result := tail) tailResult
-                  unfold RuntimeEvidenceEnvironment.Matches at tailMatches ⊢
-                  change runtimeEvidenceGoal evidence ::
-                    RuntimeEvidenceEnvironment.goals tail =
-                      predicate :: predicates
-                  have evidenceMatches :
-                      runtimeEvidenceGoal evidence = solvedPredicate := by
-                    cases evidence
-                    exact goalMatches
-                  rw [evidenceMatches, predicateMatches, tailMatches]
+                  change
+                    (match closeRuntimeEvidence available evidence with
+                    | .ok closed => List.cons closed <$>
+                        materializeCallEvidence caller occurrence available
+                          requirements predicates
+                    | .error missing => .error
+                        (.missingRuntimeAssumptionEvidence caller.key occurrence
+                          requirement missing)) = .ok result at success
+                  cases closing : closeRuntimeEvidence available evidence with
+                  | error missing =>
+                    rw [closing] at success
+                    contradiction
+                  | ok closed =>
+                    rw [closing] at success
+                    obtain ⟨tail, tailResult, resultEq⟩ :=
+                      exceptMap_eq_ok success
+                    subst result
+                    have tailMatches := inductionHypothesis
+                      (predicates := predicates) (result := tail) tailResult
+                    unfold RuntimeEvidenceEnvironment.Matches at tailMatches ⊢
+                    change runtimeEvidenceGoal closed ::
+                      RuntimeEvidenceEnvironment.goals tail =
+                        predicate :: predicates
+                    have evidenceMatches :
+                        runtimeEvidenceGoal closed = solvedPredicate := by
+                      rw [closeRuntimeEvidence_goal closing]
+                      cases evidence <;> exact goalMatches
+                    rw [evidenceMatches, predicateMatches, tailMatches]
               | assumption assumption =>
                   change
                     (match availableRuntimeEvidence? available assumption with
@@ -1029,9 +1117,13 @@ private def validateSelectedCallImplementationEvidence
       if selected == evidence then
         .ok ()
       else
-        let .byImpl _ implementation _ := evidence
-        .error (.callEvidenceNotSelected caller.key occurrence requirement
-          goal implementation)
+        match evidence with
+        | .byImpl _ implementation _ =>
+            .error (.callEvidenceNotSelected caller.key occurrence requirement
+              goal implementation)
+        | .byAssumption assumption =>
+            .error (.missingRuntimeAssumptionEvidence caller.key occurrence requirement
+              assumption)
 
 /-- Recover one concrete requirement witness at runtime.  Assumption markers
 are discharged from the caller's closed dictionary; concrete witnesses are
@@ -1049,7 +1141,11 @@ def exactRuntimeRequirementEvidence (program : CheckedProgram)
     throw (.callRequirementEvidenceGoalMismatch caller.key node.id requirement
       expected solved.evidence.goal)
   let evidence ← match solved.evidence with
-    | .implementation evidence => pure evidence
+    | .implementation evidence =>
+        match closeRuntimeEvidence available evidence with
+        | .ok closed => pure closed
+        | .error missing => throw (.missingRuntimeAssumptionEvidence caller.key node.id
+            requirement missing)
     | .assumption predicate =>
         match availableRuntimeEvidence? available predicate with
         | some evidence => pure evidence
@@ -1091,15 +1187,26 @@ theorem exactRuntimeRequirementEvidence_success_goal
         exact Decidable.of_not_not (of_decide_eq_false goalRejected)
       cases solvedEvidence with
       | implementation evidence =>
-          change Except.bind
-            (validateSelectedCallImplementationEvidence program.signatures
-              caller node.id requirement expected evidence)
-            (fun _ => .ok evidence) = .ok result at success
-          obtain ⟨_, _, resultEq⟩ := exceptBind_eq_ok success
-          injection resultEq with resultMatches
-          subst result
-          cases evidence
-          exact goalMatches
+          change
+            (match closeRuntimeEvidence available evidence with
+            | .ok closed => Except.bind
+                (validateSelectedCallImplementationEvidence program.signatures
+                  caller node.id requirement expected closed)
+                (fun _ => .ok closed)
+            | .error missing => .error
+                (.missingRuntimeAssumptionEvidence caller.key node.id
+                  requirement missing)) = .ok result at success
+          cases closing : closeRuntimeEvidence available evidence with
+          | error missing =>
+              rw [closing] at success
+              contradiction
+          | ok closed =>
+              rw [closing] at success
+              obtain ⟨_, _, resultEq⟩ := exceptBind_eq_ok success
+              injection resultEq with resultMatches
+              subst result
+              rw [closeRuntimeEvidence_goal closing]
+              cases evidence <;> exact goalMatches
       | assumption assumption =>
           change
             (match availableRuntimeEvidence? available assumption with
@@ -1432,6 +1539,8 @@ private def resolveClosedMethodEvidence (program : CheckedProgram)
             requirement reason)
       | .success evidence => do
           let .byImpl goal _ _ := evidence
+            | throw (.callRequirementEvidenceGoalMismatch caller.key node.id
+                requirement predicate evidence.goal)
           if goal != predicate then
             throw (.callRequirementEvidenceGoalMismatch caller.key node.id
               requirement predicate goal)
@@ -1480,6 +1589,7 @@ def resolveRuntimeEvidenceEnvironment (program : CheckedProgram)
           throw (.runtimeEvidenceResolutionInconclusive key reason)
       | .success evidence => do
           let .byImpl goal _ _ := evidence
+            | throw (.runtimeEvidenceGoalMismatch key 0 predicate evidence.goal)
           if goal != predicate then
             throw (.runtimeEvidenceGoalMismatch key 0 predicate goal)
           pure (evidence :: (← resolveRuntimeEvidenceEnvironment program key
@@ -1807,6 +1917,7 @@ private def literalEvidenceIsBuiltin (function : CheckedFunction)
       solved.predicate == expected &&
         match solved.evidence with
         | .assumption _ => false
+        | .implementation (.byAssumption _) => false
         | .implementation (.byImpl goal implementation premises) =>
             goal == expected && premises.isEmpty &&
               match resolution.targetType with

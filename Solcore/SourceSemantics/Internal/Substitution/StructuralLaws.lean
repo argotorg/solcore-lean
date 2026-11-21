@@ -7150,8 +7150,7 @@ theorem applyPredicateEvidence_goal (substitution : Substitution)
   cases evidence with
   | assumption predicate => rfl
   | implementation evidence =>
-      cases evidence
-      rfl
+      cases evidence <;> rfl
 
 theorem applySolvedRequirement_goal_alignment (substitution : Substitution)
     (requirement : SolvedRequirement)

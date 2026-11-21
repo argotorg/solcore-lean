@@ -74,6 +74,7 @@ theorem word {solved : List SolvedRequirement} {node : ExpressionNode}
                   · rename_i goal
                     split at checked
                     · cases checked
+                    · cases checked
                     · rename_i actualGoal implementation premises evidence
                       split at checked
                       · cases checked
@@ -137,6 +138,7 @@ theorem integer {solved : List SolvedRequirement} {node : ExpressionNode}
                   · cases checked
                   · rename_i goal
                     split at checked
+                    · cases checked
                     · cases checked
                     · rename_i actualGoal implementation premises evidence
                       split at checked
@@ -203,6 +205,7 @@ theorem fixed {solved : List SolvedRequirement} {node : ExpressionNode}
                   · rename_i goal
                     split at checked
                     · cases checked
+                    · cases checked
                     · rename_i actualGoal implementation premises evidence
                       split at checked
                       · cases checked
@@ -267,6 +270,7 @@ theorem negativeWord {solved : List SolvedRequirement} {node : ExpressionNode}
                   · cases checked
                   · rename_i goal
                     split at checked
+                    · cases checked
                     · cases checked
                     · rename_i actualGoal implementation premises evidence
                       split at checked
@@ -333,6 +337,7 @@ theorem negativeInteger {solved : List SolvedRequirement} {node : ExpressionNode
                   · rename_i goal
                     split at checked
                     · cases checked
+                    · cases checked
                     · rename_i actualGoal implementation premises evidence
                       split at checked
                       · cases checked
@@ -397,6 +402,7 @@ theorem negativeFixed {solved : List SolvedRequirement} {node : ExpressionNode}
                   · cases checked
                   · rename_i goal
                     split at checked
+                    · cases checked
                     · cases checked
                     · rename_i actualGoal implementation premises evidence
                       split at checked

@@ -299,6 +299,10 @@ inductive ResolutionEvidenceValid
         premiseGoals premiseEvidence) :
       ResolutionEvidenceValid program goal
         (.byImpl goal implId premiseEvidence)
+  | byAssumption
+      {goal : Predicate Trait Ty}
+      (given : goal ∈ program.givens) :
+      ResolutionEvidenceValid program goal (.byAssumption goal)
 
 /-- Pointwise validity of a premise goal/evidence spine. -/
 inductive ResolutionPremisesValid
@@ -619,25 +623,33 @@ theorem resolveAux_sound [DecidableEq Trait] [DecidableEq Ty]
   induction fuel with
   | zero =>
       intro active state goal state_valid
+      by_cases given : goal ∈ program.givens
+      · rw [resolveAux, if_pos (decide_eq_true given)]
+        exact ⟨ResolutionEvidenceValid.byAssumption given, state_valid⟩
+      have notGiven : decide (goal ∈ program.givens) = false := decide_eq_false given
       cases memoResult : lookupMemo? goal state.memo with
       | some outcome =>
-          rw [resolveAux, memoResult]
+          rw [resolveAux, if_neg (by simp [notGiven]), memoResult]
           exact ⟨lookupMemo?_sound state_valid memoResult, state_valid⟩
       | none =>
           by_cases activeGoal : isActive goal active = true
-          · rw [resolveAux, memoResult, if_pos activeGoal]
+          · rw [resolveAux, if_neg (by simp [notGiven]), memoResult, if_pos activeGoal]
             exact ⟨True.intro, state_valid⟩
-          · rw [resolveAux, memoResult, if_neg activeGoal]
+          · rw [resolveAux, if_neg (by simp [notGiven]), memoResult, if_neg activeGoal]
             exact ⟨True.intro, state_valid⟩
   | succ remaining induction =>
       intro active state goal state_valid
+      by_cases given : goal ∈ program.givens
+      · rw [resolveAux, if_pos (decide_eq_true given)]
+        exact ⟨ResolutionEvidenceValid.byAssumption given, state_valid⟩
+      have notGiven : decide (goal ∈ program.givens) = false := decide_eq_false given
       cases memoResult : lookupMemo? goal state.memo with
       | some outcome =>
-          rw [resolveAux, memoResult]
+          rw [resolveAux, if_neg (by simp [notGiven]), memoResult]
           exact ⟨lookupMemo?_sound state_valid memoResult, state_valid⟩
       | none =>
           by_cases activeGoal : isActive goal active = true
-          · rw [resolveAux, memoResult, if_pos activeGoal]
+          · rw [resolveAux, if_neg (by simp [notGiven]), memoResult, if_pos activeGoal]
             exact ⟨True.intro, state_valid⟩
           · let expanded : SearchState Trait Ty ImplId :=
               { state with
@@ -662,13 +674,13 @@ theorem resolveAux_sound [DecidableEq Trait] [DecidableEq Ty]
                 | success evidence =>
                     have cached := cacheConclusive_valid ordinarySound.2
                       ordinarySound.1
-                    rw [resolveAux, memoResult, if_neg activeGoal]
+                    rw [resolveAux, if_neg (by simp [notGiven]), memoResult, if_neg activeGoal]
                     simpa [expanded, resolveChild, ordinaryResult] using
                       And.intro ordinarySound.1 cached
                 | inconclusive reason =>
                     have cached := cacheConclusive_valid ordinarySound.2
                       ordinarySound.1
-                    rw [resolveAux, memoResult, if_neg activeGoal]
+                    rw [resolveAux, if_neg (by simp [notGiven]), memoResult, if_neg activeGoal]
                     simpa [expanded, resolveChild, ordinaryResult] using
                       And.intro ordinarySound.1 cached
                 | noSolution =>
@@ -682,7 +694,7 @@ theorem resolveAux_sound [DecidableEq Trait] [DecidableEq Ty]
                         rw [defaultResult] at defaultSound
                         have cached := cacheConclusive_valid defaultSound.2
                           defaultSound.1
-                        rw [resolveAux, memoResult, if_neg activeGoal]
+                        rw [resolveAux, if_neg (by simp [notGiven]), memoResult, if_neg activeGoal]
                         simpa [expanded, resolveChild, ordinaryResult,
                           defaultResult] using
                           And.intro defaultSound.1 cached

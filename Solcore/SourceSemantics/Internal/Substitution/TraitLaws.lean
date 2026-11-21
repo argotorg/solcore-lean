@@ -265,10 +265,13 @@ theorem ImplementationEvidenceRepresents.applyParameters
       Forall₂ ImplementationEvidenceRepresents
         (applyEvidences substitution retained)
         (semantic.map (applyTraitEvidence substitution)))
-    ?_ ?_ ?_ represents
+    ?_ ?_ ?_ ?_ represents
   · intro goal implId retainedPremises semanticPremises premises induction
     simpa [applyEvidence, applyEvidences, applyTraitEvidence] using
       (ImplementationEvidenceRepresents.byImpl induction)
+  · intro goal
+    simpa [applyEvidence, applyTraitEvidence] using
+      (ImplementationEvidenceRepresents.byAssumption (goal := _))
   · exact .nil
   · intro retained semantic retainedRest semanticRest head tail
       headInduction tailInduction
@@ -800,10 +803,13 @@ theorem ImplementationEvidenceRepresents.applySubstitution
       Forall₂ ImplementationEvidenceRepresents
         (applyEvidences substitution retained)
         (semantic.map (applyTraitEvidence substitution)))
-    ?_ ?_ ?_ represents
+    ?_ ?_ ?_ ?_ represents
   · intro goal implId retainedPremises semanticPremises premises induction
     simpa [applyEvidence, applyEvidences, applyTraitEvidence] using
       (ImplementationEvidenceRepresents.byImpl induction)
+  · intro goal
+    simpa [applyEvidence, applyTraitEvidence] using
+      (ImplementationEvidenceRepresents.byAssumption (goal := _))
   · exact .nil
   · intro retained semantic retainedRest semanticRest head tail
       headInduction tailInduction

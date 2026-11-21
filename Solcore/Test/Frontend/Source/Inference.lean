@@ -2053,6 +2053,7 @@ private def evidenceHasGoal (expected : ProgramPredicate) :
     SourceInference.PredicateEvidence → Bool
   | .assumption actual => decide (actual = expected)
   | .implementation (.byImpl goal _ _) => decide (goal = expected)
+  | .implementation (.byAssumption goal) => decide (goal = expected)
 
 private def aligned (function : SourceInference.CheckedFunction)
     (expected : List ProgramPredicate) : Bool :=

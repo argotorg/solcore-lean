@@ -2439,6 +2439,7 @@ private def testMalformedRequirementMetadata
     | .assumption _ => .assumption wrongPredicate
     | .implementation (.byImpl _ implementation premises) =>
         .implementation (.byImpl wrongPredicate implementation premises)
+    | .implementation (.byAssumption _) => .implementation (.byAssumption wrongPredicate)
   let wrongPredicateFunction : CheckedFunction := {
     function with
     solvedRequirements := [{
@@ -2515,6 +2516,7 @@ private def testMalformedCoercionEvidence
     | .assumption _ => PredicateEvidence.assumption goal
     | .implementation (.byImpl _ implementation premises) =>
         .implementation (.byImpl goal implementation premises)
+    | .implementation (.byAssumption _) => .implementation (.byAssumption goal)
   let wrongPredicate : ProgramPredicate := {
     solved.predicate with subject := .word
   }

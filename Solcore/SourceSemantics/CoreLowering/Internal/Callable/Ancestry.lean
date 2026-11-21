@@ -784,6 +784,7 @@ theorem witnesses_actual_subset {caller : SourceSpecialization.SpecializedFuncti
     simp only [bind, Except.bind, pure, Except.pure, throw, throwThe, MonadExceptOf.throw] at iteration
     split at iteration
     · next evidence caseEq =>
+      split at iteration <;> try contradiction
       cases iteration
       refine ⟨_, rfl, ?_⟩
       intro witness member
