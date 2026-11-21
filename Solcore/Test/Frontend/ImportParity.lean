@@ -3,7 +3,8 @@ import Solcore.Frontend.ProgramImports
 
 /-! Upstream's import rules at the whole-program load: a selected or wildcard import beside a
 declaration of the importing module (`SC0108`), an unknown selected or hidden item (`SC0110`) and
-an unknown module are refused where they are; an import of one of upstream's std modules is not;
+an unknown module are refused where they are; an import of one of upstream's std modules is not,
+and the rules count the names it exports with their namespaces (`upstreamStandardModuleExports`);
 of two import declarations that bind one name from one module, the first is kept; a name listed
 twice in one import (`SC0117`), a name brought from two modules (`SC0120`) and a qualifier beside a
 value (`SC0121`) are refused; and a module that no import or re-export reaches from the entry is
@@ -253,6 +254,73 @@ private def testUnreachableModules : IO Unit := do
   expectRefused "the same module, imported" ["import { f as h } from loose;"] []
     ["item nosuch", "module nosuchmodule", "item f", "value f", "duplicate k", "ambiguous f"] loose
 
+/-- Modules beside std's: one exporting a function named like std's `not`, one a function named like
+std's constructor `Empty`, and a module whose path ends in a name std exports as a function. -/
+private def standardNeighbours : List Workspace.RawSourceFile := [
+  { path := "lib8.solc", content :=
+      "pragma solcore;\nexport { not };\nfunction not(x: word) returns (word) { return x; }" },
+  { path := "lib9.solc", content :=
+      "pragma solcore;\nexport { Empty };\nfunction Empty(x: word) returns (word) { return x; }" },
+  { path := "pkg/lt.solc", content :=
+      "pragma solcore;\nexport { g };\nfunction g(x: word) returns (word) { return x; }" }]
+
+/-- The rules with std's modules other than `std.opcodes`, by the names they export and their
+namespaces: a constructor is no item (`SC0110`) and meets nothing; a function meets a value, and a
+type or a trait a type, an enum or a trait (`SC0108`); a name std and another module bring is
+ambiguous, a re-export beside its origin too (`SC0120`); and a std function meets a qualifier
+(`SC0121`). -/
+private def testStandardModules : IO Unit := do
+  let lt := "function lt(x: word, y: word) returns (word) { return x; }"
+  expectRefused "unknown item of std" ["import { nosuch } from std;"] [] ["item nosuch"]
+  expectRefused "unknown hidden item of std" ["import * from std hiding { nosuch };"] []
+    ["item nosuch"]
+  expectRefused "a constructor of std selected" ["import { Empty } from std;"] [] ["item Empty"]
+  expectLoaded "a type of std selected" ["import { Error } from std;"] []
+  expectRefused "std wildcard, a local function of a std function's name" ["import * from std;"]
+    [lt] ["value lt"]
+  expectRefused "a std trait selected, a local trait" ["import { Add } from std;"]
+    ["trait Add<a> {}"] ["type Add"]
+  expectRefused "std wildcard, a local enum named like a std type" ["import * from std;"]
+    ["enum DynArray { D }"] ["type DynArray"]
+  expectLoaded "std wildcard, a local function named like a std trait" ["import * from std;"]
+    ["function Add(x: word) returns (word) { return x; }"]
+  expectLoaded "std wildcard, a local function named like a std type" ["import * from std;"]
+    ["function DynArray(x: word) returns (word) { return x; }"]
+  expectLoaded "std wildcard, a local function named like a std constructor" ["import * from std;"]
+    ["function Empty(x: word) returns (word) { return x; }"]
+  expectLoaded "a std function hidden, a local of its name" ["import * from std hiding { lt };"]
+    [lt]
+  expectRefused "std and std.opcodes wildcards"
+    ["import * from std;", "import * from std.opcodes;"] []
+    (["addmod", "address", "and", "byte", "gt", "log1", "lt", "mulmod", "not", "or"].map
+      ("ambiguous " ++ ·))
+  expectLoaded "std, std.opcodes hiding the ten it shares"
+    ["import * from std;",
+      "import * from std.opcodes hiding { addmod, address, and, byte, gt, " ++
+        "log1, lt, mulmod, not, or };"]
+    []
+  expectRefused "std wildcard, a selected std.opcodes type-named function"
+    ["import * from std;", "import { address } from std.opcodes;"] [] ["ambiguous address"]
+  expectRefused "one function from std and std.opcodes"
+    ["import { lt } from std;", "import { lt } from std.opcodes;"] [] ["ambiguous lt"]
+  expectLoaded "std hiding not, not from std.opcodes"
+    ["import * from std hiding { not };", "import { not } from std.opcodes;"] []
+  expectLoaded "std and an alias from std.opcodes"
+    ["import * from std;", "import { not as n } from std.opcodes;"] []
+  expectRefused "std and a user module sharing a function"
+    ["import * from std;", "import * from lib8;"] [] ["ambiguous not"] (loose := standardNeighbours)
+  expectLoaded "std's constructor and a user module's function of its name"
+    ["import * from std;", "import * from lib9;"] [] (loose := standardNeighbours)
+  expectRefused "a re-export of std beside its origin"
+    ["import * from std.unchecked.signed;", "import * from std.unchecked.unsigned;"] []
+    (["UncheckedAdd", "UncheckedSub", "UncheckedMul", "UncheckedDiv", "UncheckedMod"].map
+      ("ambiguous " ++ ·))
+  expectLoaded "std twice, std beside std.dispatch, std.signed beside std.opcodes"
+    ["import * from std;", "import * from std;", "import * from std.dispatch;",
+      "import * from std.signed;"] []
+  expectRefused "a plain import's qualifier beside a std function"
+    ["import pkg.lt;", "import * from std;"] [] ["qualifier lt"] (loose := standardNeighbours)
+
 def testImportParity : IO Unit := do
   testImportedNameConflicts
   testUnknownImports
@@ -261,5 +329,6 @@ def testImportParity : IO Unit := do
   testAmbiguousImports
   testQualifierConflicts
   testUnreachableModules
+  testStandardModules
 
 end Tests.ImportParity

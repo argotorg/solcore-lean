@@ -323,6 +323,11 @@ private def processImport
   if isStandardOpcodesImport environment importer declaration then
     let (visibility, bindings) := processStandardOpcodesImport earlier visibility declaration
     ([], visibility, bindings)
+  else if (standardModuleImportExports? environment importer declaration).isSome then
+    -- One of upstream's other std modules: Lean has none of its declarations, so its names bind
+    -- nothing and resolve as they would without the import. The load checks the import
+    -- (`standardModuleImportErrors`).
+    ([], visibility, [])
   else
   match declaration.value with
   | .plain path =>

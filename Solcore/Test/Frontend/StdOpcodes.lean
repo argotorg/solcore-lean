@@ -7,9 +7,10 @@ Upstream's `std.opcodes` as a module of the load: its 81 functions bound by sele
 wildcard and hiding imports, the 26 pure ones as builtins, the other 55 refused where they are
 used. Each case is a source upstream's pinned checker was probed with, and gives upstream's
 verdict; an accepted one runs at 9 and 2^256 − 1 and gives the results upstream's checked Hull
-gives. Until qualified access and std beside std.opcodes follow upstream, six forms stay as they
-were (`testFormsAsBefore`). Operators beside a bound name follow upstream's three kinds
-(`testOperators`).
+gives. std's other modules bind no name, so a name resolves past their imports, and a name they
+export is refused where it is used (`testBesideStandardModules`). Until qualified access follows
+upstream, three forms stay as they were (`testFormsAsBefore`). Operators beside a bound name follow
+upstream's three kinds (`testOperators`).
 -/
 
 set_option autoImplicit false
@@ -153,6 +154,8 @@ private def testRefused : IO Unit := do
     ["function opcodes(x: word) returns (word) { return x; }"] "opcodes(a0)" "load"
   expectRefused "a plain import, a bare call" ["import std.opcodes;"] [] "div(a0, 4)" "check"
   expectRefused "no import, a qualified call" [] [] "std.opcodes.div(a0, 4)" "check"
+  expectRefused "std and std.opcodes wildcards, nothing used"
+    ["import * from std;", "import * from std.opcodes;"] [] "a0" "load"
 
 /-- Operators beside the names an import of `std.opcodes` binds, as upstream gives them. `<` and
 `!` call the `lt` and `not` in scope, `<` with a bool expected, so a bound `lt` refuses `<` in a
@@ -176,8 +179,33 @@ private def testOperators : IO Unit := do
   expectResults "&& and || beside selected and and or" ["import { and, or } from std.opcodes;"] []
     "((true && true) || false) ? 1 : 0" [1, 1]
 
-/-- The six forms that differ from upstream as they did before `std.opcodes` was a module of the
-load: qualified access after a plain import, and std beside std.opcodes. -/
+/-- Names past an import of std's other modules, which bind none: a function of `std.opcodes`,
+Lean's operators and the twelve types' conversions, at upstream's results. A function std exports
+is refused where it is used, as Lean has none of std's declarations. -/
+private def testBesideStandardModules : IO Unit := do
+  let quarter := [2, maximum / 4]
+  expectResults "a std wildcard, a std.opcodes function used"
+    ["import * from std;", "import { div } from std.opcodes;"] [] "div(a0, 4)" quarter
+  expectResults "a std.dispatch wildcard, a std.opcodes function used"
+    ["import * from std.dispatch;", "import { div } from std.opcodes;"] [] "div(a0, 4)" quarter
+  expectResults "std, std.opcodes hiding the ten it shares"
+    ["import * from std;",
+      "import * from std.opcodes hiding { addmod, address, and, byte, gt, " ++
+        "log1, lt, mulmod, not, or };"]
+    [] "div(a0, 4)" quarter
+  expectResults "std hiding not, not from std.opcodes"
+    ["import * from std hiding { not };", "import { not } from std.opcodes;"] [] "not(a0)"
+    [maximum - 9, 0]
+  expectResults "< beside std" ["import * from std;"] [] "(a0 < 10) ? 1 : 0" [1, 0]
+  expectResults "<< beside std" ["import * from std;"] [] "a0 << 2" [36, maximum - 3]
+  expectResults "! beside std" ["import * from std;"] [] "(!false) ? 1 : 0" [1, 1]
+  expectResults "uint256 and Typedef.rep beside std" ["import * from std;"] []
+    "Typedef.rep(uint256(a0))" [9, maximum]
+  expectRefused "a function std exports, used" ["import * from std;"] [] "tobool(a0) ? 1 : 0"
+    "check"
+
+/-- The three forms that differ from upstream as they did before `std.opcodes` was a module of the
+load: qualified access after a plain import. -/
 private def testFormsAsBefore : IO Unit := do
   expectRefused "a plain import, a qualified call" ["import std.opcodes;"] [] "opcodes.div(a0, 4)"
     "check"
@@ -185,18 +213,13 @@ private def testFormsAsBefore : IO Unit := do
     "std.opcodes.div(a0, 4)" "check"
   expectRefused "a qualified opcode as a function value" ["import std.opcodes;"] [apply]
     "apply(opcodes.sub, a0)" "check"
-  expectResults "std and std.opcodes wildcards, nothing used"
-    ["import * from std;", "import * from std.opcodes;"] [] "a0" [9, maximum]
-  expectRefused "a std wildcard, a std.opcodes function used"
-    ["import * from std;", "import { div } from std.opcodes;"] [] "div(a0, 4)" "check"
-  expectRefused "a std.dispatch wildcard, a std.opcodes function used"
-    ["import * from std.dispatch;", "import { div } from std.opcodes;"] [] "div(a0, 4)" "check"
 
 def run : IO Unit := do
   testAccepted
   testRefused
+  testBesideStandardModules
   testFormsAsBefore
   testOperators
-  IO.println "std.opcodes imports and operators: upstream's forms and results, six as before GREEN"
+  IO.println "std.opcodes and std imports, operators: upstream's forms and results GREEN"
 
 end Tests.StdOpcodes
