@@ -1962,7 +1962,7 @@ private def duplicateImportNames (module : ProgramModule) : List ProgramInterfac
 
 /-- Upstream's `SC0120`: a local name that selected or wildcard imports bring from two or more
 modules, in any import group and used or not. Two imports of one module are no ambiguity; a
-module counts by the import that names it, so a re-export beside its origin is one. -/
+module counts by the import that names it, so a re-export beside its origin counts as two. -/
 private def ambiguousImports (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (module : ProgramModule) : List ProgramInterfaceError :=
   let brought := (importsIn module).flatMap fun declaration =>
