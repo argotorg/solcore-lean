@@ -162,8 +162,9 @@ rejected before the body runs, as a data-conversion error: the counterpart of st
 **Unchanged:** Core, the Hull importer and the shared contract runtime.
 
 **Meaning proofs.** The operators, literals, unary minus and `case uint256(p)` at the twelve types
-are inside the meaning proofs, and so, on the accepted-body route, are the conversions. Compound
-assignments and in-place `~` at fixed-width targets are compiled but outside them.
+are inside the meaning proofs, and so, on the accepted-body route, are the conversions. So are
+compound assignments at fixed-width targets, except `<<=` and `>>=`. Those two and in-place `~`
+there are compiled but outside them.
 
 **Tests.** `Tests.SourceCoreShiftExecution` and `Tests.SourceCoreUncheckedExecution` run shifts
 and blocks through the public API. `runUpstreamFixtures` in `Tests.SourceCoreFixedIntegerOperators`
@@ -317,7 +318,7 @@ upstream wrote them.
   as it rejects `integer`, because its local-cell proofs rely on each Core type having one source
   type. The catalog projections, which the public pipelines use, lower them to `word`.
 
-### Row 1's compound assignments: checked at the guard, outside the meaning proofs
+### Row 1's compound assignments: checked at the guard
 
 - **Typing.** A compound assignment takes the target's type where its binary operator is a builtin
   there (`Detail.compoundOperandType`).
@@ -338,21 +339,12 @@ upstream wrote them.
 - **Fault sites.** A fixed-width target has its own site
   (`SourceCoreAssignmentFaultSites.operandTarget`), so an absent operand fails with its own
   `invalidAssignmentOperands` diagnostic, naming the target's type.
-- **Outside the meaning proofs.** The proofs' operator profile (`AssignmentProfile`, on the
-  metadata view) excludes fixed-width compound targets, as the receipts' `sourceProfile`
-  (`operator = .equal ∨ T = .word`) excludes Integer targets. Inside the profiles,
+- **Meaning proofs.** `WideAssignmentProfile` admits these targets (`FixedCompoundAssignment`),
+  and so does the receipts' `sourceProfile`, which still excludes Integer targets.
+  `FixedCompoundModifier.Agreement` and `CompatiblePlaceModifier.wide_outcome` relate the
+  compiler's modifier and check to `CompoundAssignmentApplies`. Inside the plain profiles,
   `assignmentModifier_plain` turns the compiler's choice back into `binaryOperator`'s, and
   `CompoundAssignmentApplies.eq_of_plain` the relation back into `AssignmentValueApplies`.
-- **Bringing in** checked `+= -= *=` and `&= |= ^=` would take:
-  - a fixed disjunct, `T = .fixed t ∧ FixedCompoundAssignmentOperator operator`, at the end of
-    `AssignmentProfile` and in the receipts' `sourceProfile`;
-  - a checked case in `DataPlaceModifier`'s modifier lemmas: in range, Word's `+ - *` is the exact
-    result's word (congruence modulo `2^256`), and `SourceCorePrimitive.checkedInRange` is
-    `Dynamic.FixedInRange` of `checkedResult` by definition;
-  - the range check in the place pipelines, through `guard_inRange`, `guard_overflow` and
-    `guard_range_inv`, which read the snapshot, the guard's fourth binder (`RangePasses`);
-  - for `&= |= ^=`, the canonical words of the representation (`ValueRep.fixed`) in the modifier's
-    result.
 
 ### Row 1's division: truncated over Core's Euclidean operations
 
@@ -435,7 +427,7 @@ inside the meaning proofs (`BinaryProfile.fixedDivision`).
 - **Typing and semantics.** `+= -= *= /= %=` in a block take the target's type, as the checked
   forms do, and an open target defaults as above. `CompoundAssignmentApplies.uncheckedAdd` …
   `uncheckedModulo` apply `FixedBinaryApplies` of the binary operator, so the result wraps.
-  `FixedCheckedCompound` includes them, so the meaning proofs' profiles exclude them.
+  The meaning proofs take them through `FixedCompoundAssignment`, as they take the checked forms.
 - **Lowering.** `assignmentModifier` gives them Word's operation (`checkedWordOperation`) with
   `fixedCheck`: no check for `+= -= *=`, and the zero test for `/= %=`. Word's operation keeps the
   low `N` bits, so the modified leaf is wrapped before the setter writes it. `modified` and
@@ -447,7 +439,7 @@ inside the meaning proofs (`BinaryProfile.fixedDivision`).
   panic. It would also change `guard_inv`, `inv_sized` and `Passes` and about 40 of their callers,
   with no gain in a public statement.
 - **Proofs.** Statements written without the argument elaborate with `none` and keep their text.
-  Under the meaning proofs' profiles `placeWrap_plain` gives `none`.
+  Under the plain profiles `placeWrap_plain` gives `none`, and the receipts state `placeWrap`.
 
 ### Row 1's shifts on the twelve types: the amount takes its own type
 
@@ -572,11 +564,8 @@ struct types, such as `case uint8(w)`, are rejected as upstream rejects them.
 ## What remains
 
 - **Meaning proofs.** Two parts are compiled but outside the meaning proofs:
-  - compound assignments at fixed-width targets. The
-    [list](#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs) covers
-    checked `+= -= *=` and `&= |= ^=`. The other forms are outside too: `/= %=` also test the
-    divisor (`DivisorPasses`), and the unchecked and shift forms wrap the leaf (`placeWrap`); the
-    note lists nothing further for them;
+  - `<<=` and `>>=` at fixed-width targets, which wrap the leaf (`placeWrap`), since
+    `FixedCompoundAssignmentOperator` has no shifts;
   - in-place `~` at fixed-width targets, whose compiler profiles take only a `Word` target.
 - **Deferred `Typedef` resolution** at finalization (option A). It is not scheduled.
 - **`where` with the builtin `Int`**, a frontend gap older than row 1.

@@ -543,7 +543,7 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
 1. **One evaluation of an element place in a compound assignment**
    ([decision 3](#3-compound-assignment-to-an-element)). `m[next(c)] += 5` runs `next` once, so the
    probe's 205 is 105 in Lean. This is row 1's rule for compound assignments
-   ([row 1's compound assignments](integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard-outside-the-meaning-proofs)).
+   ([row 1's compound assignments](integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard)).
 2. **`0x41` only from the length check**
    ([decision 2](#2-how-the-lowering-stores-arrays-and-when-new-panics-with-0x41)).
    - For lengths just below 2^251 − 1, the pinned backends disagree with each other. Each panics
