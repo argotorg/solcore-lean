@@ -411,7 +411,7 @@ theorem collected_of_imperative
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
-      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → faults (.invalidUnaryOperand .bitNot)
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
@@ -884,7 +884,7 @@ def of_imperative_compiler
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
-      assignment.target.type = .word → semanticFaults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → semanticFaults (.invalidUnaryOperand .bitNot)
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}
@@ -962,7 +962,7 @@ def of_actual_with_catalog
       (fun _ _ represented => CallableIndexedOwnedPublicAssignmentDiagnostics.prepared_operands
         prepared diagnostic receiver represented) origin profile
   have unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
-      assignment.target.type = .word → CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
         (.invalidUnaryOperand .bitNot)
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root) := by
     intro site assignment origin rawWord

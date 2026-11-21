@@ -224,7 +224,7 @@ theorem Choice.Issued.unary {named : Named} {choice : Choice code (stages := sta
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
     {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
     (origin : GenericAssignmentUnaryDiagnostics.UnaryOccurs function.source site assignment)
-    (rawWord : assignment.target.type = .word) :
+    (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) :
     CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
       (.invalidUnaryOperand .bitNot) (choice.invalidUnary site assignment.target.root) := by
   obtain ⟨diagnostics, namedCode, compilation, actual, _operandToken, token, _projectionToken, _missingToken⟩ := issued
@@ -233,7 +233,7 @@ theorem Choice.Issued.unary {named : Named} {choice : Choice code (stages := sta
   rw [sourceEq] at origin
   exact GenericAssignmentUnaryDiagnostics.prepared_unary_included prepared
     (fun _ _ represented => CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.compilation_unary
-      compilation actual receiver represented) origin rawWord
+      compilation actual receiver represented) origin profile
 
 /-- Place tokens come from the same real issuing inventory as this closure. -/
 theorem Choice.Issued.assignmentAuthority {named : Named} {choice : Choice code (stages := stages)}
@@ -302,7 +302,7 @@ theorem collected
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (choice.invalidOperand site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs function.source site assignment →
-      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → faults (.invalidUnaryOperand .bitNot)
         (choice.invalidUnary site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}

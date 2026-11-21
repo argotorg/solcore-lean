@@ -643,13 +643,13 @@ theorem unary_of_diagnostic
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
     {site assignment}
     (origin : GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment)
-    (rawWord : assignment.target.type = .word) :
+    (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) :
     CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
       (.invalidUnaryOperand .bitNot) (invalidUnary principal site assignment.target.root) := by
   obtain ⟨first, prepared⟩ := CallableIndexedOwnedAssignmentProvenance.method_assignments principal diagnostic
   exact GenericAssignmentUnaryDiagnostics.prepared_unary_included prepared
     (fun _ _ represented => CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.cached_unary
-      principal.cached diagnostic receiver represented) origin rawWord
+      principal.cached diagnostic receiver represented) origin profile
 
 variable (wellFormed : ProgramWellFormed (Program.ofChecked compiled.sourceProgram))
 
@@ -663,7 +663,7 @@ theorem collected
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (invalidOperand principal site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment →
-      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → faults (.invalidUnaryOperand .bitNot)
         (invalidUnary principal site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
@@ -727,7 +727,7 @@ theorem of_compiler
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (invalidOperand principal site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment →
-      assignment.target.type = .word → semanticFaults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → semanticFaults (.invalidUnaryOperand .bitNot)
         (invalidUnary principal site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     (syntaxTree : GenericImperativeMatch.PreparedSyntax principal.sourceBody.source expressionSyntax

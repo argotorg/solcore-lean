@@ -1733,7 +1733,7 @@ theorem collected
     (operands : ∀ {assignment operator rhs}, .assignValue assignment operator rhs ∈ items →
       ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator (invalidOperand parentSite assignment.target.root operator))
-    (unary : ∀ {assignment}, .assignBitNot assignment ∈ items → assignment.target.type = .word →
+    (unary : ∀ {assignment}, .assignBitNot assignment ∈ items → (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) →
       faults (.invalidUnaryOperand .bitNot) (invalidUnary parentSite assignment.target.root))
     (origins : ∀ {assignment operator rhs}, .assignValue assignment operator rhs ∈ items →
       AssignmentDiagnosticOrigins.Occurs source parentSite assignment operator rhs)
@@ -2187,7 +2187,7 @@ theorem collected_at
       ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator (invalidOperand site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs source site assignment →
-      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot) (invalidUnary site assignment.target.root))
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → faults (.invalidUnaryOperand .bitNot) (invalidUnary site assignment.target.root))
     {matchCompilation : SourceCoreCompatibleDataMatches.Context}
     (matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess policy matchCompilation)
     (matchValues : matchCompilation.values = values)
@@ -3039,7 +3039,7 @@ theorem collected
       ((operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) →
       AssignmentOperandDiagnostics.OperandsLaw faults operator (invalidOperand site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs source site assignment →
-      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot) (invalidUnary site assignment.target.root))
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → faults (.invalidUnaryOperand .bitNot) (invalidUnary site assignment.target.root))
     {matchCompilation : SourceCoreCompatibleDataMatches.Context}
     (matchPolicy : CompatibleMatchAmbientLowering.PolicySuccess policy matchCompilation)
     (matchValues : matchCompilation.values = values)

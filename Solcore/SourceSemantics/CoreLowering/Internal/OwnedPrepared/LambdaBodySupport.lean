@@ -839,7 +839,7 @@ theorem of_branching
       (fun reason token represented => included reason token
         (CallableIndexedOwnedIssuedAssignmentRecipes.operands compilation issued receiver represented)) occurrence rawProfile
   have unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs function.source site assignment →
-      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → faults (.invalidUnaryOperand .bitNot)
         (compilation.own.assignments.reasonAt site assignment.target.root .bitNot) := by
     intro site assignment origin rawWord
     exact GenericAssignmentUnaryDiagnostics.prepared_unary_included assignmentPrepared

@@ -329,10 +329,12 @@ inductive ItemShape : List ForItemForm → Prop where
       (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) (projected : assignment.target.projections ≠ [])
       (remaining : ItemShape rest) : ItemShape (.assignValue assignment operator rhs :: rest)
   | bitNot {assignment rest}
-      (profile : assignment.target.type = .word) (bare : assignment.target.projections = [])
+      (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
+      (bare : assignment.target.projections = [])
       (remaining : ItemShape rest) : ItemShape (.assignBitNot assignment :: rest)
   | bitNotProjected {assignment rest}
-      (profile : assignment.target.type = .word) (projected : assignment.target.projections ≠ [])
+      (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
+      (projected : assignment.target.projections ≠ [])
       (remaining : ItemShape rest) : ItemShape (.assignBitNot assignment :: rest)
 
 theorem ItemShape.let_tail {binder initializer rest}
@@ -358,13 +360,13 @@ theorem ItemShape.assign_tail {assignment operator rhs rest}
 
 theorem ItemShape.unary_tail {assignment rest}
     (shape : ItemShape (.assignBitNot assignment :: rest)) :
-    assignment.target.type = .word ∧ ItemShape rest := by
+    (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) ∧ ItemShape rest := by
   cases shape with
   | bitNot profile _ remaining | bitNotProjected profile _ remaining => exact ⟨profile, remaining⟩
 
 theorem ItemShape.bitNot_tail {assignment rest}
     (shape : ItemShape (.assignBitNot assignment :: rest)) (bare : assignment.target.projections = []) :
-    assignment.target.type = .word ∧ assignment.target.projections = [] ∧ ItemShape rest :=
+    (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) ∧ assignment.target.projections = [] ∧ ItemShape rest :=
   ⟨shape.unary_tail.1, bare, shape.unary_tail.2⟩
 
 inductive Shape (source : TypedSource) : Bool → List StatementId → Prop where
@@ -409,13 +411,13 @@ inductive Shape (source : TypedSource) : Bool → List StatementId → Prop wher
   | bitNot {mode id node assignment rest}
       (found : source.lookupStatement? id = some node)
       (form : node.form = .assignBitNot assignment)
-      (profile : assignment.target.type = .word)
+      (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
       (bare : assignment.target.projections = [])
       (remaining : Shape source mode rest) : Shape source mode (id :: rest)
   | bitNotProjected {mode id node assignment rest}
       (found : source.lookupStatement? id = some node)
       (form : node.form = .assignBitNot assignment)
-      (profile : assignment.target.type = .word)
+      (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
       (projected : assignment.target.projections ≠ [])
       (remaining : Shape source mode rest) : Shape source mode (id :: rest)
   | conditional {mode id node condition thenBody elseBody rest}
@@ -461,7 +463,7 @@ def allowedForm : StatementForm → Bool
       operator == .equal || assignment.target.type == .word ||
         decide (FixedCompoundAssignment operator assignment.target.type)
   | .assignBitNot assignment =>
-      assignment.target.type == .word
+      assignment.target.type == .word || decide (∃ type, assignment.target.type = .fixed type)
 
 private theorem node_eq {source : TypedSource} {id : StatementId} {first second : StatementNode}
     (left : source.lookupStatement? id = some first)
@@ -486,7 +488,9 @@ theorem Shape.head_allowed {source mode id node rest}
       · simp [form, allowedForm, decide_eq_true fixed]
   | bitNot actual form profile _ _ | bitNotProjected actual form profile _ _ =>
       cases node_eq found actual
-      simp [form, allowedForm, profile]
+      rcases profile with word | fixed
+      · simp [form, allowedForm, word]
+      · simp [form, allowedForm, decide_eq_true fixed]
 
 theorem Shape.tail_of_let {source mode id node binder initializer rest}
     (shape : Shape source mode (id :: rest))
@@ -561,7 +565,7 @@ theorem Shape.assign_tail {source mode id node assignment operator rhs rest}
 theorem Shape.unary_tail {source mode id node assignment rest}
     (shape : Shape source mode (id :: rest)) (found : source.lookupStatement? id = some node)
     (form : node.form = .assignBitNot assignment) :
-    assignment.target.type = .word ∧ Shape source mode rest := by
+    (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) ∧ Shape source mode rest := by
   cases shape with
   | forLoop actual same _ _ _ _ =>
       cases node_eq found actual
@@ -582,7 +586,7 @@ theorem Shape.unary_tail {source mode id node assignment rest}
 theorem Shape.bitNot_tail {source mode id node assignment rest}
     (shape : Shape source mode (id :: rest)) (found : source.lookupStatement? id = some node)
     (form : node.form = .assignBitNot assignment) (bare : assignment.target.projections = []) :
-    assignment.target.type = .word ∧ assignment.target.projections = [] ∧ Shape source mode rest :=
+    (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) ∧ assignment.target.projections = [] ∧ Shape source mode rest :=
   ⟨(shape.unary_tail found form).1, bare, (shape.unary_tail found form).2⟩
 
 theorem Shape.branches {source mode id node condition thenBody elseBody rest}
@@ -784,7 +788,8 @@ inductive ItemShape : List ForItemForm → Prop where
       (profile : (operator = .equal ∨ assignment.target.type = .word) ∨ FixedCompoundAssignment operator assignment.target.type) (bare : assignment.target.projections = [])
       (remaining : ItemShape rest) : ItemShape (.assignValue assignment operator rhs :: rest)
   | bitNot {assignment rest}
-      (profile : assignment.target.type = .word) (bare : assignment.target.projections = [])
+      (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
+      (bare : assignment.target.projections = [])
       (remaining : ItemShape rest) : ItemShape (.assignBitNot assignment :: rest)
 
 theorem ItemShape.let_tail {binder initializer rest}
@@ -803,7 +808,7 @@ theorem ItemShape.assign_tail {assignment operator rhs rest}
 
 theorem ItemShape.bitNot_tail {assignment rest}
     (shape : ItemShape (.assignBitNot assignment :: rest)) :
-    assignment.target.type = .word ∧ assignment.target.projections = [] ∧ ItemShape rest := by
+    (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) ∧ assignment.target.projections = [] ∧ ItemShape rest := by
   cases shape with | bitNot profile bare remaining => exact ⟨profile, bare, remaining⟩
 
 inductive Shape (source : TypedSource) : Bool → List StatementId → Prop where
@@ -842,7 +847,7 @@ inductive Shape (source : TypedSource) : Bool → List StatementId → Prop wher
   | bitNot {mode id node assignment rest}
       (found : source.lookupStatement? id = some node)
       (form : node.form = .assignBitNot assignment)
-      (profile : assignment.target.type = .word)
+      (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
       (bare : assignment.target.projections = [])
       (remaining : Shape source mode rest) : Shape source mode (id :: rest)
   | conditional {mode id node condition thenBody elseBody rest}
@@ -888,7 +893,8 @@ def allowedForm : StatementForm → Bool
       (operator == .equal || assignment.target.type == .word ||
         decide (FixedCompoundAssignment operator assignment.target.type)) && assignment.target.projections.isEmpty
   | .assignBitNot assignment =>
-      assignment.target.type == .word && assignment.target.projections.isEmpty
+      (assignment.target.type == .word || decide (∃ type, assignment.target.type = .fixed type)) &&
+        assignment.target.projections.isEmpty
 
 private theorem node_eq {source : TypedSource} {id : StatementId} {first second : StatementNode}
     (left : source.lookupStatement? id = some first)
@@ -913,7 +919,9 @@ theorem Shape.head_allowed {source mode id node rest}
       · simp [form, allowedForm, bare, decide_eq_true fixed]
   | bitNot actual form profile bare _ =>
       cases node_eq found actual
-      simp [form, allowedForm, bare, profile]
+      rcases profile with word | fixed
+      · simp [form, allowedForm, bare, word]
+      · simp [form, allowedForm, bare, decide_eq_true fixed]
 
 theorem Shape.tail_of_let {source mode id node binder initializer rest}
     (shape : Shape source mode (id :: rest))
@@ -982,7 +990,7 @@ theorem Shape.assign_tail {source mode id node assignment operator rhs rest}
 theorem Shape.bitNot_tail {source mode id node assignment rest}
     (shape : Shape source mode (id :: rest)) (found : source.lookupStatement? id = some node)
     (form : node.form = .assignBitNot assignment) :
-    assignment.target.type = .word ∧ assignment.target.projections = [] ∧ Shape source mode rest := by
+    (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) ∧ assignment.target.projections = [] ∧ Shape source mode rest := by
   cases shape with
   | forLoop actual same _ _ _ _ =>
       cases node_eq found actual

@@ -1149,6 +1149,12 @@ abbrev WideBitNotProfile (target : TypeSystem.Ty) : Prop :=
   (SourceCoreRawMetadata.runtimeType target = .word ∨ SourceCoreRawMetadata.runtimeType target = .integer) ∨
     ∃ type, target = .fixed type
 
+/-- The accepted-body recognizers' targets for in-place `~`, `Word` and the twelve fixed-width types,
+are of its profile. -/
+theorem WideBitNotProfile.of_word_or_fixed {target : TypeSystem.Ty}
+    (profile : target = .word ∨ ∃ type, target = .fixed type) : WideBitNotProfile target :=
+  profile.imp_left fun word => .inl (by rw [word]; rfl)
+
 end Solcore.SourceSemantics.CoreLowering
 
 namespace Solcore.SourceSemantics.CoreLowering.FixedCompoundModifier

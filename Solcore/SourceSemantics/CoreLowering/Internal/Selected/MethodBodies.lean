@@ -2397,7 +2397,7 @@ theorem collected
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (invalidOperand principal site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment →
-      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → faults (.invalidUnaryOperand .bitNot)
         (invalidUnary principal site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
@@ -2461,7 +2461,7 @@ theorem of_compiler
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (invalidOperand principal site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment →
-      assignment.target.type = .word → semanticFaults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → semanticFaults (.invalidUnaryOperand .bitNot)
         (invalidUnary principal site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     (syntaxTree : GenericImperativeMatch.PreparedSyntax principal.sourceBody.source expressionSyntax
@@ -2678,7 +2678,7 @@ theorem of_actual_with_evidence
       (fun _ _ represented => CallableIndexedOwnedAssignmentProvenance.cached_operands
         principal.cached diagnostic receiver represented) origin profile
   have unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs principal.sourceBody.source site assignment →
-      assignment.target.type = .word → CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
         (.invalidUnaryOperand .bitNot)
         (GenericAssignmentUnaryDiagnostics.unaryToken principal.cached.compilation.own.assignments site assignment.target.root) := by
     intro site assignment origin rawWord

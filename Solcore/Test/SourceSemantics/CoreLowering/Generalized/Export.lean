@@ -4555,12 +4555,11 @@ end Tests.SourceCoreCompoundShiftSubset
 end
 
 section
-/-! Step 9a's in-place `~` at a Word target stays in the statement-level meaning
-proofs: the compiler body profile (`AcceptedCompilerBodyProfile.validate`, whose
-`~=` profiles are `BitNotAssignable` and `ProjectedBitNotAssignable`) admits a
-bare `w ~=;` and a mapping element's `m[k] ~=;`. A fixed-width target is
-compiled but outside them: those profiles take only a Word target. (The
-invocation body shape, `shape?`, has no `~=` form.) -/
+/-! Step 9a's in-place `~` stays in the statement-level meaning proofs, at a Word
+target and at a fixed-width one: the compiler body profile
+(`AcceptedCompilerBodyProfile.validate`, whose `~=` profiles are
+`BitNotAssignable` and `ProjectedBitNotAssignable`) admits a bare `w ~=;`, a
+mapping element's `m[k] ~=;` and an `int8` target's `r ~=;`. -/
 set_option autoImplicit false
 namespace Tests.SourceCoreBitNotSubset
 open Solcore Frontend SourceInference SourceSemantics CoreLowering
@@ -4582,7 +4581,7 @@ def run : IO Unit := do
     | .ok source => pure source
     | .error error => throw (IO.userError s!"bit-not subset compilation: {reprStr error}")
   let some cached := source.artifact? | throw (IO.userError "bit-not subset cache absent")
-  for (name, inside) in [("wordBare", true), ("wordElement", true), ("fixedBare", false)] do
+  for (name, inside) in [("wordBare", true), ("wordElement", true), ("fixedBare", true)] do
     let some signature := cached.sourceProgram.signatures.functions.find? (·.name == name)
       | throw (IO.userError s!"bit-not subset signature {name}")
     let some original := cached.validationPlan.specializations.find?
@@ -4591,7 +4590,7 @@ def run : IO Unit := do
     let admitted := (AcceptedCompilerBodyProfile.validate original.function.typedBody (fun _ => True)).isSome
     if admitted != inside then
       throw (IO.userError s!"{name}: the body profile admitted {admitted}, expected {inside}")
-  IO.println "SOURCE_CORE_BIT_NOT_SUBSET_PASS: the compiler body profile admits w ~= and m[k] ~= at Word and keeps an int8 target outside"
+  IO.println "SOURCE_CORE_BIT_NOT_SUBSET_PASS: the compiler body profile admits w ~= and m[k] ~= at Word and an int8 r ~="
 
 end Tests.SourceCoreBitNotSubset
 end

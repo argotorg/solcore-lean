@@ -46,7 +46,7 @@ def UnaryLaw (source : TypedSource)
     (invalidUnary : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word)
     (faults : FunctionCalls.FaultRep) : Prop :=
   ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs source site assignment →
-    assignment.target.type = .word →
+    (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) →
     faults (.invalidUnaryOperand .bitNot) (invalidUnary site assignment.target.root)
 
 variable {layouts : SourceCoreAllocationLayouts.Prepared} {owner : SourceSpecialization.SpecializationKey}
@@ -687,7 +687,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
   | bitNotProjected {assignment binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
-      (profile : assignment.target.type = .word)
+      (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (remaining : Scan source approved rest) : Scan source approved (.assignBitNot assignment :: rest)
@@ -703,7 +703,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop) : List 
   | bitNot {assignment binder rest}
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (targetType : binder.scheme.body = assignment.target.type)
-      (profile : assignment.target.type = .word)
+      (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
       (bare : assignment.target.projections = [])
       (remaining : Scan source approved rest) : Scan source approved (.assignBitNot assignment :: rest)
 
@@ -953,7 +953,7 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
         | assignBitNot assignment =>
           obtain ⟨sourceTyped, writable⟩ := projected_bitNot_facts unique declaration route assignment
           apply GenericForHeader.PreparedSyntax.bitNotProjected sourceTyped writable projected route.elementFree
-            (.inl (.inl (by rw [profile]; rfl)))
+            (WideBitNotProfile.of_word_or_fixed profile)
           · intro child member
             obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
             exact ⟨keys child member, node, found, typed⟩
@@ -965,7 +965,7 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
         cases head with
         | assignBitNot assignment =>
           exact .bitNot (bitNot_facts declaration targetType bare assignment) bare
-            (.inl (.inl (by rw [profile]; rfl))) (ih tail)
+            (WideBitNotProfile.of_word_or_fixed profile) (ih tail)
 
 
 private theorem binder_final {owner : Resolved.DeclarationId} {context left right : SourceSemantics.Context}
@@ -1134,7 +1134,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (route : AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type)
-      (profile : assignment.target.type = .word)
+      (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
       (projected : assignment.target.projections ≠ [])
       (keys : ∀ key ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections, approved key)
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
@@ -1154,7 +1154,7 @@ inductive Scan (source : TypedSource) (approved : ExpressionId → Prop)
       (found : source.lookupStatement? id = some node) (form : node.form = .assignBitNot assignment)
       (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
       (targetType : binder.scheme.body = assignment.target.type)
-      (profile : assignment.target.type = .word)
+      (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
       (bare : assignment.target.projections = [])
       (remaining : Scan source approved expected mode rest) : Scan source approved expected mode (id :: rest)
 
@@ -1369,7 +1369,7 @@ theorem Scan.syntax {source approved expected mode statements}
       | assignBitNot assignment =>
         obtain ⟨sourceTyped, writable⟩ := ScopedSourceForItemsAdmission.projected_bitNot_facts unique declaration route assignment
         apply GenericImperativeMatch.PreparedSyntax.bitNotProjected found form sourceTyped writable projected
-          route.elementFree (.inl (.inl (by rw [profile]; rfl)))
+          route.elementFree (WideBitNotProfile.of_word_or_fixed profile)
         · intro child member
           obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
           exact ⟨keys child member, node, found, typed⟩
@@ -1383,7 +1383,7 @@ theorem Scan.syntax {source approved expected mode statements}
       | assignBitNot assignment =>
         exact .bitNot found form
           (ScopedSourceForItemsAdmission.bitNot_facts declaration targetType bare assignment)
-          bare (.inl (.inl (by rw [profile]; rfl))) (ih result tail)
+          bare (WideBitNotProfile.of_word_or_fixed profile) (ih result tail)
 
   | matching found form scrutineeFound value hiddenOrdinary armsOrdinary _ _ _ arms fallback remaining =>
       obtain ⟨middle, headFacts, tailFacts, head, tail⟩ := head_tail typed

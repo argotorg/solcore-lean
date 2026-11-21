@@ -502,14 +502,14 @@ theorem bare_head (index : ActualBodyInvocation.Index compiled bodyRelation) {ta
     (fun _ generated => ⟨node, found, generated⟩) lowered
 
 /-- Checker validity of a bare bit-not target gives its writable declaration,
-and the compiler profile's `Word` target (`sourceProfile`) its Word
-representation. -/
+and the compiler profile's `Word` or fixed-width target (`sourceProfile`)
+in-place `~`'s profile. -/
 theorem bitNot_facts {source : TypedSource} {context : SourceSemantics.Context}
     {assignment : AssignmentResolution} {binder : TypedBinder}
     (declaration : SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder)
     (targetType : binder.scheme.body = assignment.target.type)
     (bare : assignment.target.projections = [])
-    (sourceProfile : assignment.target.type = .word)
+    (sourceProfile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
     (typed : SourceBitNotAssignmentValid source context assignment) :
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       WritableLocal context assignment.target.root actual.scheme.body) ∧
@@ -518,7 +518,7 @@ theorem bitNot_facts {source : TypedSource} {context : SourceSemantics.Context}
   | intro place _ =>
   cases place with
   | intro writable projections target =>
-    refine ⟨?_, .inl (.inl (by rw [sourceProfile]; rfl))⟩
+    refine ⟨?_, WideBitNotProfile.of_word_or_fixed sourceProfile⟩
     intro actual actualFound
     cases Except.ok.inj (declaration.symm.trans actualFound)
     rw [bare] at projections
@@ -605,7 +605,7 @@ theorem projected_bitNot_head (index : ActualBodyInvocation.Index compiled bodyR
     ScopedSourceForItemsAdmission.projected_bitNot_facts unique receipt.description.binding route typed
   exact CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
     unique signatures sourceTyped writable receipt.projected route.elementFree
-    (.inl (.inl (by rw [receipt.sourceProfile]; rfl)))
+    (WideBitNotProfile.of_word_or_fixed receipt.sourceProfile)
     (fun id _ member generated _ => by
       obtain ⟨node, found, _⟩ := route.key_typed unique (sourceTyped _ receipt.description.binding) member
       exact ⟨node, found, generated⟩) lowered native

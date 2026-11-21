@@ -22,8 +22,8 @@ Main declarations:
 section
 -- leanmerge: from Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedBodyShape
 /-! Source statement lists that the accepted-body route closes at named rows:
-value and unit returns, monomorphic declarations, bare assignments the
-compiler refines, expression statements, blocks and conditionals, each with
+value and unit returns, monomorphic declarations, bare assignments and bare
+in-place `~` the compiler refines, expression statements, blocks and conditionals, each with
 its expressions in a given predicate. `Shape` recognizes these lists on the
 Source; `covered` shows that every refined accepted tree of such a list is
 covered by the statement closure, and `shapeWith?` recognizes them on an
@@ -34,7 +34,7 @@ set_option Elab.async false
 set_option maxHeartbeats 4000000
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedBodyShape
 open Core Frontend SourceInference
-open AcceptedNamedBodyFlow (Tree Assignable)
+open AcceptedNamedBodyFlow (Tree Assignable BitNotAssignable)
 open CellAwareInvocationAcceptedFlow (Covered)
 
 /-- Statement lists of the supported forms. A list may end without returning
@@ -64,6 +64,10 @@ inductive Shape (source : TypedSource) (expected : TypeSystem.Ty) (child : Expre
       (found : source.lookupStatement? id = some node) (form : node.form = .assignValue assignment operator expression)
       (assignable : Assignable source assignment operator) (value : child expression)
       (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
+  | bitNotted {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+      {assignment : AssignmentResolution} (found : source.lookupStatement? id = some node)
+      (form : node.form = .assignBitNot assignment) (assignable : BitNotAssignable source assignment)
+      (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
   | discarded {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
       {expression : ExpressionId} (found : source.lookupStatement? id = some node)
       (form : node.form = .expression expression true) (value : child expression)
@@ -91,6 +95,21 @@ def assignable? (source : TypedSource) (assignment : AssignmentResolution) (oper
           some ⟨⟨operatorOk, bare, fun other found => by rw [root] at found; cases found; exact typed⟩⟩
         else none
       | .error _ => some ⟨⟨operatorOk, bare, fun other found => by rw [root] at found; cases found⟩⟩
+    | _ :: _ => none
+  else none
+
+/-- Proof-producing recognition of a bare in-place `~` the compiler refines. -/
+def bitNotAssignable? (source : TypedSource) (assignment : AssignmentResolution) :
+    Option (PLift (BitNotAssignable source assignment)) :=
+  if profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type then
+    match bare : assignment.target.projections with
+    | [] =>
+      match root : SourceCoreDataPlaces.rootBinder source assignment.target.root with
+      | .ok binder =>
+        if typed : binder.scheme.body = assignment.target.type then
+          some ⟨⟨profile, bare, fun other found => by rw [root] at found; cases found; exact typed⟩⟩
+        else none
+      | .error _ => some ⟨⟨profile, bare, fun other found => by rw [root] at found; cases found⟩⟩
     | _ :: _ => none
   else none
 
@@ -130,6 +149,10 @@ def shapeWith? (source : TypedSource) (expected : TypeSystem.Ty) (child : Expres
         let ⟨value⟩ ← child? expression
         let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
         pure ⟨.assigned found form assignable value tail⟩
+      | .assignBitNot assignment => do
+        let ⟨assignable⟩ ← bitNotAssignable? source assignment
+        let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+        pure ⟨.bitNotted found form assignable tail⟩
       | .expression expression true => do
         let ⟨value⟩ ← child? expression
         let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
@@ -184,6 +207,7 @@ private theorem head_expanded {source : TypedSource} {expected : TypeSystem.Ty} 
   | declared found form => exact ⟨_, found, by rw [form]; rfl⟩
   | uninitialized found form => exact ⟨_, found, by rw [form]; rfl⟩
   | assigned found form => exact ⟨_, found, by rw [form]; rfl⟩
+  | bitNotted found form => exact ⟨_, found, by rw [form]; rfl⟩
   | discarded found form => exact ⟨_, found, by rw [form]; rfl⟩
   | block found form => exact ⟨_, found, by rw [form]; rfl⟩
   | conditional found form => exact ⟨_, found, by rw [form]; rfl⟩
@@ -270,6 +294,41 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     intro ready shape
     cases shape with
     | assigned found _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready tail⟩
+    | _ =>
+      exfalso
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
+      clear ih ready
+      simp_all
+  | bitNotting read form _ _ _ _ =>
+    intro ready shape
+    cases shape with
+    | bitNotted found form' assignable _ =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      rw [form] at form'
+      cases form'
+      exact absurd (.inl assignable) ready.1
+    | _ =>
+      exfalso
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
+      clear ready
+      simp_all
+  | bitNotted read form _ _ _ _ ih =>
+    intro ready shape
+    cases shape with
+    | bitNotted found _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready tail⟩
+    | _ =>
+      exfalso
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
+      clear ih ready
+      simp_all
+  | projectedBitNotted read form _ _ _ _ ih =>
+    intro ready shape
+    cases shape with
+    | bitNotted found _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       exact ⟨sameSource, ih ready tail⟩
     | _ =>
@@ -613,6 +672,23 @@ private theorem assigned_inv (unique : NodeOccurrencesUnique source) (found : so
     obtain rfl := same_node unique found (by assumption)
     simp_all
 
+private theorem bitNotted_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    {assignment : AssignmentResolution} (form : node.form = .assignBitNot assignment)
+    (head : Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after) :
+    ∃ updatedRoot, Dynamic.SourcePlaceSnapshotUpdate program context evidence source
+        (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updatedRoot after ∧
+      finalContext = context ∧ outcome = .fallthrough environment := by
+  cases head with
+  | assignBitNot contains formEq executes =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, executes, rfl, rfl⟩
+  | _ =>
+    exfalso
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
+
 private theorem discarded_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
     {expression : ExpressionId} (form : node.form = .expression expression true)
     (head : Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after) :
@@ -797,6 +873,20 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {mode : Bool} {
           write (tailIH next)
     · intro context environment before finalContext outcome after head terminal
       obtain ⟨_, _, _, same⟩ := assigned_inv unique found form head
+      subst same
+      cases terminal
+  | bitNotted found form assignable _ tailIH =>
+    intro context environment before after finalContext outcome
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after head next
+      obtain ⟨_, executes, rfl, same⟩ := bitNotted_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve write =>
+        obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve
+        exact .bitNotBare (lookupStatement?_sound found) form snapshot write (tailIH next)
+    · intro context environment before finalContext outcome after head terminal
+      obtain ⟨_, _, _, same⟩ := bitNotted_inv unique found form head
       subst same
       cases terminal
   | discarded found form value _ tailIH =>

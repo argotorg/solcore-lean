@@ -203,8 +203,8 @@ end
 
 section
 -- leanmerge: from Solcore.SourceSemantics.CoreLowering.AcceptedBareBitNotReceipt
-/-! The actual absent-RHS callback retains the original bare Word target and
-complete emitted update. It contributes no expression child. -/
+/-! The actual absent-RHS callback retains the original bare Word or fixed-width
+target and complete emitted update. It contributes no expression child. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Solcore.SourceSemantics.CoreLowering.AcceptedBareBitNotReceipt
@@ -220,7 +220,7 @@ structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : Typed
   invalidUnary : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
   missing : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
   matched : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missing
-  sourceProfile : assignment.target.type = .word
+  sourceProfile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type
   bare : assignment.target.projections = []
   callback : ExpressionLowerer → Nat → TypedSource → SourceCoreLocalCell.Scope →
     SourceCoreElaboration.ErrorSite → AssignmentResolution → Ty → Expr →
@@ -244,10 +244,10 @@ structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : Typed
   emitted : code = execute place (.var index) (SourceCoreCalls.packArguments [])
     (LanguageResult.success .unit) next output
     (binaryOperator (place.route.leafType = .integer) .equal) true
-    (invalidUnary site assignment.target.root)
+    (invalidUnary site assignment.target.root) (SourceCoreDataPlaces.bitNotWrap assignment.target.type)
 
 /-- The callback and accepted action determine the original layout and token.
-Raw Word eligibility is retained separately from the native numeric view. -/
+Raw Word or fixed-width eligibility is retained separately from the native numeric view. -/
 theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompatibleValues.Context}
     {invalidProjection invalidUnary : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word}
     {missing : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word}
@@ -258,7 +258,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
       SourceCoreElaboration.ErrorSite → AssignmentResolution → Ty → Expr →
       (ExpressionId → Word) → Except SourceCoreBasic.Error Expr}
     (matched : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missing)
-    (sourceProfile : assignment.target.type = .word)
+    (sourceProfile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
     (bare : assignment.target.projections = [])
     (selected : policy.assignBitNotWithExpression = some callback)
     (accepted : callback policy.lowerExpression fuel source scope site assignment
@@ -270,11 +270,8 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
       (missing site assignment.target.root) = .ok code := by
     have same := Option.some.inj (selected.symm.trans matched)
     simpa only [same] using accepted
-  have numeric : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer :=
-    .inl (by rw [sourceProfile]; rfl)
   obtain ⟨binder, place, index, declaration, rootType, rawType, slot, layout, emitted⟩ :=
-    CompatibleBareBitNotCertificates.of_lower bare numeric lowered
+    CompatibleBareBitNotCertificates.of_lower_wide bare (WideBitNotProfile.of_word_or_fixed sourceProfile) lowered
   exact ⟨⟨values, invalidProjection, invalidUnary, missing, matched, sourceProfile, bare,
     callback, selected, accepted, lowered, binder, declaration, place, index, rootType, rawType,
     slot, layout, emitted⟩⟩
@@ -302,7 +299,7 @@ structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : Typed
   invalidUnary : SourceCoreElaboration.ErrorSite → Resolved.LocalId → Word
   missing : SourceCoreElaboration.ErrorSite → Resolved.LocalId → TypeSystem.Ty → Word
   matched : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missing
-  sourceProfile : assignment.target.type = .word
+  sourceProfile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type
   projected : assignment.target.projections ≠ []
   callback : ExpressionLowerer → Nat → TypedSource → SourceCoreLocalCell.Scope →
     SourceCoreElaboration.ErrorSite → AssignmentResolution → Ty → Expr →
@@ -331,7 +328,7 @@ structure Receipt (policy : SourceCoreLoops.Policy) (fuel : Nat) (source : Typed
   leafType : place.route.leafType = .word ∨ place.route.leafType = .integer
   emitted : code = execute place (.var index) (SourceCoreCalls.packArguments keys) (LanguageResult.success .unit)
     next output (binaryOperator (place.route.leafType = .integer) .equal) true
-    (invalidUnary site assignment.target.root)
+    (invalidUnary site assignment.target.root) (SourceCoreDataPlaces.bitNotWrap assignment.target.type)
 
 /-- The accepted callback supplies the actual keys, route and unary token. -/
 theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompatibleValues.Context}
@@ -344,7 +341,7 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
       SourceCoreElaboration.ErrorSite → AssignmentResolution → Ty → Expr →
       (ExpressionId → Word) → Except SourceCoreBasic.Error Expr}
     (matched : CompatibleBitNotStatements.Policy policy values invalidProjection invalidUnary missing)
-    (sourceProfile : assignment.target.type = .word)
+    (sourceProfile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type)
     (projected : assignment.target.projections ≠ [])
     (routed : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections
@@ -374,10 +371,8 @@ theorem of_accepted {policy : SourceCoreLoops.Policy} {values : SourceCoreCompat
         projected, _, callbackSelected, accepted, lowered, route, binder, selected, description,
         place, prepared, routeType, path, index, slot, keys, keysGenerated,
         CompatiblePlaceCompilerCertificates.PreparedPath.key_ids path, leafType, ?_⟩⟩
-      have noWrap : SourceCoreDataPlaces.bitNotWrap assignment.target.type = none :=
-        SourceCoreDataPlaces.bitNotWrap_of_not_fixed fun _ same => by cases sourceProfile.symm.trans same
       simp only [routeType, Option.isNone_none, SourceCoreCompatibleDataPlaces.placeModifier,
-        SourceCoreDataPlaces.placeWrap, ↓reduceIte, noWrap]
+        SourceCoreDataPlaces.placeWrap, ↓reduceIte]
 
 end Solcore.SourceSemantics.CoreLowering.AcceptedProjectedBitNotReceipt
 end
@@ -464,13 +459,13 @@ def ValueAssignable (source : TypedSource) (assignment : AssignmentResolution)
 
 /-- Unary writes have the same original declaration requirement, with no RHS. -/
 def BitNotAssignable (source : TypedSource) (assignment : AssignmentResolution) : Prop :=
-  assignment.target.type = .word ∧ assignment.target.projections = [] ∧
+  (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) ∧ assignment.target.projections = [] ∧
     ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       binder.scheme.body = assignment.target.type
 
-/-- Mapping routes retain the declared root and the actual raw Word leaf. -/
+/-- Mapping routes retain the declared root and the actual raw Word or fixed-width leaf. -/
 def ProjectedBitNotAssignable (source : TypedSource) (assignment : AssignmentResolution) : Prop :=
-  assignment.target.type = .word ∧ assignment.target.projections ≠ [] ∧
+  (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) ∧ assignment.target.projections ≠ [] ∧
     ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       AcceptedProjectedAssignmentRoute.Route source binder.scheme.body assignment.target.projections assignment.target.type
 

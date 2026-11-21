@@ -227,7 +227,7 @@ theorem unary_of_diagnostic
       completion.entry completion.result.context.registry completion.result.extension completion.result.diagnostics)
     {site assignment}
     (origin : GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment)
-    (rawWord : assignment.target.type = .word) :
+    (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) :
     CallableIndexedOwnedPublicDecodedCallFaults.faults completion.result.diagnostics
       (.invalidUnaryOperand .bitNot)
       (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root) := by
@@ -235,7 +235,7 @@ theorem unary_of_diagnostic
     prepared diagnostic aligned
   exact GenericAssignmentUnaryDiagnostics.prepared_unary_included assignmentPrepared
     (fun _ _ represented => CallableIndexedOwnedPublicUnaryAssignmentDiagnostics.prepared_unary
-      prepared diagnostic receiver represented) origin rawWord
+      prepared diagnostic receiver represented) origin profile
 
 
 include aligned in
@@ -309,7 +309,7 @@ theorem collected_of_imperative
       AssignmentOperandDiagnostics.OperandsLaw faults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
-      assignment.target.type = .word → faults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → faults (.invalidUnaryOperand .bitNot)
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     {expressionSyntax : ExpressionId → Prop}
     {certificates : SourceSemantics.Context → GenericExpressionMeaning.Certificate}
@@ -403,7 +403,7 @@ def of_imperative_compiler
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
-      assignment.target.type = .word → semanticFaults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → semanticFaults (.invalidUnaryOperand .bitNot)
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}
@@ -456,7 +456,7 @@ def of_compiler
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
-      assignment.target.type = .word → semanticFaults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → semanticFaults (.invalidUnaryOperand .bitNot)
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}
@@ -521,7 +521,7 @@ def of_imperative_compiler
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
-      assignment.target.type = .word → semanticFaults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → semanticFaults (.invalidUnaryOperand .bitNot)
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}
@@ -1366,7 +1366,7 @@ def of_imperative_compiler
       AssignmentOperandDiagnostics.OperandsLaw semanticFaults operator
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidOperand prepared site assignment.target.root operator))
     (unary : ∀ {site assignment}, GenericAssignmentUnaryDiagnostics.UnaryOccurs header.function.source site assignment →
-      assignment.target.type = .word → semanticFaults (.invalidUnaryOperand .bitNot)
+      (assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) → semanticFaults (.invalidUnaryOperand .bitNot)
         (RecursiveNamedPreparedHeaderPolicies.Prepared.invalidUnary prepared site assignment.target.root))
     (stages : Staging.Recursive.Registry)
     {expressionSyntax : ExpressionId → Prop}

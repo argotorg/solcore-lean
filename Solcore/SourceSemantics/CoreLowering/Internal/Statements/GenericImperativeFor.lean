@@ -1794,12 +1794,18 @@ theorem prepared_unary_target {source : TypedSource} {first : Nat} {table : Tabl
     rw [← present.2]
     exact prepared_unary_at_target prepared present.1 (.header form member) rawTarget
 
+/-- `Word` and the twelve fixed-width types have an operand diagnostic. -/
+theorem operandTarget_of_word_or_fixed {target : TypeSystem.Ty}
+    (profile : target = .word ∨ ∃ type, target = .fixed type) : operandTarget target = true := by
+  rcases profile with rfl | ⟨_, rfl⟩ <;> rfl
+
 theorem prepared_unary {source : TypedSource} {first : Nat} {table : Table}
     {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
     (prepared : prepare source first = .ok table)
-    (origin : UnaryOccurs source site assignment) (rawWord : assignment.target.type = .word) :
+    (origin : UnaryOccurs source site assignment)
+    (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) :
     UnaryRep table (.invalidUnaryOperand .bitNot) (unaryToken table site assignment.target.root) :=
-  prepared_unary_target prepared origin (operandTarget_of_scalar (.inl rawWord))
+  prepared_unary_target prepared origin (operandTarget_of_word_or_fixed profile)
 
 /-- The receiving relation gets only the actual prepared unary entry. -/
 theorem prepared_unary_included {source : TypedSource} {first : Nat} {table : Table}
@@ -1807,9 +1813,10 @@ theorem prepared_unary_included {source : TypedSource} {first : Nat} {table : Ta
     (prepared : prepare source first = .ok table)
     (included : ∀ reason token, UnaryRep table reason token → faults reason token)
     {site : SourceCoreElaboration.ErrorSite} {assignment : AssignmentResolution}
-    (origin : UnaryOccurs source site assignment) (rawWord : assignment.target.type = .word) :
+    (origin : UnaryOccurs source site assignment)
+    (profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type) :
     faults (.invalidUnaryOperand .bitNot) (unaryToken table site assignment.target.root) :=
-  included _ _ (prepared_unary prepared origin rawWord)
+  included _ _ (prepared_unary prepared origin profile)
 
 /-- So does every unary site whose target type has an operand diagnostic. -/
 theorem prepared_unary_included_target {source : TypedSource} {first : Nat} {table : Table}

@@ -114,7 +114,7 @@ def valueAssignment? (source : TypedSource) (assignment : AssignmentResolution)
 
 def bitNotAssignment? (source : TypedSource) (assignment : AssignmentResolution)
     : Option (PLift (BitNotAssignable source assignment)) := do
-  if profile : assignment.target.type = .word then
+  if profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type then
     if bare : assignment.target.projections = [] then
       match found : SourceCoreDataPlaces.rootBinder source assignment.target.root with
       | .error _ => none
@@ -130,7 +130,7 @@ def bitNotAssignment? (source : TypedSource) (assignment : AssignmentResolution)
 
 def projectedBitNotAssignment? (source : TypedSource) (assignment : AssignmentResolution)
     : Option (PLift (ProjectedBitNotAssignable source assignment)) := do
-  if profile : assignment.target.type = .word then
+  if profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type then
     if projected : assignment.target.projections ≠ [] then
       match found : SourceCoreDataPlaces.rootBinder source assignment.target.root with
       | .error _ => none

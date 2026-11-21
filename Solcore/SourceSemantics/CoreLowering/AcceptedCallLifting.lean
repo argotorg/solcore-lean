@@ -181,6 +181,25 @@ private theorem assigned_inv (unique : NodeOccurrencesUnique source) (found : so
     obtain rfl := same_node unique found (by assumption)
     simp_all
 
+private theorem bitNotted_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    {assignment : AssignmentResolution} (form : node.form = .assignBitNot assignment)
+    (head : SourceExecutionSize.StatementExecutes program size context evidence source environment before id
+      finalContext outcome after) :
+    ∃ child updatedRoot, child < size ∧
+      SourceExecutionSize.SourcePlaceSnapshotUpdate program child context evidence source
+        (Dynamic.BitNotAssignmentApplies assignment.target.type) environment before assignment.target updatedRoot after ∧
+      finalContext = context ∧ outcome = .fallthrough environment := by
+  cases head with
+  | assignBitNot contains formEq executes =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, _, below_one, executes, rfl, rfl⟩
+  | _ =>
+    exfalso
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
+
 private theorem discarded_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
     {expression : ExpressionId} (form : node.form = .expression expression true)
     (head : SourceExecutionSize.StatementExecutes program size context evidence source environment before id
@@ -387,6 +406,21 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {child : Expres
           write (tailIH (by omega) next)
     · intro context environment before finalContext outcome after _ _ head terminal
       obtain ⟨_, _, _, _, _, same⟩ := assigned_inv unique found form head
+      subst same
+      cases terminal
+  | bitNotted found form assignable _ tailIH =>
+    intro size context environment before after finalContext outcome within
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after headSize
+        tailSize headBelow tailBelow head next
+      obtain ⟨_, _, _, executes, rfl, same⟩ := bitNotted_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve write =>
+        obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+        exact .bitNotBare (lookupStatement?_sound found) form snapshot write (tailIH (by omega) next)
+    · intro context environment before finalContext outcome after _ _ head terminal
+      obtain ⟨_, _, _, _, _, same⟩ := bitNotted_inv unique found form head
       subst same
       cases terminal
   | discarded found form value _ tailIH =>

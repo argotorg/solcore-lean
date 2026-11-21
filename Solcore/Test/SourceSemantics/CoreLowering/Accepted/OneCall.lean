@@ -10,9 +10,10 @@ function, and `twice` returns `identity(identity(value))`, a direct call whose
 argument is another direct call, both at a `Word` parameter; `narrow` returns
 `uint8(value)`, a conversion of its `Word` parameter, and `roundTrip` returns
 `Typedef.rep(uint8(value))`, the word of that value; `doubled` converts its
-parameter to a `uint8` local `x`, adds `x` to it in place and returns it, and `shifted` shifts such
-an `x` left in place by the parameter, a `Word` amount. Runtime checks place every
-expression node of the seven rows among the nested sites that call `identity`'s
+parameter to a `uint8` local `x`, adds `x` to it in place and returns it, `shifted` shifts such
+an `x` left in place by the parameter, a `Word` amount, and `flipped` applies `~` to such an `x` in
+place. Runtime checks place every
+expression node of the eight rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
@@ -26,7 +27,8 @@ reflection applies to `doubled`: below 128 the actual resumption returns the sum
 from 128 the checked `+=` panics with `0x11`, and at a word outside `uint8` the
 conversion fails with the dirty-integer reason. So does it to `shifted`: at a word in `uint8` the
 actual resumption returns Word's shift wrapped to eight bits, and at any other word the conversion
-fails.
+fails. So does it to `flipped`: at a word in `uint8` the actual resumption returns its complement in
+eight bits, and at any other word the conversion fails.
 
 Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.twice_source`,
@@ -38,12 +40,13 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedNestedCallRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`,
-`Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run` and
-`Tests.SourceCoreAcceptedOneCall.AcceptedFixedShiftRuntime.run`.
+`Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedFixedShiftRuntime.run` and
+`Tests.SourceCoreAcceptedOneCall.AcceptedFixedBitNotRuntime.run`.
 -/
 
 section
-/-! The program and the declarative typing of its seven functions, constructed
+/-! The program and the declarative typing of its eight functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -61,7 +64,8 @@ def workspace : Workspace.RawWorkspace := {
     "function narrow(value: Word) returns (uint8) { return uint8(value); }",
     "function roundTrip(value: Word) returns (Word) { return Typedef.rep(uint8(value)); }",
     "function doubled(value: Word) returns (uint8) { let x: uint8 = uint8(value); x += x; return x; }",
-    "function shifted(value: Word) returns (uint8) { let x: uint8 = uint8(value); x <<= value; return x; }" ]}] }
+    "function shifted(value: Word) returns (uint8) { let x: uint8 = uint8(value); x <<= value; return x; }",
+    "function flipped(value: Word) returns (uint8) { let x: uint8 = uint8(value); x ~=; return x; }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -773,15 +777,178 @@ def observeShifted (function : CheckedFunction) (signature : ProgramFunctionSign
     targetOwner, targetDistinct, targetOrdinary, initializedType, assignmentType, returnedType, targetRoot,
     targetType, targetBare, assignmentRequirements⟩
 
+/-- The nodes of `flipped`'s body: the read of its parameter, `uint8(value)` initializing the local
+`x`, `x ~=` and the return of `x`, found by following the statement graph. -/
+structure FlippedParts (source : TypedSource) where
+  binder : TypedBinder
+  target : TypedBinder
+  read : Tests.SourceCoreNamedBranch.Read source binder .word
+  converted : Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedFromWord ⟨false, .w8⟩) read.node.id
+  returnRead : Tests.SourceCoreNamedBranch.Read source target (.fixed ⟨false, .w8⟩)
+  initialized : StatementNode
+  assignment : StatementNode
+  resolution : AssignmentResolution
+  returned : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement initialized.id, .statement assignment.id, .statement returned.id]
+  initializedFound : source.lookupStatement? initialized.id = some initialized
+  initializedForm : initialized.form = .letDecl target (some converted.value.node.id)
+  assignmentFound : source.lookupStatement? assignment.id = some assignment
+  assignmentForm : assignment.form = .assignBitNot resolution
+  returnedFound : source.lookupStatement? returned.id = some returned
+  returnedForm : returned.form = .returnStmt (some returnRead.node.id)
+
+def observeFlippedParts (source : TypedSource) : IO (FlippedParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "flipped input")
+  let [.statement initializedId, .statement assignmentId, .statement returnedId] := source.roots
+    | throw (IO.userError "flipped roots")
+  let some initialized := source.lookupStatement? initializedId | throw (IO.userError "flipped let")
+  let some assignment := source.lookupStatement? assignmentId | throw (IO.userError "flipped assignment")
+  let some returned := source.lookupStatement? returnedId | throw (IO.userError "flipped return")
+  let .letDecl target (some valueId) := initialized.form | throw (IO.userError "flipped let form")
+  let .assignBitNot resolution := assignment.form | throw (IO.userError "flipped assignment form")
+  let .returnStmt (some returnId) := returned.form | throw (IO.userError "flipped return form")
+  let some valueNode := source.lookupExpression? valueId | throw (IO.userError "flipped conversion node")
+  let .call calleeId [readId] _ := valueNode.form | throw (IO.userError "flipped conversion form")
+  let some calleeNode := source.lookupExpression? calleeId | throw (IO.userError "flipped callee")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "flipped read")
+  let some returnNode := source.lookupExpression? returnId | throw (IO.userError "flipped returned read")
+  let read ← Tests.SourceCoreNamedBranch.observeRead source binder readNode .word
+  let converted ← observeConversion source (.fixedFromWord ⟨false, .w8⟩) read.node.id calleeNode valueNode
+  let returnRead ← Tests.SourceCoreNamedBranch.observeRead source target returnNode (.fixed ⟨false, .w8⟩)
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "flipped inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement initialized.id, .statement assignment.id, .statement returned.id])
+    "flipped roots shape"
+  let ⟨initializedFound⟩ ← observed (source.lookupStatement? initialized.id = some initialized) "flipped initializedFound"
+  let ⟨initializedForm⟩ ← observed (initialized.form = .letDecl target (some converted.value.node.id))
+    "flipped initializedForm"
+  let ⟨assignmentFound⟩ ← observed (source.lookupStatement? assignment.id = some assignment) "flipped assignmentFound"
+  let ⟨assignmentForm⟩ ← observed (assignment.form = .assignBitNot resolution) "flipped assignmentForm"
+  let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "flipped returnedFound"
+  let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some returnRead.node.id)) "flipped returnedForm"
+  return ⟨binder, target, read, converted, returnRead, initialized, assignment, resolution, returned,
+    inputs, roots, initializedFound, initializedForm, assignmentFound, assignmentForm, returnedFound, returnedForm⟩
+
+/-- `flipped`'s body: `let x: uint8 = uint8(value)`, `x ~=` at the fixed-width local, and the return
+of `x`. -/
+structure FlippedShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : FlippedParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.fixed ⟨false, .w8⟩]
+  binderScheme : parts.binder.scheme = .mono .word
+  binderRequirements : parts.binder.schemeRequirements = []
+  targetScheme : parts.target.scheme = .mono (.fixed ⟨false, .w8⟩)
+  targetRequirements : parts.target.schemeRequirements = []
+  targetOwner : parts.target.id.owner = function.typedBody.owner
+  targetDistinct : parts.target.id ≠ parts.binder.id
+  targetOrdinary : parts.target.comptime = false
+  initializedType : parts.initialized.type = .unit
+  assignmentType : parts.assignment.type = .unit
+  returnedType : parts.returned.type = .fixed ⟨false, .w8⟩
+  targetRoot : parts.resolution.target.root = parts.target.id
+  targetType : parts.resolution.target.type = .fixed ⟨false, .w8⟩
+  targetBare : parts.resolution.target.projections = []
+  assignmentRequirements : parts.resolution.requirements = []
+
+theorem FlippedShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : FlippedShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.initialized.id, shape.parts.assignment.id, shape.parts.returned.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts :=
+    {type := .fixed ⟨false, .w8⟩, hasValue := true, sawReturn := true, control := .returned}
+  let ordinary : StatementFacts := {type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit}
+  refine ⟨BodyFacts.cons ordinary (BodyFacts.cons ordinary (BodyFacts.singleton facts)), rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have narrow : TypeAdmissible lexical (.fixed ⟨false, .w8⟩) := ⟨binders, .builtin (.fixed ⟨false, .w8⟩)⟩
+    have read := shape.parts.read.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have converted : ExpressionHasType function.typedBody lexical shape.parts.converted.value.node.id
+        (.fixed ⟨false, .w8⟩) := shape.parts.converted.typed rfl narrow read
+    let locals := lexical.withLocal shape.parts.target.id shape.parts.target.scheme shape.parts.target.schemeRequirements
+    have targetExtended : BinderExtends function.typedBody.owner lexical shape.parts.target locals := by
+      apply BinderExtends.intro
+      · exact {
+          owned := shape.targetOwner
+          scheme := shape.targetScheme.symm ▸ SchemeWellFormed.monoAdmissible narrow
+          quantified_fresh := by rw [shape.targetScheme]; simp [SchemeQuantifiersFresh, TypeSystem.Scheme.mono]
+          monomorphic_requirements_empty := fun _ => shape.targetRequirements }
+      · cases head
+        simp [LocalFresh, Context.withLocal, checkedBodyContext, declarationContext,
+          Context.ofSignatures, Context.forDeclaration, Context.withAssumptions,
+          Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.targetDistinct]
+    have localNarrow : TypeAdmissible locals (.fixed ⟨false, .w8⟩) := ⟨binders, .builtin (.fixed ⟨false, .w8⟩)⟩
+    have initializedTyped : StatementHasType function.typedBody ⟨.fixed ⟨false, .w8⟩, 0⟩ lexical
+        shape.parts.initialized.id locals ordinary := by
+      apply StatementHasType.letInitialized (lookupStatement?_sound shape.parts.initializedFound)
+        shape.parts.initializedForm
+      · simpa only [shape.targetScheme, TypeSystem.Scheme.mono] using converted
+      · rw [shape.targetScheme]; rfl
+      · rw [shape.targetScheme]; rfl
+      · exact targetExtended
+      · exact shape.initializedType
+    have writable : WritableLocal locals shape.parts.resolution.target.root (.fixed ⟨false, .w8⟩) := by
+      rw [shape.targetRoot]
+      exact .intro targetExtended.local_self (shape.targetScheme.symm ▸ SchemeWellFormed.monoAdmissible localNarrow)
+        (by rw [shape.targetScheme]; rfl) (by rw [shape.targetScheme]; rfl)
+    have assignmentTyped : SourceBitNotAssignmentValid function.typedBody locals shape.parts.resolution :=
+      .intro (.intro writable (by rw [shape.targetBare]; exact .nil _) shape.targetType) (.fixed ⟨false, .w8⟩)
+        shape.assignmentRequirements
+    have assignedTyped : StatementHasType function.typedBody ⟨.fixed ⟨false, .w8⟩, 0⟩ locals
+        shape.parts.assignment.id locals ordinary :=
+      .assignBitNot (lookupStatement?_sound shape.parts.assignmentFound) shape.parts.assignmentForm assignmentTyped
+        shape.assignmentType
+    have returnedValue := shape.parts.returnRead.typed shape.targetScheme shape.targetRequirements localNarrow
+      targetExtended.local_self targetExtended.local_scheme_requirements_self
+    exact ⟨_, .cons initializedTyped (.cons assignedTyped (.singleton (.returnValue
+      (lookupStatement?_sound shape.parts.returnedFound) shape.parts.returnedForm returnedValue shape.returnedType)))⟩
+
+def observeFlipped (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (FlippedShape function signature) := do
+  let parts ← observeFlippedParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "flipped parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "flipped inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.fixed ⟨false, .w8⟩]) "flipped returns"
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "flipped binderScheme"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "flipped binderRequirements"
+  let ⟨targetScheme⟩ ← observed (parts.target.scheme = .mono (.fixed ⟨false, .w8⟩)) "flipped targetScheme"
+  let ⟨targetRequirements⟩ ← observed (parts.target.schemeRequirements = []) "flipped targetRequirements"
+  let ⟨targetOwner⟩ ← observed (parts.target.id.owner = function.typedBody.owner) "flipped targetOwner"
+  let ⟨targetDistinct⟩ ← observed (parts.target.id ≠ parts.binder.id) "flipped targetDistinct"
+  let ⟨targetOrdinary⟩ ← observed (parts.target.comptime = false) "flipped targetOrdinary"
+  let ⟨initializedType⟩ ← observed (parts.initialized.type = .unit) "flipped initializedType"
+  let ⟨assignmentType⟩ ← observed (parts.assignment.type = .unit) "flipped assignmentType"
+  let ⟨returnedType⟩ ← observed (parts.returned.type = .fixed ⟨false, .w8⟩) "flipped returnedType"
+  let ⟨targetRoot⟩ ← observed (parts.resolution.target.root = parts.target.id) "flipped targetRoot"
+  let ⟨targetType⟩ ← observed (parts.resolution.target.type = .fixed ⟨false, .w8⟩) "flipped targetType"
+  let ⟨targetBare⟩ ← observed (parts.resolution.target.projections = []) "flipped targetBare"
+  let ⟨assignmentRequirements⟩ ← observed (parts.resolution.requirements = []) "flipped assignmentRequirements"
+  return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, targetScheme, targetRequirements,
+    targetOwner, targetDistinct, targetOrdinary, initializedType, assignmentType, returnedType, targetRoot,
+    targetType, targetBare, assignmentRequirements⟩
+
 /-- The declarative typing of the complete checked program. -/
 def observeWellFormed {program : CheckedProgram}
     (checked : checkProgram workspace options.checkingFuel = .ok program) :
     IO (PLift (ProgramWellFormed (Program.ofChecked program))) := do
   match functions : program.functions, signatures : program.signatures.functions with
   | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction,
-      shiftedFunction],
+      shiftedFunction, flippedFunction],
     [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature,
-      shiftedSignature] =>
+      shiftedSignature, flippedSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
@@ -789,6 +956,7 @@ def observeWellFormed {program : CheckedProgram}
     let roundTripShape ← observeRoundTrip roundTripFunction roundTripSignature
     let doubledShape ← observeDoubled doubledFunction doubledSignature
     let shiftedShape ← observeShifted shiftedFunction shiftedSignature
+    let flippedShape ← observeFlipped flippedFunction flippedSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -799,6 +967,7 @@ def observeWellFormed {program : CheckedProgram}
       "calls roundTripDeclaration"
     let ⟨doubledDeclaration⟩ ← observed (doubledFunction.declaration = doubledSignature.id) "calls doubledDeclaration"
     let ⟨shiftedDeclaration⟩ ← observed (shiftedFunction.declaration = shiftedSignature.id) "calls shiftedDeclaration"
+    let ⟨flippedDeclaration⟩ ← observed (flippedFunction.declaration = flippedSignature.id) "calls flippedDeclaration"
     let ⟨identityRelay⟩ ← observed (identitySignature.id ≠ relaySignature.id) "calls identityRelay"
     let ⟨identityTwice⟩ ← observed (identitySignature.id ≠ twiceSignature.id) "calls identityTwice"
     let ⟨relayTwice⟩ ← observed (relaySignature.id ≠ twiceSignature.id) "calls relayTwice"
@@ -820,14 +989,21 @@ def observeWellFormed {program : CheckedProgram}
     let ⟨narrowShifted⟩ ← observed (narrowSignature.id ≠ shiftedSignature.id) "calls narrowShifted"
     let ⟨roundTripShifted⟩ ← observed (roundTripSignature.id ≠ shiftedSignature.id) "calls roundTripShifted"
     let ⟨doubledShifted⟩ ← observed (doubledSignature.id ≠ shiftedSignature.id) "calls doubledShifted"
+    let ⟨identityFlipped⟩ ← observed (identitySignature.id ≠ flippedSignature.id) "calls identityFlipped"
+    let ⟨relayFlipped⟩ ← observed (relaySignature.id ≠ flippedSignature.id) "calls relayFlipped"
+    let ⟨twiceFlipped⟩ ← observed (twiceSignature.id ≠ flippedSignature.id) "calls twiceFlipped"
+    let ⟨narrowFlipped⟩ ← observed (narrowSignature.id ≠ flippedSignature.id) "calls narrowFlipped"
+    let ⟨roundTripFlipped⟩ ← observed (roundTripSignature.id ≠ flippedSignature.id) "calls roundTripFlipped"
+    let ⟨doubledFlipped⟩ ← observed (doubledSignature.id ≠ flippedSignature.id) "calls doubledFlipped"
+    let ⟨shiftedFlipped⟩ ← observed (shiftedSignature.id ≠ flippedSignature.id) "calls shiftedFlipped"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
         intro actual member candidate candidateMember accepted
         have declared := checkFunctionBody_success_declaration accepted
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
         simp only [signatures, List.mem_cons, List.not_mem_nil, or_false] at candidateMember
-        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-          rcases candidateMember with rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
+          rcases candidateMember with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
         · exact identityShape.statementTyping program.signatures
         · exact False.elim (identityRelay (identityDeclaration.symm.trans declared))
         · exact False.elim (identityTwice (identityDeclaration.symm.trans declared))
@@ -835,6 +1011,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (identityRoundTrip (identityDeclaration.symm.trans declared))
         · exact False.elim (identityDoubled (identityDeclaration.symm.trans declared))
         · exact False.elim (identityShifted (identityDeclaration.symm.trans declared))
+        · exact False.elim (identityFlipped (identityDeclaration.symm.trans declared))
         · exact False.elim (identityRelay (declared.symm.trans relayDeclaration))
         · exact relayShape.statementTyping program.signatures (by simp [signatures])
         · exact False.elim (relayTwice (relayDeclaration.symm.trans declared))
@@ -842,6 +1019,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (relayRoundTrip (relayDeclaration.symm.trans declared))
         · exact False.elim (relayDoubled (relayDeclaration.symm.trans declared))
         · exact False.elim (relayShifted (relayDeclaration.symm.trans declared))
+        · exact False.elim (relayFlipped (relayDeclaration.symm.trans declared))
         · exact False.elim (identityTwice (declared.symm.trans twiceDeclaration))
         · exact False.elim (relayTwice (declared.symm.trans twiceDeclaration))
         · exact twiceShape.statementTyping program.signatures (by simp [signatures])
@@ -849,6 +1027,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (twiceRoundTrip (twiceDeclaration.symm.trans declared))
         · exact False.elim (twiceDoubled (twiceDeclaration.symm.trans declared))
         · exact False.elim (twiceShifted (twiceDeclaration.symm.trans declared))
+        · exact False.elim (twiceFlipped (twiceDeclaration.symm.trans declared))
         · exact False.elim (identityNarrow (declared.symm.trans narrowDeclaration))
         · exact False.elim (relayNarrow (declared.symm.trans narrowDeclaration))
         · exact False.elim (twiceNarrow (declared.symm.trans narrowDeclaration))
@@ -856,6 +1035,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (narrowRoundTrip (narrowDeclaration.symm.trans declared))
         · exact False.elim (narrowDoubled (narrowDeclaration.symm.trans declared))
         · exact False.elim (narrowShifted (narrowDeclaration.symm.trans declared))
+        · exact False.elim (narrowFlipped (narrowDeclaration.symm.trans declared))
         · exact False.elim (identityRoundTrip (declared.symm.trans roundTripDeclaration))
         · exact False.elim (relayRoundTrip (declared.symm.trans roundTripDeclaration))
         · exact False.elim (twiceRoundTrip (declared.symm.trans roundTripDeclaration))
@@ -863,6 +1043,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact roundTripShape.statementTyping program.signatures
         · exact False.elim (roundTripDoubled (roundTripDeclaration.symm.trans declared))
         · exact False.elim (roundTripShifted (roundTripDeclaration.symm.trans declared))
+        · exact False.elim (roundTripFlipped (roundTripDeclaration.symm.trans declared))
         · exact False.elim (identityDoubled (declared.symm.trans doubledDeclaration))
         · exact False.elim (relayDoubled (declared.symm.trans doubledDeclaration))
         · exact False.elim (twiceDoubled (declared.symm.trans doubledDeclaration))
@@ -870,6 +1051,7 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (roundTripDoubled (declared.symm.trans doubledDeclaration))
         · exact doubledShape.statementTyping program.signatures
         · exact False.elim (doubledShifted (doubledDeclaration.symm.trans declared))
+        · exact False.elim (doubledFlipped (doubledDeclaration.symm.trans declared))
         · exact False.elim (identityShifted (declared.symm.trans shiftedDeclaration))
         · exact False.elim (relayShifted (declared.symm.trans shiftedDeclaration))
         · exact False.elim (twiceShifted (declared.symm.trans shiftedDeclaration))
@@ -877,6 +1059,15 @@ def observeWellFormed {program : CheckedProgram}
         · exact False.elim (roundTripShifted (declared.symm.trans shiftedDeclaration))
         · exact False.elim (doubledShifted (declared.symm.trans shiftedDeclaration))
         · exact shiftedShape.statementTyping program.signatures
+        · exact False.elim (shiftedFlipped (shiftedDeclaration.symm.trans declared))
+        · exact False.elim (identityFlipped (declared.symm.trans flippedDeclaration))
+        · exact False.elim (relayFlipped (declared.symm.trans flippedDeclaration))
+        · exact False.elim (twiceFlipped (declared.symm.trans flippedDeclaration))
+        · exact False.elim (narrowFlipped (declared.symm.trans flippedDeclaration))
+        · exact False.elim (roundTripFlipped (declared.symm.trans flippedDeclaration))
+        · exact False.elim (doubledFlipped (declared.symm.trans flippedDeclaration))
+        · exact False.elim (shiftedFlipped (declared.symm.trans flippedDeclaration))
+        · exact flippedShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -885,7 +1076,7 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the seven functions and their original Source
+/-! The cache rows of the eight functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `narrow` returns the conversion of its parameter,
@@ -1039,6 +1230,19 @@ def observeShiftedBody (source : TypedSource) : IO (ShiftedBody source) := do
     let ⟨binderScheme⟩ ← observed (binder.scheme = .mono .word) "shifted row binderScheme"
     return ⟨binder, inputs, binderScheme⟩
   | _ => throw (IO.userError "shifted row inputs changed")
+
+/-- `flipped`'s cache row: its one `Word` parameter. -/
+structure FlippedBody (source : TypedSource) where
+  binder : TypedBinder
+  inputs : source.inputs = [binder]
+  binderScheme : binder.scheme = .mono .word
+
+def observeFlippedBody (source : TypedSource) : IO (FlippedBody source) := do
+  match inputs : source.inputs with
+  | [binder] =>
+    let ⟨binderScheme⟩ ← observed (binder.scheme = .mono .word) "flipped row binderScheme"
+    return ⟨binder, inputs, binderScheme⟩
+  | _ => throw (IO.userError "flipped row inputs changed")
 
 /-- The read of a parameter at the next cell of a heap. -/
 theorem read_value {source : TypedSource} {binder : TypedBinder}
@@ -1203,7 +1407,7 @@ end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the seven rows among the nested sites or their callees
+every expression node of the eight rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
 receipts. The original Source executions of `relay`, `twice`, `narrow` and `roundTrip`,
@@ -1811,6 +2015,43 @@ def run : IO Unit := do
   IO.println "ACCEPTED_FIXED_SHIFT_PUBLIC_PASS"
 
 end AcceptedFixedShiftRuntime
+
+namespace AcceptedFixedBitNotRuntime
+
+/-- At `flipped`, whose body converts its `Word` parameter to a `uint8` local `x`, applies `~` to `x` in
+place and returns it. The call root's reflection applies at every word. At a word canonical for
+`uint8` the actual resumption returns its complement in eight bits; at any other word the conversion
+fails with the dirty-integer reason. -/
+def run : IO Unit := do
+  let observed ← observe
+  let flipped ← observeRow observed.fixture "flipped"
+  let flippedBody ← observeFlippedBody flipped.original.function.typedBody
+  let cases : List (Word × Option Word) :=
+    [(Word.zero, some (Word.ofNatModulo 255)), (Word.ofNatModulo 1, some (Word.ofNatModulo 254)),
+     (Word.ofNatModulo 7, some (Word.ofNatModulo 248)), (Word.ofNatModulo 128, some (Word.ofNatModulo 127)),
+     (Word.ofNatModulo 170, some (Word.ofNatModulo 85)), (Word.ofNatModulo 255, some Word.zero),
+     (Word.ofNatModulo 256, none), (Word.maximum, none)]
+  for entry in cases do
+    let word := entry.1
+    let expected := entry.2
+    let started ← observeStarted observed.fixture flipped.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole flipped),
+        Nonempty (AcceptedReflection selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select flipped
+      exact ⟨whole, selected, accepted_reflection selected observed.calls word observed.wellFormed started
+        observed.callableProfile flippedBody.inputs flippedBody.binderScheme⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match expected, result.val with
+    | some value, .succeeded returned =>
+      unless returned.value == .word value do throw (IO.userError "accepted fixed-width bit-not output changed")
+    | none, .failed reason _ =>
+      unless reason == SourceCorePanics.dirtyReason do
+        throw (IO.userError "accepted fixed-width bit-not failure changed")
+    | _, _ => throw (IO.userError "accepted fixed-width bit-not outcome changed")
+  IO.println "ACCEPTED_FIXED_BIT_NOT_PUBLIC_PASS"
+
+end AcceptedFixedBitNotRuntime
 
 end Tests.SourceCoreAcceptedOneCall
 end
