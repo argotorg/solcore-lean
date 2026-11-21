@@ -10,7 +10,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.AssignmentProfi
 The modifier that both place compilers emit for `+= -= *= /= %=`, their unchecked forms and
 `&= |= ^=` at the twelve fixed-width integer types, beside the source rules on the same operands,
 and the profile that admits them beside `AssignmentProfile`. The data and compatible place pipelines
-use them. `<<=` and `>>=` there have the same facts, for an amount of any word.
+use them. `<<=` and `>>=` there have the same facts, for an amount of any word, and so does in-place
+`~` there, with its own profile beside `AssignmentProfile`'s.
 
 Main declarations:
 - `FixedCompoundAssignment` and `WideAssignmentProfile`, the profile with these targets, and
@@ -22,7 +23,10 @@ Main declarations:
   source applies the operation, and otherwise fails with the source's panic;
 - `canonical_of_applies`, an applied result is canonical for the type;
 - `shift_leaf_evaluates`, `shift_applies_leaf`, `shift_canonical_of_applies` and
-  `shift_guard_agrees`, the same facts for the shifts, which ask nothing of the amount.
+  `shift_guard_agrees`, the same facts for the shifts, which ask nothing of the amount;
+- `WideBitNotProfile`, in-place `~`'s profile with these targets, and `bitNotLeaf`,
+  `bitNot_modified_evaluates`, `bitNot_applies_leaf`, `bitNot_applies` and `bitNot_canonical`, its
+  leaf and the source's rule on it.
 -/
 
 section
@@ -1126,6 +1130,127 @@ theorem guard_agrees {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAs
       rw [leaf_uncheckedModulo type zero]
       exact .uncheckedModulo rfl (.uncheckedDivision .uncheckedModulo left right zero))
       (.wordUncheckedModulo left)
+
+end Solcore.SourceSemantics.CoreLowering.FixedCompoundModifier
+end
+
+section
+/-! In-place `~` at a fixed-width target. Both place compilers apply Word's `~` to the snapshot's
+word, and at `uint8` … `uint128` keep its low `N` bits (`SourceCoreDataPlaces.bitNotWrap`), as the
+source's `~` there does (`FixedUnaryApplies`). At the other fixed-width types the source's `~` is
+Word's, which keeps a canonical word canonical. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering
+open Frontend
+
+/-- In-place `~`'s profile: a target whose metadata view is `word` or `integer`, or one of the twelve
+fixed-width integer types at its own type, whose `~` the compiler wraps at `uint8` … `uint128`. -/
+abbrev WideBitNotProfile (target : TypeSystem.Ty) : Prop :=
+  (SourceCoreRawMetadata.runtimeType target = .word ∨ SourceCoreRawMetadata.runtimeType target = .integer) ∨
+    ∃ type, target = .fixed type
+
+end Solcore.SourceSemantics.CoreLowering
+
+namespace Solcore.SourceSemantics.CoreLowering.FixedCompoundModifier
+open Core Frontend DataEquality
+
+/-- The word in-place `~` writes at a fixed-width target: Word's `~`, keeping only the low `N` bits
+at `uint8` … `uint128`. -/
+def bitNotLeaf (type : TypeSystem.FixedInteger) (word : Word) : Word :=
+  if type.signed = false ∧ type.width ≠ .w256 then word.bitNot.bitAnd (Word.ofNatModulo (2 ^ type.width.bits - 1))
+  else word.bitNot
+
+private theorem bitNotWrap_narrow {width : TypeSystem.IntegerWidth} (narrow : width ≠ .w256) :
+    SourceCoreDataPlaces.bitNotWrap (.fixed ⟨false, width⟩) = some ⟨false, width⟩ := by
+  unfold SourceCoreDataPlaces.bitNotWrap TypeSystem.Ty.fixed
+  simp [narrow]
+
+private theorem bitNotWrap_wide {type : TypeSystem.FixedInteger}
+    (wide : ¬ (type.signed = false ∧ type.width ≠ .w256)) :
+    SourceCoreDataPlaces.bitNotWrap (.fixed type) = none := by
+  unfold SourceCoreDataPlaces.bitNotWrap TypeSystem.Ty.fixed
+  simp [wide]
+
+/-- The data-place compiler's in-place `~` at a fixed-width target gives the leaf. -/
+theorem bitNot_modified_evaluates {type : TypeSystem.FixedInteger} {environment : Environment}
+    {snapshot rhs : Expr} {word : Word} (snapshotSelected : Selects environment snapshot (.inRight .unit (.word word)))
+    (operator : Option SourceCoreDataPlaces.Modifier) (store : Store) (invalid : Word) :
+    Evaluates environment store
+      (SourceCoreDataPlaces.modified .word operator true snapshot rhs invalid
+        (SourceCoreDataPlaces.bitNotWrap (.fixed type)))
+      (.inRight .word (.word (bitNotLeaf type word))) store := by
+  by_cases narrow : type.signed = false ∧ type.width ≠ .w256
+  · obtain ⟨signed, width⟩ := type
+    obtain ⟨unsigned, narrowWidth⟩ := narrow
+    cases unsigned
+    rw [bitNotWrap_narrow narrowWidth, bitNotLeaf, if_pos ⟨rfl, narrowWidth⟩]
+    exact .caseRight (snapshotSelected.evaluates store) (.inRight (.binary (.unary (.var rfl) rfl) .word rfl))
+  · rw [bitNotWrap_wide narrow, bitNotLeaf, if_neg narrow]
+    exact .caseRight (snapshotSelected.evaluates store) (.inRight (.unary (.var rfl) rfl))
+
+/-- So does the compatible compiler's. -/
+theorem bitNot_compatible_modified_evaluates {type : TypeSystem.FixedInteger} {environment : Environment}
+    {snapshot rhs : Expr} {word : Word} (snapshotSelected : Selects environment snapshot (.inRight .unit (.word word)))
+    (operator : Option SourceCoreDataPlaces.Modifier) (store : Store) (invalid : Word) :
+    Evaluates environment store
+      (SourceCoreCompatibleDataPlaces.modified .word operator true snapshot rhs invalid
+        (SourceCoreDataPlaces.bitNotWrap (.fixed type)))
+      (.inRight .word (.word (bitNotLeaf type word))) store := by
+  by_cases narrow : type.signed = false ∧ type.width ≠ .w256
+  · obtain ⟨signed, width⟩ := type
+    obtain ⟨unsigned, narrowWidth⟩ := narrow
+    cases unsigned
+    rw [bitNotWrap_narrow narrowWidth, bitNotLeaf, if_pos ⟨rfl, narrowWidth⟩]
+    exact .caseRight (snapshotSelected.evaluates store) (.inRight (.binary (.unary (.var rfl) rfl) .word rfl))
+  · rw [bitNotWrap_wide narrow, bitNotLeaf, if_neg narrow]
+    exact .caseRight (snapshotSelected.evaluates store) (.inRight (.unary (.var rfl) rfl))
+
+/-- The source's in-place `~` at a fixed-width target gives the leaf. -/
+theorem bitNot_applies_leaf {type : TypeSystem.FixedInteger} {word : Word} {result : Dynamic.Value}
+    (applied : Dynamic.BitNotAssignmentApplies (.fixed type) (some (.word word)) result) :
+    result = .word (bitNotLeaf type word) := by
+  cases applied with
+  | primitive plain applies =>
+    cases applies
+    have wide : ¬ (type.signed = false ∧ type.width ≠ .w256) :=
+      fun narrow => plain type rfl (.bitNot narrow.1 narrow.2)
+    rw [bitNotLeaf, if_neg wide]
+  | narrow same applies =>
+    cases fixed_inj same
+    cases applies with
+    | narrowBitNot unsigned narrow =>
+      rw [bitNotLeaf, if_pos ⟨unsigned, narrow⟩]
+      rfl
+
+/-- The source's in-place `~` at a fixed-width target applies, with the leaf. -/
+theorem bitNot_applies (type : TypeSystem.FixedInteger) (word : Word) :
+    Dynamic.BitNotAssignmentApplies (.fixed type) (some (.word word)) (.word (bitNotLeaf type word)) := by
+  by_cases narrow : type.signed = false ∧ type.width ≠ .w256
+  · rw [bitNotLeaf, if_pos narrow]
+    exact .narrow rfl (.narrowBitNot narrow.1 narrow.2 word)
+  · rw [bitNotLeaf, if_neg narrow]
+    refine .primitive (fun other same kind => ?_) (.word word)
+    cases fixed_inj same
+    cases kind with
+    | bitNot unsigned narrowWidth => exact narrow ⟨unsigned, narrowWidth⟩
+
+/-- In-place `~` keeps the target's word canonical for the type. -/
+theorem bitNot_canonical {type : TypeSystem.FixedInteger} {word : Word}
+    (canonical : type.canonical word.val = true) : type.canonical (bitNotLeaf type word).val = true := by
+  by_cases narrow : type.signed = false ∧ type.width ≠ .w256
+  · rw [bitNotLeaf, if_pos narrow]
+    exact Dynamic.fixed_canonical_narrowBitNot narrow.1 narrow.2 word
+  · rw [bitNotLeaf, if_neg narrow]
+    refine Dynamic.fixed_canonical_bitNot ?_ canonical
+    cases signed : type.signed
+    · by_cases full : type.width = .w256
+      · exact .full full
+      · exact absurd ⟨signed, full⟩ narrow
+    · exact .signed signed
+
+/-- A word is never an invalid operand of `~`. -/
+theorem bitNot_word_valid (word : Word) : ¬ Dynamic.UnaryPrimitiveOperandInvalid .bitNot (.word word) :=
+  fun invalid => invalid.excludes_application ⟨_, .wordBitNot word⟩
 
 end Solcore.SourceSemantics.CoreLowering.FixedCompoundModifier
 end
