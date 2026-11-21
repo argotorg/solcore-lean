@@ -13,16 +13,18 @@ argument is another direct call, both at a `Word` parameter; `narrow` returns
 parameter to a `uint8` local `x`, adds `x` to it in place and returns it, `shifted` shifts such
 an `x` left in place by the parameter, a `Word` amount, and `flipped` applies `~` to such an `x` in
 place; `tailed`'s body is `identity(value)` as its final value; `stored` declares a local mapping
-`table`, assigns its parameter at `table[value]` and returns `table[value]`. Runtime checks place every
-expression node of the ten rows among the nested sites that call `identity`'s
+`table`, assigns its parameter at `table[value]` and returns `table[value]`; `summed` returns
+`integerAdd(wordToInteger(value), wordToInteger(value))`, calls of builtin closures. Runtime checks place
+every expression node of the eleven rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
-`relay`, `twice`, `tailed`, `stored`, `narrow` and `roundTrip` (at words canonical for `uint8`) are
-lifted to staged traces, and the call root's theorems apply at the first public call of
+`relay`, `twice`, `tailed`, `stored`, `summed`, `narrow` and `roundTrip` (at words canonical for
+`uint8`) are lifted to staged traces, and the call root's theorems apply at the first public call of
 each in both directions: the actual resumption succeeds, and actual native
 completion reconstructs a staged Source execution. `stored`'s index read returns the word its
-assignment wrote, not the default. At other words the call
+assignment wrote, not the default, and `summed` returns its integer, which at the largest word
+exceeds every word. At other words the call
 root's reflection applies to `narrow` and `roundTrip`, and the actual
 resumption fails with the dirty-integer reason. At every word the call root's
 reflection applies to `doubled`: below 128 the actual resumption returns the sum,
@@ -39,6 +41,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.twice_source`,
 `Tests.SourceCoreAcceptedOneCall.tailed_source`,
 `Tests.SourceCoreAcceptedOneCall.stored_source`,
+`Tests.SourceCoreAcceptedOneCall.summed_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_source`,
 `Tests.SourceCoreAcceptedOneCall.roundTrip_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_fault`,
@@ -46,12 +49,14 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.doubled_panic`,
 `Tests.SourceCoreAcceptedOneCall.accepted_call`,
 `Tests.SourceCoreAcceptedOneCall.accepted_call_with_locals`,
+`Tests.SourceCoreAcceptedOneCall.accepted_call_returning`,
 `Tests.SourceCoreAcceptedOneCall.accepted_reflection`,
 `Tests.SourceCoreAcceptedOneCall.accepted_failure` and the runtime checks
 `Tests.SourceCoreAcceptedOneCall.AcceptedCallRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedNestedCallRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedTailRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedMappingRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedBuiltinRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run`,
@@ -61,7 +66,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 -/
 
 section
-/-! The program and the declarative typing of its ten functions, constructed
+/-! The program and the declarative typing of its eleven functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -83,7 +88,9 @@ def workspace : Workspace.RawWorkspace := {
     "function flipped(value: Word) returns (uint8) { let x: uint8 = uint8(value); x ~=; return x; }",
     "function tailed(value: Word) returns (Word) { identity(value) }",
     "function stored(value: Word) returns (Word) { let table: mapping(Word => Word); table[value] = value; " ++
-      "return table[value]; }" ]}] }
+      "return table[value]; }",
+    "function summed(value: Word) returns (integer) { " ++
+      "return integerAdd(wordToInteger(value), wordToInteger(value)); }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -1229,6 +1236,125 @@ def observeStored (function : CheckedFunction) (signature : ProgramFunctionSigna
   return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, tableScheme, tableRequirements,
     tableOwner, tableDistinct, declaredType, assignmentType, returnedType, assignmentRequirements⟩
 
+/-- The nodes of `summed`'s body: two reads of its parameter, the call of the
+builtin closure `wordToInteger` at each, the call of `integerAdd` at both and
+the return of the sum, found by following the return statement's expression
+graph. -/
+structure SummedParts (source : TypedSource) where
+  binder : TypedBinder
+  leftRead : Tests.SourceCoreNamedBranch.Read source binder .word
+  rightRead : Tests.SourceCoreNamedBranch.Read source binder .word
+  left : Tests.SourceCoreBuiltinCalls.BuiltinCall source .wordToInteger leftRead.node.id
+  right : Tests.SourceCoreBuiltinCalls.BuiltinCall source .wordToInteger rightRead.node.id
+  sumCallee : Tests.SourceCoreOperatorCalls.TypedNode source BuiltinFunctionId.integerAdd.type
+  sum : Tests.SourceCoreOperatorCalls.TypedNode source .integer
+  sumName : String
+  sumCalleeForm : sumCallee.node.form = .reference sumName (.builtinFunction .integerAdd)
+  sumForm : sum.node.form = .call sumCallee.node.id [left.value.node.id, right.value.node.id]
+    (.builtinFunction .integerAdd)
+  statement : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement statement.id]
+  statementFound : source.lookupStatement? statement.id = some statement
+  statementForm : statement.form = .returnStmt (some sum.node.id)
+
+def observeSummedParts (source : TypedSource) : IO (SummedParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "summed input")
+  let [.statement statementId] := source.roots | throw (IO.userError "summed roots")
+  let some statement := source.lookupStatement? statementId | throw (IO.userError "summed statement")
+  let .returnStmt (some sumId) := statement.form | throw (IO.userError "summed return")
+  let some sumNode := source.lookupExpression? sumId | throw (IO.userError "summed sum node")
+  let .call sumCalleeId [leftId, rightId] _ := sumNode.form | throw (IO.userError "summed sum form")
+  let some sumCalleeNode := source.lookupExpression? sumCalleeId | throw (IO.userError "summed sum callee")
+  let some leftNode := source.lookupExpression? leftId | throw (IO.userError "summed left call")
+  let some rightNode := source.lookupExpression? rightId | throw (IO.userError "summed right call")
+  let .call leftCalleeId [leftReadId] _ := leftNode.form | throw (IO.userError "summed left form")
+  let .call rightCalleeId [rightReadId] _ := rightNode.form | throw (IO.userError "summed right form")
+  let some leftCalleeNode := source.lookupExpression? leftCalleeId | throw (IO.userError "summed left callee")
+  let some rightCalleeNode := source.lookupExpression? rightCalleeId | throw (IO.userError "summed right callee")
+  let some leftReadNode := source.lookupExpression? leftReadId | throw (IO.userError "summed left read")
+  let some rightReadNode := source.lookupExpression? rightReadId | throw (IO.userError "summed right read")
+  let leftRead ← Tests.SourceCoreNamedBranch.observeRead source binder leftReadNode .word
+  let rightRead ← Tests.SourceCoreNamedBranch.observeRead source binder rightReadNode .word
+  let left ← observeConversion source .wordToInteger leftRead.node.id leftCalleeNode leftNode
+  let right ← observeConversion source .wordToInteger rightRead.node.id rightCalleeNode rightNode
+  let sumCallee ← Tests.SourceCoreOperatorCalls.observeNode source sumCalleeNode BuiltinFunctionId.integerAdd.type
+  let sum ← Tests.SourceCoreOperatorCalls.observeNode source sumNode .integer
+  let .reference sumName (.builtinFunction _) := sumCalleeNode.form | throw (IO.userError "summed sum callee form")
+  let ⟨sumCalleeForm⟩ ← observed (sumCallee.node.form = .reference sumName (.builtinFunction .integerAdd))
+    "summed sum callee"
+  let ⟨sumForm⟩ ← observed (sum.node.form = .call sumCallee.node.id [left.value.node.id, right.value.node.id]
+    (.builtinFunction .integerAdd)) "summed sum call"
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "summed inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "summed roots shape"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement) "summed statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some sum.node.id)) "summed statementForm"
+  return ⟨binder, leftRead, rightRead, left, right, sumCallee, sum, sumName, sumCalleeForm, sumForm, statement,
+    inputs, roots, statementFound, statementForm⟩
+
+/-- `summed`'s body: the return of `integerAdd(wordToInteger(value), wordToInteger(value))`. -/
+structure SummedShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : SummedParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.integer]
+  binderScheme : parts.binder.scheme = .mono .word
+  binderRequirements : parts.binder.schemeRequirements = []
+  statementType : parts.statement.type = .integer
+
+theorem SummedShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : SummedShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.statement.id] := statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .integer, hasValue := true, sawReturn := true, control := .returned}
+  refine ⟨BodyFacts.singleton facts, rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have integer : TypeAdmissible lexical .integer := ⟨binders, .builtin .integer⟩
+    have leftRead := shape.parts.leftRead.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have rightRead := shape.parts.rightRead.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have leftTyped := shape.parts.left.typed rfl integer leftRead
+    have rightTyped := shape.parts.right.typed rfl integer rightRead
+    have callee : DirectBuiltinCalleeValid function.typedBody shape.parts.sumCallee.node.id .integerAdd :=
+      .intro (lookupExpression?_sound shape.parts.sumCallee.found) shape.parts.sumCalleeForm
+        shape.parts.sumCallee.type shape.parts.sumCallee.requirements shape.parts.sumCallee.coercions
+    have arguments : ExpressionsHaveTypes function.typedBody lexical
+        [shape.parts.left.value.node.id, shape.parts.right.value.node.id] BuiltinFunctionId.integerAdd.parameterTypes :=
+      .cons leftTyped (.cons rightTyped (.nil _))
+    have typed : ExpressionHasType function.typedBody lexical shape.parts.sum.node.id shape.parts.sum.node.type := by
+      refine .intro (lookupExpression?_sound shape.parts.sum.found)
+        (shape.parts.sumForm ▸ ExpressionFormHasRawType.builtinCall callee arguments)
+        shape.parts.sum.raw integer (shape.parts.sum.type.symm ▸ integer) ?_
+      rw [shape.parts.sum.requirements, shape.parts.sum.coercions, shape.parts.sum.type]
+      exact .ordinary (by intro id member; cases member) (.nil _) rfl
+    rw [shape.parts.sum.type] at typed
+    exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.parts.statementFound)
+      shape.parts.statementForm typed shape.statementType)⟩
+
+def observeSummed (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (SummedShape function signature) := do
+  let parts ← observeSummedParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "summed parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "summed inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.integer]) "summed returns"
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "summed binderScheme"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "summed binderRequirements"
+  let ⟨statementType⟩ ← observed (parts.statement.type = .integer) "summed statementType"
+  return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, statementType⟩
+
 /-- Two members of a list of signatures whose ids are distinct are equal when
 their ids are. -/
 private theorem signature_of_id {signatures : List ProgramFunctionSignature}
@@ -1255,9 +1381,9 @@ def observeWellFormed {program : CheckedProgram}
     IO (PLift (ProgramWellFormed (Program.ofChecked program))) := do
   match functions : program.functions, signatures : program.signatures.functions with
   | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction,
-      shiftedFunction, flippedFunction, tailedFunction, storedFunction],
+      shiftedFunction, flippedFunction, tailedFunction, storedFunction, summedFunction],
     [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature,
-      shiftedSignature, flippedSignature, tailedSignature, storedSignature] =>
+      shiftedSignature, flippedSignature, tailedSignature, storedSignature, summedSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
@@ -1268,6 +1394,7 @@ def observeWellFormed {program : CheckedProgram}
     let flippedShape ← observeFlipped flippedFunction flippedSignature
     let tailedShape ← observeTailed tailedFunction tailedSignature identitySignature
     let storedShape ← observeStored storedFunction storedSignature
+    let summedShape ← observeSummed summedFunction summedSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -1281,6 +1408,7 @@ def observeWellFormed {program : CheckedProgram}
     let ⟨flippedDeclaration⟩ ← observed (flippedFunction.declaration = flippedSignature.id) "calls flippedDeclaration"
     let ⟨tailedDeclaration⟩ ← observed (tailedFunction.declaration = tailedSignature.id) "calls tailedDeclaration"
     let ⟨storedDeclaration⟩ ← observed (storedFunction.declaration = storedSignature.id) "calls storedDeclaration"
+    let ⟨summedDeclaration⟩ ← observed (summedFunction.declaration = summedSignature.id) "calls summedDeclaration"
     let ⟨distinct⟩ ← observed ((program.signatures.functions.map (·.id)).Nodup) "calls distinct signatures"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
@@ -1290,7 +1418,7 @@ def observeWellFormed {program : CheckedProgram}
             actual.declaration = signature.id → candidate = signature := fun signatureMember same =>
           signature_of_id distinct candidateMember signatureMember (declared.symm.trans same)
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
-        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
         · obtain rfl := selects (by simp [signatures]) identityDeclaration
           exact identityShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) relayDeclaration
@@ -1311,6 +1439,8 @@ def observeWellFormed {program : CheckedProgram}
           exact tailedShape.statementTyping program.signatures (by simp [signatures])
         · obtain rfl := selects (by simp [signatures]) storedDeclaration
           exact storedShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) summedDeclaration
+          exact summedShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -1319,12 +1449,13 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the ten functions and their original Source
+/-! The cache rows of the eleven functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `tailed` ends in the direct call of `identity` with
 its parameter as its final value, `stored` returns its parameter from the index of its local mapping
-where its assignment put it, `narrow` returns the conversion of its parameter,
+where its assignment put it, `summed` returns the integer sum of its parameter's word with itself,
+`narrow` returns the conversion of its parameter,
 and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
 a given body invocation. At a word not canonical for `uint8` the conversions of `narrow`, `doubled`,
 `shifted` and `flipped` fault with the dirty-integer reason, and at a canonical word whose double is
@@ -1558,6 +1689,16 @@ def observeStoredBody (source : TypedSource) : IO (StoredBody source) := do
   let ⟨tableScheme⟩ ← observed (parts.table.scheme = .mono (.mapping .word .word)) "stored row tableScheme"
   let ⟨tableDistinct⟩ ← observed (parts.table.id ≠ parts.binder.id) "stored row tableDistinct"
   return ⟨parts, binderScheme, tableScheme, tableDistinct⟩
+
+/-- `summed`'s cache row: the nodes of its body and its `Word` parameter. -/
+structure SummedBody (source : TypedSource) where
+  parts : SummedParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeSummedBody (source : TypedSource) : IO (SummedBody source) := do
+  let parts ← observeSummedParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "summed row binderScheme"
+  return ⟨parts, binderScheme⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
 theorem read_value {source : TypedSource} {binder : TypedBinder}
@@ -1922,19 +2063,62 @@ theorem StoredBody.trace {source : TypedSource} (body : StoredBody source) {prog
     (by rw [body.parts.returnedForm]; intro id impossible; cases impossible)
     (.returnValue (lookupStatement?_sound body.parts.returnedFound) body.parts.returnedForm indexed)))
 
+/-- A call of a builtin closure on one argument evaluates to the builtin's
+result at the argument's value. -/
+theorem builtin_value {source : TypedSource} {function : BuiltinFunctionId} {argument : ExpressionId}
+    (call : Tests.SourceCoreBuiltinCalls.BuiltinCall source function argument) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment} {environment : Dynamic.Environment}
+    {before after : Dynamic.Heap} {input result : Dynamic.Value}
+    (argumentTrace : Dynamic.ExpressionEvaluates program context evidence source environment before argument input
+      after)
+    (applied : Dynamic.BuiltinApplies function [input] result) :
+    Dynamic.ExpressionEvaluates program context evidence source environment before call.value.node.id result after := by
+  apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound call.value.found)
+  · rw [call.form, call.value.requirements, call.value.coercions]
+    exact .builtinCall rfl (.cons argumentTrace .nil) (.builtin applied)
+  · rw [call.value.coercions]
+    exact .nil
+
+/-- `summed`'s body returns the integer sum of its parameter's word with
+itself: each call of `wordToInteger` gives the word's integer, and the call of
+`integerAdd` their sum. -/
+theorem SummedBody.trace {source : TypedSource} (body : SummedBody source) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.statement.id] context
+      (.returned (.integer (Int.ofNat word.val + Int.ofNat word.val))) (wordHeap before word) := by
+  have left := builtin_value (program := program) (context := context) body.parts.left
+    (read_value body.parts.leftRead evidence before word) (.wordToInteger word)
+  have right := builtin_value (program := program) (context := context) body.parts.right
+    (read_value body.parts.rightRead evidence before word) (.wordToInteger word)
+  have sum : Dynamic.ExpressionEvaluates program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) body.parts.sum.node.id (.integer (Int.ofNat word.val + Int.ofNat word.val))
+      (wordHeap before word) := by
+    apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound body.parts.sum.found)
+    · rw [body.parts.sumForm, body.parts.sum.requirements, body.parts.sum.coercions]
+      exact .builtinCall rfl (.cons left (.cons right .nil)) (.builtin (.integerAdd _ _))
+    · rw [body.parts.sum.coercions]
+      exact .nil
+  apply Dynamic.FunctionStatementsExecute.singleton (lookupStatement?_sound body.parts.statementFound)
+  · intro expression impossible
+    rw [body.parts.statementForm] at impossible
+    cases impossible
+  · exact .returnValue (lookupStatement?_sound body.parts.statementFound) body.parts.statementForm sum
+
 end Tests.SourceCoreAcceptedOneCall
 end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the ten rows among the nested sites or their callees
+every expression node of the eleven rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
-receipts. The original Source executions of `relay`, `twice`, `tailed`, `stored`, `narrow` and
-`roundTrip`, whose calls run `identity`'s body instance, are lifted through the checked
+receipts. The original Source executions of `relay`, `twice`, `tailed`, `stored`, `summed`, `narrow`
+and `roundTrip`, whose calls run `identity`'s body instance, are lifted through the checked
 shapes, and with the existing start receipts the call root's theorems apply at
 the first public call of each in both directions; `stored`'s execution ends in its local's
-context (`accepted_call_with_locals`). The call root's reflection
+context (`accepted_call_with_locals`), and `summed`'s returns an integer (`accepted_call_returning`). The call root's reflection
 needs no Source execution (`accepted_reflection`). At a faulting word the
 row's original Source fault is lifted to a staged fault trace, given that the
 direct calls of the row and of `identity` have plain callees, and the call
@@ -2232,6 +2416,18 @@ theorem stored_source (selected : SelectedInventory whole row) (storedBody : Sto
       rw [body, selected.source_eq]
       exact ⟨_, storedBody.trace selected.packet.header.function.evidence ⟨[]⟩ extension word⟩
 
+/-- The original Source execution of `summed`'s body at its header returns the
+integer sum of its parameter's word with itself. -/
+theorem summed_source (selected : SelectedInventory whole row) (summedBody : SummedBody row.original.function.typedBody)
+    (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment summedBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.integer (Int.ofNat word.val + Int.ofNat word.val)))
+      (wordHeap ⟨[]⟩ word) := by
+  rw [single_body selected summedBody.parts.roots, selected.source_eq]
+  exact summedBody.trace selected.packet.header.function.evidence ⟨[]⟩ word
+
 /-- The callee premise of the fault lifting for the family that admits
 `identity`'s retained instantiation: its body instance is its header's, whose
 Source is `identity`'s cache row. -/
@@ -2280,9 +2476,9 @@ structure AcceptedCall (selected : SelectedInventory whole row) (word : Word)
       Staging.Recursive.BodyResult selected.packet.header.function.resultType outcome
         (CallableIndexedOwnedAdmittedStagedLexicalFlow.result outcome)
 
-/-- `accepted_call` at an original Source execution that ends in any context,
-as one of a body with local declarations does. -/
-theorem accepted_call_with_locals (selected : SelectedInventory whole row) {called : DeclarationInstantiation → Prop}
+/-- `accepted_call` at an original Source execution that returns any value in
+any context, as one of a body that returns an integer or declares locals does. -/
+theorem accepted_call_returning (selected : SelectedInventory whole row) {called : DeclarationInstantiation → Prop}
     (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
     (admitted : ∀ {instantiation}, called instantiation →
       ∃ callee : Row fixture, instantiation = CallableNamedCanonicalOrder.retainedInstantiation callee.original)
@@ -2291,12 +2487,12 @@ theorem accepted_call_with_locals (selected : SelectedInventory whole row) {call
     (started : Started fixture row.original.key [.word word])
     (callableProfile : fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true)
     {binder : TypedBinder} (inputs : row.original.function.typedBody.inputs = [binder])
-    (scheme : binder.scheme = .mono .word) {finalContext : SourceSemantics.Context} {result : Word}
+    (scheme : binder.scheme = .mono .word) {finalContext : SourceSemantics.Context} {result : Dynamic.Value}
     {after : Dynamic.Heap}
     (sourceTrace : Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
       selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
       (wordEnvironment binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
-      finalContext (.returned (.word result)) after) :
+      finalContext (.returned result) after) :
     Nonempty (AcceptedCall selected word started) := by
   obtain ⟨types, allocated⟩ := word_parameter selected inputs scheme ⟨[]⟩ word
   have support := SelectedCompilationNamedSupport.Support.of_program wellFormed
@@ -2364,6 +2560,26 @@ theorem accepted_call_with_locals (selected : SelectedInventory whole row) {call
         (CellAwarePublicAcceptedCallRoot.expressions_of_family callableProfile initial.issued prepared
           selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows)
     exact ⟨sidecar, size, environment, bound, finalContext, outcome, after, allocated, staged, result⟩
+
+/-- `accepted_call` at an original Source execution that ends in any context,
+as one of a body with local declarations does. -/
+theorem accepted_call_with_locals (selected : SelectedInventory whole row) {called : DeclarationInstantiation → Prop}
+    (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
+    (admitted : ∀ {instantiation}, called instantiation →
+      ∃ callee : Row fixture, instantiation = CallableNamedCanonicalOrder.retainedInstantiation callee.original)
+    (word : Word)
+    (wellFormed : ProgramWellFormed (Program.ofChecked fixture.recipe.compiled.sourceProgram))
+    (started : Started fixture row.original.key [.word word])
+    (callableProfile : fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true)
+    {binder : TypedBinder} (inputs : row.original.function.typedBody.inputs = [binder])
+    (scheme : binder.scheme = .mono .word) {finalContext : SourceSemantics.Context} {result : Word}
+    {after : Dynamic.Heap}
+    (sourceTrace : Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      finalContext (.returned (.word result)) after) :
+    Nonempty (AcceptedCall selected word started) :=
+  accepted_call_returning selected calls admitted word wellFormed started callableProfile inputs scheme sourceTrace
 
 /-- Every premise is an original checked or static observation, a runtime check
 of the program's rows, an actual public start, or the row's original Source
@@ -2690,6 +2906,35 @@ def run : IO Unit := do
   IO.println "ACCEPTED_MAPPING_PUBLIC_PASS"
 
 end AcceptedMappingRuntime
+
+namespace AcceptedBuiltinRuntime
+
+/-- As `AcceptedCallRuntime.run`, at `summed`, which returns the integer sum of
+its parameter's word with itself through calls of the builtin closures
+`integerAdd` and `wordToInteger`; the sum at `Word.maximum` is beyond any
+word. -/
+def run : IO Unit := do
+  let observed ← observe
+  let summed ← observeRow observed.fixture "summed"
+  let summedBody ← observeSummedBody summed.original.function.typedBody
+  for word in [Word.ofNatModulo 7, Word.maximum] do
+    let started ← observeStarted observed.fixture summed.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole summed),
+        Nonempty (AcceptedCall selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select summed
+      exact ⟨whole, selected, accepted_call_returning selected observed.calls
+        (fun admits => ⟨observed.identity, admits⟩) word observed.wellFormed started observed.callableProfile
+        summedBody.parts.inputs summedBody.binderScheme (summed_source selected summedBody word)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .succeeded returned =>
+      unless returned.value == .integer (Int.ofNat word.val + Int.ofNat word.val) do
+        throw (IO.userError "accepted builtin output changed")
+    | _ => throw (IO.userError "accepted builtin did not succeed")
+  IO.println "ACCEPTED_BUILTIN_PUBLIC_PASS"
+
+end AcceptedBuiltinRuntime
 
 namespace AcceptedConversionRuntime
 
