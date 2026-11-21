@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceCore.Compatible
 import Solcore.SourceSemantics.Dynamic.Fault
+import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.SourceSemantics.CoreLowering.Internal.Data.Equality
 import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.AssignmentProfiles
 
@@ -9,7 +10,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Foundations.AssignmentProfi
 The modifier that both place compilers emit for `+= -= *= /= %=`, their unchecked forms and
 `&= |= ^=` at the twelve fixed-width integer types, beside the source rules on the same operands,
 and the profile that admits them beside `AssignmentProfile`. The data and compatible place pipelines
-use them.
+use them. `<<=` and `>>=` there have the same facts, for an amount of any word.
 
 Main declarations:
 - `FixedCompoundAssignment` and `WideAssignmentProfile`, the profile with these targets, and
@@ -19,7 +20,9 @@ Main declarations:
 - `applies_leaf`, an applied source operation gives that word;
 - `Agreement` and `guard_agrees`: the modifier's check after the setter writes exactly when the
   source applies the operation, and otherwise fails with the source's panic;
-- `canonical_of_applies`, an applied result is canonical for the type.
+- `canonical_of_applies`, an applied result is canonical for the type;
+- `shift_leaf_evaluates`, `shift_applies_leaf`, `shift_canonical_of_applies` and
+  `shift_guard_agrees`, the same facts for the shifts, which ask nothing of the amount.
 -/
 
 section
@@ -436,7 +439,7 @@ end
 section
 /-! The leaf. Both place compilers choose the modifier with `assignmentModifier` and the wrap with
 `SourceCoreDataPlaces.placeWrap`. At a fixed-width target the modifier applies Word's operation to
-the snapshot's word and the right-hand side's, and the unchecked forms wrap the result. -/
+the snapshot's word and the right-hand side's, and the unchecked forms and `<<=` wrap the result. -/
 set_option autoImplicit false
 namespace Solcore.SourceSemantics.CoreLowering.FixedCompoundModifier
 open Core Frontend DataEquality
@@ -456,6 +459,8 @@ def leaf (type : TypeSystem.FixedInteger) : Syntax.ValueAssignOp → Word → Wo
   | .uncheckedMultiply, left, right => wrapWord type (left.mul right)
   | .uncheckedDivide, left, right => wrapWord type (if type.signed then left.sdiv right else left.udiv right)
   | .uncheckedModulo, left, right => wrapWord type (if type.signed then left.smod right else left.umod right)
+  | .shiftLeft, left, right => wrapWord type (left.shiftLeft right)
+  | .shiftRight, left, right => if type.signed then left.shiftArithmeticRight right else left.shiftRight right
   | _, _, right => right
 
 /-- The two compilers' modifiers are the same. -/
@@ -466,6 +471,52 @@ theorem compatible_assignmentModifier (target : TypeSystem.Ty) (integer : Bool) 
   cases SourceCoreDataPlaces.checkedCompound target operator with
   | some pair => rfl
   | none => cases operator <;> rfl
+
+/-- At a fixed-width target a shift's modifier, wrapped as the compiler wraps it, computes the
+leaf. -/
+theorem shift_leaf_evaluates {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
+    (shift : ShiftCompoundAssignmentOperator operator) {environment : Environment} {store : Store}
+    {shifted : Expr} {left right : Word}
+    (rightEvaluated : Evaluates (.word left :: environment) store shifted (.word right) store) :
+    ∃ modifier, SourceCoreDataPlaces.assignmentModifier (.fixed type) false operator = some modifier ∧
+      Evaluates (.word left :: environment) store
+        (SourceCoreDataPlaces.wrapLeaf (SourceCoreDataPlaces.placeWrap (.fixed type) operator false)
+          (.binary modifier.operation (.var 0) shifted)) (.word (leaf type operator left right)) store := by
+  obtain ⟨signed, width⟩ := type
+  cases signed <;> cases shift <;>
+    first
+      | exact ⟨_, rfl, .binary (.var rfl) rightEvaluated rfl⟩
+      | exact ⟨_, rfl, .binary (.binary (.var rfl) rightEvaluated rfl) .word rfl⟩
+      | exact ⟨_, rfl, .binary .word (.binary (.var rfl) rightEvaluated rfl) rfl⟩
+
+/-- The data-place compiler's shift modifier at a fixed-width target gives the leaf. -/
+theorem shift_modified_evaluates {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
+    (shift : ShiftCompoundAssignmentOperator operator) {environment : Environment} {snapshot rhs : Expr}
+    {left right : Word} (snapshotSelected : Selects environment snapshot (.inRight .unit (.word left)))
+    (rightSelected : Selects environment rhs (.word right)) (store : Store) (invalid : Word) :
+    Evaluates environment store
+      (SourceCoreDataPlaces.modified .word (SourceCoreDataPlaces.assignmentModifier (.fixed type) false operator)
+        false snapshot rhs invalid (SourceCoreDataPlaces.placeWrap (.fixed type) operator false))
+      (.inRight .word (.word (leaf type operator left right))) store := by
+  obtain ⟨modifier, chosen, evaluated⟩ :=
+    shift_leaf_evaluates (type := type) shift ((rightSelected.weaken (.word left)).evaluates store)
+  rw [chosen]
+  exact .caseRight (snapshotSelected.evaluates store) (.inRight evaluated)
+
+/-- So does the compatible compiler's. -/
+theorem shift_compatible_modified_evaluates {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
+    (shift : ShiftCompoundAssignmentOperator operator) {environment : Environment} {snapshot rhs : Expr}
+    {left right : Word} (snapshotSelected : Selects environment snapshot (.inRight .unit (.word left)))
+    (rightSelected : Selects environment rhs (.word right)) (store : Store) (invalid : Word) :
+    Evaluates environment store
+      (SourceCoreCompatibleDataPlaces.modified .word
+        (SourceCoreCompatibleDataPlaces.assignmentModifier (.fixed type) false operator)
+        false snapshot rhs invalid (SourceCoreDataPlaces.placeWrap (.fixed type) operator false))
+      (.inRight .word (.word (leaf type operator left right))) store := by
+  obtain ⟨modifier, chosen, evaluated⟩ :=
+    shift_leaf_evaluates (type := type) shift ((rightSelected.weaken (.word left)).evaluates store)
+  rw [compatible_assignmentModifier, chosen]
+  exact .caseRight (snapshotSelected.evaluates store) (.inRight evaluated)
 
 /-- At a fixed-width target the modifier's operation, wrapped as the compiler wraps it, computes the
 leaf. -/
@@ -597,6 +648,34 @@ private theorem leaf_uncheckedModulo (type : TypeSystem.FixedInteger) {left righ
   rw [modulo_fixed type nonzero, wrap_ofIntModulo]
   rfl
 
+private theorem leaf_shiftLeft (type : TypeSystem.FixedInteger) (left right : Word) :
+    leaf type .shiftLeft left right =
+      Word.ofIntModulo (Dynamic.fixedWrap type (Dynamic.fixedValue type (left.shiftLeft right))) :=
+  wrapWord_fixed type _
+
+/-- An applied shift at a fixed-width target gives the leaf. -/
+theorem shift_applies_leaf {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
+    (shift : ShiftCompoundAssignmentOperator operator) {left right : Word} {result : Dynamic.Value}
+    (applied : Dynamic.CompoundAssignmentApplies (.fixed type) operator (some (.word left)) (.word right) result) :
+    result = .word (leaf type operator left right) := by
+  cases shift
+  · cases applied
+    case primitive plain _ => exact (plain type rfl .shiftLeft).elim
+    case shiftLeft same applies =>
+      cases fixed_inj same
+      cases applies <;> first
+        | cases ‹FixedCheckedArithmetic _› | cases ‹FixedCheckedDivision _› | cases ‹FixedUncheckedArithmetic _›
+        | cases ‹FixedUncheckedDivision _›
+        | exact congrArg Dynamic.Value.word (leaf_shiftLeft type left right).symm
+  · cases applied
+    case primitive plain _ => exact (plain type rfl .shiftRight).elim
+    case shiftRight same applies =>
+      cases fixed_inj same
+      cases applies <;> first
+        | cases ‹FixedCheckedArithmetic _› | cases ‹FixedCheckedDivision _› | cases ‹FixedUncheckedArithmetic _›
+        | cases ‹FixedUncheckedDivision _›
+        | rfl
+
 /-- An applied operation at a fixed-width target gives the leaf. -/
 theorem applies_leaf {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
     (kind : FixedCompoundAssignmentOperator operator) {left right : Word} {result : Dynamic.Value}
@@ -663,6 +742,18 @@ theorem applies_leaf {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAs
   case shiftLeft => cases kind
   case shiftRight => cases kind
 
+/-- An applied shift keeps the target's word canonical for the type, whatever the amount. -/
+theorem shift_canonical_of_applies {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
+    (shift : ShiftCompoundAssignmentOperator operator) {left right : Word} {result : Dynamic.Value}
+    (leftCanonical : type.canonical left.val = true)
+    (applied : Dynamic.CompoundAssignmentApplies (.fixed type) operator (some (.word left)) (.word right) result) :
+    ∃ word, result = .word word ∧ type.canonical word.val = true := by
+  refine ⟨_, shift_applies_leaf shift applied, ?_⟩
+  cases shift
+  · rw [leaf_shiftLeft]
+    exact canonical_ofIntModulo (Dynamic.fixedWrap_inRange type _)
+  · exact Dynamic.fixed_canonical_shiftRight leftCanonical right
+
 /-- An applied operation keeps the words canonical for the type. -/
 theorem canonical_of_applies {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
     (kind : FixedCompoundAssignmentOperator operator) {left right : Word} {result : Dynamic.Value}
@@ -726,6 +817,17 @@ private theorem not_applies_zero {type : TypeSystem.FixedInteger} {operator : Sy
         | cases ‹FixedCheckedArithmetic _›
         | cases ‹FixedCheckedDivision _›
         | cases ‹FixedUncheckedArithmetic _›)
+
+/-- Word operands of a shift are never invalid. -/
+theorem shift_words_valid {operator : Syntax.ValueAssignOp} (shift : ShiftCompoundAssignmentOperator operator)
+    (left right : Word) : ¬ Dynamic.AssignmentOperandsInvalid operator (some (.word left)) (.word right) := by
+  intro invalid
+  cases invalid with
+  | compound corresponds invalid =>
+    cases invalid with
+    | numeric _ pair => exact pair trivial
+    | word _ pair => exact pair trivial
+    | logical operatorClass => cases shift <;> cases corresponds <;> cases operatorClass
 
 /-- Word operands of these operators are never invalid. -/
 theorem words_valid {operator : Syntax.ValueAssignOp} (kind : FixedCompoundAssignmentOperator operator)
@@ -952,6 +1054,19 @@ private theorem agrees_unchecked_division {type : TypeSystem.FixedInteger} {oper
     exact .panicked 0x12 (.compound corresponds (.primitive panics)) (not_applies_zero corresponds kind left)
       (guard_divisor_zero _ _)
   · exact .applied (applies zero) (.inl (.nonzero zero)) (guard_divisor_nonzero zero _ _)
+
+/-- A shift's modifier checks nothing after the setter, and the source applies the shift, with the
+leaf. -/
+theorem shift_guard_agrees {type : TypeSystem.FixedInteger} {operator : Syntax.ValueAssignOp}
+    (shift : ShiftCompoundAssignmentOperator operator) (left right : Word) {leftType : Ty} :
+    Agreement (.fixed type) operator (some (.word left)) (.word right) (.word (leaf type operator left right))
+      (SourceCoreDataPlaces.assignmentModifier (.fixed type) false operator) (.inRight leftType (.word left))
+      (.word right) := by
+  cases shift
+  · exact agrees_total (by
+      rw [leaf_shiftLeft]
+      exact .shiftLeft rfl (.shiftLeft left right))
+  · exact agrees_total (.shiftRight rfl (.shiftRight left right))
 
 /-- The check of the modifier after the setter, under the check's binders (the updated root, the
 modified leaf, the right-hand side and the snapshot), agrees with the source: it writes exactly when
