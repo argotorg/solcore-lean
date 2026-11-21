@@ -119,15 +119,23 @@ private theorem bind_ok {α β ε : Type} {action : Except ε α} {next : α →
   | error => cases accepted
   | ok value => exact ⟨value, rfl, accepted⟩
 
+private theorem ensureType_ok {site : SourceCoreElaboration.ErrorSite} {expected actual : Ty} {done : Unit}
+    (accepted : SourceCoreBasic.ensureType site expected actual = .ok done) : expected = actual := by
+  unfold SourceCoreBasic.ensureType at accepted
+  split at accepted
+  · assumption
+  · cases accepted
+
 /-- An accepted reference to a builtin closure lowers to the closure's
-contracted value. -/
+contracted value, at the type that the compatible reader projects. -/
 theorem value_of_accepted (site : Site prepared named source id) (rootFuel : Nat) {name : String}
     (form : site.node.form = .reference name (.builtinFunction function))
     {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {reasonAt : ExpressionId → Word}
     {lowered : SourceCoreBasic.LoweredExpr}
     (accepted : SourceCoreFunctions.lowerExpressionWithPolicy (namedPolicy compiled rootFuel)
       (namedLowerBody compiled) fuel (context prepared named) source scope id reasonAt = .ok lowered) :
-    Nonempty (CellAwareBuiltinValueCertificates.Header prepared source id lowered) := by
+    Nonempty (CellAwareBuiltinValueCertificates.Header prepared source id lowered) ∧
+      CompatibleExpressionReads.Metadata checked source id site.node lowered.type := by
   cases fuel with
   | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
   | succ fuel =>
@@ -151,11 +159,13 @@ theorem value_of_accepted (site : Site prepared named source id) (rootFuel : Nat
       subst other
       simp only [form] at rest
       obtain ⟨code, reference, rest⟩ := bind_ok rest
-      obtain ⟨done, _sameType, rest⟩ := bind_ok rest
+      obtain ⟨done, sameType, rest⟩ := bind_ok rest
       cases done
       cases rest
-      exact CellAwareBuiltinValueCertificates.of_reference prepared rfl site.found form
-        metadata.requirements metadata.coercions reference
+      have typeEq := ensureType_ok sameType
+      subst typeEq
+      exact ⟨CellAwareBuiltinValueCertificates.of_reference prepared rfl site.found form
+        metadata.requirements metadata.coercions reference, metadata⟩
     · simp [owner, bind, Except.bind] at accepted
 
 /-- Proof-producing recognition of a call of a closure of the row. -/

@@ -588,8 +588,10 @@ staged executions. A direct call's original rule runs the callee body, so the
 lifting is one strong induction on the size of the original derivation across
 bodies: at a call of a given size, the callee body's derivation is smaller, and
 its lifting below that size gives the staged global application. A
-conversion's original rule applies its builtin as the staged rule does, and a
-mapping index's original rules give the staged index outcome. Inside one
+conversion's and a builtin closure call's original rule applies the builtin as
+the staged rule does, a reference to a builtin closure is the staged atomic
+value, and a mapping index's original rules give the staged index outcome.
+Inside one
 body, a nested site is lifted by induction on the site, over the sized
 derivations of its operands, branches, elements and arguments. The admitted
 callees are static inputs (`Callees`): the registry scope of each callee's
@@ -940,6 +942,33 @@ theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         (key (by
           simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
           omega) second) (.default rfl absent defaulted)
+  | builtinValue site form =>
+    intro size context environment before after value _ trace
+    exact Staging.Recursive.Lifting.atomic_nonlocal unique (lookupExpression?_sound site.found)
+      (by rw [form]; exact .reference _ _) site.coercions
+      (fun name binder same => by rw [form] at same; cases same) (.value trace.sound)
+  | @builtin id callee ids function site _ arguments =>
+    intro size context environment before after value within trace
+    have contains := lookupExpression?_sound site.found
+    cases trace with
+    | intro found form coercions =>
+      cases node_unique unique found contains
+      rw [site.coercions] at coercions
+      cases coercions
+      rw [site.form, site.requirements, site.coercions] at form
+      cases form with
+      | builtinCall layout evaluated applies =>
+        have stagedArguments := arguments_value (registry := registry) arguments (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
+          omega) evaluated
+        cases applies with
+        | builtin applied =>
+          exact .builtinApplied ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
+            stagedArguments (.builtin applied)
+    | generalizedLocal found formEq =>
+      cases node_unique unique found contains
+      rw [site.form] at formEq
+      cases formEq
 
 /-- The value lifting of every nested site below a size, given the lifting of
 the callee bodies below it. -/
@@ -1571,6 +1600,44 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
           simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
           omega) second)
         (.unavailable rfl keyTyped absent unavailable)
+  | builtinValue site form =>
+    intro size context environment before after reason _ _ _ trace
+    exact Staging.Recursive.Lifting.atomic_nonlocal unique (lookupExpression?_sound site.found)
+      (by rw [form]; exact .reference _ _) site.coercions
+      (fun name binder same => by rw [form] at same; cases same) (.fault trace.sound)
+  | @builtin id callee ids function site argumentsNested arguments =>
+    intro size context environment before after reason within signatures expressible trace
+    have contains := lookupExpression?_sound site.found
+    have callOccurrence :
+        Staging.Recursive.Occurrence scope id (.call callee ids (.builtinFunction function)) :=
+      ⟨site.node, contains, site.form, site.requirements, site.coercions⟩
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [site.form] at same; cases same) trace
+    rw [site.form, site.requirements] at raw
+    have values : ∀ other ∈ ids, ∀ {size : Nat} {context : SourceSemantics.Context}
+        {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+        SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
+          before other value after →
+        Staging.Recursive.Expression program registry scope context environment before other (.value value)
+          after :=
+      fun other member => nested_value prepared unique bodies (argumentsNested other member)
+    cases raw with
+    | builtinArguments _ failed =>
+      exact .builtinArgumentsFault callOccurrence
+        (arguments_fault values arguments (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible failed)
+    | builtinApply _ evaluated failed =>
+      have stagedArguments := CellAwareInvocationAcceptedCallLifting.arguments_value (registry := registry)
+        values (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) evaluated
+      cases failed with
+      | notCallable invalid => exact (invalid trivial).elim
+      | builtinArity mismatch => exact .builtinApplied callOccurrence stagedArguments (.builtinArity mismatch)
+      | builtinArgumentType arity mismatch =>
+        exact .builtinApplied callOccurrence stagedArguments (.builtinType arity mismatch)
+      | builtinFaults failed => exact .builtinApplied callOccurrence stagedArguments (.builtinFault failed)
 
 /-- The fault lifting of every nested site below a size, given that the
 Source's direct calls have plain callees and the value and fault liftings of
