@@ -30,7 +30,9 @@ The [umbrella](../../Solcore/Frontend.lean) imports the pipeline (through
 
 A program flows down this table. `checkProgram` loads it (validating the workspace, parsing each
 file through `Syntax/Unchecked`, building the declaration environment), resolves imports, types and
-signatures, and checks every function and method body. `SourceCoreCompiler.compileChecked` then
+signatures, and checks every function and method body. The load refuses, as upstream does, a name
+that an import brings beside a declaration of the module, an unknown item, and an unknown module
+other than one of upstream's std modules. `SourceCoreCompiler.compileChecked` then
 plans the specializations of the requested roots, validates the plan, and compiles one cached Core
 artifact. `SourceCoreExecution.prepare` turns that artifact into the recipe that sessions run.
 

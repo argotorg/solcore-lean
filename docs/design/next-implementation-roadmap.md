@@ -113,11 +113,12 @@ The last two are recorded without investigation, and the generators avoid them.
 
 ### Now
 
-1. **Upstream's new trait coherence rules** (row 13). The re-pin and rows 9 to 12 are done. Part
-   of row 13 refuses forms that Lean accepts today, and the rest widens what it accepts. With
-   row 13, Lean's trait search also takes an impl's conditions from a body's `where` predicates.
-   Lean keeps ignoring `#[derive]`. Then Lean follows upstream in four more places:
-   - no default once an ordinary impl's head matches the goal;
+1. **Upstream's new trait coherence rules** (row 13). The re-pin and rows 9 to 12 are done, and
+   Lean's trait search takes a goal from a body's `where` predicates at any depth. Next, Lean
+   uses no default once an ordinary impl's head matches the goal, which the rest of row 13
+   builds on: a `where` predicate then gives its superclasses, and each impl proves its
+   superclasses at its declaration (`SC0248`) instead of restating them. Lean keeps ignoring
+   `#[derive]`. Then Lean follows upstream in three more places:
    - a match's exhaustiveness: today Lean counts constructors only for a scrutinee of a nominal
      type, so an exhaustive match over a pair needs a `_` arm;
    - a literal `lidx` index, which gets `uint256` as a read's index does;
@@ -128,10 +129,11 @@ The last two are recorded without investigation, and the generators avoid them.
    Source goal two.
 3. **Lean's native frontend as a fourth differential path.** The harness runs the admitted pure
    cases through the native pipeline, alone or as the fuzz driver's `native` run kind, memory
-   arrays with their slices and memrefs among them. Next is native `std.opcodes`, after Lean's
-   import rules follow upstream's: a selected or wildcard import beside a local of the same
-   name, an unknown import item and an unknown module are refused, and two selected imports
-   under one alias are accepted.
+   arrays with their slices and memrefs among them. Lean's imports follow upstream's `SC0108`
+   and `SC0110`, an unknown module is refused at the import, and of two imports that bind one
+   name from one module the first is kept. Next is native `std.opcodes`. Then the remaining
+   import differences follow upstream: `SC0117`, `SC0120` for unused names, `SC0121` and the
+   export checks.
 
 ### Then
 
@@ -179,10 +181,10 @@ code.
 | — | `msgSender` (#142) and contract-declared struct state (#138) | **Nothing to do.** #142 uses std's existing `msgSender` in examples, and #138 changes only examples. | `msg-context` |
 | 8 | Re-pin to `d1b5ac28` (#146, #155; #147 and #148 change only the playground) | **Done.** Upstream's Hull format and backends are unchanged, so the importer and the harness took only the new commit, and every existing expectation holds. | `abi-layout-through-reexport` (new), `superclass-default-through-subtrait` (new), `abi-raw-default-codec` (6 → 8 calls), `abi-word-custom-codec` |
 | 9 | Impl method constraints (`81afb96b`, `SC0249`): each constraint of an impl method is one of its trait method's, its impl's conditions or its head's direct superclasses, and an entailed one is refused | **Done.** Lean accepts the omitted, reordered, repeated and restated constraints that its equality refused, and refuses an undeclared or entailed one, as upstream does. The method's body sees only its declared constraints. | uitest `impl_method_extra_constraint` |
-| 10 | No default for a type-parameter goal (`1c7fe983`, `SC0207`) | **Done.** Lean's checker refuses a generic whose body needs a default for a goal on its type parameter, or on a product whose first component is one, called or not, and accepts the goal from a `where` predicate, as upstream does. Where Lean's search lacks upstream's givens below the top or its superclass projection, it keeps the default it used before rather than refuse what upstream accepts. | uitest `default_not_used_for_type_parameter`, `default_not_used_for_tuple_of_type_parameter` |
+| 10 | No default for a type-parameter goal (`1c7fe983`, `SC0207`) | **Done.** Lean's checker refuses a generic whose body needs a default for a goal on its type parameter, or on a product whose first component is one, called or not, and accepts the goal from a `where` predicate, as upstream does. Where Lean's search lacks upstream's superclass projection, it keeps the default it used before rather than refuse what upstream accepts. | uitest `default_not_used_for_type_parameter`, `default_not_used_for_tuple_of_type_parameter` |
 | 11 | Overlapping unconditional defaults (`4f22ddb0`, `SC0247`) | **Done.** Lean refuses a default implementation whose subject unifies with an earlier default of the same trait when either has no `where` predicates, comparing only subjects, as upstream's `SC0247` does. Two conditional defaults, a default with an ordinary implementation, and defaults whose subjects don't unify stay accepted. | uitest `overlapping_unconditional_default` |
 | 12 | The orphan rule (`02456cee`, `282cb2c8`, `SC0246`): an impl sits next to its trait or its type, std counting as one unit and a tuple as its first element | **Done.** Lean refuses an implementation that sits neither in its trait's module nor in the module of the type at its subject's head, a product counting as its first component, nor in a module that sees that module and is seen by it through imports and re-exports, as upstream's `SC0246` does. Two tests now implement the imported trait for the consumer's own type. Upstream's two `invokable` uitests have no Lean form. | uitest `orphan_*`; the six rewritten e2e fixtures |
-| 13 | Superclass obligations (`6e3c4d3c`, `7bdd9a0a`, `SC0248`): each impl proves its superclasses at declaration, and a given entails its superclasses | **To follow, measured first.** Lean restates superclass predicates in each impl and never projects. It will refuse an impl whose superclass has no impl, and accept the impls without the restatement and the projections that it refuses today. | `superclass-default-through-subtrait`; uitest `missing_superclass_instance`; the solver fixtures |
+| 13 | Superclass obligations (`6e3c4d3c`, `7bdd9a0a`, `SC0248`): each impl proves its superclasses at declaration, and a given entails its superclasses | **In progress.** Lean's trait search decides a goal equal to one of the body's `where` predicates by that given at any depth, before any impl, as upstream ranks its local givens. Lean still restates superclass predicates in each impl and never projects. Once its default tier follows upstream's, it will refuse an impl whose superclass has no impl, and accept the impls without the restatement and the projections that it refuses today. | `superclass-default-through-subtrait`; uitest `missing_superclass_instance`; the solver fixtures |
 | — | Impls through re-exports (`9286baea`), std's generic impls (`ad8f003f`), `SC0416` (`86d7bc02`), derive checks (`ba16e8e5`) | **Nothing to do.** Lean's impls are visible everywhere, so neither re-export visibility nor a goal with two impls in different places arises. std's changes reach the importer through the Hull. Lean ignores `#[derive]`, so `SC0230`'s check waits for derive itself. | `abi-layout-through-reexport` |
 
 The new `evm-word-boundaries` fixture checks the `word` operations at their extremes, which the

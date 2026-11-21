@@ -102,7 +102,7 @@ Premises matter: several results are conditional on purpose.
 | `StructuralSubstitution.BodyHasType.applyParameters`, `FlexibleSubstitution.BodyHasType.applySubstitution`, `Dynamic.FunctionInstantiates.hasType` | Typing survives rigid and flexible substitution; an instantiated body has its substituted type | Inference soundness, preservation |
 | `programWellFormed_ofCheckProgram_statements` | Checker success and statement typing of every body give `ProgramWellFormed` | Core lowering's test fixtures build `wellFormed` with it |
 | `SourceInferenceSoundness.programWellFormed_ofCheckProgram_inferStatementsFuel_sound`, `programHasStages_ofCheckProgram_and_analysis` | The same from inference, with one premise left open, `SourceInferenceSoundness.InferStatementsFuelSoundness`; with it and a successful stage analysis of every body, the program has stages | — |
-| `TraitResolutionSoundness.resolve_success_evidenceValid` | A successful resolution gives valid evidence | `Internal/Callable` of Core lowering |
+| `TraitResolutionSoundness.resolve_success_evidenceValid` | A successful resolution gives evidence that is valid under its givens | `Internal/Callable` of Core lowering |
 | `SourceStageAnalysisSoundness.analyzeFunction_success_hasStages_of_wellFormed` | Stage analysis establishes the declarative stages | `Internal/RecursiveNamed` of Core lowering |
 | `SourceCompiledActualInitializerBarriers.compile_cached_bodies` | A successful compilation with an artifact gives validity of every cached body. No other premise | `PublicSessions` of Core lowering |
 | `CaptureBinders.copiedBinder?` | The copy decision of closures | The native lowering, Core lowering |
