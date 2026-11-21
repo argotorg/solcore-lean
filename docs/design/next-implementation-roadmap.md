@@ -76,7 +76,7 @@ obligations. None follows from agreement in a test corpus.
   ([the upstream table](#following-upstreams-semantics-the-next-units)).
 - **Lean's native frontend as a fourth path**: the harness and the fuzz driver's `native` run kind
   compare the admitted pure cases with direct Core, memory arrays with their slices and memrefs
-  among them. Native `std.opcodes` is next.
+  among them. Native `std.opcodes` is under way.
 
 ### Open
 
@@ -113,26 +113,30 @@ The last two are recorded without investigation, and the generators avoid them.
 
 ### Now
 
-1. **Upstream's new trait coherence rules** (row 13). The re-pin and rows 9 to 12 are done, and
-   Lean's trait search takes a goal from a body's `where` predicates at any depth. Next, Lean
-   uses no default once an ordinary impl's head matches the goal, which the rest of row 13
-   builds on: a `where` predicate then gives its superclasses, and each impl proves its
-   superclasses at its declaration (`SC0248`) instead of restating them. Lean keeps ignoring
-   `#[derive]`. Then Lean follows upstream in three more places:
+1. **Upstream's new trait coherence rules** (row 13). The re-pin and rows 9 to 12 are done.
+   Lean's trait search takes a goal from a body's `where` predicates at any depth, and uses no
+   default once an ordinary impl's head can describe the goal. Next, a `where` predicate gives
+   its superclasses, and each impl proves its superclasses at its declaration (`SC0248`)
+   instead of restating them. A superclass that two different `where` predicates reach is then
+   ambiguous where it is used, as upstream reports it (`SC0208`), so a `where` clause no longer
+   states a superclass beside its subclass. Lean keeps ignoring `#[derive]`. Then Lean follows
+   upstream in three more places:
    - a match's exhaustiveness: today Lean counts constructors only for a scrutinee of a nominal
      type, so an exhaustive match over a pair needs a `_` arm;
    - a literal `lidx` index, which gets `uint256` as a read's index does;
    - the Patterson, coverage and closed-default conditions (`SC0213`, `SC0212`, `SC0219`), with
      upstream's two pragmas.
-2. **Meaning proofs.** Row 1's leftovers: `<<=`, `>>=` and in-place `~` at the twelve types
+2. **Meaning proofs.** Row 1's leftover: in-place `~` at the twelve types
    ([what remains](integer-types-unchecked-shifts.md#what-remains)). Then the rest of native
    Source goal two.
 3. **Lean's native frontend as a fourth differential path.** The harness runs the admitted pure
    cases through the native pipeline, alone or as the fuzz driver's `native` run kind, memory
    arrays with their slices and memrefs among them. Lean's imports follow upstream's `SC0108`
    and `SC0110`, an unknown module is refused at the import, and of two imports that bind one
-   name from one module the first is kept. Next is native `std.opcodes`. Then the remaining
-   import differences follow upstream: `SC0117`, `SC0120` for unused names, `SC0121` and the
+   name from one module the first is kept. The 26 pure functions of `std.opcodes` are builtins
+   that no name reaches yet. Next, Lean's imports follow upstream's `SC0117`, `SC0120` for
+   unused names and `SC0121`. Then come the `std.opcodes` module with its selected, aliased and
+   wildcard imports, the harness's next admission, qualified access to the module, and the
    export checks.
 
 ### Then
@@ -171,7 +175,7 @@ code.
 
 | Row | Upstream change | Status | Fixtures |
 | ---: | --- | --- | --- |
-| 1 | Checked integer types and literal defaulting (#95): `uint8` to `uint256` and `int8` to `int256`, checked `+ - * / %` that panic with `0x11` or `0x12`, unary negation, range-checked literals, ABI validation of narrow integers, and an unconstrained literal defaulting to `uint256` instead of `word` | **Done.** The twelve types are builtins with comparisons, bitwise operators, checked and unchecked arithmetic, shifts and their compound forms, range-checked literals, the `uint256` default, the constructors from `word`, and `Typedef.abs` and `Typedef.rep` where the call's type is known. `<<=`, `>>=` and in-place `~` at the twelve types are compiled but outside the meaning proofs, and four differences from upstream remain ([integer note](integer-types-unchecked-shifts.md#semantics-in-lean), [differences](integer-types-unchecked-shifts.md#differences-from-upstream)). | `checked-arith`, `int-ops`, `issue92-checked-defaults`, `shift-operators`, `mini-erc20`, `deposit` |
+| 1 | Checked integer types and literal defaulting (#95): `uint8` to `uint256` and `int8` to `int256`, checked `+ - * / %` that panic with `0x11` or `0x12`, unary negation, range-checked literals, ABI validation of narrow integers, and an unconstrained literal defaulting to `uint256` instead of `word` | **Done.** The twelve types are builtins with comparisons, bitwise operators, checked and unchecked arithmetic, shifts and their compound forms, range-checked literals, the `uint256` default, the constructors from `word`, and `Typedef.abs` and `Typedef.rep` where the call's type is known. In-place `~` at the twelve types is compiled but outside the meaning proofs, and four differences from upstream remain ([integer note](integer-types-unchecked-shifts.md#semantics-in-lean), [differences](integer-types-unchecked-shifts.md#differences-from-upstream)). | `checked-arith`, `int-ops`, `issue92-checked-defaults`, `shift-operators`, `mini-erc20`, `deposit` |
 | 2 | `unchecked` blocks (#119): `+ - * / %` inside a block resolve to `std.unchecked`'s wrapping instances, lexically | **Done** for `word` and the twelve types. `+ - * / %` and their compound forms wrap to the type's width, and `/ %` panic with `0x12` on a zero divisor ([unchecked blocks](integer-types-unchecked-shifts.md#unchecked-blocks-as-implemented)). | `unchecked-scope`, `shift-operators` |
 | 3 | Shift operators (#129): `<<` and `>>` with `Shl`, `Shr` and `ShiftAmount`, arithmetic `>>` for signed types, no revert, amounts of at least the width giving 0 or -1 | **Done** for `word` and the twelve types: `<<`, `>>`, `<<=` and `>>=` by a `word` or unsigned amount ([shifts](integer-types-unchecked-shifts.md#shifts-as-implemented)). | `shift-operators` |
 | 4 | Memory arrays, slices and panic codes (#145): `T[]`, `new T[](n)` zeroed, `a.length` and methods on any receiver, `a[i]` through a checked `memref`, read-only slices `a[s:e]`, memory arrays in the public ABI, `Panic(0x32)` for indices and slice bounds, `Panic(0x31)` for an empty pop, `Panic(0x41)` for allocation overflow | **Done for memory arrays in functions.** `T[]`, `new`, literals, reads, element writes and compound assignments, lengths, slices, `toArray(s)`, `memref<T>`, `lidx(a, i)`, `CanStore.load(r)` and `CanStore.store(r, v)` are typed, have their source semantics and compile through the compatible profile, outside the meaning proofs. A compound assignment evaluates its element place once, by the user's decision, where upstream evaluates it twice. Storage and calldata arrays and `T[]` in the ABI wait for native contract storage and a calldata ABI ([memory arrays note](memory-arrays-slices.md), [differences](memory-arrays-slices.md#differences-from-upstream-that-lean-would-keep)). | `array-syntax`, `mem-array`, `array-slice`, `calldata-slice`, `memory-array-abi`, `user-collection-index`, `memory-allocation-bounds`, `allocator-bounds`, `abi-sum-padding`, `array-ops` |
@@ -184,7 +188,7 @@ code.
 | 10 | No default for a type-parameter goal (`1c7fe983`, `SC0207`) | **Done.** Lean's checker refuses a generic whose body needs a default for a goal on its type parameter, or on a product whose first component is one, called or not, and accepts the goal from a `where` predicate, as upstream does. Where Lean's search lacks upstream's superclass projection, it keeps the default it used before rather than refuse what upstream accepts. | uitest `default_not_used_for_type_parameter`, `default_not_used_for_tuple_of_type_parameter` |
 | 11 | Overlapping unconditional defaults (`4f22ddb0`, `SC0247`) | **Done.** Lean refuses a default implementation whose subject unifies with an earlier default of the same trait when either has no `where` predicates, comparing only subjects, as upstream's `SC0247` does. Two conditional defaults, a default with an ordinary implementation, and defaults whose subjects don't unify stay accepted. | uitest `overlapping_unconditional_default` |
 | 12 | The orphan rule (`02456cee`, `282cb2c8`, `SC0246`): an impl sits next to its trait or its type, std counting as one unit and a tuple as its first element | **Done.** Lean refuses an implementation that sits neither in its trait's module nor in the module of the type at its subject's head, a product counting as its first component, nor in a module that sees that module and is seen by it through imports and re-exports, as upstream's `SC0246` does. Two tests now implement the imported trait for the consumer's own type. Upstream's two `invokable` uitests have no Lean form. | uitest `orphan_*`; the six rewritten e2e fixtures |
-| 13 | Superclass obligations (`6e3c4d3c`, `7bdd9a0a`, `SC0248`): each impl proves its superclasses at declaration, and a given entails its superclasses | **In progress.** Lean's trait search decides a goal equal to one of the body's `where` predicates by that given at any depth, before any impl, as upstream ranks its local givens. Lean still restates superclass predicates in each impl and never projects. Once its default tier follows upstream's, it will refuse an impl whose superclass has no impl, and accept the impls without the restatement and the projections that it refuses today. | `superclass-default-through-subtrait`; uitest `missing_superclass_instance`; the solver fixtures |
+| 13 | Superclass obligations (`6e3c4d3c`, `7bdd9a0a`, `SC0248`): each impl proves its superclasses at declaration, and a given entails its superclasses | **In progress.** Lean's trait search decides a goal equal to one of the body's `where` predicates by that given at any depth, before any impl, as upstream ranks its local givens. It uses no default once a non-default impl's head can describe the goal, whether that impl's conditions hold or not. Lean still restates superclass predicates in each impl and never projects. It will refuse an impl whose superclass has no impl and a superclass use that two different `where` predicates reach (`SC0208`), and accept the impls without the restatement and the projections that it refuses today. | `superclass-default-through-subtrait`; uitest `missing_superclass_instance`; the solver fixtures |
 | — | Impls through re-exports (`9286baea`), std's generic impls (`ad8f003f`), `SC0416` (`86d7bc02`), derive checks (`ba16e8e5`) | **Nothing to do.** Lean's impls are visible everywhere, so neither re-export visibility nor a goal with two impls in different places arises. std's changes reach the importer through the Hull. Lean ignores `#[derive]`, so `SC0230`'s check waits for derive itself. | `abi-layout-through-reexport` |
 
 The new `evm-word-boundaries` fixture checks the `word` operations at their extremes, which the

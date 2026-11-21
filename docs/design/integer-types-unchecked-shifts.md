@@ -163,8 +163,8 @@ rejected before the body runs, as a data-conversion error: the counterpart of st
 
 **Meaning proofs.** The operators, literals, unary minus and `case uint256(p)` at the twelve types
 are inside the meaning proofs, and so, on the accepted-body route, are the conversions. So are
-compound assignments at fixed-width targets, except `<<=` and `>>=`. Those two and in-place `~`
-there are compiled but outside them.
+compound assignments at fixed-width targets, `<<=` and `>>=` included. In-place `~` there is
+compiled but outside them.
 
 **Tests.** `Tests.SourceCoreShiftExecution` and `Tests.SourceCoreUncheckedExecution` run shifts
 and blocks through the public API. `runUpstreamFixtures` in `Tests.SourceCoreFixedIntegerOperators`
@@ -457,10 +457,11 @@ inside the meaning proofs (`BinaryProfile.fixedDivision`).
   `wordShl` then the type's wrap, and `shiftRightBody` runs `wordSar` or `wordShr`. `BinaryProfile`
   has `wordShift` and `fixedShift`, so the fixed-width shifts are in the meaning proofs.
 - **Compound shifts** type as upstream's rewrite to `x = x << n` types them
-  (`SourceAssignmentHasType.shiftCompound`). At a fixed-width target they write back through the
-  leaf wrap, outside the meaning proofs. A `Word` target stays in them with an amount of its own
-  type, through `AssignedRhsView`, so `w <<= 3`, whose amount is a `uint256`, passes the statement
-  shape check.
+  (`SourceAssignmentHasType.shiftCompound`). At a fixed-width target `<<=` writes back through
+  the leaf wrap, and `>>=` without one. At both a `Word` and a fixed-width target the amount
+  keeps its own type, through `AssignedRhsView`, and at a fixed-width target it need not be
+  canonical for the target's type (`fixedShiftAmount`). So `w <<= 3` and a `uint8` `r <<= 1`,
+  whose amounts are `uint256`, pass the statement shape check.
 
 ### Row 1's in-place `~`: the target keeps its type
 
@@ -563,10 +564,8 @@ struct types, such as `case uint8(w)`, are rejected as upstream rejects them.
 
 ## What remains
 
-- **Meaning proofs.** Two parts are compiled but outside the meaning proofs:
-  - `<<=` and `>>=` at fixed-width targets, which wrap the leaf (`placeWrap`), since
-    `FixedCompoundAssignmentOperator` has no shifts;
-  - in-place `~` at fixed-width targets, whose compiler profiles take only a `Word` target.
+- **Meaning proofs.** One part is compiled but outside the meaning proofs: in-place `~` at
+  fixed-width targets, whose compiler profiles take only a `Word` target.
 - **Deferred `Typedef` resolution** at finalization (option A). It is not scheduled.
 - **`where` with the builtin `Int`**, a frontend gap older than row 1.
 - **Generic code**, such as `Typedef`'s identity at other types, which row 1 leaves out.

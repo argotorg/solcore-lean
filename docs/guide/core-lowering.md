@@ -137,9 +137,10 @@ Build the umbrella and work up from the lowest failing file: its importers fail 
     (`placeWrap`) and the operator's checks in `guard`
     ([design note](../design/integer-types-unchecked-shifts.md#row-1s-compound-assignments-checked-at-the-guard),
     [why the wrap belongs to the leaf](../design/integer-types-unchecked-shifts.md#row-1s-unchecked-compound-assignments-the-wrap-belongs-to-the-leaf)).
-    The meaning proofs take them through `FixedCompoundAssignment`, except `<<=` and `>>=`,
-    which `FixedCompoundAssignmentOperator` leaves out. A `Word` target's `<<=` and `>>=` are
-    inside, with an amount of its own type (`AssignedRhsView`).
+    The meaning proofs take them through `FixedCompoundAssignment`, whose operators include
+    `<<=` and `>>=` (`ShiftCompoundAssignmentOperator`). A shift's amount keeps its own type at a
+    `Word` target and at a fixed-width one (`AssignedRhsView`), and the place pipelines read it
+    there (`CompatiblePlaceModifier.assigned_outcome`).
   - Public-API tests go in `Foundations/Execution`. The `example` in
     `Tests.SourceCorePrimitiveExpressions` (`Foundations/Statements`) runs every
     `StrictBinaryOperator` through `PrimitiveExpressions.lowerExpression_preserves`.
@@ -153,6 +154,11 @@ Build the umbrella and work up from the lowest failing file: its importers fail 
 - **A new builtin function**, such as the conversions `uint256(w)`, `uintN(w)` and `intN(w)`. A
   builtin that is not a closure stays out of `BuiltinFunctionId.all`, so no program's globals,
   callable table or closure identities change, and `lowerExpressionWithPolicy` lowers it inline.
+  A closure builtin, such as the 26 pure word functions of `std.opcodes`
+  (`BuiltinFunctionId.wordOpcode`), is appended to `BuiltinFunctionId.all`: every program's
+  callable table gains its entry, each indirect callsite's dispatch gains a gate for it, and the
+  identities after the builtins shift. Its meaning is a `Dynamic.BuiltinApplies` constructor, and
+  its body's cases join `BuiltinBodyMeaning.InputRep`.
   On the accepted-body route the conversions are nested sites
   (`CellAwareInvocationAcceptedConversionSites.of_accepted`); the older families' builtin calls
   still take `function.conversion? = none` (`BuiltinCalls.call_of_accepted`).
