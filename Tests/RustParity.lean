@@ -53,6 +53,7 @@ private def loadStage : ProgramLoadError → String
   | .pragmaSolcore _ _ => "parsing"
   | .uncheckedBlock _ _ => "unchecked-blocks"
   | .environment _ => "name-resolution"
+  | .imports _ => "imports"
 
 private def checkStage : ProgramCheckError → String
   | .loading error => loadStage error

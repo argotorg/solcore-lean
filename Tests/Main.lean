@@ -67,6 +67,7 @@ import Solcore.SourceSemantics.CoreLowering
 import Solcore.Test.Resolved.Semantics
 import Solcore.Test.Frontend.PublicBoundary
 import Solcore.Test.Frontend.Programs
+import Solcore.Test.Frontend.ImportParity
 import Solcore.Test.Frontend.LocalExpressions
 import Solcore.Test.Frontend.WordOperators
 import Solcore.Test.Core.LocalFragments
@@ -1016,6 +1017,7 @@ def staticSemanticsSpineTests : IO Unit := do
   testProgramTypeAliases
   testProgramInterfaces
   testProgramImports
+  Tests.ImportParity.testImportParity
   Tests.ImportedResolutionConsumers.testImportedResolutionConsumers
   testProgramLoading
   TypedTraitResolution.testTypedTraitResolution

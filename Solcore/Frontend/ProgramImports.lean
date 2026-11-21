@@ -256,43 +256,77 @@ private def addWildcardDeclarations
   values := visibility.values ++ values
 }
 
-private def addSelectedDeclarations
-    (visibility : ProgramImports) (selected : SelectedDeclarations) :
-    ProgramImports :=
-  addWildcardDeclarations visibility selected.types selected.traits
-    selected.values
+/-- A local name an earlier import declaration bound, with its import group
+(`ProgramDeclarationNamespace.importGroup`) and the module it came from. -/
+private structure EarlierBinding where
+  localName : String
+  group : ProgramDeclarationNamespace
+  target : Workspace.ModuleId
+
+/-- Whether an earlier import declaration bound this local name in the declaration's group from
+the same module. Upstream keeps that first binding and ignores the later one; the same name from
+another module is upstream's `SC0120`, which stays an ambiguity here. -/
+private def boundEarlier (earlier : List EarlierBinding) (target : Workspace.ModuleId)
+    (localName : String) (declaration : ProgramDeclaration) : Bool :=
+  match declaration.nameSpace with
+  | none => false
+  | some nameSpace => earlier.any fun binding =>
+      binding.localName == localName && binding.group == nameSpace.importGroup &&
+        decide (binding.target = target)
+
+private def bindingOf (target : Workspace.ModuleId) (localName : String)
+    (declaration : ProgramDeclaration) : Option EarlierBinding :=
+  declaration.nameSpace.map fun nameSpace =>
+    { localName, group := nameSpace.importGroup, target }
+
+/-- One import declaration's rows, less those an earlier declaration bound from the same
+module, and the bindings all of its rows make. -/
+private def keepFirstBindings (earlier : List EarlierBinding) (target : Workspace.ModuleId)
+    (types : List ProgramImportedType) (traits : List ProgramImportedTrait)
+    (values : List ProgramImportedValue) :
+    (List ProgramImportedType × List ProgramImportedTrait × List ProgramImportedValue) ×
+      List EarlierBinding :=
+  ((types.filter fun row => !boundEarlier earlier target row.localName row.declaration,
+    traits.filter fun row => !boundEarlier earlier target row.localName row.declaration,
+    values.filter fun row => !boundEarlier earlier target row.localName row.declaration),
+   types.filterMap (fun row => bindingOf target row.localName row.declaration) ++
+     traits.filterMap (fun row => bindingOf target row.localName row.declaration) ++
+     values.filterMap (fun row => bindingOf target row.localName row.declaration))
 
 private def processImport
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
-    (importer : Workspace.ModuleId)
+    (importer : Workspace.ModuleId) (earlier : List EarlierBinding)
     (visibility : ProgramImports) (declaration : Syntax.ImportDecl) :
-    List ProgramImportError × ProgramImports :=
+    List ProgramImportError × ProgramImports × List EarlierBinding :=
   match declaration.value with
   | .plain path =>
       match resolveProgramImportModule environment importer path with
-      | .error error => ([error], visibility)
+      | .error error => ([error], visibility, [])
       | .ok target =>
-          ([], addNamespace visibility (defaultNamespaceName path) target)
+          ([], addNamespace visibility (defaultNamespaceName path) target, [])
   | .namespace path alias =>
       match resolveProgramImportModule environment importer path with
-      | .error error => ([error], visibility)
-      | .ok target => ([], addNamespace visibility alias.value target)
+      | .error error => ([error], visibility, [])
+      | .ok target => ([], addNamespace visibility alias.value target, [])
   | .wildcard path hidingClause =>
       match resolveProgramImportModule environment importer path with
-      | .error error => ([error], visibility)
+      | .error error => ([error], visibility, [])
       | .ok target =>
           let hidden := hiddenSelectorNames hidingClause
-          ([], addWildcardDeclarations visibility
+          let ((types, traits, values), bindings) := keepFirstBindings earlier target
             (wildcardTypes interfaces target hidden)
             (wildcardTraits interfaces target hidden)
-            (wildcardValues interfaces target hidden))
+            (wildcardValues interfaces target hidden)
+          ([], addWildcardDeclarations visibility types traits values, bindings)
   | .selected selection path hidingClause =>
       match resolveProgramImportModule environment importer path with
-      | .error error => ([error], visibility)
+      | .error error => ([error], visibility, [])
       | .ok target =>
           let selected := selectedDeclarationsList interfaces importer target
             (hiddenSelectorNames hidingClause) selection.elements.toList
-          (selected.errors, addSelectedDeclarations visibility selected)
+          let ((types, traits, values), bindings) := keepFirstBindings earlier target
+            selected.types selected.traits selected.values
+          (selected.errors, addWildcardDeclarations visibility types traits values, bindings)
 
 private def importsInModule (module : ProgramModule) : List Syntax.ImportDecl :=
   module.source.items.filterMap fun item =>
@@ -305,13 +339,18 @@ private def buildProgramImportsFrom
     (importer : Workspace.ModuleId)
     (declarations : List Syntax.ImportDecl) :
     List ProgramImportError × ProgramImports :=
-  declarations.foldl (fun result declaration =>
-    let next := processImport environment interfaces importer result.2 declaration
-    (result.1 ++ next.1, next.2))
+  let result := declarations.foldl
+      (fun (result : List ProgramImportError × ProgramImports × List EarlierBinding)
+        declaration =>
+    let (errors, visibility, earlier) := result
+    let (next, nextVisibility, bindings) :=
+      processImport environment interfaces importer earlier visibility declaration
+    (errors ++ next, nextVisibility, earlier ++ bindings))
     ([], {
       hasImports := !declarations.isEmpty
       publicInterfaces := interfaces
-    })
+    }, [])
+  (result.1, result.2.1)
 
 /-- Build public-interface-backed visibility for one program module.
 Scopes not owned by the environment retain the old empty-import behavior. -/

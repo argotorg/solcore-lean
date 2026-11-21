@@ -45,6 +45,13 @@ inductive ProgramDeclarationNamespace where
   | value
   deriving Repr, BEq, DecidableEq
 
+/-- The namespace in which an import meets a declaration or an earlier import, as
+upstream's: values apart, and types, enums, contracts and traits together. -/
+def ProgramDeclarationNamespace.importGroup :
+    ProgramDeclarationNamespace → ProgramDeclarationNamespace
+  | .value => .value
+  | .type | .trait => .type
+
 /-- One parsed top-level declaration with its stable whole-program identity. -/
 structure ProgramDeclaration where
   id : Resolved.DeclarationId
@@ -911,6 +918,13 @@ inductive ProgramInterfaceError where
       (owner : Workspace.ModuleId)
       (typeName constructorName : String)
   | fixedPointExhausted
+  /-- A selected or wildcard import that brings a name a declaration of the importing module
+  has in the same import group (`ProgramDeclarationNamespace.importGroup`), as upstream's
+  `SC0108` refuses it. -/
+  | importedNameConflict
+      (owner : Workspace.ModuleId)
+      (nameSpace : ProgramDeclarationNamespace)
+      (name : String)
   deriving Repr, DecidableEq
 
 namespace ProgramDeclaration
@@ -1186,15 +1200,54 @@ private def importsIn (module : ProgramModule) : List Syntax.ImportDecl :=
     | .importDecl declaration => some declaration
     | _ => none
 
+private def importPath (declaration : Syntax.ImportDecl) : Syntax.ModulePath :=
+  match declaration.value with
+  | .plain path | .namespace path _ | .wildcard path _ | .selected _ path _ => path
+
+/-- A local name an earlier import declaration bound, with its import group and the module
+it came from. -/
+private structure EarlierImport where
+  localName : String
+  group : ProgramDeclarationNamespace
+  target : Workspace.ModuleId
+
+private def VisibleEntity.importGroup? (entity : VisibleEntity) :
+    Option ProgramDeclarationNamespace :=
+  entity.declaration.nameSpace.map ProgramDeclarationNamespace.importGroup
+
+/-- Whether an earlier import declaration bound this entity's local name in its group from the
+same module. Upstream keeps that first binding and ignores the later one; the same name from
+another module is upstream's `SC0120`, which stays an ambiguity here. -/
+private def boundEarlier (earlier : List EarlierImport) (target : Workspace.ModuleId)
+    (entity : VisibleEntity) : Bool :=
+  match entity.importGroup? with
+  | none => false
+  | some group => earlier.any fun binding =>
+      binding.localName == entity.localName && binding.group == group &&
+        decide (binding.target = target)
+
+private def earlierImports (target : Workspace.ModuleId)
+    (entities : List VisibleEntity) : List EarlierImport :=
+  entities.filterMap fun entity => entity.importGroup?.map fun group =>
+    { localName := entity.localName, group, target }
+
+/-- The module's imported visibility: each import declaration's entities, less those whose local
+name an earlier declaration bound from the same module. One declaration's own candidates, an
+overload set among them, all stay. -/
 private def importedVisibility
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (module : ProgramModule) : VisibilityResult :=
-  (importsIn module).foldl (fun result declaration =>
+  let result := (importsIn module).foldl
+      (fun (state : VisibilityResult × List EarlierImport) declaration =>
     let next := processImport environment interfaces module.id declaration
-    {
-      entities := mergeVisible result.entities next.entities
-      errors := result.errors ++ next.errors
-    }) {}
+    match resolveProgramModulePath? environment module.id (importPath declaration) with
+    | none => ({ state.1 with errors := state.1.errors ++ next.errors }, state.2)
+    | some target =>
+        let kept := next.entities.filter fun entity => !boundEarlier state.2 target entity
+        ({ entities := mergeVisible state.1.entities kept
+           errors := state.1.errors ++ next.errors },
+          state.2 ++ earlierImports target next.entities)) ({}, [])
+  result.1
 
 private def localEntities
     (environment : ProgramEnvironment) (moduleId : Workspace.ModuleId) :
@@ -1207,6 +1260,26 @@ private def localEntities
         constructors := declaration.localConstructorVisibility
       }
     | _, _ => none
+
+/-- Upstream's `SC0108` for imports: each name that a selected or wildcard import brings, and
+that a declaration of the module has in the same import group, once per group and name, in
+import order. Hidden names and constructors are not brought, so they meet nothing. -/
+private def importConflicts
+    (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
+    (module : ProgramModule) (locals : List VisibleEntity) :
+    List ProgramInterfaceError :=
+  let imported := (importsIn module).flatMap fun declaration =>
+    (processImport environment interfaces module.id declaration).entities
+  let clashes := imported.filterMap fun entity => do
+    let group ← entity.importGroup?
+    if locals.any (fun declared => declared.localName == entity.localName &&
+        declared.importGroup? == some group &&
+        !decide (declared.declaration.id = entity.declaration.id)) then
+      some (group, entity.localName)
+    else none
+  let unique := clashes.foldl (fun seen clash =>
+    if seen.contains clash then seen else seen ++ [clash]) []
+  unique.map fun (group, name) => .importedNameConflict module.id group name
 
 private def visibleNamed
     (locals imported : List VisibleEntity) (name : String) : List VisibleEntity :=
@@ -1426,7 +1499,8 @@ private def moduleContribution
       (fun (contribution : Contribution) declaration =>
     processExport environment interfaces module locals imported.entities
       contribution declaration) ({} : Contribution)
-  { exported with errors := imported.errors ++ exported.errors }
+  { exported with errors := imported.errors ++
+      importConflicts environment interfaces module locals ++ exported.errors }
 
 private def closureRound
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces) :
@@ -1572,6 +1646,10 @@ inductive ProgramLoadError where
       (source : Workspace.SourceId)
       (error : Syntax.Unchecked.Error)
   | environment (error : ProgramEnvironmentError)
+  /-- Imports that upstream refuses where they are: an unknown module, an unknown selected or
+  hidden item (`SC0110`), and a name an import brings beside a declaration of the module
+  (`SC0108`) (`programImportErrors`). -/
+  | imports (errors : List ProgramInterfaceError)
   deriving Repr
 
 /-- Convert a canonical workspace library into its parser-visible owner. -/
@@ -1626,14 +1704,41 @@ private def parseWorkspaceFiles :
       | .ok source => (restErrors, source :: restSources)
       | .error error => (error :: restErrors, restSources)
 
-/-- Parse and catalog an already validated workspace. -/
+/-- The modules of upstream's std at the pinned commit (`d1b5ac28`), by path components. Lean
+has none of them, so an import of one is accepted where it is, as upstream accepts it, and is
+refused only where a name resolves through it (`buildProgramImports`). -/
+def upstreamStandardModulePaths : List (List String) :=
+  [["std"], ["std", "ABIGeneric"], ["std", "Generic"], ["std", "StorageGeneric"],
+    ["std", "dispatch"], ["std", "eip712"], ["std", "eip7951"], ["std", "opcodes"],
+    ["std", "signed"], ["std", "unsigned"], ["std", "unchecked", "signed"],
+    ["std", "unchecked", "unsigned"]]
+
+/-- Whether a load reports an interface error where the import is, as upstream reports it: an
+unknown module other than one of upstream's std modules, an unknown selected or hidden item,
+and an import beside a declaration. The other errors are reported where a name resolves. -/
+def ProgramInterfaceError.reportedAtLoad : ProgramInterfaceError → Bool
+  | .unknownModule _ components => !upstreamStandardModulePaths.contains components
+  | .unknownImportName _ _ _ | .importedNameConflict _ _ _ => true
+  | .unknownExportName _ _ | .unknownExportConstructor _ _ _ | .fixedPointExhausted => false
+
+/-- The import errors of a program that its load reports, in `buildProgramInterfaces`' order. -/
+def programImportErrors (environment : ProgramEnvironment) : List ProgramInterfaceError :=
+  match buildProgramInterfaces environment with
+  | .ok _ => []
+  | .error errors => errors.filter ProgramInterfaceError.reportedAtLoad
+
+/-- Parse and catalog an already validated workspace, and refuse the imports upstream refuses
+where they are. -/
 def loadValidatedProgram
     (workspace : Workspace.ValidatedUserWorkspace) :
     Except (List ProgramLoadError) LoadedProgram :=
   let (parseErrors, sources) := parseWorkspaceFiles workspace.files
   if parseErrors.isEmpty then
     match buildProgramEnvironment sources with
-    | .ok environment => .ok { workspace, sources, environment }
+    | .ok environment =>
+        match programImportErrors environment with
+        | [] => .ok { workspace, sources, environment }
+        | errors => .error [.imports errors]
     | .error errors => .error (errors.map ProgramLoadError.environment)
   else
     .error parseErrors
@@ -1660,9 +1765,13 @@ theorem loadValidatedProgram_success_environment
         cases environmentResult : buildProgramEnvironment sources with
         | error errors => simp [environmentResult] at success
         | ok environment =>
-            simp only [environmentResult, Except.ok.injEq] at success
-            subst loaded
-            exact environmentResult
+            cases importErrors : programImportErrors environment with
+            | nil =>
+                simp only [environmentResult, importErrors, Except.ok.injEq] at success
+                subst loaded
+                exact environmentResult
+            | cons error rest =>
+                simp [environmentResult, importErrors] at success
       · simp [noParseErrors] at success
 
 /-- A successful raw-workspace load likewise exposes the exact environment

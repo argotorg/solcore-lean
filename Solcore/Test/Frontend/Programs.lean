@@ -2477,7 +2477,7 @@ private def importedEnvironment : IO ProgramEnvironment := do
   let consumer ← parsed .main "consumer.solc" (String.intercalate "\n" [
     "import library.types;",
     "import * as Lib from library.types;",
-    "import * from library.types hiding {Hidden, HiddenTrait, hiddenValue};",
+    "import * from library.types hiding {Hidden, HiddenTrait, hiddenValue, Public};",
     "import {Renamed as Alias, Hidden, Marker, Marker as ChosenTrait, pick, pick as chosen, HiddenTrait as HiddenMarker, hiddenValue as hidden} from library.types hiding {Hidden, HiddenTrait, hiddenValue};",
     "import @dep.external;",
     "import * as Ext from @dep.external;",
@@ -2502,16 +2502,16 @@ private def testVisibilityConstruction : IO Unit := do
   | .ok visibility =>
       assertTrue (decide (visibility.hasImports = true ∧
           visibility.namespaces.length = 4 ∧
-          visibility.types.length = 3 ∧
-          visibility.traits.length = 3 ∧
-          visibility.values.length = 6))
+          visibility.types.length = 2 ∧
+          visibility.traits.length = 2 ∧
+          visibility.values.length = 4))
         "direct import visibility shape changed"
       assertTrue (decide ((visibility.modulesNamed "types").length = 1 ∧
           (visibility.modulesNamed "Lib").length = 1 ∧
           (visibility.modulesNamed "external").length = 1 ∧
           (visibility.modulesNamed "Ext").length = 1))
         "plain or explicit namespace aliases were not retained"
-      assertTrue (decide ((visibility.typesNamed "Public").length = 1 ∧
+      assertTrue (decide ((visibility.typesNamed "Public").isEmpty = true ∧
           (visibility.typesNamed "Renamed").length = 1 ∧
           (visibility.typesNamed "Alias").length = 1 ∧
           (visibility.typesNamed "Hidden").isEmpty = true))
@@ -2556,7 +2556,7 @@ private def testSuccessfulLookup : IO Unit := do
   let shadowed ← resolveAlias environment "consumer" "LocalShadow"
   assertTrue (decide (shadowed = TypeSystem.Ty.nominal localPublic.id [] ∧
       shadowed ≠ TypeSystem.Ty.nominal sourcePublic.id []))
-    "local declaration did not shadow its imported namesake"
+    "a local declaration beside its hidden namesake did not resolve locally"
 
 private def testHiddenAndAmbiguousLookup : IO Unit := do
   let environment ← importedEnvironment
