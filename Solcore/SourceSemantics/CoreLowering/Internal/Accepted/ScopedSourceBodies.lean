@@ -953,7 +953,7 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
         | assignBitNot assignment =>
           obtain ⟨sourceTyped, writable⟩ := projected_bitNot_facts unique declaration route assignment
           apply GenericForHeader.PreparedSyntax.bitNotProjected sourceTyped writable projected route.elementFree
-            (.inl (by rw [profile]; rfl))
+            (.inl (.inl (by rw [profile]; rfl)))
           · intro child member
             obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
             exact ⟨keys child member, node, found, typed⟩
@@ -965,7 +965,7 @@ theorem Scan.syntax {source approved items} (scan : Scan source approved items)
         cases head with
         | assignBitNot assignment =>
           exact .bitNot (bitNot_facts declaration targetType bare assignment) bare
-            (.inl (by rw [profile]; rfl)) (ih tail)
+            (.inl (.inl (by rw [profile]; rfl))) (ih tail)
 
 
 private theorem binder_final {owner : Resolved.DeclarationId} {context left right : SourceSemantics.Context}
@@ -1369,7 +1369,7 @@ theorem Scan.syntax {source approved expected mode statements}
       | assignBitNot assignment =>
         obtain ⟨sourceTyped, writable⟩ := ScopedSourceForItemsAdmission.projected_bitNot_facts unique declaration route assignment
         apply GenericImperativeMatch.PreparedSyntax.bitNotProjected found form sourceTyped writable projected
-          route.elementFree (.inl (by rw [profile]; rfl))
+          route.elementFree (.inl (.inl (by rw [profile]; rfl)))
         · intro child member
           obtain ⟨node, found, typed⟩ := route.key_typed unique (sourceTyped _ declaration) member
           exact ⟨keys child member, node, found, typed⟩
@@ -1383,7 +1383,7 @@ theorem Scan.syntax {source approved expected mode statements}
       | assignBitNot assignment =>
         exact .bitNot found form
           (ScopedSourceForItemsAdmission.bitNot_facts declaration targetType bare assignment)
-          bare (.inl (by rw [profile]; rfl)) (ih result tail)
+          bare (.inl (.inl (by rw [profile]; rfl))) (ih result tail)
 
   | matching found form scrutineeFound value hiddenOrdinary armsOrdinary _ _ _ arms fallback remaining =>
       obtain ⟨middle, headFacts, tailFacts, head, tail⟩ := head_tail typed

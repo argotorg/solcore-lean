@@ -61,15 +61,14 @@ theorem of_lower_with_token {values : ValuesContext} {source : TypedSource} {sit
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (bare : assignment.target.projections = [])
-    (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (profile : WideBitNotProfile assignment.target.type)
     (accepted : lower values values.checked.signatures expression fuel source scope site assignment .equal none
       output next reasonAt invalid invalidOperand missing = .ok code) :
     ∃ head : Head context scope assignment, code = head.emit next output ∧ head.invalid = invalidOperand := by
   obtain ⟨binder, prepared, index, binding, rootEq, view, slot, layout, lowering⟩ :=
-    CompatibleBareBitNotCertificates.of_lower_wide bare (.inl profile) accepted
+    CompatibleBareBitNotCertificates.of_lower_wide bare profile accepted
   exact ⟨⟨prepared, index, invalidOperand, bare, layout, slot, rootEq ▸ writable binder binding,
-    .inl profile, view⟩, lowering, rfl⟩
+    profile, view⟩, lowering, rfl⟩
 
 theorem of_lower {values : ValuesContext} {source : TypedSource} {site : SourceCoreElaboration.ErrorSite}
     {expression : ExpressionLowerer} {fuel : Nat} {next code : Expr} {output : Ty}
@@ -77,8 +76,7 @@ theorem of_lower {values : ValuesContext} {source : TypedSource} {site : SourceC
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (bare : assignment.target.projections = [])
-    (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (profile : WideBitNotProfile assignment.target.type)
     (accepted : lower values values.checked.signatures expression fuel source scope site assignment .equal none
       output next reasonAt invalid invalidOperand missing = .ok code) :
     ∃ head : Head context scope assignment, code = head.emit next output := by
@@ -617,8 +615,7 @@ theorem of_lower {site : SourceCoreElaboration.ErrorSite} {expression : Expressi
       SourceProjectionsHaveType source context binder.scheme.body assignment.target.projections assignment.target.type)
     (nonempty : assignment.target.projections ≠ [])
     (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
-    (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (profile : WideBitNotProfile assignment.target.type)
     (extract : ∀ id lowered, expression fuel source scope id reasonAt = .ok lowered → ∃ node,
       source.lookupExpression? id = some node ∧ certificate scope id lowered)
     (accepted : lower values values.checked.signatures expression fuel source scope site assignment .equal none output
@@ -629,7 +626,7 @@ theorem of_lower {site : SourceCoreElaboration.ErrorSite} {expression : Expressi
   obtain ⟨binder, leaf, prepared, codes, sourceTypes, index, _, binding, rootEq, view, slot, layout, ordinary, _, emitted⟩ :=
     CompatiblePlaceBitNotCertificates.of_lower_wide unique signatures sourceTyped nonempty free extract accepted typed
   exact ⟨⟨prepared, index, codes, leaf, sourceTypes, site, invalidOperand, layout, ordinary, slot,
-    rootEq ▸ writable binder binding, .inl profile, view⟩, emitted, rfl⟩
+    rootEq ▸ writable binder binding, profile, view⟩, emitted, rfl⟩
 
 end Head
 end Solcore.SourceSemantics.CoreLowering.CompatibleProjectedBitNotStatements

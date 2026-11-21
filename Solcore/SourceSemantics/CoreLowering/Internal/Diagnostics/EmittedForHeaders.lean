@@ -120,8 +120,7 @@ def bitNot {context scope assignment rest body}
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (bare : assignment.target.projections = [])
-    (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (profile : WideBitNotProfile assignment.target.type)
     (remaining : ProducedDiagnosticExtraction diagnosticPolicy layouts owner active frame globals onError values source factory certificates definitions administrative type continuation
         context scope rest body) :
     ProducedDiagnosticExtraction diagnosticPolicy layouts owner active frame globals onError values source factory certificates definitions administrative type continuation
@@ -235,8 +234,7 @@ def bitNot {context scope assignment rest body}
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (bare : assignment.target.projections = [])
-    (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (profile : WideBitNotProfile assignment.target.type)
     (site : SourceCoreElaboration.ErrorSite)
     (origin : EmittedDiagnosticTokenPlan.UnaryOccursFor tracked source site assignment)
     (same : head.invalid = invalidUnary site assignment.target.root)
@@ -358,8 +356,7 @@ def bitNot {context scope assignment rest body}
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (bare : assignment.target.projections = [])
-    (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (profile : WideBitNotProfile assignment.target.type)
     (site : SourceCoreElaboration.ErrorSite)
     (origin : EmittedDiagnosticTokenPlan.UnaryOccursFor tracked source site assignment)
     (same : head.invalid = invalidUnary site assignment.target.root)
@@ -463,8 +460,7 @@ inductive Coupled (factory : AssignmentDiagnosticOrigins.Factory tracked diagnos
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       : Coupled factory invalidProjection missingDefault (.bitNot head remaining) (.pair remainingPlan (.unary head writable bare profile))
 
 end Solcore.SourceSemantics.CoreLowering.GenericForHeader
@@ -580,8 +576,7 @@ def bitNot {context scope assignment rest body}
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (bare : assignment.target.projections = [])
-    (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (profile : WideBitNotProfile assignment.target.type)
     (site : SourceCoreElaboration.ErrorSite)
     (origin : EmittedDiagnosticTokenPlan.UnaryOccursFor tracked source site assignment)
     (same : head.invalid = invalidUnary site assignment.target.root)

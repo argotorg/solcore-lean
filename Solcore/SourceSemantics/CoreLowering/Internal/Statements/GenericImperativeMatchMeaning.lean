@@ -159,16 +159,14 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (remaining : Syntax source expressionSyntax context (.statements mode rest) expected) :
       Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
   | initializerBitNot {context assignment rest condition post statements expected}
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (remaining : Syntax source expressionSyntax context (.initializers rest condition post statements) expected) :
       Syntax source expressionSyntax context (.initializers (.assignBitNot assignment :: rest) condition post statements) expected
 
@@ -367,8 +365,7 @@ inductive PreparedSyntax (source : TypedSource) (expressionSyntax : ExpressionId
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) :
       PreparedSyntax source expressionSyntax context (.statements mode (id :: rest)) expected
   | bitNotProjected {context mode id node assignment rest expected}
@@ -379,8 +376,7 @@ inductive PreparedSyntax (source : TypedSource) (expressionSyntax : ExpressionId
         WritableLocal context assignment.target.root binder.scheme.body)
       (projected : assignment.target.projections ≠ [])
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (children : ∀ id, id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections →
         expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
       (remaining : PreparedSyntax source expressionSyntax context (.statements mode rest) expected) :
@@ -389,8 +385,7 @@ inductive PreparedSyntax (source : TypedSource) (expressionSyntax : ExpressionId
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (remaining : PreparedSyntax source expressionSyntax context (.initializers rest condition post statements) expected) :
       PreparedSyntax source expressionSyntax context (.initializers (.assignBitNot assignment :: rest) condition post statements) expected
 
@@ -401,8 +396,7 @@ inductive PreparedSyntax (source : TypedSource) (expressionSyntax : ExpressionId
         WritableLocal context assignment.target.root binder.scheme.body)
       (projected : assignment.target.projections ≠ [])
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (children : ∀ id, id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections →
         expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
       (remaining : PreparedSyntax source expressionSyntax context (.initializers rest condition post statements) expected) :

@@ -1525,10 +1525,10 @@ private theorem booleanSyntax : CompatibleExpressionTyped.Syntax source expressi
   .fragment (.fragment (.fragment (.fragment (.primitive (.product (.literal (node := literal) rfl (.bool _ _)))))))
 private theorem syntaxTree (mode : Bool) : TypedImperativeFor.UnarySyntax source context (.statements mode statements) .bool := by
   apply TypedImperativeFor.UnarySyntax.forLoop (node := loopNode) rfl rfl rfl
-  · apply TypedImperativeFor.UnarySyntax.initializerBitNot rootWritable rfl (.inl rfl)
+  · apply TypedImperativeFor.UnarySyntax.initializerBitNot rootWritable rfl (.inl (.inl rfl))
     apply TypedImperativeFor.UnarySyntax.initializersDone (conditionNode := literal) rfl rfl booleanTyped booleanSyntax
-    · exact .bitNot (node := assigned) rfl rfl rootWritable rfl (.inl rfl) (.breaking (node := breakNode) rfl rfl)
-    · exact .bitNot rootWritable rfl (.inl rfl) .nil
+    · exact .bitNot (node := assigned) rfl rfl rootWritable rfl (.inl (.inl rfl)) (.breaking (node := breakNode) rfl rfl)
+    · exact .bitNot rootWritable rfl (.inl (.inl rfl)) .nil
   · exact .body (.body (.returnValue [] rfl rfl rfl rfl rfl booleanTyped booleanSyntax))
 
 private theorem sourceFlipped (value : Word) : Dynamic.SourcePlaceSnapshotUpdate program context [] source

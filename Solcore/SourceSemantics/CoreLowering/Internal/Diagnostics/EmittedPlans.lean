@@ -315,8 +315,7 @@ inductive Plan (factory : AssignmentDiagnosticOrigins.Factory tracked diagnostic
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer) : Plan factory
+      (profile : WideBitNotProfile assignment.target.type) : Plan factory
   | selected (requests : List GenericMatchChildren.Request) (parent : SourceSemantics.Context)
       (hiddenIds : List Resolved.LocalId) (scrutineeType : TypeSystem.Ty)
       (cases : List TypedMatchCase) (fallback : Option (List StatementId))
@@ -350,8 +349,7 @@ structure LocalReceipts (registry : SourceCoreRawMetadata.Registry) (faults : Fu
     (_writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (_bare : assignment.target.projections = [])
-    (_profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer), head.Errors faults
+    (_profile : WideBitNotProfile assignment.target.type), head.Errors faults
 
 /-- This finite static interpreter follows only the retained diagnostic plan. -/
 theorem interpret {registry : SourceCoreRawMetadata.Registry} {faults : FunctionCalls.FaultRep}
@@ -494,8 +492,7 @@ inductive TokensFor : Plan factory → Prop where
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (site : SourceCoreElaboration.ErrorSite) (origin : UnaryOccursFor tracked source site assignment)
       (same : head.invalid = invalidUnary site assignment.target.root) :
       TokensFor (.unary head writable bare profile)

@@ -1856,16 +1856,14 @@ inductive UnarySyntax (source : TypedSource) :
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (remaining : UnarySyntax source context (.statements mode rest) expected) :
       UnarySyntax source context (.statements mode (id :: rest)) expected
   | initializerBitNot {context assignment rest condition post statements expected}
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (remaining : UnarySyntax source context (.initializers rest condition post statements) expected) :
       UnarySyntax source context (.initializers (.assignBitNot assignment :: rest) condition post statements) expected
 

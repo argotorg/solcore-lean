@@ -59,8 +59,7 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (remaining : Syntax source expressionSyntax context rest) : Syntax source expressionSyntax context (.assignBitNot assignment :: rest)
 
 
@@ -103,8 +102,7 @@ inductive PreparedSyntax (source : TypedSource) (expressionSyntax : ExpressionId
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (remaining : PreparedSyntax source expressionSyntax context rest) : PreparedSyntax source expressionSyntax context (.assignBitNot assignment :: rest)
 
 
@@ -115,8 +113,7 @@ inductive PreparedSyntax (source : TypedSource) (expressionSyntax : ExpressionId
         WritableLocal context assignment.target.root binder.scheme.body)
       (projected : assignment.target.projections ≠ [])
       (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (children : ∀ id, id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections →
         expressionSyntax id ∧ ∃ node, source.lookupExpression? id = some node ∧ ExpressionHasType source context id node.type)
       (remaining : PreparedSyntax source expressionSyntax context rest) : PreparedSyntax source expressionSyntax context (.assignBitNot assignment :: rest)

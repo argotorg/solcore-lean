@@ -154,16 +154,14 @@ inductive Syntax (source : TypedSource) (expressionSyntax : ExpressionId → Pro
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (remaining : Syntax source expressionSyntax context (.statements mode rest) expected) :
       Syntax source expressionSyntax context (.statements mode (id :: rest)) expected
   | initializerBitNot {context assignment rest condition post statements expected}
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (remaining : Syntax source expressionSyntax context (.initializers rest condition post statements) expected) :
       Syntax source expressionSyntax context (.initializers (.assignBitNot assignment :: rest) condition post statements) expected
 

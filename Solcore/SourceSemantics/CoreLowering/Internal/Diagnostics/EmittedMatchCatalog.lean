@@ -245,8 +245,7 @@ def bitNot
     (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (bare : assignment.target.projections = [])
-    (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (profile : WideBitNotProfile assignment.target.type)
     (site : SourceCoreElaboration.ErrorSite)
     (origin : EmittedDiagnosticTokenPlan.UnaryOccursFor tracked source site assignment)
     (same : head.invalid = invalidUnary site assignment.target.root)
@@ -362,8 +361,7 @@ def initializerBitNot
     (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
       WritableLocal context assignment.target.root binder.scheme.body)
     (bare : assignment.target.projections = [])
-    (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (profile : WideBitNotProfile assignment.target.type)
     (site : SourceCoreElaboration.ErrorSite)
     (origin : EmittedDiagnosticTokenPlan.UnaryOccursFor tracked source site assignment)
     (same : head.invalid = invalidUnary site assignment.target.root)

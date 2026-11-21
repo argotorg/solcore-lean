@@ -513,13 +513,12 @@ theorem bitNot_facts {source : TypedSource} {context : SourceSemantics.Context}
     (typed : SourceBitNotAssignmentValid source context assignment) :
     (∀ actual, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok actual →
       WritableLocal context assignment.target.root actual.scheme.body) ∧
-    (SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer) := by
+    WideBitNotProfile assignment.target.type := by
   cases typed with
   | intro place _ =>
   cases place with
   | intro writable projections target =>
-    refine ⟨?_, .inl (by rw [sourceProfile]; rfl)⟩
+    refine ⟨?_, .inl (.inl (by rw [sourceProfile]; rfl))⟩
     intro actual actualFound
     cases Except.ok.inj (declaration.symm.trans actualFound)
     rw [bare] at projections
@@ -606,7 +605,7 @@ theorem projected_bitNot_head (index : ActualBodyInvocation.Index compiled bodyR
     ScopedSourceForItemsAdmission.projected_bitNot_facts unique receipt.description.binding route typed
   exact CallableIndexedOwnedPreparedNativeProjectedBitNotHeadCollectors.Head.of_lower_with_raw_occurrences
     unique signatures sourceTyped writable receipt.projected route.elementFree
-    (.inl (by rw [receipt.sourceProfile]; rfl))
+    (.inl (.inl (by rw [receipt.sourceProfile]; rfl)))
     (fun id _ member generated _ => by
       obtain ⟨node, found, _⟩ := route.key_typed unique (sourceTyped _ receipt.description.binding) member
       exact ⟨node, found, generated⟩) lowered native

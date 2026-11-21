@@ -1597,8 +1597,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
     (writable : ∀ binder, rootBinder source assignment.target.root = .ok binder → WritableLocal context assignment.target.root binder.scheme.body)
     (projected : assignment.target.projections ≠ [])
     (free : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
-    (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-      SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+    (profile : WideBitNotProfile assignment.target.type)
     (extract : ∀ id lowered, id ∈ DataPlaceKeyOrder.sourceKeys assignment.target.projections →
       expression fuel source scope id reasonAt = .ok lowered →
       RawTyped (SourceCoreLocalCell.coreContext scope ++ administrative) lowered.expression definitions →
@@ -1644,7 +1643,7 @@ theorem Head.of_lower_with_raw_occurrences {values : ValuesContext} {source : Ty
         rw [routeEq]
         exact description.ordinary (fun k v same => notMapping k v (rootEq.trans same))
       refine ⟨⟨prepared, index, codes, leaf, sourceTypes, site, invalidUnary, layout, ordinary,
-        by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding, .inl profile, leafView⟩,
+        by simpa only [routeEq] using lookup, rootEq ▸ writable binder description.binding, profile, leafView⟩,
         by simp [Head.emit, routeEq, placeModifier, SourceCoreDataPlaces.placeWrap], rfl, ?_⟩
       exact ⟨rfl, route, described, preparedBy⟩
 

@@ -1051,8 +1051,7 @@ inductive UnarySyntax (source : TypedSource) : SourceSemantics.Context → List 
       (writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
         WritableLocal context assignment.target.root binder.scheme.body)
       (bare : assignment.target.projections = [])
-      (profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-        SourceCoreRawMetadata.runtimeType assignment.target.type = .integer)
+      (profile : WideBitNotProfile assignment.target.type)
       (remaining : UnarySyntax source context rest) : UnarySyntax source context (.assignBitNot assignment :: rest)
 
 private theorem unary_ensure_same {site : SourceCoreElaboration.ErrorSite} {expected actual : Ty}

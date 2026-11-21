@@ -2253,8 +2253,7 @@ structure UnaryReceipt (source : TypedSource) (context : SourceSemantics.Context
   writable : ∀ binder, SourceCoreDataPlaces.rootBinder source assignment.target.root = .ok binder →
     WritableLocal context assignment.target.root binder.scheme.body
   bare : assignment.target.projections = []
-  profile : SourceCoreRawMetadata.runtimeType assignment.target.type = .word ∨
-    SourceCoreRawMetadata.runtimeType assignment.target.type = .integer
+  profile : WideBitNotProfile assignment.target.type
 
 /- Support is indexed by the original independent typing proof, rather than a
 new source grammar. Its Bool index records availability of a universal stopping
