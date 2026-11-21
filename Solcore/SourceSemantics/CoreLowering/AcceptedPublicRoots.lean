@@ -3,6 +3,7 @@ import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicRoots
 import Solcore.SourceSemantics.CoreLowering.Internal.RecursiveNamed.PublicInputRegistries
 import Solcore.SourceSemantics.CoreLowering.AcceptedExpressions
 import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHistories
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.PublicHandles
 import Solcore.SourceSemantics.CoreLowering.Internal.Selected.NamedAdmission
 import Solcore.SourceSemantics.CoreLowering.AcceptedCalls
 import Solcore.SourceSemantics.CoreLowering.AcceptedNestedCalls
@@ -21,7 +22,9 @@ Main declarations:
 - `CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected` and
   `CellAwarePublicAcceptedCallRoot.checkpoint_reflects_selected`, both directions for a row
   whose body contains direct calls, with `CellAwarePublicAcceptedCallRoot.expressions_of_family`
-  for their expression input, and `CellAwarePublicAcceptedCallForward.first_value_selected`;
+  for their expression input, `CellAwarePublicAcceptedCallForward.first_value_selected` and
+  `CellAwarePublicAcceptedCallForward.first_fault_selected`, from a staged trace that faults to a
+  failed public resumption;
 - `CellAwarePublicAcceptedNamedRoot.compilation_receipts` and
   `CellAwarePublicAcceptedNamedRoot.refined_body`, which derive the static receipts.
 -/
@@ -804,8 +807,10 @@ end
 section
 /-! A returning call-containing body reaches actual public output from an
 independent staged Source trace, as `CellAwarePublicAcceptedNamedForward` has
-it for first-subset rows. The body's accepted-expression meaning is the input
-that `CellAwarePublicAcceptedCallRoot.expressions_of_family` supplies. -/
+it for first-subset rows, and a faulting one reaches actual public failure with
+a token that represents its fault. The body's accepted-expression meaning is
+the input that `CellAwarePublicAcceptedCallRoot.expressions_of_family`
+supplies. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 2000000
@@ -945,6 +950,57 @@ theorem first_value_selected
   obtain ⟨requiredOutput, output⟩ := CellAwarePublicNamedOutput.first_success _ _ selected started
     exactRegistry exportsReady atCheckpoint publicResult run physical
   exact ⟨capture, value, finalStore, finalMap, finalWorld, required, requiredOutput, result, output⟩
+
+include callableProfile receiver aligned ready diagnostic support selected globalReference keyPhysical physical
+  stable heapTyped argumentsTyped bodySelected artifact checked covered represented heaps
+  sameCompiled started atCheckpoint exactRegistry exportsReady in
+/-- A staged Source trace of a call-containing body that faults determines the
+actual public resumption: it fails with a token that represents the fault, and
+the returned session has a physical history in the accepted cell model. -/
+theorem first_fault_selected
+    {environment : Dynamic.Environment} {bound after : Dynamic.Heap} {size : Nat}
+    {finalContext : SourceSemantics.Context} {failure : Staging.Recursive.Failure}
+    (allocated : Dynamic.BindersAllocate [] before header.function.parameters arguments environment bound)
+    (trace : Staging.Recursive.Size.Statements (Program.ofChecked whole.sourceProgram) stages size
+      (RecursiveStageRegistry.scope sidecar [] header.function) header.context environment bound
+      header.function.body finalContext (.fault failure) after)
+    (expressions : ∀ (owner : OwnedKey keys)
+      (keyPhysical : CallableIndexedOwnedNamedPhysicalCaptures.KeyPhysical owner.key headers)
+      {child : Staging.Recursive.Scope}, (stages).Closure header.function child →
+      CellAwareInvocationAcceptedInputs.Expressions (attachment := fun _ _ _ => True)
+        (receiving := completion.result.context.registry) (functions := rootFunctions)
+        (CallableIndexedOwnedPhysicalCanonicalState.ordinaryCaller owner 1 keyPhysical.locations).forgetSlots
+        (index prepared aligned) stages child faults size) :
+    ∃ capture : NamedCapture headers owner.key header mapping world,
+      ∃ value finalStore finalMap finalWorld required token,
+        CellAwarePublicApplicationResult.NamedResultAt (registry := completion.result.context.registry)
+          rootFunctions accepted owner caller header capture payloads header.context
+          (.fault failure) after value finalStore finalMap finalWorld faults ∧ faults failure token ∧
+        ∀ executionFuel outputFuel (outcome : SourceCoreExecution.Outcome publicArtifact),
+          required ≤ executionFuel → publicCheckpoint.ResumeAt executionFuel outputFuel outcome →
+          ∃ (returned : SourceCoreExecution.Session publicArtifact)
+            (actual : SourceCoreIndexedSession.Session nativeArtifact)
+            (reached : RecursiveNamedPublicFunctionHistory.Caller headers keys finalMap finalWorld after finalStore),
+            outcome = .failed token returned ∧
+            nativeCheckpoint.FailedResultAt executionFuel value finalStore token actual ∧
+            returned.IndexedAt actual ∧ CallableIndexedOwnedFunctionState.Relates caller reached ∧
+            CellAwarePublicPhysicalHistory.History (functions := rootFunctions) (cells := accepted)
+              (receiving := completion.result.context.registry) (anchor := header)
+              actual finalMap finalWorld after finalStore reached [] ∧
+            actual.RegistryAt completion.result.context.registry ∧ returned.ExportsReady := by
+  cases sameCompiled
+  obtain ⟨capture, value, finalStore, finalMap, finalWorld, required, run, result⟩ :=
+    CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected callableProfile receiver prepared aligned
+      ready diagnostic support selected owner caller globalReference keyPhysical physical stable heapTyped argumentsTyped
+      bodySelected artifact checked body covered represented heaps rfl started allocated trace expressions
+  have supports := (SelectedCompilationPublicReturnedValues.header_context_supports header header
+    support.bodyTyping).2
+  have faultHeap := CellAwareNamedFaultHeap.after_fault_selected header support bodySelected heapTyped
+    argumentsTyped allocated trace
+  obtain ⟨token, represented, output⟩ := CellAwarePublicNamedFailure.first_failure _ _ selected started
+    exactRegistry exportsReady atCheckpoint (faultHeap.transportContext supports) (result.context supports) run
+    physical
+  exact ⟨capture, value, finalStore, finalMap, finalWorld, required, token, result, represented, output⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwarePublicAcceptedCallForward
 end
