@@ -949,6 +949,9 @@ declaration without requirements or coercions. -/
 def CalleesPlain (source : TypedSource) : Prop :=
   source.nodes.all (CalleePlainAt source.nodes) = true
 
+instance (source : TypedSource) : Decidable (CalleesPlain source) :=
+  inferInstanceAs (Decidable (source.nodes.all (CalleePlainAt source.nodes) = true))
+
 section Sites
 variable {program : Program} {scope : Staging.Recursive.Scope}
 

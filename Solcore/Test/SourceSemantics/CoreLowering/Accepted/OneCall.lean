@@ -28,21 +28,29 @@ from 128 the checked `+=` panics with `0x11`, and at a word outside `uint8` the
 conversion fails with the dirty-integer reason. So does it to `shifted`: at a word in `uint8` the
 actual resumption returns Word's shift wrapped to eight bits, and at any other word the conversion
 fails. So does it to `flipped`: at a word in `uint8` the actual resumption returns its complement in
-eight bits, and at any other word the conversion fails.
+eight bits, and at any other word the conversion fails. At the faulting words of `narrow`, `doubled`,
+`shifted` and `flipped` the row's original Source execution faults, its staged fault trace is lifted
+from it, and the call root's failure theorem applies: the actual resumption fails with a token that
+represents the Source fault.
 
 Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.twice_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_source`,
 `Tests.SourceCoreAcceptedOneCall.roundTrip_source`,
+`Tests.SourceCoreAcceptedOneCall.narrow_fault`,
+`Tests.SourceCoreAcceptedOneCall.initializer_fault`,
+`Tests.SourceCoreAcceptedOneCall.doubled_panic`,
 `Tests.SourceCoreAcceptedOneCall.accepted_call`,
-`Tests.SourceCoreAcceptedOneCall.accepted_reflection` and the runtime checks
+`Tests.SourceCoreAcceptedOneCall.accepted_reflection`,
+`Tests.SourceCoreAcceptedOneCall.accepted_failure` and the runtime checks
 `Tests.SourceCoreAcceptedOneCall.AcceptedCallRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedNestedCallRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run`,
-`Tests.SourceCoreAcceptedOneCall.AcceptedFixedShiftRuntime.run` and
-`Tests.SourceCoreAcceptedOneCall.AcceptedFixedBitNotRuntime.run`.
+`Tests.SourceCoreAcceptedOneCall.AcceptedFixedShiftRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedFixedBitNotRuntime.run` and
+`Tests.SourceCoreAcceptedOneCall.AcceptedFaultRuntime.run`.
 -/
 
 section
@@ -1081,7 +1089,9 @@ executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `narrow` returns the conversion of its parameter,
 and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
-a given body invocation. -/
+a given body invocation. At a word not canonical for `uint8` the conversions of `narrow`, `doubled`,
+`shifted` and `flipped` fault with the dirty-integer reason, and at a canonical word whose double is
+outside `uint8`, `doubled`'s checked `x += x` panics with `0x11`. -/
 set_option autoImplicit false
 set_option Elab.async false
 namespace Tests.SourceCoreAcceptedOneCall
@@ -1095,6 +1105,10 @@ def wordHeap (before : Dynamic.Heap) (word : Core.Word) : Dynamic.Heap :=
 /-- A binder at the next cell of a heap. -/
 def wordEnvironment (binder : TypedBinder) (before : Dynamic.Heap) : Dynamic.Environment :=
   [(binder.id, ⟨before.cells.length⟩)]
+
+/-- A heap with one more initialized `uint8` cell. -/
+def byteHeap (before : Dynamic.Heap) (word : Core.Word) : Dynamic.Heap :=
+  ⟨before.cells ++ [{type := .fixed ⟨false, .w8⟩, value := some (.word word)}]⟩
 
 /-- `identity`'s cache row: its `Word` parameter, the read of it and the return
 of the read. -/
@@ -1205,44 +1219,48 @@ def observeRoundTripBody (source : TypedSource) : IO (RoundTripBody source) := d
   let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "roundTrip row binderScheme"
   return ⟨parts, binderScheme⟩
 
-/-- `doubled`'s cache row: its one `Word` parameter. -/
+/-- `doubled`'s cache row: the nodes of its body, its `Word` parameter, and its `uint8` local, which
+is the bare target of `x += x`. -/
 structure DoubledBody (source : TypedSource) where
-  binder : TypedBinder
-  inputs : source.inputs = [binder]
-  binderScheme : binder.scheme = .mono .word
+  parts : DoubledParts source
+  binderScheme : parts.binder.scheme = .mono .word
+  targetScheme : parts.target.scheme = .mono (.fixed ⟨false, .w8⟩)
+  targetRoot : parts.resolution.target.root = parts.target.id
+  targetType : parts.resolution.target.type = .fixed ⟨false, .w8⟩
+  targetBare : parts.resolution.target.projections = []
 
 def observeDoubledBody (source : TypedSource) : IO (DoubledBody source) := do
-  match inputs : source.inputs with
-  | [binder] =>
-    let ⟨binderScheme⟩ ← observed (binder.scheme = .mono .word) "doubled row binderScheme"
-    return ⟨binder, inputs, binderScheme⟩
-  | _ => throw (IO.userError "doubled row inputs changed")
+  let parts ← observeDoubledParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "doubled row binderScheme"
+  let ⟨targetScheme⟩ ← observed (parts.target.scheme = .mono (.fixed ⟨false, .w8⟩)) "doubled row targetScheme"
+  let ⟨targetRoot⟩ ← observed (parts.resolution.target.root = parts.target.id) "doubled row targetRoot"
+  let ⟨targetType⟩ ← observed (parts.resolution.target.type = .fixed ⟨false, .w8⟩) "doubled row targetType"
+  let ⟨targetBare⟩ ← observed (parts.resolution.target.projections = []) "doubled row targetBare"
+  return ⟨parts, binderScheme, targetScheme, targetRoot, targetType, targetBare⟩
 
-/-- `shifted`'s cache row: its one `Word` parameter. -/
+/-- `shifted`'s cache row: the nodes of its body, its `Word` parameter and its `uint8` local. -/
 structure ShiftedBody (source : TypedSource) where
-  binder : TypedBinder
-  inputs : source.inputs = [binder]
-  binderScheme : binder.scheme = .mono .word
+  parts : ShiftedParts source
+  binderScheme : parts.binder.scheme = .mono .word
+  targetScheme : parts.target.scheme = .mono (.fixed ⟨false, .w8⟩)
 
 def observeShiftedBody (source : TypedSource) : IO (ShiftedBody source) := do
-  match inputs : source.inputs with
-  | [binder] =>
-    let ⟨binderScheme⟩ ← observed (binder.scheme = .mono .word) "shifted row binderScheme"
-    return ⟨binder, inputs, binderScheme⟩
-  | _ => throw (IO.userError "shifted row inputs changed")
+  let parts ← observeShiftedParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "shifted row binderScheme"
+  let ⟨targetScheme⟩ ← observed (parts.target.scheme = .mono (.fixed ⟨false, .w8⟩)) "shifted row targetScheme"
+  return ⟨parts, binderScheme, targetScheme⟩
 
-/-- `flipped`'s cache row: its one `Word` parameter. -/
+/-- `flipped`'s cache row: the nodes of its body, its `Word` parameter and its `uint8` local. -/
 structure FlippedBody (source : TypedSource) where
-  binder : TypedBinder
-  inputs : source.inputs = [binder]
-  binderScheme : binder.scheme = .mono .word
+  parts : FlippedParts source
+  binderScheme : parts.binder.scheme = .mono .word
+  targetScheme : parts.target.scheme = .mono (.fixed ⟨false, .w8⟩)
 
 def observeFlippedBody (source : TypedSource) : IO (FlippedBody source) := do
-  match inputs : source.inputs with
-  | [binder] =>
-    let ⟨binderScheme⟩ ← observed (binder.scheme = .mono .word) "flipped row binderScheme"
-    return ⟨binder, inputs, binderScheme⟩
-  | _ => throw (IO.userError "flipped row inputs changed")
+  let parts ← observeFlippedParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "flipped row binderScheme"
+  let ⟨targetScheme⟩ ← observed (parts.target.scheme = .mono (.fixed ⟨false, .w8⟩)) "flipped row targetScheme"
+  return ⟨parts, binderScheme, targetScheme⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
 theorem read_value {source : TypedSource} {binder : TypedBinder}
@@ -1402,6 +1420,104 @@ theorem RoundTripBody.trace {source : TypedSource} (body : RoundTripBody source)
           (.fixedFromWord canonical))
         (.fixedToWord canonical))
 
+/-- A conversion of an argument faults with the reason that its Source
+application gives the argument's word. -/
+theorem conversion_fault {source : TypedSource} {function : BuiltinFunctionId} {argument : ExpressionId}
+    (converted : Tests.SourceCoreBuiltinCalls.BuiltinCall source function argument)
+    {program : SourceSemantics.Program} {context : SourceSemantics.Context} {evidence : Dynamic.EvidenceEnvironment}
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap} {word : Core.Word}
+    (argumentTrace : Dynamic.ExpressionEvaluates program context evidence source environment before argument
+      (.word word) after)
+    {reason : Dynamic.SemanticFault} (failed : Dynamic.BuiltinFaults function [.word word] reason) :
+    Dynamic.ExpressionFaults program context evidence source environment before converted.value.node.id reason
+      after := by
+  apply Dynamic.ExpressionFaults.form (lookupExpression?_sound converted.value.found)
+  rw [converted.form, converted.value.requirements, converted.value.coercions]
+  exact .builtinApply rfl (.cons argumentTrace .nil) (.builtinFaults failed)
+
+/-- `narrow`'s body faults at a parameter word not canonical for `uint8`: its
+conversion gives the dirty-integer reason. -/
+theorem NarrowBody.fault {source : TypedSource} (body : NarrowBody source) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (word : Core.Word) (dirty : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = false) :
+    Dynamic.FunctionStatementsFault program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.statement.id] context .dirtyHigherBitsForInteger (wordHeap before word) :=
+  .singleton (.returnValue (lookupStatement?_sound body.parts.statementFound) body.parts.statementForm
+    (conversion_fault body.parts.converted (read_value body.parts.read evidence before word) (.fixedFromWord dirty)))
+
+/-- A body whose first statement initializes a `uint8` local with the
+conversion of its `Word` parameter, before at least one more statement, faults
+there at a parameter word not canonical for `uint8`. -/
+theorem dirty_initializer {source : TypedSource} {binder target : TypedBinder}
+    (read : Tests.SourceCoreNamedBranch.Read source binder .word)
+    (converted : Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedFromWord ⟨false, .w8⟩) read.node.id)
+    {initialized : StatementNode} (found : source.lookupStatement? initialized.id = some initialized)
+    (form : initialized.form = .letDecl target (some converted.value.node.id))
+    (scheme : target.scheme = .mono (.fixed ⟨false, .w8⟩)) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (word : Core.Word) (dirty : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = false)
+    (next : StatementId) (rest : List StatementId) :
+    Dynamic.FunctionStatementsFault program context evidence source (wordEnvironment binder before)
+      (wordHeap before word) (initialized.id :: next :: rest) context .dirtyHigherBitsForInteger
+      (wordHeap before word) :=
+  .head (.letInitializer (lookupStatement?_sound found) form (by rw [scheme]; rfl)
+    (conversion_fault converted (read_value read evidence before word) (.fixedFromWord dirty)))
+
+/-- `doubled`'s body panics with `0x11` at a parameter word canonical for
+`uint8` whose double is outside `uint8`: its local holds the word, and the
+checked `x += x` overflows. The local's context is a binder extension of the
+body's. -/
+theorem DoubledBody.panic {source : TypedSource} (body : DoubledBody source) {program : SourceSemantics.Program}
+    {context localContext : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment)
+    (before : Dynamic.Heap) (extension : BinderExtends source.owner context body.parts.target localContext)
+    (word : Core.Word) (canonical : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = true)
+    (outside : ¬ Dynamic.FixedInRange ⟨false, .w8⟩
+      (Dynamic.checkedResult .add (Dynamic.fixedValue ⟨false, .w8⟩ word) (Dynamic.fixedValue ⟨false, .w8⟩ word))) :
+    Dynamic.FunctionStatementsFault program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.initialized.id, body.parts.assignment.id, body.parts.returned.id]
+      localContext (.panic 0x11) (byteHeap (wordHeap before word) word) := by
+  have allocation : Dynamic.Heap.Allocates (wordHeap before word) (.fixed ⟨false, .w8⟩) (some (.word word))
+      ⟨(wordHeap before word).cells.length⟩ (byteHeap (wordHeap before word) word) := .append
+  have declared : Dynamic.StatementExecutes program context evidence source
+      (wordEnvironment body.parts.binder before) (wordHeap before word) body.parts.initialized.id localContext
+      (.fallthrough ((body.parts.target.id, ⟨(wordHeap before word).cells.length⟩) ::
+        wordEnvironment body.parts.binder before)) (byteHeap (wordHeap before word) word) :=
+    .letInitialized (lookupStatement?_sound body.parts.initializedFound) body.parts.initializedForm
+      (conversion_value body.parts.converted (read_value body.parts.read evidence before word)
+        (.fixedFromWord canonical))
+      (by rw [body.targetScheme]; rfl) extension (by rw [body.targetScheme]; exact allocation)
+  have resolve : Dynamic.SourcePlaceResolves program localContext evidence source
+      ((body.parts.target.id, ⟨(wordHeap before word).cells.length⟩) :: wordEnvironment body.parts.binder before)
+      (byteHeap (wordHeap before word) word) body.parts.resolution.target
+      {location := ⟨(wordHeap before word).cells.length⟩, rootType := .fixed ⟨false, .w8⟩,
+        valueType := body.parts.resolution.target.type, projections := [], selected := some (.word word)}
+      (byteHeap (wordHeap before word) word) := by
+    apply Dynamic.SourcePlaceResolves.intro (initialCell := {type := .fixed ⟨false, .w8⟩, value := some (.word word)})
+      (currentCell := {type := .fixed ⟨false, .w8⟩, value := some (.word word)})
+    · rw [body.targetRoot]
+      exact .head
+    · exact allocation.reads_new
+    · rw [body.targetBare]
+      exact .nil
+    · exact allocation.reads_new
+    · exact .initialized
+    · exact .nil
+  have right : Dynamic.ExpressionEvaluates program localContext evidence source
+      ((body.parts.target.id, ⟨(wordHeap before word).cells.length⟩) :: wordEnvironment body.parts.binder before)
+      (byteHeap (wordHeap before word) word) body.parts.rightRead.node.id (.word word)
+      (byteHeap (wordHeap before word) word) := by
+    apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound body.parts.rightRead.found)
+    · rw [body.parts.rightRead.form]
+      exact .local (by rw [body.parts.rightRead.requirements, body.parts.rightRead.coercions]; rfl)
+        Dynamic.Environment.LooksUp.head allocation.reads_new rfl rfl
+    · rw [body.parts.rightRead.coercions]
+      exact .nil
+  have panics : Dynamic.AssignmentOperandsPanic body.parts.resolution.target.type .add (some (.word word))
+      (.word word) 0x11 :=
+    .compound .add (.fixed (by rw [body.targetType]) (.overflow .add word word outside))
+  exact .tail declared (.head (.assignValue (lookupStatement?_sound body.parts.assignmentFound)
+    body.parts.assignmentForm (.panic resolve right allocation.reads_new rfl .initialized .nil panics)))
+
 end Tests.SourceCoreAcceptedOneCall
 end
 
@@ -1414,7 +1530,10 @@ receipts. The original Source executions of `relay`, `twice`, `narrow` and `roun
 whose calls run `identity`'s body instance, are lifted through the checked
 shapes, and with the existing start receipts the call root's theorems apply at
 the first public call of each in both directions. The call root's reflection
-needs no Source execution (`accepted_reflection`). -/
+needs no Source execution (`accepted_reflection`). At a faulting word the
+row's original Source fault is lifted to a staged fault trace, given that the
+direct calls of the row and of `identity` have plain callees, and the call
+root's failure theorem applies (`accepted_failure`). -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxHeartbeats 4000000
@@ -1514,6 +1633,15 @@ private theorem single_body (selected : SelectedInventory whole row) {statement 
     exact roots
   exact statementRoots_injective (selected.packet.header.agreement.roots.symm.trans headerRoots)
 
+/-- The statement roots of a header whose row's body is three statements. -/
+private theorem three_body (selected : SelectedInventory whole row) {first second third : StatementId}
+    (roots : row.original.function.typedBody.roots = [.statement first, .statement second, .statement third]) :
+    selected.packet.header.function.body = [first, second, third] := by
+  have headerRoots : selected.packet.header.function.source.roots = [first, second, third].map NodeId.statement := by
+    rw [selected.source_eq]
+    exact roots
+  exact statementRoots_injective (selected.packet.header.agreement.roots.symm.trans headerRoots)
+
 /-- The original Source execution of `relay`'s body at its header: the direct
 call's global application runs `identity`'s body instance, its header's Source
 body, at the empty dictionary. -/
@@ -1584,6 +1712,89 @@ theorem roundTrip_source (selected : SelectedInventory whole row)
       selected.packet.header.context (.returned (.word word)) (wordHeap ⟨[]⟩ word) := by
   rw [single_body selected roundTripBody.parts.roots, selected.source_eq]
   exact roundTripBody.trace selected.packet.header.function.evidence ⟨[]⟩ word canonical
+
+/-- The original Source execution of `narrow`'s body at its header faults with
+the dirty-integer reason at a word not canonical for `uint8`. -/
+theorem narrow_fault (selected : SelectedInventory whole row) (narrowBody : NarrowBody row.original.function.typedBody)
+    (word : Core.Word) (dirty : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = false) :
+    Dynamic.FunctionStatementsFault (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment narrowBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context .dirtyHigherBitsForInteger (wordHeap ⟨[]⟩ word) := by
+  rw [single_body selected narrowBody.parts.roots, selected.source_eq]
+  exact narrowBody.fault selected.packet.header.function.evidence ⟨[]⟩ word dirty
+
+/-- The original Source execution at its header of a three-statement body that
+first initializes a `uint8` local with the conversion of its `Word` parameter,
+as `doubled`'s, `shifted`'s and `flipped`'s do, faults there with the
+dirty-integer reason at a word not canonical for `uint8`. -/
+theorem initializer_fault (selected : SelectedInventory whole row) {binder target : TypedBinder}
+    (read : Tests.SourceCoreNamedBranch.Read row.original.function.typedBody binder .word)
+    (converted : Tests.SourceCoreBuiltinCalls.BuiltinCall row.original.function.typedBody
+      (.fixedFromWord ⟨false, .w8⟩) read.node.id)
+    {initialized assignment returned : StatementNode}
+    (roots : row.original.function.typedBody.roots =
+      [.statement initialized.id, .statement assignment.id, .statement returned.id])
+    (found : row.original.function.typedBody.lookupStatement? initialized.id = some initialized)
+    (form : initialized.form = .letDecl target (some converted.value.node.id))
+    (scheme : target.scheme = .mono (.fixed ⟨false, .w8⟩))
+    (word : Core.Word) (dirty : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = false) :
+    Dynamic.FunctionStatementsFault (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context .dirtyHigherBitsForInteger (wordHeap ⟨[]⟩ word) := by
+  rw [three_body selected roots, selected.source_eq]
+  exact dirty_initializer read converted found form scheme selected.packet.header.function.evidence ⟨[]⟩ word dirty
+    assignment.id [returned.id]
+
+/-- The original Source execution of `doubled`'s body at its header panics
+with `0x11` at a word canonical for `uint8` whose double is outside `uint8`.
+The local's binder extension comes from the header's typing certificate. -/
+theorem doubled_panic (selected : SelectedInventory whole row)
+    (doubledBody : DoubledBody row.original.function.typedBody)
+    (certified : SelectedCompilationNamedSourceTyping.Certified selected.packet.header) (word : Core.Word)
+    (canonical : TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = true)
+    (outside : ¬ Dynamic.FixedInRange ⟨false, .w8⟩
+      (Dynamic.checkedResult .add (Dynamic.fixedValue ⟨false, .w8⟩ word) (Dynamic.fixedValue ⟨false, .w8⟩ word))) :
+    ∃ finalContext, Dynamic.FunctionStatementsFault (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment doubledBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      finalContext (.panic 0x11) (byteHeap (wordHeap ⟨[]⟩ word) word) := by
+  have body := three_body selected doubledBody.parts.roots
+  have unique : NodeOccurrencesUnique row.original.function.typedBody :=
+    selected.source_eq ▸ selected.packet.header.unique
+  obtain ⟨_final, _facts, typed, _completes⟩ := certified.statements
+  rw [body, selected.source_eq] at typed
+  cases typed with
+  | cons head _ =>
+    obtain ⟨node, contains, formTyped⟩ := Dynamic.StatementHasType.formTyping head
+    cases Option.some.inj ((lookupStatement?_complete unique contains).symm.trans doubledBody.parts.initializedFound)
+    rw [doubledBody.parts.initializedForm] at formTyped
+    cases formTyped with
+    | letInitialized _ _ extension =>
+      rw [body, selected.source_eq]
+      exact ⟨_, doubledBody.panic selected.packet.header.function.evidence ⟨[]⟩ extension word canonical outside⟩
+    | letInitializedGeneralized polymorphic =>
+      rw [doubledBody.targetScheme] at polymorphic
+      exact absurd rfl polymorphic
+
+/-- The callee premise of the fault lifting for the family that admits
+`identity`'s retained instantiation: its body instance is its header's, whose
+Source is `identity`'s cache row. -/
+theorem identity_callees_plain (whole : WholeInventory fixture)
+    (wellFormed : ProgramWellFormed (Program.ofChecked fixture.recipe.compiled.sourceProgram)) {identity : Row fixture}
+    (plain : CellAwareInvocationAcceptedFaultLifting.CalleesPlain identity.original.function.typedBody) :
+    CellAwareInvocationAcceptedFaultLifting.CalleesFault (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      (fun instantiation => instantiation = CallableNamedCanonicalOrder.retainedInstantiation identity.original) := by
+  intro instantiation bodyInstance admits instantiates
+  subst admits
+  obtain ⟨selected⟩ := whole.select identity
+  have frameInstantiated := selected.packet.header.frame.instantiated
+  rw [selected.packet.aligned.metadata, selected.original] at frameInstantiated
+  have bodySame := BuiltinNamedCalls.instantiation_unique_of_wellFormed wellFormed instantiates frameInstantiated
+  subst bodySame
+  rw [← selected.packet.header.frame.source, selected.source_eq]
+  exact plain
 
 /-- The first public call of a row, with the conclusions of the call root's
 output theorem, its checkpoint sufficiency theorem and its checkpoint
@@ -1770,10 +1981,101 @@ theorem accepted_reflection (selected : SelectedInventory whole row) {called : D
         selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows)
   exact ⟨sidecar, size, environment, bound, finalContext, outcome, after, allocated, staged, result⟩
 
+/-- The first public call of a row whose original Source execution faults,
+with the conclusion of the call root's failure theorem: the actual resumption
+fails with a token that represents the fault at the call's public diagnostic
+table. -/
+structure AcceptedFailure (selected : SelectedInventory whole row) (word : Word)
+    (started : Started fixture row.original.key [.word word]) (reason : Dynamic.SemanticFault) where
+  start : SelectedCompilationPublicSessionInitial.Started whole.rows fixture.ready selected.packet.header started.call
+  output : ∃ (table : SourceCoreFaultSites.Table) (token : Word) (requiredExecution : Nat),
+    CallableIndexedOwnedPublicDecodedStagedCallFaults.faults table (.semantic reason) token ∧
+    ∀ executionFuel outputFuel (outcome : SourceCoreExecution.Outcome started.artifact),
+      requiredExecution ≤ executionFuel → started.call.checkpoint.ResumeAt executionFuel outputFuel outcome →
+      ∃ (returned : SourceCoreExecution.Session started.artifact)
+        (actual : SourceCoreIndexedSession.Session start.artifact) (value : Value) (finalStore : Store),
+        outcome = .failed token returned ∧ start.checkpoint.FailedResultAt executionFuel value finalStore token actual ∧
+        returned.IndexedAt actual
+
+/-- As `accepted_call`, from the row's original Source execution that faults
+with an expressible reason: the staged fault trace is lifted from it through
+the checked shape, given that the direct calls of the row and of the admitted
+callees have plain callees, and the call root's failure theorem applies at the
+first public call. -/
+theorem accepted_failure (selected : SelectedInventory whole row) {called : DeclarationInstantiation → Prop}
+    (calls : CallRows fixture called fixture.recipe.compiled.indexed.base.functions)
+    (admitted : ∀ {instantiation}, called instantiation →
+      ∃ callee : Row fixture, instantiation = CallableNamedCanonicalOrder.retainedInstantiation callee.original)
+    (word : Word)
+    (wellFormed : ProgramWellFormed (Program.ofChecked fixture.recipe.compiled.sourceProgram))
+    (started : Started fixture row.original.key [.word word])
+    (callableProfile : fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true)
+    {binder : TypedBinder} (inputs : row.original.function.typedBody.inputs = [binder])
+    (scheme : binder.scheme = .mono .word)
+    (plain : CellAwareInvocationAcceptedFaultLifting.CalleesPlain row.original.function.typedBody)
+    (calleesPlain : CellAwareInvocationAcceptedFaultLifting.CalleesFault
+      (Program.ofChecked fixture.recipe.compiled.sourceProgram) called)
+    {reason : Dynamic.SemanticFault} (expressible : CellAwareInvocationAcceptedFaultLifting.Expressible reason)
+    {finalContext : SourceSemantics.Context} {after : Dynamic.Heap}
+    (sourceFault : Dynamic.FunctionStatementsFault (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      finalContext reason after) :
+    Nonempty (AcceptedFailure selected word started reason) := by
+  obtain ⟨types, allocated⟩ := word_parameter selected inputs scheme ⟨[]⟩ word
+  have support := SelectedCompilationNamedSupport.Support.of_program wellFormed
+  obtain ⟨start⟩ := CellAwarePublicInitialSelectedStart.from_selected_call
+    (rows := whole.rows) (prepared := fixture.ready) (header := selected.packet.header) (call := started.call)
+    fixture.accepted fixture.selected started.opened started.bootstrap started.fresh
+    started.authority (.single started.ready) (fun _ member key => selected.root_selection member key)
+  have inputTypes : RecursiveNamedPublicDataArgumentReceipts.PublicDataTypes
+      selected.packet.header.function.context [.word word] selected.packet.header.types := by
+    rw [types]
+    exact .cons ⟨.word word, by simp [SourceCoreIndexedSession.DataInput.publicValue], .word word⟩ .nil
+  have inputMeanings : RecursiveNamedPublicDataInputs.Meanings [.word word] [.word word] :=
+    .cons ⟨.word word, by simp [SourceCoreIndexedSession.DataInput.publicValue], .word word⟩ .nil
+  obtain ⟨origin, _contextAt, _issued, _extension⟩ := CellAwarePublicInitialStart.receiver start
+  obtain ⟨initial⟩ := CellAwarePublicInitialStart.of_started whole.distinct callableProfile
+    origin.result.context.registry (CallableIndexedOwnedPublicDecodedCallFaults.faults origin.result.diagnostics)
+    support.bodyTyping start inputTypes inputMeanings
+  let prepared := CallableIndexedOwnedSelectedNamedHeaderReceipts.reissued selected.input.prepared selected.packet.selected
+  have diagnostic : CallableIndexedOwnedPublicDiagnosticReceipts.Receipt prepared :=
+    ⟨selected.packet.selected.diagnostics, selected.packet.selected.found, rfl⟩
+  obtain ⟨sidecar, _sidecarIssued, bodySelected⟩ := whole.invocation selected.packet selected.retained
+  obtain ⟨body, covered, closed, ports⟩ := whole.call_inputs calls selected.packet
+  obtain ⟨sourceCompiled, artifact, checked⟩ := CellAwarePublicAcceptedNamedRoot.compilation_receipts
+    fixture.checked fixture.accepted fixture.selected
+  obtain ⟨_entry, entryMember, _shape, _first⟩ := start.selected.2
+  let rows : ∀ header, header ∈ headers whole.rows → called header.instantiation →
+      CellAwareInvocationAcceptedCallFamily.Row (headers := headers whole.rows) called header :=
+    fun _header member _ => Classical.choice (whole.family_row calls support entryMember member)
+  obtain ⟨size, trace⟩ := CellAwareInvocationAcceptedFaultLifting.body_fault fixture.recipe.compiled.indexed
+    (registry := SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled)
+    ((SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled).source bodySelected)
+    ((SelectedCompilationPhysicalProgramSupport.stages fixture.recipe.compiled).evidence bodySelected)
+    selected.packet.header.unique (selected.source_eq ▸ plain) (whole.callees calls wellFormed admitted)
+    calleesPlain (calls.header_shape selected.packet) (header_signatures selected.packet.header) expressible
+    sourceFault
+  obtain ⟨_capture, _value, _finalStore, _finalMap, _finalWorld, requiredExecution, token, _result, represented,
+      output⟩ :=
+    CellAwarePublicAcceptedCallForward.first_fault_selected callableProfile initial.issued prepared
+      selected.packet.aligned fixture.ready diagnostic support start.selected (owner fixture.recipe.compiled)
+      initial.caller.base.val initial.globalReference initial.keyPhysical initial.caller.physical initial.stable
+      initial.heapTyped initial.argumentsTyped bodySelected artifact checked body covered initial.represented
+      initial.heaps rfl start.started start.atCheckpoint
+      (congrArg SourceCoreCompatibleValues.Context.registry initial.contextAt) initial.exportsReady allocated trace
+      (CellAwarePublicAcceptedCallRoot.expressions_of_family callableProfile initial.issued prepared
+        selected.packet.aligned diagnostic support artifact checked closed ports wellFormed rows size)
+  refine ⟨⟨start, _, token, requiredExecution, represented, ?_⟩⟩
+  intro executionFuel outputFuel outcome enough resumed
+  obtain ⟨returned, actual, _reached, same, failed, indexed, _⟩ :=
+    output executionFuel outputFuel outcome enough resumed
+  exact ⟨returned, actual, _, _, same, failed, indexed⟩
+
 /-- The receipts that the runtime checks observe: the compiled program, its
 cache, `identity`'s row and body, the checked rows of the family that admits
-`identity`'s retained instantiation, the program typing and the callable
-profile. -/
+`identity`'s retained instantiation, the program typing, the callable profile
+and the plain callees of `identity`'s body. -/
 structure Observed where
   fixture : CompiledFixture workspace options
   cache : ObservedCache fixture fixture.recipe.compiled.indexed.base.functions
@@ -1783,6 +2085,7 @@ structure Observed where
     CallableNamedCanonicalOrder.retainedInstantiation identity.original) fixture.recipe.compiled.indexed.base.functions
   wellFormed : ProgramWellFormed (Program.ofChecked fixture.recipe.compiled.sourceProgram)
   callableProfile : fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true
+  identityPlain : CellAwareInvocationAcceptedFaultLifting.CalleesPlain identity.original.function.typedBody
 
 def observe : IO Observed := do
   let fixture ← compileFixture workspace options
@@ -1795,7 +2098,9 @@ def observe : IO Observed := do
   let ⟨wellFormed⟩ ← observeWellFormed fixture.checked
   let ⟨callableProfile⟩ ← observed (fixture.recipe.compiled.compatible.checked.catalog.callableContracts = true)
     "calls actual callable profile"
-  return ⟨fixture, cache, identity, identityBody, calls, wellFormed, callableProfile⟩
+  let ⟨identityPlain⟩ ← observed
+    (CellAwareInvocationAcceptedFaultLifting.CalleesPlain identity.original.function.typedBody) "identity callees"
+  return ⟨fixture, cache, identity, identityBody, calls, wellFormed, callableProfile, identityPlain⟩
 
 namespace AcceptedCallRuntime
 
@@ -1965,7 +2270,7 @@ def run : IO Unit := do
       obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
       obtain ⟨selected⟩ := whole.select doubled
       exact ⟨whole, selected, accepted_reflection selected observed.calls word observed.wellFormed started
-        observed.callableProfile doubledBody.inputs doubledBody.binderScheme⟩
+        observed.callableProfile doubledBody.parts.inputs doubledBody.binderScheme⟩
     let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
     let expectedReason :=
       if word.val < 256 then SourceCorePanics.reason SourceCorePanics.arithmetic else SourceCorePanics.dirtyReason
@@ -2003,7 +2308,7 @@ def run : IO Unit := do
       obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
       obtain ⟨selected⟩ := whole.select shifted
       exact ⟨whole, selected, accepted_reflection selected observed.calls word observed.wellFormed started
-        observed.callableProfile shiftedBody.inputs shiftedBody.binderScheme⟩
+        observed.callableProfile shiftedBody.parts.inputs shiftedBody.binderScheme⟩
     let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
     match expected, result.val with
     | some value, .succeeded returned =>
@@ -2040,7 +2345,7 @@ def run : IO Unit := do
       obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
       obtain ⟨selected⟩ := whole.select flipped
       exact ⟨whole, selected, accepted_reflection selected observed.calls word observed.wellFormed started
-        observed.callableProfile flippedBody.inputs flippedBody.binderScheme⟩
+        observed.callableProfile flippedBody.parts.inputs flippedBody.binderScheme⟩
     let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
     match expected, result.val with
     | some value, .succeeded returned =>
@@ -2052,6 +2357,124 @@ def run : IO Unit := do
   IO.println "ACCEPTED_FIXED_BIT_NOT_PUBLIC_PASS"
 
 end AcceptedFixedBitNotRuntime
+
+namespace AcceptedFaultRuntime
+
+/-- The actual resumption of a fresh call failed with `expected`. -/
+def failsWith {artifact : SourceCoreExecution.Artifact} (outcome : SourceCoreExecution.Outcome artifact)
+    (expected : Word) (row : String) : IO Unit :=
+  match outcome with
+  | .failed reason _ =>
+    unless reason == expected do throw (IO.userError s!"accepted fault of {row} changed")
+  | _ => throw (IO.userError s!"accepted fault of {row} did not fail")
+
+/-- At the faulting words of `narrow`, `doubled`, `shifted` and `flipped`, the
+row's original Source execution faults, and the call root's failure theorem
+applies at the first public call: the actual resumption fails with a token
+that represents the Source fault. At a word outside `uint8` each conversion
+faults with the dirty-integer reason, and at a word from 128 to 255 `doubled`'s
+checked `x += x` panics with `0x11`. -/
+def run : IO Unit := do
+  let observed ← observe
+  let dirtyWords := [Word.ofNatModulo 256, Word.maximum]
+  let narrow ← observeRow observed.fixture "narrow"
+  let narrowBody ← observeNarrowBody narrow.original.function.typedBody
+  let ⟨narrowPlain⟩ ← Tests.SourceCoreAcceptedFixture.observed
+    (CellAwareInvocationAcceptedFaultLifting.CalleesPlain narrow.original.function.typedBody) "narrow callees"
+  for word in dirtyWords do
+    let ⟨dirty⟩ ← Tests.SourceCoreAcceptedFixture.observed
+      (TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = false) "narrow dirty word"
+    let started ← observeStarted observed.fixture narrow.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole narrow),
+        Nonempty (AcceptedFailure selected word started .dirtyHigherBitsForInteger) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select narrow
+      exact ⟨whole, selected, accepted_failure selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile narrowBody.parts.inputs narrowBody.binderScheme
+        narrowPlain (identity_callees_plain whole observed.wellFormed observed.identityPlain) trivial
+        (narrow_fault selected narrowBody word dirty)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    failsWith result.val SourceCorePanics.dirtyReason "narrow"
+  let doubled ← observeRow observed.fixture "doubled"
+  let doubledBody ← observeDoubledBody doubled.original.function.typedBody
+  let ⟨doubledPlain⟩ ← Tests.SourceCoreAcceptedFixture.observed
+    (CellAwareInvocationAcceptedFaultLifting.CalleesPlain doubled.original.function.typedBody) "doubled callees"
+  for word in dirtyWords do
+    let ⟨dirty⟩ ← Tests.SourceCoreAcceptedFixture.observed
+      (TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = false) "doubled dirty word"
+    let started ← observeStarted observed.fixture doubled.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole doubled),
+        Nonempty (AcceptedFailure selected word started .dirtyHigherBitsForInteger) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select doubled
+      exact ⟨whole, selected, accepted_failure selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile doubledBody.parts.inputs doubledBody.binderScheme
+        doubledPlain (identity_callees_plain whole observed.wellFormed observed.identityPlain) trivial
+        (initializer_fault selected doubledBody.parts.read doubledBody.parts.converted doubledBody.parts.roots
+          doubledBody.parts.initializedFound doubledBody.parts.initializedForm doubledBody.targetScheme word dirty)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    failsWith result.val SourceCorePanics.dirtyReason "doubled"
+  for word in [Word.ofNatModulo 128, Word.ofNatModulo 255] do
+    let ⟨canonical⟩ ← Tests.SourceCoreAcceptedFixture.observed
+      (TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = true) "doubled canonical word"
+    let ⟨outside⟩ ← Tests.SourceCoreAcceptedFixture.observed
+      (¬ Dynamic.FixedInRange ⟨false, .w8⟩
+        (Dynamic.checkedResult .add (Dynamic.fixedValue ⟨false, .w8⟩ word) (Dynamic.fixedValue ⟨false, .w8⟩ word)))
+      "doubled overflowing word"
+    let started ← observeStarted observed.fixture doubled.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole doubled),
+        Nonempty (AcceptedFailure selected word started (.panic 0x11)) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select doubled
+      obtain ⟨_finalContext, sourceFault⟩ := doubled_panic selected doubledBody
+        ((SelectedCompilationNamedSupport.Support.of_program observed.wellFormed).certified selected.packet.header)
+        word canonical outside
+      exact ⟨whole, selected, accepted_failure selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile doubledBody.parts.inputs doubledBody.binderScheme
+        doubledPlain (identity_callees_plain whole observed.wellFormed observed.identityPlain) trivial sourceFault⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    failsWith result.val (SourceCorePanics.reason SourceCorePanics.arithmetic) "doubled"
+  let shifted ← observeRow observed.fixture "shifted"
+  let shiftedBody ← observeShiftedBody shifted.original.function.typedBody
+  let ⟨shiftedPlain⟩ ← Tests.SourceCoreAcceptedFixture.observed
+    (CellAwareInvocationAcceptedFaultLifting.CalleesPlain shifted.original.function.typedBody) "shifted callees"
+  for word in dirtyWords do
+    let ⟨dirty⟩ ← Tests.SourceCoreAcceptedFixture.observed
+      (TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = false) "shifted dirty word"
+    let started ← observeStarted observed.fixture shifted.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole shifted),
+        Nonempty (AcceptedFailure selected word started .dirtyHigherBitsForInteger) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select shifted
+      exact ⟨whole, selected, accepted_failure selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile shiftedBody.parts.inputs shiftedBody.binderScheme
+        shiftedPlain (identity_callees_plain whole observed.wellFormed observed.identityPlain) trivial
+        (initializer_fault selected shiftedBody.parts.read shiftedBody.parts.converted shiftedBody.parts.roots
+          shiftedBody.parts.initializedFound shiftedBody.parts.initializedForm shiftedBody.targetScheme word dirty)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    failsWith result.val SourceCorePanics.dirtyReason "shifted"
+  let flipped ← observeRow observed.fixture "flipped"
+  let flippedBody ← observeFlippedBody flipped.original.function.typedBody
+  let ⟨flippedPlain⟩ ← Tests.SourceCoreAcceptedFixture.observed
+    (CellAwareInvocationAcceptedFaultLifting.CalleesPlain flipped.original.function.typedBody) "flipped callees"
+  for word in dirtyWords do
+    let ⟨dirty⟩ ← Tests.SourceCoreAcceptedFixture.observed
+      (TypeSystem.FixedInteger.canonical ⟨false, .w8⟩ word.val = false) "flipped dirty word"
+    let started ← observeStarted observed.fixture flipped.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole flipped),
+        Nonempty (AcceptedFailure selected word started .dirtyHigherBitsForInteger) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select flipped
+      exact ⟨whole, selected, accepted_failure selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile flippedBody.parts.inputs flippedBody.binderScheme
+        flippedPlain (identity_callees_plain whole observed.wellFormed observed.identityPlain) trivial
+        (initializer_fault selected flippedBody.parts.read flippedBody.parts.converted flippedBody.parts.roots
+          flippedBody.parts.initializedFound flippedBody.parts.initializedForm flippedBody.targetScheme word dirty)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    failsWith result.val SourceCorePanics.dirtyReason "flipped"
+  IO.println "ACCEPTED_FAULT_PUBLIC_PASS"
+
+end AcceptedFaultRuntime
 
 end Tests.SourceCoreAcceptedOneCall
 end

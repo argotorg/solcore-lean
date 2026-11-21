@@ -2280,6 +2280,7 @@ def main : IO UInt32 := do
   Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run
   Tests.SourceCoreAcceptedOneCall.AcceptedFixedShiftRuntime.run
   Tests.SourceCoreAcceptedOneCall.AcceptedFixedBitNotRuntime.run
+  Tests.SourceCoreAcceptedOneCall.AcceptedFaultRuntime.run
   Tests.SourceCoreShiftSubset.run
   Tests.SourceCoreCompoundShiftSubset.run
   Tests.SourceCoreBitNotSubset.run
