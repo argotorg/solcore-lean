@@ -3372,6 +3372,10 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
         | assignmentOperands snapshot _ _ _ _ _ _ | assignmentPanic snapshot _ _ _ _ _ _ => cases snapshot with | intro empty _ _ _ => exact (bare empty).elim
         | unbound empty _ => exact (bare empty).elim
         | dangling empty _ _ => exact (bare empty).elim
+        | elementAssignment element _ _ _ _ | elementAssignmentTargetFault element _
+        | elementAssignmentRhsFault element _ _ | elementAssignmentWriteFault element _ _ _ =>
+          obtain ⟨_, member⟩ := element.mem
+          exact (head.shape.elementFree _ member).elim
         | projectedAssignmentRootFault _ failed => exact (failed.excluded head.writable locals).elim
         | projectedAssignmentKeysFault _ ready keysTrace =>
           obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
@@ -3510,6 +3514,9 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
         have empty : assignment.target.projections = [] := by cases snapshot; assumption
         exact (head.projected empty).elim
       | bitNotFault empty _ => exact (head.projected empty).elim
+      | elementBitNot element _ _ _ | elementBitNotTargetFault element _ | elementBitNotOperandFault element _ _ _ =>
+        obtain ⟨_, member⟩ := element.mem
+        exact (head.layout.path.elementFree _ member).elim
       | projectedBitNotRootFault _ failed => exact (failed.excluded head.writable locals).elim
       | projectedBitNotKeysFault _ ready keysTrace =>
         obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
@@ -3635,6 +3642,7 @@ theorem projected_bitNot {program : Program} {registry : Registry} {invocation :
     {assignment : AssignmentResolution} {test : ExpressionId}
     {items post : List ForItemForm} {body : List StatementId} {size : Nat} {outcome : BodyOutcome}
     (projected : assignment.target.projections ≠ [])
+    (elementFree : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (trace : Trace program registry invocation context environment before
       (.assignBitNot assignment :: items) test post body size outcome after) :
     Result program registry invocation context environment before assignment items test post body size outcome after := by
@@ -3645,6 +3653,9 @@ theorem projected_bitNot {program : Program} {registry : Registry} {invocation :
       have empty : assignment.target.projections = [] := by cases snapshot; assumption
       exact (projected empty).elim
     | bitNotFault empty _ => exact (projected empty).elim
+    | elementBitNot element _ _ _ | elementBitNotTargetFault element _ | elementBitNotOperandFault element _ _ _ =>
+      obtain ⟨_, member⟩ := element.mem
+      exact (elementFree _ member).elim
     | projectedBitNotRootFault _ failed => exact .rootFault failed
     | projectedBitNotKeysFault _ ready keys => exact .keysFault ready keys
     | projectedBitNotGetterFault _ keys failed => exact .getterFault keys failed
@@ -3657,6 +3668,9 @@ theorem projected_bitNot {program : Program} {registry : Registry} {invocation :
     | bitNot snapshot _ _ =>
       have empty : assignment.target.projections = [] := by cases snapshot; assumption
       exact (projected empty).elim
+    | elementBitNot element _ _ _ =>
+      obtain ⟨_, member⟩ := element.mem
+      exact (elementFree _ member).elim
     | projectedBitNot _ keys snapshot write next =>
       have result := Result.success keys snapshot write (Trace.loop next loop)
       simpa only [loop_grade] using result
@@ -3736,6 +3750,7 @@ theorem projected_assignment {program : Program} {registry : Registry} {invocati
     {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs test : ExpressionId}
     {items post : List ForItemForm} {body : List StatementId} {size : Nat} {outcome : BodyOutcome}
     (projected : assignment.target.projections ≠ [])
+    (elementFree : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (trace : Trace program registry invocation context environment before
       (.assignValue assignment operator rhs :: items) test post body size outcome after) :
     Result program registry invocation context environment before assignment operator rhs items test post body size outcome after := by
@@ -3746,6 +3761,10 @@ theorem projected_assignment {program : Program} {registry : Registry} {invocati
       have empty : assignment.target.projections = [] := by cases snapshot; assumption
       exact (projected empty).elim
     | unbound empty _ | dangling empty _ _ => exact (projected empty).elim
+    | elementAssignment element _ _ _ _ | elementAssignmentTargetFault element _
+    | elementAssignmentRhsFault element _ _ | elementAssignmentWriteFault element _ _ _ =>
+      obtain ⟨_, member⟩ := element.mem
+      exact (elementFree _ member).elim
     | projectedAssignmentRootFault _ failed => exact .rootFault failed
     | projectedAssignmentKeysFault _ ready keys => exact .keysFault ready keys
     | projectedAssignmentGetterFault _ keys failed => exact .getterFault keys failed
@@ -3759,6 +3778,9 @@ theorem projected_assignment {program : Program} {registry : Registry} {invocati
     | assignment snapshot _ _ _ =>
       have empty : assignment.target.projections = [] := by cases snapshot; assumption
       exact (projected empty).elim
+    | elementAssignment element _ _ _ _ =>
+      obtain ⟨_, member⟩ := element.mem
+      exact (elementFree _ member).elim
     | projectedAssignment _ keys snapshot child write next =>
       have result := Result.success keys snapshot child write (Trace.loop next loop)
       simpa only [loop_grade] using result

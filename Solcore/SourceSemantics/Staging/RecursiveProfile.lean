@@ -1146,6 +1146,8 @@ mutual
         (invalid : UnaryPrimitiveOperandInvalid .bitNot value) :
         StatementsIn program registry mode scope context environment before (id :: rest) context
           (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
+    /-- In-place `~` at an element place resolves the place through `ElementTarget`, then writes the
+    array object it resolved. -/
     | bitNotElement {mode scope context finalContext environment before targetHeap written after assignment target updated id rest node outcome}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignBitNot assignment)
@@ -1228,6 +1230,8 @@ mutual
         (child : Expression program registry scope context environment targetHeap rhs (.value right) after)
         (failed : ProjectedTarget.WriteFault operator target right after reason) :
         StatementsIn program registry mode scope context environment before (id :: rest) context (.fault (.semantic reason)) after
+    /-- A write at an element place resolves the place through `ElementTarget`, then the right-hand
+    side, then writes the array object it resolved, as the Source's assignment rule does. -/
     | assignElement {mode scope context finalContext environment before targetHeap middle written after assignment operator rhs target value updated id rest node outcome}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment operator rhs)
@@ -1525,6 +1529,29 @@ mutual
         (invalid : UnaryPrimitiveOperandInvalid .bitNot value) :
         ForItems program registry scope context environment before (.assignBitNot assignment :: rest) context
           (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
+    /-- In-place `~` at an element place, as the statement `bitNotElement` does it. -/
+    | elementBitNot {scope context finalContext environment before targetHeap written after assignment target updated rest outcome}
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry scope context environment before assignment.target (.resolved target)
+          targetHeap)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
+          targetHeap target updated written)
+        (next : ForItems program registry scope context environment written rest finalContext outcome after) :
+        ForItems program registry scope context environment before (.assignBitNot assignment :: rest) finalContext outcome after
+    | elementBitNotTargetFault {scope context environment before after assignment rest failure}
+        (element : ElementPlace assignment.target.projections)
+        (failed : ElementTarget program registry scope context environment before assignment.target (.fault failure)
+          after) :
+        ForItems program registry scope context environment before (.assignBitNot assignment :: rest) context (.fault failure) after
+    | elementBitNotOperandFault {scope context environment before after assignment target value rest}
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry scope context environment before assignment.target (.resolved target)
+          after)
+        (selected : target.selected = some value)
+        (invalid : UnaryPrimitiveOperandInvalid .bitNot value) :
+        ForItems program registry scope context environment before (.assignBitNot assignment :: rest) context
+          (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
     | projectedAssignment {scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated rest outcome}
         (projected : assignment.target.projections ≠ [])
         (keys : Expressions program registry scope context environment before
@@ -1564,6 +1591,35 @@ mutual
         (keys : Expressions program registry scope context environment before
           (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
         (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry scope context environment targetHeap rhs (.value right) after)
+        (failed : ProjectedTarget.WriteFault operator target right after reason) :
+        ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault (.semantic reason)) after
+    /-- A write at an element place, as the statement `assignElement` does it. -/
+    | elementAssignment {scope context finalContext environment before targetHeap middle written after assignment operator rhs target value updated rest outcome}
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry scope context environment before assignment.target (.resolved target)
+          targetHeap)
+        (child : Expression program registry scope context environment targetHeap rhs (.value value) middle)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
+          middle target updated written)
+        (next : ForItems program registry scope context environment written rest finalContext outcome after) :
+        ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) finalContext outcome after
+    | elementAssignmentTargetFault {scope context environment before after assignment operator rhs rest failure}
+        (element : ElementPlace assignment.target.projections)
+        (failed : ElementTarget program registry scope context environment before assignment.target (.fault failure)
+          after) :
+        ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault failure) after
+    | elementAssignmentRhsFault {scope context environment before targetHeap after assignment operator rhs target rest failure}
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry scope context environment before assignment.target (.resolved target)
+          targetHeap)
+        (child : Expression program registry scope context environment targetHeap rhs (.fault failure) after) :
+        ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault failure) after
+    | elementAssignmentWriteFault {scope context environment before targetHeap after assignment operator rhs target right rest reason}
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry scope context environment before assignment.target (.resolved target)
+          targetHeap)
         (child : Expression program registry scope context environment targetHeap rhs (.value right) after)
         (failed : ProjectedTarget.WriteFault operator target right after reason) :
         ForItems program registry scope context environment before (.assignValue assignment operator rhs :: rest) context (.fault (.semantic reason)) after
@@ -1944,6 +2000,14 @@ local macro "retain_stage_origin" : tactic =>
       cases same
       exact ih s c r rfl
     case assignElementRhsFault contains form element resolved child resolvedIH childIH =>
+      intro s c r same
+      cases same
+      exact childIH s c r rfl
+    case elementBitNotTargetFault element failed ih | elementAssignmentTargetFault element failed ih =>
+      intro s c r same
+      cases same
+      exact ih s c r rfl
+    case elementAssignmentRhsFault element resolved child resolvedIH childIH =>
       intro s c r same
       cases same
       exact childIH s c r rfl

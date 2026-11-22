@@ -1792,6 +1792,76 @@ theorem for_items_step (size : Nat)
           | expression expressionTyped =>
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap expressionTyped child
               exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
+  | @elementBitNot targetSize nextSize scope context finalContext environment before targetHeap written after assignment target updated rest outcome
+      _element resolved write next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+          cases headTyped with
+          | assignBitNot assignmentTyped =>
+              cases assignmentTyped with
+              | @intro _ _ targetType targetTyped kind _ =>
+                  obtain ⟨targetHeapTyped, targetExtends, targetResolved⟩ := element_target_below _ expressionIH
+                    (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
+                  obtain ⟨_, savedTyped⟩ := targetResolved _ rfl
+                  rw [targetTyped.type_eq] at write
+                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_bitNot kind savedTyped targetHeapTyped write
+                  have totalExtends := targetExtends.trans writtenExtends
+                  have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                    (locals.mono totalExtends) writtenTyped tailTyped next
+                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done⟩
+  | @elementBitNotTargetFault targetSize scope context environment before after assignment rest failure
+      _element failed
+  | @elementBitNotOperandFault targetSize scope context environment before after assignment _ _ rest
+      _element failed _ _ =>
+      cases typed with
+      | cons headTyped tailTyped =>
+          cases headTyped with
+          | assignBitNot assignmentTyped =>
+              cases assignmentTyped with
+              | intro targetTyped _ _ =>
+                  obtain ⟨afterTyped, targetExtends, _⟩ := element_target_below _ expressionIH
+                    (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped failed
+                  exact ⟨afterTyped, targetExtends, by intro environment equal; cases equal⟩
+  | @elementAssignment targetSize childSize nextSize scope context finalContext environment before targetHeap middle written after assignment operator rhs target value updated rest outcome
+      _element resolved child write next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+          cases headTyped with
+          | assignValue assignmentTyped =>
+              obtain ⟨_, _, targetTyped, _⟩ := assignment_parts_typed assignmentTyped
+              obtain ⟨targetHeapTyped, targetExtends, targetResolved⟩ := element_target_below _ expressionIH
+                (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
+              obtain ⟨writtenTyped, writtenExtends⟩ := resolved_write assignmentTyped targetTyped (targetResolved _ rfl)
+                (fun _ rhsTyped => expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+                  runtime covers (locals.mono targetExtends) targetHeapTyped rhsTyped child) write
+              have totalExtends := targetExtends.trans writtenExtends
+              have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono totalExtends) writtenTyped tailTyped next
+              exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done⟩
+  | @elementAssignmentTargetFault targetSize scope context environment before after assignment operator rhs rest failure
+      _element failed =>
+      cases typed with
+      | cons headTyped tailTyped =>
+          cases headTyped with
+          | assignValue assignmentTyped =>
+              obtain ⟨_, _, targetTyped, _⟩ := assignment_parts_typed assignmentTyped
+              obtain ⟨afterTyped, targetExtends, _⟩ := element_target_below _ expressionIH
+                (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped failed
+              exact ⟨afterTyped, targetExtends, by intro environment equal; cases equal⟩
+  | @elementAssignmentRhsFault targetSize childSize scope context environment before targetHeap after assignment operator rhs target rest failure
+      _element resolved child
+  | @elementAssignmentWriteFault targetSize childSize scope context environment before targetHeap after assignment operator rhs target _ rest _
+      _element resolved child _ =>
+      cases typed with
+      | cons headTyped tailTyped =>
+          cases headTyped with
+          | assignValue assignmentTyped =>
+              obtain ⟨_, _, targetTyped, rhsTyped⟩ := assignment_parts_typed assignmentTyped
+              obtain ⟨targetHeapTyped, targetExtends, _⟩ := element_target_below _ expressionIH
+                (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
+              have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono targetExtends) targetHeapTyped rhsTyped child
+              exact ⟨post.heap_typed, targetExtends.trans post.heap_extends, by intro environment equal; cases equal⟩
   | @projectedBitNot keysSize nextSize scope context finalContext environment before targetHeap written after assignment values target updated rest outcome
       _projected keys snapshot write next =>
       cases typed with

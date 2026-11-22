@@ -1315,6 +1315,29 @@ local macro "erase_recursive_plain" : tactic =>
     case bitNot snapshot write _next nextIH =>
       exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves _ _ _ _) write)) nextIH
     case bitNotFault _bare failed => exact .head (.assignBitNot failed)
+    case elementBitNot _element resolved write _next resolvedIH nextIH =>
+      exact ForItemsPlain.prepend (.assignBitNot (.intro resolvedIH write)) nextIH
+    case elementBitNotTargetFault _element failed failedIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .head (.assignBitNot (.target failedIH))
+    case elementBitNotOperandFault _element resolved selected invalid resolvedIH =>
+      exact .head (.assignBitNot (.operand resolvedIH selected invalid))
+    case elementAssignment _element resolved child write _next resolvedIH childIH nextIH =>
+      exact ForItemsPlain.prepend (.assignValue (.intro resolvedIH childIH write)) nextIH
+    case elementAssignmentTargetFault _element failed failedIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .head (.assignValue (.target failedIH))
+    case elementAssignmentRhsFault _element resolved child resolvedIH childIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .head (.assignValue (.rhs resolvedIH childIH))
+    case elementAssignmentWriteFault _element resolved child failed resolvedIH childIH =>
+      exact .head (.assignValue (failed.source resolvedIH childIH))
     case projectedBitNot _projected keys snapshot write _next keysIH nextIH =>
       exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves keysIH) write)) nextIH
     case projectedBitNotRootFault _projected failed =>
@@ -2138,6 +2161,29 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
   case bitNot snapshot write _next nextIH =>
     exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves _ _ _ _) write)) nextIH
   case bitNotFault _bare failed => exact .head (.assignBitNot failed)
+  case elementBitNot _element resolved write _next _resolvedIH nextIH =>
+    exact ForItemsPlain.prepend (.assignBitNot (.intro resolved.resolved_plain write)) nextIH
+  case elementBitNotTargetFault _element failed _failedIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.assignBitNot (.target failed.semanticFault_plain))
+  case elementBitNotOperandFault _element resolved selected invalid _resolvedIH =>
+    exact .head (.assignBitNot (.operand resolved.resolved_plain selected invalid))
+  case elementAssignment _element resolved child write _next _resolvedIH _childIH nextIH =>
+    exact ForItemsPlain.prepend (.assignValue (.intro resolved.resolved_plain child.value_plain write)) nextIH
+  case elementAssignmentTargetFault _element failed _failedIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.assignValue (.target failed.semanticFault_plain))
+  case elementAssignmentRhsFault _element resolved child _resolvedIH _childIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.assignValue (.rhs resolved.resolved_plain child.semanticFault_plain))
+  case elementAssignmentWriteFault _element resolved child failed _resolvedIH _childIH =>
+    exact .head (.assignValue (failed.source resolved.resolved_plain child.value_plain))
   case projectedBitNot _projected keys snapshot write _next _keysIH nextIH =>
     exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves keys.values_plain) write)) nextIH
   case projectedBitNotRootFault _projected failed =>
@@ -2313,6 +2359,29 @@ theorem ForItems.plain {program : Program} {registry : Registry} {scope : Scope}
   case bitNot snapshot write _next nextIH =>
     exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves _ _ _ _) write)) nextIH
   case bitNotFault _bare failed => exact .head (.assignBitNot failed)
+  case elementBitNot _element resolved write _next _resolvedIH nextIH =>
+    exact ForItemsPlain.prepend (.assignBitNot (.intro resolved.resolved_plain write)) nextIH
+  case elementBitNotTargetFault _element failed _failedIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.assignBitNot (.target failed.semanticFault_plain))
+  case elementBitNotOperandFault _element resolved selected invalid _resolvedIH =>
+    exact .head (.assignBitNot (.operand resolved.resolved_plain selected invalid))
+  case elementAssignment _element resolved child write _next _resolvedIH _childIH nextIH =>
+    exact ForItemsPlain.prepend (.assignValue (.intro resolved.resolved_plain child.value_plain write)) nextIH
+  case elementAssignmentTargetFault _element failed _failedIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.assignValue (.target failed.semanticFault_plain))
+  case elementAssignmentRhsFault _element resolved child _resolvedIH _childIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact .head (.assignValue (.rhs resolved.resolved_plain child.semanticFault_plain))
+  case elementAssignmentWriteFault _element resolved child failed _resolvedIH _childIH =>
+    exact .head (.assignValue (failed.source resolved.resolved_plain child.value_plain))
   case projectedBitNot _projected keys snapshot write _next _keysIH nextIH =>
     exact ForItemsPlain.prepend (.assignBitNot (.intro (snapshot.resolves keys.values_plain) write)) nextIH
   case projectedBitNotRootFault _projected failed =>

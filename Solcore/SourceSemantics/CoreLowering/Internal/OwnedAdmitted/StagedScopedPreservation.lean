@@ -922,7 +922,8 @@ theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : 
             maps.trans finalMaps, worlds.trans finalWorlds, preservation.trans finalFrame, metadata.trans finalMetadata,
             last, callerProtocol.trans related lastRelated, post⟩
       ·
-        have splitTrace := CallableIndexedOwnedAdmittedStagedForInitializerProjectedInversion.projected_assignment bare trace
+        have splitTrace := CallableIndexedOwnedAdmittedStagedForInitializerProjectedInversion.projected_assignment bare
+          head.shape.elementFree trace
         cases splitTrace with
         | rootFault failed => exact False.elim (failed.excluded head.writable locals)
         | keysFault ready keyTrace =>
@@ -1055,7 +1056,8 @@ theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : 
         intro scope id lowered generated node found typed
         obtain ⟨actualNode, nodeFound, nodeTyped, certified⟩ := generated
         exact children context size smaller certified found typed
-      have splitTrace := CallableIndexedOwnedAdmittedStagedForInitializerProjectedBitNotInversion.projected_bitNot head.projected trace
+      have splitTrace := CallableIndexedOwnedAdmittedStagedForInitializerProjectedBitNotInversion.projected_bitNot head.projected
+        head.layout.path.elementFree trace
       cases splitTrace with
       | rootFault failed => exact False.elim (failed.excluded head.writable locals)
       | keysFault ready keyTrace =>

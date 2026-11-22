@@ -1114,6 +1114,10 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   | assignment snapshot _ _ _ | assignmentFailure snapshot _ | assignmentOperands snapshot _ _ _ _ _ _ | assignmentPanic snapshot _ _ _ _ _ _ =>
     cases snapshot with | intro empty _ _ _ => exact (projected empty).elim
   | unbound empty _ | dangling empty _ _ => exact (projected empty).elim
+  | elementAssignment element _ _ _ _ | elementAssignmentTargetFault element _
+  | elementAssignmentRhsFault element _ _ | elementAssignmentWriteFault element _ _ _ =>
+    obtain ⟨_, member⟩ := element.mem
+    exact (head.shape.elementFree _ member).elim
   | projectedAssignmentRootFault _ failed => exact False.elim (failed.excluded head.writable locals)
   | projectedAssignmentKeysFault _ ready keyTrace =>
       obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
@@ -1452,6 +1456,9 @@ theorem preserves (budget : Nat)
   | bitNot snapshot _ _ =>
     cases snapshot with | intro empty _ _ _ => exact (projected empty).elim
   | bitNotFault empty _ => exact (projected empty).elim
+  | elementBitNot element _ _ _ | elementBitNotTargetFault element _ | elementBitNotOperandFault element _ _ _ =>
+    obtain ⟨_, member⟩ := element.mem
+    exact (head.layout.path.elementFree _ member).elim
   | projectedBitNotRootFault _ failed => exact False.elim (failed.excluded head.writable locals)
   | projectedBitNotKeysFault _ ready keyTrace =>
       obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds,
@@ -2605,7 +2612,8 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   intro size within mapping world actualContext environment canonical actual before store embedding
     environments heaps locals agrees actualTyped runtime covers sameLedger
     initial admitted authority physical owner sameLocation ready outcome after trace
-  have splitTrace := CallableIndexedOwnedAdmittedStagedForInitializerProjectedInversion.projected_assignment projected trace
+  have splitTrace := CallableIndexedOwnedAdmittedStagedForInitializerProjectedInversion.projected_assignment projected
+    head.shape.elementFree trace
   cases splitTrace with
   | rootFault failed => exact False.elim (failed.excluded head.writable locals)
   | keysFault ready keyTrace =>
@@ -2928,7 +2936,8 @@ theorem preserves (budget : Nat)
   intro size within mapping world actualContext environment canonical actual before store embedding
     environments heaps locals agrees actualTyped runtime covers sameLedger
     initial admitted authority physical owner sameLocation ready outcome after trace
-  have splitTrace := CallableIndexedOwnedAdmittedStagedForInitializerProjectedBitNotInversion.projected_bitNot projected trace
+  have splitTrace := CallableIndexedOwnedAdmittedStagedForInitializerProjectedBitNotInversion.projected_bitNot projected
+    head.layout.path.elementFree trace
   cases splitTrace with
   | rootFault failed => exact False.elim (failed.excluded head.writable locals)
   | keysFault ready keyTrace =>

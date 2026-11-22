@@ -1124,6 +1124,64 @@ theorem for_items_step (wellFormed : ProgramWellFormed program) (size : Nat)
           | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ | shiftCompound _ _ _ rhsTyped _ _ =>
             have post := expression_value wellFormed runtime covers locals heap rhsTyped child
             exact ⟨post.heap_typed, post.heap_extends⟩
+  | @elementBitNot targetSize nextSize scope context finalContext environment before targetHeap written after assignment target updated rest outcome
+      _element resolved write next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+        exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
+          runtime covers locals heap headTyped tailTyped
+          (.assignBitNot (.intro resolved.sound.resolved_plain write)) next
+  | @elementBitNotTargetFault targetSize scope context environment before after assignment rest failure
+      _element failed
+  | @elementBitNotOperandFault targetSize scope context environment before after assignment _ _ rest
+      _element failed _ _ =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | assignBitNot assignmentTyped =>
+          cases assignmentTyped with
+          | intro targetTyped _ =>
+              exact element_target_below wellFormed _ expressionIH (Size.child_lt_stepSize (by simp))
+                runtime covers locals heap targetTyped failed
+  | @elementAssignment targetSize childSize nextSize scope context finalContext environment before targetHeap middle written after assignment operator rhs target value updated rest outcome
+      _element resolved child write next =>
+      cases typed with
+      | cons headTyped tailTyped =>
+        exact for_items_tail wellFormed (itemsIH nextSize (Size.child_lt_stepSize (by simp)))
+          runtime covers locals heap headTyped tailTyped
+          (.assignValue (.intro resolved.sound.resolved_plain child.sound.value_plain write)) next
+  | @elementAssignmentTargetFault targetSize scope context environment before after assignment operator rhs rest failure
+      _element failed =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | assignValue assignmentTyped =>
+          obtain ⟨_, _, targetTyped, _⟩ := SelectedPreservation.assignment_parts_typed assignmentTyped
+          exact element_target_below wellFormed _ expressionIH (Size.child_lt_stepSize (by simp))
+            runtime covers locals heap targetTyped failed
+  | @elementAssignmentRhsFault targetSize childSize scope context environment before targetHeap after assignment operator rhs target rest failure
+      _element resolved child =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | assignValue assignmentTyped =>
+          obtain ⟨_, _, targetTyped, rhsTyped⟩ := SelectedPreservation.assignment_parts_typed assignmentTyped
+          obtain ⟨targetHeapTyped, targetExtends⟩ := element_target_below wellFormed _ expressionIH
+            (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
+          obtain ⟨afterTyped, rhsExtends⟩ := expressionIH childSize (Size.child_lt_stepSize (by simp))
+            runtime covers (locals.mono targetExtends) targetHeapTyped rhsTyped child
+          exact ⟨afterTyped, targetExtends.trans rhsExtends⟩
+  | @elementAssignmentWriteFault targetSize childSize scope context environment before targetHeap after assignment operator rhs target right rest reason
+      _element resolved child _failed =>
+      cases typed with
+      | cons headTyped _ =>
+        cases headTyped with
+        | assignValue assignmentTyped =>
+          obtain ⟨_, _, targetTyped, rhsTyped⟩ := SelectedPreservation.assignment_parts_typed assignmentTyped
+          obtain ⟨targetHeapTyped, targetExtends⟩ := element_target_below wellFormed _ expressionIH
+            (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
+          have post := expression_value wellFormed runtime covers (locals.mono targetExtends) targetHeapTyped rhsTyped child
+          exact ⟨post.heap_typed, targetExtends.trans post.heap_extends⟩
   | @projectedBitNot keysSize nextSize scope context finalContext environment before targetHeap written after assignment values target updated rest outcome
       _projected keys snapshot write next =>
       cases typed with

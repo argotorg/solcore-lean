@@ -137,6 +137,12 @@ theorem assignment {assignment : AssignmentResolution} {operator : Syntax.ValueA
   | projectedAssignmentWriteFault projected _ _ _ _ =>
       have empty : assignment.target.projections = [] := by cases snapshot; assumption
       exact (projected empty).elim
+  | elementAssignment element _ _ _ _
+  | elementAssignmentTargetFault element _
+  | elementAssignmentRhsFault element _ _
+  | elementAssignmentWriteFault element _ _ _ =>
+      have empty : assignment.target.projections = [] := by cases snapshot; assumption
+      exact (element.ne_nil empty).elim
   | assignment actualSnapshot child write remaining =>
       have targets := target_functional snapshot actualSnapshot
       cases targets
@@ -183,6 +189,9 @@ theorem bitNot {assignment : AssignmentResolution}
   | projectedBitNotKeysFault projected _ _ | projectedBitNotGetterFault projected _ _
   | projectedBitNotOperandFault projected _ _ _ _ =>
       exact (projected bare).elim
+  | elementBitNot element _ _ _ | elementBitNotTargetFault element _
+  | elementBitNotOperandFault element _ _ _ =>
+      exact (element.ne_nil bare).elim
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion
 end
@@ -265,7 +274,8 @@ theorem initial_context {program : Program} {registry : Registry} {invocation : 
           cases Dynamic.BinderExtends.functional extended staticExtended
           exact ih _ (Size.child_lt_stepSize (by simp)) tail next
     | expression child next | assignment _ child _ next | bitNot _ _ next
-    | projectedAssignment _ _ _ child _ next | projectedBitNot _ child _ _ next =>
+    | projectedAssignment _ _ _ child _ next | projectedBitNot _ child _ _ next
+    | elementAssignment _ _ _ _ next | elementBitNot _ _ _ next =>
       cases typed with
       | cons head tail =>
         cases head
