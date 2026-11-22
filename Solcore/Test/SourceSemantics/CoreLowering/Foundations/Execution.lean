@@ -7455,6 +7455,52 @@ private def runLiteralElementRefs : IO Unit := do
   let _ ← panics session (← key 4) [] SourceCorePanics.outOfBounds "pastTheEnd"
   IO.println "SOURCE_CORE_LITERAL_ELEMENT_REFS_PASS: a literal lidx index takes uint256 as a read's does, as upstream's literal in lidx's generic bound does, in a let, as an argument and under CanStore.store and CanStore.load, and one past the array's end panics with 0x32"
 
+private def methodPredicateSuperclassesWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := []
+  mainSources := [{ path := "main.solc", content := String.intercalate "\n" [
+    "pragma solcore;",
+    "trait BitNot<T> { function bnot(value: T) returns (T); }",
+    "trait Sub<T> where T: BitNot { function sub(left: T, right: T) returns (T); }",
+    "trait Add<T> where T: BitNot { function add(left: T, right: T) returns (T); }",
+    "trait Mod<T> where T: Add { function mod(left: T, right: T) returns (T); }",
+    "trait Mul<T> { function mul(left: T, right: T) returns (T) where T: Sub; }",
+    "trait Div<T> { function div(left: T, right: T) returns (T) where T: Mod; }",
+    "default impl<T> BitNot<T> { function bnot(value: T) returns (T) { return value; } }",
+    "enum Coin { Head, Tail }",
+    "impl BitNot<Coin> { function bnot(value: Coin) returns (Coin) { match (value) { case Coin.Head { return Coin.Tail; } case Coin.Tail { return Coin.Head; } } } }",
+    "enum Plain { Head, Tail }",
+    "impl Sub<Coin> { function sub(left: Coin, right: Coin) returns (Coin) { return left; } }",
+    "impl Sub<Plain> { function sub(left: Plain, right: Plain) returns (Plain) { return left; } }",
+    "impl Add<Coin> { function add(left: Coin, right: Coin) returns (Coin) { return left; } }",
+    "impl Mod<Coin> { function mod(left: Coin, right: Coin) returns (Coin) { return left; } }",
+    "impl<A> Mul<A> { function mul(left: A, right: A) returns (A) where A: Sub { return ~left; } }",
+    "impl<A> Div<A> { function div(left: A, right: A) returns (A) where A: Mod { return ~left; } }",
+    "function coin(value: Coin) returns (Word) { match (value) { case Coin.Head { return 1; } case Coin.Tail { return 2; } } }",
+    "function plain(value: Plain) returns (Word) { match (value) { case Plain.Head { return 1; } case Plain.Tail { return 2; } } }",
+    "function viaTwoGivens<U>(x: U, y: U) returns (U) where U: Sub, U: Add { return x * y; }",
+    "function coinMethod() returns (Word) { return coin(Coin.Head * Coin.Tail); }",
+    "function plainMethod() returns (Word) { return plain(Plain.Head * Plain.Tail); }",
+    "function twoGivens() returns (Word) { return coin(viaTwoGivens(Coin.Head, Coin.Tail)); }",
+    "function twoLevels() returns (Word) { return coin(Coin.Head / Coin.Tail); }"] }]
+}
+
+private def runMethodPredicateSuperclasses : IO Unit := do
+  let program ← get "method predicate superclasses check"
+    (checkProgram methodPredicateSuperclassesWorkspace)
+  let names := ["coinMethod", "plainMethod", "twoGivens", "twoLevels"]
+  let compiled ← get "method predicate superclasses compilation"
+    (compile methodPredicateSuperclassesWorkspace (← names.mapM (seed program)))
+  let mut session ← boot (← compiled.open)
+  for (index, expected) in ([(0, 2), (1, 1), (2, 2), (3, 2)] : List (Nat × Nat)) do
+    let key ← match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError "method predicate superclasses root missing")
+    let completed ← execute session key []
+    require (completed.value == word expected)
+      s!"{names[index]!} gave {reprStr completed.value}"
+    session := completed.session
+  IO.println "SOURCE_CORE_METHOD_PREDICATE_SUPERCLASSES_PASS: a superclass of an implementation method's own predicate is a given its caller proves, as upstream projects it, so the body runs the impl at a type with its own, the default at a type only the default covers, through a caller whose two givens reach it and two levels up"
+
 private def runDefaultForTypeParameter : IO Unit := do
   let program ← get "default for a type parameter check" (checkProgram defaultForTypeParameterWorkspace)
   let names := ["viaCoin", "viaPlain", "viaSecond", "viaBoxed"]
@@ -7787,6 +7833,7 @@ def run : IO Unit := do
   runSuperclassesOfGivens
   runImpliedSuperclasses
   runLiteralElementRefs
+  runMethodPredicateSuperclasses
 
 end Tests.SourceCoreExecution
 end

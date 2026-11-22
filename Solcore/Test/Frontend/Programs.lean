@@ -1834,6 +1834,91 @@ private def testSuperclassesOfGivens : IO Unit := do
       s!"an implementation that restates a superclass had the wrong failure: {reprStr errors}")
   | .ok _ => throw (IO.userError "an implementation that restates a superclass was accepted")
 
+/-- A superclass of an implementation method's own predicate is a given in its
+body, as upstream projects it: a trait method's predicates are closed under
+their superclasses, which its caller proves, and an implementation method's
+take their superclasses from that closure and from its implementation's
+conditions, both kept as written (`declaredWherePredicates`). A goal that two
+of the method's predicates, or a method predicate and a condition, reach is
+refused where it is used (`SC0208`); the superclasses that a trait method's
+closure adds at a call are never checked there. The shapes are the probes
+measured at the pin, with upstream's `Up`, `Down`, `Side`, `Mid` and `Low` as
+`BitNot`, `Sub`, `Add`, `Add` and `Sub`, and its `Use` traits as `Mul`. -/
+private def testSuperclassesOfMethodPredicates : IO Unit := do
+  let bitNot := "trait BitNot<T> { function bnot(value: T) returns (T); }"
+  let coin := ["enum Coin { Head, Tail }",
+    "impl BitNot<Coin> { function bnot(value: Coin) returns (Coin) { match (value) { case Coin.Head { return Coin.Tail; } case Coin.Tail { return Coin.Head; } } } }",
+    "impl Add<Coin> { function add(left: Coin, right: Coin) returns (Coin) { return right; } }",
+    "impl Sub<Coin> { function sub(left: Coin, right: Coin) returns (Coin) { return left; } }"]
+  let siblings := [bitNot,
+    "trait Add<T> where T: BitNot { function add(left: T, right: T) returns (T); }",
+    "trait Sub<T> where T: BitNot { function sub(left: T, right: T) returns (T); }"] ++ coin
+  let chain := [bitNot,
+    "trait Add<T> where T: BitNot { function add(left: T, right: T) returns (T); }",
+    "trait Sub<T> where T: Add { function sub(left: T, right: T) returns (T); }"] ++ coin
+  let mulWith (predicates : String) : String :=
+    s!"trait Mul<T> \{ function mul(left: T, right: T) returns (T) where {predicates}; }"
+  let mulImpl (head conditions predicates body : String) : String :=
+    s!"impl<A> Mul<{head}>{conditions} \{ function mul(left: {head}, right: {head}) returns ({head}){predicates} \{ {body} } }"
+  let run := "function run() returns (Coin) { return Coin.Head * Coin.Tail; }"
+  let ownPredicate := siblings ++ [mulWith "T: Sub", mulImpl "A" "" " where A: Sub" "return ~left;", run]
+  let lifted := ["pragma no-patterson-condition;"]
+  for (label, lines) in [
+      ("a superclass of the method's own predicate", ownPredicate),
+      ("two superclass levels", chain ++ [mulWith "T: Sub",
+        mulImpl "A" "" " where A: Sub" "return ~(left + right);", run]),
+      ("two method predicates that the body never uses", siblings ++ [mulWith "T: Sub, T: Add",
+        mulImpl "A" "" " where A: Sub, A: Add" "return (left + right) - right;", run]),
+      ("a method predicate beside a condition, both unused", lifted ++ siblings ++ [mulWith "T: Sub",
+        mulImpl "A" " where A: Add" " where A: Sub" "return (left + right) - right;", run]),
+      ("a method predicate equal to a condition", lifted ++ siblings ++ [mulWith "T: Sub",
+        mulImpl "A" " where A: Sub" " where A: Sub" "return ~left;", run]),
+      ("a caller whose two givens reach the trait method's superclass", siblings ++ [
+        mulWith "T: Sub", mulImpl "A" "" " where A: Sub" "return ~left;",
+        "function caller<U>(x: U, y: U) returns (U) where U: Sub, U: Add { return x * y; }"]),
+      ("a caller with the one given", siblings ++ [mulWith "T: Sub",
+        mulImpl "A" "" " where A: Sub" "return ~left;",
+        "function caller<U>(x: U, y: U) returns (U) where U: Sub { return ~(x * y); }"]),
+      ("a nominal subject", siblings ++ [mulWith "T: Sub", "enum Box<A> { Wrap(A) }",
+        "impl<A> BitNot<Box<A>> where A: BitNot { function bnot(value: Box<A>) returns (Box<A>) { match (value) { case Box.Wrap(x) { return Box.Wrap(~x); } } } }",
+        "impl<A> Sub<Box<A>> where A: BitNot { function sub(left: Box<A>, right: Box<A>) returns (Box<A>) { return left; } }",
+        mulImpl "Box<A>" "" " where Box<A>: Sub" "return ~left;"])] do
+    match checkProgram (singleSourceWorkspace (String.intercalate "\n" lines)) with
+    | .ok _ => pure ()
+    | .error errors => throw (IO.userError s!"{label} was refused: {reprStr errors}")
+  for (label, lines) in [
+      ("two method predicates", siblings ++ [mulWith "T: Sub, T: Add",
+        mulImpl "A" "" " where A: Sub, A: Add" "return ~left;"]),
+      ("a method predicate beside a condition", lifted ++ siblings ++ [mulWith "T: Sub",
+        mulImpl "A" " where A: Add" " where A: Sub" "return ~left;"]),
+      ("a superclass stated beside its subclass", siblings ++ [mulWith "T: Sub, T: BitNot",
+        mulImpl "A" "" " where A: Sub, A: BitNot" "return ~left;"])] do
+    match checkProgram (singleSourceWorkspace (String.intercalate "\n" lines)) with
+    | .error [.methodAmbiguousGiven _ predicate] =>
+        assertTrue (match predicate.subject with | .parameter _ => true | _ => false)
+          s!"{label} was refused at {reprStr predicate}"
+    | .error errors => throw (IO.userError s!"{label} had the wrong failure: {reprStr errors}")
+    | .ok _ => throw (IO.userError s!"{label} was accepted")
+  -- A method that omits its trait method's predicate has no given for the
+  -- superclass, as upstream's `SC0207` finds.
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" (siblings ++
+      [mulWith "T: Sub", mulImpl "A" "" "" "return ~left;"]))) with
+  | .error [.methodNoSolution _ _] => pure ()
+  | .error errors => throw (IO.userError s!"an omitted method predicate had the wrong failure: {reprStr errors}")
+  | .ok _ => throw (IO.userError "an omitted method predicate gave its superclass")
+  -- The catalog keeps both lists as written beside their closures.
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" ownPredicate)) with
+  | .ok program =>
+      let traitMethods := (program.signatures.traits.filter (·.name == "Mul")).flatMap (·.methods)
+      let implMethods := (program.signatures.implementations.filter fun implementation =>
+        implementation.methods.any (·.name == "mul")).flatMap (·.methods)
+      assertTrue (traitMethods.map (·.declaredWherePredicates.length) == [1] &&
+          traitMethods.map (·.wherePredicates.length) == [2] &&
+          implMethods.map (·.declaredWherePredicates.length) == [1] &&
+          implMethods.map (·.wherePredicates.length) == [2])
+        s!"the method predicates were not closed as written: {reprStr (traitMethods.map (·.wherePredicates))}"
+  | .error errors => throw (IO.userError s!"the method predicate shape was refused: {reprStr errors}")
+
 /-- Row 13's third step: an implementation need not restate its trait's where
 predicates, and each that it does not state must be provided where it is
 declared, its conditions as the givens, as upstream's `SC0248` checks. The
@@ -2160,6 +2245,7 @@ def testProgramChecking : IO Unit := do
   testGivenBelowAnImplementation
   testDefaultTierBlocking
   testSuperclassesOfGivens
+  testSuperclassesOfMethodPredicates
   testSuperclassInstances
   testStageClassification
   testPhantomImplementationParameterRejection

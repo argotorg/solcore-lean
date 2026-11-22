@@ -455,30 +455,78 @@ theorem checkImplementationMethodBodies_success_member
       exact ⟨implementation, method, trait, catalogMember.1,
         catalogMember.2, traitLookup, idEq, bodySuccess⟩
 
-/-- The requirements that a function's closure under superclasses adds to a
-call of it, or a reference to it, after the callee's own `where` predicates.
-Upstream projects them from those predicates' dictionaries and never solves
-them where the call is, so they meet no ambiguity check. -/
+/-- The trait method that a call's primary requirement selects by its trait
+and `methodName`: its where predicates as written and closed under their
+superclasses, by their counts. -/
+def calledMethodPredicateCounts (signatures : ProgramSignatures)
+    (solved : List SourceInference.SolvedRequirement)
+    (primary : SourceInference.RequirementId) (methodName : String) :
+    Option (Nat × Nat) := do
+  let requirement ← solved.find? fun requirement => decide (requirement.id = primary)
+  match requirement.predicate.trait with
+  | .declaration traitId =>
+      let trait ← signatures.traits.find? fun trait => decide (trait.id = traitId)
+      let method ← trait.methods.find? fun method => method.name == methodName
+      pure (method.declaredWherePredicates.length, method.wherePredicates.length)
+  | .builtin _ => none
+
+/-- The trait method that an operator calls, by its name, if it calls one. -/
+def operatorMethodName? : SourceInference.ExpressionForm → Option String
+  | .binary _ operator _ =>
+      match SourceInference.Detail.binaryOperatorDispatch operator with
+      | .traitMethod _ name => some name
+      | .function _ => none
+  | .unary operator _ =>
+      match SourceInference.Detail.unaryOperatorDispatch operator with
+      | .traitMethod _ name => some name
+      | .function _ => none
+  | _ => none
+
+/-- The method requirements that a trait method's closure adds after its own
+where predicates, at a call through an operator or a coercion. -/
+def impliedMethodRequirements (signatures : ProgramSignatures)
+    (solved : List SourceInference.SolvedRequirement) (primary : SourceInference.RequirementId)
+    (methodName : String) (methodRequirements : List SourceInference.RequirementId) :
+    List SourceInference.RequirementId :=
+  match calledMethodPredicateCounts signatures solved primary methodName with
+  | some (declared, closed) =>
+      if methodRequirements.length == closed then methodRequirements.drop declared else []
+  | none => []
+
+/-- The requirements that a callee's closure under superclasses adds where it
+is used, after the callee's own `where` predicates: at a call of a function or
+a reference to it, and at a call of a trait method through an operator or a
+coercion. Upstream projects them from those predicates' dictionaries and never
+solves them where the call is, so they meet no ambiguity check. -/
 def impliedCallRequirements (signatures : ProgramSignatures)
+    (solved : List SourceInference.SolvedRequirement)
     (body : SourceInference.TypedSource) : List SourceInference.RequirementId :=
   body.nodes.flatMap fun
     | .expression node =>
+        let coercions := node.coercions.flatMap (·.requirements)
+        let own := node.requirements.filter fun id => !coercions.contains id
         let callee := match node.form with
           | .call _ _ (.declaration instantiation) => some instantiation
           | .reference _ (.declaration instantiation) => some instantiation
           | _ => none
-        match callee with
-        | some instantiation =>
-            match signatures.functions.find? fun signature =>
-                decide (signature.id = instantiation.declaration) with
-            | some signature =>
-                let coercions := node.coercions.flatMap (·.requirements)
-                let own := node.requirements.filter fun id => !coercions.contains id
-                if own.length == instantiation.predicates.length then
-                  own.drop signature.declaredPredicates.length
-                else []
-            | none => []
-        | none => []
+        let ofCall := match callee with
+          | some instantiation =>
+              match signatures.functions.find? fun signature =>
+                  decide (signature.id = instantiation.declaration) with
+              | some signature =>
+                  if own.length == instantiation.predicates.length then
+                    own.drop signature.declaredPredicates.length
+                  else []
+              | none => []
+          | none => []
+        let ofOperator := match operatorMethodName? node.form, own with
+          | some name, primary :: methodRequirements =>
+              impliedMethodRequirements signatures solved primary name methodRequirements
+          | _, _ => []
+        let ofCoercions := node.coercions.flatMap fun step =>
+          impliedMethodRequirements signatures solved step.requirement "coerce"
+            step.methodRequirements
+        ofCall ++ ofOperator ++ ofCoercions
     | .statement _ => []
 
 mutual
@@ -518,7 +566,8 @@ among its requirements other than those a callee's closure adds. -/
 def ambiguousGivenUse? (signatures : ProgramSignatures)
     (declared : List ProgramPredicate) (function : SourceInference.CheckedFunction) :
     Option ProgramPredicate :=
-  let implied := impliedCallRequirements signatures function.typedBody
+  let implied := impliedCallRequirements signatures function.solvedRequirements
+    function.typedBody
   function.solvedRequirements.findSome? fun requirement =>
     if implied.contains requirement.id then none
     else match requirement.evidence with
@@ -544,7 +593,7 @@ def ambiguousGivenErrors (signatures : ProgramSignatures)
         match signatures.implementation? method.id.implementation,
             signatures.implMethod? method.id with
         | some implementation, some implMethod =>
-            implementation.declaredWherePredicates ++ implMethod.wherePredicates
+            implementation.declaredWherePredicates ++ implMethod.declaredWherePredicates
         | _, _ => []
       (ambiguousGivenUse? signatures declared method.checked).map
         (ProgramCheckError.methodAmbiguousGiven method.id)

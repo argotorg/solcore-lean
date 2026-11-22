@@ -429,6 +429,10 @@ structure ProgramTraitMethodSignature where
   returnComptime : Bool
   wherePredicates : List ProgramPredicate
   source : Syntax.TraitMethod
+  /-- The `where` predicates as written. Once the catalog is built,
+  `wherePredicates` closes them under their superclasses: what a caller proves,
+  and so what an implementation method's body may assume. -/
+  declaredWherePredicates : List ProgramPredicate := wherePredicates
   deriving Repr
 
 namespace ProgramTraitMethodSignature
@@ -458,6 +462,10 @@ structure ProgramImplMethodSignature where
   returnComptime : Bool
   wherePredicates : List ProgramPredicate
   source : Syntax.ImplMethod
+  /-- The `where` predicates as written. Once the catalog is built,
+  `wherePredicates` adds their superclasses that a caller proves, as upstream
+  projects them from their dictionaries. -/
+  declaredWherePredicates : List ProgramPredicate := wherePredicates
   deriving Repr
 
 namespace ProgramImplMethodSignature
@@ -530,6 +538,168 @@ theorem mem_superclassClosure_of_mem {traits : List ProgramTraitSignature}
     {predicates : List ProgramPredicate} {predicate : ProgramPredicate}
     (member : predicate ∈ predicates) : predicate ∈ superclassClosure traits predicates :=
   mem_closeUnderSuperclasses_of_mem member
+
+/-- Whether a predicate is in a list, by its decidable equality. -/
+def predicateListed (predicates : List ProgramPredicate) (predicate : ProgramPredicate) :
+    Bool :=
+  predicates.any fun listed => decide (listed = predicate)
+
+theorem mem_of_predicateListed {predicates : List ProgramPredicate}
+    {predicate : ProgramPredicate} (listed : predicateListed predicates predicate = true) :
+    predicate ∈ predicates := by
+  obtain ⟨candidate, member, equal⟩ := List.any_eq_true.mp listed
+  exact of_decide_eq_true equal ▸ member
+
+namespace ProgramTraitMethodSignature
+
+/-- Close the trait method's where predicates under their superclasses, keeping
+them as written in `declaredWherePredicates`. A caller proves the closure, so
+an implementation method's body may assume the superclasses of its own
+predicates, as upstream projects them from their dictionaries. -/
+def closeUnderSuperclasses (traits : List ProgramTraitSignature)
+    (method : ProgramTraitMethodSignature) : ProgramTraitMethodSignature :=
+  { method with wherePredicates := superclassClosure traits method.wherePredicates }
+
+@[simp] theorem closeUnderSuperclasses_id (traits : List ProgramTraitSignature)
+    (method : ProgramTraitMethodSignature) :
+    (method.closeUnderSuperclasses traits).id = method.id := rfl
+
+@[simp] theorem closeUnderSuperclasses_name (traits : List ProgramTraitSignature)
+    (method : ProgramTraitMethodSignature) :
+    (method.closeUnderSuperclasses traits).name = method.name := rfl
+
+@[simp] theorem closeUnderSuperclasses_parameters (traits : List ProgramTraitSignature)
+    (method : ProgramTraitMethodSignature) :
+    (method.closeUnderSuperclasses traits).parameters = method.parameters := rfl
+
+@[simp] theorem closeUnderSuperclasses_returnTypes (traits : List ProgramTraitSignature)
+    (method : ProgramTraitMethodSignature) :
+    (method.closeUnderSuperclasses traits).returnTypes = method.returnTypes := rfl
+
+@[simp] theorem closeUnderSuperclasses_returnComptime (traits : List ProgramTraitSignature)
+    (method : ProgramTraitMethodSignature) :
+    (method.closeUnderSuperclasses traits).returnComptime = method.returnComptime := rfl
+
+@[simp] theorem closeUnderSuperclasses_parameterTypes (traits : List ProgramTraitSignature)
+    (method : ProgramTraitMethodSignature) :
+    (method.closeUnderSuperclasses traits).parameterTypes = method.parameterTypes := rfl
+
+@[simp] theorem closeUnderSuperclasses_parameterComptime
+    (traits : List ProgramTraitSignature) (method : ProgramTraitMethodSignature) :
+    (method.closeUnderSuperclasses traits).parameterComptime =
+      method.parameterComptime := rfl
+
+@[simp] theorem closeUnderSuperclasses_parameterNames (traits : List ProgramTraitSignature)
+    (method : ProgramTraitMethodSignature) :
+    (method.closeUnderSuperclasses traits).parameterNames = method.parameterNames := rfl
+
+end ProgramTraitMethodSignature
+
+namespace ProgramTraitSignature
+
+/-- Close each of the trait's methods' where predicates under their
+superclasses (`ProgramTraitMethodSignature.closeUnderSuperclasses`). -/
+def closeMethodsUnderSuperclasses (traits : List ProgramTraitSignature)
+    (trait : ProgramTraitSignature) : ProgramTraitSignature :=
+  { trait with
+    methods := trait.methods.map (ProgramTraitMethodSignature.closeUnderSuperclasses traits) }
+
+@[simp] theorem closeMethodsUnderSuperclasses_id (traits : List ProgramTraitSignature)
+    (trait : ProgramTraitSignature) :
+    (trait.closeMethodsUnderSuperclasses traits).id = trait.id := rfl
+
+@[simp] theorem closeMethodsUnderSuperclasses_name (traits : List ProgramTraitSignature)
+    (trait : ProgramTraitSignature) :
+    (trait.closeMethodsUnderSuperclasses traits).name = trait.name := rfl
+
+@[simp] theorem closeMethodsUnderSuperclasses_parameters (traits : List ProgramTraitSignature)
+    (trait : ProgramTraitSignature) :
+    (trait.closeMethodsUnderSuperclasses traits).parameters = trait.parameters := rfl
+
+@[simp] theorem closeMethodsUnderSuperclasses_wherePredicates
+    (traits : List ProgramTraitSignature) (trait : ProgramTraitSignature) :
+    (trait.closeMethodsUnderSuperclasses traits).wherePredicates = trait.wherePredicates := rfl
+
+@[simp] theorem closeMethodsUnderSuperclasses_methods (traits : List ProgramTraitSignature)
+    (trait : ProgramTraitSignature) :
+    (trait.closeMethodsUnderSuperclasses traits).methods =
+      trait.methods.map (ProgramTraitMethodSignature.closeUnderSuperclasses traits) := rfl
+
+end ProgramTraitSignature
+
+namespace ProgramImplMethodSignature
+
+/-- Add to an implementation method's where predicates their superclasses among
+`provided`, the predicates that its caller and its implementation's use sites
+prove, keeping them as written in `declaredWherePredicates`. -/
+def closeUnderSuperclasses (traits : List ProgramTraitSignature)
+    (provided : List ProgramPredicate) (method : ProgramImplMethodSignature) :
+    ProgramImplMethodSignature :=
+  { method with
+    wherePredicates := method.wherePredicates ++
+      (superclassClosure traits method.wherePredicates).filter fun predicate =>
+        !predicateListed method.wherePredicates predicate &&
+          predicateListed provided predicate }
+
+@[simp] theorem closeUnderSuperclasses_id (traits : List ProgramTraitSignature)
+    (provided : List ProgramPredicate) (method : ProgramImplMethodSignature) :
+    (method.closeUnderSuperclasses traits provided).id = method.id := rfl
+
+@[simp] theorem closeUnderSuperclasses_traitMethod (traits : List ProgramTraitSignature)
+    (provided : List ProgramPredicate) (method : ProgramImplMethodSignature) :
+    (method.closeUnderSuperclasses traits provided).traitMethod = method.traitMethod := rfl
+
+@[simp] theorem closeUnderSuperclasses_name (traits : List ProgramTraitSignature)
+    (provided : List ProgramPredicate) (method : ProgramImplMethodSignature) :
+    (method.closeUnderSuperclasses traits provided).name = method.name := rfl
+
+@[simp] theorem closeUnderSuperclasses_parameters (traits : List ProgramTraitSignature)
+    (provided : List ProgramPredicate) (method : ProgramImplMethodSignature) :
+    (method.closeUnderSuperclasses traits provided).parameters = method.parameters := rfl
+
+@[simp] theorem closeUnderSuperclasses_returnTypes (traits : List ProgramTraitSignature)
+    (provided : List ProgramPredicate) (method : ProgramImplMethodSignature) :
+    (method.closeUnderSuperclasses traits provided).returnTypes = method.returnTypes := rfl
+
+@[simp] theorem closeUnderSuperclasses_returnComptime (traits : List ProgramTraitSignature)
+    (provided : List ProgramPredicate) (method : ProgramImplMethodSignature) :
+    (method.closeUnderSuperclasses traits provided).returnComptime =
+      method.returnComptime := rfl
+
+@[simp] theorem closeUnderSuperclasses_source (traits : List ProgramTraitSignature)
+    (provided : List ProgramPredicate) (method : ProgramImplMethodSignature) :
+    (method.closeUnderSuperclasses traits provided).source = method.source := rfl
+
+@[simp] theorem closeUnderSuperclasses_parameterTypes (traits : List ProgramTraitSignature)
+    (provided : List ProgramPredicate) (method : ProgramImplMethodSignature) :
+    (method.closeUnderSuperclasses traits provided).parameterTypes =
+      method.parameterTypes := rfl
+
+@[simp] theorem closeUnderSuperclasses_parameterComptime
+    (traits : List ProgramTraitSignature) (provided : List ProgramPredicate)
+    (method : ProgramImplMethodSignature) :
+    (method.closeUnderSuperclasses traits provided).parameterComptime =
+      method.parameterComptime := rfl
+
+@[simp] theorem closeUnderSuperclasses_parameterNames (traits : List ProgramTraitSignature)
+    (provided : List ProgramPredicate) (method : ProgramImplMethodSignature) :
+    (method.closeUnderSuperclasses traits provided).parameterNames =
+      method.parameterNames := rfl
+
+/-- Each predicate of the closed method is one of its own or one provided. -/
+theorem mem_closeUnderSuperclasses {traits : List ProgramTraitSignature}
+    {provided : List ProgramPredicate} {method : ProgramImplMethodSignature}
+    {predicate : ProgramPredicate}
+    (member : predicate ∈ (method.closeUnderSuperclasses traits provided).wherePredicates) :
+    predicate ∈ method.wherePredicates ∨ predicate ∈ provided := by
+  simp only [closeUnderSuperclasses] at member
+  rcases List.mem_append.mp member with own | added
+  · exact Or.inl own
+  · have selected := (List.mem_filter.mp added).2
+    simp only [Bool.and_eq_true] at selected
+    exact Or.inr (mem_of_predicateListed selected.2)
+
+end ProgramImplMethodSignature
 
 /-- The declared givens that reach a goal, directly or through their
 superclasses, each counted once. -/
@@ -738,7 +908,7 @@ def functionSignatureOfMethod
       (TypeSystem.Ty.productMany method.parameterTypes)
       (TypeSystem.Ty.productMany method.returnTypes)
   }
-  declaredPredicates := implementation.declaredWherePredicates ++ method.wherePredicates
+  declaredPredicates := implementation.declaredWherePredicates ++ method.declaredWherePredicates
   source := method.source.value.declaration
 }
 
@@ -756,22 +926,63 @@ def functionSignatureOfMethodWithTrait
       signature.scheme with
       predicates := implementation.methodAssumptions trait method
     }
-    declaredPredicates := implementation.declaredWherePredicates ++ method.wherePredicates
+    declaredPredicates := implementation.declaredWherePredicates ++ method.declaredWherePredicates
   }
 
-/-- Close the implementation's conditions under their superclasses, keeping
-them as written in `declaredWherePredicates`. -/
+/-- The predicates that a caller proves for one of the implementation's
+methods: its trait method's, closed under their superclasses
+(`ProgramTraitMethodSignature.closeUnderSuperclasses`) and instantiated at the
+head. The trait is the one with the head's identity and the trait method the
+one with the method's name, each only when it is the only one. -/
+def inheritedMethodPredicates (traits : List ProgramTraitSignature)
+    (implementation : ProgramImplementationSignature)
+    (method : ProgramImplMethodSignature) : List ProgramPredicate :=
+  match traits.filter fun trait => decide (implementation.head.trait = .declaration trait.id) with
+  | [trait] =>
+      match trait.methods.filter fun traitMethod => traitMethod.name == method.name with
+      | [traitMethod] => (superclassClosure traits traitMethod.wherePredicates).map
+          (ProgramPredicate.applyParameters
+            (trait.parameters.zip
+              (implementation.head.subject :: implementation.head.arguments)))
+      | _ => []
+  | _ => []
+
+/-- Close the implementation's conditions under their superclasses, and add to
+each method's predicates their superclasses that its caller or the
+implementation's use sites prove, keeping both as written in
+`declaredWherePredicates`. -/
 def closeUnderSuperclasses (traits : List ProgramTraitSignature)
     (implementation : ProgramImplementationSignature) :
-    ProgramImplementationSignature := {
-  implementation with
-  wherePredicates := superclassClosure traits implementation.wherePredicates
-  declaredWherePredicates := implementation.declaredWherePredicates
-}
+    ProgramImplementationSignature :=
+  let conditions := superclassClosure traits implementation.wherePredicates
+  {
+    implementation with
+    wherePredicates := conditions
+    declaredWherePredicates := implementation.declaredWherePredicates
+    methods := implementation.methods.map fun method =>
+      method.closeUnderSuperclasses traits
+        (implementation.inheritedMethodPredicates traits method ++ conditions)
+  }
 
 @[simp] theorem closeUnderSuperclasses_id (traits : List ProgramTraitSignature)
     (implementation : ProgramImplementationSignature) :
     (implementation.closeUnderSuperclasses traits).id = implementation.id := rfl
+
+@[simp] theorem closeUnderSuperclasses_head (traits : List ProgramTraitSignature)
+    (implementation : ProgramImplementationSignature) :
+    (implementation.closeUnderSuperclasses traits).head = implementation.head := rfl
+
+@[simp] theorem closeUnderSuperclasses_parameters (traits : List ProgramTraitSignature)
+    (implementation : ProgramImplementationSignature) :
+    (implementation.closeUnderSuperclasses traits).parameters = implementation.parameters := rfl
+
+@[simp] theorem closeUnderSuperclasses_methods (traits : List ProgramTraitSignature)
+    (implementation : ProgramImplementationSignature) :
+    (implementation.closeUnderSuperclasses traits).methods =
+      implementation.methods.map fun method =>
+        method.closeUnderSuperclasses traits
+          (implementation.inheritedMethodPredicates traits method ++
+            superclassClosure traits implementation.wherePredicates) := rfl
 
 end ProgramImplementationSignature
 
@@ -787,23 +998,17 @@ theorem ImplementationSignatureHeadValidated.closeUnderSuperclasses
   exact ⟨parameters, trait, member, headTrait, fun predicate requiredMember =>
     mem_superclassClosure_of_mem (required predicate requiredMember)⟩
 
-/-- The closure keeps every condition, so each method's predicates stay among
-the provided ones. -/
-theorem ImplementationSignatureMethodCatalogValidated.closeUnderSuperclasses
+/-- Closing the traits' methods keeps their where predicates, so an
+implementation's head stays validated against the closed catalog. -/
+theorem ImplementationSignatureHeadValidated.closeTraits
     {traits catalog : List ProgramTraitSignature}
     {signature : ProgramImplementationSignature}
-    (validated : ImplementationSignatureMethodCatalogValidated traits signature) :
-    ImplementationSignatureMethodCatalogValidated traits
-      (signature.closeUnderSuperclasses catalog) := by
-  obtain ⟨trait, member, headTrait, methods, complete⟩ := validated
-  refine ⟨trait, member, headTrait, fun method methodMember => ?_, complete⟩
-  obtain ⟨traitMethod, traitMember, idEq, nameEq, parameters, returns,
-    parameterComptime, returnComptime, predicates⟩ := methods method methodMember
-  refine ⟨traitMethod, traitMember, idEq, nameEq, parameters, returns,
-    parameterComptime, returnComptime, fun predicate predicateMember => ?_⟩
-  rcases List.mem_append.mp (predicates predicate predicateMember) with inherited | own
-  · exact List.mem_append_left _ inherited
-  · exact List.mem_append_right _ (mem_superclassClosure_of_mem own)
+    (validated : ImplementationSignatureHeadValidated traits signature) :
+    ImplementationSignatureHeadValidated
+      (traits.map (ProgramTraitSignature.closeMethodsUnderSuperclasses catalog)) signature := by
+  obtain ⟨parameters, trait, member, headTrait, required⟩ := validated
+  exact ⟨parameters, trait.closeMethodsUnderSuperclasses catalog, List.mem_map_of_mem member,
+    headTrait, required⟩
 
 namespace ProgramFunctionSignature
 
@@ -2701,6 +2906,111 @@ private def implementationConditionErrors (environment : ProgramEnvironment)
         [ProgramSignatureError.pattersonCondition implementation.id]
       else [])
 
+/-- The closure keeps every condition and every method predicate, and adds to a
+method only predicates that its closed trait method or the closed conditions
+provide, so the method catalog stays validated against the closed traits. -/
+theorem ImplementationSignatureMethodCatalogValidated.closeUnderSuperclasses
+    {traits : List ProgramTraitSignature} {signature : ProgramImplementationSignature}
+    (validated : ImplementationSignatureMethodCatalogValidated traits signature) :
+    ImplementationSignatureMethodCatalogValidated
+      (traits.map (ProgramTraitSignature.closeMethodsUnderSuperclasses traits))
+      (signature.closeUnderSuperclasses traits) := by
+  obtain ⟨trait, member, headTrait, methods, complete⟩ := validated
+  refine ⟨trait.closeMethodsUnderSuperclasses traits, List.mem_map_of_mem member, headTrait,
+    fun closedMethod closedMember => ?_, fun closedTraitMethod closedTraitMember => ?_⟩
+  · simp only [ProgramImplementationSignature.closeUnderSuperclasses] at closedMember
+    obtain ⟨method, methodMember, rfl⟩ := List.mem_map.mp closedMember
+    obtain ⟨traitMethod, traitMember, idEq, nameEq, parameters, returns,
+      parameterComptime, returnComptime, predicates⟩ := methods method methodMember
+    refine ⟨traitMethod.closeUnderSuperclasses traits, ?_, by simpa using idEq,
+      by simpa using nameEq, by simpa using parameters, by simpa using returns,
+      by simpa using parameterComptime, by simpa using returnComptime,
+      fun predicate predicateMember => ?_⟩
+    · simpa using List.mem_map_of_mem traitMember
+    · simp only [ProgramTraitSignature.closeMethodsUnderSuperclasses_parameters,
+        ProgramTraitMethodSignature.closeUnderSuperclasses,
+        ProgramImplementationSignature.closeUnderSuperclasses]
+      rcases ProgramImplMethodSignature.mem_closeUnderSuperclasses predicateMember with
+        own | provided
+      · rcases List.mem_append.mp (predicates predicate own) with inherited | condition
+        · obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp inherited
+          exact List.mem_append_left _
+            (List.mem_map_of_mem (mem_superclassClosure_of_mem originalMember))
+        · exact List.mem_append_right _ (mem_superclassClosure_of_mem condition)
+      · rcases List.mem_append.mp provided with inherited | condition
+        · refine List.mem_append_left _ ?_
+          simp only [ProgramImplementationSignature.inheritedMethodPredicates] at inherited
+          split at inherited
+          · rename_i onlyTrait traitsEq
+            have traitSelected : trait ∈ traits.filter fun candidate =>
+                decide (signature.head.trait = .declaration candidate.id) :=
+              List.mem_filter.mpr ⟨member, by simp [headTrait]⟩
+            rw [traitsEq, List.mem_singleton] at traitSelected
+            subst traitSelected
+            split at inherited
+            · rename_i onlyMethod methodsEq
+              have methodSelected : traitMethod ∈ trait.methods.filter fun candidate =>
+                  candidate.name == method.name :=
+                List.mem_filter.mpr ⟨traitMember, by simp [nameEq]⟩
+              rw [methodsEq, List.mem_singleton] at methodSelected
+              subst methodSelected
+              exact inherited
+            · simp at inherited
+          · simp at inherited
+        · exact List.mem_append_right _ condition
+  · simp only [ProgramTraitSignature.closeMethodsUnderSuperclasses_methods] at closedTraitMember
+    obtain ⟨traitMethod, traitMember, rfl⟩ := List.mem_map.mp closedTraitMember
+    obtain ⟨method, methodMember, idEq⟩ := complete traitMethod traitMember
+    exact ⟨_, List.mem_map_of_mem methodMember, by simpa using idEq⟩
+
+/-- Closing the traits' methods keeps every structural fact of the traits. -/
+private theorem TraitSignatureStructuralWellFormed.closeMethods
+    {catalog : List ProgramTraitSignature} {trait : ProgramTraitSignature}
+    (structural : TraitSignatureStructuralWellFormed trait) :
+    TraitSignatureStructuralWellFormed (trait.closeMethodsUnderSuperclasses catalog) := by
+  obtain ⟨names, owners, positions, parameterNames⟩ := structural
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · simpa [List.map_map, Function.comp_def] using names
+  · intro method member
+    simp only [ProgramTraitSignature.closeMethodsUnderSuperclasses_methods] at member
+    obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+    simpa using owners original originalMember
+  · intro index
+    have bound : index.val < trait.methods.length := by
+      simpa using index.isLt
+    rw [List.get_eq_getElem]
+    simp only [ProgramTraitSignature.closeMethodsUnderSuperclasses_methods, List.getElem_map,
+      ProgramTraitMethodSignature.closeUnderSuperclasses_id]
+    simpa [List.get_eq_getElem] using positions ⟨index.val, bound⟩
+  · intro method member
+    simp only [ProgramTraitSignature.closeMethodsUnderSuperclasses_methods] at member
+    obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+    simpa using parameterNames original originalMember
+
+/-- Closing an implementation's methods keeps every structural fact of them. -/
+private theorem ImplementationSignatureStructuralWellFormed.closeUnderSuperclasses
+    {traits : List ProgramTraitSignature} {signature : ProgramImplementationSignature}
+    (structural : ImplementationSignatureStructuralWellFormed signature) :
+    ImplementationSignatureStructuralWellFormed (signature.closeUnderSuperclasses traits) := by
+  obtain ⟨names, owners, positions, parameterNames⟩ := structural
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · simpa [List.map_map, Function.comp_def] using names
+  · intro method member
+    simp only [ProgramImplementationSignature.closeUnderSuperclasses_methods] at member
+    obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+    simpa using owners original originalMember
+  · intro index
+    have bound : index.val < signature.methods.length := by
+      simpa using index.isLt
+    rw [List.get_eq_getElem]
+    simp only [ProgramImplementationSignature.closeUnderSuperclasses_methods, List.getElem_map,
+      ProgramImplMethodSignature.closeUnderSuperclasses_id]
+    simpa [List.get_eq_getElem] using positions ⟨index.val, bound⟩
+  · intro method member
+    simp only [ProgramImplementationSignature.closeUnderSuperclasses_methods] at member
+    obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+    simpa using parameterNames original originalMember
+
 /-- Resolve every top-level function signature and implementation rule.
 Independent declaration failures are accumulated in source order. -/
 def buildProgramSignatures (environment : ProgramEnvironment) :
@@ -2726,7 +3036,8 @@ def buildProgramSignatures (environment : ProgramEnvironment) :
       functions := state.functions.map
         (ProgramFunctionSignature.closeUnderSuperclasses traitState.traits)
       implRules := implementations.map (ProgramImplementationSignature.implRule)
-      traits := traitState.traits
+      traits := traitState.traits.map
+        (ProgramTraitSignature.closeMethodsUnderSuperclasses traitState.traits)
       implementations
       dataTypes := state.dataTypes
       contracts := state.contracts
@@ -4117,7 +4428,9 @@ theorem buildProgramSignatures_success_parameter_state
         obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
         exact signatureParameters.functions original originalMember
       dataTypes := signatureParameters.dataTypes
-      traits := traitParameters
+      traits := fun signature member => by
+        obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+        exact traitParameters original originalMember
       implementations := fun signature member => by
         obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
         exact signatureParameters.implementations original originalMember
@@ -4207,7 +4520,7 @@ theorem buildProgramSignatures_success_implementation_structure_state
     subst signatures
     intro signature member
     obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
-    exact { signatureFacts.implementationShapes original originalMember with }
+    exact (signatureFacts.implementationShapes original originalMember).closeUnderSuperclasses
   · simp at success
 
 /-- Internal collector boundary used by `ProgramSignaturesProperties`: every
@@ -4235,7 +4548,7 @@ theorem buildProgramSignatures_success_implementation_head_validated_state
     subst signatures
     intro signature member
     obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
-    exact (signatureFacts.implementationHeads original originalMember).closeUnderSuperclasses
+    exact ((signatureFacts.implementationHeads original originalMember).closeUnderSuperclasses).closeTraits
   · simp at success
 
 /-- Internal collector boundary used by `ProgramSignaturesProperties`: every
@@ -4286,7 +4599,9 @@ theorem buildProgramSignatures_success_trait_structure_state
   split at success
   · injection success with signaturesEq
     subst signatures
-    exact traitStructures
+    intro signature member
+    obtain ⟨original, originalMember, rfl⟩ := List.mem_map.mp member
+    exact (traitStructures original originalMember).closeMethods
   · simp at success
 
 end Solcore.Frontend
