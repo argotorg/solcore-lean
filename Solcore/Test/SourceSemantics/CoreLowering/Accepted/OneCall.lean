@@ -15,14 +15,16 @@ an `x` left in place by the parameter, a `Word` amount, and `flipped` applies `~
 place; `tailed`'s body is `identity(value)` as its final value; `stored` declares a local mapping
 `table`, assigns its parameter at `table[value]` and returns `table[value]`; `summed` returns
 `integerAdd(wordToInteger(value), wordToInteger(value))`, calls of builtin closures, `zeroed`
-returns `iszero(value)`, the opcode that the program imports from `std.opcodes`, and `inverted`
-declares a local mapping, complements `table[value]` in place and returns it. Runtime checks place
-every expression node of the thirteen rows among the nested sites that call `identity`'s
+returns `iszero(value)`, the opcode that the program imports from `std.opcodes`, `inverted`
+declares a local mapping, complements `table[value]` in place and returns it, `broken` runs
+`while (true) { break; }` before it returns its parameter, and `counted` runs
+`for (let go: bool = true; go; go = false) { continue; }` before it does. Runtime checks place
+every expression node of the fifteen rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
-`relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`, `inverted`, `narrow` and `roundTrip` (at
-words canonical for `uint8`) are lifted to staged traces, and the call root's theorems apply at the first public call of
+`relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`, `inverted`, `broken`, `counted`, `narrow` and
+`roundTrip` (at words canonical for `uint8`) are lifted to staged traces, and the call root's theorems apply at the first public call of
 each in both directions: the actual resumption succeeds, and actual native
 completion reconstructs a staged Source execution. `stored`'s index read returns the word its
 assignment wrote, not the default, and `summed` returns its integer, which at the largest word
@@ -46,6 +48,8 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.summed_source`,
 `Tests.SourceCoreAcceptedOneCall.zeroed_source`,
 `Tests.SourceCoreAcceptedOneCall.inverted_source`,
+`Tests.SourceCoreAcceptedOneCall.broken_source`,
+`Tests.SourceCoreAcceptedOneCall.counted_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_source`,
 `Tests.SourceCoreAcceptedOneCall.roundTrip_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_fault`,
@@ -63,6 +67,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedBuiltinRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedOpcodeRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedProjectedBitNotRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedLoopRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run`,
@@ -72,7 +77,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 -/
 
 section
-/-! The program and the declarative typing of its thirteen functions, constructed
+/-! The program and the declarative typing of its fifteen functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -100,7 +105,10 @@ def workspace : Workspace.RawWorkspace := {
       "return integerAdd(wordToInteger(value), wordToInteger(value)); }",
     "function zeroed(value: Word) returns (Word) { return iszero(value); }",
     "function inverted(value: Word) returns (Word) { let table: mapping(Word => Word); table[value] ~=; " ++
-      "return table[value]; }" ]}] }
+      "return table[value]; }",
+    "function broken(value: Word) returns (Word) { while (true) { break; } return value; }",
+    "function counted(value: Word) returns (Word) { for (let go: bool = true; go; go = false) { continue; } " ++
+      "return value; }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -1629,6 +1637,349 @@ def observeInverted (function : CheckedFunction) (signature : ProgramFunctionSig
   return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, tableScheme, tableRequirements,
     tableOwner, tableDistinct, declaredType, flipType, returnedType, flipRequirements⟩
 
+/-- The nodes of `broken`'s body: a `while` loop whose condition is the builtin
+`true` and whose body is a `break`, and the return of the parameter, found by
+following the statement graph. -/
+structure BrokenParts (source : TypedSource) where
+  binder : TypedBinder
+  read : Tests.SourceCoreNamedBranch.Read source binder .word
+  loop : StatementNode
+  condition : ExpressionNode
+  name : String
+  jump : StatementNode
+  returned : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement loop.id, .statement returned.id]
+  loopFound : source.lookupStatement? loop.id = some loop
+  loopForm : loop.form = .whileLoop condition.id [jump.id]
+  conditionFound : source.lookupExpression? condition.id = some condition
+  conditionForm : condition.form = .reference name (.builtinBoolean true)
+  conditionRaw : condition.rawType = .bool
+  conditionType : condition.type = .bool
+  conditionRequirements : condition.requirements = []
+  conditionCoercions : condition.coercions = []
+  jumpFound : source.lookupStatement? jump.id = some jump
+  jumpForm : jump.form = .breakStmt
+  returnedFound : source.lookupStatement? returned.id = some returned
+  returnedForm : returned.form = .returnStmt (some read.node.id)
+
+def observeBrokenParts (source : TypedSource) : IO (BrokenParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "broken input")
+  let [.statement loopId, .statement returnedId] := source.roots | throw (IO.userError "broken roots")
+  let some loop := source.lookupStatement? loopId | throw (IO.userError "broken loop")
+  let some returned := source.lookupStatement? returnedId | throw (IO.userError "broken return")
+  let .whileLoop conditionId [jumpId] := loop.form | throw (IO.userError "broken loop form")
+  let some condition := source.lookupExpression? conditionId | throw (IO.userError "broken condition")
+  let .reference name (.builtinBoolean true) := condition.form | throw (IO.userError "broken condition form")
+  let some jump := source.lookupStatement? jumpId | throw (IO.userError "broken jump")
+  let .returnStmt (some readId) := returned.form | throw (IO.userError "broken return form")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "broken read")
+  let read ← Tests.SourceCoreNamedBranch.observeRead source binder readNode .word
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "broken inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement loop.id, .statement returned.id]) "broken roots shape"
+  let ⟨loopFound⟩ ← observed (source.lookupStatement? loop.id = some loop) "broken loopFound"
+  let ⟨loopForm⟩ ← observed (loop.form = .whileLoop condition.id [jump.id]) "broken loopForm"
+  let ⟨conditionFound⟩ ← observed (source.lookupExpression? condition.id = some condition) "broken conditionFound"
+  let ⟨conditionForm⟩ ← observed (condition.form = .reference name (.builtinBoolean true)) "broken conditionForm"
+  let ⟨conditionRaw⟩ ← observed (condition.rawType = .bool) "broken conditionRaw"
+  let ⟨conditionType⟩ ← observed (condition.type = .bool) "broken conditionType"
+  let ⟨conditionRequirements⟩ ← observed (condition.requirements = []) "broken conditionRequirements"
+  let ⟨conditionCoercions⟩ ← observed (condition.coercions = []) "broken conditionCoercions"
+  let ⟨jumpFound⟩ ← observed (source.lookupStatement? jump.id = some jump) "broken jumpFound"
+  let ⟨jumpForm⟩ ← observed (jump.form = .breakStmt) "broken jumpForm"
+  let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "broken returnedFound"
+  let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some read.node.id)) "broken returnedForm"
+  return ⟨binder, read, loop, condition, name, jump, returned, inputs, roots, loopFound, loopForm, conditionFound,
+    conditionForm, conditionRaw, conditionType, conditionRequirements, conditionCoercions, jumpFound, jumpForm,
+    returnedFound, returnedForm⟩
+
+/-- `broken`'s body: `while (true) { break; }` and the return of the parameter. -/
+structure BrokenShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : BrokenParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  binderRequirements : parts.binder.schemeRequirements = []
+  loopType : parts.loop.type = .unit
+  jumpType : parts.jump.type = .unit
+  returnedType : parts.returned.type = .word
+
+theorem BrokenShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : BrokenShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.loop.id, shape.parts.returned.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := true, control := .returned}
+  let ordinary : StatementFacts := {type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit}
+  refine ⟨BodyFacts.cons ordinary (BodyFacts.singleton facts), rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have boolean : TypeAdmissible lexical .bool := ⟨binders, .builtin .bool⟩
+    have conditionTyped : ExpressionHasType function.typedBody lexical shape.parts.condition.id
+        shape.parts.condition.type := by
+      apply ExpressionHasType.ofOrdinary (rawType := .bool) (owned := [])
+        (lookupExpression?_sound shape.parts.conditionFound)
+      · rw [shape.parts.conditionForm]
+        exact .reference (.builtinBoolean true)
+      · exact boolean
+      · rw [shape.parts.conditionType]
+        exact boolean
+      · intro id member
+        cases member
+      · rw [shape.parts.conditionCoercions, shape.parts.conditionType]
+        exact .nil _
+      · rw [shape.parts.conditionRequirements, shape.parts.conditionCoercions]
+        rfl
+    rw [shape.parts.conditionType] at conditionTyped
+    have jumpTyped : StatementHasType function.typedBody (ControlContext.enterLoop ⟨.word, 0⟩) lexical
+        shape.parts.jump.id lexical {type := .unit, hasValue := false, sawReturn := false, control := .breaking} :=
+      .breakStmt (lookupStatement?_sound shape.parts.jumpFound) shape.parts.jumpForm
+        (by simp [ControlContext.loopAllowed, ControlContext.enterLoop]) shape.jumpType
+    have loopTyped : StatementHasType function.typedBody ⟨.word, 0⟩ lexical shape.parts.loop.id lexical ordinary :=
+      .whileLoop (lookupStatement?_sound shape.parts.loopFound) shape.parts.loopForm conditionTyped
+        (.singleton jumpTyped) shape.loopType
+    have read := shape.parts.read.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    exact ⟨_, .cons loopTyped (.singleton (.returnValue (lookupStatement?_sound shape.parts.returnedFound)
+      shape.parts.returnedForm read shape.returnedType))⟩
+
+def observeBroken (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (BrokenShape function signature) := do
+  let parts ← observeBrokenParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "broken parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "broken inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "broken returns"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "broken binderRequirements"
+  let ⟨loopType⟩ ← observed (parts.loop.type = .unit) "broken loopType"
+  let ⟨jumpType⟩ ← observed (parts.jump.type = .unit) "broken jumpType"
+  let ⟨returnedType⟩ ← observed (parts.returned.type = .word) "broken returnedType"
+  return ⟨parts, parameters, inputTypes, returns, binderRequirements, loopType, jumpType, returnedType⟩
+
+/-- The nodes of `counted`'s body: a `for` loop whose header declares the
+`bool` local `go` at the builtin `true`, tests `go` and assigns it the builtin
+`false` after each iteration, and whose body is a `continue`, and the return of
+the parameter, found by following the statement graph. -/
+structure CountedParts (source : TypedSource) where
+  binder : TypedBinder
+  read : Tests.SourceCoreNamedBranch.Read source binder .word
+  go : TypedBinder
+  test : Tests.SourceCoreNamedBranch.Read source go .bool
+  loop : StatementNode
+  start : ExpressionNode
+  startName : String
+  resolution : AssignmentResolution
+  stop : ExpressionNode
+  stopName : String
+  jump : StatementNode
+  returned : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement loop.id, .statement returned.id]
+  loopFound : source.lookupStatement? loop.id = some loop
+  loopForm : loop.form = .forLoop [.letDecl go (some start.id)] test.node.id
+    [.assignValue resolution .equal stop.id] [jump.id]
+  startFound : source.lookupExpression? start.id = some start
+  startForm : start.form = .reference startName (.builtinBoolean true)
+  startRaw : start.rawType = .bool
+  startType : start.type = .bool
+  startRequirements : start.requirements = []
+  startCoercions : start.coercions = []
+  targetRoot : resolution.target.root = go.id
+  targetProjections : resolution.target.projections = []
+  targetType : resolution.target.type = .bool
+  stopFound : source.lookupExpression? stop.id = some stop
+  stopForm : stop.form = .reference stopName (.builtinBoolean false)
+  stopRaw : stop.rawType = .bool
+  stopType : stop.type = .bool
+  stopRequirements : stop.requirements = []
+  stopCoercions : stop.coercions = []
+  jumpFound : source.lookupStatement? jump.id = some jump
+  jumpForm : jump.form = .continueStmt
+  returnedFound : source.lookupStatement? returned.id = some returned
+  returnedForm : returned.form = .returnStmt (some read.node.id)
+
+def observeCountedParts (source : TypedSource) : IO (CountedParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "counted input")
+  let [.statement loopId, .statement returnedId] := source.roots | throw (IO.userError "counted roots")
+  let some loop := source.lookupStatement? loopId | throw (IO.userError "counted loop")
+  let some returned := source.lookupStatement? returnedId | throw (IO.userError "counted return")
+  let .forLoop [.letDecl go (some startId)] testId [.assignValue resolution .equal stopId] [jumpId] := loop.form
+    | throw (IO.userError "counted loop form")
+  let some start := source.lookupExpression? startId | throw (IO.userError "counted start")
+  let .reference startName (.builtinBoolean true) := start.form | throw (IO.userError "counted start form")
+  let some testNode := source.lookupExpression? testId | throw (IO.userError "counted test")
+  let some stop := source.lookupExpression? stopId | throw (IO.userError "counted stop")
+  let .reference stopName (.builtinBoolean false) := stop.form | throw (IO.userError "counted stop form")
+  let some jump := source.lookupStatement? jumpId | throw (IO.userError "counted jump")
+  let .returnStmt (some readId) := returned.form | throw (IO.userError "counted return form")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "counted read")
+  let read ← Tests.SourceCoreNamedBranch.observeRead source binder readNode .word
+  let test ← Tests.SourceCoreNamedBranch.observeRead source go testNode .bool
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "counted inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement loop.id, .statement returned.id]) "counted roots shape"
+  let ⟨loopFound⟩ ← observed (source.lookupStatement? loop.id = some loop) "counted loopFound"
+  let ⟨loopForm⟩ ← observed (loop.form = .forLoop [.letDecl go (some start.id)] test.node.id
+    [.assignValue resolution .equal stop.id] [jump.id]) "counted loopForm"
+  let ⟨startFound⟩ ← observed (source.lookupExpression? start.id = some start) "counted startFound"
+  let ⟨startForm⟩ ← observed (start.form = .reference startName (.builtinBoolean true)) "counted startForm"
+  let ⟨startRaw⟩ ← observed (start.rawType = .bool) "counted startRaw"
+  let ⟨startType⟩ ← observed (start.type = .bool) "counted startType"
+  let ⟨startRequirements⟩ ← observed (start.requirements = []) "counted startRequirements"
+  let ⟨startCoercions⟩ ← observed (start.coercions = []) "counted startCoercions"
+  let ⟨targetRoot⟩ ← observed (resolution.target.root = go.id) "counted targetRoot"
+  let ⟨targetProjections⟩ ← observed (resolution.target.projections = []) "counted targetProjections"
+  let ⟨targetType⟩ ← observed (resolution.target.type = .bool) "counted targetType"
+  let ⟨stopFound⟩ ← observed (source.lookupExpression? stop.id = some stop) "counted stopFound"
+  let ⟨stopForm⟩ ← observed (stop.form = .reference stopName (.builtinBoolean false)) "counted stopForm"
+  let ⟨stopRaw⟩ ← observed (stop.rawType = .bool) "counted stopRaw"
+  let ⟨stopType⟩ ← observed (stop.type = .bool) "counted stopType"
+  let ⟨stopRequirements⟩ ← observed (stop.requirements = []) "counted stopRequirements"
+  let ⟨stopCoercions⟩ ← observed (stop.coercions = []) "counted stopCoercions"
+  let ⟨jumpFound⟩ ← observed (source.lookupStatement? jump.id = some jump) "counted jumpFound"
+  let ⟨jumpForm⟩ ← observed (jump.form = .continueStmt) "counted jumpForm"
+  let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "counted returnedFound"
+  let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some read.node.id)) "counted returnedForm"
+  return ⟨binder, read, go, test, loop, start, startName, resolution, stop, stopName, jump, returned, inputs,
+    roots, loopFound, loopForm, startFound, startForm, startRaw, startType, startRequirements, startCoercions,
+    targetRoot, targetProjections, targetType, stopFound, stopForm, stopRaw, stopType, stopRequirements,
+    stopCoercions, jumpFound, jumpForm, returnedFound, returnedForm⟩
+
+/-- `counted`'s body: `for (let go: bool = true; go; go = false) { continue; }`
+and the return of the parameter. -/
+structure CountedShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : CountedParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  binderRequirements : parts.binder.schemeRequirements = []
+  goScheme : parts.go.scheme = .mono .bool
+  goRequirements : parts.go.schemeRequirements = []
+  goOwner : parts.go.id.owner = function.typedBody.owner
+  goDistinct : parts.go.id ≠ parts.binder.id
+  loopType : parts.loop.type = .unit
+  jumpType : parts.jump.type = .unit
+  returnedType : parts.returned.type = .word
+  assignmentRequirements : parts.resolution.requirements = []
+
+theorem CountedShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : CountedShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.loop.id, shape.parts.returned.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := true, control := .returned}
+  let ordinary : StatementFacts := {type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit}
+  refine ⟨BodyFacts.cons ordinary (BodyFacts.singleton facts), rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have boolean : TypeAdmissible lexical .bool := ⟨binders, .builtin .bool⟩
+    have startTyped : ExpressionHasType function.typedBody lexical shape.parts.start.id shape.parts.start.type := by
+      apply ExpressionHasType.ofOrdinary (rawType := .bool) (owned := [])
+        (lookupExpression?_sound shape.parts.startFound)
+      · rw [shape.parts.startForm]
+        exact .reference (.builtinBoolean true)
+      · exact boolean
+      · rw [shape.parts.startType]
+        exact boolean
+      · intro id member
+        cases member
+      · rw [shape.parts.startCoercions, shape.parts.startType]
+        exact .nil _
+      · rw [shape.parts.startRequirements, shape.parts.startCoercions]
+        rfl
+    rw [shape.parts.startType] at startTyped
+    let locals := lexical.withLocal shape.parts.go.id shape.parts.go.scheme shape.parts.go.schemeRequirements
+    have goExtended : BinderExtends function.typedBody.owner lexical shape.parts.go locals := by
+      apply BinderExtends.intro
+      · exact {
+          owned := shape.goOwner
+          scheme := shape.goScheme.symm ▸ SchemeWellFormed.monoAdmissible boolean
+          quantified_fresh := by rw [shape.goScheme]; simp [SchemeQuantifiersFresh, TypeSystem.Scheme.mono]
+          monomorphic_requirements_empty := fun _ => shape.goRequirements }
+      · cases head
+        simp [LocalFresh, Context.withLocal, checkedBodyContext, declarationContext,
+          Context.ofSignatures, Context.forDeclaration, Context.withAssumptions,
+          Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.goDistinct]
+    have localBoolean : TypeAdmissible locals .bool := ⟨binders, .builtin .bool⟩
+    have testTyped := shape.parts.test.typed shape.goScheme shape.goRequirements localBoolean goExtended.local_self
+      goExtended.local_scheme_requirements_self
+    have stopTyped : ExpressionHasType function.typedBody locals shape.parts.stop.id shape.parts.stop.type := by
+      apply ExpressionHasType.ofOrdinary (rawType := .bool) (owned := [])
+        (lookupExpression?_sound shape.parts.stopFound)
+      · rw [shape.parts.stopForm]
+        exact .reference (.builtinBoolean false)
+      · exact localBoolean
+      · rw [shape.parts.stopType]
+        exact localBoolean
+      · intro id member
+        cases member
+      · rw [shape.parts.stopCoercions, shape.parts.stopType]
+        exact .nil _
+      · rw [shape.parts.stopRequirements, shape.parts.stopCoercions]
+        rfl
+    rw [shape.parts.stopType] at stopTyped
+    have writable : WritableLocal locals shape.parts.resolution.target.root .bool := by
+      rw [shape.parts.targetRoot]
+      exact .intro goExtended.local_self (shape.goScheme.symm ▸ SchemeWellFormed.monoAdmissible localBoolean)
+        (by rw [shape.goScheme]; rfl) (by rw [shape.goScheme]; rfl)
+    have assignmentTyped : SourceAssignmentHasType function.typedBody locals shape.parts.resolution .equal
+        shape.parts.stop.id :=
+      .equal (.intro writable (by rw [shape.parts.targetProjections]; exact .nil _) shape.parts.targetType) stopTyped
+        shape.assignmentRequirements
+    have jumpTyped : StatementHasType function.typedBody (ControlContext.enterLoop ⟨.word, 0⟩) locals
+        shape.parts.jump.id locals {type := .unit, hasValue := false, sawReturn := false, control := .continuing} :=
+      .continueStmt (lookupStatement?_sound shape.parts.jumpFound) shape.parts.jumpForm
+        (by simp [ControlContext.loopAllowed, ControlContext.enterLoop]) shape.jumpType
+    have initialTyped : ForItemsHaveType function.typedBody ⟨.word, 0⟩ lexical
+        [.letDecl shape.parts.go (some shape.parts.start.id)] locals :=
+      .cons (.letInitialized (by simpa only [shape.goScheme, TypeSystem.Scheme.mono] using startTyped)
+        (by rw [shape.goScheme]; rfl) (by rw [shape.goScheme]; rfl) goExtended) (.nil _ _)
+    have loopTyped : StatementHasType function.typedBody ⟨.word, 0⟩ lexical shape.parts.loop.id lexical ordinary :=
+      .forLoop (lookupStatement?_sound shape.parts.loopFound) shape.parts.loopForm initialTyped testTyped
+        (.singleton jumpTyped) (.cons (.assignValue assignmentTyped) (.nil _ _)) shape.loopType
+    have read := shape.parts.read.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    exact ⟨_, .cons loopTyped (.singleton (.returnValue (lookupStatement?_sound shape.parts.returnedFound)
+      shape.parts.returnedForm read shape.returnedType))⟩
+
+def observeCounted (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (CountedShape function signature) := do
+  let parts ← observeCountedParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "counted parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "counted inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "counted returns"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "counted binderRequirements"
+  let ⟨goScheme⟩ ← observed (parts.go.scheme = .mono .bool) "counted goScheme"
+  let ⟨goRequirements⟩ ← observed (parts.go.schemeRequirements = []) "counted goRequirements"
+  let ⟨goOwner⟩ ← observed (parts.go.id.owner = function.typedBody.owner) "counted goOwner"
+  let ⟨goDistinct⟩ ← observed (parts.go.id ≠ parts.binder.id) "counted goDistinct"
+  let ⟨loopType⟩ ← observed (parts.loop.type = .unit) "counted loopType"
+  let ⟨jumpType⟩ ← observed (parts.jump.type = .unit) "counted jumpType"
+  let ⟨returnedType⟩ ← observed (parts.returned.type = .word) "counted returnedType"
+  let ⟨assignmentRequirements⟩ ← observed (parts.resolution.requirements = []) "counted assignmentRequirements"
+  return ⟨parts, parameters, inputTypes, returns, binderRequirements, goScheme, goRequirements, goOwner, goDistinct,
+    loopType, jumpType, returnedType, assignmentRequirements⟩
+
 /-- Two members of a list of signatures whose ids are distinct are equal when
 their ids are. -/
 private theorem signature_of_id {signatures : List ProgramFunctionSignature}
@@ -1656,10 +2007,10 @@ def observeWellFormed {program : CheckedProgram}
   match functions : program.functions, signatures : program.signatures.functions with
   | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction,
       shiftedFunction, flippedFunction, tailedFunction, storedFunction, summedFunction, zeroedFunction,
-      invertedFunction],
+      invertedFunction, brokenFunction, countedFunction],
     [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature,
       shiftedSignature, flippedSignature, tailedSignature, storedSignature, summedSignature, zeroedSignature,
-      invertedSignature] =>
+      invertedSignature, brokenSignature, countedSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
@@ -1673,6 +2024,8 @@ def observeWellFormed {program : CheckedProgram}
     let summedShape ← observeSummed summedFunction summedSignature
     let zeroedShape ← observeZeroed zeroedFunction zeroedSignature
     let invertedShape ← observeInverted invertedFunction invertedSignature
+    let brokenShape ← observeBroken brokenFunction brokenSignature
+    let countedShape ← observeCounted countedFunction countedSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -1690,6 +2043,9 @@ def observeWellFormed {program : CheckedProgram}
     let ⟨zeroedDeclaration⟩ ← observed (zeroedFunction.declaration = zeroedSignature.id) "calls zeroedDeclaration"
     let ⟨invertedDeclaration⟩ ← observed (invertedFunction.declaration = invertedSignature.id)
       "calls invertedDeclaration"
+    let ⟨brokenDeclaration⟩ ← observed (brokenFunction.declaration = brokenSignature.id) "calls brokenDeclaration"
+    let ⟨countedDeclaration⟩ ← observed (countedFunction.declaration = countedSignature.id)
+      "calls countedDeclaration"
     let ⟨distinct⟩ ← observed ((program.signatures.functions.map (·.id)).Nodup) "calls distinct signatures"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
@@ -1699,7 +2055,7 @@ def observeWellFormed {program : CheckedProgram}
             actual.declaration = signature.id → candidate = signature := fun signatureMember same =>
           signature_of_id distinct candidateMember signatureMember (declared.symm.trans same)
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
-        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
         · obtain rfl := selects (by simp [signatures]) identityDeclaration
           exact identityShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) relayDeclaration
@@ -1726,6 +2082,10 @@ def observeWellFormed {program : CheckedProgram}
           exact zeroedShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) invertedDeclaration
           exact invertedShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) brokenDeclaration
+          exact brokenShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) countedDeclaration
+          exact countedShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -1734,14 +2094,15 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the thirteen functions and their original Source
+/-! The cache rows of the fifteen functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `tailed` ends in the direct call of `identity` with
 its parameter as its final value, `stored` returns its parameter from the index of its local mapping
 where its assignment put it, `summed` returns the integer sum of its parameter's word with itself,
 `zeroed` returns the opcode `iszero` on its parameter, `inverted` returns the complement of the default
-word from the index of its local mapping where its in-place `~` put it, `narrow` returns the conversion of
+word from the index of its local mapping where its in-place `~` put it, `broken` and `counted` return
+their parameter after their loops, `counted`'s after one iteration, `narrow` returns the conversion of
 its parameter,
 and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
 a given body invocation. At a word not canonical for `uint8` the conversions of `narrow`, `doubled`,
@@ -1768,6 +2129,10 @@ def byteHeap (before : Dynamic.Heap) (word : Core.Word) : Dynamic.Heap :=
 /-- A heap with one more `mapping(Word => Word)` cell. -/
 def mappingHeap (before : Dynamic.Heap) (value : Option Dynamic.Value) : Dynamic.Heap :=
   ⟨before.cells ++ [{type := .mapping .word .word, value := value}]⟩
+
+/-- A heap with one more initialized `bool` cell. -/
+def boolHeap (before : Dynamic.Heap) (value : Bool) : Dynamic.Heap :=
+  ⟨before.cells ++ [{type := .bool, value := some (.bool value)}]⟩
 
 /-- `identity`'s cache row: its `Word` parameter, the read of it and the return
 of the read. -/
@@ -2010,6 +2375,31 @@ def observeInvertedBody (source : TypedSource) : IO (InvertedBody source) := do
   let ⟨tableScheme⟩ ← observed (parts.table.scheme = .mono (.mapping .word .word)) "inverted row tableScheme"
   let ⟨tableDistinct⟩ ← observed (parts.table.id ≠ parts.binder.id) "inverted row tableDistinct"
   return ⟨parts, binderScheme, tableScheme, tableDistinct⟩
+
+/-- `broken`'s cache row: the nodes of its body and its `Word` parameter. -/
+structure BrokenBody (source : TypedSource) where
+  parts : BrokenParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeBrokenBody (source : TypedSource) : IO (BrokenBody source) := do
+  let parts ← observeBrokenParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "broken row binderScheme"
+  return ⟨parts, binderScheme⟩
+
+/-- `counted`'s cache row: the nodes of its body, its `Word` parameter and the
+header's `bool` local. -/
+structure CountedBody (source : TypedSource) where
+  parts : CountedParts source
+  binderScheme : parts.binder.scheme = .mono .word
+  goScheme : parts.go.scheme = .mono .bool
+  goDistinct : parts.go.id ≠ parts.binder.id
+
+def observeCountedBody (source : TypedSource) : IO (CountedBody source) := do
+  let parts ← observeCountedParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "counted row binderScheme"
+  let ⟨goScheme⟩ ← observed (parts.go.scheme = .mono .bool) "counted row goScheme"
+  let ⟨goDistinct⟩ ← observed (parts.go.id ≠ parts.binder.id) "counted row goDistinct"
+  return ⟨parts, binderScheme, goScheme, goDistinct⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
 theorem read_value {source : TypedSource} {binder : TypedBinder}
@@ -2508,16 +2898,126 @@ theorem InvertedBody.trace {source : TypedSource} (body : InvertedBody source) {
     (by rw [body.parts.returnedForm]; intro id impossible; cases impossible)
     (.returnValue (lookupStatement?_sound body.parts.returnedFound) body.parts.returnedForm indexed)))
 
+/-- `broken`'s body returns its parameter: the loop's condition is `true`, its
+body breaks at once, and the loop falls through at the loop's own bindings. -/
+theorem BrokenBody.trace {source : TypedSource} (body : BrokenBody source) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.loop.id, body.parts.returned.id] context (.returned (.word word))
+      (wordHeap before word) := by
+  have parameterAllocation : Dynamic.Heap.Allocates before .word (some (.word word)) ⟨before.cells.length⟩
+      (wordHeap before word) := .append
+  have tested : Dynamic.ExpressionEvaluates program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) body.parts.condition.id (.bool true) (wordHeap before word) := by
+    apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound body.parts.conditionFound)
+    · rw [body.parts.conditionForm]
+      exact .builtinBoolean (by rw [body.parts.conditionRequirements, body.parts.conditionCoercions]; rfl)
+    · rw [body.parts.conditionCoercions]
+      exact .nil
+  have broke : Dynamic.StatementsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.jump.id] context (.breaking (wordEnvironment body.parts.binder before))
+      (wordHeap before word) :=
+    .terminal (.breakStmt (lookupStatement?_sound body.parts.jumpFound) body.parts.jumpForm) (.breaking _)
+  have looped : Dynamic.StatementExecutes program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) body.parts.loop.id context (.fallthrough (wordEnvironment body.parts.binder before))
+      (wordHeap before word) :=
+    .whileLoop (lookupStatement?_sound body.parts.loopFound) body.parts.loopForm (.breaks tested broke)
+  exact .cons looped (.singleton (lookupStatement?_sound body.parts.returnedFound)
+    (by rw [body.parts.returnedForm]; intro id impossible; cases impossible)
+    (.returnValue (lookupStatement?_sound body.parts.returnedFound) body.parts.returnedForm
+      (local_value body.parts.read evidence .head parameterAllocation.reads_new)))
+
+/-- `counted`'s body returns its parameter: the header declares `go` at
+`true`, the first test reads it, the body continues, the post header assigns
+`go` its `false`, and the second test ends the loop, which falls through at the
+loop's own bindings. The local's context is a binder extension of the body's. -/
+theorem CountedBody.trace {source : TypedSource} (body : CountedBody source) {program : SourceSemantics.Program}
+    {context loopContext : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (extension : BinderExtends source.owner context body.parts.go loopContext) (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.loop.id, body.parts.returned.id] context (.returned (.word word))
+      (boolHeap (wordHeap before word) false) := by
+  let flag : Dynamic.Location := ⟨(wordHeap before word).cells.length⟩
+  let environment : Dynamic.Environment := (body.parts.go.id, flag) :: wordEnvironment body.parts.binder before
+  have parameterAllocation : Dynamic.Heap.Allocates before .word (some (.word word)) ⟨before.cells.length⟩
+      (wordHeap before word) := .append
+  have raised : Dynamic.Heap.Allocates (wordHeap before word) .bool (some (.bool true)) flag
+      (boolHeap (wordHeap before word) true) := .append
+  have lowered : Dynamic.Heap.Allocates (wordHeap before word) .bool (some (.bool false)) flag
+      (boolHeap (wordHeap before word) false) := .append
+  have started : Dynamic.ExpressionEvaluates program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) body.parts.start.id (.bool true) (wordHeap before word) := by
+    apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound body.parts.startFound)
+    · rw [body.parts.startForm]
+      exact .builtinBoolean (by rw [body.parts.startRequirements, body.parts.startCoercions]; rfl)
+    · rw [body.parts.startCoercions]
+      exact .nil
+  have initialized : Dynamic.ForItemsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [.letDecl body.parts.go (some body.parts.start.id)] loopContext environment
+      (boolHeap (wordHeap before word) true) :=
+    .cons (.letInitialized started (by rw [body.goScheme]; rfl) extension (by rw [body.goScheme]; exact raised)) .nil
+  have stopped : Dynamic.ExpressionEvaluates program loopContext evidence source environment
+      (boolHeap (wordHeap before word) true) body.parts.stop.id (.bool false) (boolHeap (wordHeap before word) true) := by
+    apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound body.parts.stopFound)
+    · rw [body.parts.stopForm]
+      exact .builtinBoolean (by rw [body.parts.stopRequirements, body.parts.stopCoercions]; rfl)
+    · rw [body.parts.stopCoercions]
+      exact .nil
+  have continued : Dynamic.StatementsExecute program loopContext evidence source environment
+      (boolHeap (wordHeap before word) true) [body.parts.jump.id] loopContext (.continuing environment)
+      (boolHeap (wordHeap before word) true) :=
+    .terminal (.continueStmt (lookupStatement?_sound body.parts.jumpFound) body.parts.jumpForm) (.continuing _)
+  have resolve : Dynamic.SourcePlaceResolves program loopContext evidence source environment
+      (boolHeap (wordHeap before word) true) body.parts.resolution.target
+      {location := flag, rootType := .bool, valueType := body.parts.resolution.target.type,
+        projections := [], selected := some (.bool true)}
+      (boolHeap (wordHeap before word) true) := by
+    apply Dynamic.SourcePlaceResolves.intro (initialCell := {type := .bool, value := some (.bool true)})
+      (currentCell := {type := .bool, value := some (.bool true)})
+    · rw [body.parts.targetRoot]
+      exact .head
+    · exact raised.reads_new
+    · rw [body.parts.targetProjections]
+      exact .nil
+    · exact raised.reads_new
+    · exact .initialized
+    · exact .nil
+  have write : Dynamic.Heap.Writes (boolHeap (wordHeap before word) true) flag (some (.bool false))
+      (boolHeap (wordHeap before word) false) :=
+    .intro raised.reads_new (write_last (wordHeap before word).cells _ _)
+  have posted : Dynamic.ForItemsExecute program loopContext evidence source environment
+      (boolHeap (wordHeap before word) true) [.assignValue body.parts.resolution .equal body.parts.stop.id]
+      loopContext environment (boolHeap (wordHeap before word) false) := by
+    refine .cons (.assignValue (updatedRoot := .bool false) ?_) .nil
+    refine .intro resolve stopped ?_
+    exact .intro raised.reads_new rfl .initialized
+      (.leaf (.primitive (Dynamic.CompoundAssignmentApplies.plain_of_profile (.inl rfl)) (.equal _ _))) write
+  have iterated : Dynamic.ForLoopExecutes program loopContext evidence source environment
+      (boolHeap (wordHeap before word) true) body.parts.test.node.id
+      [.assignValue body.parts.resolution .equal body.parts.stop.id] [body.parts.jump.id] loopContext
+      (.fallthrough environment) (boolHeap (wordHeap before word) false) :=
+    .nextContinue (local_value body.parts.test evidence .head raised.reads_new) continued posted
+      (.done (local_value body.parts.test evidence .head lowered.reads_new))
+  have looped : Dynamic.StatementExecutes program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) body.parts.loop.id context (.fallthrough (wordEnvironment body.parts.binder before))
+      (boolHeap (wordHeap before word) false) :=
+    .forLoop (lookupStatement?_sound body.parts.loopFound) body.parts.loopForm initialized iterated
+  exact .cons looped (.singleton (lookupStatement?_sound body.parts.returnedFound)
+    (by rw [body.parts.returnedForm]; intro id impossible; cases impossible)
+    (.returnValue (lookupStatement?_sound body.parts.returnedFound) body.parts.returnedForm
+      (local_value body.parts.read evidence .head (lowered.preserves_read parameterAllocation.reads_new))))
+
 end Tests.SourceCoreAcceptedOneCall
 end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the thirteen rows among the nested sites or their callees
+every expression node of the fifteen rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
 receipts. The original Source executions of `relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`,
-`inverted`, `narrow` and `roundTrip`, whose calls run `identity`'s body instance, are lifted through the checked
+`inverted`, `broken`, `counted`, `narrow` and `roundTrip`, whose calls run `identity`'s body instance, are lifted through the checked
 shapes, and with the existing start receipts the call root's theorems apply at
 the first public call of each in both directions; `stored`'s and `inverted`'s executions end in their
 local's context (`accepted_call_with_locals`), and `summed`'s returns an integer (`accepted_call_returning`). The call root's reflection
@@ -2629,6 +3129,15 @@ private theorem three_body (selected : SelectedInventory whole row) {first secon
     (roots : row.original.function.typedBody.roots = [.statement first, .statement second, .statement third]) :
     selected.packet.header.function.body = [first, second, third] := by
   have headerRoots : selected.packet.header.function.source.roots = [first, second, third].map NodeId.statement := by
+    rw [selected.source_eq]
+    exact roots
+  exact statementRoots_injective (selected.packet.header.agreement.roots.symm.trans headerRoots)
+
+/-- The statement roots of a header whose row's body is two statements. -/
+private theorem two_body (selected : SelectedInventory whole row) {first second : StatementId}
+    (roots : row.original.function.typedBody.roots = [.statement first, .statement second]) :
+    selected.packet.header.function.body = [first, second] := by
+  have headerRoots : selected.packet.header.function.source.roots = [first, second].map NodeId.statement := by
     rw [selected.source_eq]
     exact roots
   exact statementRoots_injective (selected.packet.header.agreement.roots.symm.trans headerRoots)
@@ -2868,6 +3377,49 @@ theorem inverted_source (selected : SelectedInventory whole row)
     | letUninitialized _ extension =>
       rw [body, selected.source_eq]
       exact ⟨_, invertedBody.trace selected.packet.header.function.evidence ⟨[]⟩ extension word⟩
+
+/-- The original Source execution of `broken`'s body at its header returns its
+parameter after its `while (true)` loop breaks at once. -/
+theorem broken_source (selected : SelectedInventory whole row) (brokenBody : BrokenBody row.original.function.typedBody)
+    (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment brokenBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.word word)) (wordHeap ⟨[]⟩ word) := by
+  rw [two_body selected brokenBody.parts.roots, selected.source_eq]
+  exact brokenBody.trace selected.packet.header.function.evidence ⟨[]⟩ word
+
+/-- The original Source execution of `counted`'s body at its header returns
+its parameter after its `for` loop runs once and stops at its post header's
+assignment. The header local's binder extension comes from the header's typing
+certificate. -/
+theorem counted_source (selected : SelectedInventory whole row)
+    (countedBody : CountedBody row.original.function.typedBody)
+    (certified : SelectedCompilationNamedSourceTyping.Certified selected.packet.header) (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment countedBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.word word)) (boolHeap (wordHeap ⟨[]⟩ word) false) := by
+  have body := two_body selected countedBody.parts.roots
+  have unique : NodeOccurrencesUnique row.original.function.typedBody :=
+    selected.source_eq ▸ selected.packet.header.unique
+  obtain ⟨_final, _facts, typed, _completes⟩ := certified.statements
+  rw [body, selected.source_eq] at typed
+  cases typed with
+  | cons head _ =>
+    obtain ⟨node, contains, formTyped⟩ := Dynamic.StatementHasType.formTyping head
+    cases Option.some.inj ((lookupStatement?_complete unique contains).symm.trans countedBody.parts.loopFound)
+    rw [countedBody.parts.loopForm] at formTyped
+    cases formTyped with
+    | forLoop initial _ _ _ =>
+      cases initial with
+      | cons item _ =>
+        cases item with
+        | letInitialized _ _ _ extension =>
+          rw [body, selected.source_eq]
+          exact countedBody.trace selected.packet.header.function.evidence ⟨[]⟩ extension word
+        | letInitializedGeneralized polymorphic =>
+          exact absurd (by rw [countedBody.goScheme]; rfl) polymorphic
 
 /-- The callee premise of the fault lifting for the family that admits
 `identity`'s retained instantiation: its body instance is its header's, whose
@@ -3434,6 +3986,53 @@ def run : IO Unit := do
   IO.println "ACCEPTED_PROJECTED_BIT_NOT_PUBLIC_PASS"
 
 end AcceptedProjectedBitNotRuntime
+
+namespace AcceptedLoopRuntime
+
+/-- As `AcceptedCallRuntime.run`, at `broken`, whose `while (true)` loop
+breaks at once before the return of its parameter, and at `counted`, whose
+`for` loop continues once and stops at its post header's assignment. -/
+def run : IO Unit := do
+  let observed ← observe
+  let broken ← observeRow observed.fixture "broken"
+  let brokenBody ← observeBrokenBody broken.original.function.typedBody
+  for word in [Word.zero, Word.ofNatModulo 7] do
+    let started ← observeStarted observed.fixture broken.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole broken),
+        Nonempty (AcceptedCall selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select broken
+      exact ⟨whole, selected, accepted_call selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile brokenBody.parts.inputs brokenBody.binderScheme
+        (broken_source selected brokenBody word)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .succeeded returned =>
+      unless returned.value == .word word do
+        throw (IO.userError "accepted loop output changed")
+    | _ => throw (IO.userError "accepted loop did not succeed")
+  let counted ← observeRow observed.fixture "counted"
+  let countedBody ← observeCountedBody counted.original.function.typedBody
+  for word in [Word.zero, Word.ofNatModulo 7] do
+    let started ← observeStarted observed.fixture counted.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole counted),
+        Nonempty (AcceptedCall selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select counted
+      exact ⟨whole, selected, accepted_call selected observed.calls (fun admits => ⟨observed.identity, admits⟩)
+        word observed.wellFormed started observed.callableProfile countedBody.parts.inputs countedBody.binderScheme
+        (counted_source selected countedBody
+          ((SelectedCompilationNamedSupport.Support.of_program observed.wellFormed).certified selected.packet.header)
+          word)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .succeeded returned =>
+      unless returned.value == .word word do
+        throw (IO.userError "accepted for loop output changed")
+    | _ => throw (IO.userError "accepted for loop did not succeed")
+  IO.println "ACCEPTED_LOOP_PUBLIC_PASS"
+
+end AcceptedLoopRuntime
 
 namespace AcceptedConversionRuntime
 
