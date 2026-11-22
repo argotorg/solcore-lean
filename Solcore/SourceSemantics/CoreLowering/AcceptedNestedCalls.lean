@@ -6,10 +6,12 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedBuiltins
 Extends the expression closure of named-row bodies to direct calls at every
 expression position: inside operators, conditionals, groups and pairs, and as
 the arguments of other direct calls, and to the builtin conversions, the
-mapping indices, and the builtin closures and their calls there. Closes a
-family of such rows by one strong induction on the grade.
+mapping indices, the builtin closures and their calls, and tuples beyond pairs
+there. Closes a family of such rows by one strong induction on the grade.
 
 Main declarations:
+- `CellAwareInvocationAcceptedTupleSites.TupleSite`, a tuple of more than two
+  elements as a compiler site;
 - `CellAwareInvocationAcceptedNestedTrees.Nested`, the sites, and
   `CellAwareInvocationAcceptedNestedTrees.NestedTree`, their receipt trees;
 - `CellAwareInvocationAcceptedNestedTrees.of_nested`, the receipt tree from the
@@ -29,18 +31,133 @@ Main declarations:
 -/
 
 section
+/-! Tuples of more than two elements in named-row bodies as compiler sites. The
+first subset's sites stop at pairs, so a longer tuple is a site of its own. It
+has no coercions or requirements, is not a generalized initializer and lies in a
+row without evidence assumptions, so the named policy's special callback
+declines it and its read policy is the compatible reader, as at a call of a
+builtin closure. `tupleSite?` recognizes one on an actually compiled row. -/
+set_option autoImplicit false
+set_option Elab.async false
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedTupleSites
+open Core Frontend SourceInference
+open CallableIndexedNamedGeneration (Prepared Compilation context representation)
+open GeneralizedLocalInitializerCompilation (namedPolicy)
+
+/-- A tuple of more than two elements in a named-row body. -/
+structure TupleSite {checked : SourceCoreCompatibleCatalog.Checked}
+    (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
+    (source : TypedSource) (id : ExpressionId) (ids : List ExpressionId) where
+  node : ExpressionNode
+  found : source.lookupExpression? id = some node
+  form : node.form = .tuple ids
+  beyond : 2 < ids.length
+  coercions : node.coercions = []
+  requirements : node.requirements = []
+  notInitializer : prepared.base.locals.bindings.find? (fun binding =>
+    decide (binding.caller = named.signature.key ∧ binding.initializer = id)) = none
+  assumptions : named.specialized.assumptions = []
+
+variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+  {named : SourceCoreGeneralFunctions.Function} {source : TypedSource} {id : ExpressionId}
+  {ids : List ExpressionId}
+
+theorem contextual (site : TupleSite prepared named source id ids) :
+    SourceCoreGeneralFunctions.contextualSource prepared.base.sourceProgram
+      (context prepared named).plan prepared.base.locals named.signature.key none source id = .ok source := by
+  simp [SourceCoreGeneralFunctions.contextualSource, site.found, site.form]
+
+private theorem ordinary_nil {node : ExpressionNode} (requirements : node.requirements = [])
+    (coercions : node.coercions = []) : SourceCompilationPlan.ordinaryOwnedRequirements? node = some [] := by
+  unfold SourceCompilationPlan.ordinaryOwnedRequirements?
+  rw [requirements, coercions]
+  rfl
+
+private theorem evidence_none (site : TupleSite prepared named source id ids)
+    (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat) (scope : SourceCoreLocalCell.Scope)
+    (reasonAt : ExpressionId → Word) :
+    SourceCoreEvidence.lowerWithProjector prepared.base.sourceProgram
+      ((representation prepared).atContext named.signature.key []).expressions.projectType
+      named.specialized (context prepared named) child budget source scope id reasonAt
+      (SourceCoreGeneralFunctions.callablePolicy prepared.base.callableContext []) = .ok none := by
+  simp [SourceCoreEvidence.lowerWithProjector, ordinary_nil site.requirements site.coercions, site.found,
+    site.form, site.requirements, site.coercions, site.assumptions]
+
+variable {diagnostics : SourceCoreDataPlaceFaultSites.Program} {code : Expr}
+  (compiled : Compilation prepared named diagnostics code)
+
+/-- The named policy's special callback declines a tuple. -/
+theorem special (site : TupleSite prepared named source id ids) (rootFuel : Nat)
+    (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat) (scope : SourceCoreLocalCell.Scope)
+    (reasonAt : ExpressionId → Word) :
+    CallableIndexedOwnedContextualLambdaPolicyRecipes.special compiled rootFuel
+      (context prepared named) child budget source scope id reasonAt = .ok none := by
+  unfold CallableIndexedOwnedContextualLambdaPolicyRecipes.special
+  have ownerEq : (context prepared named).owner = named.signature.key := rfl
+  simp only [ownerEq, contextual site, bind, Except.bind, pure, Except.pure, site.found,
+    site.notInitializer, Option.filter_none]
+  rw [evidence_none site child budget scope reasonAt]
+  simp [site.form]
+
+theorem read (site : TupleSite prepared named source id ids) (rootFuel : Nat) :
+    (namedPolicy compiled rootFuel).readExpression source id =
+      SourceCoreCompatibleDataExpressions.readExpression checked source id := by
+  simp only [namedPolicy, contextual site, bind, Except.bind]
+  rfl
+
+/-- Proof-producing recognition of a tuple of more than two elements of the row. -/
+def tupleSite? (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
+    (source : TypedSource) (id : ExpressionId) :
+    Option (Σ' (ids : List ExpressionId), TupleSite prepared named source id ids) :=
+  match found : source.lookupExpression? id with
+  | none => none
+  | some node =>
+    match form : node.form with
+    | .tuple ids =>
+      if beyond : 2 < ids.length then
+        match coercions : node.coercions, requirements : node.requirements with
+        | [], [] =>
+          match initializer : prepared.base.locals.bindings.find? (fun binding =>
+              decide (binding.caller = named.signature.key ∧ binding.initializer = id)) with
+          | some _ => none
+          | none =>
+            match assumptions : named.specialized.assumptions with
+            | [] => some ⟨ids, ⟨node, found, form, beyond, coercions, requirements, initializer, assumptions⟩⟩
+            | _ :: _ => none
+        | _, _ => none
+      else none
+    | _ => none
+
+/-- A tuple site depends on its row only through the row's key and its empty
+assumptions. -/
+def transport {first second : SourceCoreGeneralFunctions.Function}
+    (keyEq : first.signature.key = second.signature.key) (assumptions : second.specialized.assumptions = [])
+    (site : TupleSite prepared first source id ids) : TupleSite prepared second source id ids where
+  node := site.node
+  found := site.found
+  form := site.form
+  beyond := site.beyond
+  coercions := site.coercions
+  requirements := site.requirements
+  notInitializer := keyEq ▸ site.notInitializer
+  assumptions := assumptions
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedTupleSites
+end
+
+section
 /-! Direct calls and conversions inside the expressions of named-row bodies.
-`Nested` closes the first subset's forms, direct calls, builtin conversions
-and calls of builtin closures under one another: every operand, branch and
-pair element, every argument of a direct call or of a closure, and the
-argument of a conversion is again a `Nested` site.
+`Nested` closes the first subset's forms, direct calls, builtin conversions,
+calls of builtin closures and tuples under one another: every operand, branch,
+pair and tuple element, every argument of a direct call or of a closure, and
+the argument of a conversion is again a `Nested` site.
 `NestedTree` keeps the first subset's receipts at its forms, the direct-call
 receipts of `CellAwareInvocationAcceptedCallTrees.CallTree` at its calls, and
 the node's metadata at `word` at its conversions. A call's argument receipts
-are indexed by the pairs of the arguments and their lowered codes: a receipt
-tree cannot be the certificate of the head's argument sequence
-(`DataExpressionSequence.Tree`) inside its own definition, so the bounds
-rebuild that sequence. -/
+and a tuple's element receipts are indexed by the pairs of the arguments or
+elements and their lowered codes: a receipt tree cannot be the certificate of
+the head's argument sequence (`DataExpressionSequence.Tree`) inside its own
+definition, so the bounds rebuild that sequence. -/
 set_option autoImplicit false
 set_option Elab.async false
 set_option maxRecDepth 4096
@@ -55,14 +172,16 @@ open CellAwareInvocationAcceptedCallTrees (CallSubset)
 open CellAwareInvocationAcceptedDirectSites (DirectSite)
 open CellAwareInvocationAcceptedConversionSites (ConversionSite)
 open CellAwareInvocationAcceptedBuiltinSites (BuiltinSite)
+open CellAwareInvocationAcceptedTupleSites (TupleSite)
 open CallableIndexedOwnedPreparedStagedDirectCallCertificates (Receipt Monomorphic)
 open CallableIndexedOwnedPreparedStagedDirectCallAuthority (Port)
 
 /-- Sites of the nested closure: the first subset's forms with nested
 children, direct calls with nested arguments whose instantiation the caller's
 family admits, builtin conversions with a nested argument, mapping indices
-with a nested base and key, references to builtin closures, and calls of
-builtin closures with nested arguments. -/
+with a nested base and key, references to builtin closures, calls of
+builtin closures with nested arguments, and tuples of more than two nested
+elements. -/
 inductive Nested {checked : SourceCoreCompatibleCatalog.Checked}
     (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
     (source : TypedSource) (called : DeclarationInstantiation → Prop) : ExpressionId → Prop where
@@ -101,6 +220,9 @@ inductive Nested {checked : SourceCoreCompatibleCatalog.Checked}
   | builtin {id callee ids function} (site : BuiltinSite prepared named source id callee ids function)
       (arguments : ∀ argument ∈ ids, Nested prepared named source called argument) :
       Nested prepared named source called id
+  | tuple {id ids} (site : TupleSite prepared named source id ids)
+      (elements : ∀ element ∈ ids, Nested prepared named source called element) :
+      Nested prepared named source called id
 
 /-- Static receipts at nested sites. The forms of the first subset keep the
 receipts of `CellAwareInvocationAcceptedExpressionTrees.Tree` with nested
@@ -111,7 +233,9 @@ index keeps the compiler's index header, its key's node, the base's mapping
 type and the receipts of its base and key; a reference to a builtin closure
 keeps the closure's value certificate and the node's metadata; and a call of a
 builtin closure keeps the compiler's builtin-call receipt, the native types of
-its arguments and the receipt of every argument at its lowered code. -/
+its arguments and the receipt of every argument at its lowered code; and a
+tuple of more than two elements keeps its node's metadata at the type of its
+packed codes and the receipt of every element at its lowered code. -/
 inductive NestedTree (whole : SourceCoreUnifiedCompilation.Compiled)
     (headers : List (CallableIndexedOwnedFunctionValues.Header whole (Program.ofChecked whole.sourceProgram)))
     (called : DeclarationInstantiation → Prop) (compilation : SourceCoreFunctions.Context)
@@ -231,6 +355,16 @@ inductive NestedTree (whole : SourceCoreUnifiedCompilation.Compiled)
         NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope argument.1
           argument.2) :
       NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id lowered
+  | tuple {id node ids codes}
+      (metadata : CompatibleExpressionPrimitives.Metadata whole.compatible.checked source id node
+        (SourceCoreCalls.packArguments codes).type)
+      (form : node.form = .tuple ids) (beyond : 2 < ids.length) (lengths : ids.length = codes.length)
+      (found : ∀ element ∈ ids, ∃ node, source.lookupExpression? element = some node)
+      (elements : ∀ element ∈ ids.zip codes,
+        NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope element.1
+          element.2) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id
+        (SourceCoreCalls.packArguments codes)
 
 section Embedding
 variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
@@ -267,6 +401,7 @@ theorem nested_found {id : ExpressionId} (nested : Nested prepared named source 
   | index site _ _ _ => exact ⟨_, site.found⟩
   | builtinValue site _ => exact ⟨_, site.found⟩
   | builtin site _ => exact ⟨_, site.found⟩
+  | tuple site _ => exact ⟨_, site.found⟩
 
 end Embedding
 
@@ -315,6 +450,9 @@ theorem projected
   | builtin receipt _ _ _ _ =>
     cases Option.some.inj (found.symm.trans receipt.metadata.found)
     exact receipt.metadata.projected
+  | tuple metadata _ _ _ _ _ =>
+    cases Option.some.inj (found.symm.trans metadata.found)
+    exact metadata.projected
 
 /-- The receipts of typed sites have the projections of the sites' types as
 their native types. -/
@@ -706,6 +844,35 @@ theorem of_nested {id : ExpressionId}
       rw [CompatibleBuiltinMeaning.argumentTypes_project function site.closure] at projectedTypes
       exact .builtin receipt (Except.ok.inj projectedTypes).symm lengths
         (fun argument member => nested_found (arguments argument member)) each
+  | @tuple id ids site elements ih =>
+    have same := Option.some.inj (site.found.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      obtain ⟨codes, generated, rfl, metadata⟩ := CompatibleExpressionTuples.of_functions
+        (policy := namedPolicy generation rootFuel) (body := namedLowerBody generation)
+        (compilation := context whole.indexed named) (values := .initial whole.compatible.checked)
+        (scope := scope) (reasonAt := reasonAt) site.found site.form
+        (fun child budget => CellAwareInvocationAcceptedTupleSites.special generation site rootFuel child budget
+          scope reasonAt)
+        (CellAwareInvocationAcceptedTupleSites.read generation site rootFuel)
+        (GeneralizedLocalInitializerCompilation.namedPolicy_recipe generation rootFuel).leafLowerer accepted
+      obtain ⟨_types, typing, _sourceType⟩ :=
+        CompatibleExpressionTuples.source_types unique site.found site.form site.coercions typed
+      have relation := argument_rel
+        (relation := fun element lowered => NestedTree whole headers called (context whole.indexed named)
+          whole.indexed.fuel (context whole.indexed named).solvedRequirements source sourceContext reasonAt scope
+          element lowered)
+        (fun element member {lowered} generated => by
+          obtain ⟨elementNode, elementFound⟩ := nested_found (elements element member)
+          exact ih element member elementFound
+            (CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique typing member
+              elementFound) generated)
+        generated
+      obtain ⟨lengths, each⟩ := zip_of_rel relation
+      exact .tuple metadata site.form site.beyond lengths (fun element member => nested_found (elements element member))
+        each
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedTrees
 end
@@ -719,8 +886,9 @@ conversion uses the conversion head, with the dirty-integer token law; an index
 uses the index head, with the key equality of the function model and the
 missing-default fault of its header (`MissingDefaults`); a reference to a
 builtin closure uses the builtin value bounds, with the function model's
-inclusion of the builtin values; and a call of a builtin closure uses the
-contracted builtin head, with the meaning of its argument receipts. The application of
+inclusion of the builtin values; a call of a builtin closure uses the
+contracted builtin head, with the meaning of its argument receipts; and a tuple
+uses the tuple head, with the meaning of its element receipts. The application of
 each admitted callee header below the grade is the input that the row lemma
 supplies. -/
 set_option autoImplicit false
@@ -1086,6 +1254,30 @@ theorem preserves_nested_tree [RecursiveStageMeaning.FaultTokens faults]
       unique selectedBodies runtime covers (receipt.result ▸ receipt.metadata) receipt.form nativeTypes size ordered
       childMeaning ⟨rfl, rfl, receipt.output⟩ nodeFound typed environments heaps locals agrees actualTyped
       initial admitted authority physical frameOwner ownerFrame trace
+  | @tuple id node ids codes metadata form _ lengths found elements ih =>
+    intro size applications current child code point actualNode nodeFound typed
+      mapping world administrativeContext environment canonical actual actualContext before store ξ outcome after
+    obtain ⟨currentEq, childEq, codeEq⟩ := point
+    subst current child code
+    cases Option.some.inj (nodeFound.symm.trans metadata.found)
+    obtain ⟨types, typing, sourceType⟩ :=
+      CompatibleExpressionTuples.source_types unique metadata.found form metadata.coercions typed
+    obtain ⟨_storedTypes, sequence⟩ := DataExpressionSequence.Tree.of_children
+      (arguments_rel (source := invocation.source) (scope := scope) lengths found)
+    have stored := tree_types sequence unique typing
+    have ordered := stored ▸ sequence
+    have childMeaning : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Arguments scope ids codes) faults size := by
+      intro smaller less current element elementCode member _
+      obtain ⟨currentEq, member⟩ := member
+      subst current
+      exact ih (element, elementCode) member smaller
+        (fun header headerMember headerAdmitted below belowLess =>
+          applications header headerMember headerAdmitted below (Nat.lt_trans belowLess less))
+        ⟨rfl, rfl, rfl⟩
+    exact CellAwareInvocationTupleBounds.tuple_preserves callerBridge.forgetSlots functions faults unique
+      selectedBodies runtime covers size childMeaning ⟨_, ids, types, codes, rfl,
+        ⟨metadata, form, sourceType⟩, ordered⟩ nodeFound typed
 
 include callerBridge keyPhysical cache faithful functionLeaves functionTypes included extension sameLedger uninitialized
   missing
@@ -1286,6 +1478,32 @@ theorem reflects_nested_tree [RecursiveStageMeaning.FaultTokens faults]
       unique selectedBodies runtime covers (receipt.result ▸ receipt.metadata) receipt.form nativeTypes size ordered
       childMeaning ⟨rfl, rfl, receipt.output⟩ nodeFound typed environments heaps locals agrees actualTyped
       initial admitted authority physical frameOwner ownerFrame completed
+  | @tuple id node ids codes metadata form _ lengths found elements ih =>
+    intro size applications current child code point
+    obtain ⟨currentEq, childEq, codeEq⟩ := point
+    subst current child code
+    have childMeaning : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Arguments scope ids codes) faults (size + 1) := by
+      intro smaller less current element elementCode member _
+      obtain ⟨currentEq, member⟩ := member
+      subst current
+      exact ih (element, elementCode) member smaller
+        (fun header headerMember headerAdmitted below belowLess =>
+          applications header headerMember headerAdmitted below
+            (Nat.lt_of_lt_of_le belowLess (Nat.le_of_lt_succ less)))
+        ⟨rfl, rfl, rfl⟩
+    intro actualNode nodeFound typed
+      mapping world administrativeContext environment canonical actual actualContext before store ξ value finalStore
+    cases Option.some.inj (nodeFound.symm.trans metadata.found)
+    obtain ⟨types, typing, sourceType⟩ :=
+      CompatibleExpressionTuples.source_types unique metadata.found form metadata.coercions typed
+    obtain ⟨_storedTypes, sequence⟩ := DataExpressionSequence.Tree.of_children
+      (arguments_rel (source := invocation.source) (scope := scope) lengths found)
+    have stored := tree_types sequence unique typing
+    have ordered := stored ▸ sequence
+    exact CellAwareInvocationTupleBounds.tuple_reflects callerBridge.forgetSlots functions faults unique
+      selectedBodies runtime covers size childMeaning ⟨_, ids, types, codes, rfl,
+        ⟨metadata, form, sourceType⟩, ordered⟩ nodeFound typed
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedBounds
 end
@@ -1806,10 +2024,15 @@ def nested? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared
           pure ⟨.conversion site child⟩
         | none =>
           match builtinSite? prepared named source id with
-          | none => none
           | some ⟨_callee, ids, _function, site⟩ => do
             let ⟨arguments⟩ ← all? (nested? prepared named source called fuel) ids
             pure ⟨.builtin site arguments⟩
+          | none =>
+            match CellAwareInvocationAcceptedTupleSites.tupleSite? prepared named source id with
+            | none => none
+            | some ⟨ids, site⟩ => do
+              let ⟨elements⟩ ← all? (nested? prepared named source called fuel) ids
+              pure ⟨.tuple site elements⟩
 
 /-- An expression node of the check: a nested site, a reference site, or the
 callee of a conversion. -/
@@ -1902,6 +2125,8 @@ theorem transport {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Pr
     exact .builtinValue (CellAwareInvocationAcceptedSubsetCheck.transportSite keyEq site) form
   | builtin site _ arguments =>
     exact .builtin (CellAwareInvocationAcceptedBuiltinSites.transport keyEq assumptions site) arguments
+  | tuple site _ elements =>
+    exact .tuple (CellAwareInvocationAcceptedTupleSites.transport keyEq assumptions site) elements
 
 /-- A named row whose every expression node is a nested site, a reference site
 or a conversion's callee has every accepted expression a nested site. -/

@@ -926,7 +926,8 @@ bodies: at a call of a given size, the callee body's derivation is smaller, and
 its lifting below that size gives the staged global application. A
 conversion's and a builtin closure call's original rule applies the builtin as
 the staged rule does, a reference to a builtin closure is the staged atomic
-value, and a mapping index's original rules give the staged index outcome.
+value, a mapping index's original rules give the staged index outcome, and a
+tuple's original rule packs its elements' values as the staged rule does.
 Inside one
 body, a nested site is lifted by induction on the site, over the sized
 derivations of its operands, branches, elements and arguments. The admitted
@@ -1305,6 +1306,17 @@ theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Stag
       cases node_unique unique found contains
       rw [site.form] at formEq
       cases formEq
+  | @tuple id ids site _ elements =>
+    intro size context environment before after value within trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.found site.coercions
+      (fun name binder same => by rw [site.form] at same; cases same) trace
+    rw [site.form, site.requirements] at raw
+    cases raw with
+    | tuple _ evaluated pack =>
+      exact .tupleValue ⟨site.node, lookupExpression?_sound site.found, site.form, site.requirements, site.coercions⟩
+        (arguments_value (registry := registry) elements (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) evaluated) pack
 
 /-- The value lifting of every nested site below a size, given the lifting of
 the callee bodies below it. -/
@@ -1974,6 +1986,24 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
       | builtinArgumentType arity mismatch =>
         exact .builtinApplied callOccurrence stagedArguments (.builtinType arity mismatch)
       | builtinFaults failed => exact .builtinApplied callOccurrence stagedArguments (.builtinFault failed)
+  | @tuple id ids site elementsNested elements =>
+    intro size context environment before after reason within signatures expressible trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [site.form] at same; cases same) trace
+    rw [site.form, site.requirements] at raw
+    have values : ∀ other ∈ ids, ∀ {size : Nat} {context : SourceSemantics.Context}
+        {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+        SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
+          before other value after →
+        Staging.Recursive.Expression program registry scope context environment before other (.value value)
+          after :=
+      fun other member => nested_value prepared unique bodies (elementsNested other member)
+    cases raw with
+    | tuple _ failed =>
+      exact .tupleFault ⟨site.node, lookupExpression?_sound site.found, site.form, site.requirements, site.coercions⟩
+        (arguments_fault values elements (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible failed)
 
 /-- The fault lifting of every nested site below a size, given that the
 Source's direct calls have plain callees and the value and fault liftings of
