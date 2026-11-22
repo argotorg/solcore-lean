@@ -244,6 +244,17 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
           obtain ⟨_keyTyped, afterTyped, secondExtends⟩ := expression_value wellFormed
             runtime covers (locals.mono firstExtends) middleTyped keyTyped second
           exact ⟨afterTyped, firstExtends.trans secondExtends⟩
+  | @arrayFault childrenSize scope context environment before after id form children failure occurrence shape failed =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      obtain ⟨_types, childrenTyped⟩ := array_children_typed formTyped shape
+      exact expressionsIH childrenSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap childrenTyped failed
+  | @arrayResult childrenSize scope context environment before middle after id form children values outcome occurrence shape evaluated result =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      obtain ⟨_types, childrenTyped⟩ := array_children_typed formTyped shape
+      obtain ⟨_valuesTyped, middleTyped, childrenExtends⟩ := expressions_values wellFormed
+        runtime covers locals heap childrenTyped evaluated
+      obtain rfl := result.fault_heap
+      exact ⟨middleTyped, childrenExtends⟩
   | @unaryOperandFault childSize scope context environment before after id operator operand failure requirements occurrence child =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with

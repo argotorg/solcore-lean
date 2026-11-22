@@ -139,6 +139,19 @@ mutual
         (second : Expression program registry secondSize scope context environment middle key (.value keyValue) after)
         (result : IndexOutcome baseValue keyValue outcome) :
         Expression program registry (stepSize [firstSize, secondSize]) scope context environment before id outcome after
+    | arrayFault {childrenSize : Nat} {scope context environment before after id form children failure}
+        (occurrence : Occurrence scope id form)
+        (shape : arrayChildren form = some children)
+        (failed : Expressions program registry childrenSize scope context environment before children (.fault failure)
+          after) :
+        Expression program registry (stepSize [childrenSize]) scope context environment before id (.fault failure) after
+    | arrayResult {childrenSize : Nat} {scope context environment before middle after id form children values outcome}
+        (occurrence : Occurrence scope id form)
+        (shape : arrayChildren form = some children)
+        (evaluated : Expressions program registry childrenSize scope context environment before children
+          (.values values) middle)
+        (result : ArrayOutcome form values middle outcome after) :
+        Expression program registry (stepSize [childrenSize]) scope context environment before id outcome after
     | unary {childSize : Nat} {scope context environment before after id operator operand input output}
         (occurrence : Occurrence scope id (.unary operator operand))
         (child : Expression program registry childSize scope context environment before operand (.value input) after)
@@ -1170,6 +1183,8 @@ local macro "erase_stage_grade" : tactic =>
     case indexBaseFault => apply Recursive.Expression.indexBaseFault <;> assumption
     case indexKeyFault => apply Recursive.Expression.indexKeyFault <;> assumption
     case indexResult => apply Recursive.Expression.indexResult <;> assumption
+    case arrayFault => apply Recursive.Expression.arrayFault <;> assumption
+    case arrayResult => apply Recursive.Expression.arrayResult <;> assumption
     case unary => apply Recursive.Expression.unary <;> assumption
     case unaryOperandFault => apply Recursive.Expression.unaryOperandFault <;> assumption
     case unaryInvalid => apply Recursive.Expression.unaryInvalid <;> assumption
@@ -1436,6 +1451,12 @@ local macro "construct_stage_grade" : tactic =>
       obtain ⟨_, first⟩ := ih_first
       obtain ⟨_, second⟩ := ih_second
       exact ⟨_, .indexResult occurrence first second result⟩
+    case arrayFault occurrence shape failed ih_failed =>
+      obtain ⟨_, failed⟩ := ih_failed
+      exact ⟨_, .arrayFault occurrence shape failed⟩
+    case arrayResult occurrence shape evaluated result ih_evaluated =>
+      obtain ⟨_, evaluated⟩ := ih_evaluated
+      exact ⟨_, .arrayResult occurrence shape evaluated result⟩
     case unary occurrence child applies ih_child =>
       obtain ⟨childSize, graded_child⟩ := ih_child
       exact ⟨_, .unary occurrence graded_child applies⟩

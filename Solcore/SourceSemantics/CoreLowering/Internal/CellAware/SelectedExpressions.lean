@@ -43,6 +43,9 @@ theorem no_stage
     cases same
     exact sameForm.symm.trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+      cases reference occurrence
+      cases shape
   | generalizedLocal contains _ _ _ _ _ _ _ path =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -452,6 +455,9 @@ theorem no_stage
     rw [← sameForm]
     exact (literal_atomic literal)
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+      have atomic := occurrence_atomic occurrence
+      cases atomic <;> cases shape
   | generalizedLocal contains localForm _ _ _ _ _ _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -686,6 +692,9 @@ theorem source_children
     obtain ⟨actualNode, contains, actualFormEq, _requirements, _coercions⟩ := occurrence
     exact actualFormEq.symm.trans ((congrArg ExpressionNode.form (same_node contains)).trans form)
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+      cases occurrence_form occurrence
+      cases shape
   | coercedValue contains _ raw _ | coercedFault contains _ raw =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       have shape := CallableIndexedOwnedPreparedStagedCoercionExclusion.raw_shape raw

@@ -63,6 +63,9 @@ private theorem no_stage
     cases same
     exact sameForm.symm.trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+      cases reference occurrence
+      cases shape
   | generalizedLocal contains _ _ _ _ _ _ _ path =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -362,6 +365,9 @@ private theorem source_group_inv
     obtain ⟨actualNode, contains, actualFormEq, _requirements, _coercions⟩ := occurrence
     exact actualFormEq.symm.trans ((congrArg ExpressionNode.form (same_node contains)).trans form)
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+    cases occurrence_form occurrence
+    cases shape
   | coercedValue contains _ raw _ | coercedFault contains _ raw =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       have shape := CallableIndexedOwnedPreparedStagedCoercionExclusion.raw_shape raw
@@ -676,6 +682,9 @@ private theorem no_stage
     rw [← sameForm]
     exact (literal_atomic literal)
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+      have atomic := occurrence_atomic occurrence
+      cases atomic <;> cases shape
   | generalizedLocal contains localForm _ _ _ _ _ _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -928,6 +937,9 @@ private theorem source_children
     obtain ⟨actualNode, contains, actualFormEq, _requirements, _coercions⟩ := occurrence
     exact actualFormEq.symm.trans ((congrArg ExpressionNode.form (same_node contains)).trans form)
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+      cases occurrence_form occurrence
+      cases shape
   | coercedValue contains _ raw _ | coercedFault contains _ raw =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       have shape := CallableIndexedOwnedPreparedStagedCoercionExclusion.raw_shape raw
@@ -1946,6 +1958,9 @@ theorem children
   have actual : ∀ {actualForm requirements}, Occurrence invocation id actualForm requirements → actualForm = .constructor instantiation arguments :=
     fun occurrence => (occurrence_form unique found occurrence).trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+    cases actual occurrence
+    cases shape
   | coercedValue contains _ raw _ | coercedFault contains _ raw =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       have shape := CallableIndexedOwnedPreparedStagedCoercionExclusion.raw_shape raw
@@ -2188,6 +2203,10 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
         environment before ids sequence after ∧
       RecursiveStageTupleMeaning.PacksOutcome sequence outcome := by
   cases trace with
+  | arrayFault owned shape _ | arrayResult owned shape _ _ =>
+      have same := form.symm.trans (occurrence_form unique metadata.found owned)
+      cases same
+      cases shape
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
   | atomicValue contains atomic uncoerced raw =>
@@ -2509,6 +2528,9 @@ theorem unary_inv {operator : Syntax.UnaryOp} {operand : ExpressionId}
   have actual : ∀ {actualForm requirements}, Staging.Recursive.Occurrence invocation id actualForm requirements → actualForm = .unary operator operand :=
     fun occurrence => (occurrence_form unique metadata.found occurrence).trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+    cases actual occurrence
+    cases shape
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
   | generalizedLocal contains actualForm _ _ _ _ _ _ _
@@ -2546,6 +2568,9 @@ theorem binary_inv {operator : Syntax.BinaryOp} {left right : ExpressionId}
   have actual : ∀ {actualForm requirements}, Staging.Recursive.Occurrence invocation id actualForm requirements → actualForm = .binary left operator right :=
     fun occurrence => (occurrence_form unique metadata.found occurrence).trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+    cases actual occurrence
+    cases shape
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
   | generalizedLocal contains actualForm _ _ _ _ _ _ _
@@ -2595,6 +2620,9 @@ theorem conditional_inv {condition thenId elseId : ExpressionId}
   have actual : ∀ {actualForm requirements}, Staging.Recursive.Occurrence invocation id actualForm requirements → actualForm = .conditional condition thenId elseId :=
     fun occurrence => (occurrence_form unique metadata.found occurrence).trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+    cases actual occurrence
+    cases shape
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
   | generalizedLocal contains actualForm _ _ _ _ _ _ _
@@ -3678,6 +3706,10 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
         environment before ids sequence after ∧
       RecursiveStageTupleMeaning.PacksOutcome sequence outcome := by
   cases trace with
+  | arrayFault owned shape _ | arrayResult owned shape _ _ =>
+      have same := form.symm.trans (occurrence_form unique metadata.found owned)
+      cases same
+      cases shape
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
   | atomicValue contains atomic uncoerced raw =>

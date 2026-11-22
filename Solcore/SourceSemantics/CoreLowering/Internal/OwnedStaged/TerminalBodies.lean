@@ -2033,6 +2033,9 @@ private theorem no_stage
     cases same
     exact sameForm.symm.trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+      cases actual occurrence
+      cases shape
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found coercions contains))
   | generalizedLocal contains actualForm _ _ _ _ _ _ _ =>
@@ -2683,6 +2686,9 @@ theorem children
   have actual : ∀ {actualForm requirements}, Occurrence invocation id actualForm requirements → actualForm = .call callee arguments (.declaration instantiation) :=
     fun occurrence => (occurrence_form unique found occurrence).trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+    cases actual occurrence
+    cases shape
   | generalizedLocal contains actualForm _ _ _ _ _ _ _
   | generalizedLocalRequirement contains actualForm _ _ _ _ _ _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)

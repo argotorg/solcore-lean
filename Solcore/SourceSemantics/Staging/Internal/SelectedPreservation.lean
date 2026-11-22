@@ -826,6 +826,17 @@ theorem expression_fault_step (selectedBodies : SelectedPreservation.SelectedBod
           obtain ⟨_keyTyped, afterTyped, secondExtends⟩ := SelectedPreservation.expression_value (expressionAllIH _ (Size.child_lt_stepSize (by simp)))
             runtime covers (locals.mono firstExtends) middleTyped keyTyped second
           exact ⟨afterTyped, firstExtends.trans secondExtends⟩
+  | @arrayFault childrenSize scope context environment before after id form children failure occurrence shape failed =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      obtain ⟨_types, childrenTyped⟩ := FaultPreservation.array_children_typed formTyped shape
+      exact expressionsIH childrenSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap childrenTyped failed
+  | @arrayResult childrenSize scope context environment before middle after id form children values outcome occurrence shape evaluated result =>
+      obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
+      obtain ⟨_types, childrenTyped⟩ := FaultPreservation.array_children_typed formTyped shape
+      obtain ⟨_valuesTyped, middleTyped, childrenExtends⟩ := SelectedPreservation.expressions_values
+        (expressionsAllIH _ (Size.child_lt_stepSize (by simp))) runtime covers locals heap childrenTyped evaluated
+      obtain rfl := result.fault_heap
+      exact ⟨middleTyped, childrenExtends⟩
   | @unaryOperandFault childSize scope context environment before after id operator operand failure requirements occurrence child =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
@@ -1173,6 +1184,104 @@ private theorem binary_dispatch_same
     leftTrait = rightTrait ∧ leftMethod = rightMethod := by
   cases left <;> cases right <;> exact ⟨rfl, rfl⟩
 
+/-- An array form's step after its typed children preserves the heap typing,
+as the Source's array rules do. -/
+private theorem array_value_preserved {size : Nat} (childrenIH : ExpressionsAt program registry size)
+    {scope : Scope} {context : Context} {environment : Dynamic.Environment} {before middle after : Heap}
+    {form : ExpressionForm} {children : List ExpressionId} {values : List Value} {value : Value} {type : Ty}
+    {plan : ExpressionRequirementPlan}
+    (runtime : SourceRuntimeValid program context scope.source) (covers : scope.evidence.Covers context)
+    (locals : EnvironmentAgrees before context.locals environment) (heap : HeapWellTyped context before)
+    (formTyped : ExpressionFormHasRawType scope.source context form type plan)
+    (shape : arrayChildren form = some children)
+    (evaluated : Size.Expressions program registry size scope context environment before children (.values values)
+      middle)
+    (result : ArrayOutcome form values middle (.value value) after) :
+    ExpressionEvaluationPreserved context before after value type := by
+  cases formTyped with
+  | newArray _ _ length_type =>
+    cases shape
+    have post := childrenIH runtime covers locals heap (.cons length_type (.nil _)) evaluated
+    cases result with
+    | newArray _ default allocates =>
+      obtain ⟨zero_typed, defaulted_typed, default_extension⟩ := default.preserves post.heap_typed
+      exact ⟨.arrayRef allocates.reads_new rfl,
+        defaulted_typed.allocate (.some (ValueHasType.arrayObject_replicate zero_typed _)) allocates,
+        (post.heap_extends.trans default_extension).trans (HeapTypesExtend.of_allocation allocates)⟩
+  | arrayLength base_type _ =>
+    cases shape
+    have post := childrenIH runtime covers locals heap (.cons base_type (.nil _)) evaluated
+    cases result with
+    | arrayLength _ => exact ⟨.fixed _ (uint256_word_canonical _), post.heap_typed, post.heap_extends⟩
+  | arrayIndex base_type view index_type _ =>
+    cases shape
+    have post := childrenIH runtime covers locals heap (.cons base_type (.cons index_type (.nil _))) evaluated
+    cases result with
+    | arrayIndex reads =>
+      have typed := post.values_typed _ rfl
+      cases typed with
+      | cons base_typed _ =>
+        exact ⟨base_typed.viewElement view post.heap_typed reads, post.heap_typed, post.heap_extends⟩
+  | arrayLiteral _ elements_type =>
+    cases shape
+    have post := childrenIH runtime covers locals heap elements_type evaluated
+    cases result with
+    | arrayLiteral allocates =>
+      exact ⟨.arrayRef allocates.reads_new rfl,
+        post.heap_typed.allocate (.some (ValueHasType.arrayObject_of_values (post.values_typed _ rfl))) allocates,
+        post.heap_extends.trans (HeapTypesExtend.of_allocation allocates)⟩
+  | arraySlice allowed base_type bounds_type =>
+    cases shape
+    have post := childrenIH runtime covers locals heap (.cons base_type bounds_type) evaluated
+    cases result with
+    | arraySlice _ _ _ _ =>
+      have typed := post.values_typed _ rfl
+      cases typed with
+      | cons base_typed _ => exact ⟨.arraySlice base_typed allowed, post.heap_typed, post.heap_extends⟩
+  | toArray slice_type view =>
+    cases shape
+    have post := childrenIH runtime covers locals heap (.cons slice_type (.nil _)) evaluated
+    cases result with
+    | toArray copies allocates =>
+      have typed := post.values_typed _ rfl
+      cases typed with
+      | cons slice_typed _ =>
+        exact ⟨.arrayRef allocates.reads_new rfl,
+          post.heap_typed.allocate (.some (ValueHasType.arrayObject_of_values
+            (slice_typed.viewElements (.slice view) post.heap_typed copies))) allocates,
+          post.heap_extends.trans (HeapTypesExtend.of_allocation allocates)⟩
+  | elementRef base_type index_type _ =>
+    cases shape
+    have post := childrenIH runtime covers locals heap (.cons base_type (.cons index_type (.nil _))) evaluated
+    cases result with
+    | elementRef _ _ =>
+      have typed := post.values_typed _ rfl
+      cases typed with
+      | cons base_typed _ => exact ⟨base_typed.memref_of_arrayRef, post.heap_typed, post.heap_extends⟩
+  | memrefLoad reference_type =>
+    cases shape
+    have post := childrenIH runtime covers locals heap (.cons reference_type (.nil _)) evaluated
+    cases result with
+    | memrefLoad reads =>
+      have typed := post.values_typed _ rfl
+      cases typed with
+      | cons reference_typed _ =>
+        exact ⟨reference_typed.arrayRef_of_memref.viewElement (.array _) post.heap_typed reads, post.heap_typed,
+          post.heap_extends⟩
+  | memrefStore reference_type value_type =>
+    cases shape
+    have post := childrenIH runtime covers locals heap (.cons reference_type (.cons value_type (.nil _))) evaluated
+    cases result with
+    | memrefStore read current replace write =>
+      have typed := post.values_typed _ rfl
+      cases typed with
+      | cons reference_typed rest =>
+        cases rest with
+        | cons stored_typed _ =>
+          exact ⟨.unit, reference_typed.arrayRef_of_memref.arrayElementWrite post.heap_typed read current replace
+            stored_typed write, post.heap_extends.trans (HeapTypesExtend.of_write write)⟩
+  | _ => cases shape
+
 theorem expression_value_step (selectedBodies : SelectedBodies program registry) (size : Nat)
     (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
     (expressionsIH : ∀ smaller, smaller < size → ExpressionsAt program registry smaller)
@@ -1274,6 +1383,10 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
               subst baseValue
               obtain ⟨rfl, rfl, _entriesTyped⟩ := baseAfter.mappingComponents
               exact ⟨defaulted.hasType, rightPost.heap_typed, leftPost.heap_extends.trans rightPost.heap_extends⟩
+  | @arrayResult childrenSize scope context environment before middle after id form children values outcome occurrence shape evaluated result =>
+      obtain ⟨_plan, formTyped, _valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
+      exact array_value_preserved (expressionsIH childrenSize (Size.child_lt_stepSize (by simp))) runtime covers locals
+        heap formTyped shape evaluated result
   | @unary childSize scope context environment before after id operator operand input output occurrence child applies =>
       obtain ⟨_plan, formTyped, valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with

@@ -291,6 +291,192 @@ private theorem fault_occurrence {program : Program} {scope : Scope} {context : 
   obtain ⟨node, contains, shape, actualRequirements, coercions⟩ := occurrence
   exact .form contains (by simpa only [shape, actualRequirements, coercions] using fault)
 
+/-- An array form's step after its children's original run is its Source rule. -/
+private theorem array_result_plain {program : Program} {scope : Scope} {context : Context}
+    {environment : Environment} {before middle after : Heap} {id : ExpressionId} {form : ExpressionForm}
+    {children : List ExpressionId} {values : List Value} {outcome : Outcome}
+    (occurrence : Occurrence scope id form) (shape : arrayChildren form = some children)
+    (evaluated : ExpressionsEvaluate program context scope.evidence scope.source environment before children values
+      middle)
+    (result : ArrayOutcome form values middle outcome after) :
+    ExpressionPlain program scope context environment before id outcome after := by
+  cases result with
+  | newArray fits default allocates =>
+    cases shape
+    cases evaluated with
+    | cons length rest =>
+      cases rest
+      exact value_occurrence occurrence (.newArray rfl length fits default allocates)
+  | newArrayLengthType notWord actual =>
+    cases shape
+    cases evaluated with
+    | cons length rest =>
+      cases rest
+      exact fault_occurrence occurrence (.newArrayLengthType rfl length notWord actual)
+  | newArrayTooLong tooLong =>
+    cases shape
+    cases evaluated with
+    | cons length rest =>
+      cases rest
+      exact fault_occurrence occurrence (.newArrayTooLong rfl length tooLong)
+  | arrayLength counted =>
+    cases shape
+    cases evaluated with
+    | cons base rest =>
+      cases rest
+      exact value_occurrence occurrence (.arrayLength rfl base counted)
+  | arrayIndex reads =>
+    cases shape
+    cases evaluated with
+    | cons base rest =>
+      cases rest with
+      | cons index last =>
+        cases last
+        exact value_occurrence occurrence (.arrayIndex rfl base index reads)
+  | arrayIndexType notWord actual =>
+    cases shape
+    cases evaluated with
+    | cons base rest =>
+      cases rest with
+      | cons index last =>
+        cases last
+        exact fault_occurrence occurrence (.arrayIndexType rfl base index notWord actual)
+  | arrayIndexOutOfBounds outOfBounds =>
+    cases shape
+    cases evaluated with
+    | cons base rest =>
+      cases rest with
+      | cons index last =>
+        cases last
+        exact fault_occurrence occurrence (.arrayIndexOutOfBounds rfl base index outOfBounds)
+  | arrayLiteral allocates =>
+    cases shape
+    exact value_occurrence occurrence (.arrayLiteral rfl evaluated allocates)
+  | arraySlice counted chosen ordered within =>
+    cases shape
+    cases evaluated with
+    | cons base bounds =>
+      exact value_occurrence occurrence (.arraySlice rfl base bounds counted chosen ordered within)
+  | arraySliceBoundType member notWord actual =>
+    cases shape
+    cases evaluated with
+    | cons base bounds =>
+      exact fault_occurrence occurrence (.arraySliceBoundType rfl base bounds member notWord actual)
+  | arraySliceOutOfBounds counted chosen outOfBounds =>
+    cases shape
+    cases evaluated with
+    | cons base bounds =>
+      exact fault_occurrence occurrence (.arraySliceOutOfBounds rfl base bounds counted chosen outOfBounds)
+  | toArray copies allocates =>
+    cases shape
+    cases evaluated with
+    | cons slice rest =>
+      cases rest
+      exact value_occurrence occurrence (.toArray rfl slice copies allocates)
+  | elementRef counted within =>
+    cases shape
+    cases evaluated with
+    | cons base rest =>
+      cases rest with
+      | cons index last =>
+        cases last
+        exact value_occurrence occurrence (.elementRef rfl base index counted within)
+  | elementRefIndexType notWord actual =>
+    cases shape
+    cases evaluated with
+    | cons base rest =>
+      cases rest with
+      | cons index last =>
+        cases last
+        exact fault_occurrence occurrence (.elementRefIndexType rfl base index notWord actual)
+  | elementRefOutOfBounds outOfBounds =>
+    cases shape
+    cases evaluated with
+    | cons base rest =>
+      cases rest with
+      | cons index last =>
+        cases last
+        exact fault_occurrence occurrence (.elementRefOutOfBounds rfl base index outOfBounds)
+  | memrefLoad reads =>
+    cases shape
+    cases evaluated with
+    | cons reference rest =>
+      cases rest
+      exact value_occurrence occurrence (.memrefLoad rfl reference reads)
+  | memrefStore read current replace write =>
+    cases shape
+    cases evaluated with
+    | cons reference rest =>
+      cases rest with
+      | cons value last =>
+        cases last
+        exact value_occurrence occurrence (.memrefStore rfl reference value read current replace write)
+
+/-- An array form's first child fault is the form's own child fault rule. -/
+private theorem array_fault_plain {program : Program} {scope : Scope} {context : Context}
+    {environment : Environment} {before after : Heap} {id : ExpressionId} {form : ExpressionForm}
+    {children : List ExpressionId} {reason : SemanticFault}
+    (occurrence : Occurrence scope id form) (shape : arrayChildren form = some children)
+    (failed : ExpressionsFault program context scope.evidence scope.source environment before children reason
+      after) :
+    ExpressionFaults program context scope.evidence scope.source environment before id reason after := by
+  cases form
+  all_goals first
+    | (cases shape; done)
+    | skip
+  case newArray element length =>
+    cases shape
+    cases failed with
+    | head fault => exact fault_occurrence occurrence (.newArrayLength rfl fault)
+    | tail _ rest => cases rest
+  case arrayLength base =>
+    cases shape
+    cases failed with
+    | head fault => exact fault_occurrence occurrence (.arrayLengthBase rfl fault)
+    | tail _ rest => cases rest
+  case arrayIndex base index =>
+    cases shape
+    cases failed with
+    | head fault => exact fault_occurrence occurrence (.arrayIndexBase rfl fault)
+    | tail evaluated rest =>
+      cases rest with
+      | head fault => exact fault_occurrence occurrence (.arrayIndexIndex rfl evaluated fault)
+      | tail _ last => cases last
+  case arrayLiteral element elements =>
+    cases shape
+    exact fault_occurrence occurrence (.arrayLiteralElements rfl failed)
+  case arraySlice base start stop =>
+    cases shape
+    cases failed with
+    | head fault => exact fault_occurrence occurrence (.arraySliceBase rfl fault)
+    | tail evaluated rest => exact fault_occurrence occurrence (.arraySliceBounds rfl evaluated rest)
+  case toArray element slice =>
+    cases shape
+    cases failed with
+    | head fault => exact fault_occurrence occurrence (.toArraySlice rfl fault)
+    | tail _ rest => cases rest
+  case elementRef base index =>
+    cases shape
+    cases failed with
+    | head fault => exact fault_occurrence occurrence (.elementRefBase rfl fault)
+    | tail evaluated rest =>
+      cases rest with
+      | head fault => exact fault_occurrence occurrence (.elementRefIndex rfl evaluated fault)
+      | tail _ last => cases last
+  case memrefLoad reference =>
+    cases shape
+    cases failed with
+    | head fault => exact fault_occurrence occurrence (.memrefLoadReference rfl fault)
+    | tail _ rest => cases rest
+  case memrefStore reference value =>
+    cases shape
+    cases failed with
+    | head fault => exact fault_occurrence occurrence (.memrefStoreReference rfl fault)
+    | tail evaluated rest =>
+      cases rest with
+      | head fault => exact fault_occurrence occurrence (.memrefStoreValue rfl evaluated fault)
+      | tail _ last => cases last
+
 theorem StatementsPlain.prepend {mode : Bool} {program : Program} {scope : Scope} {context middleContext finalContext : Context}
     {environment middleEnvironment : Environment} {before middle after : Heap} {id : StatementId} {node : StatementNode}
     {rest : List StatementId} {outcome : BodyOutcome}
@@ -694,6 +880,13 @@ local macro "erase_recursive_plain" : tactic =>
       | semantic => exact fault_occurrence occurrence (.constructorArgument rfl ih)
     case constructorMetadataFault occurrence fault =>
       exact fault_occurrence occurrence (.constructorMetadata rfl fault)
+    case arrayFault occurrence shape failed ih =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact array_fault_plain occurrence shape ih
+    case arrayResult occurrence shape evaluated result ih =>
+      exact array_result_plain occurrence shape ih result
     case indexBaseFault occurrence first a =>
       rename_i failure
       cases failure with

@@ -45,6 +45,9 @@ private theorem no_stage
     cases same
     exact sameForm.symm.trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+    cases occurrence_form occurrence
+    cases shape
   | generalizedLocal contains actualForm _ _ _ _ _ _ _ =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same

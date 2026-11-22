@@ -1045,6 +1045,12 @@ private theorem local_fault {program : Program} {registry : Staging.Recursive.Re
   have same {other : ExpressionNode} (contains : ContainsExpression scope.source id other) : other = node :=
     Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+    obtain ⟨other, contains, otherForm, _requirements, _coercions⟩ := occurrence
+    have impossible := (same contains) ▸ otherForm
+    rw [form] at impossible
+    cases impossible
+    cases shape
   | generalizedLocal contains otherForm _ actualLookup actualRead descriptor _ _ _
   | generalizedLocalRequirement contains otherForm _ actualLookup actualRead descriptor _ _ _ =>
     have nodeEq := same contains

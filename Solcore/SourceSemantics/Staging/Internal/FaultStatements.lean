@@ -228,6 +228,25 @@ theorem expression_form_plan {scope : Scope} {context : Context} {id : Expressio
     cases same
     exact ⟨raw, plan, shape ▸ typedForm, by simpa only [requirementsEq, coercionsEq] using valid⟩
 
+/-- An array form's typing types its children, in the order the Source
+evaluates them. -/
+theorem array_children_typed {source : TypedSource} {context : Context} {form : ExpressionForm}
+    {type : TypeSystem.Ty} {plan : ExpressionRequirementPlan} {children : List ExpressionId}
+    (typed : ExpressionFormHasRawType source context form type plan) (shape : arrayChildren form = some children) :
+    ∃ types, ExpressionsHaveTypes source context children types := by
+  cases typed with
+  | newArray _ _ length_type => cases shape; exact ⟨_, .cons length_type (.nil _)⟩
+  | arrayLength base_type _ => cases shape; exact ⟨_, .cons base_type (.nil _)⟩
+  | arrayIndex base_type _ index_type _ => cases shape; exact ⟨_, .cons base_type (.cons index_type (.nil _))⟩
+  | arrayLiteral _ elements_type => cases shape; exact ⟨_, elements_type⟩
+  | arraySlice _ base_type bounds_type => cases shape; exact ⟨_, .cons base_type bounds_type⟩
+  | toArray slice_type _ => cases shape; exact ⟨_, .cons slice_type (.nil _)⟩
+  | elementRef base_type index_type _ => cases shape; exact ⟨_, .cons base_type (.cons index_type (.nil _))⟩
+  | memrefLoad reference_type => cases shape; exact ⟨_, .cons reference_type (.nil _)⟩
+  | memrefStore reference_type value_type =>
+    cases shape; exact ⟨_, .cons reference_type (.cons value_type (.nil _))⟩
+  | _ => cases shape
+
 /-- Atomic failures cannot execute a child or change the source heap. -/
 theorem atomic_fault_heap {scope : Scope} {context : Context} {environment : Environment}
     {before after : Heap} {form : ExpressionForm} {requirements : List RequirementId} {reason : SemanticFault}

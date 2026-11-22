@@ -939,6 +939,10 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
   induction free generalizing before after with
   | atomic found empty atomic =>
     cases trace with
+    | arrayFault owned shape _ | arrayResult owned shape _ _ =>
+      have same := occurrence_form unique found owned
+      rw [same] at atomic
+      cases atomic <;> cases shape
     | generalizedLocal contains _ _ _ _ _ _ _ path =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -1016,6 +1020,11 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases atomic
   | group found empty form child ih =>
     cases trace with
+    | arrayFault owned shape _ | arrayResult owned shape _ _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
+      cases shape
     | generalizedLocal contains _ _ _ _ _ _ _ path =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -1093,6 +1102,11 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | pair found empty form first second firstIH secondIH =>
     cases trace with
+    | arrayFault owned shape _ | arrayResult owned shape _ _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
+      cases shape
     | generalizedLocal contains _ _ _ _ _ _ _ path =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -1177,6 +1191,11 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | unary found empty form requirements child ih =>
     cases trace with
+    | arrayFault owned shape _ | arrayResult owned shape _ _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
+      cases shape
     | generalizedLocal contains _ _ _ _ _ _ _ path =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -1256,6 +1275,11 @@ private theorem CallFree.no_stage {invocation : Staging.Recursive.Scope} {id : E
       cases same
   | binary found empty form requirements first second firstIH secondIH =>
     cases trace with
+    | arrayFault owned shape _ | arrayResult owned shape _ _ =>
+      have same := occurrence_form unique found owned
+      rw [form] at same
+      cases same
+      cases shape
     | generalizedLocal contains _ _ _ _ _ _ _ path =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -1590,6 +1614,10 @@ theorem source_inv {program : Program} {stages : Staging.Recursive.Registry} {in
     ∃ sequence, Staging.Recursive.Expressions program stages invocation context environment before ids sequence after ∧
       PacksOutcome sequence outcome := by
   cases trace with
+  | arrayFault owned shape _ | arrayResult owned shape _ _ =>
+    have same := form.symm.trans (occurrence_form unique metadata.found owned)
+    cases same
+    cases shape
   | generalizedLocal contains localForm _ _ _ _ _ _ _
   | generalizedLocalRequirement contains localForm _ _ _ _ _ _ _ =>
     have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans metadata.found)
@@ -2182,6 +2210,11 @@ private theorem reference_no_stage {invocation : Staging.Recursive.Scope} {id : 
     (trace : Staging.Recursive.Expression program stages invocation context environment before id
       (.fault (.stage failedScope call reason)) after) : False := by
   cases trace with
+  | arrayFault owned shape _ | arrayResult owned shape _ _ =>
+    have same := occurrence_form unique found owned
+    rw [form] at same
+    cases same
+    cases shape
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found coercions contains))
   | generalizedLocal contains _ _ _ _ _ _ _ path =>

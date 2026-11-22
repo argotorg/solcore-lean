@@ -629,6 +629,9 @@ private theorem source_prefix
     obtain ⟨actualNode, contains, actualFormEq, _requirements, _coercions⟩ := occurrence
     exact actualFormEq.symm.trans ((congrArg ExpressionNode.form (same_node contains)).trans form)
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+    cases occurrence_form occurrence
+    cases shape
   | coercedValue contains _ raw _ | coercedFault contains _ raw =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       have shape := CallableIndexedOwnedPreparedStagedCoercionExclusion.raw_shape raw

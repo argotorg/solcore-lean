@@ -841,6 +841,9 @@ private theorem no_stage
     cases same
     exact sameForm.symm.trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+      cases actual occurrence
+      cases shape
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique found coercions contains))
   | generalizedLocal contains actualForm _ _ _ _ _ _ _ =>

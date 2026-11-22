@@ -469,6 +469,105 @@ inductive IndexOutcome (base key : Dynamic.Value) : Outcome → Prop where
       (missing : ¬ Defaultable valueType) :
       IndexOutcome base key (.fault (.semantic (.missingMappingDefault valueType)))
 
+/-- The children of an array form, in the order the Source evaluates them. -/
+def arrayChildren : ExpressionForm → Option (List ExpressionId)
+  | .newArray _ length => some [length]
+  | .arrayLength base => some [base]
+  | .arrayIndex base index => some [base, index]
+  | .arrayLiteral _ elements => some elements
+  | .arraySlice base start stop => some (base :: (start.toList ++ stop.toList))
+  | .toArray _ slice => some [slice]
+  | .elementRef base index => some [base, index]
+  | .memrefLoad reference => some [reference]
+  | .memrefStore reference value => some [reference, value]
+  | _ => none
+
+/-- An array form's step after its children have evaluated, as the Source's
+array rules take it: the result and the heap after it, or a fault at the heap
+the children reached. -/
+inductive ArrayOutcome : ExpressionForm → List Dynamic.Value → Heap → Outcome → Heap → Prop where
+  | newArray {element length heap defaulted after count zero location}
+      (fits : count.val < newArrayLengthLimit)
+      (default : NewArrayDefault heap element zero defaulted)
+      (allocates : Heap.Allocates defaulted (TypeSystem.Ty.arrayObject element)
+        (some (.arrayObject element (List.replicate count.val zero))) location after) :
+      ArrayOutcome (.newArray element length) [.word count] heap (.value (.arrayRef element location)) after
+  | newArrayLengthType {element length heap value actual}
+      (not_word : ¬ WordValue value) (actual_type : ValueRuntimeType value actual) :
+      ArrayOutcome (.newArray element length) [value] heap
+        (.fault (.semantic (.typeMismatch (.fixed .uint256) actual))) heap
+  | newArrayTooLong {element length heap count}
+      (too_long : newArrayLengthLimit ≤ count.val) :
+      ArrayOutcome (.newArray element length) [.word count] heap (.fault (.semantic (.panic 0x41))) heap
+  | arrayLength {base heap baseValue count}
+      (counted : ViewLength heap baseValue count) :
+      ArrayOutcome (.arrayLength base) [baseValue] heap (.value (.word (Core.Word.ofNatModulo count))) heap
+  | arrayIndex {base index heap baseValue position value}
+      (reads : ViewReads heap baseValue position.val value) :
+      ArrayOutcome (.arrayIndex base index) [baseValue, .word position] heap (.value value) heap
+  | arrayIndexType {base index heap baseValue value actual}
+      (not_word : ¬ WordValue value) (actual_type : ValueRuntimeType value actual) :
+      ArrayOutcome (.arrayIndex base index) [baseValue, value] heap
+        (.fault (.semantic (.typeMismatch .word actual))) heap
+  | arrayIndexOutOfBounds {base index heap baseValue position}
+      (out_of_bounds : ViewOutOfBounds heap baseValue position.val) :
+      ArrayOutcome (.arrayIndex base index) [baseValue, .word position] heap
+        (.fault (.semantic (.panic 0x32))) heap
+  | arrayLiteral {element elements heap after values location}
+      (allocates : Heap.Allocates heap (TypeSystem.Ty.arrayObject element)
+        (some (.arrayObject element values)) location after) :
+      ArrayOutcome (.arrayLiteral element elements) values heap (.value (.arrayRef element location)) after
+  | arraySlice {base start stop heap baseValue bounds count first last}
+      (counted : ViewLength heap baseValue count)
+      (chosen : SliceBounds count start stop bounds first last)
+      (ordered : first ≤ last) (within : last ≤ count) :
+      ArrayOutcome (.arraySlice base start stop) (baseValue :: bounds) heap
+        (.value (.arraySlice baseValue first (last - first))) heap
+  | arraySliceBoundType {base start stop heap baseValue bounds value actual}
+      (member : value ∈ bounds) (not_word : ¬ WordValue value) (actual_type : ValueRuntimeType value actual) :
+      ArrayOutcome (.arraySlice base start stop) (baseValue :: bounds) heap
+        (.fault (.semantic (.typeMismatch (.fixed .uint256) actual))) heap
+  | arraySliceOutOfBounds {base start stop heap baseValue bounds count first last}
+      (counted : ViewLength heap baseValue count)
+      (chosen : SliceBounds count start stop bounds first last)
+      (out_of_bounds : last < first ∨ count < last) :
+      ArrayOutcome (.arraySlice base start stop) (baseValue :: bounds) heap
+        (.fault (.semantic (.panic 0x32))) heap
+  | toArray {element slice heap after view start length values location}
+      (copies : ViewCopies heap (.arraySlice view start length) 0 length values)
+      (allocates : Heap.Allocates heap (TypeSystem.Ty.arrayObject element)
+        (some (.arrayObject element values)) location after) :
+      ArrayOutcome (.toArray element slice) [.arraySlice view start length] heap
+        (.value (.arrayRef element location)) after
+  | elementRef {base index heap element location position count}
+      (counted : ViewLength heap (.arrayRef element location) count)
+      (within : position.val < count) :
+      ArrayOutcome (.elementRef base index) [.arrayRef element location, .word position] heap
+        (.value (.memref element location position.val)) heap
+  | elementRefIndexType {base index heap baseValue value actual}
+      (not_word : ¬ WordValue value) (actual_type : ValueRuntimeType value actual) :
+      ArrayOutcome (.elementRef base index) [baseValue, value] heap
+        (.fault (.semantic (.typeMismatch .word actual))) heap
+  | elementRefOutOfBounds {base index heap baseValue position}
+      (out_of_bounds : ViewOutOfBounds heap baseValue position.val) :
+      ArrayOutcome (.elementRef base index) [baseValue, .word position] heap
+        (.fault (.semantic (.panic 0x32))) heap
+  | memrefLoad {reference heap element location position value}
+      (reads : ViewReads heap (.arrayRef element location) position value) :
+      ArrayOutcome (.memrefLoad reference) [.memref element location position] heap (.value value) heap
+  | memrefStore {reference value heap final element location position stored cell elements updated}
+      (read : Heap.Reads heap location cell)
+      (current : cell.value = some (.arrayObject element elements))
+      (replace : ValuesReplaceAt elements position stored updated)
+      (write : Heap.Writes heap location (some (.arrayObject element updated)) final) :
+      ArrayOutcome (.memrefStore reference value) [.memref element location position, stored] heap
+        (.value .unit) final
+
+/-- A fault after an array form's children keeps the heap they reached. -/
+theorem ArrayOutcome.fault_heap {form : ExpressionForm} {values : List Dynamic.Value} {heap after : Heap}
+    {failure : Failure} (result : ArrayOutcome form values heap (.fault failure) after) : after = heap := by
+  cases result <;> rfl
+
 mutual
   inductive Expression (program : Program) (registry : Registry) :
       Scope → Context → Environment → Heap → ExpressionId → Outcome → Heap → Prop where
@@ -569,6 +668,21 @@ mutual
         (first : Expression program registry scope context environment before base (.value baseValue) middle)
         (second : Expression program registry scope context environment middle key (.value keyValue) after)
         (result : IndexOutcome baseValue keyValue outcome) :
+        Expression program registry scope context environment before id outcome after
+    /-- An array form whose children fault first, in its order. -/
+    | arrayFault {scope context environment before after id form children failure}
+        (occurrence : Occurrence scope id form)
+        (shape : arrayChildren form = some children)
+        (failed : Expressions program registry scope context environment before children (.fault failure) after) :
+        Expression program registry scope context environment before id (.fault failure) after
+    /-- An array form whose children evaluate, then its step, as the Source's
+    array rules take them. -/
+    | arrayResult {scope context environment before middle after id form children values outcome}
+        (occurrence : Occurrence scope id form)
+        (shape : arrayChildren form = some children)
+        (evaluated : Expressions program registry scope context environment before children (.values values)
+          middle)
+        (result : ArrayOutcome form values middle outcome after) :
         Expression program registry scope context environment before id outcome after
     | unary {scope context environment before after id operator operand input output}
         (occurrence : Occurrence scope id (.unary operator operand))
@@ -1640,6 +1754,12 @@ local macro "retain_stage_origin" : tactic =>
       rename_i outcome
       cases outcome <;> simp_all [BodyOutcome.restore, BodyOrigin]
     case indexResult occurrence first second result ih_first ih_second =>
+      cases result <;> simp_all [ExpressionOrigin]
+    case arrayFault occurrence shape failed ih =>
+      intro s c r same
+      cases same
+      exact ih s c r rfl
+    case arrayResult occurrence shape evaluated result ih =>
       cases result <;> simp_all [ExpressionOrigin]
     all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
   ))

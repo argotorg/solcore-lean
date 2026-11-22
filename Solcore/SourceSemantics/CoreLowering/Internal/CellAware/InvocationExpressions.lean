@@ -920,6 +920,9 @@ private theorem no_stage
     cases same
     exact sameForm.symm.trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+      cases reference occurrence
+      cases shape
   | generalizedLocal contains _ _ _ _ _ _ _ path =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       cases same
@@ -1334,6 +1337,9 @@ private theorem source_children
     obtain ⟨actualNode, contains, actualFormEq, _requirements, _coercions⟩ := occurrence
     exact actualFormEq.symm.trans ((congrArg ExpressionNode.form (same_node contains)).trans form)
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+      cases occurrence_form occurrence
+      cases shape
   | coercedValue contains _ raw _ | coercedFault contains _ raw =>
       have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
       have shape := CallableIndexedOwnedPreparedStagedCoercionExclusion.raw_shape raw
@@ -2364,6 +2370,9 @@ private theorem unchanged {program : Program} {stages : Staging.Recursive.Regist
     cases same_node contains
     exact same.symm.trans form
   cases trace with
+  | arrayFault occurrence shape _ | arrayResult occurrence shape _ _ =>
+    cases same_occurrence occurrence
+    cases shape
   | atomicValue contains _ _ raw =>
     cases same_node contains
     rw [form] at raw
@@ -2949,6 +2958,10 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
         environment before ids sequence after ∧
       RecursiveStageTupleMeaning.PacksOutcome sequence outcome := by
   cases trace with
+  | arrayFault owned shape _ | arrayResult owned shape _ _ =>
+      have same := form.symm.trans (occurrence_form unique metadata.found owned)
+      cases same
+      cases shape
   | coercedValue contains nonempty _ _ | coercedFault contains nonempty _ =>
       exact False.elim (nonempty (CallableIndexedOwnedPreparedStagedCoercionExclusion.empty_at unique metadata.found metadata.coercions contains))
   | atomicValue contains atomic uncoerced raw =>
