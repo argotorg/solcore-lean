@@ -555,6 +555,15 @@ private theorem builtin_return_closed (function : BuiltinFunctionId) :
     function.returnType.VariablesBelow 0 := by
   cases function <;> simp [BuiltinFunctionId.returnType, Ty.integer, Ty.word, Ty.bool, Ty.fixed]
 
+private theorem builtin_type_closed (function : BuiltinFunctionId) :
+    function.type.VariablesBelow 0 := by
+  unfold BuiltinFunctionId.type
+  apply (Ty.variablesBelow_function_iff _ _ _).mpr
+  constructor
+  · apply Ty.variablesBelow_productMany
+    exact builtin_parameters_closed function
+  · exact builtin_return_closed function
+
 private def builtin_finish (source callee : Syntax.Expr) (name : String)
     (function : BuiltinFunctionId) (arguments : List InferredExpression) (call : ExpressionId)
     (state : State) : InferredExpression × State :=
@@ -1011,6 +1020,12 @@ theorem inferExprFuel_call_fixes_protected
                                     functionsResult)
                                   attempt selectionResult resultEq
                         | none =>
+                            cases qualifiedBuiltinEq : qualifiedBuiltinNamed? context namespacePath name
+                            case some function =>
+                              simp only [qualifiedBuiltinEq] at success
+                              exact recordBuiltinFunctionCall_fixes_protected
+                                argumentsPrivacy.2.1 expectedSafeAtArguments argumentsFixed success
+                            simp only [qualifiedBuiltinEq] at success
                             cases typedefEq : typedefCall? namespacePath name
                             case some call =>
                               simp only [typedefEq] at success
@@ -1326,23 +1341,31 @@ theorem inferExprFuel_fieldConstructor_fixes_protected
       simp only [candidatesResult] at success
       cases candidates with
       | nil =>
-          obtain ⟨arrayResult, arrayState, _, baseRun, _, recordedSuccess⟩ :=
-            inferExprFuel_success_fieldLength_facts expressionEq allocationEq
-              candidatesResult overallSuccess
-          have noneBelow : ∀ expectedType ∈ (none : Option Ty),
-              expectedType.VariablesBelow allocated.inference.next := by simp
-          have noneSafe : ∀ expectedType ∈ (none : Option Ty),
-              Safe protectedVars allocated expectedType := by simp
-          have basePrivacy := inferExprFuel_private protectedVars fuel context base none allocated
-            allocationProperties.2 wfAllocated boundAllocated allocationPrivacy.2.1 catalog validated
-            canonical noneBelow noneSafe (arrayResult, arrayState) baseRun
-          have baseFixed := baseInduction allocationProperties.2 wfAllocated boundAllocated
-            allocationPrivacy.2.1 allocatedFixed catalog validated canonical noneBelow noneSafe
-            (arrayResult, arrayState) baseRun
-          have beforeFit := allocationPrivacy.1.trans basePrivacy.1
-          exact recordExpressionWithExpected_fixes_protected baseFixed
-            (safe_closed _ _ (Ty.variablesBelow_constructor 0 _))
-            (fun type member => beforeFit _ (expectedSafe _ member)) recordedSuccess
+          cases builtinResult : qualifiedBuiltinReference? context allocated expression with
+          | some found =>
+              rcases found with ⟨reference, function⟩
+              have recordedSuccess := inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq
+                candidatesResult builtinResult overallSuccess
+              exact recordExpressionWithExpected_fixes_protected allocatedFixed
+                (safe_closed _ _ (builtin_type_closed function))
+                (fun type member => allocationPrivacy.1 _ (expectedSafe _ member)) recordedSuccess
+          | none =>
+              obtain ⟨arrayResult, arrayState, _, baseRun, _, recordedSuccess⟩ :=
+                inferExprFuel_success_fieldLength_facts expressionEq allocationEq candidatesResult builtinResult overallSuccess
+              have noneBelow : ∀ expectedType ∈ (none : Option Ty),
+                  expectedType.VariablesBelow allocated.inference.next := by simp
+              have noneSafe : ∀ expectedType ∈ (none : Option Ty),
+                  Safe protectedVars allocated expectedType := by simp
+              have basePrivacy := inferExprFuel_private protectedVars fuel context base none allocated
+                allocationProperties.2 wfAllocated boundAllocated allocationPrivacy.2.1 catalog validated
+                canonical noneBelow noneSafe (arrayResult, arrayState) baseRun
+              have baseFixed := baseInduction allocationProperties.2 wfAllocated boundAllocated
+                allocationPrivacy.2.1 allocatedFixed catalog validated canonical noneBelow noneSafe
+                (arrayResult, arrayState) baseRun
+              have beforeFit := allocationPrivacy.1.trans basePrivacy.1
+              exact recordExpressionWithExpected_fixes_protected baseFixed
+                (safe_closed _ _ (Ty.variablesBelow_constructor 0 _))
+                (fun type member => beforeFit _ (expectedSafe _ member)) recordedSuccess
       | cons candidate rest =>
           cases rest with
           | cons second tail => simp at success

@@ -64,6 +64,18 @@ def operatorBuiltin? (context : Context) (callsInScope : Bool) (name : String) :
     | .error _ => none
   else none
 
+/-- The builtin a qualified name denotes: one of the 26 under a namespace path that an import of
+upstream's `std.opcodes` gives the module (`ProgramImports.builtinNamespaces`). A name of one of
+its other functions denotes none, so it is refused where it is used. -/
+def qualifiedBuiltinNamed? (context : Context) (namespacePath : List String) (name : String) :
+    Option BuiltinFunctionId :=
+  match buildProgramImports context.environment context.scope.currentModule with
+  | .ok visibility =>
+      if visibility.builtinNamespaces.contains namespacePath then
+        (WordOpcode.ofName? name).map .wordOpcode
+      else none
+  | .error _ => none
+
 def qualifiedFunctionsNamed (context : Context)
     (namespacePath : List String) (name : String) :
     Except Error (Option (List ProgramFunctionSignature)) :=
@@ -1291,5 +1303,18 @@ def calleeQualifiedIdentifier? (expression : Syntax.Expr) :
   match components with
   | _ :: _ :: _ => some (components.dropLast, components.getLast!)
   | _ => none
+
+/-- The builtin a qualified value names, with the name it is written as: a name under one of the
+namespace paths that stand for `std.opcodes` (`qualifiedBuiltinNamed?`), whose root no local
+binds. -/
+def qualifiedBuiltinReference? (context : Context) (state : State) (expression : Syntax.Expr) :
+    Option (String × BuiltinFunctionId) := do
+  let (namespacePath, name) ← calleeQualifiedIdentifier? expression
+  let root ← namespacePath.head?
+  match state.lookupBinder? root with
+  | some _ => none
+  | none =>
+      let function ← qualifiedBuiltinNamed? context namespacePath name
+      pure (String.intercalate "." (namespacePath ++ [name]), function)
 
 end Solcore.Frontend.SourceInference.Detail

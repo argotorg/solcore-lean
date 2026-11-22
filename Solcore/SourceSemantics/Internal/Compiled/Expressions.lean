@@ -1515,6 +1515,7 @@ theorem expressionRetained_fieldLength_for {callProvenance : CallIndex → Prop}
     (form : expression.value = .field base dot name)
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (nonconstructor : Detail.constructorCalleeCandidates inferenceContext allocated expression = .ok [])
+    (notBuiltin : Detail.qualifiedBuiltinReference? inferenceContext allocated expression = none)
     (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
       expected initial inferred resultState frames target) :
     ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected)) selected.body.finalized.typedSource
@@ -1528,7 +1529,8 @@ theorem expressionRetained_fieldLength_for {callProvenance : CallIndex → Prop}
     rw [allocateExpressionId_inferenceNext_eq allocationEq]
     exact boundary.expectedBelow
   obtain ⟨arrayResult, arrayState, element, baseSuccess, resolved, recorded⟩ :=
-    Detail.inferExprFuel_success_fieldLength_facts form allocationEq nonconstructor boundary.accepted
+    Detail.inferExprFuel_success_fieldLength_facts form allocationEq nonconstructor notBuiltin
+      boundary.accepted
   have baseExpected : ∀ type ∈ (none : Option Ty), type.VariablesBelow allocated.inference.next := by
     intro _ member
     simp at member
@@ -1560,7 +1562,8 @@ theorem expressionRetained_fieldLength_for {callProvenance : CallIndex → Prop}
   have childRequirements := List.Subset.trans
     (Detail.recordExpressionWithExpected_requirements_subset recorded) boundary.requirements
   have childHere := descend here
-    (ChildStep.expression_field_length_base boundary.accepted form allocationEq nonconstructor baseSuccess)
+    (ChildStep.expression_field_length_base boundary.accepted form allocationEq nonconstructor notBuiltin
+      baseSuccess)
   have typed := expressionRooted_of_retained_for checked recursive childHere ({
     accepted := baseSuccess
     interfaces := boundary.interfaces
@@ -1618,8 +1621,19 @@ theorem constructor_field_for {callProvenance : CallIndex → Prop}
   | ok candidates =>
     cases candidates with
     | nil =>
-      exact expressionRetained_fieldLength_for checked descend recursive here form allocation
-        discovery boundary
+      cases builtinResult : Detail.qualifiedBuiltinReference? inferenceContext allocated expression with
+      | some found =>
+        rcases found with ⟨reference, function⟩
+        exact recordBuiltinFunctionReference_expressionTypingBase_selected
+          selected.body.resources boundary.interfaces
+          (Detail.inferExprFuel_success_fieldBuiltin_facts form allocation discovery builtinResult
+            boundary.accepted)
+          boundary.extension boundary.requirements boundary.expressionRequirements
+          boundary.coercionPrimaries (boundary.scope.catalog checked) boundary.scope.signatures
+          ((CheckingScope.refl selected).canonical checked) boundary.invariant boundary.covered
+      | none =>
+        exact expressionRetained_fieldLength_for checked descend recursive here form allocation
+          discovery builtinResult boundary
     | cons first rest =>
       obtain ⟨dataType, constructor⟩ := first
       cases rest with

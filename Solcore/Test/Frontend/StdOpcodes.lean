@@ -8,9 +8,9 @@ wildcard and hiding imports, the 26 pure ones as builtins, the other 55 refused 
 used. Each case is a source upstream's pinned checker was probed with, and gives upstream's
 verdict; an accepted one runs at 9 and 2^256 − 1 and gives the results upstream's checked Hull
 gives. std's other modules bind no name, so a name resolves past their imports, and a name they
-export is refused where it is used (`testBesideStandardModules`). Until qualified access follows
-upstream, three forms stay as they were (`testFormsAsBefore`). Operators beside a bound name follow
-upstream's three kinds (`testOperators`).
+export is refused where it is used (`testBesideStandardModules`). A plain import's last component
+and full path, and a namespace import's alias, qualify the module's functions (`testQualified`).
+Operators beside a bound name follow upstream's three kinds (`testOperators`).
 -/
 
 set_option autoImplicit false
@@ -204,21 +204,48 @@ private def testBesideStandardModules : IO Unit := do
   expectRefused "a function std exports, used" ["import * from std;"] [] "tobool(a0) ? 1 : 0"
     "check"
 
-/-- The three forms that differ from upstream as they did before `std.opcodes` was a module of the
-load: qualified access after a plain import. -/
-private def testFormsAsBefore : IO Unit := do
-  expectRefused "a plain import, a qualified call" ["import std.opcodes;"] [] "opcodes.div(a0, 4)"
+/-- Qualified access, as upstream gives it: `opcodes` and `std.opcodes` after a plain import, and a
+namespace import's alias, qualify the 26 pure functions in calls and as values. An effectful
+function under them is refused where it is used, as after the other imports, and so are an unknown
+name, a wrong arity, and a qualifier no import of `std.opcodes` gives. -/
+private def testQualified : IO Unit := do
+  let quarter := [2, maximum / 4]
+  expectResults "a plain import, a qualified call" ["import std.opcodes;"] [] "opcodes.div(a0, 4)"
+    quarter
+  expectResults "a plain import, a fully qualified call" ["import std.opcodes;"] []
+    "std.opcodes.div(a0, 4)" quarter
+  expectResults "a qualified opcode as a function value" ["import std.opcodes;"] [apply]
+    "apply(opcodes.sub, a0)" [5, maximum - 4]
+  expectResults "a fully qualified opcode as a function value" ["import std.opcodes;"] [apply]
+    "apply(std.opcodes.sub, a0)" [5, maximum - 4]
+  expectResults "a namespace import's alias" ["import * as O from std.opcodes;"] [] "O.div(a0, 4)"
+    quarter
+  expectResults "nested qualified calls" ["import std.opcodes;"] []
+    "opcodes.div(opcodes.add(a0, 3), 4)" [3, 0]
+  expectResults "plain and selected imports, both used"
+    ["import std.opcodes;", "import { div } from std.opcodes;"] [] "opcodes.div(div(a0, 2), 2)"
+    quarter
+  expectResults "a plain import and a local div, both used" ["import std.opcodes;"] [localDiv]
+    "opcodes.div(div(a0, 4), 2)" [4, maximum / 2]
+  expectResults "a qualified ternary" ["import std.opcodes;"] [] "opcodes.addmod(a0, 1, 5)" [0, 1]
+  expectResults "a qualified comparison" ["import std.opcodes;"] [] "opcodes.lt(a0, 10)" [1, 0]
+  expectResults "plain imports of std.opcodes and lib" ["import std.opcodes;", "import lib;"] []
+    "lib.f(opcodes.div(a0, 4))" quarter
+  expectRefused "an effectful function, qualified" ["import std.opcodes;"] [] "opcodes.mload(a0)"
     "check"
-  expectRefused "a plain import, a fully qualified call" ["import std.opcodes;"] []
+  expectRefused "an effectful function under an alias" ["import * as O from std.opcodes;"] []
+    "O.mload(a0)" "check"
+  expectRefused "an unknown name, qualified" ["import std.opcodes;"] [] "opcodes.nosuch(a0)" "check"
+  expectRefused "a wrong arity, qualified" ["import std.opcodes;"] [] "opcodes.div(a0)" "check"
+  expectRefused "a plain import of std, std.opcodes qualified" ["import std;"] []
     "std.opcodes.div(a0, 4)" "check"
-  expectRefused "a qualified opcode as a function value" ["import std.opcodes;"] [apply]
-    "apply(opcodes.sub, a0)" "check"
+  expectRefused "no import, a qualified call" [] [] "opcodes.div(a0, 4)" "check"
 
 def run : IO Unit := do
   testAccepted
   testRefused
   testBesideStandardModules
-  testFormsAsBefore
+  testQualified
   testOperators
   IO.println "std.opcodes and std imports, operators: upstream's forms and results GREEN"
 

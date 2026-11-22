@@ -359,6 +359,7 @@ theorem expression_field_length_base
       (_form : source.value = .field base dot name)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (_nonconstructor : constructorCalleeCandidates context allocated source = .ok [])
+      (_notBuiltin : qualifiedBuiltinReference? context allocated source = none)
       (_child : inferExprFuel fuel context base none allocated =
         .ok (childValue, childFinal))
       (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs) : (CallIndex.expression fuel context base none allocated childValue childFinal).Inputs := by

@@ -220,9 +220,16 @@ theorem inferExprFuelLedgerPreservation_step
     | ok candidates =>
       cases candidates with
       | nil =>
-        obtain ⟨_, _, _, baseRun, _, recorded⟩ :=
-          Detail.inferExprFuel_success_fieldLength_facts form allocation discovery accepted
-        exact (expressionIH baseRun allocatedTracked).recordExpressionWithExpected recorded
+        cases builtinResult : Detail.qualifiedBuiltinReference? context allocated expression with
+        | some found =>
+            rcases found with ⟨reference, function⟩
+            have recorded := Detail.inferExprFuel_success_fieldBuiltin_facts form allocation
+              discovery builtinResult accepted
+            exact allocatedTracked.recordExpressionWithExpected recorded
+        | none =>
+            obtain ⟨_, _, _, baseRun, _, recorded⟩ :=
+              Detail.inferExprFuel_success_fieldLength_facts form allocation discovery builtinResult accepted
+            exact (expressionIH baseRun allocatedTracked).recordExpressionWithExpected recorded
       | cons candidate rest =>
         unfold Detail.inferExprFuel at accepted
         simp only [allocation, form, discovery, bind, Except.bind] at accepted

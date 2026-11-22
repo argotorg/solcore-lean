@@ -250,6 +250,95 @@ theorem
       resources.ownership invariant.signaturesEq
       invariant.solvedRequirementsEq invariant.assumptionsMono covered)
 
+/-- A recorded builtin-function reference has a closed, catalog-independent raw
+reference type in the active context, whatever name it is written as. -/
+theorem recordBuiltinFunctionReference_expressionTypingBase_selected
+    {wholeContext inferenceContext : Frontend.SourceInference.Context}
+    {wholeReturn : Ty} {evidenceState : State} {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources wholeContext wholeReturn
+      evidenceState roots finalized)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      wholeContext.signatures finalized.solvedRequirements finalized.typedSource)
+    {expression : Syntax.Expr} {expected : Option Ty}
+    {initial allocated resultState : State}
+    {id : ExpressionId} {reference : String}
+    {function : BuiltinFunctionId} {inferred : InferredExpression}
+    {semanticSource : TypedSource} {active : SourceSemantics.Context}
+    (recorded : Detail.recordExpressionWithExpected inferenceContext
+      expression id function.type
+      (.reference reference (.builtinFunction function)) [] expected
+      allocated = .ok (inferred, resultState))
+    (resultSubstitutionExtension :
+      finalized.substitution.SemanticallyExtends
+        resultState.inference.substitution)
+    (requirementsSubset : resultState.requirements ⊆
+      evidenceState.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (coercionsRetained : ExpressionCoercionPrimariesRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (catalog : SignatureCatalogWellFormed inferenceContext.signatures)
+    (signaturesEq : inferenceContext.signatures = wholeContext.signatures)
+    (canonical : SignatureParametersWellFormed
+      wholeContext.scope.genericOwner wholeContext.typeParameters)
+    (invariant : RecursiveExpressionInvariant wholeContext finalized initial
+      active)
+    (covered : TemplateScopeCovered finalized.typedSource active
+      (.expression inferred.id)) :
+    ExpressionTypingBase (resultState.toTypedSource roots) semanticSource
+      active finalized.substitution inferred := by
+  have fixedType : finalized.substitution.apply function.type =
+      function.type := by
+    cases function
+    case wordOpcode op => cases op <;> rfl
+    all_goals
+      simp [BuiltinFunctionId.type, BuiltinFunctionId.parameterTypes,
+        BuiltinFunctionId.returnType, Ty.productMany]
+  have formType : ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.reference reference
+        (.builtinFunction function)).applySubstitution
+          finalized.substitution)
+      (finalized.substitution.apply function.type) (.ordinary []) := by
+    rw [fixedType]
+    simpa [ExpressionForm.applySubstitution,
+      ReferenceResolution.applySubstitution] using
+      (ExpressionFormHasRawType.reference (source := semanticSource)
+        (ReferenceUseValid.builtinFunction (context := active) function))
+  have rawAdmissible : TypeAdmissible active
+      (finalized.substitution.apply function.type) := by
+    rw [fixedType]
+    exact TypeAdmissible.builtinFunction
+      (invariant.typeParameterBinders canonical) function
+  have finalSubstitutionEq :
+      resources.finalState.inference.substitution = finalized.substitution :=
+    resources.substitution_eq.symm
+  have requirementsSubsetFinal :
+      resultState.requirements ⊆ resources.finalState.requirements := by
+    intro requirement member
+    rw [resources.requirements_eq]
+    exact requirementsSubset member
+  have activeSignaturesEq : active.signatures =
+      inferenceContext.signatures :=
+    invariant.signatures_eq_whole.trans signaturesEq.symm
+  have activeCatalog : SignatureCatalogWellFormed active.signatures := by
+    rw [activeSignaturesEq]
+    exact catalog
+  simpa only [finalSubstitutionEq] using
+    (recordExpressionWithExpected_success_ordinaryExpressionTypingBase_from_interfaces
+      (later := resources.finalState)
+      (base := finalizedRequirementContext wholeContext finalized)
+      recorded
+      (by simpa only [finalSubstitutionEq] using resultSubstitutionExtension)
+      requirementsSubsetFinal retained
+      (by simpa only [finalSubstitutionEq] using formType)
+      (by simpa only [finalSubstitutionEq] using rawAdmissible)
+      (by simpa only [signaturesEq] using interfaces) coercionsRetained
+      activeCatalog activeSignaturesEq
+      resources.solve_success resources.solved_context_eq resources.ledger
+      resources.ownership invariant.signaturesEq
+      invariant.solvedRequirementsEq invariant.assumptionsMono covered)
+
 /-- A builtin-function identifier has a closed, catalog-independent raw
 reference type in the active context. -/
 theorem
@@ -294,63 +383,12 @@ theorem
     (covered : TemplateScopeCovered finalized.typedSource active
       (.expression inferred.id)) :
     ExpressionTypingBase (resultState.toTypedSource roots) semanticSource
-      active finalized.substitution inferred := by
-  have recorded : Detail.recordExpressionWithExpected inferenceContext
-      expression id function.type
-      (.reference name.value (.builtinFunction function)) [] expected
-      allocated = .ok (inferred, resultState) :=
-    Detail.inferExprFuel_success_builtinFunctionIdentifier_record expressionEq
-      allocationEq lookupEq notBoolean functionsEq builtinEq success
-  have fixedType : finalized.substitution.apply function.type =
-      function.type := by
-    cases function
-    case wordOpcode op => cases op <;> rfl
-    all_goals
-      simp [BuiltinFunctionId.type, BuiltinFunctionId.parameterTypes,
-        BuiltinFunctionId.returnType, Ty.productMany]
-  have formType : ExpressionFormHasRawType semanticSource active
-      ((ExpressionForm.reference name.value
-        (.builtinFunction function)).applySubstitution
-          finalized.substitution)
-      (finalized.substitution.apply function.type) (.ordinary []) := by
-    rw [fixedType]
-    simpa [ExpressionForm.applySubstitution,
-      ReferenceResolution.applySubstitution] using
-      (ExpressionFormHasRawType.reference (source := semanticSource)
-        (ReferenceUseValid.builtinFunction (context := active) function))
-  have rawAdmissible : TypeAdmissible active
-      (finalized.substitution.apply function.type) := by
-    rw [fixedType]
-    exact TypeAdmissible.builtinFunction
-      (invariant.typeParameterBinders canonical) function
-  have finalSubstitutionEq :
-      resources.finalState.inference.substitution = finalized.substitution :=
-    resources.substitution_eq.symm
-  have requirementsSubsetFinal :
-      resultState.requirements ⊆ resources.finalState.requirements := by
-    intro requirement member
-    rw [resources.requirements_eq]
-    exact requirementsSubset member
-  have activeSignaturesEq : active.signatures =
-      inferenceContext.signatures :=
-    invariant.signatures_eq_whole.trans signaturesEq.symm
-  have activeCatalog : SignatureCatalogWellFormed active.signatures := by
-    rw [activeSignaturesEq]
-    exact catalog
-  simpa only [finalSubstitutionEq] using
-    (recordExpressionWithExpected_success_ordinaryExpressionTypingBase_from_interfaces
-      (later := resources.finalState)
-      (base := finalizedRequirementContext wholeContext finalized)
-      recorded
-      (by simpa only [finalSubstitutionEq] using resultSubstitutionExtension)
-      requirementsSubsetFinal retained
-      (by simpa only [finalSubstitutionEq] using formType)
-      (by simpa only [finalSubstitutionEq] using rawAdmissible)
-      (by simpa only [signaturesEq] using interfaces) coercionsRetained
-      activeCatalog activeSignaturesEq
-      resources.solve_success resources.solved_context_eq resources.ledger
-      resources.ownership invariant.signaturesEq
-      invariant.solvedRequirementsEq invariant.assumptionsMono covered)
+      active finalized.substitution inferred :=
+  recordBuiltinFunctionReference_expressionTypingBase_selected resources interfaces
+    (Detail.inferExprFuel_success_builtinFunctionIdentifier_record expressionEq
+      allocationEq lookupEq notBoolean functionsEq builtinEq success)
+    resultSubstitutionExtension requirementsSubset retained coercionsRetained catalog
+    signaturesEq canonical invariant covered
 
 /-- Canonical local-scheme instantiation closes directly in the active
 recursive context.  The allocation and no-capture certificates remain

@@ -2225,36 +2225,42 @@ mutual
                           pure <| recordSelectedCall expression callee displayName
                             arguments attempt
                       | none =>
-                          match typedefCall? namespacePath name with
-                          | some call =>
-                              let function ← typedefFunction call arguments
-                                expected state
+                          match qualifiedBuiltinNamed? context namespacePath name with
+                          | some function =>
                               recordBuiltinFunctionCall expression callee
-                                function.spelling function arguments id expected
-                                state
+                                (String.intercalate "." (namespacePath ++ [name])) function
+                                arguments id expected state
                           | none =>
-                              if lengthCall namespacePath name then
-                                let array ← arrayLengthArgument arguments state
-                                recordExpressionWithExpected context expression id
-                                  (.fixed .uint256) (.arrayLength array.id) []
-                                  expected state
-                              else if loadCall namespacePath name then
-                                let loaded ← memrefLoadArgument arguments state
-                                recordExpressionWithExpected context expression id
-                                  loaded.2 (.memrefLoad loaded.1.id) [] expected state
-                              else if storeCall namespacePath name then
-                                let stored ← memrefStoreArguments arguments state
-                                let state ← unify state stored.2.1.type stored.2.2
-                                recordExpressionWithExpected context expression id
-                                  Ty.unit (.memrefStore stored.1.id stored.2.1.id) [] expected
-                                  state
-                              else
-                                let (calleeResult, state) ←
-                                  inferExprFuel fuel context callee none state
-                                let result ← applyFunctionType context id
-                                  calleeResult.type arguments expected state
-                                pure <| recordIndirectCall expression calleeResult
-                                  arguments result
+                              match typedefCall? namespacePath name with
+                              | some call =>
+                                  let function ← typedefFunction call arguments
+                                    expected state
+                                  recordBuiltinFunctionCall expression callee
+                                    function.spelling function arguments id expected
+                                    state
+                              | none =>
+                                  if lengthCall namespacePath name then
+                                    let array ← arrayLengthArgument arguments state
+                                    recordExpressionWithExpected context expression id
+                                      (.fixed .uint256) (.arrayLength array.id) []
+                                      expected state
+                                  else if loadCall namespacePath name then
+                                    let loaded ← memrefLoadArgument arguments state
+                                    recordExpressionWithExpected context expression id
+                                      loaded.2 (.memrefLoad loaded.1.id) [] expected state
+                                  else if storeCall namespacePath name then
+                                    let stored ← memrefStoreArguments arguments state
+                                    let state ← unify state stored.2.1.type stored.2.2
+                                    recordExpressionWithExpected context expression id
+                                      Ty.unit (.memrefStore stored.1.id stored.2.1.id) [] expected
+                                      state
+                                  else
+                                    let (calleeResult, state) ←
+                                      inferExprFuel fuel context callee none state
+                                    let result ← applyFunctionType context id
+                                      calleeResult.type arguments expected state
+                                    pure <| recordIndirectCall expression calleeResult
+                                      arguments result
               | none =>
                   match calleeIdentifier? callee with
                   | some name =>
@@ -2344,12 +2350,17 @@ mutual
               | some (qualifiers, missing) =>
                   throw (.unknownConstructor qualifiers missing)
               | none =>
-                  if name.value == "length" then
-                    let (array, state) ← inferExprFuel fuel context base none state
-                    arrayLengthOf array state
-                    recordExpressionWithExpected context expression id
-                      (.fixed .uint256) (.arrayLength array.id) [] expected state
-                  else .error (.unsupportedExpression "field")
+                  match qualifiedBuiltinReference? context state expression with
+                  | some (reference, function) =>
+                      recordExpressionWithExpected context expression id function.type
+                        (.reference reference (.builtinFunction function)) [] expected state
+                  | none =>
+                      if name.value == "length" then
+                        let (array, state) ← inferExprFuel fuel context base none state
+                        arrayLengthOf array state
+                        recordExpressionWithExpected context expression id
+                          (.fixed .uint256) (.arrayLength array.id) [] expected state
+                      else .error (.unsupportedExpression "field")
           | _ => throw (.ambiguousConstructor [] name.value
               (candidates.map fun candidate => candidate.2.id))
       -- A literal infers its elements with no expected type, as a tuple does, and
@@ -2943,9 +2954,10 @@ mutual
 
 end
 
-/-- Invert successful `a.length` inference, a field that names no constructor:
-the field is `length`, and the base, inferred with no expected type, is a
-memory array once resolved, whose length is recorded at `uint256`. -/
+/-- Invert successful `a.length` inference, a field that names no constructor
+and no `std.opcodes` builtin: the field is `length`, and the base, inferred with
+no expected type, is a memory array once resolved, whose length is recorded at
+`uint256`. -/
 theorem inferExprFuel_success_fieldLength_facts
     {fuel : Nat} {context : Context} {expression base : Syntax.Expr}
     {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
@@ -2954,6 +2966,7 @@ theorem inferExprFuel_success_fieldLength_facts
     (expressionEq : expression.value = .field base dot name)
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (nonconstructor : constructorCalleeCandidates context allocated expression = .ok [])
+    (notBuiltin : qualifiedBuiltinReference? context allocated expression = none)
     (success : inferExprFuel (fuel + 1) context expression expected initial =
       .ok result) :
     ∃ arrayResult arrayState element,
@@ -2971,7 +2984,7 @@ theorem inferExprFuel_success_fieldLength_facts
           rcases pair with ⟨qualifiers, missingName⟩
           simp [missing] at success
       | none =>
-          simp only [missing] at success
+          simp only [missing, notBuiltin] at success
           by_cases lengthName : (name.value == "length") = true
           · simp only [lengthName, ↓reduceIte] at success
             cases baseRun : inferExprFuel fuel context base none allocated with
@@ -2986,6 +2999,38 @@ theorem inferExprFuel_success_fieldLength_facts
                     obtain ⟨element, resolved⟩ := arrayLengthOf_ok checked
                     exact ⟨arrayResult, arrayState, element, rfl, resolved, success⟩
           · simp [lengthName] at success
+
+/-- Invert successful inference of a qualified `std.opcodes` builtin named as a
+value, a field that names no constructor: the builtin's reference, recorded at
+its type under the name it is written as. -/
+theorem inferExprFuel_success_fieldBuiltin_facts
+    {fuel : Nat} {context : Context} {expression base : Syntax.Expr}
+    {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    {reference : String} {function : BuiltinFunctionId}
+    (expressionEq : expression.value = .field base dot name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (nonconstructor : constructorCalleeCandidates context allocated expression = .ok [])
+    (builtin : qualifiedBuiltinReference? context allocated expression =
+      some (reference, function))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    recordExpressionWithExpected context expression id function.type
+      (.reference reference (.builtinFunction function)) [] expected allocated =
+        .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, nonconstructor, bind, Except.bind] at success
+  cases missing : missingExplicitConstructor? context allocated expression with
+  | error error => simp [missing] at success
+  | ok missingResult =>
+      cases missingResult with
+      | some pair =>
+          rcases pair with ⟨qualifiers, missingName⟩
+          simp [missing] at success
+      | none =>
+          simp only [missing, builtin] at success
+          exact success
 
 end Solcore.Frontend.SourceInference.Detail
 end

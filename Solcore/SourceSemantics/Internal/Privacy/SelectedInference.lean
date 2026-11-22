@@ -2685,31 +2685,45 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         simp only [candidatesResult] at success
         cases candidates with
         | nil =>
-            obtain ⟨arrayResult, arrayState, _, baseRun, _, recordedSuccess⟩ :=
-              Detail.inferExprFuel_success_fieldLength_facts expressionEq allocationEq
-                candidatesResult overallSuccess
-            have noneBelow : ∀ expectedType ∈ (none : Option Ty),
-                expectedType.VariablesBelow allocated.inference.next := by simp
-            have noneSafe : ∀ expectedType ∈ (none : Option Ty),
-                Safe protectedVars allocated expectedType := by simp
-            have basePrivacy := baseInduction allocationProperties.2 wfAllocated boundAllocated
-              allocationPrivacy.2.1 catalog validated canonical noneBelow noneSafe
-              (arrayResult, arrayState) baseRun
-            have baseProperties := inferExprFuel_inferenceProperties allocationProperties.2
-              validated canonical noneBelow baseRun
-            have prefixProgress := allocationProperties.1.trans baseProperties.1
-            have beforeFit := allocationPrivacy.1.trans basePrivacy.1
-            have uint256Closed : (Ty.fixed FixedInteger.uint256).VariablesBelow 0 :=
-              Ty.variablesBelow_constructor _ _
-            have recorded := recordExpressionWithExpected_private catalog baseProperties.2.1
-              (uint256Closed.weaken (Nat.zero_le _))
-              (fun type member => (expectedBelow type member).weaken prefixProgress.next_le)
-              (safe_closed _ _ uint256Closed) (fun type member => beforeFit _ (expectedSafe _ member))
-              basePrivacy.2.2.1 recordedSuccess
-            refine ⟨beforeFit.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
-            intro row member fresh
-            exact new_requirements_trans basePrivacy.2.2.2 recorded.2.2.2 recorded.1 row member
-              (by simpa only [allocationPrivacy.2.2] using fresh)
+            cases builtinResult : Detail.qualifiedBuiltinReference? context allocated expression with
+            | some found =>
+                rcases found with ⟨reference, function⟩
+                have recordedSuccess := Detail.inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq
+                  candidatesResult builtinResult overallSuccess
+                have recorded := recordExpressionWithExpected_private catalog allocationProperties.2
+                  ((builtinFunction_type_closed function).weaken (Nat.zero_le _))
+                  (fun type member => (expectedBelow type member).weaken allocationProperties.1.next_le)
+                  (safe_closed _ _ (builtinFunction_type_closed function))
+                  (fun type member => allocationPrivacy.1 _ (expectedSafe _ member))
+                  allocationPrivacy.2.1 recordedSuccess
+                refine ⟨allocationPrivacy.1.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+                intro row member fresh
+                exact recorded.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using fresh)
+            | none =>
+                obtain ⟨arrayResult, arrayState, _, baseRun, _, recordedSuccess⟩ :=
+                  Detail.inferExprFuel_success_fieldLength_facts expressionEq allocationEq candidatesResult builtinResult overallSuccess
+                have noneBelow : ∀ expectedType ∈ (none : Option Ty),
+                    expectedType.VariablesBelow allocated.inference.next := by simp
+                have noneSafe : ∀ expectedType ∈ (none : Option Ty),
+                    Safe protectedVars allocated expectedType := by simp
+                have basePrivacy := baseInduction allocationProperties.2 wfAllocated boundAllocated
+                  allocationPrivacy.2.1 catalog validated canonical noneBelow noneSafe
+                  (arrayResult, arrayState) baseRun
+                have baseProperties := inferExprFuel_inferenceProperties allocationProperties.2
+                  validated canonical noneBelow baseRun
+                have prefixProgress := allocationProperties.1.trans baseProperties.1
+                have beforeFit := allocationPrivacy.1.trans basePrivacy.1
+                have uint256Closed : (Ty.fixed FixedInteger.uint256).VariablesBelow 0 :=
+                  Ty.variablesBelow_constructor _ _
+                have recorded := recordExpressionWithExpected_private catalog baseProperties.2.1
+                  (uint256Closed.weaken (Nat.zero_le _))
+                  (fun type member => (expectedBelow type member).weaken prefixProgress.next_le)
+                  (safe_closed _ _ uint256Closed) (fun type member => beforeFit _ (expectedSafe _ member))
+                  basePrivacy.2.2.1 recordedSuccess
+                refine ⟨beforeFit.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+                intro row member fresh
+                exact new_requirements_trans basePrivacy.2.2.2 recorded.2.2.2 recorded.1 row member
+                  (by simpa only [allocationPrivacy.2.2] using fresh)
         | cons candidate rest =>
             cases rest with
             | cons second tail => simp at success

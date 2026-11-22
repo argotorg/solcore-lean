@@ -61,6 +61,9 @@ structure ProgramImports where
   traits : List ProgramImportedTrait := []
   values : List ProgramImportedValue := []
   builtins : List ProgramImportedBuiltin := []
+  /-- The namespace paths that stand for upstream's `std.opcodes`: `opcodes` and `std.opcodes` for
+  a plain import, the alias for a namespace import. -/
+  builtinNamespaces : List (List String) := []
   deriving Repr
 
 /-- Import construction failures which cannot be interpreted as name absence. -/
@@ -302,16 +305,25 @@ private def keepFirstBindings (earlier : List EarlierBinding) (target : Workspac
      values.filterMap (fun row => bindingOf target row.localName row.declaration))
 
 /-- An import of upstream's `std.opcodes`: the functions it binds, less the names an earlier import
-of it bound, as upstream keeps the first. Its plain and namespace forms bind nothing yet. -/
+of it bound, as upstream keeps the first, and the namespace paths that stand for the module, by
+which its functions are named qualified: `opcodes` and `std.opcodes` for a plain import, and the
+alias for a namespace import. -/
 private def processStandardOpcodesImport (earlier : List EarlierBinding)
     (visibility : ProgramImports) (declaration : Syntax.ImportDecl) :
     ProgramImports × List EarlierBinding :=
   let bindings := (standardOpcodeBindings declaration).filter fun (localName, _) =>
     !earlier.any fun binding => binding.localName == localName &&
       binding.group == .value && decide (binding.target = standardOpcodesModule)
+  let namespaces : List (List String) := match declaration.value with
+    | .plain path =>
+        let components := programModulePathComponents path
+        (components.getLast?.toList.map ([·])) ++ [components]
+    | .namespace _ alias => [[alias.value]]
+    | _ => []
   ({ visibility with
       builtins := visibility.builtins ++ bindings.map fun (localName, function) =>
-        { localName, function } },
+        { localName, function }
+      builtinNamespaces := visibility.builtinNamespaces ++ namespaces },
     bindings.map fun (localName, _) =>
       { localName, group := .value, target := standardOpcodesModule })
 

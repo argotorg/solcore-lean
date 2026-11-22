@@ -1665,6 +1665,18 @@ theorem inferExprFuel_call_private
                                     functionsResult)
                                   attempt selectionResult resultEq
                         | none =>
+                            cases qualifiedBuiltinEq : qualifiedBuiltinNamed? context namespacePath name
+                            case some function =>
+                              simp only [qualifiedBuiltinEq] at success
+                              have builtinPrivacy := recordBuiltinFunctionCall_private
+                                argumentsPrivacy.2.1 expectedSafeAtArguments argumentsPrivacy.2.2.1 success
+                              refine ⟨prefixPrivacy.trans builtinPrivacy.1, builtinPrivacy.2.1,
+                                builtinPrivacy.2.2.1, ?_⟩
+                              intro row member fresh
+                              have inArguments := builtinPrivacy.2.2.2 ▸ member
+                              exact fun type typeMember => builtinPrivacy.1 _
+                                (argumentsPrivacy.2.2.2 row inArguments fresh type typeMember)
+                            simp only [qualifiedBuiltinEq] at success
                             cases typedefEq : typedefCall? namespacePath name
                             case some call =>
                               simp only [typedefEq] at success

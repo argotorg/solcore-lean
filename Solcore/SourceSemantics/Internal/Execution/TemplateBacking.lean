@@ -217,11 +217,12 @@ theorem expression_field_length_base
       (form : source.value = .field base dot name)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (nonconstructor : constructorCalleeCandidates context allocated source = .ok [])
+      (notBuiltin : qualifiedBuiltinReference? context allocated source = none)
       (child : inferExprFuel fuel context base none allocated =
         .ok (childValue, childFinal))
       (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs)
       (backed : LiveTemplatesBacked initial) : LiveTemplatesBacked (CallIndex.expression fuel context base none allocated childValue childFinal).initial := by
-  have step : ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.expression fuel context base none allocated childValue childFinal) := .expression_field_length_base accepted form allocation nonconstructor child
+  have step : ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.expression fuel context base none allocated childValue childFinal) := .expression_field_length_base accepted form allocation nonconstructor notBuiltin child
   have childInputs := step.inputs inputs
   have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
   subst allocated

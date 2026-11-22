@@ -345,6 +345,7 @@ theorem fieldLength
     (form : source.value = .field base dot name)
     (allocation : initial.allocateExpressionId = (id, allocated))
     (nonconstructor : constructorCalleeCandidates context allocated source = .ok [])
+    (notBuiltin : qualifiedBuiltinReference? context allocated source = none)
     (childAccepted : inferExprFuel fuel context base none allocated = .ok child)
     (accepted : inferExprFuel (fuel + 1) context source expected initial = .ok final)
     (lifetime : GeneralizationLifetime event allocated.inference.next child.2 [child.1.type]) :
@@ -357,7 +358,7 @@ theorem fieldLength
     (allocatedEq ▸ ready.allocateExpressionId) catalog.formation catalog.canonical
     (by simp) childAccepted
   obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
-    inferExprFuel_success_fieldLength_facts form allocation nonconstructor accepted
+    inferExprFuel_success_fieldLength_facts form allocation nonconstructor notBuiltin accepted
   cases Except.ok.inj (baseRun.symm.trans childAccepted)
   have uint256Closed : (Ty.fixed FixedInteger.uint256).VariablesBelow 0 :=
     Ty.variablesBelow_constructor _ _

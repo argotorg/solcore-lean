@@ -5376,6 +5376,12 @@ private theorem inference_anchoredNodePrefixExtends :
                                           candidates attempt selectionResult
                                           resultEq
                                 | none =>
+                                    cases qualifiedBuiltinEq : qualifiedBuiltinNamed? context namespacePath name
+                                    case some function =>
+                                      simp only [qualifiedBuiltinEq] at success
+                                      exact throughArguments.trans
+                                        (recordBuiltinFunctionCall_anchoredNodePrefixExtends success)
+                                    simp only [qualifiedBuiltinEq] at success
                                     cases typedefEq : typedefCall? namespacePath name
                                     case some call =>
                                       simp only [typedefEq] at success
@@ -5590,12 +5596,19 @@ private theorem inference_anchoredNodePrefixExtends :
         simp only [candidatesResult, bind, Except.bind] at success
         cases candidates with
         | nil =>
-            obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
-              inferExprFuel_success_fieldLength_facts expressionEq allocationEq
-                candidatesResult overallSuccess
-            have baseExtends := baseInduction (arrayResult, arrayState) baseRun
-            exact allocationExtends.trans (baseExtends.trans
-              (recordExpressionWithExpected_anchoredNodePrefixExtends recorded))
+            cases builtinResult : qualifiedBuiltinReference? context allocated expression with
+            | some found =>
+                rcases found with ⟨reference, function⟩
+                have recorded := inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq
+                  candidatesResult builtinResult overallSuccess
+                exact allocationExtends.trans
+                  (recordExpressionWithExpected_anchoredNodePrefixExtends recorded)
+            | none =>
+                obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
+                  inferExprFuel_success_fieldLength_facts expressionEq allocationEq candidatesResult builtinResult overallSuccess
+                have baseExtends := baseInduction (arrayResult, arrayState) baseRun
+                exact allocationExtends.trans (baseExtends.trans
+                  (recordExpressionWithExpected_anchoredNodePrefixExtends recorded))
         | cons candidate rest =>
             cases rest with
             | cons second tail => simp at success

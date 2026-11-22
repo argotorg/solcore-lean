@@ -742,6 +742,7 @@ theorem actualFieldLength_typing {fuel : Nat}
     (expressionEq : expression.value = .field base dot name)
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (nonconstructor : Detail.constructorCalleeCandidates inferenceContext allocated expression = .ok [])
+    (notBuiltin : Detail.qualifiedBuiltinReference? inferenceContext allocated expression = none)
     (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression expected initial =
       .ok (inferred, resultState))
     (resources : FinalInferenceResources wholeContext wholeReturn evidenceState roots finalized)
@@ -786,7 +787,8 @@ theorem actualFieldLength_typing {fuel : Nat}
     ExpressionTypingBase (resultState.toTypedSource roots) semanticSource
       semanticContext finalized.substitution inferred := by
   obtain ⟨arrayResult, arrayState, element, baseSuccess, resolved, recorded⟩ :=
-    Detail.inferExprFuel_success_fieldLength_facts expressionEq allocationEq nonconstructor success
+    Detail.inferExprFuel_success_fieldLength_facts expressionEq allocationEq nonconstructor notBuiltin
+      success
   have baseExpected : ∀ type ∈ (none : Option Ty), type.VariablesBelow allocated.inference.next := by
     intro _ member
     simp at member
@@ -916,11 +918,20 @@ theorem actualInferExprFuelRetainedSoundness_field_constructor {fuel : Nat}
   | ok candidates =>
     cases candidates with
     | nil =>
-      exact actualFieldLength_typing recursive expressionEq allocationEq discovery original
-        resources interfaces extension signaturesEq ownerEq typeParametersEq assumptionsEq formation
-        functions catalog canonical invariant actual allocatedInvariant allocatedOperational
-        allocatedExpected final raw patterns literals requirements retained coercionsRetained
-        childrenRetained covered semantic actualCovered
+      cases builtinResult : Detail.qualifiedBuiltinReference? inferenceContext allocated expression with
+      | some found =>
+        rcases found with ⟨reference, function⟩
+        exact recordBuiltinFunctionReference_expressionTypingBase_selected resources interfaces
+          (Detail.inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq discovery
+            builtinResult original)
+          extension requirements retained coercionsRetained catalog signaturesEq
+          (by simpa only [ownerEq, typeParametersEq] using canonical) invariant covered
+      | none =>
+        exact actualFieldLength_typing recursive expressionEq allocationEq discovery builtinResult
+          original resources interfaces extension signaturesEq ownerEq typeParametersEq assumptionsEq
+          formation functions catalog canonical invariant actual allocatedInvariant
+          allocatedOperational allocatedExpected final raw patterns literals requirements retained
+          coercionsRetained childrenRetained covered semantic actualCovered
     | cons first rest =>
       obtain ⟨dataType, constructor⟩ := first
       cases rest with

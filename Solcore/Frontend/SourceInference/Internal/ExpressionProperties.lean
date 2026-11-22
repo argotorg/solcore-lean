@@ -11289,18 +11289,27 @@ private theorem inferFuel_inferenceProperties_internal :
         simp only [candidatesResult, bind, Except.bind] at success
         cases candidates with
         | nil =>
-            obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
-              inferExprFuel_success_fieldLength_facts expressionEq allocationEq
-                candidatesResult overallSuccess
-            have baseProperties := baseInduction allocationProperties.2
-              validated canonical (by simp) (arrayResult, arrayState) baseRun
-            have recordedProperties := recordExpressionWithExpected_inferenceProperties
-              baseProperties.2.1 (Ty.variablesBelow_constructor _ _)
-              (fun expectedType member =>
-                (expectedAtAllocated expectedType member).weaken baseProperties.1.next_le)
-              recorded
-            exact ⟨allocationProperties.1.trans (baseProperties.1.trans recordedProperties.1),
-              recordedProperties.2⟩
+            cases builtinResult : qualifiedBuiltinReference? context allocated expression with
+            | some found =>
+                rcases found with ⟨reference, function⟩
+                have recorded := inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq
+                  candidatesResult builtinResult overallSuccess
+                have recordedProperties := recordExpressionWithExpected_inferenceProperties
+                  allocationProperties.2 (builtinFunction_type_variablesBelow function _)
+                  expectedAtAllocated recorded
+                exact ⟨allocationProperties.1.trans recordedProperties.1, recordedProperties.2⟩
+            | none =>
+                obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
+                  inferExprFuel_success_fieldLength_facts expressionEq allocationEq candidatesResult builtinResult overallSuccess
+                have baseProperties := baseInduction allocationProperties.2
+                  validated canonical (by simp) (arrayResult, arrayState) baseRun
+                have recordedProperties := recordExpressionWithExpected_inferenceProperties
+                  baseProperties.2.1 (Ty.variablesBelow_constructor _ _)
+                  (fun expectedType member =>
+                    (expectedAtAllocated expectedType member).weaken baseProperties.1.next_le)
+                  recorded
+                exact ⟨allocationProperties.1.trans (baseProperties.1.trans recordedProperties.1),
+                  recordedProperties.2⟩
         | cons candidate rest =>
             cases rest with
             | cons second tail => simp at success
@@ -12507,6 +12516,17 @@ private theorem inferFuel_inferenceProperties_internal :
                                             functionsResult)
                                           attempt selectionResult resultEq
                                 | none =>
+                                    cases qualifiedBuiltinEq : qualifiedBuiltinNamed? context namespacePath name
+                                    case some function =>
+                                      simp only [qualifiedBuiltinEq] at success
+                                      have builtinProperties :=
+                                        recordBuiltinFunctionCall_inferenceProperties
+                                          argumentsProperties.2.1
+                                          argumentsProperties.2.2
+                                          expectedAtArguments success
+                                      exact ⟨prefixProgress.trans builtinProperties.1,
+                                        builtinProperties.2⟩
+                                    simp only [qualifiedBuiltinEq] at success
                                     cases typedefEq : typedefCall? namespacePath name
                                     case some call =>
                                       simp only [typedefEq] at success
@@ -14869,6 +14889,12 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                           candidates attempt selectionResult
                                           resultEq
                                 | none =>
+                                    cases qualifiedBuiltinEq : qualifiedBuiltinNamed? context namespacePath name
+                                    case some function =>
+                                      simp only [qualifiedBuiltinEq] at success
+                                      exact (recordBuiltinFunctionCall_lexicalScope success).trans
+                                        throughArguments
+                                    simp only [qualifiedBuiltinEq] at success
                                     cases typedefEq : typedefCall? namespacePath name
                                     case some call =>
                                       simp only [typedefEq] at success
@@ -15149,12 +15175,18 @@ private theorem inferFuel_preserves_lexicalScope_internal :
         simp only [candidatesResult, bind, Except.bind] at success
         cases candidates with
         | nil =>
-            obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
-              inferExprFuel_success_fieldLength_facts expressionEq allocationEq
-                candidatesResult overallSuccess
-            have baseScope := baseInduction (arrayResult, arrayState) baseRun
-            exact (recordExpressionWithExpected_lexicalScope recorded).trans
-              (baseScope.trans allocationScope)
+            cases builtinResult : qualifiedBuiltinReference? context allocated expression with
+            | some found =>
+                rcases found with ⟨reference, function⟩
+                have recorded := inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq
+                  candidatesResult builtinResult overallSuccess
+                exact (recordExpressionWithExpected_lexicalScope recorded).trans allocationScope
+            | none =>
+                obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
+                  inferExprFuel_success_fieldLength_facts expressionEq allocationEq candidatesResult builtinResult overallSuccess
+                have baseScope := baseInduction (arrayResult, arrayState) baseRun
+                exact (recordExpressionWithExpected_lexicalScope recorded).trans
+                  (baseScope.trans allocationScope)
         | cons candidate rest =>
             cases rest with
             | cons second tail => simp at success

@@ -134,8 +134,9 @@ def assignmentExpected (operator : Syntax.ValueAssignOp) (state : State) (type :
   | .uncheckedModulo => some (compoundOperandType operator (state.resolve type))
 
 /-- The actual dispatch tests selecting an indirect callee after its arguments:
-a qualified name that no source namespace has is indirect unless it is one of
-the `Typedef` compiler functions or `Length.length`. -/
+a qualified name that no source namespace has is indirect unless it is a
+`std.opcodes` builtin under one of its namespace paths, one of the `Typedef`
+compiler functions or `Length.length`. -/
 def IndirectCalleeAt (context : SourceInference.Context) (callee : Syntax.Expr)
     (state : State) : Prop :=
   match calleeQualifiedIdentifier? callee with
@@ -143,6 +144,7 @@ def IndirectCalleeAt (context : SourceInference.Context) (callee : Syntax.Expr)
       state.lookupBinder? namespacePath.head! ≠ none ∨
         (state.lookupBinder? namespacePath.head! = none ∧
           qualifiedFunctionsNamed context namespacePath name = .ok none ∧
+          qualifiedBuiltinNamed? context namespacePath name = none ∧
           typedefCall? namespacePath name = none ∧
           lengthCall namespacePath name = false ∧
           loadCall namespacePath name = false ∧
@@ -722,6 +724,7 @@ inductive ChildStep : CallIndex → CallIndex → Prop where
       (form : source.value = .field base dot name)
       (allocation : initial.allocateExpressionId = (id, allocated))
       (nonconstructor : constructorCalleeCandidates context allocated source = .ok [])
+      (notBuiltin : qualifiedBuiltinReference? context allocated source = none)
       (child : inferExprFuel fuel context base none allocated =
         .ok (childValue, childFinal)) :
       ChildStep (.expression (fuel + 1) context source expected initial value final)

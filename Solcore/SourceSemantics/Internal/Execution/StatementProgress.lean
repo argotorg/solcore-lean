@@ -1423,7 +1423,7 @@ theorem ChildStep.progress_nonexpression {parent child : CallIndex}
       exact False.elim nonexpression
   | expression_newArray_length accepted form allocation child =>
       exact False.elim nonexpression
-  | expression_field_length_base accepted form allocation nonconstructor child =>
+  | expression_field_length_base accepted form allocation nonconstructor notBuiltin child =>
       exact False.elim nonexpression
   | expression_tuple accepted form allocation child =>
       exact False.elim nonexpression

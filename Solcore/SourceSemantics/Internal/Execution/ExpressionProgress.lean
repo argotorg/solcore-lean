@@ -48,9 +48,9 @@ theorem ChildStep.lifetime_expression
   | expression_newArray_length accepted form allocation childAccepted =>
       exact GeneralizationLifetime.newArray inputs.ready inputs.catalog inputs.bounds
         form allocation childAccepted accepted life
-  | expression_field_length_base accepted form allocation nonconstructor childAccepted =>
+  | expression_field_length_base accepted form allocation nonconstructor notBuiltin childAccepted =>
       exact GeneralizationLifetime.fieldLength inputs.ready inputs.catalog inputs.bounds
-        form allocation nonconstructor childAccepted accepted life
+        form allocation nonconstructor notBuiltin childAccepted accepted life
   | expression_tuple accepted form allocation childAccepted =>
       exact GeneralizationLifetime.tuple inputs.ready inputs.catalog inputs.bounds
         form allocation childAccepted accepted life
@@ -596,9 +596,9 @@ theorem ChildStep.progress_expression
       exact (recordExpressionWithExpected_inferenceProperties childProperties.2.1 (arrayBelow _)
         (fun type member => ((allocation_next allocation) ▸ inputs.bounds type member).weaken childProperties.1.next_le)
         recorded).1
-  | expression_field_length_base accepted form allocation nonconstructor childAccepted =>
+  | expression_field_length_base accepted form allocation nonconstructor notBuiltin childAccepted =>
       obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
-        Detail.inferExprFuel_success_fieldLength_facts form allocation nonconstructor accepted
+        Detail.inferExprFuel_success_fieldLength_facts form allocation nonconstructor notBuiltin accepted
       cases Except.ok.inj (baseRun.symm.trans childAccepted)
       exact (recordExpressionWithExpected_inferenceProperties childProperties.2.1
         (Ty.variablesBelow_constructor _ _)

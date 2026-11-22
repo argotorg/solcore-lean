@@ -1359,25 +1359,37 @@ theorem inferExprFuel_fieldConstructor_formation
     simp only [candidatesResult] at success
     cases candidates with
     | nil =>
-      obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
-        inferExprFuel_success_fieldLength_facts form allocationEq candidatesResult overallSuccess
-      have baseProperties := inferExprFuel_inferenceProperties allocatedReady
-        formation.validated formation.functionShapes (by simp) baseRun
-      have recording := recordExpressionWithExpected_inferenceProperties baseProperties.2.1
-        (Ty.variablesBelow_constructor _ _)
-        (fun type member => (expectedBelow type member).weaken baseProperties.1.next_le) recorded
-      have baseContinuation := continuation.trans recording.1.substitution_extends
-      have baseCapture : NoCaptureNodes outer arrayState.nodes := by
-        obtain ⟨_, fit, _, nodes⟩ := recordExpressionWithExpected_success_nodes recorded
-        rw [nodes, (withExpected_occurrenceState_eq fit).1] at capture
-        exact capture.of_prefix (List.prefix_append _ _)
-      have baseFormation := baseIH allocatedReady allocatedNodes allocatedFormed formation
-        (by simp) (by simp) (arrayResult, arrayState) baseRun baseContinuation baseCapture
-      have produced := recordExpressionWithExpected_normalized_formation
-        (type := Ty.fixed .uint256) formation.toFormationContext continuation
-        (TypeAdmissible.builtin formation.scope.binders (.fixed .uint256)) expectedFormed recorded
-      exact ⟨produced.1, baseFormation.2.of_new_rows (congrArg LexicalScope.binders
-        (localReadScope_recordExpressionWithExpected_lexicalScope recorded)) produced.2⟩
+      cases builtinResult : qualifiedBuiltinReference? context allocated expression with
+      | some found =>
+          rcases found with ⟨reference, function⟩
+          have recorded := inferExprFuel_success_fieldBuiltin_facts form allocationEq
+            candidatesResult builtinResult overallSuccess
+          have produced := recordExpressionWithExpected_normalized_formation
+            formation.toFormationContext continuation
+            (type_applySubstitution_residual formation.residual formation.range
+              (.builtinFunction formation.scope.binders function)) expectedFormed recorded
+          exact ⟨produced.1, allocatedFormed.of_new_rows (congrArg LexicalScope.binders
+            (localReadScope_recordExpressionWithExpected_lexicalScope recorded)) produced.2⟩
+      | none =>
+          obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
+            inferExprFuel_success_fieldLength_facts form allocationEq candidatesResult builtinResult overallSuccess
+          have baseProperties := inferExprFuel_inferenceProperties allocatedReady
+            formation.validated formation.functionShapes (by simp) baseRun
+          have recording := recordExpressionWithExpected_inferenceProperties baseProperties.2.1
+            (Ty.variablesBelow_constructor _ _)
+            (fun type member => (expectedBelow type member).weaken baseProperties.1.next_le) recorded
+          have baseContinuation := continuation.trans recording.1.substitution_extends
+          have baseCapture : NoCaptureNodes outer arrayState.nodes := by
+            obtain ⟨_, fit, _, nodes⟩ := recordExpressionWithExpected_success_nodes recorded
+            rw [nodes, (withExpected_occurrenceState_eq fit).1] at capture
+            exact capture.of_prefix (List.prefix_append _ _)
+          have baseFormation := baseIH allocatedReady allocatedNodes allocatedFormed formation
+            (by simp) (by simp) (arrayResult, arrayState) baseRun baseContinuation baseCapture
+          have produced := recordExpressionWithExpected_normalized_formation
+            (type := Ty.fixed .uint256) formation.toFormationContext continuation
+            (TypeAdmissible.builtin formation.scope.binders (.fixed .uint256)) expectedFormed recorded
+          exact ⟨produced.1, baseFormation.2.of_new_rows (congrArg LexicalScope.binders
+            (localReadScope_recordExpressionWithExpected_lexicalScope recorded)) produced.2⟩
     | cons candidate rest =>
       cases rest with
       | cons second tail => simp at success
