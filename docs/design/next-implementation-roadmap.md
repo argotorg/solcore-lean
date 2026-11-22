@@ -55,10 +55,11 @@ obligations. None follows from agreement in a test corpus.
   ([Core runtime unification](core-runtime-unification.md#remaining-work-for-the-second-goal)).
   - Done: statement closure over the actual compiler tree; a first expression subset and
     statement shape for named rows, connected to the unchanged public root; one concrete instance
-    (`AcceptedTick` in `Generalized/Export`); direct calls, the builtin conversions and mapping
-    indices at any expression position, closed by one size induction over a family of rows, and
-    final values and assignments through mapping indices in the shape; call authority from
-    a complete inventory; and the public root in both directions for call-containing rows
+    (`AcceptedTick` in `Generalized/Export`); direct calls, the builtin conversions, mapping
+    indices and builtin closures at any expression position, closed by one size induction over a
+    family of rows, and final values and assignments through mapping indices in the shape; call
+    authority from a complete inventory; and the public root in both directions for
+    call-containing rows
     (`CellAwarePublicAcceptedCallRoot`), with their original traces lifted and instances at a
     call, a nested call, a conversion and `Typedef.rep` of a conversion (`Accepted/OneCall`); and
     the fault lifting of call-containing rows with the public failure theorem, instanced at the
@@ -76,8 +77,8 @@ obligations. None follows from agreement in a test corpus.
     deployment, the rest of inline Yul, object linking, and then divergence and reverse
     correspondence.
 - **Upstream's trait and match rules**: row 13 is done but for a method's own `where`
-  predicates; match exhaustiveness, the `lidx` default and the declaration checks follow
-  ([the upstream table](#following-upstreams-semantics-the-next-units)).
+  predicates, and the literal `lidx` index and the declaration checks are done; match
+  exhaustiveness follows ([the upstream table](#following-upstreams-semantics-the-next-units)).
 - **Lean's native frontend as a fourth path**: the harness and the fuzz driver's `native` run kind
   compare the admitted pure cases with direct Core, memory arrays with their slices and memrefs
   among them. Native `std.opcodes` is under way.
@@ -94,6 +95,12 @@ obligations. None follows from agreement in a test corpus.
 - **Not built** in the generators: `bytes` returns beyond 64 bytes; returned enums, enum arguments,
   enum arrays, array returns, constructor arguments, call returns, call sequences and call branches
   beyond the recorded shapes; and other dynamic return values.
+- **Impl checks Lean lacks.** Upstream accepts, under `pragma no-bounded-variable-condition`, a
+  condition whose variable is not in its impl's head (`SC0214`). Lean refuses it either way, since
+  an impl's parameters all occur in its head. Lean also accepts overlapping ordinary impls, which
+  upstream refuses (`SC0218`). And Lean holds a function type's parameters as one product, so for
+  `SC0213` it counts `function(a, b)` as one tuple parameter and `function()` as `()`. It accepts
+  the two heads of those forms that upstream refuses.
 
 ### Known upstream findings
 
@@ -124,21 +131,20 @@ The last two are recorded without investigation, and the generators avoid them.
    of restating them. A goal that two different `where` predicates reach is ambiguous where it
    is used, as upstream reports it (`SC0208`), so a body cannot use a superclass that its
    `where` clause states beside the subclass. The superclasses of a method's own `where`
-   predicates are still open. Lean keeps ignoring `#[derive]`. Then Lean follows upstream in
-   two more places:
-   - a match's exhaustiveness: today Lean counts constructors only for a scrutinee of a nominal
-     type, so an exhaustive match over a pair needs a `_` arm. Lean also reads a `true` or
-     `false` pattern as a variable, so that arm matches every value, where upstream matches
-     the boolean;
-   - the Patterson, coverage and closed-default conditions (`SC0213`, `SC0212`, `SC0219`), with
-     upstream's two pragmas.
+   predicates are still open. Lean keeps ignoring `#[derive]`. Each impl's head and declared
+   conditions are checked where it is declared, as upstream's `SC0219`, `SC0212` and `SC0213` do,
+   with its two pragmas. Then Lean follows upstream in a match's exhaustiveness: today Lean
+   counts constructors only for a scrutinee of a nominal type, so an exhaustive match over a pair
+   needs a `_` arm. Lean also reads a `true` or `false` pattern as a variable, so that arm
+   matches every value, where upstream matches the boolean.
 
    One more difference is open: Lean's `&&` and `||` call a program's own `and` or `or`, where
    upstream's are builtins.
 2. **Meaning proofs.** The rest of native Source goal two
    ([remaining work](core-runtime-unification.md#remaining-work-for-the-second-goal)). Row 1 has
-   no leftover, and the faults, the final values and the mapping indices of call-containing rows
-   are lifted, with assignments through mapping indices. Next come builtin closures, then loops.
+   no leftover, and the faults, the final values, the mapping indices and the builtin closures of
+   call-containing rows are lifted, with assignments through mapping indices. Next come projected
+   in-place `~`, then loops.
 3. **Lean's native frontend as a fourth differential path.** The harness runs the admitted pure
    cases through the native pipeline, alone or as the fuzz driver's `native` run kind, memory
    arrays with their slices and memrefs among them. Lean's imports follow upstream's `SC0108`,
@@ -150,9 +156,12 @@ The last two are recorded without investigation, and the generators avoid them.
    harness admits the cases that import them. Beside a name that such an import binds, Lean's
    operators follow upstream's: `<` and `!` call the bound `lt` and `not`, so `<` is refused
    (each of the 26 gives a word where `<` wants a bool), and the trait methods and `&&` and `||`
-   see no bound name. Next come qualified access to the module, std beside `std.opcodes`, and
-   the export checks. Two imports under one qualifier (`SC0116`) and a module that re-exports
-   two traits of one name (`SC0111`) are still accepted.
+   see no bound name. The load knows upstream's other std modules by the names they export and
+   their namespaces, read from the pinned checkout (`scripts/standard-modules.py`): their imports
+   meet upstream's import rules, and their names, whose declarations Lean lacks, bind nothing, so
+   a program resolves past them. Next come qualified access to `std.opcodes` and the export
+   checks. Two imports under one qualifier (`SC0116`) and a module that re-exports two traits of
+   one name (`SC0111`) are still accepted.
 
 ### Then
 

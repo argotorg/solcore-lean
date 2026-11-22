@@ -243,7 +243,9 @@ Direct calls are in [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/A
   The builtin conversions are nested sites too, with the dirty-integer revert's token law as an
   instance argument (`CellAwareInvocationAcceptedConversionFaults.DirtyToken`). So are mapping
   indices (`Nested.index`), whose key equality and missing-default fault the family derives from
-  the callable profile and the row's issuer.
+  the callable profile and the row's issuer, and references to builtin closures and calls of
+  them (`Nested.builtinValue`, `Nested.builtin`), with the function model's inclusion of the
+  builtin values, which the family derives from the callable profile.
 - **Authority.** `CellAwareInvocationAcceptedCallAuthority` derives `Ports` from a complete
   inventory: a call receipt's global slot names an indexed function, and the inventory's header for
   that index gives the `Port`.
@@ -336,7 +338,9 @@ program.
   call-containing function body. The admitted callees' static receipts are a premise (`Callees`).
   An assignment through mapping indices lifts to the staged `assignProjected`, with its keys and
   `ProjectedTarget.Snapshot` from the Source's place resolution (`projected_target`), and each of
-  its faults to the staged rule at the same point.
+  its faults to the staged rule at the same point. A call of a builtin closure lifts to the
+  staged `builtinApplied` and `builtinArgumentsFault`, and a reference to one to the staged atomic
+  value.
 - **Fault lifting.** `CellAwareInvocationAcceptedFaultLifting`, in the same file, lifts the
   original fault executions of the same bodies with the same reason and heap (`body_fault`). The
   staged traces express every reason but a type mismatch and a missing declaration
@@ -362,18 +366,21 @@ program.
   uses are general over the subset and the shape.
 - **One call.** The test
   [Accepted/OneCall](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/OneCall.lean) compiles
-  a ten-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
+  a twelve-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
   `identity(value)`, `twice` returns `identity(identity(value))`, `narrow` returns `uint8(value)`,
   `roundTrip` returns `Typedef.rep(uint8(value))`, `doubled`, `shifted` and `flipped` update a
   `uint8` local in place with `+=`, `<<=` and `~`, `tailed` ends in `identity(value)` as its final
-  value, and `stored` assigns its parameter at `table[value]` of a local mapping and returns
-  `table[value]`. Its `accepted_call` meets every premise of
+  value, `stored` assigns its parameter at `table[value]` of a local mapping and returns
+  `table[value]`, `summed` returns `integerAdd(wordToInteger(value), wordToInteger(value))`, an
+  integer, and `zeroed` returns `iszero(value)` with `iszero` imported from `std.opcodes`. Its
+  `accepted_call` meets every premise of
   `CellAwarePublicAcceptedCallForward.first_value_selected`,
   `CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected` and
-  `checkpoint_reflects_selected` at `relay`'s and `tailed`'s first public calls, at `twice`'s,
-  where the inner call's result is the outer call's argument, and at `narrow`'s and `roundTrip`'s
-  at a canonical word. At `stored`, `accepted_call_with_locals` meets them with a Source execution
-  that ends in the local's context. At a dirty word, `accepted_reflection` meets the reflection's
+  `checkpoint_reflects_selected` at `relay`'s, `tailed`'s and `zeroed`'s first public calls, at
+  `twice`'s, where the inner call's result is the outer call's argument, and at `narrow`'s and
+  `roundTrip`'s at a canonical word. At `stored`, `accepted_call_with_locals` meets them with a
+  Source execution that ends in the local's context, and at `summed`, `accepted_call_returning`
+  with one that returns an integer. At a dirty word, `accepted_reflection` meets the reflection's
   premises at `narrow` and `roundTrip`, and the call fails with the dirty-integer reason. At the
   faulting words of `narrow`, `doubled`, `shifted` and `flipped`, `accepted_failure` lifts the
   row's original Source fault and meets every premise of `first_fault_selected`: the actual call
@@ -407,14 +414,15 @@ On the accepted-body route above, the next connected steps are:
     available Source input.
 - **Extend the expression closure beyond its first subset**, over the same actual accepted
   expression compiler.
-  - Direct calls, the builtin conversions and mapping indices at any expression position are
-    closed over families of rows, with call authority from a complete inventory. They are
-    connected at the public root in both directions, original traces of call-containing bodies
-    are lifted, and a program with a call, a nested call, a conversion, `Typedef.rep` of a
-    conversion and an index read after a write through the same index instantiates both
+  - Direct calls, the builtin conversions, mapping indices and builtin closures with their calls
+    at any expression position are closed over families of rows, with call authority from a
+    complete inventory. They are connected at the public root in both directions, original
+    traces of call-containing bodies are lifted, and a program with a call, a nested call, a
+    conversion, `Typedef.rep` of a conversion, an index read after a write through the same
+    index, a call of an integer closure and a call of an imported opcode instantiates both
     directions.
-  - Next come indirect calls, the other builtin calls, methods, array indices, tuples,
-    constructors, generalized reads, closures and coercions.
+  - Next come indirect calls, methods, array indices, tuples, constructors, generalized reads,
+    closures and coercions.
   - Expressions of contextual closures need the relation between the compiler view and the Source
     that their writes and matches also need.
 - **Strengthen the named-row public connection.**
