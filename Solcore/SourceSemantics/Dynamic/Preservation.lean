@@ -1826,6 +1826,7 @@ theorem rootArity_unique
   | tuple => cases right_represents; rfl
   | uint256Word => cases right_represents; rfl
   | boolLiteral => cases right_represents; rfl
+  | sameNameConstructor => cases right_represents; rfl
   | group _ inductionHypothesis =>
       cases right_represents with
       | group inner => exact inductionHypothesis inner

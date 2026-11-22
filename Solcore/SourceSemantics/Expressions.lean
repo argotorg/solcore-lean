@@ -853,6 +853,12 @@ inductive MatchPatternSourceRepresents (context : Context) :
   | boolLiteral {span name value}
       (spelling : name = boolPatternSpelling value) :
       MatchPatternSourceRepresents context (.binder span name) (.boolLiteral value) 0
+  /-- A bare name that names a constructor sharing its type's name, as upstream reads a bare
+  `m` for `m.m`: the constructor, with no arguments. -/
+  | sameNameConstructor {span name instantiation arguments}
+      (spelling : ConstructorPatternSpellingValid context name instantiation) :
+      MatchPatternSourceRepresents context (.binder span name)
+        (.constructor instantiation arguments) 0
 
 /-- Complete source-level pattern typing.  The result exposes binders so a
 match-arm judgment can extend its lexical context without inspecting the

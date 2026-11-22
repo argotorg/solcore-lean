@@ -12867,6 +12867,8 @@ private theorem inferMatchPatternFlatFuel_success_binder_sound
     {result : Detail.InferredPattern}
     (pattern_eq : pattern.value = .binder name)
     (notBool : ¬(name.value == "true" || name.value == "false") = true)
+    (notSameName : ¬Detail.sameNameConstructorVisible inferenceContext name.value = true)
+    (notLeaf : ¬Detail.constructorLeafVisible inferenceContext name.value = true)
     (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
     (ready : initial.InferenceReady)
     (expectedBelow : expected.VariablesBelow initial.inference.next)
@@ -12890,7 +12892,7 @@ private theorem inferMatchPatternFlatFuel_success_binder_sound
   have properties := stateCallbacks.pattern ready expectedBelow validated below
     success
   unfold Detail.inferMatchPatternFlatFuel at success
-  simp only [pattern_eq, notBool, Bool.false_eq_true, ↓reduceIte] at success
+  simp only [pattern_eq, notBool, notSameName, notLeaf, Bool.false_eq_true, ↓reduceIte] at success
   by_cases duplicate : seen.contains name.value = true
   · have duplicateMem : name.value ∈ seen := by
       simpa using duplicate
@@ -13905,10 +13907,62 @@ private theorem inferMatchPatternFlatFuel_success_sound_step
       · exact inferMatchPatternFlatFuel_success_bool_sound valueEq isBool
           stateCallbacks ready expectedBelow validated below seen_nodup
           invariant outerExtension success
-      · exact inferMatchPatternFlatFuel_success_binder_sound valueEq isBool
-          stateCallbacks ready expectedBelow validated below owner_eq
-          semanticOwner seen_nodup semanticAdmissible activeAdmissible
-          invariant outerExtension success
+      · by_cases sameName : Detail.sameNameConstructorVisible inferenceContext name.value = true
+        · -- A bare same-name constructor reads as `name.name` with no arguments.
+          unfold Detail.inferMatchPatternFlatFuel at success
+          simp only [valueEq, isBool, sameName, Bool.false_eq_true, ↓reduceIte, bind,
+            Except.bind] at success
+          cases innerSuccess : Detail.inferMatchPatternFlatFuel fuel inferenceContext
+              { span := pattern.span, value := .constructor none [name] name none } expected seen
+              initial with
+          | error error => simp [innerSuccess] at success
+          | ok innerResult =>
+              simp only [innerSuccess, pure, Pure.pure, Except.pure] at success
+              injection success with resultEq
+              subst result
+              have innerOuter : outer.SemanticallyExtends
+                  innerResult.state.inference.substitution := outerExtension
+              obtain ⟨certificate⟩ := recursivePattern
+                (result := innerResult) ready expectedBelow below owner_eq
+                seen_nodup semanticAdmissible activeAdmissible activeSignaturesEq
+                invariant innerOuter innerSuccess
+              have innerSource :=
+                Detail.inferMatchPatternFlatFuel_qualified_constructor_source rfl innerSuccess
+              have represents := certificate.source_represents
+              have instructionsEq := certificate.instructions_eq
+              rw [innerSource] at represents
+              simp only [List.map_cons, List.map_nil, Option.map_none, Option.getD_none,
+                List.length_nil] at represents
+              generalize closedEq : innerResult.resolution.applySubstitution outer = closed
+                at represents
+              generalize arityEq : certificate.rootArity = arity at represents instructionsEq
+              cases represents with
+              | constructor spelling =>
+                  exact ⟨{
+                    binders := certificate.binders
+                    rootArity := 0
+                    finalContext := certificate.finalContext
+                    source_represents := by
+                      rw [closedEq]
+                      exact .sameNameConstructor spelling
+                    instructions_eq := instructionsEq
+                    instruction_type := certificate.instruction_type
+                    binders_extend := certificate.binders_extend
+                    invariant := certificate.invariant
+                    progress := certificate.progress
+                    ready := certificate.ready
+                    below := certificate.below
+                    owner_eq := certificate.owner_eq
+                    names_eq := certificate.names_eq
+                    names_nodup := certificate.names_nodup
+                  }⟩
+        · by_cases leaf : Detail.constructorLeafVisible inferenceContext name.value = true
+          · unfold Detail.inferMatchPatternFlatFuel at success
+            simp [valueEq, isBool, sameName, leaf] at success
+          · exact inferMatchPatternFlatFuel_success_binder_sound valueEq isBool sameName leaf
+              stateCallbacks ready expectedBelow validated below owner_eq
+              semanticOwner seen_nodup semanticAdmissible activeAdmissible
+              invariant outerExtension success
   | constructor leadingDot qualifiers name arguments =>
       cases selected : Detail.uint256PatternArgument? leadingDot qualifiers name.value
           ((arguments.map (fun retained => retained.elements.toList)).getD [])
@@ -14043,10 +14097,63 @@ private theorem inferMatchPatternFlatFuel_success_sound_step_at
       · exact inferMatchPatternFlatFuel_success_bool_sound valueEq isBool
           stateCallbacks ready expectedBelow validated below seen_nodup
           invariant outerExtension success
-      · exact inferMatchPatternFlatFuel_success_binder_sound valueEq isBool
-          stateCallbacks ready expectedBelow validated below owner_eq
-          semanticOwner seen_nodup semanticAdmissible activeAdmissible
-          invariant outerExtension success
+      · by_cases sameName : Detail.sameNameConstructorVisible inferenceContext name.value = true
+        · -- A bare same-name constructor reads as `name.name` with no arguments.
+          unfold Detail.inferMatchPatternFlatFuel at success
+          simp only [valueEq, isBool, sameName, Bool.false_eq_true, ↓reduceIte, bind,
+            Except.bind] at success
+          cases innerSuccess : Detail.inferMatchPatternFlatFuel fuel inferenceContext
+              { span := pattern.span, value := .constructor none [name] name none } expected seen
+              initial with
+          | error error => simp [innerSuccess] at success
+          | ok innerResult =>
+              simp only [innerSuccess, pure, Pure.pure, Except.pure] at success
+              injection success with resultEq
+              subst result
+              have innerOuter : outer.SemanticallyExtends
+                  innerResult.state.inference.substitution := outerExtension
+              obtain ⟨certificate⟩ := recursivePattern
+                (result := innerResult) ready expectedBelow below owner_eq
+                seen_nodup semanticAdmissible activeAdmissible activeSignaturesEq
+                invariant innerOuter
+                integerPatternsSubset requirementsSubset requirementsOccur innerSuccess
+              have innerSource :=
+                Detail.inferMatchPatternFlatFuel_qualified_constructor_source rfl innerSuccess
+              have represents := certificate.source_represents
+              have instructionsEq := certificate.instructions_eq
+              rw [innerSource] at represents
+              simp only [List.map_cons, List.map_nil, Option.map_none, Option.getD_none,
+                List.length_nil] at represents
+              generalize closedEq : innerResult.resolution.applySubstitution outer = closed
+                at represents
+              generalize arityEq : certificate.rootArity = arity at represents instructionsEq
+              cases represents with
+              | constructor spelling =>
+                  exact ⟨{
+                    binders := certificate.binders
+                    rootArity := 0
+                    finalContext := certificate.finalContext
+                    source_represents := by
+                      rw [closedEq]
+                      exact .sameNameConstructor spelling
+                    instructions_eq := instructionsEq
+                    instruction_type := certificate.instruction_type
+                    binders_extend := certificate.binders_extend
+                    invariant := certificate.invariant
+                    progress := certificate.progress
+                    ready := certificate.ready
+                    below := certificate.below
+                    owner_eq := certificate.owner_eq
+                    names_eq := certificate.names_eq
+                    names_nodup := certificate.names_nodup
+                  }⟩
+        · by_cases leaf : Detail.constructorLeafVisible inferenceContext name.value = true
+          · unfold Detail.inferMatchPatternFlatFuel at success
+            simp [valueEq, isBool, sameName, leaf] at success
+          · exact inferMatchPatternFlatFuel_success_binder_sound valueEq isBool sameName leaf
+              stateCallbacks ready expectedBelow validated below owner_eq
+              semanticOwner seen_nodup semanticAdmissible activeAdmissible
+              invariant outerExtension success
   | constructor leadingDot qualifiers name arguments =>
       cases selected : Detail.uint256PatternArgument? leadingDot qualifiers name.value
           ((arguments.map (fun retained => retained.elements.toList)).getD [])

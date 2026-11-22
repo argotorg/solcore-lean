@@ -162,6 +162,9 @@ negative for a negative literal. -/
   | invalidAssignmentTarget (span : Syntax.SourceSpan)
   | controlOutsideLoop (kind : String)
   | duplicatePatternBinder (name : String)
+  /-- A bare pattern name that spells a visible constructor other than one sharing its type's
+  name, which upstream refuses with `SC0106`: binding it would turn the arm into a catch-all. -/
+  | unqualifiedConstructorPattern (name : String)
   | unsupportedPattern (span : Syntax.SourceSpan) (kind : String)
   | nonNumericPatternType (span : Syntax.SourceSpan) (type : Ty)
   | nonReturningMatchArm (span : Syntax.SourceSpan)

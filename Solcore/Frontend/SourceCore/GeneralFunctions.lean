@@ -1777,6 +1777,14 @@ def rootInstructions (context : Context) : MatchPatternSource → MatchPatternRe
   | .binder _ name, .boolLiteral value => do
       unless name = boolPatternSpelling value do throw invalid
       pure [.boolLiteral value]
+  | .binder _ name, .constructor instantiation instructions => do
+      let signatures := context.signatures.dataTypes.filter (fun signature =>
+        decide (signature.id = instantiation.constructor.dataType))
+      let [signature] := signatures | throw invalid
+      let [constructor] := signature.constructors.filter (fun constructor =>
+        decide (constructor.id = instantiation.constructor)) | throw invalid
+      unless constructor.name = name do throw invalid
+      pure (.constructor instantiation 0 :: instructions)
   | .constructor _ _ _ name count, .constructor instantiation instructions => do
       let signatures := context.signatures.dataTypes.filter (fun signature =>
         decide (signature.id = instantiation.constructor.dataType))

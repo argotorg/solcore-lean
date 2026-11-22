@@ -498,6 +498,7 @@ private theorem matchPattern_rootArity_eq
   | tuple => cases right_represents; rfl
   | uint256Word => cases right_represents; rfl
   | boolLiteral => cases right_represents; rfl
+  | sameNameConstructor => cases right_represents; rfl
   | group _ induction =>
       cases right_represents with
       | group inner => exact induction inner
@@ -803,6 +804,7 @@ theorem rootArity_eq
   | tuple => cases right_represents; rfl
   | uint256Word => cases right_represents; rfl
   | boolLiteral => cases right_represents; rfl
+  | sameNameConstructor => cases right_represents; rfl
   | group _ induction =>
       cases right_represents with
       | group inner => exact induction inner

@@ -5301,6 +5301,98 @@ def runBoolPatterns : IO Unit := do
     ["function bad(x: Word) returns (Word) { match (x) { case true { return 1; } case _ { return 0; } } }"]
   IO.println "SOURCE_CORE_BOOL_PATTERNS_PASS: case true and case false through the public API, each arm for its own boolean in a bool match and in a payload as the m4c and m8c probes give upstream's 2, a repeated true in a tuple binding nothing, a group and a let-bound scrutinee taking bool; m4 and m8 with no catch-all refused until upstream's coverage, m9 and tuple_nested_nonexhaustive refused as upstream refuses them, and true at Word rejected"
 
+/-- Upstream's reading of a bare name in a pattern, after `true` and `false`: a constructor that
+shares its type's name is that constructor, as `same-name-ctor-pattern` measures it; any other
+visible constructor of that spelling is refused, as upstream's `SC0106` refuses it, whatever the
+scrutinee's type; and any other name is a binder. -/
+private def bareNameWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "enum m { m, k }",
+  "enum thing { thing }",
+  "enum colour { red, blue }",
+  "function pickM(x: m) returns (Word) { match (x) { case m { return 1; } case m.k { return 2; } } }",
+  "function pickThing(t: thing) returns (Word) { match (t) { case thing { return 7; } } }",
+  "function colourBinder(c: colour) returns (Word) { match (c) { case colour { return 3; } } }",
+  "function first() returns (Word) { return pickM(m.m); }",
+  "function second() returns (Word) { return pickM(m.k); }",
+  "function only() returns (Word) { return pickThing(thing.thing); }",
+  "function blue() returns (Word) { return colourBinder(colour.blue); }"]
+
+private def bareNameNames : List String := ["first", "second", "only", "blue"]
+
+/-- A main module and a module `lib` beside it. -/
+private def libraryWorkspace (main library : String) : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := []
+  mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ main},
+    {path := "lib.solc", content := "pragma solcore;\n" ++ library}] }
+
+/-- Inference refuses the program with exactly this error. -/
+private def refusedWith (label : String) (workspace : Workspace.RawWorkspace)
+    (error : Frontend.SourceInference.Error) : IO Unit :=
+  match checkProgram workspace with
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error [.inference failure] =>
+      if failure.error == error then pure ()
+      else throw (IO.userError s!"{label} gave {reprStr failure.error}")
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+private def flagLibrary : String := "export { flag(*) };\nenum flag { on, off }"
+
+private def pickFlag (type : String) (qualified : String) : String :=
+  s!"function pick(f: {type}) returns (Word) \{ match (f) \{ case off \{ return 1; } case {qualified} \{ return 2; } } }"
+
+/-- The bare-name rule through the public API: same-name constructors run as their constructors,
+`case m` beside `case m.k` covering `m`; a type's name with no constructor of that name, and a
+constructor an import keeps opaque, stay binders; and a visible constructor's spelling is refused
+as a binder, at its own scrutinee, at an unrelated one, nested, beside a parameter of that name,
+and through a selected, wildcard or plain import, as the pinned checker refuses each one. -/
+def runBareNamePatterns : IO Unit := do
+  let program ← get "bare name check" (checkProgram bareNameWorkspace)
+  let seeds ← bareNameNames.mapM (seed program)
+  let compiled ← get "bare name compilation"
+    (compile bareNameWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match bareNameNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"bare name root {name} missing")
+    | none => throw (IO.userError s!"bare name {name} unknown")
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × List Value × Value) := [
+    ("first", [], word 1), ("second", [], word 2), ("only", [], word 7), ("blue", [], word 3)]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) arguments
+    require (completed.value == expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  let _ := session
+  -- An opaque import's constructors are not visible, so `off` binds.
+  match checkProgram (libraryWorkspace
+      "import { flag, makeOn } from lib;\nfunction pick(f: flag) returns (Word) { match (f) { case off { return 1; } } }"
+      "export { flag, makeOn };\nenum flag { on, off }\nfunction makeOn() returns (flag) { return flag.on; }") with
+  | .ok _ => pure ()
+  | .error errors => throw (IO.userError s!"an opaque import's constructor spelling gave {reprStr errors}")
+  -- Upstream's `nameres/unqualified_ctor_pattern`, refused at `off`.
+  refusedWith "unqualified_ctor_pattern" (workspaceOf ["enum flag { off, on }",
+    "function pick(f: flag) returns (Word) { match (f) { case off { return 0; } case on { return 1; } } }",
+    "function main() returns (Word) { return pick(flag.on); }"]) (.unqualifiedConstructorPattern "off")
+  refusedWith "a binder spelled like an unrelated type's constructor" (workspaceOf ["enum flag { on, off }",
+    "function f(x: Word) returns (Word) { match (x) { case on { return 1; } } }"])
+    (.unqualifiedConstructorPattern "on")
+  refusedWith "a nested binder spelled like another type's constructor" (workspaceOf ["enum flag { on, off }",
+    "enum Box { Box(Word) }", "function f(b: Box) returns (Word) { match (b) { case Box.Box(off) { return off; } } }"])
+    (.unqualifiedConstructorPattern "off")
+  refusedWith "a binder spelled like a constructor beside a parameter of that name" (workspaceOf ["enum flag { on, off }",
+    "function pick(off: Word, f: flag) returns (Word) { match (f) { case off { return 1; } case flag.on { return 2; } } }"])
+    (.unqualifiedConstructorPattern "off")
+  refusedWith "a selected import's constructor" (libraryWorkspace
+    ("import { flag } from lib;\n" ++ pickFlag "flag" "flag.on") flagLibrary) (.unqualifiedConstructorPattern "off")
+  refusedWith "a wildcard import's constructor" (libraryWorkspace
+    ("import * from lib;\n" ++ pickFlag "flag" "flag.on") flagLibrary) (.unqualifiedConstructorPattern "off")
+  refusedWith "a plain import's constructor" (libraryWorkspace
+    ("import lib;\n" ++ pickFlag "lib.flag" "lib.flag.on") flagLibrary) (.unqualifiedConstructorPattern "off")
+  -- A same-name constructor with a payload, written bare, is that constructor, short of its argument.
+  rejectedByInference "a bare same-name constructor with a payload"
+    ["enum box { box(Word) }", "function f(b: box) returns (Word) { match (b) { case box { return 1; } } }"]
+  IO.println "SOURCE_CORE_BARE_NAME_PATTERNS_PASS: a bare name in a pattern as upstream reads it through the public API, same-name constructors m and thing running as their constructors with case m beside case m.k covering m, a type name with no constructor of that name and an opaque import's constructor binding, and a visible constructor's spelling refused as upstream's SC0106 refuses it, upstream's unqualified_ctor_pattern, at an unrelated scrutinee, nested, beside a parameter of that name and through a selected, wildcard and plain import, and a bare same-name constructor with a payload refused for its argument"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -6172,6 +6264,7 @@ def run : IO Unit := do
   runTypedef
   runUint256Patterns
   runBoolPatterns
+  runBareNamePatterns
   runUpstreamFixtures
   runUpstreamArrayFixtures
   runArrayElementCases

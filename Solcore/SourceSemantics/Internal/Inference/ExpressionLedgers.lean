@@ -1317,37 +1317,37 @@ private theorem flatPatternLedger (fuel : Nat) (context : Frontend.SourceInferen
     all_goals try cases success
     all_goals simp_all [pure, Pure.pure, Except.pure]
     all_goals exact (integerPatternsLedger (tracked.fresh.addRequirementWithId _) _).unify (by assumption)
-  case case11 =>
-    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel leadingDot qualifiers constructorName sourceArguments
-      patternEq branchEq flatArguments notUint256 branch childrenIH
-    unfold PatternLedger at *
-    intro pending result success tracked
-    unfold Detail.inferMatchPatternFlatFuel at success
-    simp_all [bind, Except.bind]
-    repeat' first | split at success
-    all_goals try cases success
-    all_goals simp_all [pure, Pure.pure, Except.pure]
-    all_goals try subst_vars
-    all_goals first
-      | exact childrenIH _ _ pending _ (by assumption) (tracked.unify (by assumption))
-      | exact childrenIH _ _ pending _ (by assumption)
-          ((tracked.freshDataConstructorInstantiation _ _).unify (by assumption))
-  case case12 =>
-    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel leadingDot qualifiers constructorName sourceArguments
-      patternEq branchEq flatArguments notUint256 branch childrenIH
-    unfold PatternLedger at *
-    intro pending result success tracked
-    unfold Detail.inferMatchPatternFlatFuel at success
-    simp_all [bind, Except.bind]
-    repeat' first | split at success
-    all_goals try cases success
-    all_goals simp_all [pure, Pure.pure, Except.pure]
-    all_goals try subst_vars
-    all_goals first
-      | exact childrenIH _ _ pending _ (by assumption) (tracked.unify (by assumption))
-      | exact childrenIH _ _ pending _ (by assumption)
-          ((tracked.freshDataConstructorInstantiation _ _).unify (by assumption))
   case case13 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel leadingDot qualifiers constructorName sourceArguments
+      patternEq branchEq flatArguments notUint256 branch childrenIH
+    unfold PatternLedger at *
+    intro pending result success tracked
+    unfold Detail.inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    all_goals first
+      | exact childrenIH _ _ pending _ (by assumption) (tracked.unify (by assumption))
+      | exact childrenIH _ _ pending _ (by assumption)
+          ((tracked.freshDataConstructorInstantiation _ _).unify (by assumption))
+  case case14 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel leadingDot qualifiers constructorName sourceArguments
+      patternEq branchEq flatArguments notUint256 branch childrenIH
+    unfold PatternLedger at *
+    intro pending result success tracked
+    unfold Detail.inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    all_goals first
+      | exact childrenIH _ _ pending _ (by assumption) (tracked.unify (by assumption))
+      | exact childrenIH _ _ pending _ (by assumption)
+          ((tracked.freshDataConstructorInstantiation _ _).unify (by assumption))
+  case case15 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq argument
       selectedEq childrenIH
@@ -1360,7 +1360,7 @@ private theorem flatPatternLedger (fuel : Nat) (context : Frontend.SourceInferen
     all_goals simp_all
     all_goals try subst_vars
     exact childrenIH _ pending _ (by assumption) (tracked.unify (by assumption))
-  case case15 =>
+  case case17 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold PatternLedger at *
     intro pending result success tracked
@@ -1375,7 +1375,7 @@ private theorem flatPatternLedger (fuel : Nat) (context : Frontend.SourceInferen
     have freshTracked := freshTypesLedger tracked sources.length
     rw [freshEq] at freshTracked
     exact childrenIH _ pending _ childAccepted (freshTracked.unify unifyAccepted)
-  case case19 =>
+  case case21 =>
     intros fuel head rest expectedHead expectedTail seen state headIH tailIH
     unfold PatternLedger at *
     intro pending result success tracked

@@ -1593,6 +1593,28 @@ def uint256PatternArgument? (leadingDot : Option Syntax.SourceSpan)
       if name = "uint256" then some argument else none
   | _, _, _, _ => none
 
+/-- A bare pattern name that names a constructor of the type of the same name, visible
+unqualified, as upstream reads a bare `m` for `m.m` (`lookup_ctor(qualify(name, name))`). -/
+def sameNameConstructorVisible (context : Context) (name : String) : Bool :=
+  match explicitConstructorCandidate context [name] name with
+  | .ok _ => true
+  | .error _ => false
+
+/-- Whether a constructor of that name is visible: one of the current module's data types', or
+one that an import makes visible, selected, wildcard or plain, as upstream's
+`has_user_constructor_leaf` counts them. An opaque import's constructors are not visible. -/
+def constructorLeafVisible (context : Context) (name : String) : Bool :=
+  let ownConstructor := context.signatures.dataTypes.any fun dataType =>
+    decide (dataType.id.moduleId = context.scope.currentModule) &&
+      dataType.constructors.any (·.name == name)
+  ownConstructor ||
+    match buildProgramImports context.environment context.scope.currentModule with
+    | .error _ => false
+    | .ok visibility => context.signatures.dataTypes.any fun dataType =>
+        match visibility.constructorVisibilityForDeclaration? dataType.id with
+        | some (.visible names) => names.contains name
+        | _ => false
+
 def freshTypes : Nat → State → List Ty × State
   | 0, state => ([], state)
   | count + 1, state =>
@@ -1675,6 +1697,17 @@ mutual
               names := seen
               state
             }
+          else if sameNameConstructorVisible context name.value then
+            -- A constructor that shares its type's name, written bare, is that constructor:
+            -- `name.name` with no arguments, its source kept as written.
+            let result ← inferMatchPatternFlatFuel fuel context
+              { span := pattern.span, value := .constructor none [name] name none } expected
+              seen state
+            pure { result with source := .binder pattern.span name.value }
+          else if constructorLeafVisible context name.value then
+            -- Any other visible constructor of that spelling is refused, as upstream's `SC0106`
+            -- refuses it, whatever the scrutinee's type.
+            throw (.unqualifiedConstructorPattern name.value)
           else
             if seen.contains name.value then
               throw (.duplicatePatternBinder name.value)

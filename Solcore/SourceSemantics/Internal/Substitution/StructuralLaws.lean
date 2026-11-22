@@ -4202,6 +4202,9 @@ theorem MatchPatternSourceRepresents.applyParameters
   | uint256Word => exact .uint256Word
   | group inner induction => exact .group induction
   | boolLiteral spelling => exact .boolLiteral spelling
+  | sameNameConstructor spelling =>
+      exact .sameNameConstructor
+        (StructuralSubstitution.ConstructorPatternSpellingValid.applyParameters spelling)
 
 theorem PatternInstructionIrrefutable.applyParameters
     {substitution : ParameterSubstitution}
@@ -12253,6 +12256,8 @@ theorem MatchPatternSourceRepresents.applySubstitution
   | uint256Word => exact .uint256Word
   | group inner induction => exact .group induction
   | boolLiteral spelling => exact .boolLiteral spelling
+  | sameNameConstructor spelling =>
+      exact .sameNameConstructor (ConstructorPatternSpellingValid.applySubstitution closes spelling)
 
 /-- Flexible substitution preserves declarative irrefutability of one prefix
 pattern instruction. -/

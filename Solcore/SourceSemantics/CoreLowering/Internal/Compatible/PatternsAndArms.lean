@@ -413,6 +413,39 @@ theorem rootInstructions_sound (compilation : Compilation) (context : Context)
         subst instructions
         exact ⟨0, rfl, .boolLiteral same⟩
       · simp [same, Functor.map, Except.map] at accepted
+    case constructor instantiation arguments =>
+      generalize selectedEq : compilation.signatures.dataTypes.filter
+        (fun signature => decide (signature.id = instantiation.constructor.dataType)) = selected at accepted
+      cases selected with
+      | nil => contradiction
+      | cons signature tail =>
+        cases tail with
+        | cons => contradiction
+        | nil =>
+          dsimp only at accepted
+          generalize constructorEq : signature.constructors.filter
+            (fun constructor => decide (constructor.id = instantiation.constructor)) = constructors at accepted
+          cases constructors with
+          | nil => contradiction
+          | cons constructor rest =>
+            cases rest with
+            | cons => contradiction
+            | nil =>
+              dsimp only at accepted
+              by_cases same : constructor.name = name
+              · simp [same, pure, Except.pure] at accepted
+                subst instructions
+                refine ⟨0, rfl, .sameNameConstructor ?_⟩
+                have selectedMember : signature ∈ compilation.signatures.dataTypes.filter
+                    (fun signature => decide (signature.id = instantiation.constructor.dataType)) := by
+                  rw [selectedEq]; simp
+                have constructorMember : constructor ∈ signature.constructors.filter
+                    (fun constructor => decide (constructor.id = instantiation.constructor)) := by
+                  rw [constructorEq]; simp
+                simp only [List.mem_filter, decide_eq_true_eq] at selectedMember constructorMember
+                exact ⟨signature, signatures ▸ selectedMember.1, constructor, constructorMember.1,
+                  constructorMember.2, same⟩
+              · simp [same, Functor.map, Except.map] at accepted
     rename_i binder
     by_cases same : binder.name = name
     · simp [same, pure, Except.pure] at accepted
@@ -3899,6 +3932,7 @@ theorem source_arity_unique
   | uint256Word => cases right; rfl
   | group inner ih => cases right with | group other => exact ih other
   | boolLiteral => cases right; rfl
+  | sameNameConstructor => cases right; rfl
 
 theorem instruction_binders
     {context : SourceSemantics.Context} {instructions rest : List MatchPatternInstruction}
