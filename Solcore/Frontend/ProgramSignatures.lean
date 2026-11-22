@@ -39,7 +39,7 @@ def spelling : BuiltinFunctionId → String
   | .wordOpcode op => "std.opcodes." ++ op.name
 
 /-- Whether a reference's name may denote the function: its spelling, or any name for an opcode,
-which an import of `std.opcodes` binds, an alias among them. -/
+which an import of `std.opcodes` binds, an alias among them, or upstream's `primAddWord`. -/
 def namedBy (function : BuiltinFunctionId) (name : String) : Bool :=
   name == function.spelling || function.opcode?.isSome
 
@@ -85,13 +85,17 @@ def scheme (function : BuiltinFunctionId) : TypeSystem.Scheme :=
 end BuiltinFunctionId
 
 /-- Resolve the deliberately small exact bare compiler-function namespace: the
-closures by their spelling, then the conversions by their type's name. An
-opcode has no bare name. -/
+closures by their spelling, the opcode `add` by upstream's primitive name
+`primAddWord`, then the conversions by their type's name. No other opcode has a
+bare name. Like upstream's builtin terms, these come after the names a module
+declares or imports, at both identifier sites (`builtinNamed?`). -/
 def builtinFunctionNamed? (name : String) : Option BuiltinFunctionId :=
   match BuiltinFunctionId.all.find? fun function =>
       function.opcode?.isNone && function.spelling == name with
   | some function => some function
-  | none => (TypeSystem.FixedInteger.ofName? name).map .fixedFromWord
+  | none =>
+      if name = "primAddWord" then some (.wordOpcode .add)
+      else (TypeSystem.FixedInteger.ofName? name).map .fixedFromWord
 
 /-- The concrete trait-predicate representation used by whole-program source
 checking. -/

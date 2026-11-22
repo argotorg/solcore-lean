@@ -10,7 +10,9 @@ verdict; an accepted one runs at 9 and 2^256 − 1 and gives the results upstrea
 gives. std's other modules bind no name, so a name resolves past their imports, and a name they
 export is refused where it is used (`testBesideStandardModules`). A plain import's last component
 and full path, and a namespace import's alias, qualify the module's functions (`testQualified`).
-Operators beside a bound name follow upstream's three kinds (`testOperators`).
+Operators beside a bound name follow upstream's three kinds (`testOperators`). Upstream's primitive
+`primAddWord` is the builtin `add` wherever no local, declaration or import takes its name
+(`testPrimAddWord`).
 -/
 
 set_option autoImplicit false
@@ -241,12 +243,40 @@ private def testQualified : IO Unit := do
     "std.opcodes.div(a0, 4)" "check"
   expectRefused "no import, a qualified call" [] [] "opcodes.div(a0, 4)" "check"
 
+/-- `primAddWord`, upstream's builtin term for word addition: in scope with no import and beside
+std and `std.opcodes`, below a program's own function of its name, whatever its type, and an import
+that binds the name, and refused at a wrong arity or type. As a value it is the builtin, which
+upstream's checker types and its Hull lowering refuses (`SC0422`). -/
+private def testPrimAddWord : IO Unit := do
+  expectResults "no import" [] [] "primAddWord(a0, 1)" [10, 0]
+  expectResults "literal operands" [] [] "primAddWord(1, 2)" [3, 3]
+  expectResults "a std wildcard" ["import * from std;"] [] "primAddWord(a0, 1)" [10, 0]
+  expectResults "a std.opcodes wildcard" ["import * from std.opcodes;"] [] "primAddWord(a0, 1)"
+    [10, 0]
+  expectResults "a program's own primAddWord" []
+    ["function primAddWord(x: word, y: word) returns (word) { return x; }"] "primAddWord(a0, 1)"
+    [9, maximum]
+  expectResults "a program's own primAddWord of another type" []
+    ["function primAddWord(x: bool) returns (word) { return 5; }"] "primAddWord(true)" [5, 5]
+  expectResults "an import binding the name" ["import { sub as primAddWord } from std.opcodes;"] []
+    "primAddWord(a0, 1)" [8, maximum - 1]
+  expectResults "upstream's Add at word through primAddWord" []
+    ["trait Add<t> { function add(l: t, r: t) returns (t); }",
+      "impl Add<word> { function add(l: word, r: word) returns (word) " ++
+        "{ return primAddWord(l, r); } }"]
+    "a0 + 1" [10, 0]
+  expectResults "a value" [] [apply] "apply(primAddWord, a0)" [13, 3]
+  expectRefused "a wrong arity" [] [] "primAddWord(a0)" "check"
+  expectRefused "a bool operand" [] [] "primAddWord(true, a0)" "check"
+  expectRefused "a uint256 operand" ["import * from std;"] [] "primAddWord(uint256(a0), a0)" "check"
+
 def run : IO Unit := do
   testAccepted
   testRefused
   testBesideStandardModules
   testQualified
   testOperators
+  testPrimAddWord
   IO.println "std.opcodes and std imports, operators: upstream's forms and results GREEN"
 
 end Tests.StdOpcodes

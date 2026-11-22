@@ -142,7 +142,8 @@ private def integerHelpers : List BuiltinFunctionId :=
   [.integerSub, .wordFromInteger, .integerAdd, .integerEq, .integerLt, .integerMul, .wordToInteger]
 
 /-- The catalog keeps the integer helpers' places and names and appends the opcodes, which take
-their words and give a word, and which no bare name reaches. -/
+their words and give a word, and which no bare name reaches but `add`, whose upstream primitive
+`primAddWord` names it. -/
 private def testCatalog : IO Unit := do
   assertTrue (decide (BuiltinFunctionId.all = integerHelpers ++ WordOpcode.all.map .wordOpcode))
     "the catalog is not the integer helpers followed by the opcodes"
@@ -165,6 +166,9 @@ private def testCatalog : IO Unit := do
     assertTrue (function.parameterTypes == List.replicate op.arity .word &&
         function.returnType == .word && function.conversion? == none && function.opcode? == some op)
       s!"{op.name}'s type"
+  assertTrue (builtinFunctionNamed? "primAddWord" == some (.wordOpcode .add) &&
+      builtinFunctionNamed? "primEqWord" == none)
+    "primAddWord is not the builtin add, or another upstream primitive gained a bare name"
 
 def run : IO Unit := do
   testCatalog
