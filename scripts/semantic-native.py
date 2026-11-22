@@ -10,12 +10,11 @@ session decodes to upstream's revert data, with the revert's output.
 Admission is a versioned predicate decided before the native tool runs. It reads the case's
 provenance (its emitter and the Core operations of its program), the adapter's reading of the source
 (one contract with functions only, no storage field, `uint256` parameters, no call of std's
-`tobool`) and, for memory arrays, the source's array forms (std's array traits and a `lidx` call
-with an integer literal index are not admitted). The adapter keeps the source's imports of
-`std.opcodes`, whose pure functions the native frontend provides. Cases that are not admitted are
-counted by reason. A native rejection, crash or different observation of an admitted case is a
-finding, never an exclusion; the known differences from upstream are findings under their own
-labels. Out of fuel and timeouts are inconclusive.
+`tobool`) and, for memory arrays, the source's array forms (std's array traits are not admitted).
+The adapter keeps the source's imports of `std.opcodes`, whose pure functions the native frontend
+provides. Cases that are not admitted are counted by reason. A native rejection, crash or different
+observation of an admitted case is a finding, never an exclusion; the known differences from
+upstream are findings under their own labels. Out of fuel and timeouts are inconclusive.
 
 Cases come from the pure runner's own preparation (`semantic-campaign.py`, with the arguments
 `semantic-suite.py` gives each profile), for the fixed corpora or a seeded random draw; preparation
@@ -55,7 +54,7 @@ runner = suite.pure_campaign
 SCHEMA = "solcore-lean.semantic-native.v1"
 REQUEST_SCHEMA = "solcore-lean.semantic-native-request.v1"
 RESULT_SCHEMA = "solcore-lean.semantic-native-result.v1"
-ADMISSION = "native-admission-v4"
+ADMISSION = "native-admission-v5"
 ADAPTER = "native-lift-v2"
 COMPARISON = "native-compare-v1"
 TOOL = ROOT / ".lake/build/bin/semantic-native-tool"
@@ -91,15 +90,12 @@ EMITTERS = {
 # a module of the native load, so a source that calls it and does not define it is not admitted.
 TOBOOL_CALL = re.compile(r"\btobool\s*\(")
 TOBOOL_DEFINITION = re.compile(r"\bfunction\s+tobool\b")
-# The array forms of the array emitters' sources that this version does not admit, each a reason, in this order:
-# std's array traits, which row 4's Lean side leaves out (its lengths are compiler forms, and it declares no std
-# trait), then a `lidx` call whose index is an integer literal, which Lean leaves open where upstream gives it
-# `uint256` (row 4's difference 25). `literal_lidx_calls` finds those calls.
+# The array form of the array emitters' sources that this version does not admit: std's array traits, which row 4's
+# Lean side leaves out (its lengths are compiler forms, and it declares no std trait). A `lidx` call whose index is an
+# integer literal is admitted since v5: Lean gives the index `uint256` at finalization, as upstream does.
 STD_ARRAY_TRAITS = re.compile(r"\b(?:RValueIdxAccess|LValueIdxAccess|ridx)\b|\bLength\b(?!\s*\.\s*length\b)")
-ARRAY_REASONS = ("std's array trait", "literal lidx index")
+ARRAY_REASONS = ("std's array trait",)
 ARRAY_EMITTERS = frozenset(("solcore-source-memory-arrays-v2",))
-LIDX = re.compile(r"lidx\s*\(")
-INTEGER_LITERAL = re.compile(r"0[xX][0-9a-fA-F]+|[0-9]+")
 # The native errors of row 4's array operations on a base whose type is still open where they are: Lean decides a
 # slice, a length, `toArray`, `lidx` and `CanStore` there (differences 18, 14, 19 and 22 to 24).
 OPEN_ARRAY_BASE = frozenset(('unsupportedExpression "slice"', *(f'operatorNotSupported "{name}" at variable'
@@ -259,67 +255,12 @@ def code_only(text: str) -> str:
     return "".join(kept)
 
 
-def call_arguments(code: str, opening: int) -> tuple[list[str], int] | None:
-    """The arguments of the call or group whose `(` is at `opening`, split at the commas at its own depth, and the
-    index of its `)`; None when it is not closed there."""
-    arguments, start, depth, position = [], opening + 1, 0, opening + 1
-    while position < len(code):
-        after = skip(code, position)
-        if after != position:
-            position = after
-            continue
-        character = code[position]
-        if character in "([{":
-            depth += 1
-        elif character in ")]}":
-            if depth == 0:
-                return (arguments + [code[start:position]], position) if character == ")" else None
-            depth -= 1
-        elif character == "," and depth == 0:
-            arguments.append(code[start:position])
-            start = position + 1
-        position += 1
-    return None
-
-
-def ungrouped(text: str) -> str:
-    """An expression's text without the groups around it: `((1))` is `1`, and `(1, 2)` stays."""
-    text = text.strip()
-    while text.startswith("("):
-        group = call_arguments(text, 0)
-        if group is None or group[1] != len(text) - 1 or len(group[0]) != 1:
-            break
-        text = group[0][0].strip()
-    return text
-
-
-def literal_lidx_calls(code: str) -> list[str]:
-    """The `lidx(a, i)` calls in code, outside its comments and string literals, whose index `i` is an integer
-    literal, perhaps in groups: each as written, with its spaces only after its commas."""
-    found, position = [], 0
-    while position < len(code):
-        after = skip(code, position)
-        if after != position:
-            position = after
-            continue
-        match = LIDX.match(code, position)
-        if match and not (position and (code[position - 1].isalnum() or code[position - 1] in "_.")):
-            call = call_arguments(code, match.end() - 1)
-            if call and len(call[0]) == 2 and INTEGER_LITERAL.fullmatch(ungrouped(call[0][1])):
-                found.append(re.sub(r"\s+", "", code[position:call[1] + 1]).replace(",", ", "))
-        position += 1
-    return found
-
-
 def array_forms(source: str) -> dict[str, list[str]]:
     """The array forms of a source's code that the native path does not read, by reason, each with what was found."""
     code, found = code_only(source), {}
     traits = sorted({match.group(0) for match in STD_ARRAY_TRAITS.finditer(code)})
     if traits:
         found["std's array trait"] = traits
-    calls = sorted(set(literal_lidx_calls(code)))
-    if calls:
-        found["literal lidx index"] = calls
     return found
 
 
@@ -386,7 +327,7 @@ def arguments(contract: dict, count: int) -> list[str] | None:
 
 
 def admission(case: dict) -> dict:
-    """native-admission-v4, decided from the case alone before any native run: the program the native tool reads
+    """native-admission-v5, decided from the case alone before any native run: the program the native tool reads
     with the case's arguments, or the first reason in a fixed order that the case is not admitted."""
     def refuse(reason: str, detail=None) -> dict:
         return {"admitted": False, "reason": reason, "detail": detail}
