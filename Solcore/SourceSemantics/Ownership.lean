@@ -29,12 +29,13 @@ def patternInstructionBinderIds
   instructions.filterMap fun instruction =>
     match instruction with
     | .binder binder => some binder.id
-    | .wildcard | .integerLiteral .. | .constructor .. | .tuple .. | .uint256Word => none
+    | .wildcard | .integerLiteral .. | .constructor .. | .tuple .. | .uint256Word
+    | .boolLiteral _ => none
 
 /-- Binder identities introduced by a resolved pattern root and its children. -/
 def patternBinderIds (pattern : TypedMatchPattern) : List Resolved.LocalId :=
   match pattern.resolution with
-  | .wildcard | .integerLiteral .. => []
+  | .wildcard | .integerLiteral .. | .boolLiteral _ => []
   | .binder binder => [binder.id]
   | .constructor _ arguments | .tuple arguments | .uint256Word arguments =>
       patternInstructionBinderIds arguments

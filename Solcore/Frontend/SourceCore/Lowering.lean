@@ -172,6 +172,13 @@ def ensureType (site : SourceCoreElaboration.ErrorSite) (expected actual : Core.
     Except Error Unit :=
   if expected = actual then .ok () else .error (.typeMismatch site expected actual)
 
+/-- The matcher of a `true` or `false` pattern at a `bool` scrutinee of Core type `type`:
+`inRight` when the scrutinee is `value`, `inLeft` otherwise. -/
+def boolPatternMatcher (type : Core.Ty) (value : Bool) : Core.Expr :=
+  .lambda type (.sum .unit .unit)
+    (if value then .ifE (.var 0) (.inRight .unit .unit) (.inLeft .unit .unit)
+      else .ifE (.var 0) (.inLeft .unit .unit) (.inRight .unit .unit))
+
 def projectType (site : SourceCoreElaboration.ErrorSite) (type : TypeSystem.Ty) :
     Except Error Core.Ty :=
   (SourceCoreElaboration.lowerType site type).mapError Error.typeProjection

@@ -477,7 +477,7 @@ private theorem patternInstruction_typedRest_length_lt
       rest.length < instructions.length)
     (motive_2 := fun instructions _ _ _ rest _ =>
       rest.length ≤ instructions.length)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   all_goals intros
   all_goals try simp_all only [List.length_cons]
   all_goals omega
@@ -497,6 +497,7 @@ private theorem matchPattern_rootArity_eq
   | constructor => cases right_represents; rfl
   | tuple => cases right_represents; rfl
   | uint256Word => cases right_represents; rfl
+  | boolLiteral => cases right_represents; rfl
   | group _ induction =>
       cases right_represents with
       | group inner => exact induction inner
@@ -556,6 +557,9 @@ mutual
         | uint256Word argument_matched =>
             exact PatternInstructionsMatch.preservesTyping argument_type (.cons (.word _) .nil)
               argument_matched
+    | boolLiteral =>
+        cases matched
+        exact ⟨rfl, .nil, rfl⟩
     termination_by instructions.length * 2
     decreasing_by
       all_goals simp_all
@@ -648,6 +652,7 @@ mutual
         exact PatternInstructionsHaveTypes.patternBinders_monomorphic elements
     | uint256Word argument =>
         exact PatternInstructionsHaveTypes.patternBinders_monomorphic argument
+    | boolLiteral => simp
     termination_by instructions.length * 2
     decreasing_by all_goals simp_all; all_goals omega
 
@@ -730,6 +735,7 @@ mutual
                 argument_type (.cons (.word word) .nil) argument_irrefutable with
               ⟨bindings, argument_matched, rest_eq⟩
             exact ⟨bindings, .uint256Word argument_matched, rest_eq⟩
+    | boolLiteral => cases irrefutable
     termination_by instructions.length * 2
     decreasing_by
       all_goals simp_all
@@ -796,6 +802,7 @@ theorem rootArity_eq
   | constructor => cases right_represents; rfl
   | tuple => cases right_represents; rfl
   | uint256Word => cases right_represents; rfl
+  | boolLiteral => cases right_represents; rfl
   | group _ induction =>
       cases right_represents with
       | group inner => exact induction inner

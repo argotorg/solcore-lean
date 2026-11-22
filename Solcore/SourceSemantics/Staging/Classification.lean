@@ -182,7 +182,8 @@ def instructionBinders : MatchPatternInstruction → List TypedBinder
   | .integerLiteral _ _
   | .constructor _ _
   | .tuple _
-  | .uint256Word => []
+  | .uint256Word
+  | .boolLiteral _ => []
 
 /-- Every binder retained by a pattern resolution, including nested prefix
 instructions, in source order. -/
@@ -192,7 +193,8 @@ def patternBinders : MatchPatternResolution → List TypedBinder
   | .tuple instructions
   | .uint256Word instructions => instructions.flatMap instructionBinders
   | .wildcard
-  | .integerLiteral _ _ => []
+  | .integerLiteral _ _
+  | .boolLiteral _ => []
 
 /-- All argument occurrences of a direct call are compile-time values. -/
 def AllComptime (stages : List Stage) : Prop :=

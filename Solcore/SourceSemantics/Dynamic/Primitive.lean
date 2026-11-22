@@ -1704,6 +1704,8 @@ mutual
     | uint256Word {instructions rest}
         (argument : PatternInstructionsSkip instructions 1 rest) :
         PatternInstructionSkips (.uint256Word :: instructions) rest
+    | boolLiteral {rest value} :
+        PatternInstructionSkips (.boolLiteral value :: rest) rest
 
   /-- Consume exactly `count` consecutive self-delimiting instructions. -/
   inductive PatternInstructionsSkip :
@@ -1764,6 +1766,9 @@ mutual
           bindings rest) :
         PatternInstructionMatches context (.word word) (.uint256Word :: instructions)
           bindings rest
+    /-- `true` or `false` matches exactly that boolean. -/
+    | boolLiteral {value rest} :
+        PatternInstructionMatches context (.bool value) (.boolLiteral value :: rest) [] rest
 
   /-- Match a source-ordered value vector against the same number of prefix
   pattern trees.  Appending head bindings before tail bindings fixes binding

@@ -533,6 +533,7 @@ theorem tree_binding_ids {compilation : CompatiblePatternCertificates.Compilatio
   | constructor projection result count resolved coreType raw children projectedChildren registered ih => exact ih
   | uint256Word projection argument coreType ih =>
     simpa [MatchPatternInstruction.binderIds] using ih
+  | boolLiteral projection coreType => rfl
   | nil => rfl
   | cons head tail headIH tailIH =>
     simp only [List.flatMap_cons, List.map_append]

@@ -1952,7 +1952,7 @@ private def patternLiterals (pattern : TypedMatchPattern) :
   | .constructor _ instructions
   | .tuple instructions
   | .uint256Word instructions => patternLiteralResolutions instructions
-  | .wildcard | .binder _ => []
+  | .wildcard | .binder _ | .boolLiteral _ => []
 
 private def validatePatternMetadata (function : CheckedFunction)
     (pattern : TypedMatchPattern) : Except RuntimeError Unit := do

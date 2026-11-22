@@ -179,6 +179,11 @@ mutual
           let (argument, rest) ← compileOne context source site span scope fuel TypeSystem.Ty.word rest
           SourceCoreBasic.ensureType (.occurrence site.occurrence) type argument.type
           pure (argument, rest)
+      | .boolLiteral value =>
+          -- `true` or `false` tests the boolean.
+          unless expected = TypeSystem.Ty.bool do throw invalid
+          SourceCoreBasic.ensureType (.occurrence site.occurrence) type .bool
+          pure (⟨type, [], [], SourceCoreBasic.boolPatternMatcher type value⟩, rest)
       | .constructor instantiation arity =>
           unless instantiation.resultType = expected && arity = instantiation.payloadTypes.length do throw invalid
           let constructor ← (context.checked.resolveConstructor instantiation)
@@ -224,6 +229,9 @@ def rootInstructions (context : Context) : MatchPatternSource → MatchPatternRe
   | .binder _ name, .binder binder => do
       unless binder.name = name do throw invalid
       pure [.binder binder]
+  | .binder _ name, .boolLiteral value => do
+      unless name = boolPatternSpelling value do throw invalid
+      pure [.boolLiteral value]
   | .constructor _ _ _ name count, .constructor instantiation instructions => do
       let signatures := context.signatures.dataTypes.filter (fun signature =>
         decide (signature.id = instantiation.constructor.dataType))

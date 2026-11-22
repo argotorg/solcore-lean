@@ -2747,7 +2747,7 @@ private theorem pattern_call_isolation (protectedVars : List TypeVarId) (fuel : 
       rename_i unified
       exact PatternIsolation.of_binders_eq raw
         (congrArg LexicalScope.binders (Detail.unify_preserves_lexicalScope unified))
-  case case10 =>
+  case case11 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
       flatArguments notUint256 contextualBranch childrenIH
@@ -2776,7 +2776,7 @@ private theorem pattern_call_isolation (protectedVars : List TypeVarId) (fuel : 
           (fun metavariable member => Nat.lt_of_lt_of_le (bound metavariable member) beforeChildren.2.1.next_le)
           (fun type member => (beforeChildren.2.2.2 type member).2) beforeChildren.1.2.1 prefixRaw.1 (by assumption)
         exact prefixRaw.trans child
-  case case11 =>
+  case case12 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq branchEq
       flatArguments notUint256 explicitBranch childrenIH
@@ -2805,7 +2805,18 @@ private theorem pattern_call_isolation (protectedVars : List TypeVarId) (fuel : 
           (fun metavariable member => Nat.lt_of_lt_of_le (bound metavariable member) beforeChildren.2.1.next_le)
           (fun type member => (beforeChildren.2.2.2 type member).2) beforeChildren.1.2.1 prefixRaw.1 (by assumption)
         exact prefixRaw.trans child
-  case case12 =>
+  case case8 =>
+    intros
+    unfold PatternCallIsolation at *
+    intro result ready expectedBelow formation bound expectedSafe live raw success
+    unfold Detail.inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all
+    all_goals try subst_vars
+    exact unify_raw raw (by assumption)
+  case case13 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq argument
       selectedEq childrenIH
@@ -2825,7 +2836,7 @@ private theorem pattern_call_isolation (protectedVars : List TypeVarId) (fuel : 
       (fun metavariable member => Nat.lt_of_lt_of_le (bound metavariable member) beforeChildren.2.1.next_le)
       (fun type member => (beforeChildren.2.2.2 type member).2) beforeChildren.1.2.1 prefixRaw.1 (by assumption)
     exact prefixRaw.trans child
-  case case14 =>
+  case case15 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold PatternCallIsolation at *
@@ -2854,7 +2865,7 @@ private theorem pattern_call_isolation (protectedVars : List TypeVarId) (fuel : 
         rw [← argumentTypesEq]
         simpa only [sources] using (by assumption))
     exact prefixRaw.trans child
-  case case18 =>
+  case case19 =>
     intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
     unfold PatternsCallIsolation
     unfold PatternCallIsolation at ihHead
@@ -3100,21 +3111,6 @@ private theorem flatPatternTracking (start : State) (fuel : Nat) (context : Fron
     all_goals try cases success
     all_goals simp_all [pure, Pure.pure, Except.pure]
     all_goals exact (integerPatternsTracking (tracked.fresh.addRequirementWithId _) _).unify (by assumption)
-  case case10 =>
-    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel leadingDot qualifiers constructorName sourceArguments
-      patternEq branchEq flatArguments notUint256 branch childrenIH
-    unfold PatternProperty at *
-    intro result success tracked
-    unfold Detail.inferMatchPatternFlatFuel at success
-    simp_all [bind, Except.bind]
-    repeat' first | split at success
-    all_goals try cases success
-    all_goals simp_all [pure, Pure.pure, Except.pure]
-    all_goals try subst_vars
-    all_goals first
-      | exact childrenIH _ _ _ (by assumption) (tracked.unify (by assumption))
-      | exact childrenIH _ _ _ (by assumption)
-          ((tracked.freshDataConstructorInstantiation _ _).unify (by assumption))
   case case11 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel leadingDot qualifiers constructorName sourceArguments
       patternEq branchEq flatArguments notUint256 branch childrenIH
@@ -3131,6 +3127,32 @@ private theorem flatPatternTracking (start : State) (fuel : Nat) (context : Fron
       | exact childrenIH _ _ _ (by assumption)
           ((tracked.freshDataConstructorInstantiation _ _).unify (by assumption))
   case case12 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel leadingDot qualifiers constructorName sourceArguments
+      patternEq branchEq flatArguments notUint256 branch childrenIH
+    unfold PatternProperty at *
+    intro result success tracked
+    unfold Detail.inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    all_goals first
+      | exact childrenIH _ _ _ (by assumption) (tracked.unify (by assumption))
+      | exact childrenIH _ _ _ (by assumption)
+          ((tracked.freshDataConstructorInstantiation _ _).unify (by assumption))
+  case case8 =>
+    intros
+    unfold PatternProperty at *
+    intro result success tracked
+    unfold Detail.inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all
+    all_goals try subst_vars
+    exact tracked.unify (by assumption)
+  case case13 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq argument
       selectedEq childrenIH
@@ -3143,7 +3165,7 @@ private theorem flatPatternTracking (start : State) (fuel : Nat) (context : Fron
     all_goals simp_all
     all_goals try subst_vars
     exact childrenIH _ _ (by assumption) (tracked.unify (by assumption))
-  case case14 =>
+  case case15 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold PatternProperty at *
     intro result success tracked
@@ -3158,7 +3180,7 @@ private theorem flatPatternTracking (start : State) (fuel : Nat) (context : Fron
     have freshTracked := freshTypesTracking tracked sources.length
     rw [freshEq] at freshTracked
     exact childrenIH _ _ childAccepted (freshTracked.unify unifyAccepted)
-  case case18 =>
+  case case19 =>
     intros fuel head rest expectedHead expectedTail seen state headIH tailIH
     unfold PatternProperty at *
     intro result success tracked

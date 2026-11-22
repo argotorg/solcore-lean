@@ -738,6 +738,7 @@ private theorem instruction_binders {context : Context}
     intro value bindings sourceRest matched
     cases matched with
     | uint256Word children => exact ih rfl children
+  | boolLiteral => intro value bindings sourceRest matched; cases matched; exact ⟨rfl, rfl⟩
   | nil =>
     rename_i values bindings sourceRest length matched
     have empty : values = [] := by simpa using length

@@ -5240,6 +5240,67 @@ def runUint256Patterns : IO Unit := do
     ["function bad(x: uint256) returns (Word) { match (x) { case uint256(a, b) { return a; } } }"]
   IO.println "SOURCE_CORE_UINT256_PATTERNS_PASS: case uint256(p) through the public API, every uint256 value matching uint256(w) with w its word, a literal, a wildcard and a group inside, two inside a tuple, an open scrutinee taking uint256, and uint8(w) and int256(w), uint256(w) at Word and uint8, and two patterns inside rejected"
 
+/-- The boolean literal pattern: `true` and `false` in a pattern name the booleans, as they do
+in an expression, as upstream reads them. `flag` and `pair` are the match probes `m4` and `m8`
+with a catch-all after them, as `m4c` and `m8c` measure them on upstream's driver. -/
+private def boolPatternWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "enum Pair<a> { Pair(Bool, a) }",
+  "function flag(a: Bool) returns (Word) { match (a) { case true { return 1; } case false { return 2; } case _ { return 3; } } }",
+  "function pair(p: Pair<Word>) returns (Word) { match (p) { case Pair.Pair(true, x) { return 1; } case Pair.Pair(false, x) { return 2; } case _ { return 3; } } }",
+  "function pairTrue() returns (Word) { return pair(Pair.Pair(true, 5)); }",
+  "function pairFalse() returns (Word) { return pair(Pair.Pair(false, 5)); }",
+  "function both(a: Bool, b: Bool) returns (Word) { match (a, b) { case (true, true) { return 1; } case (false, y) { return 2; } case (_, _) { return 3; } } }",
+  "function grouped(a: Bool) returns (Word) { match (a) { case (false) { return 4; } case _ { return 5; } } }",
+  "function bound() returns (Word) { let x = false; match (x) { case false { return 6; } case _ { return 7; } } }"]
+
+private def boolPatternNames : List String :=
+  ["flag", "pairTrue", "pairFalse", "both", "grouped", "bound"]
+
+/-- The boolean literal pattern through the public API: each arm runs for its own boolean, a
+repeated `true` binds nothing, and a group and a `let`-bound scrutinee take `bool`. A match on `bool`
+with no catch-all, `m4`, and one that splits a payload's boolean, `m8`, are refused as
+non-exhaustive until upstream's coverage joins `MatchExhaustive`; `m9`, which upstream refuses,
+and upstream's `typeck/tuple_nested_nonexhaustive` are refused, and `true` at `Word` is a type
+error. -/
+def runBoolPatterns : IO Unit := do
+  let program ← get "bool pattern check" (checkProgram boolPatternWorkspace)
+  let seeds ← boolPatternNames.mapM (seed program)
+  let compiled ← get "bool pattern compilation"
+    (compile boolPatternWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match boolPatternNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"bool pattern root {name} missing")
+    | none => throw (IO.userError s!"bool pattern {name} unknown")
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × List Value × Value) := [
+    ("flag", [boolean true], word 1), ("flag", [boolean false], word 2),
+    ("pairTrue", [], word 1), ("pairFalse", [], word 2),
+    ("both", [boolean true, boolean true], word 1), ("both", [boolean false, boolean true], word 2),
+    ("both", [boolean true, boolean false], word 3),
+    ("grouped", [boolean false], word 4), ("grouped", [boolean true], word 5),
+    ("bound", [], word 6)]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) arguments
+    require (completed.value == expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  let _ := session
+  -- `m4` and `m8` with no catch-all, which upstream accepts, wait for upstream's coverage.
+  rejectedByInference "m4, a bool match with no catch-all"
+    ["function flag(a: Bool) returns (Word) { match (a) { case true { return 1; } case false { return 2; } } }"]
+  rejectedByInference "m8, a payload's boolean split with no catch-all"
+    ["enum Pair<a> { Pair(Bool, a) }",
+      "function pair(p: Pair<Word>) returns (Word) { match (p) { case Pair.Pair(true, x) { return x; } case Pair.Pair(false, x) { return x + 100; } } }"]
+  -- Upstream refuses these two (`SC0302`).
+  rejectedByInference "m9, a payload's false missing"
+    ["enum Pair<a> { Pair(Bool, a) }",
+      "function pair(p: Pair<Word>) returns (Word) { match (p) { case Pair.Pair(true, x) { return x; } } }"]
+  rejectedByInference "tuple_nested_nonexhaustive"
+    ["function nested(p: ((), (Bool, Word))) returns (Word) { match (p) { case ((), (true, x)) { return x; } } }"]
+  rejectedByInference "true at Word"
+    ["function bad(x: Word) returns (Word) { match (x) { case true { return 1; } case _ { return 0; } } }"]
+  IO.println "SOURCE_CORE_BOOL_PATTERNS_PASS: case true and case false through the public API, each arm for its own boolean in a bool match and in a payload as the m4c and m8c probes give upstream's 2, a repeated true in a tuple binding nothing, a group and a let-bound scrutinee taking bool; m4 and m8 with no catch-all refused until upstream's coverage, m9 and tuple_nested_nonexhaustive refused as upstream refuses them, and true at Word rejected"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -6110,6 +6171,7 @@ def run : IO Unit := do
   runConversions
   runTypedef
   runUint256Patterns
+  runBoolPatterns
   runUpstreamFixtures
   runUpstreamArrayFixtures
   runArrayElementCases

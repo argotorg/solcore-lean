@@ -1007,6 +1007,10 @@ theorem Tree.binding_types {compilation : Compilation} {context : SourceSemantic
         cases tail
         cases represented with
         | fixed => simpa using ih _ _ _ _ (.word _) head
+  | boolLiteral projection coreType =>
+    intro sourceValue value bindings sourceRest represented matched
+    cases matched
+    exact ⟨[], rfl, .nil⟩
   | nil =>
     intro sources values bindings sourceRest represented matched
     cases represented

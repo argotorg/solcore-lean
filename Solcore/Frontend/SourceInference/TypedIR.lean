@@ -179,6 +179,8 @@ inductive MatchPatternInstruction where
   /-- `uint256(p)`: a `uint256` value, whose word the one pattern that follows
   matches at `word`. A `uint256` value is its word. -/
   | uint256Word
+  /-- `true` or `false`: a `bool` value equal to `value`. -/
+  | boolLiteral (value : Bool)
   deriving Repr, BEq, DecidableEq
 
 /-- The supported semantic classification of one source match pattern. -/
@@ -194,7 +196,14 @@ inductive MatchPatternResolution where
   | tuple (elements : List MatchPatternInstruction)
   /-- `uint256(p)`, with the instructions of `p`. -/
   | uint256Word (argument : List MatchPatternInstruction)
+  /-- `true` or `false`, as an expression reads the names. -/
+  | boolLiteral (value : Bool)
   deriving Repr, BEq, DecidableEq
+
+/-- The spelling of a boolean literal pattern, which is a binder's spelling
+in the source: `true` or `false`. -/
+def boolPatternSpelling (value : Bool) : String :=
+  if value then "true" else "false"
 
 /-- A source-preserving pattern carrier for the initial executable match
 profile.  Numeric patterns own their exact builtin-`Int` requirement just as
@@ -802,6 +811,7 @@ def applySubstitution (substitution : Substitution) :
       .constructor (instantiation.applySubstitution substitution) argumentCount
   | .tuple elementCount => .tuple elementCount
   | .uint256Word => .uint256Word
+  | .boolLiteral value => .boolLiteral value
 
 end MatchPatternInstruction
 
@@ -821,6 +831,7 @@ def applySubstitution (substitution : Substitution) :
       .tuple (elements.map (MatchPatternInstruction.applySubstitution substitution))
   | .uint256Word argument =>
       .uint256Word (argument.map (MatchPatternInstruction.applySubstitution substitution))
+  | .boolLiteral value => .boolLiteral value
 
 end MatchPatternResolution
 
@@ -933,7 +944,8 @@ def binderIds (instructions : List MatchPatternInstruction) :
   instructions.filterMap fun instruction =>
     match instruction with
     | .binder selectedBinder => some selectedBinder.id
-    | .wildcard | .integerLiteral .. | .constructor .. | .tuple .. | .uint256Word => none
+    | .wildcard | .integerLiteral .. | .constructor .. | .tuple .. | .uint256Word
+    | .boolLiteral _ => none
 
 end MatchPatternInstruction
 
@@ -943,7 +955,7 @@ namespace TypedMatchPattern
 children. -/
 def binderIds (pattern : TypedMatchPattern) : List Resolved.LocalId :=
   match pattern.resolution with
-  | .wildcard | .integerLiteral .. => []
+  | .wildcard | .integerLiteral .. | .boolLiteral _ => []
   | .binder selectedBinder => [selectedBinder.id]
   | .constructor _ arguments | .tuple arguments | .uint256Word arguments =>
       MatchPatternInstruction.binderIds arguments

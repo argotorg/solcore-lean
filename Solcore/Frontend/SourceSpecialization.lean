@@ -181,6 +181,7 @@ def applyMatchPatternInstruction (substitution : ParameterSubstitution) :
         argumentCount
   | .tuple elementCount => .tuple elementCount
   | .uint256Word => .uint256Word
+  | .boolLiteral value => .boolLiteral value
 
 def applyMatchPatternResolution (substitution : ParameterSubstitution) :
     MatchPatternResolution → MatchPatternResolution
@@ -196,6 +197,7 @@ def applyMatchPatternResolution (substitution : ParameterSubstitution) :
       .tuple (elements.map (applyMatchPatternInstruction substitution))
   | .uint256Word argument =>
       .uint256Word (argument.map (applyMatchPatternInstruction substitution))
+  | .boolLiteral value => .boolLiteral value
 
 def applyTypedMatchPattern (substitution : ParameterSubstitution)
     (pattern : TypedMatchPattern) : TypedMatchPattern := {
@@ -450,13 +452,14 @@ private def dataInstantiationTypes
 private def matchInstructionTypes : MatchPatternInstruction → List Ty
   | .wildcard
   | .tuple _
-  | .uint256Word => []
+  | .uint256Word
+  | .boolLiteral _ => []
   | .integerLiteral _ resolution => [resolution.targetType]
   | .binder selectedBinder => [selectedBinder.scheme.body]
   | .constructor instantiation _ => dataInstantiationTypes instantiation
 
 private def matchResolutionTypes : MatchPatternResolution → List Ty
-  | .wildcard => []
+  | .wildcard | .boolLiteral _ => []
   | .integerLiteral _ resolution => [resolution.targetType]
   | .binder selectedBinder => [selectedBinder.scheme.body]
   | .constructor instantiation arguments =>

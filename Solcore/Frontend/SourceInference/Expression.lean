@@ -1663,18 +1663,31 @@ mutual
           | .string _ =>
               .error (.unsupportedPattern pattern.span "string literal")
       | .binder name => do
-          if seen.contains name.value then
-            throw (.duplicatePatternBinder name.value)
-          let (binder, state) := state.allocateBinder name.value
-            (.mono (state.resolve expected)) (some name.span)
-          pure {
-            source := .binder pattern.span name.value
-            resolution := .binder binder
-            instructions := [.binder binder]
-            requirements := []
-            names := seen ++ [name.value]
-            state
-          }
+          -- `true` and `false` name the booleans, as they do in an expression, and bind
+          -- nothing.
+          if name.value == "true" || name.value == "false" then
+            let state ← unify state expected .bool
+            pure {
+              source := .binder pattern.span name.value
+              resolution := .boolLiteral (name.value == "true")
+              instructions := [.boolLiteral (name.value == "true")]
+              requirements := []
+              names := seen
+              state
+            }
+          else
+            if seen.contains name.value then
+              throw (.duplicatePatternBinder name.value)
+            let (binder, state) := state.allocateBinder name.value
+              (.mono (state.resolve expected)) (some name.span)
+            pure {
+              source := .binder pattern.span name.value
+              resolution := .binder binder
+              instructions := [.binder binder]
+              requirements := []
+              names := seen ++ [name.value]
+              state
+            }
       | .constructor leadingDot qualifiers name arguments => do
           let qualifierNames := qualifiers.map (·.value)
           let sourceArguments := arguments.map (·.elements.toList) |>.getD []
@@ -1798,7 +1811,7 @@ mutual
         | fuel + 1 =>
             match instruction with
             | .wildcard | .binder _ => some (true, rest)
-            | .integerLiteral .. => some (false, rest)
+            | .integerLiteral .. | .boolLiteral _ => some (false, rest)
             | .constructor _ count => do
                 let (_, rest) ← consumeIrrefutableInstructions fuel count rest
                 pure (false, rest)
@@ -1841,7 +1854,7 @@ def typedPatternIsCatchall (pattern : TypedMatchPattern) : Bool :=
       match consumeIrrefutableInstructions (instructions.length + 1) 1 instructions with
       | some (true, []) => true
       | _ => false
-  | .integerLiteral .. | .constructor .. => false
+  | .integerLiteral .. | .constructor .. | .boolLiteral _ => false
 
 def exhaustsNominalConstructors (context : Context) (state : State)
     (scrutineeType : Ty) (cases : List TypedMatchCase) : Bool :=

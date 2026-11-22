@@ -4052,7 +4052,7 @@ theorem PatternInstructionHasType.applyParameters
         (types.map substitution.apply) requirements
         (binders.map (applyBinder substitution))
         (rest.map (applyMatchPatternInstruction substitution)))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intro rest type
     exact .wildcard
   · intro rest source resolution valid
@@ -4081,6 +4081,10 @@ theorem PatternInstructionHasType.applyParameters
     simpa [applyMatchPatternInstruction] using
       (PatternInstructionHasType.uint256Word
         (context := applyContext substitution context) argumentInduction)
+  · intro rest value
+    simpa [applyMatchPatternInstruction, TypeSystem.Ty.bool] using
+      (PatternInstructionHasType.boolLiteral (context := applyContext substitution context)
+        (rest := rest.map (applyMatchPatternInstruction substitution)) (value := value))
   · intro instructions
     exact .nil
   · intro instructions afterHead rest type types headRequirements
@@ -4115,7 +4119,7 @@ theorem PatternInstructionsHaveTypes.applyParameters
         (types.map substitution.apply) requirements
         (binders.map (applyBinder substitution))
         (rest.map (applyMatchPatternInstruction substitution)))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intro rest type
     exact .wildcard
   · intro rest source resolution valid
@@ -4144,6 +4148,10 @@ theorem PatternInstructionsHaveTypes.applyParameters
     simpa [applyMatchPatternInstruction] using
       (PatternInstructionHasType.uint256Word
         (context := applyContext substitution context) argumentInduction)
+  · intro rest value
+    simpa [applyMatchPatternInstruction, TypeSystem.Ty.bool] using
+      (PatternInstructionHasType.boolLiteral (context := applyContext substitution context)
+        (rest := rest.map (applyMatchPatternInstruction substitution)) (value := value))
   · intro instructions
     exact .nil
   · intro instructions afterHead rest type types headRequirements
@@ -4193,6 +4201,7 @@ theorem MatchPatternSourceRepresents.applyParameters
   | tuple => exact .tuple
   | uint256Word => exact .uint256Word
   | group inner induction => exact .group induction
+  | boolLiteral spelling => exact .boolLiteral spelling
 
 theorem PatternInstructionIrrefutable.applyParameters
     {substitution : ParameterSubstitution}
@@ -12081,7 +12090,7 @@ theorem PatternInstructionHasType.applySubstitution
         (types.map substitution.apply) requirements
         (binders.map (TypedBinder.applySubstitution substitution))
         (rest.map (MatchPatternInstruction.applySubstitution substitution)))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intro rest type
     exact .wildcard
   · intro rest literal resolution valid
@@ -12105,6 +12114,11 @@ theorem PatternInstructionHasType.applySubstitution
   · intro instructions rest requirements binders argument argumentInduction
     simpa [MatchPatternInstruction.applySubstitution] using
       (PatternInstructionHasType.uint256Word (context := target) argumentInduction)
+  · intro rest value
+    simpa [MatchPatternInstruction.applySubstitution, TypeSystem.Ty.bool] using
+      (PatternInstructionHasType.boolLiteral (context := target)
+        (rest := rest.map (MatchPatternInstruction.applySubstitution substitution))
+        (value := value))
   · intro instructions
     exact .nil
   · intro instructions afterHead rest type types headRequirements
@@ -12145,7 +12159,7 @@ theorem PatternInstructionsHaveTypes.applySubstitution
         (types.map substitution.apply) requirements
         (binders.map (TypedBinder.applySubstitution substitution))
         (rest.map (MatchPatternInstruction.applySubstitution substitution)))
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intro rest type
     exact .wildcard
   · intro rest literal resolution valid
@@ -12169,6 +12183,11 @@ theorem PatternInstructionsHaveTypes.applySubstitution
   · intro instructions rest requirements binders argument argumentInduction
     simpa [MatchPatternInstruction.applySubstitution] using
       (PatternInstructionHasType.uint256Word (context := target) argumentInduction)
+  · intro rest value
+    simpa [MatchPatternInstruction.applySubstitution, TypeSystem.Ty.bool] using
+      (PatternInstructionHasType.boolLiteral (context := target)
+        (rest := rest.map (MatchPatternInstruction.applySubstitution substitution))
+        (value := value))
   · intro instructions
     exact .nil
   · intro instructions afterHead rest type types headRequirements
@@ -12233,6 +12252,7 @@ theorem MatchPatternSourceRepresents.applySubstitution
   | tuple => exact .tuple
   | uint256Word => exact .uint256Word
   | group inner induction => exact .group induction
+  | boolLiteral spelling => exact .boolLiteral spelling
 
 /-- Flexible substitution preserves declarative irrefutability of one prefix
 pattern instruction. -/

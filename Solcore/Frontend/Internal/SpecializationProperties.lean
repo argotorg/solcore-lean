@@ -270,6 +270,7 @@ private theorem recover_instruction (original : MatchPatternInstruction)
       exact congrArg (fun selected => MatchPatternInstruction.constructor selected count) recovered
   | tuple count => rfl
   | uint256Word => rfl
+  | boolLiteral value => rfl
 
 private theorem recover_pattern_resolution (original : MatchPatternResolution)
     (leftLocal rightLocal : Substitution)
@@ -308,6 +309,7 @@ private theorem recover_pattern_resolution (original : MatchPatternResolution)
         (recover_map elements _ _ _ _
           (fun item itemSame => recover_instruction leftClosed rightClosed item
             leftLocal rightLocal itemSame) (MatchPatternResolution.uint256Word.inj same))
+  | boolLiteral value => rfl
 
 private theorem recover_pattern (original : TypedMatchPattern)
     (leftLocal rightLocal : Substitution)

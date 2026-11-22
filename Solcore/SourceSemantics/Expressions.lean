@@ -755,6 +755,10 @@ mutual
           [TypeSystem.Ty.word] requirements binders rest) :
         PatternInstructionHasType context (.uint256Word :: instructions)
           (TypeSystem.Ty.fixed .uint256) requirements binders rest
+    /-- `true` or `false` at `bool`, with no requirement and no binder. -/
+    | boolLiteral {rest value} :
+        PatternInstructionHasType context (.boolLiteral value :: rest)
+          TypeSystem.Ty.bool [] [] rest
 
   /-- Consume a source-ordered sequence of pattern trees at the corresponding
   source types.  Requirements and binders are concatenated in that same order. -/
@@ -788,6 +792,7 @@ def matchPatternResolutionInstructions :
       .constructor instantiation rootArity :: arguments
   | .tuple elements, rootArity => .tuple rootArity :: elements
   | .uint256Word argument, _ => .uint256Word :: argument
+  | .boolLiteral value, _ => [.boolLiteral value]
 
 /-- The root resolution is a complete, exactly consumed pattern program. -/
 def MatchPatternResolutionHasType (context : Context)
@@ -843,6 +848,11 @@ inductive MatchPatternSourceRepresents (context : Context) :
       (inner_represents :
         MatchPatternSourceRepresents context inner resolution rootArity) :
       MatchPatternSourceRepresents context (.group span inner) resolution rootArity
+  /-- `true` or `false`: a binder's spelling that names the boolean, as an
+  expression's does. -/
+  | boolLiteral {span name value}
+      (spelling : name = boolPatternSpelling value) :
+      MatchPatternSourceRepresents context (.binder span name) (.boolLiteral value) 0
 
 /-- Complete source-level pattern typing.  The result exposes binders so a
 match-arm judgment can extend its lexical context without inspecting the
@@ -933,7 +943,7 @@ theorem requirements_valid
       RequirementIdsValid context requirements)
     (motive_2 := fun _ _ requirements _ _ _ =>
       RequirementIdsValid context requirements)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intros
     simp [RequirementIdsValid]
   · intros
@@ -949,6 +959,8 @@ theorem requirements_valid
     assumption
   · intros
     assumption
+  · intros
+    simp [RequirementIdsValid]
   · intros
     simp [RequirementIdsValid]
   · intros
@@ -971,7 +983,7 @@ theorem requirements_valid
       RequirementIdsValid context requirements)
     (motive_2 := fun _ _ requirements _ _ _ =>
       RequirementIdsValid context requirements)
-    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ typing
   · intros
     simp [RequirementIdsValid]
   · intros
@@ -987,6 +999,8 @@ theorem requirements_valid
     assumption
   · intros
     assumption
+  · intros
+    simp [RequirementIdsValid]
   · intros
     simp [RequirementIdsValid]
   · intros

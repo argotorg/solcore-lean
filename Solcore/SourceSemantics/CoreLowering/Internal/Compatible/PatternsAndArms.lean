@@ -101,6 +101,12 @@ mutual
         (coreType : type = argument.type) :
         Tree compilation source site span scope (TypeSystem.Ty.fixed .uint256) (.uint256Word :: instructions)
           argument rest
+    /-- `true` or `false` compiles to a test of the boolean. -/
+    | boolLiteral {type value rest}
+        (projection : projected compilation source TypeSystem.Ty.bool = .ok type)
+        (coreType : type = .bool) :
+        Tree compilation source site span scope TypeSystem.Ty.bool (.boolLiteral value :: rest)
+          ⟨type, [], [], SourceCoreBasic.boolPatternMatcher type value⟩ rest
 
   inductive Forest (compilation : Compilation) (source : TypedSource) (site : StatementId)
       (span : Syntax.SourceSpan) (scope : Scope) : List TypeSystem.Ty → List MatchPatternInstruction →
@@ -226,6 +232,18 @@ theorem trees_of_compile (fuel : Nat) (compilation : Compilation) (source : Type
                 · simp [compileOne, projection, compiled, SourceCoreBasic.ensureType, same, bind,
                     Except.bind] at accepted
             · simp [compileOne, projection, fixed, bind, Except.bind] at accepted
+          | boolLiteral value =>
+            by_cases isBool : expected = TypeSystem.Ty.bool
+            · subst isBool
+              by_cases same : type = .bool
+              · subst same
+                simp [compileOne, projection, SourceCoreBasic.ensureType, bind, Except.bind,
+                  pure, Except.pure] at accepted
+                rcases accepted with ⟨rfl, rfl⟩
+                exact .boolLiteral projection rfl
+              · simp [compileOne, projection, SourceCoreBasic.ensureType, same, bind,
+                  Except.bind] at accepted
+            · simp [compileOne, projection, isBool, bind, Except.bind] at accepted
     · intro types instructions patterns rest accepted
       cases types with
       | nil =>
@@ -337,6 +355,7 @@ theorem Tree.skips {compilation : Compilation} {source : TypedSource} {site : St
   | constructor projection result count resolved coreType raw children projectedChildren registered ih =>
     exact .constructor (count.symm ▸ ih)
   | uint256Word projection argument coreType ih => exact .uint256Word (.succ ih .zero)
+  | boolLiteral projection coreType => exact .boolLiteral
   | nil => exact .zero
   | cons head tail headIH tailIH => exact .succ headIH tailIH
 
@@ -355,6 +374,7 @@ theorem Forest.skips {compilation : Compilation} {source : TypedSource} {site : 
   | constructor projection result count resolved coreType raw children projectedChildren registered ih =>
     exact .constructor (count.symm ▸ ih)
   | uint256Word projection argument coreType ih => exact .uint256Word (.succ ih .zero)
+  | boolLiteral projection coreType => exact .boolLiteral
   | nil => exact .zero
   | cons head tail headIH tailIH => exact .succ headIH tailIH
 
@@ -387,6 +407,12 @@ theorem rootInstructions_sound (compilation : Compilation) (context : Context)
   | binder span name =>
     cases resolution <;> simp only [rootInstructions] at accepted
     all_goals try contradiction
+    case boolLiteral value =>
+      by_cases same : name = boolPatternSpelling value
+      · simp [same, pure, Except.pure] at accepted
+        subst instructions
+        exact ⟨0, rfl, .boolLiteral same⟩
+      · simp [same, Functor.map, Except.map] at accepted
     rename_i binder
     by_cases same : binder.name = name
     · simp [same, pure, Except.pure] at accepted
@@ -2033,6 +2059,18 @@ theorem Tree.success {context : Context} {source : TypedSource} {site : Statemen
           rw [typeEq]
           exact .word word
         simpa using ih _ _ _ _ wordRep head
+  | @boolLiteral type boolean rest projection coreType =>
+    intro sourceValue value bindings sourceRest represented matched
+    subst coreType
+    cases matched
+    obtain ⟨actual, sourceEq, valueEq⟩ := CompatibleExpressionPrimitives.bool_fields represented
+    cases sourceEq
+    subst valueEq
+    refine ⟨[], rfl, .nil, ?_⟩
+    intro environment store expression selected
+    cases boolean
+    · exact .apply .lambda (selected.evaluates store) (.ifFalse (.var rfl) (.inRight .unit))
+    · exact .apply .lambda (selected.evaluates store) (.ifTrue (.var rfl) (.inRight .unit))
   | nil =>
     intro sources values coreTypes bindings sourceRest represented matched
     cases represented
@@ -2395,6 +2433,22 @@ theorem Tree.decides_with_literals {context : Context} {source : TypedSource} {s
       refine .inl ⟨bindings, values, .uint256Word ?_, bindingRep, run⟩
       simpa using Dynamic.PatternInstructionsMatch.cons matched .nil
     | inr failed => exact .inr failed
+  | @boolLiteral type boolean rest projection coreType =>
+    intro sites sourceValue value represented
+    subst coreType
+    obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.bool_fields represented
+    by_cases same : actual = boolean
+    · subst actual
+      refine .inl ⟨[], [], .boolLiteral, .nil, ?_⟩
+      intro environment store expression selected
+      cases boolean
+      · exact .apply .lambda (selected.evaluates store) (.ifFalse (.var rfl) (.inRight .unit))
+      · exact .apply .lambda (selected.evaluates store) (.ifTrue (.var rfl) (.inRight .unit))
+    · refine .inr ?_
+      intro environment store expression selected
+      cases boolean <;> cases actual <;> simp at same
+      · exact .apply .lambda (selected.evaluates store) (.ifTrue (.var rfl) (.inLeft .unit))
+      · exact .apply .lambda (selected.evaluates store) (.ifFalse (.var rfl) (.inLeft .unit))
   | nil sites =>
     intro sources values coreTypes represented
     cases represented
@@ -2551,6 +2605,40 @@ private theorem integer_matcher_inv {environment : Environment} {store finalStor
         | inLeft unit =>
           cases unit
           exact ⟨.inr ⟨by simpa [BinaryOp.apply] using applied, rfl⟩, rfl⟩
+
+private theorem bool_matcher_inv {environment : Environment} {store finalStore : Store}
+    {actual expected : Bool} {outcome : Value}
+    (completed : Evaluates (.bool actual :: environment) store
+      (if expected then .ifE (.var 0) (.inRight .unit .unit) (.inLeft .unit .unit)
+        else .ifE (.var 0) (.inLeft .unit .unit) (.inRight .unit .unit))
+      outcome finalStore) :
+    ((actual = expected ∧ outcome = .inRight .unit .unit) ∨
+      (actual ≠ expected ∧ outcome = .inLeft .unit .unit)) ∧ finalStore = store := by
+  cases expected <;> simp only [Bool.false_eq_true, ↓reduceIte] at completed
+  all_goals
+    cases completed with
+    | ifTrue condition branch =>
+      cases condition with
+      | var found =>
+        simp only [List.getElem?_cons_zero, Option.some.injEq, Value.bool.injEq] at found
+        subst found
+        cases branch
+        all_goals rename_i unit
+        all_goals cases unit
+        all_goals first
+          | exact ⟨.inl ⟨rfl, rfl⟩, rfl⟩
+          | exact ⟨.inr ⟨by decide, rfl⟩, rfl⟩
+    | ifFalse condition branch =>
+      cases condition with
+      | var found =>
+        simp only [List.getElem?_cons_zero, Option.some.injEq, Value.bool.injEq] at found
+        subst found
+        cases branch
+        all_goals rename_i unit
+        all_goals cases unit
+        all_goals first
+          | exact ⟨.inl ⟨rfl, rfl⟩, rfl⟩
+          | exact ⟨.inr ⟨by decide, rfl⟩, rfl⟩
 
 private theorem bundle_inv {environment : Environment} {store after : Store}
     {expressions : List Expr} {values : List Value} {result : Value}
@@ -2761,6 +2849,15 @@ theorem Tree.reflects_with_literals {context : Context} {source : TypedSource} {
     · refine .inl ⟨bindings, values, .uint256Word ?_, bindingRep, outcomeEq⟩
       simpa using Dynamic.PatternInstructionsMatch.cons matched .nil
     · exact .inr failed
+  | @boolLiteral type boolean rest projection coreType =>
+    intro sites sourceValue value represented environment store expression selected outcome after completed
+    subst coreType
+    obtain ⟨actual, rfl, rfl⟩ := CompatibleExpressionPrimitives.bool_fields represented
+    obtain ⟨observed, sameStore⟩ := bool_matcher_inv (apply_lambda_inv selected completed)
+    refine ⟨?_, sameStore⟩
+    rcases observed with ⟨rfl, rfl⟩ | ⟨_, rfl⟩
+    · exact .inl ⟨[], [], .boolLiteral, .nil, rfl⟩
+    · exact .inr rfl
   | nil sites =>
     intro sources values coreTypes represented environment store expressions accumulated accumulatedValues outputType selected previous outcome after completed
     cases represented
@@ -3770,6 +3867,7 @@ theorem Tree.source_binders
       | cons head tail =>
         cases tail
         simpa using ih head
+  | boolLiteral => intro context sourceType requirements binders sourceRest typed; cases typed; exact ⟨rfl, rfl⟩
   | nil =>
     rename_i context sourceTypes requirements binders sourceRest typed length
     have empty : sourceTypes = [] := List.length_eq_zero_iff.mp length
@@ -3800,6 +3898,7 @@ theorem source_arity_unique
   | tuple => cases right; rfl
   | uint256Word => cases right; rfl
   | group inner ih => cases right with | group other => exact ih other
+  | boolLiteral => cases right; rfl
 
 theorem instruction_binders
     {context : SourceSemantics.Context} {instructions rest : List MatchPatternInstruction}
@@ -3817,6 +3916,7 @@ theorem instruction_binders
   | constructor valid arity arguments ih => exact ih
   | tuple arity elements ih => exact ih
   | uint256Word argument ih => exact ih
+  | boolLiteral => rfl
   | nil => rfl
   | cons head tail headIH tailIH => rw [headIH, tailIH, List.append_assoc]
 

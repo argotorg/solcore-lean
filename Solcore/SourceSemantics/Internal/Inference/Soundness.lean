@@ -7709,6 +7709,8 @@ private theorem consumeIrrefutable_true_sound :
     exact .binder
   · intro rest fuel source resolution final success
     simp [Detail.consumeIrrefutableInstruction] at success
+  · intro rest fuel value final success
+    simp [Detail.consumeIrrefutableInstruction] at success
   · intro rest fuel instantiation count induction final success
     cases consumed : Detail.consumeIrrefutableInstructions fuel count rest with
     | none => simp [Detail.consumeIrrefutableInstruction, consumed] at success
@@ -7809,6 +7811,8 @@ theorem typedPatternIsCatchall_true_sound
         matchPatternResolutionInstructions] using
         (PatternInstructionIrrefutable.wildcard (rest := []))
   | integerLiteral source resolution =>
+      simp [Detail.typedPatternIsCatchall, resolutionEq] at accepted
+  | boolLiteral value =>
       simp [Detail.typedPatternIsCatchall, resolutionEq] at accepted
   | binder binder =>
       simpa [TypedMatchPattern.applySubstitution, resolutionEq,
@@ -12778,6 +12782,78 @@ theorem inferMatchPatternFlatFuel_success_literal_sound_at
   exact evidence.integerLiteralValid_of_flat pattern_eq success resolutionEq
     integerPatterns_subset requirements_subset requirements_occur
 
+/-- A `true` or `false` pattern retains no binder: it unifies the scrutinee's type
+with `bool` and emits the one boolean instruction. -/
+private theorem inferMatchPatternFlatFuel_success_bool_sound
+    {source : TypedSource}
+    {inferenceContext : Frontend.SourceInference.Context}
+    {semanticContext activeContext : SourceSemantics.Context}
+    {outer : TypeSystem.Substitution} {fuel : Nat}
+    {pattern : Syntax.Pattern} {name : Syntax.Identifier}
+    {expected : TypeSystem.Ty} {seen : List String}
+    {initial : Frontend.SourceInference.State}
+    {result : Detail.InferredPattern}
+    (pattern_eq : pattern.value = .binder name)
+    (isBool : (name.value == "true" || name.value == "false") = true)
+    (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
+    (ready : initial.InferenceReady)
+    (expectedBelow : expected.VariablesBelow initial.inference.next)
+    (validated : ProgramSignatureFormationValidated
+      inferenceContext.signatures)
+    (below : initial.LocalBindersBelowNextLocal)
+    (seen_nodup : seen.Nodup)
+    (invariant : ActiveLocalContextInvariant initial outer activeContext)
+    (outerExtension : outer.SemanticallyExtends
+      result.state.inference.substitution)
+    (success : Detail.inferMatchPatternFlatFuel (fuel + 1) inferenceContext
+      pattern expected seen initial = .ok result) :
+    Nonempty (MatchPatternFlatInferenceCertificate source semanticContext
+      activeContext outer expected seen initial result) := by
+  have properties := stateCallbacks.pattern ready expectedBelow validated below
+    success
+  have spelling : name.value = "true" ∨ name.value = "false" := by
+    simpa using isBool
+  unfold Detail.inferMatchPatternFlatFuel at success
+  simp only [pattern_eq, isBool, ↓reduceIte, bind, Except.bind] at success
+  cases unifyResult : Detail.unify initial expected TypeSystem.Ty.bool with
+  | error error => simp [unifyResult] at success
+  | ok unified =>
+      simp only [unifyResult, pure, Pure.pure, Except.pure] at success
+      injection success with resultEq
+      subst result
+      have boolEq : outer.apply expected = TypeSystem.Ty.bool := by
+        calc
+          outer.apply expected =
+              outer.apply (unified.resolve expected) :=
+            (outerExtension expected).symm
+          _ = outer.apply (unified.resolve TypeSystem.Ty.bool) :=
+            congrArg outer.apply (Detail.unify_resolve_eq unifyResult)
+          _ = outer.apply TypeSystem.Ty.bool :=
+            outerExtension TypeSystem.Ty.bool
+          _ = TypeSystem.Ty.bool := by
+            simp [TypeSystem.Ty.bool]
+      exact ⟨{
+        binders := []
+        rootArity := 0
+        finalContext := activeContext
+        source_represents := .boolLiteral (by
+          rcases spelling with spelled | spelled <;> simp [spelled, boolPatternSpelling])
+        instructions_eq := rfl
+        instruction_type := fun suffix => by
+          rw [boolEq]
+          simpa [MatchPatternInstruction.applySubstitution] using
+            (PatternInstructionHasType.boolLiteral (context := semanticContext) (rest := suffix)
+              (value := name.value == "true"))
+        binders_extend := .nil activeContext
+        invariant := invariant.unify unifyResult
+        progress := properties.1
+        ready := properties.2.1
+        below := properties.2.2.1
+        owner_eq := properties.2.2.2
+        names_eq := by simp
+        names_nodup := seen_nodup
+      }⟩
+
 /-- A successful binder pattern installs exactly one closed monomorphic
 binder in the active arm context. -/
 private theorem inferMatchPatternFlatFuel_success_binder_sound
@@ -12790,6 +12866,7 @@ private theorem inferMatchPatternFlatFuel_success_binder_sound
     {initial : Frontend.SourceInference.State}
     {result : Detail.InferredPattern}
     (pattern_eq : pattern.value = .binder name)
+    (notBool : ¬(name.value == "true" || name.value == "false") = true)
     (stateCallbacks : MatchPatternFlatStateCallbacks inferenceContext)
     (ready : initial.InferenceReady)
     (expectedBelow : expected.VariablesBelow initial.inference.next)
@@ -12813,7 +12890,7 @@ private theorem inferMatchPatternFlatFuel_success_binder_sound
   have properties := stateCallbacks.pattern ready expectedBelow validated below
     success
   unfold Detail.inferMatchPatternFlatFuel at success
-  simp only [pattern_eq] at success
+  simp only [pattern_eq, notBool, Bool.false_eq_true, ↓reduceIte] at success
   by_cases duplicate : seen.contains name.value = true
   · have duplicateMem : name.value ∈ seen := by
       simpa using duplicate
@@ -13824,10 +13901,14 @@ private theorem inferMatchPatternFlatFuel_success_sound_step
         (fun resolutionEq => branches.literal valueEq success resolutionEq)
         success
   | binder name =>
-      exact inferMatchPatternFlatFuel_success_binder_sound valueEq
-        stateCallbacks ready expectedBelow validated below owner_eq
-        semanticOwner seen_nodup semanticAdmissible activeAdmissible
-        invariant outerExtension success
+      by_cases isBool : (name.value == "true" || name.value == "false") = true
+      · exact inferMatchPatternFlatFuel_success_bool_sound valueEq isBool
+          stateCallbacks ready expectedBelow validated below seen_nodup
+          invariant outerExtension success
+      · exact inferMatchPatternFlatFuel_success_binder_sound valueEq isBool
+          stateCallbacks ready expectedBelow validated below owner_eq
+          semanticOwner seen_nodup semanticAdmissible activeAdmissible
+          invariant outerExtension success
   | constructor leadingDot qualifiers name arguments =>
       cases selected : Detail.uint256PatternArgument? leadingDot qualifiers name.value
           ((arguments.map (fun retained => retained.elements.toList)).getD [])
@@ -13958,10 +14039,14 @@ private theorem inferMatchPatternFlatFuel_success_sound_step_at
         expectedBelow validated below seen_nodup invariant outerExtension
         success
   | binder name =>
-      exact inferMatchPatternFlatFuel_success_binder_sound valueEq
-        stateCallbacks ready expectedBelow validated below owner_eq
-        semanticOwner seen_nodup semanticAdmissible activeAdmissible
-        invariant outerExtension success
+      by_cases isBool : (name.value == "true" || name.value == "false") = true
+      · exact inferMatchPatternFlatFuel_success_bool_sound valueEq isBool
+          stateCallbacks ready expectedBelow validated below seen_nodup
+          invariant outerExtension success
+      · exact inferMatchPatternFlatFuel_success_binder_sound valueEq isBool
+          stateCallbacks ready expectedBelow validated below owner_eq
+          semanticOwner seen_nodup semanticAdmissible activeAdmissible
+          invariant outerExtension success
   | constructor leadingDot qualifiers name arguments =>
       cases selected : Detail.uint256PatternArgument? leadingDot qualifiers name.value
           ((arguments.map (fun retained => retained.elements.toList)).getD [])

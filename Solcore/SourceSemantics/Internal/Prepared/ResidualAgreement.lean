@@ -317,13 +317,14 @@ private def expressionBinders : ExpressionForm → List TypedBinder
 private def instructionTypes : MatchPatternInstruction → List Ty
   | .wildcard
   | .tuple _
-  | .uint256Word => []
+  | .uint256Word
+  | .boolLiteral _ => []
   | .integerLiteral _ resolution => [resolution.targetType]
   | .binder binder => [binder.scheme.body]
   | .constructor instantiation _ => constructorTypes instantiation
 
 private def patternTypes : MatchPatternResolution → List Ty
-  | .wildcard => []
+  | .wildcard | .boolLiteral _ => []
   | .integerLiteral _ resolution => [resolution.targetType]
   | .binder binder => [binder.scheme.body]
   | .constructor instantiation instructions =>
@@ -518,7 +519,7 @@ private theorem instruction_congr {left right : Substitution} {instruction : Mat
       binder.applySubstitution left = binder.applySubstitution right) :
     instruction.applySubstitution left = instruction.applySubstitution right := by
   cases instruction with
-  | wildcard | tuple | uint256Word => rfl
+  | wildcard | tuple | uint256Word | boolLiteral => rfl
   | integerLiteral source resolution => exact congrArg _ (integer_congr same.head)
   | binder binder =>
     exact congrArg MatchPatternInstruction.binder
@@ -561,6 +562,7 @@ private theorem pattern_congr {left right : Substitution} {pattern : MatchPatter
     exact congrArg MatchPatternResolution.tuple (instructions_congr same binders)
   | uint256Word instructions =>
     exact congrArg MatchPatternResolution.uint256Word (instructions_congr same binders)
+  | boolLiteral value => rfl
 
 private theorem assignment_congr {left right : Substitution} {assignment : AssignmentResolution}
     (same : left.apply assignment.target.type = right.apply assignment.target.type) :
