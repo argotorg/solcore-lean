@@ -6,6 +6,7 @@ import Solcore.SourceSemantics.CoreLowering.AcceptedShapes
 import Solcore.SourceSemantics.CoreLowering.AcceptedCalls
 import Solcore.SourceSemantics.CoreLowering.AcceptedConversions
 import Solcore.SourceSemantics.CoreLowering.AcceptedBuiltins
+import Solcore.SourceSemantics.CoreLowering.AcceptedConstructors
 import Solcore.SourceSemantics.CoreLowering.AcceptedNestedCalls
 import Solcore.SourceSemantics.CoreLowering.AcceptedCallLifting
 import Solcore.SourceSemantics.CoreLowering.AcceptedPublicRoots

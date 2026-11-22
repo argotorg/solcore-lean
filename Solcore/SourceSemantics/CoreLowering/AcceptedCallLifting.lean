@@ -1317,6 +1317,18 @@ theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         (arguments_value (registry := registry) elements (by
           simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
           omega) evaluated) pack
+  | @constructor id instantiation ids site _ arguments =>
+    intro size context environment before after value within trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.found site.coercions
+      (fun name binder same => by rw [site.form] at same; cases same) trace
+    rw [site.form, site.requirements] at raw
+    cases raw with
+    | constructor _ valid evaluated =>
+      exact .constructorValue
+        ⟨site.node, lookupExpression?_sound site.found, site.form, site.requirements, site.coercions⟩ valid
+        (arguments_value (registry := registry) arguments (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) evaluated)
 
 /-- The value lifting of every nested site below a size, given the lifting of
 the callee bodies below it. -/
@@ -2004,6 +2016,27 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         (arguments_fault values elements (by
           simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
           omega) signatures expressible failed)
+  | @constructor id instantiation ids site argumentsNested arguments =>
+    intro size context environment before after reason within signatures expressible trace
+    have occurrence : Staging.Recursive.Occurrence scope id (.constructor instantiation ids) :=
+      ⟨site.node, lookupExpression?_sound site.found, site.form, site.requirements, site.coercions⟩
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [site.form] at same; cases same) trace
+    rw [site.form, site.requirements] at raw
+    have values : ∀ other ∈ ids, ∀ {size : Nat} {context : SourceSemantics.Context}
+        {environment : Dynamic.Environment} {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+        SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
+          before other value after →
+        Staging.Recursive.Expression program registry scope context environment before other (.value value)
+          after :=
+      fun other member => nested_value prepared unique bodies (argumentsNested other member)
+    cases raw with
+    | constructorArgument _ failed =>
+      exact .constructorFault occurrence
+        (arguments_fault values arguments (by
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+          omega) signatures expressible failed)
+    | constructorMetadata _ metadata => exact .constructorMetadataFault occurrence metadata
 
 /-- The fault lifting of every nested site below a size, given that the
 Source's direct calls have plain callees and the value and fault liftings of
