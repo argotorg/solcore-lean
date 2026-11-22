@@ -324,6 +324,28 @@ private theorem while_inv (unique : NodeOccurrencesUnique source) (found : sourc
     exfalso
     obtain rfl := same_node unique found (by assumption)
     simp_all
+
+private theorem for_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    {initializer : List ForItemForm} {condition : ExpressionId} {post : List ForItemForm} {body : List StatementId}
+    (form : node.form = .forLoop initializer condition post body)
+    (head : SourceExecutionSize.StatementExecutes program size context evidence source environment before id
+      finalContext outcome after) :
+    ∃ first second loopContext loopEnvironment initialized loopFinalContext inner, first < size ∧ second < size ∧
+      SourceExecutionSize.ForItemsExecute program first context evidence source environment before initializer
+        loopContext loopEnvironment initialized ∧
+      SourceExecutionSize.ForLoopExecutes program second loopContext evidence source loopEnvironment initialized
+        condition post body loopFinalContext inner after ∧
+      finalContext = context ∧ outcome = Dynamic.restoreControl environment inner := by
+  cases head with
+  | forLoop contains formEq initial iterate =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, _, _, _, _, _, _, below_left, below_right, initial, iterate, rfl, rfl⟩
+  | _ =>
+    exfalso
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
 end Inversion
 
 variable {program : Program} {registry : Staging.Recursive.Registry} {scope : Staging.Recursive.Scope}
@@ -469,6 +491,157 @@ private theorem while_lift {child : ExpressionId → Prop} {bound : Nat}
         (inner (Nat.le_of_lt (Nat.lt_of_lt_of_le below_right within)) executes), .inl rfl⟩
     | returns evaluate executes =>
       exact ⟨.returned (lift test (Nat.lt_of_lt_of_le below_left within) evaluate)
+        (inner (Nat.le_of_lt (Nat.lt_of_lt_of_le below_right within)) executes), .inr ⟨_, rfl⟩⟩
+
+/-- The sized Source execution of a supported header vector whose expressions
+`child` admits is the staged execution of the vector, with the same context,
+bindings and heap, given the lifting of `child` within the bound. The vector
+keeps the signatures of its context. -/
+private theorem items_lift {child : ExpressionId → Prop} {bound : Nat}
+    (lift : ChildLifts program registry scope child bound) {items : List ForItemForm}
+    (shape : CellAwareInvocationAcceptedBodyShape.ItemsShape scope.source child items) :
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {finalContext : SourceSemantics.Context} {finalEnvironment : Dynamic.Environment},
+      size ≤ bound →
+      SourceExecutionSize.ForItemsExecute program size context scope.evidence scope.source environment before items
+        finalContext finalEnvironment after →
+      Staging.Recursive.ForItems program registry scope context environment before items finalContext
+          (.done finalEnvironment) after ∧
+        finalContext.signatures = context.signatures := by
+  induction shape with
+  | nil =>
+    intro size context environment before after finalContext finalEnvironment _ executes
+    cases executes
+    exact ⟨.empty, rfl⟩
+  | absent monomorphic _ tailIH =>
+    intro size context environment before after finalContext finalEnvironment within executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | letUninitialized _ extension allocate =>
+        obtain ⟨staged, signatures⟩ := tailIH (Nat.le_of_lt (Nat.lt_of_lt_of_le below_right within)) tail
+        exact ⟨.absent monomorphic extension allocate staged, signatures.trans extension.context_fields.1⟩
+  | initialized monomorphic value _ tailIH =>
+    intro size context environment before after finalContext finalEnvironment within executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | letInitialized evaluate _ extension allocate =>
+        have below := within
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+        obtain ⟨staged, signatures⟩ := tailIH (by omega) tail
+        exact ⟨.initialized monomorphic extension (lift value (by omega) evaluate) allocate staged,
+          signatures.trans extension.context_fields.1⟩
+      | letInitializedGeneralized _ _ polymorphic => exact absurd monomorphic polymorphic
+  | discarded value _ tailIH =>
+    intro size context environment before after finalContext finalEnvironment within executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | expression evaluate =>
+        have below := within
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+        obtain ⟨staged, signatures⟩ := tailIH (by omega) tail
+        exact ⟨.expression (lift value (by omega) evaluate) staged, signatures⟩
+  | assigned assignable value _ tailIH =>
+    intro size context environment before after finalContext finalEnvironment within executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | assignValue executes =>
+        cases executes with
+        | intro resolve evaluate write =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+          obtain ⟨staged, signatures⟩ := tailIH (by omega) tail
+          exact ⟨.assignment snapshot (lift value (by omega) evaluate) write staged, signatures⟩
+  | projectedAssigned assignable keys value _ tailIH =>
+    intro size context environment before after finalContext finalEnvironment within executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | assignValue executes =>
+        cases executes with
+        | intro resolve evaluate write =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨values, staged, snapshot⟩ := projected_target lift keys (by omega) resolve
+          obtain ⟨remaining, signatures⟩ := tailIH (by omega) tail
+          exact ⟨.projectedAssignment assignable.2.1 staged snapshot (lift value (by omega) evaluate) write remaining,
+            signatures⟩
+  | bitNotted assignable _ tailIH =>
+    intro size context environment before after finalContext finalEnvironment within executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | assignBitNot executes =>
+        cases executes with
+        | intro resolve write =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+          obtain ⟨staged, signatures⟩ := tailIH (by omega) tail
+          exact ⟨.bitNot snapshot write staged, signatures⟩
+  | projectedBitNotted assignable keys _ tailIH =>
+    intro size context environment before after finalContext finalEnvironment within executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | assignBitNot executes =>
+        cases executes with
+        | intro resolve write =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨values, staged, snapshot⟩ := projected_target lift keys (by omega) resolve
+          obtain ⟨remaining, signatures⟩ := tailIH (by omega) tail
+          exact ⟨.projectedBitNot assignable.2.1 staged snapshot write remaining, signatures⟩
+
+/-- The sized Source iterations of a `for` loop whose condition `child` admits,
+whose body lifts within the bound and whose post header is supported are the
+staged iterations, with the same outcome and heap. The loop falls through at
+its own bindings or returns. -/
+private theorem for_lift {child : ExpressionId → Prop} {bound : Nat}
+    (lift : ChildLifts program registry scope child bound) {condition : ExpressionId} {post : List ForItemForm}
+    {body : List StatementId} (test : child condition)
+    (inner : ∀ {size : Nat} {context environment before innerContext outcome after}, size ≤ bound →
+      SourceExecutionSize.StatementsExecute program size context scope.evidence scope.source environment before body
+        innerContext outcome after →
+      Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
+        (control outcome) after)
+    (postShape : CellAwareInvocationAcceptedBodyShape.ItemsShape scope.source child post) :
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {loopContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome},
+      size ≤ bound →
+      SourceExecutionSize.ForLoopExecutes program size context scope.evidence scope.source environment before
+        condition post body loopContext outcome after →
+      Staging.Recursive.ForLoop program registry scope context environment before condition post body
+          (control outcome) after ∧
+        (outcome = .fallthrough environment ∨ ∃ value, outcome = .returned value) := by
+  intro size
+  induction size using Nat.strongRecOn with
+  | ind size ih =>
+    intro context environment before after loopContext outcome within loop
+    cases loop with
+    | done evaluate =>
+      exact ⟨.finished (lift test (Nat.lt_of_lt_of_le below_one within) evaluate), .inl rfl⟩
+    | nextFallthrough evaluate executes postExecutes next =>
+      have below := within
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+      obtain ⟨staged, ended⟩ := ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) (by omega) next
+      exact ⟨.iterate (lift test (by omega) evaluate) (inner (by omega) executes)
+        (items_lift lift postShape (by omega) postExecutes).1 staged, ended⟩
+    | nextContinue evaluate executes postExecutes next =>
+      have below := within
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+      obtain ⟨staged, ended⟩ := ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) (by omega) next
+      exact ⟨.continueIterate (lift test (by omega) evaluate) (inner (by omega) executes)
+        (items_lift lift postShape (by omega) postExecutes).1 staged, ended⟩
+    | breaks evaluate executes =>
+      exact ⟨.forBreakFromBody (lift test (Nat.lt_of_lt_of_le below_left within) evaluate)
+        (inner (Nat.le_of_lt (Nat.lt_of_lt_of_le below_right within)) executes), .inl rfl⟩
+    | returns evaluate executes =>
+      exact ⟨.returnedFromBody (lift test (Nat.lt_of_lt_of_le below_left within) evaluate)
         (inner (Nat.le_of_lt (Nat.lt_of_lt_of_le below_right within)) executes), .inr ⟨_, rfl⟩⟩
 
 /-- A sized ordinary execution of a supported statement list is a staged
@@ -706,6 +879,29 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {child : Expres
       rcases ended with rfl | ⟨_, rfl⟩
       · cases terminal
       · exact .whileReturned (lookupStatement?_sound found) form loop
+  | forLooped found form initialItems test _ postItems _ innerIH tailIH =>
+    intro size context environment before after finalContext outcome within
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after headSize
+        tailSize headBelow tailBelow head next
+      obtain ⟨_, _, _, _, _, _, loopOutcome, firstBelow, secondBelow, initialized, iterate, rfl, same⟩ :=
+        for_inv unique found form head
+      obtain ⟨loop, ended⟩ := for_lift lift test (fun within executes => innerIH within executes) postItems
+        (by omega) iterate
+      rcases ended with rfl | ⟨_, rfl⟩
+      · cases same
+        exact .forFallthrough (lookupStatement?_sound found) form (items_lift lift initialItems (by omega) initialized).1
+          loop (tailIH (by omega) next)
+      · cases same
+    · intro context environment before finalContext outcome after headSize headBelow head terminal
+      obtain ⟨_, _, _, _, _, _, loopOutcome, firstBelow, secondBelow, initialized, iterate, rfl, rfl⟩ :=
+        for_inv unique found form head
+      obtain ⟨loop, ended⟩ := for_lift lift test (fun within executes => innerIH within executes) postItems
+        (by omega) iterate
+      rcases ended with rfl | ⟨_, rfl⟩
+      · cases terminal
+      · exact .forReturned (lookupStatement?_sound found) form (items_lift lift initialItems (by omega) initialized).1
+          loop
   | tail found form _ value =>
     intro size context environment before after finalContext outcome within original
     unfold Original at original
@@ -1797,7 +1993,7 @@ section
 executions with the same reason and heap, given the value and fault liftings
 of their expressions below the size. A statement faults in its expression, its
 target, bare or through mapping indices, the operand of its in-place `~`, its
-inner list or an iteration of its loop, or a
+inner list, a header item or an iteration of its loop, or a
 falling-through statement is followed by a fault in the rest of its list; the
 staged rule of the same form carries the fault, at the context, environment
 and heap of the original execution. -/
@@ -2036,6 +2232,36 @@ private theorem while_fault_inv (unique : NodeOccurrencesUnique source)
     exfalso
     obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
     simp_all
+
+private theorem for_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) {initializer : List ForItemForm} {condition : ExpressionId}
+    {post : List ForItemForm} {body : List StatementId} (form : node.form = .forLoop initializer condition post body)
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) :
+    (∃ child failedContext, child < size ∧ SourceExecutionSize.ForItemsFault program child context evidence source
+      environment before initializer failedContext reason after) ∨
+    (∃ first second loopContext loopEnvironment initialized, first < size ∧ second < size ∧
+      SourceExecutionSize.ForItemsExecute program first context evidence source environment before initializer
+        loopContext loopEnvironment initialized ∧
+      SourceExecutionSize.ForLoopFaults program second loopContext evidence source loopEnvironment initialized
+        condition post body reason after) := by
+  cases fault with
+  | missing absent => exact (Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)).elim
+  | forInitializer contains formEq fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact .inl ⟨_, _, CellAwareInvocationAcceptedSizedLifting.below_one, fault⟩
+  | forIteration contains formEq initial fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact .inr ⟨_, _, _, _, _, CellAwareInvocationAcceptedSizedLifting.below_left,
+      CellAwareInvocationAcceptedSizedLifting.below_right, initial, fault⟩
+  | _ =>
+    exfalso
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
 end Inversion
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked) {program : Program}
@@ -2233,6 +2459,375 @@ private theorem while_fault_lift {child : ExpressionId → Prop} {bound : Nat}
       have below := within
       simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
       exact .continueNext (lift test (by omega) evaluate) (inner (by omega) executes)
+        (ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) (by omega) signatures expressible fault)
+
+/-- A header assignment whose bare target faults: its root is unbound or
+dangling. -/
+private theorem items_bare_target_fault {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
+    {rhs : ExpressionId} {rest : List ForItemForm} {size : Nat} {context : SourceSemantics.Context}
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}
+    (bare : assignment.target.projections = [])
+    (failed : SourceExecutionSize.SourcePlaceFaults program size context scope.evidence scope.source environment
+      before assignment.target reason after) :
+    Staging.Recursive.ForItems program registry scope context environment before
+      (.assignValue assignment operator rhs :: rest) context (.fault (.semantic reason)) after := by
+  cases failed with
+  | unbound missing => exact .unbound bare missing
+  | dangling lookup missing => exact .dangling bare lookup missing
+  | projectionExpression _ _ failed =>
+    rw [bare] at failed
+    cases failed
+  | danglingAfterProjections lookup _ evaluated missing =>
+    rw [bare] at evaluated
+    cases evaluated
+    exact .dangling bare lookup missing
+  | projectionRead _ _ evaluated _ _ failed =>
+    rw [bare] at evaluated
+    cases evaluated
+    cases failed
+  | uninitialized _ _ evaluated _ _ _ projected =>
+    rw [bare] at evaluated
+    cases evaluated
+    exact absurd rfl projected
+  | elementPrefix projectionsEq _
+  | elementIndex projectionsEq _ _
+  | elementIndexType projectionsEq _ _ _ _
+  | elementOutOfBounds projectionsEq _ _ _ _ _ _
+  | elementUninitialized projectionsEq _ _ =>
+    rw [bare] at projectionsEq
+    simp at projectionsEq
+
+/-- The sized Source fault of a supported header vector whose expressions
+`child` admits, with an expressible reason at a context with the program's
+signatures, is a staged fault of the vector with the same heap, given the value
+and fault liftings of `child` within the bound. -/
+private theorem items_fault_lift {child : ExpressionId → Prop} {bound : Nat}
+    (lift : ChildLifts program registry scope child bound)
+    (faultLift : ChildFaultLifts program registry scope child bound) {items : List ForItemForm}
+    (shape : CellAwareInvocationAcceptedBodyShape.ItemsShape scope.source child items) :
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {failedContext : SourceSemantics.Context} {reason : Dynamic.SemanticFault},
+      size ≤ bound → context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.ForItemsFault program size context scope.evidence scope.source environment before items
+        failedContext reason after →
+      Staging.Recursive.ForItems program registry scope context environment before items failedContext
+        (.fault (.semantic reason)) after := by
+  induction shape with
+  | nil =>
+    intro size context environment before after failedContext reason _ _ _ failed
+    cases failed
+  | absent monomorphic _ tailIH =>
+    intro size context environment before after failedContext reason within signatures expressible failed
+    cases failed with
+    | head fault =>
+      cases fault with
+      | polymorphicLet polymorphic _ => exact absurd monomorphic polymorphic
+    | tail head fault =>
+      cases head with
+      | letUninitialized _ extension allocate =>
+        exact .absent monomorphic extension allocate
+          (tailIH (Nat.le_of_lt (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_right within))
+            (extension.context_fields.1.trans signatures) expressible fault)
+  | initialized monomorphic value _ tailIH =>
+    intro size context environment before after failedContext reason within signatures expressible failed
+    cases failed with
+    | head fault =>
+      cases fault with
+      | polymorphicLet polymorphic _ => exact absurd monomorphic polymorphic
+      | letInitializer _ fault =>
+        have below := within
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+        exact .initializerFault monomorphic (faultLift value (by omega) signatures expressible fault)
+    | tail head fault =>
+      cases head with
+      | letInitialized evaluate _ extension allocate =>
+        have below := within
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+        exact .initialized monomorphic extension (lift value (by omega) evaluate) allocate
+          (tailIH (by omega) (extension.context_fields.1.trans signatures) expressible fault)
+      | letInitializedGeneralized _ _ polymorphic => exact absurd monomorphic polymorphic
+  | discarded value _ tailIH =>
+    intro size context environment before after failedContext reason within signatures expressible failed
+    cases failed with
+    | head fault =>
+      cases fault with
+      | expression fault =>
+        have below := within
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+        exact .expressionFailure (faultLift value (by omega) signatures expressible fault)
+    | tail head fault =>
+      cases head with
+      | expression evaluate =>
+        have below := within
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+        exact .expression (lift value (by omega) evaluate) (tailIH (by omega) signatures expressible fault)
+  | assigned assignable value _ tailIH =>
+    intro size context environment before after failedContext reason within signatures expressible failed
+    cases failed with
+    | head fault =>
+      cases fault with
+      | assignValue fault =>
+        cases fault with
+        | target failed => exact items_bare_target_fault assignable.2.1 failed
+        | rhs resolve failed =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+          exact .assignmentFailure snapshot (faultLift value (by omega) signatures expressible failed)
+        | operands resolve evaluate currentRead rootType initialValue pathRead invalid =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+          exact .assignmentOperands snapshot (lift value (by omega) evaluate) currentRead rootType initialValue
+            pathRead invalid
+        | panic resolve evaluate currentRead rootType initialValue pathRead panics =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+          exact .assignmentPanic snapshot (lift value (by omega) evaluate) currentRead rootType initialValue
+            pathRead panics
+        | structuralUpdate resolve _ _ _ _ failed =>
+          obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+          cases snapshot
+          cases failed
+    | tail head fault =>
+      cases head with
+      | assignValue executes =>
+        cases executes with
+        | intro resolve evaluate write =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+          exact .assignment snapshot (lift value (by omega) evaluate) write
+            (tailIH (by omega) signatures expressible fault)
+  | projectedAssigned assignable keys value _ tailIH =>
+    intro size context environment before after failedContext reason within signatures expressible failed
+    cases failed with
+    | head fault =>
+      cases fault with
+      | assignValue fault =>
+        cases fault with
+        | target failed =>
+          cases failed with
+          | unbound missing => exact .projectedAssignmentRootFault assignable.2.1 (.unbound missing)
+          | dangling lookup missing => exact .projectedAssignmentRootFault assignable.2.1 (.dangling lookup missing)
+          | projectionExpression lookup read failed =>
+            have below := within
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+            exact .projectedAssignmentKeysFault assignable.2.1 (.intro lookup read)
+              (projections_fault lift faultLift keys (by omega) signatures expressible failed)
+          | danglingAfterProjections lookup read evaluate missing =>
+            have below := within
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+            obtain ⟨values, staged, ordered⟩ :=
+              CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+            exact .projectedAssignmentGetterFault assignable.2.1 staged (.dangling lookup read ordered missing)
+          | projectionRead lookup initialRead evaluate currentRead initialValue failed =>
+            have below := within
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+            obtain ⟨values, staged, ordered⟩ :=
+              CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+            exact .projectedAssignmentGetterFault assignable.2.1 staged
+              (.projection lookup initialRead ordered currentRead initialValue failed)
+          | uninitialized lookup initialRead evaluate currentRead empty notMapping nonempty =>
+            have below := within
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+            obtain ⟨values, staged, ordered⟩ :=
+              CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+            exact .projectedAssignmentGetterFault assignable.2.1 staged
+              (.uninitialized lookup initialRead ordered currentRead empty notMapping nonempty)
+          | elementPrefix projectionsEq _
+          | elementIndex projectionsEq _ _
+          | elementIndexType projectionsEq _ _ _ _
+          | elementOutOfBounds projectionsEq _ _ _ _ _ _
+          | elementUninitialized projectionsEq _ _ =>
+            exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
+        | rhs resolve failed =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨values, staged, snapshot⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+          exact .projectedAssignmentRhsFault assignable.2.1 staged snapshot
+            (faultLift value (by omega) signatures expressible failed)
+        | operands resolve evaluate currentRead rootType initialValue pathRead invalid =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨values, staged, snapshot⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+          exact .projectedAssignmentWriteFault assignable.2.1 staged snapshot (lift value (by omega) evaluate)
+            (.operands currentRead rootType initialValue pathRead invalid)
+        | panic resolve evaluate currentRead rootType initialValue pathRead panics =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨values, staged, snapshot⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+          exact .projectedAssignmentWriteFault assignable.2.1 staged snapshot (lift value (by omega) evaluate)
+            (.panic currentRead rootType initialValue pathRead panics)
+        | structuralUpdate resolve evaluate currentRead rootType initialValue failed =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨values, staged, snapshot⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+          exact .projectedAssignmentWriteFault assignable.2.1 staged snapshot (lift value (by omega) evaluate)
+            (.structural currentRead rootType initialValue failed)
+    | tail head fault =>
+      cases head with
+      | assignValue executes =>
+        cases executes with
+        | intro resolve evaluate write =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨values, staged, snapshot⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+          exact .projectedAssignment assignable.2.1 staged snapshot (lift value (by omega) evaluate) write
+            (tailIH (by omega) signatures expressible fault)
+  | bitNotted assignable _ tailIH =>
+    intro size context environment before after failedContext reason within signatures expressible failed
+    cases failed with
+    | head fault =>
+      cases fault with
+      | assignBitNot fault =>
+        have unchanged := Staging.Recursive.bitNot_fault_heap assignable.2.1 fault.sound
+        subst unchanged
+        exact .bitNotFault assignable.2.1 fault.sound
+    | tail head fault =>
+      cases head with
+      | assignBitNot executes =>
+        cases executes with
+        | intro resolve write =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve.sound
+          exact .bitNot snapshot write (tailIH (by omega) signatures expressible fault)
+  | projectedBitNotted assignable keys _ tailIH =>
+    intro size context environment before after failedContext reason within signatures expressible failed
+    cases failed with
+    | head fault =>
+      cases fault with
+      | assignBitNot fault =>
+        cases fault with
+        | target failed =>
+          cases failed with
+          | unbound missing => exact .projectedBitNotRootFault assignable.2.1 (.unbound missing)
+          | dangling lookup missing => exact .projectedBitNotRootFault assignable.2.1 (.dangling lookup missing)
+          | projectionExpression lookup read failed =>
+            have below := within
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+            exact .projectedBitNotKeysFault assignable.2.1 (.intro lookup read)
+              (projections_fault lift faultLift keys (by omega) signatures expressible failed)
+          | danglingAfterProjections lookup read evaluate missing =>
+            have below := within
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+            obtain ⟨values, staged, ordered⟩ :=
+              CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+            exact .projectedBitNotGetterFault assignable.2.1 staged (.dangling lookup read ordered missing)
+          | projectionRead lookup initialRead evaluate currentRead initialValue failed =>
+            have below := within
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+            obtain ⟨values, staged, ordered⟩ :=
+              CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+            exact .projectedBitNotGetterFault assignable.2.1 staged
+              (.projection lookup initialRead ordered currentRead initialValue failed)
+          | uninitialized lookup initialRead evaluate currentRead empty notMapping nonempty =>
+            have below := within
+            simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+            obtain ⟨values, staged, ordered⟩ :=
+              CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+            exact .projectedBitNotGetterFault assignable.2.1 staged
+              (.uninitialized lookup initialRead ordered currentRead empty notMapping nonempty)
+          | elementPrefix projectionsEq _
+          | elementIndex projectionsEq _ _
+          | elementIndexType projectionsEq _ _ _ _
+          | elementOutOfBounds projectionsEq _ _ _ _ _ _
+          | elementUninitialized projectionsEq _ _ =>
+            exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
+        | uninitialized resolve empty =>
+          exfalso
+          cases resolve with
+          | intro _ _ evaluate _ _ selection =>
+            obtain ⟨_, present⟩ := read_selects selection (.inr (evaluated_nonempty assignable.2.1 evaluate))
+            cases present.symm.trans empty
+          | element projectionsEq =>
+            exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
+        | operand resolve selected invalid =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨values, staged, snapshot⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+          exact .projectedBitNotOperandFault assignable.2.1 staged snapshot selected invalid
+    | tail head fault =>
+      cases head with
+      | assignBitNot executes =>
+        cases executes with
+        | intro resolve write =>
+          have below := within
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+          obtain ⟨values, staged, snapshot⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+          exact .projectedBitNot assignable.2.1 staged snapshot write (tailIH (by omega) signatures expressible fault)
+
+/-- The sized Source fault of a `for` loop whose condition `child` admits,
+whose body lifts within the bound and whose post header is supported, with an
+expressible reason at a context with the program's signatures, is a staged
+fault of the loop with the same heap. -/
+private theorem for_fault_lift {child : ExpressionId → Prop} {bound : Nat}
+    (lift : ChildLifts program registry scope child bound)
+    (faultLift : ChildFaultLifts program registry scope child bound) {condition : ExpressionId}
+    {post : List ForItemForm} {body : List StatementId} (test : child condition)
+    (inner : ∀ {size : Nat} {context environment before innerContext outcome after}, size ≤ bound →
+      SourceExecutionSize.StatementsExecute program size context scope.evidence scope.source environment before body
+        innerContext outcome after →
+      Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
+        (CellAwareInvocationAcceptedStatementLifting.control outcome) after)
+    (innerFault : ∀ {size : Nat} {context environment before innerContext after} {reason : Dynamic.SemanticFault},
+      size ≤ bound → context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.StatementsFault program size context scope.evidence scope.source environment before body
+        innerContext reason after →
+      Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
+        (.fault (.semantic reason)) after)
+    (postShape : CellAwareInvocationAcceptedBodyShape.ItemsShape scope.source child post) :
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault},
+      size ≤ bound → context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.ForLoopFaults program size context scope.evidence scope.source environment before
+        condition post body reason after →
+      Staging.Recursive.ForLoop program registry scope context environment before condition post body
+        (.fault (.semantic reason)) after := by
+  intro size
+  induction size using Nat.strongRecOn with
+  | ind size ih =>
+    intro context environment before after reason within signatures expressible failed
+    cases failed with
+    | condition fault =>
+      exact .testFault (faultLift test
+        (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_one within) signatures expressible fault)
+    | conditionType => simp [Expressible] at expressible
+    | body evaluate fault =>
+      exact .bodyFailure (lift test (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_left within)
+        evaluate)
+        (innerFault (Nat.le_of_lt (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_right within))
+          signatures expressible fault)
+    | postFallthrough evaluate executes fault =>
+      have below := within
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+      exact .postFailure (lift test (by omega) evaluate) (inner (by omega) executes)
+        (items_fault_lift lift faultLift postShape (by omega) signatures expressible fault)
+    | postContinue evaluate executes fault =>
+      have below := within
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+      exact .continuePostFailure (lift test (by omega) evaluate) (inner (by omega) executes)
+        (items_fault_lift lift faultLift postShape (by omega) signatures expressible fault)
+    | nextFallthrough evaluate executes postExecutes fault =>
+      have below := within
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+      exact .iterate (lift test (by omega) evaluate) (inner (by omega) executes)
+        (CellAwareInvocationAcceptedSizedLifting.items_lift lift postShape (by omega) postExecutes).1
+        (ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) (by omega) signatures expressible fault)
+    | nextContinue evaluate executes postExecutes fault =>
+      have below := within
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+      exact .continueIterate (lift test (by omega) evaluate) (inner (by omega) executes)
+        (CellAwareInvocationAcceptedSizedLifting.items_lift lift postShape (by omega) postExecutes).1
         (ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) (by omega) signatures expressible fault)
 
 /-- A sized fault execution of a supported statement list with an expressible
@@ -2610,6 +3205,34 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
           (fun within executes => CellAwareInvocationAcceptedSizedLifting.statements unique lift inner within executes)
           (fun within signatures expressible failed => innerIH within signatures expressible failed)
           (by omega) signatures expressible failed)
+  | forLooped found form initialItems test inner postItems _ innerIH tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, _, _, _, _, _, loopOutcome, firstBelow, secondBelow, initialized, iterate, rfl, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.for_inv unique found form head
+      obtain ⟨loop, ended⟩ := CellAwareInvocationAcceptedSizedLifting.for_lift lift test
+        (fun within executes => CellAwareInvocationAcceptedSizedLifting.statements unique lift inner within executes)
+        postItems (by omega) iterate
+      rcases ended with rfl | ⟨_, rfl⟩
+      · cases same
+        exact .forFallthrough (lookupStatement?_sound found) form
+          (CellAwareInvocationAcceptedSizedLifting.items_lift lift initialItems (by omega) initialized).1 loop
+          (tailIH (by omega) signatures expressible next)
+      · cases same
+    · intro context environment before after headSize headBelow signatures fault
+      rcases for_fault_inv unique found form fault with
+        ⟨_, _, initialBelow, failed⟩ | ⟨_, _, _, _, _, firstBelow, secondBelow, initialized, failed⟩
+      · exact .forInitializerFault (lookupStatement?_sound found) form
+          (items_fault_lift lift faultLift initialItems (by omega) signatures expressible failed)
+      · obtain ⟨initial, sameSignatures⟩ :=
+          CellAwareInvocationAcceptedSizedLifting.items_lift lift initialItems (by omega) initialized
+        exact .forFault (lookupStatement?_sound found) form initial
+          (for_fault_lift lift faultLift test
+            (fun within executes => CellAwareInvocationAcceptedSizedLifting.statements unique lift inner within executes)
+            (fun within signatures expressible failed => innerIH within signatures expressible failed)
+            postItems (by omega) (sameSignatures.trans signatures) expressible failed)
   | tail found form _ value =>
     intro size context environment before after finalContext reason within signatures expressible original
     unfold FaultOriginal at original

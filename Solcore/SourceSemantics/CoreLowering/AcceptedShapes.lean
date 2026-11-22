@@ -25,8 +25,8 @@ section
 /-! Source statement lists that the accepted-body route closes at named rows:
 value and unit returns, monomorphic declarations, bare assignments, assignments
 through mapping indices and in-place `~`, bare or through mapping indices, that
-the compiler refines, expression statements, blocks, conditionals, `while` loops,
-`break` and `continue`, and a function body's final value of its
+the compiler refines, expression statements, blocks, conditionals, `while` and
+`for` loops with headers of these forms, `break` and `continue`, and a function body's final value of its
 declared type, each with its expressions in a given predicate. `Shape` recognizes these lists on the
 Source; `covered` shows that every refined accepted tree of such a list is
 covered by the statement closure, and `shapeWith?` recognizes them on an
@@ -39,6 +39,37 @@ namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedBodySh
 open Core Frontend SourceInference
 open AcceptedNamedBodyFlow (Tree Assignable ProjectedAssignable BitNotAssignable ProjectedBitNotAssignable)
 open CellAwareInvocationAcceptedFlow (Covered)
+
+/-- For-header vectors of the supported forms: monomorphic declarations,
+expression items, and bare assignments, assignments through mapping indices
+and in-place `~`, bare or through mapping indices, that the compiler refines,
+each with its expressions in `child`. -/
+inductive ItemsShape (source : TypedSource) (child : ExpressionId → Prop) : List ForItemForm → Prop where
+  | nil : ItemsShape source child []
+  | absent {binder : TypedBinder} {rest : List ForItemForm} (monomorphic : binder.scheme.quantified = [])
+      (tail : ItemsShape source child rest) : ItemsShape source child (.letDecl binder none :: rest)
+  | initialized {binder : TypedBinder} {expression : ExpressionId} {rest : List ForItemForm}
+      (monomorphic : binder.scheme.quantified = []) (value : child expression)
+      (tail : ItemsShape source child rest) : ItemsShape source child (.letDecl binder (some expression) :: rest)
+  | discarded {expression : ExpressionId} {rest : List ForItemForm} (value : child expression)
+      (tail : ItemsShape source child rest) : ItemsShape source child (.expression expression :: rest)
+  | assigned {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {expression : ExpressionId}
+      {rest : List ForItemForm} (assignable : Assignable source assignment operator) (value : child expression)
+      (tail : ItemsShape source child rest) :
+      ItemsShape source child (.assignValue assignment operator expression :: rest)
+  | projectedAssigned {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp}
+      {expression : ExpressionId} {rest : List ForItemForm}
+      (assignable : ProjectedAssignable source assignment operator)
+      (keys : ∀ projection ∈ assignment.target.projections, ∃ key, projection = .index key ∧ child key)
+      (value : child expression) (tail : ItemsShape source child rest) :
+      ItemsShape source child (.assignValue assignment operator expression :: rest)
+  | bitNotted {assignment : AssignmentResolution} {rest : List ForItemForm}
+      (assignable : BitNotAssignable source assignment) (tail : ItemsShape source child rest) :
+      ItemsShape source child (.assignBitNot assignment :: rest)
+  | projectedBitNotted {assignment : AssignmentResolution} {rest : List ForItemForm}
+      (assignable : ProjectedBitNotAssignable source assignment)
+      (keys : ∀ projection ∈ assignment.target.projections, ∃ key, projection = .index key ∧ child key)
+      (tail : ItemsShape source child rest) : ItemsShape source child (.assignBitNot assignment :: rest)
 
 /-- Statement lists of the supported forms. A list may end without returning
 only as a branch or block body, or in a Unit function, and a function body may
@@ -109,6 +140,13 @@ inductive Shape (source : TypedSource) (expected : TypeSystem.Ty) (child : Expre
       (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition body)
       (test : child condition) (inner : Shape source expected child false body)
       (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
+  | forLooped {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+      {initializer : List ForItemForm} {condition : ExpressionId} {post : List ForItemForm}
+      {body : List StatementId} (found : source.lookupStatement? id = some node)
+      (form : node.form = .forLoop initializer condition post body) (initial : ItemsShape source child initializer)
+      (test : child condition) (inner : Shape source expected child false body)
+      (after : ItemsShape source child post) (tail : Shape source expected child mode rest) :
+      Shape source expected child mode (id :: rest)
   | tail {id : StatementId} {node : StatementNode} {expression : ExpressionId}
       (found : source.lookupStatement? id = some node) (form : node.form = .expression expression false)
       (typed : ∀ expressionNode, source.lookupExpression? expression = some expressionNode →
@@ -222,6 +260,52 @@ def projectedBitNotAssignable? (source : TypedSource) (assignment : AssignmentRe
     else none
   else none
 
+/-- Proof-producing recognition of a supported header vector whose
+expressions satisfy `child`, which `child?` checks. -/
+def itemsWith? (source : TypedSource) (child : ExpressionId → Prop)
+    (child? : (id : ExpressionId) → Option (PLift (child id))) :
+    (items : List ForItemForm) → Option (PLift (ItemsShape source child items))
+  | [] => some ⟨.nil⟩
+  | .letDecl binder none :: rest =>
+    match monomorphic : binder.scheme.quantified with
+    | [] => do
+      let ⟨tail⟩ ← itemsWith? source child child? rest
+      pure ⟨.absent monomorphic tail⟩
+    | _ :: _ => none
+  | .letDecl binder (some expression) :: rest =>
+    match monomorphic : binder.scheme.quantified with
+    | [] => do
+      let ⟨value⟩ ← child? expression
+      let ⟨tail⟩ ← itemsWith? source child child? rest
+      pure ⟨.initialized monomorphic value tail⟩
+    | _ :: _ => none
+  | .expression expression :: rest => do
+    let ⟨value⟩ ← child? expression
+    let ⟨tail⟩ ← itemsWith? source child child? rest
+    pure ⟨.discarded value tail⟩
+  | .assignValue assignment operator expression :: rest =>
+    match assignable? source assignment operator with
+    | some ⟨assignable⟩ => do
+      let ⟨value⟩ ← child? expression
+      let ⟨tail⟩ ← itemsWith? source child child? rest
+      pure ⟨.assigned assignable value tail⟩
+    | none => do
+      let ⟨assignable⟩ ← projectedAssignable? source assignment operator
+      let ⟨keys⟩ ← indexKeys? child? assignment.target.projections
+      let ⟨value⟩ ← child? expression
+      let ⟨tail⟩ ← itemsWith? source child child? rest
+      pure ⟨.projectedAssigned assignable keys value tail⟩
+  | .assignBitNot assignment :: rest =>
+    match bitNotAssignable? source assignment with
+    | some ⟨assignable⟩ => do
+      let ⟨tail⟩ ← itemsWith? source child child? rest
+      pure ⟨.bitNotted assignable tail⟩
+    | none => do
+      let ⟨assignable⟩ ← projectedBitNotAssignable? source assignment
+      let ⟨keys⟩ ← indexKeys? child? assignment.target.projections
+      let ⟨tail⟩ ← itemsWith? source child child? rest
+      pure ⟨.projectedBitNotted assignable keys tail⟩
+
 /-- Proof-producing recognition of a supported statement list whose
 expressions satisfy `child`, which `child?` checks. The fuel bounds the nesting
 of statement lists. -/
@@ -303,6 +387,13 @@ def shapeWith? (source : TypedSource) (expected : TypeSystem.Ty) (child : Expres
         let ⟨inner⟩ ← shapeWith? source expected child child? fuel false body
         let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
         pure ⟨.whileLooped found form test inner tail⟩
+      | .forLoop initializer condition post body => do
+        let ⟨initial⟩ ← itemsWith? source child child? initializer
+        let ⟨test⟩ ← child? condition
+        let ⟨inner⟩ ← shapeWith? source expected child child? fuel false body
+        let ⟨after⟩ ← itemsWith? source child child? post
+        let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+        pure ⟨.forLooped found form initial test inner after tail⟩
       | _ => none
 
 /-- Proof-producing recognition of a supported statement list whose expressions
@@ -352,6 +443,7 @@ private theorem head_expanded {source : TypedSource} {expected : TypeSystem.Ty} 
   | breaking found form => exact ⟨_, found, by rw [form]; rfl⟩
   | continuing found form => exact ⟨_, found, by rw [form]; rfl⟩
   | whileLooped found form => exact ⟨_, found, by rw [form]; rfl⟩
+  | forLooped found form => exact ⟨_, found, by rw [form]; rfl⟩
   | tail found form => exact ⟨_, found, by rw [form]; rfl⟩
 
 variable {whole : SourceCoreUnifiedCompilation.Compiled} {bodyRelation : ActualBodyInvocation.BodyRelation}
@@ -362,6 +454,52 @@ private theorem node_of_read (index : ActualBodyInvocation.Index whole bodyRelat
     index.compilerSource.lookupStatement? id = some node := by
   rw [index.statement_reader] at read
   exact read_found read
+
+/-- Every refined accepted header tree of a supported header vector is covered
+when the compiler's view is the original Source. -/
+private theorem items_covered {policy : SourceCoreLoops.Policy} {source semantic : TypedSource}
+    {site : SourceCoreElaboration.ErrorSite} {result : Ty} {reasonAt : ExpressionId → Word}
+    {next : SourceCoreLocalCell.Scope → Except SourceCoreBasic.Error Expr} {finalScope : SourceCoreLocalCell.Scope}
+    {finish : Expr} {child : ExpressionId → Prop} (sameSource : source = semantic) :
+    ∀ {fuel : Nat} {scope : SourceCoreLocalCell.Scope} {items : List ForItemForm} {code : Expr}
+      (tree : AcceptedNamedBodyFlow.Items policy source site result reasonAt next finalScope finish fuel scope items
+        code),
+      tree.Ready → ItemsShape source child items → CellAwareInvocationAcceptedForItems.ItemsCovered semantic tree := by
+  intro fuel scope items code tree
+  induction tree with
+  | nil => intro _ _; trivial
+  | absent _ _ _ ih =>
+    intro ready shape
+    cases shape with
+    | absent _ tail => exact ih ready tail
+  | initialized _ _ _ _ _ _ ih =>
+    intro ready shape
+    cases shape with
+    | initialized monomorphic _ tail => exact ⟨monomorphic, ih ready tail⟩
+  | discard _ _ _ ih =>
+    intro ready shape
+    cases shape with
+    | discarded _ tail => exact ih ready tail
+  | assigning =>
+    intro ready shape
+    cases shape with
+    | assigned assignable _ _ => exact absurd (.inl assignable) ready.1
+    | projectedAssigned assignable _ _ _ => exact absurd (.inr assignable) ready.1
+  | assigned _ _ _ ih | projectedAssigned _ _ _ ih =>
+    intro ready shape
+    cases shape with
+    | assigned _ _ tail => exact ⟨sameSource, ih ready tail⟩
+    | projectedAssigned _ _ _ tail => exact ⟨sameSource, ih ready tail⟩
+  | bitNotting =>
+    intro ready shape
+    cases shape with
+    | bitNotted assignable _ => exact absurd (.inl assignable) ready.1
+    | projectedBitNotted assignable _ _ => exact absurd (.inr assignable) ready.1
+  | bitNotted _ _ _ ih | projectedBitNotted _ _ _ ih =>
+    intro ready shape
+    cases shape with
+    | bitNotted _ tail => exact ⟨sameSource, ih ready tail⟩
+    | projectedBitNotted _ _ tail => exact ⟨sameSource, ih ready tail⟩
 
 /-- Every refined accepted tree of a supported statement list is covered, for
 every match and generalized input. -/
@@ -550,6 +688,23 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
       clear innerIH tailIH ready
       simp_all
+  | forLoop read form _ _ _ _ initial _ after _ innerIH tailIH =>
+    intro ready shape
+    cases shape with
+    | forLooped found form' initialShape _ inner afterShape tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      rw [form] at form'
+      cases form'
+      exact ⟨items_covered sameSource initial ready.1 initialShape, innerIH ready.2.1 inner,
+        items_covered sameSource after ready.2.2.1 afterShape, tailIH ready.2.2.2 tail⟩
+    | _ =>
+      exfalso
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
+      clear innerIH tailIH ready
+      simp_all
+  | forBoundary _ _ outside _ =>
+    intro _ _
+    exact absurd ⟨True.intro, True.intro⟩ outside
   | tailValue read form _ _ _ _ =>
     intro _ shape
     cases shape with
@@ -746,8 +901,8 @@ declarations allocate the same cell, a bare assignment resolves its target
 without changing the heap and writes it by the same rule, an assignment or an
 in-place `~` through mapping indices evaluates its keys in order before the
 same snapshot and write, blocks and conditional arms restore their entry bindings while
-keeping their heap, and a `while` loop runs the same iterations, falling
-through at its own bindings. Each control outcome is carried unchanged, with the
+keeping their heap, and a `while` or `for` loop runs the same header items and
+iterations, falling through at its own bindings. Each control outcome is carried unchanged, with the
 context, environment and heap of the original execution. Fault executions are
 not lifted here. -/
 set_option autoImplicit false
@@ -991,6 +1146,27 @@ private theorem while_inv (unique : NodeOccurrencesUnique source) (found : sourc
     exfalso
     obtain rfl := same_node unique found (by assumption)
     simp_all
+
+private theorem for_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    {initializer : List ForItemForm} {condition : ExpressionId} {post : List ForItemForm} {body : List StatementId}
+    (form : node.form = .forLoop initializer condition post body)
+    (head : Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after) :
+    ∃ loopContext loopEnvironment initialized loopFinalContext inner,
+      Dynamic.ForItemsExecute program context evidence source environment before initializer loopContext
+        loopEnvironment initialized ∧
+      Dynamic.ForLoopExecutes program loopContext evidence source loopEnvironment initialized condition post body
+        loopFinalContext inner after ∧
+      finalContext = context ∧ outcome = Dynamic.restoreControl environment inner := by
+  cases head with
+  | forLoop contains formEq initial iterate =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, _, _, _, _, initial, iterate, rfl, rfl⟩
+  | _ =>
+    exfalso
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
 end Inversion
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
@@ -1074,6 +1250,127 @@ private theorem while_lift {evidence : Dynamic.EvidenceEnvironment} {source : Ty
       exact ⟨.continueNext (test evaluate.sound) (inner executes.sound) staged, ended⟩
     | breaks evaluate executes => exact ⟨.breakFromBody (test evaluate.sound) (inner executes.sound), .inl rfl⟩
     | returns evaluate executes => exact ⟨.returned (test evaluate.sound) (inner executes.sound), .inr ⟨_, rfl⟩⟩
+
+/-- The Source's execution of a supported header vector whose expressions are
+subset sites is the staged execution of the vector, with the same context,
+bindings and heap. -/
+private theorem items_lift (unique : NodeOccurrencesUnique scope.source) {items : List ForItemForm}
+    (shape : CellAwareInvocationAcceptedBodyShape.ItemsShape scope.source (Subset prepared named scope.source)
+      items) :
+    ∀ {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+      {finalContext : SourceSemantics.Context} {finalEnvironment : Dynamic.Environment},
+      Dynamic.ForItemsExecute program context scope.evidence scope.source environment before items finalContext
+        finalEnvironment after →
+      Staging.Recursive.ForItems program registry scope context environment before items finalContext
+        (.done finalEnvironment) after := by
+  induction shape with
+  | nil =>
+    intro context environment before after finalContext finalEnvironment executes
+    cases executes
+    exact .empty
+  | absent monomorphic _ tailIH =>
+    intro context environment before after finalContext finalEnvironment executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | letUninitialized _ extension allocate => exact .absent monomorphic extension allocate (tailIH tail)
+  | initialized monomorphic value _ tailIH =>
+    intro context environment before after finalContext finalEnvironment executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | letInitialized evaluate _ extension allocate =>
+        exact .initialized monomorphic extension (expression_value unique value evaluate) allocate (tailIH tail)
+      | letInitializedGeneralized _ _ polymorphic => exact absurd monomorphic polymorphic
+  | discarded value _ tailIH =>
+    intro context environment before after finalContext finalEnvironment executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | expression evaluate => exact .expression (expression_value unique value evaluate) (tailIH tail)
+  | assigned assignable value _ tailIH =>
+    intro context environment before after finalContext finalEnvironment executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | assignValue executes =>
+        cases executes with
+        | intro resolve evaluate write =>
+          obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve
+          exact .assignment snapshot (expression_value unique value evaluate) write (tailIH tail)
+  | projectedAssigned assignable keys value _ tailIH =>
+    intro context environment before after finalContext finalEnvironment executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | assignValue executes =>
+        cases executes with
+        | intro resolve evaluate write =>
+          obtain ⟨values, staged, snapshot⟩ := projected_target unique keys resolve
+          exact .projectedAssignment assignable.2.1 staged snapshot (expression_value unique value evaluate) write
+            (tailIH tail)
+  | bitNotted assignable _ tailIH =>
+    intro context environment before after finalContext finalEnvironment executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | assignBitNot executes =>
+        cases executes with
+        | intro resolve write =>
+          obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve
+          exact .bitNot snapshot write (tailIH tail)
+  | projectedBitNotted assignable keys _ tailIH =>
+    intro context environment before after finalContext finalEnvironment executes
+    cases executes with
+    | cons head tail =>
+      cases head with
+      | assignBitNot executes =>
+        cases executes with
+        | intro resolve write =>
+          obtain ⟨values, staged, snapshot⟩ := projected_target unique keys resolve
+          exact .projectedBitNot assignable.2.1 staged snapshot write (tailIH tail)
+
+/-- The Source's iterations of a `for` loop whose condition, body and post
+header lift are the staged iterations, with the same outcome and heap. The
+loop falls through at its own bindings or returns. -/
+private theorem for_lift {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource}
+    {condition : ExpressionId} {post : List ForItemForm} {body : List StatementId}
+    (test : ∀ {context environment before value after},
+      Dynamic.ExpressionEvaluates program context evidence source environment before condition value after →
+      Staging.Recursive.Expression program registry scope context environment before condition (.value value) after)
+    (inner : ∀ {context environment before innerContext outcome after},
+      Dynamic.StatementsExecute program context evidence source environment before body innerContext outcome after →
+      Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
+        (control outcome) after)
+    (postLift : ∀ {context environment before finalContext finalEnvironment after},
+      Dynamic.ForItemsExecute program context evidence source environment before post finalContext finalEnvironment
+        after →
+      Staging.Recursive.ForItems program registry scope context environment before post finalContext
+        (.done finalEnvironment) after)
+    {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {loopContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
+    (loop : Dynamic.ForLoopExecutes program context evidence source environment before condition post body
+      loopContext outcome after) :
+    Staging.Recursive.ForLoop program registry scope context environment before condition post body
+        (control outcome) after ∧
+      (outcome = .fallthrough environment ∨ ∃ value, outcome = .returned value) := by
+  obtain ⟨size, sized⟩ := SourceExecutionSize.ForLoopExecutes.has_size loop
+  clear loop
+  induction size using Nat.strongRecOn generalizing before loopContext outcome after with
+  | ind size ih =>
+    cases sized with
+    | done evaluate => exact ⟨.finished (test evaluate.sound), .inl rfl⟩
+    | nextFallthrough evaluate executes postExecutes next =>
+      obtain ⟨staged, ended⟩ := ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next
+      exact ⟨.iterate (test evaluate.sound) (inner executes.sound) (postLift postExecutes.sound) staged, ended⟩
+    | nextContinue evaluate executes postExecutes next =>
+      obtain ⟨staged, ended⟩ := ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next
+      exact ⟨.continueIterate (test evaluate.sound) (inner executes.sound) (postLift postExecutes.sound) staged,
+        ended⟩
+    | breaks evaluate executes =>
+      exact ⟨.forBreakFromBody (test evaluate.sound) (inner executes.sound), .inl rfl⟩
+    | returns evaluate executes =>
+      exact ⟨.returnedFromBody (test evaluate.sound) (inner executes.sound), .inr ⟨_, rfl⟩⟩
 
 /-- One statement followed by the rest of its list. A falling-through head runs
 the rest; a terminal head ends the list. Both compiler modes share this
@@ -1335,6 +1632,27 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {mode : Bool} {
       rcases ended with rfl | ⟨_, rfl⟩
       · cases terminal
       · exact .whileReturned (lookupStatement?_sound found) form loop
+  | forLooped found form initialItems test _ postItems _ innerIH tailIH =>
+    intro context environment before after finalContext outcome
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after head next
+      obtain ⟨_, _, _, _, loopOutcome, initialized, iterate, rfl, same⟩ := for_inv unique found form head
+      obtain ⟨loop, ended⟩ := for_lift (registry := registry) (scope := scope) (evidence := scope.evidence)
+        (source := scope.source) (fun evaluate => expression_value unique test evaluate)
+        (fun executes => innerIH executes) (fun executes => items_lift unique postItems executes) iterate
+      rcases ended with rfl | ⟨_, rfl⟩
+      · cases same
+        exact .forFallthrough (lookupStatement?_sound found) form (items_lift unique initialItems initialized) loop
+          (tailIH next)
+      · cases same
+    · intro context environment before finalContext outcome after head terminal
+      obtain ⟨_, _, _, _, loopOutcome, initialized, iterate, rfl, rfl⟩ := for_inv unique found form head
+      obtain ⟨loop, ended⟩ := for_lift (registry := registry) (scope := scope) (evidence := scope.evidence)
+        (source := scope.source) (fun evaluate => expression_value unique test evaluate)
+        (fun executes => innerIH executes) (fun executes => items_lift unique postItems executes) iterate
+      rcases ended with rfl | ⟨_, rfl⟩
+      · cases terminal
+      · exact .forReturned (lookupStatement?_sound found) form (items_lift unique initialItems initialized) loop
   | tail found form _ value =>
     intro context environment before after finalContext outcome original
     unfold Original at original
