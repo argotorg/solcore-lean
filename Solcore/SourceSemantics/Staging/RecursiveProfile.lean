@@ -563,6 +563,12 @@ inductive ArrayOutcome : ExpressionForm → List Dynamic.Value → Heap → Outc
       ArrayOutcome (.memrefStore reference value) [.memref element location position, stored] heap
         (.value .unit) final
 
+/-- A staged element place's resolution: the place it resolves to, or a
+fault. -/
+inductive TargetOutcome where
+  | resolved (target : ResolvedPlace)
+  | fault (failure : Failure)
+
 /-- A fault after an array form's children keeps the heap they reached. -/
 theorem ArrayOutcome.fault_heap {form : ExpressionForm} {values : List Dynamic.Value} {heap after : Heap}
     {failure : Failure} (result : ArrayOutcome form values heap (.fault failure) after) : after = heap := by
@@ -1661,6 +1667,84 @@ mutual
         (head : CoercionStep program registry scope context before step input (.fault failure) after) :
         CoercionPath program registry scope context before (step :: steps) input (.fault failure) after
 
+  /-- An element place `root[i₀]⋯[iₖ]` on a root local, staged as the Source's
+  `SourcePlaceResolves.element` resolves it: the leading place, then the index,
+  then the array object's own cell, whose element at the index is the snapshot.
+  The leading place of the first element is the bare root. Its faults mirror
+  `SourcePlaceFaults`: the root's, the leading place's, a root not yet
+  initialized, the index's, an index that is not a word, and `0x32` from the
+  array's length on. -/
+  inductive ElementTarget (program : Program) (registry : Registry) :
+      Scope → Context → Environment → Heap → PlaceResolution → TargetOutcome → Heap → Prop where
+    | elementRoot {scope context environment heap place location cell initial}
+        (bare : place.projections = [])
+        (lookup : Environment.LooksUp environment place.root location)
+        (read : Heap.Reads heap location cell)
+        (initialValue : RootInitialValue cell initial) :
+        ElementTarget program registry scope context environment heap place
+          (.resolved { location := location, rootType := cell.type, valueType := place.type, projections := [], selected := initial })
+          heap
+    | elementRootFault {scope context environment heap place reason}
+        (bare : place.projections = [])
+        (failed : ProjectedTarget.RootFault environment heap place reason) :
+        ElementTarget program registry scope context environment heap place (.fault (.semantic reason)) heap
+    | elementStep {scope context environment before middle after place leading index prefixTarget element location
+          position cell elements selected}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
+          middle)
+        (prefix_selected : prefixTarget.selected = some (.arrayRef element location))
+        (indexed : Expression program registry scope context environment middle index (.value (.word position)) after)
+        (read : Heap.Reads after location cell)
+        (initialValue : RootInitialValue cell (some (.arrayObject element elements)))
+        (selection : ValueAt elements position.val selected) :
+        ElementTarget program registry scope context environment before place
+          (.resolved { location := location, rootType := cell.type, valueType := place.type, projections := [.element position.val], selected := some selected })
+          after
+    | elementPrefixFault {scope context environment before after place leading index failure}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.fault failure) after) :
+        ElementTarget program registry scope context environment before place (.fault failure) after
+    | elementUninitialized {scope context environment before after place leading index prefixTarget}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
+          after)
+        (prefix_empty : prefixTarget.selected = none) :
+        ElementTarget program registry scope context environment before place
+          (.fault (.semantic (.uninitializedLocation prefixTarget.location))) after
+    | elementIndexFault {scope context environment before middle after place leading index prefixTarget failure}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
+          middle)
+        (indexed : Expression program registry scope context environment middle index (.fault failure) after) :
+        ElementTarget program registry scope context environment before place (.fault failure) after
+    | elementIndexType {scope context environment before middle after place leading index prefixTarget value actual}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
+          middle)
+        (indexed : Expression program registry scope context environment middle index (.value value) after)
+        (not_word : ¬ WordValue value) (actual_type : ValueRuntimeType value actual) :
+        ElementTarget program registry scope context environment before place
+          (.fault (.semantic (.typeMismatch .word actual))) after
+    | elementOutOfBounds {scope context environment before middle after place leading index prefixTarget element location
+          position cell elements}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
+          middle)
+        (prefix_selected : prefixTarget.selected = some (.arrayRef element location))
+        (indexed : Expression program registry scope context environment middle index (.value (.word position)) after)
+        (read : Heap.Reads after location cell)
+        (stored : cell.value = some (.arrayObject element elements))
+        (out_of_bounds : elements.length ≤ position.val) :
+        ElementTarget program registry scope context environment before place
+          (.fault (.semantic (.panic 0x32))) after
+
 end
 
 /-- Function bodies retain the original interface. Branch arms use `StatementsIn ... false`. -/
@@ -1707,6 +1791,10 @@ private def BodyOrigin (outcome : BodyOutcome) : Prop :=
     outcome = .fault (.stage originScope call reason) → Generated originScope call reason
 
 private def ForItemsOrigin (outcome : ForItemsOutcome) : Prop :=
+  ∀ (originScope : Scope) (call : ExpressionId) (reason : CallGuard.Fault),
+    outcome = .fault (.stage originScope call reason) → Generated originScope call reason
+
+private def TargetOrigin (outcome : TargetOutcome) : Prop :=
   ∀ (originScope : Scope) (call : ExpressionId) (reason : CallGuard.Fault),
     outcome = .fault (.stage originScope call reason) → Generated originScope call reason
 
@@ -1761,7 +1849,15 @@ local macro "retain_stage_origin" : tactic =>
       exact ih s c r rfl
     case arrayResult occurrence shape evaluated result ih =>
       cases result <;> simp_all [ExpressionOrigin]
-    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin]
+    case elementPrefixFault projections_eq leadingTarget ih =>
+      intro s c r same
+      cases same
+      exact ih s c r rfl
+    case elementIndexFault projections_eq leadingTarget indexed leadingIH indexIH =>
+      intro s c r same
+      cases same
+      exact indexIH s c r rfl
+    all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin, TargetOrigin]
   ))
 
 theorem Expression.stage_origin {program : Program} {registry : Registry} {scope : Scope}
@@ -1782,6 +1878,7 @@ theorem Expression.stage_origin {program : Program} {registry : Registry} {scope
       (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_12 := fun _ _ _ _ _ outcome _ _ => TargetOrigin outcome)
     retain_stage_origin
   exact origin originScope call reason failed
 
@@ -1803,6 +1900,7 @@ theorem Expressions.stage_origin {program : Program} {registry : Registry} {scop
       (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_12 := fun _ _ _ _ _ outcome _ _ => TargetOrigin outcome)
     retain_stage_origin
   exact origin originScope call reason failed
 
@@ -1824,6 +1922,7 @@ theorem Applies.stage_origin {program : Program} {registry : Registry} {scope : 
       (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_12 := fun _ _ _ _ _ outcome _ _ => TargetOrigin outcome)
     retain_stage_origin
   exact origin originScope call reason failed
 
@@ -1846,6 +1945,7 @@ theorem StatementsIn.stage_origin {mode : Bool} {program : Program} {registry : 
       (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_12 := fun _ _ _ _ _ outcome _ _ => TargetOrigin outcome)
     retain_stage_origin
   exact origin originScope call reason failed
 
@@ -1898,6 +1998,7 @@ theorem RawForm.stage_origin {program : Program} {registry : Registry}
       (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_12 := fun _ _ _ _ _ outcome _ _ => TargetOrigin outcome)
     retain_stage_origin
   exact origin originScope call reason failed
 
@@ -1920,6 +2021,7 @@ theorem CoercionStep.stage_origin {program : Program} {registry : Registry}
       (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_12 := fun _ _ _ _ _ outcome _ _ => TargetOrigin outcome)
     retain_stage_origin
   exact origin originScope call reason failed
 
@@ -1942,6 +2044,30 @@ theorem CoercionPath.stage_origin {program : Program} {registry : Registry}
       (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
       (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
       (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_12 := fun _ _ _ _ _ outcome _ _ => TargetOrigin outcome)
+    retain_stage_origin
+  exact origin originScope call reason failed
+
+theorem ElementTarget.stage_origin {program : Program} {registry : Registry} {scope : Scope}
+    {context : Context} {environment : Environment} {before after : Heap} {place : PlaceResolution}
+    {outcome : TargetOutcome}
+    (trace : ElementTarget program registry scope context environment before place outcome after)
+    {originScope : Scope} {call : ExpressionId} {reason : CallGuard.Fault}
+    (failed : outcome = .fault (.stage originScope call reason)) : Generated originScope call reason := by
+  have origin : TargetOrigin outcome := by
+    clear failed
+    induction trace using ElementTarget.rec
+      (motive_1 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_2 := fun _ _ _ _ _ outcome _ _ => ValuesOrigin outcome)
+      (motive_3 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_4 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_5 := fun _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_6 := fun _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_7 := fun _ _ _ _ _ _ outcome _ _ => ForItemsOrigin outcome)
+      (motive_8 := fun _ _ _ _ _ _ _ outcome _ _ => BodyOrigin outcome)
+      (motive_9 := fun _ _ _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_10 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
+      (motive_11 := fun _ _ _ _ _ outcome _ _ => ExpressionOrigin outcome)
     retain_stage_origin
   exact origin originScope call reason failed
 

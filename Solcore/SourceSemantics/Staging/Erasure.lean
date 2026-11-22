@@ -35,6 +35,14 @@ private def ExpressionsPlain (program : Program) (scope : Scope) (context : Cont
   | .fault (.semantic reason) => ExpressionsFault program context scope.evidence scope.source environment before ids reason after
   | .fault (.stage ..) => True
 
+private def ElementTargetPlain (program : Program) (scope : Scope) (context : Context)
+    (environment : Environment) (before : Heap) (place : PlaceResolution) (outcome : TargetOutcome) (after : Heap) :
+    Prop :=
+  match outcome with
+  | .resolved target => SourcePlaceResolves program context scope.evidence scope.source environment before place target after
+  | .fault (.semantic reason) => SourcePlaceFaults program context scope.evidence scope.source environment before place reason after
+  | .fault (.stage ..) => True
+
 private def AppliesPlain (program : Program) (scope : Scope) (context : Context)
     (before : Heap) (callee : Value) (arguments : List Value) (outcome : Outcome) (after : Heap) : Prop :=
   match outcome with
@@ -770,6 +778,32 @@ private theorem builtin_fault_evidence {program : Program} {context : Context}
 
 local macro "erase_recursive_plain" : tactic =>
   `(tactic| (
+    case elementRoot bare lookup read initialValue =>
+      exact .intro lookup read (by rw [bare]; exact .nil) read initialValue .nil
+    case elementRootFault bare failed =>
+      cases failed with
+      | unbound missing => exact .unbound missing
+      | dangling lookup missing => exact .dangling lookup missing
+    case elementStep projections_eq leadingTarget prefix_selected indexed read initialValue selection leadingIH
+        indexIH =>
+      exact .element projections_eq leadingIH prefix_selected indexIH read initialValue selection
+    case elementPrefixFault projections_eq leadingTarget leadingIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .elementPrefix projections_eq leadingIH
+    case elementUninitialized projections_eq leadingTarget prefix_empty leadingIH =>
+      exact .elementUninitialized projections_eq leadingIH prefix_empty
+    case elementIndexFault projections_eq leadingTarget indexed leadingIH indexIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact .elementIndex projections_eq leadingIH indexIH
+    case elementIndexType projections_eq leadingTarget indexed not_word actual_type leadingIH indexIH =>
+      exact .elementIndexType projections_eq leadingIH indexIH not_word actual_type
+    case elementOutOfBounds projections_eq leadingTarget prefix_selected indexed read stored out_of_bounds leadingIH
+        indexIH =>
+      exact .elementOutOfBounds projections_eq leadingIH prefix_selected indexIH read stored out_of_bounds
     case generalizedLocal contains form layout lookup read descriptor contextFields instantiation coercions pathIH =>
       rename_i outcome
       cases outcome with
@@ -1346,6 +1380,7 @@ private theorem projection {program : Program} {registry : Registry} {scope : Sc
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => RawFormPlain program scope context environment before form requirements coercions outcome after)
     (motive_10 := fun scope context before step input outcome after _ => CoercionStepPlain program scope context before step input outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => CoercionPathPlain program scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ElementTargetPlain program scope context environment before place outcome after)
   erase_recursive_plain
 
 private theorem rawform_projection {program : Program} {registry : Registry}
@@ -1364,6 +1399,7 @@ private theorem rawform_projection {program : Program} {registry : Registry}
     (motive_8 := fun scope context environment before condition post body outcome after _ => ForLoopPlain program scope context environment before condition post body outcome after)
     (motive_10 := fun scope context before step input outcome after _ => CoercionStepPlain program scope context before step input outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => CoercionPathPlain program scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ElementTargetPlain program scope context environment before place outcome after)
   erase_recursive_plain
 
 theorem RawForm.value_plain {program : Program} {registry : Registry}
@@ -1394,6 +1430,7 @@ private theorem coercionstep_projection {program : Program} {registry : Registry
     (motive_8 := fun scope context environment before condition post body outcome after _ => ForLoopPlain program scope context environment before condition post body outcome after)
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => RawFormPlain program scope context environment before form requirements coercions outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => CoercionPathPlain program scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ElementTargetPlain program scope context environment before place outcome after)
   erase_recursive_plain
 
 theorem CoercionStep.value_plain {program : Program} {registry : Registry}
@@ -1424,6 +1461,7 @@ private theorem coercionpath_projection {program : Program} {registry : Registry
     (motive_8 := fun scope context environment before condition post body outcome after _ => ForLoopPlain program scope context environment before condition post body outcome after)
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => RawFormPlain program scope context environment before form requirements coercions outcome after)
     (motive_10 := fun scope context before step input outcome after _ => CoercionStepPlain program scope context before step input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ElementTargetPlain program scope context environment before place outcome after)
   erase_recursive_plain
 
 theorem CoercionPath.value_plain {program : Program} {registry : Registry}
@@ -1440,6 +1478,42 @@ theorem CoercionPath.semanticFault_plain {program : Program} {registry : Registr
 
 /-- Successful recursively staged expressions retain their ordinary source
 meaning, including all nested closure-body computations. -/
+private theorem elementtarget_projection {program : Program} {registry : Registry} {scope : Scope}
+    {context : Context} {environment : Environment} {before after : Heap} {place : PlaceResolution}
+    {outcome : TargetOutcome}
+    (trace : ElementTarget program registry scope context environment before place outcome after) :
+    ElementTargetPlain program scope context environment before place outcome after := by
+  induction trace using ElementTarget.rec
+    (motive_1 := fun scope context environment before id outcome after _ => ExpressionPlain program scope context environment before id outcome after)
+    (motive_2 := fun scope context environment before ids outcome after _ => ExpressionsPlain program scope context environment before ids outcome after)
+    (motive_3 := fun scope context before value arguments outcome after _ => AppliesPlain program scope context before value arguments outcome after)
+    (motive_4 := fun mode scope context environment before ids finalContext outcome after _ => StatementsPlain program mode scope context environment before ids finalContext outcome after)
+    (motive_5 := fun scope context environment before condition statements outcome after _ => WhilePlain program scope context environment before condition statements outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => MatchPlain program scope context environment before resolution outcome after)
+    (motive_7 := fun scope context environment before items finalContext outcome after _ => ForItemsPlain program scope context environment before items finalContext outcome after)
+    (motive_8 := fun scope context environment before condition post body outcome after _ => ForLoopPlain program scope context environment before condition post body outcome after)
+    (motive_9 := fun scope context environment before form requirements coercions outcome after _ => RawFormPlain program scope context environment before form requirements coercions outcome after)
+    (motive_10 := fun scope context before step input outcome after _ => CoercionStepPlain program scope context before step input outcome after)
+    (motive_11 := fun scope context before steps input outcome after _ => CoercionPathPlain program scope context before steps input outcome after)
+  erase_recursive_plain
+
+/-- A staged element place's resolution is the Source's. -/
+theorem ElementTarget.resolved_plain {program : Program} {registry : Registry} {scope : Scope}
+    {context : Context} {environment : Environment} {before after : Heap} {place : PlaceResolution}
+    {target : ResolvedPlace}
+    (trace : ElementTarget program registry scope context environment before place (.resolved target) after) :
+    SourcePlaceResolves program context scope.evidence scope.source environment before place target after :=
+  elementtarget_projection trace
+
+/-- A staged element place's semantic fault is the Source's. -/
+theorem ElementTarget.semanticFault_plain {program : Program} {registry : Registry} {scope : Scope}
+    {context : Context} {environment : Environment} {before after : Heap} {place : PlaceResolution}
+    {reason : SemanticFault}
+    (trace : ElementTarget program registry scope context environment before place (.fault (.semantic reason))
+      after) :
+    SourcePlaceFaults program context scope.evidence scope.source environment before place reason after :=
+  elementtarget_projection trace
+
 theorem Expression.value_plain {program : Program} {registry : Registry} {scope : Scope}
     {context : Context} {environment : Environment} {before after : Heap} {id : ExpressionId} {value : Value}
     (trace : Expression program registry scope context environment before id (.value value) after) :
@@ -1469,6 +1543,7 @@ theorem Expressions.plain {program : Program} {registry : Registry} {scope : Sco
     (motive_9 := fun _ _ _ _ _ _ _ _ _ _ => True)
     (motive_10 := fun _ _ _ _ _ _ _ _ => True)
     (motive_11 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_12 := fun _ _ _ _ _ _ _ _ => True)
   all_goals try exact True.intro
   case nil => exact .nil
   case cons head _tail _headIH tailIH => exact .cons head.value_plain tailIH
@@ -1782,6 +1857,7 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     (motive_9 := fun _ _ _ _ _ _ _ _ _ _ => True)
     (motive_10 := fun _ _ _ _ _ _ _ _ => True)
     (motive_11 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_12 := fun _ _ _ _ _ _ _ _ => True)
   all_goals try exact True.intro
   case nil => rename_i mode _ _ _; intro heap; cases mode <;> exact .nil
   case returnUnit contains form =>
@@ -2101,6 +2177,7 @@ theorem While.plain {program : Program} {registry : Registry} {scope : Scope}
     (motive_9 := fun _ _ _ _ _ _ _ _ _ _ => True)
     (motive_10 := fun _ _ _ _ _ _ _ _ => True)
     (motive_11 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_12 := fun _ _ _ _ _ _ _ _ => True)
   all_goals try exact True.intro
   case done test _ih => exact .done test.value_plain
   case conditionFault test _ih =>
@@ -2160,6 +2237,7 @@ theorem ForItems.plain {program : Program} {registry : Registry} {scope : Scope}
     (motive_9 := fun _ _ _ _ _ _ _ _ _ _ => True)
     (motive_10 := fun _ _ _ _ _ _ _ _ => True)
     (motive_11 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_12 := fun _ _ _ _ _ _ _ _ => True)
   all_goals try exact True.intro
   case empty => exact .nil
   case absent mono extended allocated next nextIH =>
@@ -2246,6 +2324,7 @@ theorem ForLoop.plain {program : Program} {registry : Registry} {scope : Scope}
     (motive_9 := fun _ _ _ _ _ _ _ _ _ _ => True)
     (motive_10 := fun _ _ _ _ _ _ _ _ => True)
     (motive_11 := fun _ _ _ _ _ _ _ _ => True)
+    (motive_12 := fun _ _ _ _ _ _ _ _ => True)
   all_goals try exact True.intro
   case testFault test _testIH =>
     rename_i failure

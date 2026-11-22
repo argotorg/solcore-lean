@@ -1123,6 +1123,85 @@ mutual
         (head : CoercionStep program registry headSize scope context before step input (.fault failure) after) :
         CoercionPath program registry (stepSize [headSize]) scope context before (step :: steps) input (.fault failure) after
 
+  inductive ElementTarget (program : Program) (registry : Registry) :
+      Nat → Scope → Context → Environment → Heap → PlaceResolution → TargetOutcome → Heap → Prop where
+    | elementRoot {scope context environment heap place location cell initial}
+        (bare : place.projections = [])
+        (lookup : Environment.LooksUp environment place.root location)
+        (read : Heap.Reads heap location cell)
+        (initialValue : RootInitialValue cell initial) :
+        ElementTarget program registry (stepSize []) scope context environment heap place
+          (.resolved { location := location, rootType := cell.type, valueType := place.type, projections := [], selected := initial })
+          heap
+    | elementRootFault {scope context environment heap place reason}
+        (bare : place.projections = [])
+        (failed : ProjectedTarget.RootFault environment heap place reason) :
+        ElementTarget program registry (stepSize []) scope context environment heap place (.fault (.semantic reason)) heap
+    | elementStep {prefixSize indexSize : Nat} {scope context environment before middle after place leading index
+          prefixTarget element location position cell elements selected}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry prefixSize scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
+          middle)
+        (prefix_selected : prefixTarget.selected = some (.arrayRef element location))
+        (indexed : Expression program registry indexSize scope context environment middle index
+          (.value (.word position)) after)
+        (read : Heap.Reads after location cell)
+        (initialValue : RootInitialValue cell (some (.arrayObject element elements)))
+        (selection : ValueAt elements position.val selected) :
+        ElementTarget program registry (stepSize [prefixSize, indexSize]) scope context environment before place
+          (.resolved { location := location, rootType := cell.type, valueType := place.type, projections := [.element position.val], selected := some selected })
+          after
+    | elementPrefixFault {prefixSize : Nat} {scope context environment before after place leading index failure}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry prefixSize scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.fault failure) after) :
+        ElementTarget program registry (stepSize [prefixSize]) scope context environment before place (.fault failure)
+          after
+    | elementUninitialized {prefixSize : Nat} {scope context environment before after place leading index prefixTarget}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry prefixSize scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
+          after)
+        (prefix_empty : prefixTarget.selected = none) :
+        ElementTarget program registry (stepSize [prefixSize]) scope context environment before place
+          (.fault (.semantic (.uninitializedLocation prefixTarget.location))) after
+    | elementIndexFault {prefixSize indexSize : Nat} {scope context environment before middle after place leading
+          index prefixTarget failure}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry prefixSize scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
+          middle)
+        (indexed : Expression program registry indexSize scope context environment middle index (.fault failure)
+          after) :
+        ElementTarget program registry (stepSize [prefixSize, indexSize]) scope context environment before place
+          (.fault failure) after
+    | elementIndexType {prefixSize indexSize : Nat} {scope context environment before middle after place leading
+          index prefixTarget value actual}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry prefixSize scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
+          middle)
+        (indexed : Expression program registry indexSize scope context environment middle index (.value value)
+          after)
+        (not_word : ¬ WordValue value) (actual_type : ValueRuntimeType value actual) :
+        ElementTarget program registry (stepSize [prefixSize, indexSize]) scope context environment before place
+          (.fault (.semantic (.typeMismatch .word actual))) after
+    | elementOutOfBounds {prefixSize indexSize : Nat} {scope context environment before middle after place leading
+          index prefixTarget element location position cell elements}
+        (projections_eq : place.projections = leading ++ [.element index])
+        (leadingTarget : ElementTarget program registry prefixSize scope context environment before
+          { place with projections := leading, type := TypeSystem.Ty.array place.type } (.resolved prefixTarget)
+          middle)
+        (prefix_selected : prefixTarget.selected = some (.arrayRef element location))
+        (indexed : Expression program registry indexSize scope context environment middle index
+          (.value (.word position)) after)
+        (read : Heap.Reads after location cell)
+        (stored : cell.value = some (.arrayObject element elements))
+        (out_of_bounds : elements.length ≤ position.val) :
+        ElementTarget program registry (stepSize [prefixSize, indexSize]) scope context environment before place
+          (.fault (.semantic (.panic 0x32))) after
+
 end
 
 abbrev Statements (program : Program) (registry : Registry) := StatementsIn program registry true
@@ -1309,6 +1388,14 @@ local macro "erase_stage_grade" : tactic =>
     case returnedFromBody => apply Recursive.ForLoop.returnedFromBody <;> assumption
     case postFailure => apply Recursive.ForLoop.postFailure <;> assumption
     case iterate => apply Recursive.ForLoop.iterate <;> assumption
+    case elementRoot => apply Recursive.ElementTarget.elementRoot <;> assumption
+    case elementRootFault => apply Recursive.ElementTarget.elementRootFault <;> assumption
+    case elementStep => apply Recursive.ElementTarget.elementStep <;> assumption
+    case elementPrefixFault => apply Recursive.ElementTarget.elementPrefixFault <;> assumption
+    case elementUninitialized => apply Recursive.ElementTarget.elementUninitialized <;> assumption
+    case elementIndexFault => apply Recursive.ElementTarget.elementIndexFault <;> assumption
+    case elementIndexType => apply Recursive.ElementTarget.elementIndexType <;> assumption
+    case elementOutOfBounds => apply Recursive.ElementTarget.elementOutOfBounds <;> assumption
   ))
 
 local macro "construct_stage_grade" : tactic =>
@@ -1856,6 +1943,34 @@ local macro "construct_stage_grade" : tactic =>
       obtain ⟨postTraceSize, gradedpostTrace⟩ := postTraceIH
       obtain ⟨nextSize, gradednext⟩ := nextIH
       exact ⟨_, .iterate gradedtest gradedbranch gradedpostTrace gradednext⟩
+    case elementRoot bare lookup read initialValue =>
+      exact ⟨_, .elementRoot bare lookup read initialValue⟩
+    case elementRootFault bare failed =>
+      exact ⟨_, .elementRootFault bare failed⟩
+    case elementStep projections_eq leadingTarget prefix_selected indexed read initialValue selection leadingIH
+        indexIH =>
+      obtain ⟨_, leadingGraded⟩ := leadingIH
+      obtain ⟨_, indexGraded⟩ := indexIH
+      exact ⟨_, .elementStep projections_eq leadingGraded prefix_selected indexGraded read initialValue selection⟩
+    case elementPrefixFault projections_eq leadingTarget leadingIH =>
+      obtain ⟨_, leadingGraded⟩ := leadingIH
+      exact ⟨_, .elementPrefixFault projections_eq leadingGraded⟩
+    case elementUninitialized projections_eq leadingTarget prefix_empty leadingIH =>
+      obtain ⟨_, leadingGraded⟩ := leadingIH
+      exact ⟨_, .elementUninitialized projections_eq leadingGraded prefix_empty⟩
+    case elementIndexFault projections_eq leadingTarget indexed leadingIH indexIH =>
+      obtain ⟨_, leadingGraded⟩ := leadingIH
+      obtain ⟨_, indexGraded⟩ := indexIH
+      exact ⟨_, .elementIndexFault projections_eq leadingGraded indexGraded⟩
+    case elementIndexType projections_eq leadingTarget indexed not_word actual_type leadingIH indexIH =>
+      obtain ⟨_, leadingGraded⟩ := leadingIH
+      obtain ⟨_, indexGraded⟩ := indexIH
+      exact ⟨_, .elementIndexType projections_eq leadingGraded indexGraded not_word actual_type⟩
+    case elementOutOfBounds projections_eq leadingTarget prefix_selected indexed read stored out_of_bounds leadingIH
+        indexIH =>
+      obtain ⟨_, leadingGraded⟩ := leadingIH
+      obtain ⟨_, indexGraded⟩ := indexIH
+      exact ⟨_, .elementOutOfBounds projections_eq leadingGraded prefix_selected indexGraded read stored out_of_bounds⟩
   ))
 
 theorem Expression.sound {program : Program} {registry : Registry} {size : Nat}
@@ -1874,6 +1989,7 @@ theorem Expression.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_9 := fun _ scope context environment before form requirements coercions outcome after _ => Recursive.RawForm program registry scope context environment before form requirements coercions outcome after)
     (motive_10 := fun _ scope context before step input outcome after _ => Recursive.CoercionStep program registry scope context before step input outcome after)
     (motive_11 := fun _ scope context before steps input outcome after _ => Recursive.CoercionPath program registry scope context before steps input outcome after)
+    (motive_12 := fun _ scope context environment before place outcome after _ => Recursive.ElementTarget program registry scope context environment before place outcome after)
   erase_stage_grade
 
 theorem Expressions.sound {program : Program} {registry : Registry} {size : Nat}
@@ -1892,6 +2008,7 @@ theorem Expressions.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_9 := fun _ scope context environment before form requirements coercions outcome after _ => Recursive.RawForm program registry scope context environment before form requirements coercions outcome after)
     (motive_10 := fun _ scope context before step input outcome after _ => Recursive.CoercionStep program registry scope context before step input outcome after)
     (motive_11 := fun _ scope context before steps input outcome after _ => Recursive.CoercionPath program registry scope context before steps input outcome after)
+    (motive_12 := fun _ scope context environment before place outcome after _ => Recursive.ElementTarget program registry scope context environment before place outcome after)
   erase_stage_grade
 
 theorem Applies.sound {program : Program} {registry : Registry} {size : Nat}
@@ -1910,6 +2027,7 @@ theorem Applies.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_9 := fun _ scope context environment before form requirements coercions outcome after _ => Recursive.RawForm program registry scope context environment before form requirements coercions outcome after)
     (motive_10 := fun _ scope context before step input outcome after _ => Recursive.CoercionStep program registry scope context before step input outcome after)
     (motive_11 := fun _ scope context before steps input outcome after _ => Recursive.CoercionPath program registry scope context before steps input outcome after)
+    (motive_12 := fun _ scope context environment before place outcome after _ => Recursive.ElementTarget program registry scope context environment before place outcome after)
   erase_stage_grade
 
 theorem StatementsIn.sound {mode : Bool} {program : Program} {registry : Registry} {size : Nat}
@@ -1928,6 +2046,7 @@ theorem StatementsIn.sound {mode : Bool} {program : Program} {registry : Registr
     (motive_9 := fun _ scope context environment before form requirements coercions outcome after _ => Recursive.RawForm program registry scope context environment before form requirements coercions outcome after)
     (motive_10 := fun _ scope context before step input outcome after _ => Recursive.CoercionStep program registry scope context before step input outcome after)
     (motive_11 := fun _ scope context before steps input outcome after _ => Recursive.CoercionPath program registry scope context before steps input outcome after)
+    (motive_12 := fun _ scope context environment before place outcome after _ => Recursive.ElementTarget program registry scope context environment before place outcome after)
   erase_stage_grade
 
 theorem Expression.of_trace {program : Program} {registry : Registry}
@@ -1946,6 +2065,7 @@ theorem Expression.of_trace {program : Program} {registry : Registry}
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => ∃ size, RawForm program registry size scope context environment before form requirements coercions outcome after)
     (motive_10 := fun scope context before step input outcome after _ => ∃ size, CoercionStep program registry size scope context before step input outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => ∃ size, CoercionPath program registry size scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ∃ size, ElementTarget program registry size scope context environment before place outcome after)
   construct_stage_grade
 
 theorem Expressions.of_trace {program : Program} {registry : Registry}
@@ -1964,6 +2084,7 @@ theorem Expressions.of_trace {program : Program} {registry : Registry}
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => ∃ size, RawForm program registry size scope context environment before form requirements coercions outcome after)
     (motive_10 := fun scope context before step input outcome after _ => ∃ size, CoercionStep program registry size scope context before step input outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => ∃ size, CoercionPath program registry size scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ∃ size, ElementTarget program registry size scope context environment before place outcome after)
   construct_stage_grade
 
 theorem Applies.of_trace {program : Program} {registry : Registry}
@@ -1982,6 +2103,7 @@ theorem Applies.of_trace {program : Program} {registry : Registry}
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => ∃ size, RawForm program registry size scope context environment before form requirements coercions outcome after)
     (motive_10 := fun scope context before step input outcome after _ => ∃ size, CoercionStep program registry size scope context before step input outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => ∃ size, CoercionPath program registry size scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ∃ size, ElementTarget program registry size scope context environment before place outcome after)
   construct_stage_grade
 
 theorem StatementsIn.of_trace {mode : Bool} {program : Program} {registry : Registry}
@@ -2000,6 +2122,7 @@ theorem StatementsIn.of_trace {mode : Bool} {program : Program} {registry : Regi
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => ∃ size, RawForm program registry size scope context environment before form requirements coercions outcome after)
     (motive_10 := fun scope context before step input outcome after _ => ∃ size, CoercionStep program registry size scope context before step input outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => ∃ size, CoercionPath program registry size scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ∃ size, ElementTarget program registry size scope context environment before place outcome after)
   construct_stage_grade
 
 theorem While.sound {program : Program} {registry : Registry} {size : Nat}
@@ -2018,6 +2141,7 @@ theorem While.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_9 := fun _ scope context environment before form requirements coercions outcome after _ => Recursive.RawForm program registry scope context environment before form requirements coercions outcome after)
     (motive_10 := fun _ scope context before step input outcome after _ => Recursive.CoercionStep program registry scope context before step input outcome after)
     (motive_11 := fun _ scope context before steps input outcome after _ => Recursive.CoercionPath program registry scope context before steps input outcome after)
+    (motive_12 := fun _ scope context environment before place outcome after _ => Recursive.ElementTarget program registry scope context environment before place outcome after)
   erase_stage_grade
 
 theorem While.of_trace {program : Program} {registry : Registry}
@@ -2036,6 +2160,7 @@ theorem While.of_trace {program : Program} {registry : Registry}
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => ∃ size, RawForm program registry size scope context environment before form requirements coercions outcome after)
     (motive_10 := fun scope context before step input outcome after _ => ∃ size, CoercionStep program registry size scope context before step input outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => ∃ size, CoercionPath program registry size scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ∃ size, ElementTarget program registry size scope context environment before place outcome after)
   construct_stage_grade
 
 /-- Preserve the original true-mode field-notation API. -/
@@ -2069,6 +2194,7 @@ theorem Match.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_9 := fun _ scope context environment before form requirements coercions outcome after _ => Recursive.RawForm program registry scope context environment before form requirements coercions outcome after)
     (motive_10 := fun _ scope context before step input outcome after _ => Recursive.CoercionStep program registry scope context before step input outcome after)
     (motive_11 := fun _ scope context before steps input outcome after _ => Recursive.CoercionPath program registry scope context before steps input outcome after)
+    (motive_12 := fun _ scope context environment before place outcome after _ => Recursive.ElementTarget program registry scope context environment before place outcome after)
   erase_stage_grade
 
 theorem Match.of_trace {program : Program} {registry : Registry}
@@ -2087,6 +2213,7 @@ theorem Match.of_trace {program : Program} {registry : Registry}
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => ∃ size, RawForm program registry size scope context environment before form requirements coercions outcome after)
     (motive_10 := fun scope context before step input outcome after _ => ∃ size, CoercionStep program registry size scope context before step input outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => ∃ size, CoercionPath program registry size scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ∃ size, ElementTarget program registry size scope context environment before place outcome after)
   construct_stage_grade
 
 theorem ForItems.sound {program : Program} {registry : Registry} {size : Nat}
@@ -2105,6 +2232,7 @@ theorem ForItems.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_9 := fun _ scope context environment before form requirements coercions outcome after _ => Recursive.RawForm program registry scope context environment before form requirements coercions outcome after)
     (motive_10 := fun _ scope context before step input outcome after _ => Recursive.CoercionStep program registry scope context before step input outcome after)
     (motive_11 := fun _ scope context before steps input outcome after _ => Recursive.CoercionPath program registry scope context before steps input outcome after)
+    (motive_12 := fun _ scope context environment before place outcome after _ => Recursive.ElementTarget program registry scope context environment before place outcome after)
   erase_stage_grade
 
 theorem ForItems.of_trace {program : Program} {registry : Registry}
@@ -2123,6 +2251,7 @@ theorem ForItems.of_trace {program : Program} {registry : Registry}
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => ∃ size, RawForm program registry size scope context environment before form requirements coercions outcome after)
     (motive_10 := fun scope context before step input outcome after _ => ∃ size, CoercionStep program registry size scope context before step input outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => ∃ size, CoercionPath program registry size scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ∃ size, ElementTarget program registry size scope context environment before place outcome after)
   construct_stage_grade
 
 theorem ForLoop.sound {program : Program} {registry : Registry} {size : Nat}
@@ -2141,6 +2270,7 @@ theorem ForLoop.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_9 := fun _ scope context environment before form requirements coercions outcome after _ => Recursive.RawForm program registry scope context environment before form requirements coercions outcome after)
     (motive_10 := fun _ scope context before step input outcome after _ => Recursive.CoercionStep program registry scope context before step input outcome after)
     (motive_11 := fun _ scope context before steps input outcome after _ => Recursive.CoercionPath program registry scope context before steps input outcome after)
+    (motive_12 := fun _ scope context environment before place outcome after _ => Recursive.ElementTarget program registry scope context environment before place outcome after)
   erase_stage_grade
 
 theorem ForLoop.of_trace {program : Program} {registry : Registry}
@@ -2159,6 +2289,7 @@ theorem ForLoop.of_trace {program : Program} {registry : Registry}
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => ∃ size, RawForm program registry size scope context environment before form requirements coercions outcome after)
     (motive_10 := fun scope context before step input outcome after _ => ∃ size, CoercionStep program registry size scope context before step input outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => ∃ size, CoercionPath program registry size scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ∃ size, ElementTarget program registry size scope context environment before place outcome after)
   construct_stage_grade
 
 theorem RawForm.sound {program : Program} {registry : Registry} {size : Nat}
@@ -2177,6 +2308,7 @@ theorem RawForm.sound {program : Program} {registry : Registry} {size : Nat}
     (motive_8 := fun _ scope context environment before condition post body outcome after _ => Recursive.ForLoop program registry scope context environment before condition post body outcome after)
     (motive_10 := fun _ scope context before step input outcome after _ => Recursive.CoercionStep program registry scope context before step input outcome after)
     (motive_11 := fun _ scope context before steps input outcome after _ => Recursive.CoercionPath program registry scope context before steps input outcome after)
+    (motive_12 := fun _ scope context environment before place outcome after _ => Recursive.ElementTarget program registry scope context environment before place outcome after)
   erase_stage_grade
 
 theorem RawForm.of_trace {program : Program} {registry : Registry}
@@ -2195,6 +2327,7 @@ theorem RawForm.of_trace {program : Program} {registry : Registry}
     (motive_8 := fun scope context environment before condition post body outcome after _ => ∃ size, ForLoop program registry size scope context environment before condition post body outcome after)
     (motive_10 := fun scope context before step input outcome after _ => ∃ size, CoercionStep program registry size scope context before step input outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => ∃ size, CoercionPath program registry size scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ∃ size, ElementTarget program registry size scope context environment before place outcome after)
   construct_stage_grade
 
 theorem CoercionStep.sound {program : Program} {registry : Registry} {size : Nat}
@@ -2213,6 +2346,7 @@ theorem CoercionStep.sound {program : Program} {registry : Registry} {size : Nat
     (motive_8 := fun _ scope context environment before condition post body outcome after _ => Recursive.ForLoop program registry scope context environment before condition post body outcome after)
     (motive_9 := fun _ scope context environment before form requirements coercions outcome after _ => Recursive.RawForm program registry scope context environment before form requirements coercions outcome after)
     (motive_11 := fun _ scope context before steps input outcome after _ => Recursive.CoercionPath program registry scope context before steps input outcome after)
+    (motive_12 := fun _ scope context environment before place outcome after _ => Recursive.ElementTarget program registry scope context environment before place outcome after)
   erase_stage_grade
 
 theorem CoercionStep.of_trace {program : Program} {registry : Registry}
@@ -2231,6 +2365,7 @@ theorem CoercionStep.of_trace {program : Program} {registry : Registry}
     (motive_8 := fun scope context environment before condition post body outcome after _ => ∃ size, ForLoop program registry size scope context environment before condition post body outcome after)
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => ∃ size, RawForm program registry size scope context environment before form requirements coercions outcome after)
     (motive_11 := fun scope context before steps input outcome after _ => ∃ size, CoercionPath program registry size scope context before steps input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ∃ size, ElementTarget program registry size scope context environment before place outcome after)
   construct_stage_grade
 
 theorem CoercionPath.sound {program : Program} {registry : Registry} {size : Nat}
@@ -2249,6 +2384,7 @@ theorem CoercionPath.sound {program : Program} {registry : Registry} {size : Nat
     (motive_8 := fun _ scope context environment before condition post body outcome after _ => Recursive.ForLoop program registry scope context environment before condition post body outcome after)
     (motive_9 := fun _ scope context environment before form requirements coercions outcome after _ => Recursive.RawForm program registry scope context environment before form requirements coercions outcome after)
     (motive_10 := fun _ scope context before step input outcome after _ => Recursive.CoercionStep program registry scope context before step input outcome after)
+    (motive_12 := fun _ scope context environment before place outcome after _ => Recursive.ElementTarget program registry scope context environment before place outcome after)
   erase_stage_grade
 
 theorem CoercionPath.of_trace {program : Program} {registry : Registry}
@@ -2267,6 +2403,45 @@ theorem CoercionPath.of_trace {program : Program} {registry : Registry}
     (motive_8 := fun scope context environment before condition post body outcome after _ => ∃ size, ForLoop program registry size scope context environment before condition post body outcome after)
     (motive_9 := fun scope context environment before form requirements coercions outcome after _ => ∃ size, RawForm program registry size scope context environment before form requirements coercions outcome after)
     (motive_10 := fun scope context before step input outcome after _ => ∃ size, CoercionStep program registry size scope context before step input outcome after)
+    (motive_12 := fun scope context environment before place outcome after _ => ∃ size, ElementTarget program registry size scope context environment before place outcome after)
+  construct_stage_grade
+
+theorem ElementTarget.sound {program : Program} {registry : Registry} {size : Nat}
+    {scope : Scope} {context : Context} {environment : Environment} {before after : Heap}
+    {place : PlaceResolution} {outcome : TargetOutcome}
+    (trace : ElementTarget program registry size scope context environment before place outcome after) :
+    Recursive.ElementTarget program registry scope context environment before place outcome after := by
+  induction trace using ElementTarget.rec
+    (motive_1 := fun _ scope context environment before id outcome after _ => Recursive.Expression program registry scope context environment before id outcome after)
+    (motive_2 := fun _ scope context environment before ids outcome after _ => Recursive.Expressions program registry scope context environment before ids outcome after)
+    (motive_3 := fun _ scope context before function arguments outcome after _ => Recursive.Applies program registry scope context before function arguments outcome after)
+    (motive_4 := fun mode _ scope context environment before roots finalContext outcome after _ => Recursive.StatementsIn program registry mode scope context environment before roots finalContext outcome after)
+    (motive_5 := fun _ scope context environment before condition statements outcome after _ => Recursive.While program registry scope context environment before condition statements outcome after)
+    (motive_6 := fun _ scope context environment before resolution outcome after _ => Recursive.Match program registry scope context environment before resolution outcome after)
+    (motive_7 := fun _ scope context environment before items finalContext outcome after _ => Recursive.ForItems program registry scope context environment before items finalContext outcome after)
+    (motive_8 := fun _ scope context environment before condition post body outcome after _ => Recursive.ForLoop program registry scope context environment before condition post body outcome after)
+    (motive_9 := fun _ scope context environment before form requirements coercions outcome after _ => Recursive.RawForm program registry scope context environment before form requirements coercions outcome after)
+    (motive_10 := fun _ scope context before step input outcome after _ => Recursive.CoercionStep program registry scope context before step input outcome after)
+    (motive_11 := fun _ scope context before steps input outcome after _ => Recursive.CoercionPath program registry scope context before steps input outcome after)
+  erase_stage_grade
+
+theorem ElementTarget.of_trace {program : Program} {registry : Registry}
+    {scope : Scope} {context : Context} {environment : Environment} {before after : Heap}
+    {place : PlaceResolution} {outcome : TargetOutcome}
+    (trace : Recursive.ElementTarget program registry scope context environment before place outcome after) :
+    ∃ size, ElementTarget program registry size scope context environment before place outcome after := by
+  induction trace using Recursive.ElementTarget.rec
+    (motive_1 := fun scope context environment before id outcome after _ => ∃ size, Expression program registry size scope context environment before id outcome after)
+    (motive_2 := fun scope context environment before ids outcome after _ => ∃ size, Expressions program registry size scope context environment before ids outcome after)
+    (motive_3 := fun scope context before function arguments outcome after _ => ∃ size, Applies program registry size scope context before function arguments outcome after)
+    (motive_4 := fun mode scope context environment before roots finalContext outcome after _ => ∃ size, StatementsIn program registry mode size scope context environment before roots finalContext outcome after)
+    (motive_5 := fun scope context environment before condition statements outcome after _ => ∃ size, While program registry size scope context environment before condition statements outcome after)
+    (motive_6 := fun scope context environment before resolution outcome after _ => ∃ size, Match program registry size scope context environment before resolution outcome after)
+    (motive_7 := fun scope context environment before items finalContext outcome after _ => ∃ size, ForItems program registry size scope context environment before items finalContext outcome after)
+    (motive_8 := fun scope context environment before condition post body outcome after _ => ∃ size, ForLoop program registry size scope context environment before condition post body outcome after)
+    (motive_9 := fun scope context environment before form requirements coercions outcome after _ => ∃ size, RawForm program registry size scope context environment before form requirements coercions outcome after)
+    (motive_10 := fun scope context before step input outcome after _ => ∃ size, CoercionStep program registry size scope context before step input outcome after)
+    (motive_11 := fun scope context before steps input outcome after _ => ∃ size, CoercionPath program registry size scope context before steps input outcome after)
   construct_stage_grade
 
 end Solcore.SourceSemantics.Staging.Recursive.Size
