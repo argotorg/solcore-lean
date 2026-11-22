@@ -2,6 +2,7 @@ import Solcore.SourceSemantics.Staging.Internal.TraceSize
 import Solcore.SourceSemantics.Dynamic.Preservation
 import Solcore.SourceSemantics.Internal.Checking.TypingCertificates
 import Solcore.SourceSemantics.Staging.RecursiveProfile
+import Solcore.SourceSemantics.Staging.Internal.KeptLengths
 
 /-!
 # Contracts of selected preservation
@@ -21,6 +22,18 @@ open Solcore.SourceSemantics.Dynamic
 
 variable {program : Program} {registry : Registry}
 
+/-- A run that returns a value preserves heap typing, as `ExpressionEvaluationPreserved` says, and keeps
+every array object's length. -/
+structure ValueKept (context : Context) (before after : Heap) (value : Dynamic.Value) (type : Ty) : Prop where
+  value_typed : ValueHasType context after value type
+  heap_typed : HeapWellTyped context after
+  heap_extends : HeapTypesExtend before after
+  lengths : KeepsLengths before after
+
+theorem ValueKept.preserved {context : Context} {before after : Heap} {value : Dynamic.Value} {type : Ty}
+    (kept : ValueKept context before after value type) : ExpressionEvaluationPreserved context before after value type :=
+  ⟨kept.value_typed, kept.heap_typed, kept.heap_extends⟩
+
 /-- The recursive premise concerns the actual selected body and its exact heap.
 It is consumed after parameter allocation, with the selected source and dictionary. -/
 def BodySuccessAt (program : Program) (registry : Registry) (size : Nat) : Prop :=
@@ -35,7 +48,7 @@ def BodySuccessAt (program : Program) (registry : Registry) (size : Nat) : Prop 
     Size.StatementsIn program registry true size scope context environment before roots
       runtimeFinal outcome after →
     BodyResult type outcome (.value value) →
-    ExpressionEvaluationPreserved context before after value type
+    ValueKept context before after value type
 
 /-- Only global bodies selected by this registry need an instance certificate. -/
 def GlobalBodiesTyped (program : Program) (registry : Registry) : Prop :=
@@ -93,7 +106,7 @@ theorem body_success {size : Nat}
     (body : Size.StatementsIn program registry true size child bodyContext environment bound
       roots finalContext outcome after)
     (resultRule : BodyResult bodyInstance.resultType outcome (.value value)) :
-    ExpressionEvaluationPreserved context before after value bodyInstance.resultType := by
+    ValueKept context before after value bodyInstance.resultType := by
   have signaturesEq : bodyInstance.context.signatures = context.signatures :=
     certificate.signatures_eq.trans runtime.signatures.symm
   have bodyBeforeTyped := beforeTyped.transportClosed signaturesEq runtime.closed
@@ -145,6 +158,7 @@ theorem body_success {size : Nat}
       runtime.closed (fields.targetVariablesClosed certificate.type_variables_empty)
       runtime.residual_variables_open
     heap_extends := allocate.extendsHeapTypes.trans preserved.heap_extends
+    lengths := (KeepsLengths.of_binders allocate).trans preserved.lengths
   }
 
 /-- Closure invocation copies every captured cell and keeps the complete code and
@@ -168,7 +182,7 @@ theorem closure_success {size : Nat}
     (body : Size.StatementsIn program registry true size child bodyContext environment bound
       function.body finalContext outcome after)
     (resultRule : BodyResult function.resultType outcome (.value value)) :
-    ExpressionEvaluationPreserved context before after value resultType := by
+    ValueKept context before after value resultType := by
   rcases callableTyped.closure_function_inv with
     ⟨parameterEq, resultEq, signaturesEq, code, closureEvidence, captures⟩
   subst parameterType
@@ -228,6 +242,7 @@ theorem closure_success {size : Nat}
         runtime.closed (fields.targetVariablesClosed code.variables_closed) runtime.residual_variables_open
       heap_extends := copy.metadata_extends.trans
         (allocate.extendsHeapTypes.trans preserved.heap_extends)
+      lengths := (KeepsLengths.of_copies copy).trans ((KeepsLengths.of_binders allocate).trans preserved.lengths)
     }
 
 /-- The strict child is the actual selected body. Unselected original functions
@@ -242,14 +257,14 @@ theorem applies_step (selectedBodies : GlobalBodiesTyped program registry) (size
     (callableTyped : ValueHasType context before callable (.function parameterType resultType))
     (packing : ValuesPack arguments packed) (packedTyped : ValueHasType context before packed parameterType)
     (trace : Size.Applies program registry size scope context before callable arguments (.value value) after) :
-    ExpressionEvaluationPreserved context before after value resultType := by
+    ValueKept context before after value resultType := by
   cases trace with
   | builtin primitive =>
     rcases primitive.preserves with ⟨argumentsTyped, resultTyped⟩
     rcases callableTyped.builtin_inv with typeEq | staged
     · rw [BuiltinFunctionId.type] at typeEq
       cases typeEq
-      exact ⟨resultTyped, beforeTyped, .refl _⟩
+      exact ⟨resultTyped, beforeTyped, .refl _, .refl _⟩
     · rcases staged with ⟨inner, impossible, innerTyped⟩
       cases impossible
   | @global bodySize scope context before bound after function arguments environment
@@ -310,12 +325,15 @@ structure OutcomePreserved (context : Context) (before after : Heap)
   heap_typed : HeapWellTyped context after
   heap_extends : HeapTypesExtend before after
   value_typed : ∀ value, outcome = .value value → ValueHasType context after value type
+  /-- A run that returns a value keeps every array object's length. -/
+  lengths : ∀ value, outcome = .value value → KeepsLengths before after
 
 structure ValuesPreserved (context : Context) (before after : Heap)
     (types : List Ty) (outcome : ValuesOutcome) : Prop where
   heap_typed : HeapWellTyped context after
   heap_extends : HeapTypesExtend before after
   values_typed : ∀ values, outcome = .values values → ValuesHaveTypes context after values types
+  lengths : ∀ values, outcome = .values values → KeepsLengths before after
 
 structure StatementsPreserved (context staticFinal runtimeFinal : Context)
     (before after : Heap) (type : Ty) (outcome : BodyOutcome) (completion : Prop := True) (allowed : Prop := True) : Prop where
@@ -324,6 +342,8 @@ structure StatementsPreserved (context staticFinal runtimeFinal : Context)
   returned : completion → ∀ value, outcome = .returned value → ValueHasType context after value type
   fallthrough : ∀ environment, outcome = .fallthrough environment →
     runtimeFinal = staticFinal ∧ EnvironmentAgrees after staticFinal.locals environment ∧ allowed
+  /-- Unless the run faulted, every array object keeps its length. -/
+  lengths : (∀ failure, outcome ≠ .fault failure) → KeepsLengths before after
 
 structure ItemsPreserved (context staticFinal runtimeFinal : Context)
     (before after : Heap) (outcome : ForItemsOutcome) : Prop where
@@ -331,6 +351,7 @@ structure ItemsPreserved (context staticFinal runtimeFinal : Context)
   heap_extends : HeapTypesExtend before after
   done : ∀ environment, outcome = .done environment →
     runtimeFinal = staticFinal ∧ EnvironmentAgrees after staticFinal.locals environment
+  lengths : ∀ environment, outcome = .done environment → KeepsLengths before after
 
 variable (program : Program) (registry : Registry)
 
@@ -414,6 +435,37 @@ set_option maxHeartbeats 1200000
 namespace Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 open Frontend SourceInference TypeSystem
 open Solcore.SourceSemantics.Dynamic
+
+/-- Atomic evaluation keeps every array object's length: it changes the heap only by copying captures or
+by filling an absent mapping local. -/
+theorem atomic_lengths
+    {program : Program} {context : Context} {evidence : EvidenceEnvironment}
+    {source : TypedSource} {environment : Dynamic.Environment}
+    {before after : Heap} {form : ExpressionForm} {requirements : List RequirementId}
+    {coercions : List SourceInference.CoercionStep} {value : Value}
+    (atomic : AtomicForm form)
+    (evaluation : ExpressionFormEvaluates program context evidence source environment before
+      form requirements coercions value after) :
+    KeepsLengths before after := by
+  cases atomic with
+  | unit =>
+    cases evaluation with
+    | tuple layout elements pack =>
+      cases elements
+      exact .refl _
+  | lambda parameters returnType body =>
+    cases evaluation with
+    | lambda layout snapshot => exact KeepsLengths.of_copies snapshot
+  | reference name resolution =>
+    cases evaluation with
+    | localEmptyMapping _ _ read _ _ empty write =>
+      apply KeepsLengths.of_write write
+      intro cell element elements cellRead stored
+      cases cellRead.functional read
+      rw [empty] at stored
+      cases stored
+    | _ => exact .refl _
+  | _ => cases evaluation <;> exact .refl _
 
 /-- Atomic evaluation performs no nested call. Captures use the original source and environment. -/
 theorem atomic_value
@@ -740,12 +792,14 @@ theorem element_place_typed {source : TypedSource} {context : Context} {place : 
 target is typed at the place's type, as the Source's `SourcePlaceResolves.preserves` types it. -/
 theorem element_target_preserved {program : Program} {registry : Registry} (budget : Nat) {scope : Scope}
     {context : Context} (unique : NodeOccurrencesUnique scope.source)
+    {Kept : Heap → Heap → Prop} (keptRefl : ∀ heap, Kept heap heap)
+    (keptTrans : ∀ {first middle last : Heap}, Kept first middle → Kept middle last → Kept first last)
     (values : ∀ {size : Nat} {environment : Dynamic.Environment} {before after : Heap} {id : ExpressionId}
       {value : Dynamic.Value} {type : Ty}, size < budget →
       EnvironmentAgrees before context.locals environment → HeapWellTyped context before →
       ExpressionHasType scope.source context id type →
       Size.Expression program registry size scope context environment before id (.value value) after →
-      ExpressionEvaluationPreserved context before after value type)
+      ExpressionEvaluationPreserved context before after value type ∧ Kept before after)
     (faults : ∀ {size : Nat} {environment : Dynamic.Environment} {before after : Heap} {id : ExpressionId}
       {failure : Failure} {type : Ty}, size < budget →
       EnvironmentAgrees before context.locals environment → HeapWellTyped context before →
@@ -758,27 +812,28 @@ theorem element_target_preserved {program : Program} {registry : Registry} (budg
     (typed : SourcePlaceHasType scope.source context place type)
     (trace : Size.ElementTarget program registry size scope context environment before place outcome after) :
     HeapWellTyped context after ∧ HeapTypesExtend before after ∧
-      ∀ target, outcome = .resolved target → ∃ root, ResolvedPlaceHasType context after target root type := by
+      ∀ target, outcome = .resolved target →
+        (∃ root, ResolvedPlaceHasType context after target root type) ∧ Kept before after := by
   cases trace with
   | elementRoot bare lookup read initialValue =>
       refine ⟨heap, .refl _, ?_⟩
       intro target equal
       cases equal
-      exact projected_target_typed unique locals heap (.refl _) typed (by rw [bare]; exact .nil _) .nil
-        (.intro lookup read (by rw [bare]; exact .nil) read initialValue .nil)
+      exact ⟨projected_target_typed unique locals heap (.refl _) typed (by rw [bare]; exact .nil _) .nil
+        (.intro lookup read (by rw [bare]; exact .nil) read initialValue .nil), keptRefl _⟩
   | elementRootFault => exact ⟨heap, .refl _, by intro _ equal; cases equal⟩
   | @elementStep prefixSize indexSize _ _ _ _ middle _ _ leading index prefixTarget element location position cell
       elements selected projections_eq leadingTarget prefix_selected indexed read initialValue selection =>
       obtain ⟨prefixTyped, _, indexTyped⟩ := element_place_typed typed projections_eq
-      obtain ⟨middleTyped, prefixExtends, prefixResolved⟩ := element_target_preserved budget unique values faults
+      obtain ⟨middleTyped, prefixExtends, prefixResolved⟩ := element_target_preserved budget unique keptRefl keptTrans values faults
         (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound) locals heap prefixTyped leadingTarget
-      obtain ⟨_, prefixPlaced⟩ := prefixResolved _ rfl
+      obtain ⟨⟨_, prefixPlaced⟩, prefixKept⟩ := prefixResolved _ rfl
       have referenceTyped : ValueHasType context middle (.arrayRef element location) (Ty.array place.type) := by
         have selectedTyped := prefixPlaced.selected
         rw [prefix_selected] at selectedTyped
         cases selectedTyped with
         | some typed => exact typed
-      have indexPost := values (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound)
+      obtain ⟨indexPost, indexKept⟩ := values (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound)
         (locals.mono prefixExtends) middleTyped indexTyped indexed
       have referenceAfter := referenceTyped.mono indexPost.heap_extends
       have selectedTyped := ValueHasType.arrayElement referenceAfter indexPost.heap_typed read
@@ -786,6 +841,7 @@ theorem element_target_preserved {program : Program} {registry : Registry} (budg
       refine ⟨indexPost.heap_typed, prefixExtends.trans indexPost.heap_extends, ?_⟩
       intro target equal
       cases equal
+      refine ⟨?_, keptTrans prefixKept indexKept⟩
       have stored := typed.type_eq
       rcases referenceAfter.arrayRef_inv with ⟨typeEq, typedCell, typedRead, cellType⟩ | ⟨_, impossible, _⟩
       · simp [Ty.array] at typeEq
@@ -801,12 +857,12 @@ theorem element_target_preserved {program : Program} {registry : Registry} (budg
   | elementPrefixFault projections_eq leadingTarget
   | elementUninitialized projections_eq leadingTarget _ =>
       obtain ⟨prefixTyped, _⟩ := element_place_typed typed projections_eq
-      obtain ⟨afterTyped, prefixExtends, _⟩ := element_target_preserved budget unique values faults
+      obtain ⟨afterTyped, prefixExtends, _⟩ := element_target_preserved budget unique keptRefl keptTrans values faults
         (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound) locals heap prefixTyped leadingTarget
       exact ⟨afterTyped, prefixExtends, by intro _ equal; cases equal⟩
   | elementIndexFault projections_eq leadingTarget indexed =>
       obtain ⟨prefixTyped, _, indexTyped⟩ := element_place_typed typed projections_eq
-      obtain ⟨middleTyped, prefixExtends, _⟩ := element_target_preserved budget unique values faults
+      obtain ⟨middleTyped, prefixExtends, _⟩ := element_target_preserved budget unique keptRefl keptTrans values faults
         (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound) locals heap prefixTyped leadingTarget
       obtain ⟨afterTyped, indexExtends⟩ := faults (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound)
         (locals.mono prefixExtends) middleTyped indexTyped indexed
@@ -814,10 +870,10 @@ theorem element_target_preserved {program : Program} {registry : Registry} (budg
   | elementIndexType projections_eq leadingTarget indexed _ _
   | elementOutOfBounds projections_eq leadingTarget _ indexed _ _ _ =>
       obtain ⟨prefixTyped, _, indexTyped⟩ := element_place_typed typed projections_eq
-      obtain ⟨middleTyped, prefixExtends, _⟩ := element_target_preserved budget unique values faults
+      obtain ⟨middleTyped, prefixExtends, _⟩ := element_target_preserved budget unique keptRefl keptTrans values faults
         (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound) locals heap prefixTyped leadingTarget
-      have indexPost := values (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound)
-        (locals.mono prefixExtends) middleTyped indexTyped indexed
+      have indexPost := (values (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound)
+        (locals.mono prefixExtends) middleTyped indexTyped indexed).1
       exact ⟨indexPost.heap_typed, prefixExtends.trans indexPost.heap_extends, by intro _ equal; cases equal⟩
 termination_by size
 decreasing_by all_goals first | exact Size.child_lt_stepSize (by simp) | (simp_all [Size.stepSize] <;> omega)

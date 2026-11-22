@@ -21,14 +21,43 @@ theorem OutcomePreserved.success {context : Context} {before after : Heap}
     ExpressionEvaluationPreserved context before after value type :=
   ⟨post.value_typed value rfl, post.heap_typed, post.heap_extends⟩
 
+theorem OutcomePreserved.kept {context : Context} {before after : Heap}
+    {type : Ty} {value : Value} (post : OutcomePreserved context before after type (.value value)) :
+    ValueKept context before after value type :=
+  ⟨post.value_typed value rfl, post.heap_typed, post.heap_extends, post.lengths value rfl⟩
+
+theorem OutcomePreserved.keeps {context : Context} {before after : Heap} {type : Ty} {value : Value}
+    (post : OutcomePreserved context before after type (.value value)) : KeepsLengths before after :=
+  post.lengths value rfl
+
+theorem ValuesPreserved.keeps {context : Context} {before after : Heap} {types : List Ty} {values : List Value}
+    (post : ValuesPreserved context before after types (.values values)) : KeepsLengths before after :=
+  post.lengths values rfl
+
+/-- Values a run returns, with heap typing and every array object's length kept. -/
+structure ValuesKept (context : Context) (before after : Heap) (values : List Value) (types : List Ty) : Prop where
+  values_typed : ValuesHaveTypes context after values types
+  heap_typed : HeapWellTyped context after
+  heap_extends : HeapTypesExtend before after
+  lengths : KeepsLengths before after
+
+theorem ValueKept.keeps {context : Context} {before after : Heap} {value : Value} {type : Ty}
+    (kept : ValueKept context before after value type) : KeepsLengths before after :=
+  kept.lengths
+
+theorem ValuesKept.keeps {context : Context} {before after : Heap} {values : List Value} {types : List Ty}
+    (kept : ValuesKept context before after values types) : KeepsLengths before after :=
+  kept.lengths
+
 theorem StatementsAt.bodySuccess {size : Nat} (sound : StatementsAt program registry size) :
     BodySuccessAt program registry size := by
   intro scope context staticFinal runtimeFinal environment before after roots facts type outcome value
     runtime covers locals heap typed completes trace result
   have preserved := sound runtime covers locals heap typed trace
   cases result with
-  | returned => exact ⟨preserved.returned (fun _ => completes) _ rfl, preserved.heap_typed, preserved.heap_extends⟩
-  | unit => exact ⟨.unit, preserved.heap_typed, preserved.heap_extends⟩
+  | returned => exact ⟨preserved.returned (fun _ => completes) _ rfl, preserved.heap_typed, preserved.heap_extends,
+      preserved.lengths (by intro _ equal; cases equal)⟩
+  | unit => exact ⟨.unit, preserved.heap_typed, preserved.heap_extends, preserved.lengths (by intro _ equal; cases equal)⟩
 
 theorem StatementsAt.fault {size : Nat} (sound : StatementsAt program registry size) :
     FaultPreservation.StatementsAt program registry size := by
@@ -48,12 +77,13 @@ theorem applies_all_step (selectedBodies : GlobalBodiesTyped program registry) (
       (fun smaller below => StatementsAt.bodySuccess (statementsIH smaller below))
       runtime heap typed packing packedTyped trace
     exact ⟨preserved.heap_typed, preserved.heap_extends, by
-      intro actual equal; cases equal; exact preserved.value_typed⟩
+      intro actual equal; cases equal; exact preserved.value_typed, by
+      intro actual equal; cases equal; exact preserved.lengths⟩
   | fault failure =>
     have preserved := SelectedFaultPreservation.applies_step selectedBodies size
       (fun smaller below => StatementsAt.fault (statementsIH smaller below))
       runtime heap typed packing packedTyped trace
-    exact ⟨preserved.1, preserved.2, by intro value equal; cases equal⟩
+    exact ⟨preserved.1, preserved.2, (by intro value equal; cases equal), by intro value equal; cases equal⟩
 
 theorem expressions_step (size : Nat)
     (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
@@ -63,7 +93,7 @@ theorem expressions_step (size : Nat)
   cases trace with
   | nil =>
     cases typed
-    exact ⟨heap, .refl _, by intro values equal; cases equal; exact .nil⟩
+    exact ⟨heap, .refl _, by intro values equal; cases equal; exact .nil, by intro values equal; exact .refl _⟩
   | @cons headSize tailSize scope context environment before middle after id ids value values head tail =>
     cases typed with
     | cons headTyped tailTyped =>
@@ -72,19 +102,22 @@ theorem expressions_step (size : Nat)
         (locals.mono first.heap_extends) first.heap_typed tailTyped tail
       exact ⟨next.heap_typed, first.heap_extends.trans next.heap_extends, by
         intro actual equal; cases equal
-        exact .cons ((first.value_typed _ rfl).mono next.heap_extends) (next.values_typed _ rfl)⟩
+        exact .cons ((first.value_typed _ rfl).mono next.heap_extends) (next.values_typed _ rfl), by
+        intro actual equal; cases equal
+        exact (first.lengths _ rfl).trans (next.lengths _ rfl)⟩
   | @headFault headSize scope context environment before after id ids failure head =>
     cases typed with
     | cons headTyped tailTyped =>
       have first := expressionIH headSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap headTyped head
-      exact ⟨first.heap_typed, first.heap_extends, by intro values equal; cases equal⟩
+      exact ⟨first.heap_typed, first.heap_extends, (by intro values equal; cases equal), by intro values equal; cases equal⟩
   | @tailFault headSize tailSize scope context environment before middle after id ids value failure head tail =>
     cases typed with
     | cons headTyped tailTyped =>
       have first := expressionIH headSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap headTyped head
       have next := expressionsIH tailSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed tailTyped tail
-      exact ⟨next.heap_typed, first.heap_extends.trans next.heap_extends, by intro values equal; cases equal⟩
+      exact ⟨next.heap_typed, first.heap_extends.trans next.heap_extends, (by intro values equal; cases equal),
+        by intro values equal; cases equal⟩
 
 theorem coercion_path_step (size : Nat)
     (stepIH : ∀ smaller, smaller < size → CoercionStepAt program registry smaller)
@@ -94,19 +127,20 @@ theorem coercion_path_step (size : Nat)
   cases trace with
   | coercionsNil =>
     cases valid
-    exact ⟨heap, .refl _, by intro value equal; cases equal; exact typed⟩
+    exact ⟨heap, .refl _, by intro value equal; cases equal; exact typed, by intro value equal; exact .refl _⟩
   | @coercionsCons headSize tailSize scope context before middle after step steps input converted outcome head tail =>
     cases valid with
     | cons headValid tailValid =>
       have first := stepIH headSize (Size.child_lt_stepSize (by simp)) runtime heap typed headValid head
       have next := pathIH tailSize (Size.child_lt_stepSize (by simp)) runtime
         first.heap_typed (first.value_typed _ rfl) tailValid tail
-      exact ⟨next.heap_typed, first.heap_extends.trans next.heap_extends, next.value_typed⟩
+      exact ⟨next.heap_typed, first.heap_extends.trans next.heap_extends, next.value_typed,
+        fun value equal => (first.lengths _ rfl).trans (next.lengths value equal)⟩
   | @coercionsFault headSize scope context before after step steps input failure head =>
     cases valid with
     | cons headValid tailValid =>
       have first := stepIH headSize (Size.child_lt_stepSize (by simp)) runtime heap typed headValid head
-      exact ⟨first.heap_typed, first.heap_extends, by intro value equal; cases equal⟩
+      exact ⟨first.heap_typed, first.heap_extends, (by intro value equal; cases equal), by intro value equal; cases equal⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end
@@ -156,9 +190,9 @@ theorem expression_value {size : Nat} (sound : ExpressionAt program registry siz
     (locals : Dynamic.EnvironmentAgrees before context.locals environment) (heap : HeapWellTyped context before)
     (typed : ExpressionHasType scope.source context id type)
     (trace : Size.Expression program registry size scope context environment before id (.value value) after) :
-    ExpressionEvaluationPreserved context before after value type := by
+    ValueKept context before after value type := by
   have post := sound runtime covers locals heap typed trace
-  exact ⟨post.value_typed _ rfl, post.heap_typed, post.heap_extends⟩
+  exact ⟨post.value_typed _ rfl, post.heap_typed, post.heap_extends, post.lengths _ rfl⟩
 
 theorem expressions_values {size : Nat} (sound : ExpressionsAt program registry size) {scope : Scope} {context : Context} {environment : Dynamic.Environment}
     {before after : Heap} {ids : List ExpressionId} {values : List Value} {types : List TypeSystem.Ty}
@@ -166,9 +200,9 @@ theorem expressions_values {size : Nat} (sound : ExpressionsAt program registry 
     (locals : Dynamic.EnvironmentAgrees before context.locals environment) (heap : HeapWellTyped context before)
     (typed : ExpressionsHaveTypes scope.source context ids types)
     (trace : Size.Expressions program registry size scope context environment before ids (.values values) after) :
-    ValuesHaveTypes context after values types ∧ HeapWellTyped context after ∧ HeapTypesExtend before after := by
+    ValuesKept context before after values types := by
   have post := sound runtime covers locals heap typed trace
-  exact ⟨post.values_typed _ rfl, post.heap_typed, post.heap_extends⟩
+  exact ⟨post.values_typed _ rfl, post.heap_typed, post.heap_extends, post.lengths _ rfl⟩
 
 theorem raw_form_value {size : Nat} (sound : RawFormAt program registry size) {scope : Scope} {context : Context} {environment : Dynamic.Environment}
     {before after : Heap} {form : ExpressionForm} {requirements : List RequirementId}
@@ -180,9 +214,9 @@ theorem raw_form_value {size : Nat} (sound : RawFormAt program registry size) {s
     (typed : ExpressionFormHasRawType scope.source context form rawType plan)
     (valid : ExpressionRequirementPlan.Valid context rawType finalType plan requirements coercions)
     (trace : Size.RawForm program registry size scope context environment before form requirements coercions (.value value) after) :
-    ValueHasType context after value rawType ∧ HeapWellTyped context after ∧ HeapTypesExtend before after := by
+    ValueKept context before after value rawType := by
   have post := sound runtime covers locals heap occurrence typed valid trace
-  exact ⟨post.value_typed _ rfl, post.heap_typed, post.heap_extends⟩
+  exact ⟨post.value_typed _ rfl, post.heap_typed, post.heap_extends, post.lengths _ rfl⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end
@@ -200,6 +234,8 @@ structure ControlPreserved (context : Context) (before after : Heap)
   heap_typed : HeapWellTyped context after
   heap_extends : HeapTypesExtend before after
   returned : ∀ value, outcome = .returned value → ValueHasType context after value type
+  /-- Unless the run faulted, every array object keeps its length. -/
+  lengths : (∀ failure, outcome ≠ .fault failure) → KeepsLengths before after
 
 variable (program : Program) (registry : Registry)
 
@@ -432,6 +468,69 @@ theorem bare_write_bitNot
       exact ⟨heap.write currentRead (.some updatedCell) heapWrite,
         HeapTypesExtend.of_write heapWrite⟩
 
+/-- A bare write keeps every array object's length: its local is writable, so its cell holds none. -/
+theorem bare_write_lengths
+    {source : TypedSource} {context : Context} {environment : Dynamic.Environment}
+    {before middle after : Heap} {place : PlaceResolution} {target : ResolvedPlace} {type : Ty}
+    {Modify : Option Value → Value → Prop} {updated : Value}
+    (locals : EnvironmentAgrees before context.locals environment)
+    (middleTyped : HeapWellTyped context middle) (extension : HeapTypesExtend before middle)
+    (targetTyped : SourcePlaceHasType source context place type)
+    (snapshot : BareTarget environment before place target)
+    (write : ResolvedPlaceWrites Modify middle target updated after) :
+    KeepsLengths middle after := by
+  apply KeepsLengths.of_place_write write
+  intro cell element elements read stored
+  exfalso
+  cases targetTyped with
+  | intro writable _ _ =>
+      cases snapshot with
+      | intro _ lookup _ _ =>
+          exact writable_not_object (locals.mono extension) middleTyped writable lookup cell element elements
+            read stored
+
+/-- A projected write keeps every array object's length: its path is a nonempty row of keys and members. -/
+theorem projected_write_lengths
+    {environment : Dynamic.Environment} {before targetHeap middle after : Heap} {place : PlaceResolution}
+    {values : List Value} {target : ResolvedPlace} {Modify : Option Value → Value → Prop} {updated : Value}
+    (projected : place.projections ≠ [])
+    (snapshot : ProjectedTarget.Snapshot environment before targetHeap place values target)
+    (write : ResolvedPlaceWrites Modify middle target updated after) :
+    KeepsLengths middle after := by
+  apply KeepsLengths.of_place_write write
+  intro _ _ _ _ _
+  cases snapshot with
+  | intro _ _ ordered _ _ _ =>
+      intro empty
+      generalize place.projections = projections at ordered projected
+      cases ordered with
+      | nil => exact projected rfl
+      | member _ => cases empty
+      | index _ => cases empty
+
+/-- An element target resolves an element place to an object's element, a nonempty path. -/
+theorem element_target_nonempty
+    {program : Program} {registry : Registry} {size : Nat} {scope : Scope} {context : Context} {environment : Dynamic.Environment} {before after : Heap}
+    {place : PlaceResolution} {target : ResolvedPlace}
+    (element : ElementPlace place.projections)
+    (resolved : Size.ElementTarget program registry size scope context environment before place (.resolved target) after) :
+    target.projections ≠ [] := by
+  cases resolved with
+  | elementRoot bare => exact absurd bare element.ne_nil
+  | elementStep => simp
+
+/-- An element write keeps every array object's length: it replaces one element of the object resolved. -/
+theorem element_write_lengths
+    {program : Program} {registry : Registry} {size : Nat} {scope : Scope} {context : Context} {environment : Dynamic.Environment}
+    {before targetHeap middle after : Heap} {place : PlaceResolution} {target : ResolvedPlace}
+    {Modify : Option Value → Value → Prop} {updated : Value}
+    (element : ElementPlace place.projections)
+    (resolved : Size.ElementTarget program registry size scope context environment before place (.resolved target)
+      targetHeap)
+    (write : ResolvedPlaceWrites Modify middle target updated after) :
+    KeepsLengths middle after :=
+  KeepsLengths.of_place_write write fun _ _ _ _ _ => element_target_nonempty element resolved
+
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end
 
@@ -501,7 +600,7 @@ theorem continue_tail
       (mode = true → BodyCompletes type tailFacts) (tailFacts.control.canFallthrough = true)) :
     StatementsPreserved context staticFinal runtimeFinal before after type outcome
       (mode = true → BodyCompletes type facts) (facts.control.canFallthrough = true) := by
-  refine ⟨post.heap_typed, post.heap_extends, ?_, ?_⟩
+  refine ⟨post.heap_typed, post.heap_extends, ?_, ?_, post.lengths⟩
   · intro complete value returned
     by_cases empty : rest = []
     · subst rest
@@ -515,10 +614,11 @@ theorem continue_tail
 theorem StatementsPreserved.prepend
     {context staticFinal runtimeFinal : Context} {before middle after : Heap}
     {type : Ty} {outcome : BodyOutcome} {complete allowed : Prop}
-    (extended : HeapTypesExtend before middle)
+    (extended : HeapTypesExtend before middle) (kept : KeepsLengths before middle)
     (post : StatementsPreserved context staticFinal runtimeFinal middle after type outcome complete allowed) :
     StatementsPreserved context staticFinal runtimeFinal before after type outcome complete allowed :=
-  ⟨post.heap_typed, extended.trans post.heap_extends, post.returned, post.fallthrough⟩
+  ⟨post.heap_typed, extended.trans post.heap_extends, post.returned, post.fallthrough,
+    fun notFault => kept.trans (post.lengths notFault)⟩
 
 theorem StatementsPreserved.transportEntry
     {program : Program} {source : TypedSource} {context middle staticFinal runtimeFinal : Context}
@@ -534,14 +634,15 @@ theorem StatementsPreserved.transportEntry
     fun completion value equal => (post.returned completion value equal).transportClosed
       fields.signatures.symm closed runtime.closed
       (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
-    post.fallthrough⟩
+    post.fallthrough, post.lengths⟩
 
 theorem fault_statements
     {context staticFinal runtimeFinal : Context} {before after : Heap}
     {type : Ty} {failure : Failure} {complete allowed : Prop}
     (heap : HeapWellTyped context after) (extended : HeapTypesExtend before after) :
     StatementsPreserved context staticFinal runtimeFinal before after type (.fault failure) complete allowed :=
-  ⟨heap, extended, (by intro _ value equal; cases equal), (by intro environment equal; cases equal)⟩
+  ⟨heap, extended, (by intro _ value equal; cases equal), (by intro environment equal; cases equal),
+    fun notFault => (notFault _ rfl).elim⟩
 
 theorem terminal_statements
     {context staticFinal runtimeFinal : Context} {before after : Heap}
@@ -550,7 +651,7 @@ theorem terminal_statements
     (terminal : ∀ environment, outcome ≠ .fallthrough environment) :
     StatementsPreserved context staticFinal runtimeFinal before after type outcome complete allowed :=
   ⟨post.heap_typed, post.heap_extends, fun _ => post.returned,
-    fun environment equal => (terminal environment equal).elim⟩
+    fun environment equal => (terminal environment equal).elim, post.lengths⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end
@@ -588,12 +689,14 @@ theorem if_branch
       | true =>
           have post := statementsIH branchSize branchSmaller runtime covers (locals.mono first.heap_extends)
             first.heap_typed yes branch
-          exact ⟨⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp)⟩,
+          exact ⟨⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp),
+            fun notFault => (first.lengths _ rfl).trans (post.lengths notFault)⟩,
             fun env equal => ControlSummary.branches_canFallthrough_left (post.fallthrough env equal).2.2⟩
       | false =>
           simp only [Bool.false_eq_true, ↓reduceIte, Option.getD_none] at branch
           cases branch
-          exact ⟨⟨first.heap_typed, first.heap_extends, by intro value equal; cases equal⟩,
+          exact ⟨⟨first.heap_typed, first.heap_extends, (by intro value equal; cases equal),
+            fun _ => first.lengths _ rfl⟩,
             fun _ _ => ControlSummary.branches_canFallthrough_right rfl⟩
   | ifWithElse conditionTyped yes no =>
       have first := expressionIH testSize testSmaller runtime covers locals heap conditionTyped test
@@ -601,12 +704,14 @@ theorem if_branch
       | true =>
           have post := statementsIH branchSize branchSmaller runtime covers (locals.mono first.heap_extends)
             first.heap_typed yes branch
-          exact ⟨⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp)⟩,
+          exact ⟨⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp),
+            fun notFault => (first.lengths _ rfl).trans (post.lengths notFault)⟩,
             fun env equal => ControlSummary.branches_canFallthrough_left (post.fallthrough env equal).2.2⟩
       | false =>
           have post := statementsIH branchSize branchSmaller runtime covers (locals.mono first.heap_extends)
             first.heap_typed no branch
-          exact ⟨⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp)⟩,
+          exact ⟨⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp),
+            fun notFault => (first.lengths _ rfl).trans (post.lengths notFault)⟩,
             fun env equal => ControlSummary.branches_canFallthrough_right (post.fallthrough env equal).2.2⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
@@ -648,11 +753,12 @@ theorem body_all {size : Nat}
   | value value =>
     have post := body_success (StatementsAt.bodySuccess statementsIH) runtime certificate covers
       beforeTyped argumentsTyped rootsEq selected parameters allocate body resultRule
-    exact ⟨post.heap_typed, post.heap_extends, by intro actual equal; cases equal; exact post.value_typed⟩
+    exact ⟨post.heap_typed, post.heap_extends, by intro actual equal; cases equal; exact post.value_typed,
+      by intro actual equal; cases equal; exact post.lengths⟩
   | fault failure =>
     have post := SelectedFaultPreservation.method_body_fault (StatementsAt.fault statementsIH)
       runtime certificate covers beforeTyped argumentsTyped rootsEq selected parameters allocate body resultRule
-    exact ⟨post.1, post.2, by intro value equal; cases equal⟩
+    exact ⟨post.1, post.2, (by intro value equal; cases equal), by intro value equal; cases equal⟩
 
  theorem coercion_step_step (selectedBodies : SelectedBodies program registry) (size : Nat)
     (statementsIH : ∀ smaller, smaller < size → StatementsAt program registry smaller) :
@@ -661,9 +767,9 @@ theorem body_all {size : Nat}
   cases trace with
   | coercionPrimitive noMethod applies =>
     obtain ⟨outputTyped, heapTyped, extended⟩ := CoercionStepExecutes.primitivePreserves heap typed applies
-    exact ⟨heapTyped, extended, by intro value equal; cases equal; exact outputTyped⟩
+    exact ⟨heapTyped, extended, by intro value equal; cases equal; exact outputTyped, fun _ _ => .refl _⟩
   | coercionRequirement _ | coercionPrimitiveInput _ _ _ =>
-    exact ⟨heap, .refl _, by intro value equal; cases equal⟩
+    exact ⟨heap, .refl _, (by intro value equal; cases equal), by intro value equal; cases equal⟩
   | @coercionMethod bodySize scope context before bound after step input bodyInstance dictionary roots child
       parameterTypes bodyContext finalContext bodyEnvironment outcome result method rootsEq selected parameters allocate body resultRule =>
     cases valid with
@@ -677,7 +783,7 @@ theorem body_all {size : Nat}
         runtime certificate covers heap (.cons typed .nil) rootsEq selected parameters allocate body resultRule
       exact ⟨post.heap_typed, post.heap_extends, by
         intro value equal
-        exact resultEq ▸ post.value_typed value equal⟩
+        exact resultEq ▸ post.value_typed value equal, post.lengths⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end
@@ -1110,16 +1216,17 @@ theorem raw_form_step (size : Nat)
   cases trace with
   | rawAtomicValue atomic valueRule =>
       have post := atomic_value runtime covers locals heap occurrence typed atomic valueRule
-      exact ⟨post.heap_typed, post.heap_extends, by intro value equal; cases equal; exact post.value_typed⟩
+      exact ⟨post.heap_typed, post.heap_extends, by intro value equal; cases equal; exact post.value_typed,
+        by intro value equal; cases equal; exact atomic_lengths atomic valueRule⟩
   | rawAtomicFault atomic faultRule =>
       have same := FaultPreservation.atomic_fault_heap atomic faultRule
       subst after
-      exact ⟨heap, .refl _, by intro value equal; cases equal⟩
+      exact ⟨heap, .refl _, (by intro value equal; cases equal), by intro value equal; cases equal⟩
   | @rawDirectArgumentsFault childrenSize scope context environment before after callee arguments instantiation name failure requirements coercions _calleeOccurrence children =>
       cases typed with
       | directCall _calleeTyped _application argumentsTyped =>
           have post := expressionsIH childrenSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap argumentsTyped children
-          exact ⟨post.heap_typed, post.heap_extends, by intro value equal; cases equal⟩
+          exact ⟨post.heap_typed, post.heap_extends, (by intro value equal; cases equal), by intro value equal; cases equal⟩
   | @rawDirectApplied childrenSize invocationSize scope context environment before argumentsHeap after callee arguments instantiation name values evidence outcome requirements coercions _calleeOccurrence valid children callEvidence invocation =>
       cases typed with
       | @directCall _ callee arguments instantiation parameterTypes resultType predicates _calleeTyped application argumentsTyped =>
@@ -1138,7 +1245,8 @@ theorem raw_form_step (size : Nat)
                   have argumentTyped := packing.hasType (args.values_typed _ rfl)
                   have post := appliesIH invocationSize (Size.child_lt_stepSize (by simp))
                     runtime args.heap_typed calleeTyped packing argumentTyped invocation
-                  exact ⟨post.heap_typed, args.heap_extends.trans post.heap_extends, post.value_typed⟩
+                  exact ⟨post.heap_typed, args.heap_extends.trans post.heap_extends, post.value_typed,
+                    fun value equal => args.keeps.trans (post.lengths value equal)⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end
@@ -1295,7 +1403,7 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
     (locals : EnvironmentAgrees before context.locals environment) (heap : HeapWellTyped context before)
     (typed : ExpressionHasType scope.source context id type)
     (trace : Size.Expression program registry size scope context environment before id (.value value) after) :
-    ExpressionEvaluationPreserved context before after value type := by
+    ValueKept context before after value type := by
   cases trace with
   | @atomicValue scope context environment before after id node value contains atomic uncoerced valueRule =>
       cases typed with
@@ -1306,7 +1414,8 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
           have post := atomic_value runtime covers locals heap ⟨id, node, contains, rfl, rawTypeEq⟩ typedForm atomic valueRule
           have path := valid.outputPath
           rw [uncoerced] at path
-          exact ⟨empty_path_type path ▸ post.value_typed, post.heap_typed, post.heap_extends⟩
+          exact ⟨empty_path_type path ▸ post.value_typed, post.heap_typed, post.heap_extends,
+            atomic_lengths atomic valueRule⟩
   | @coercedValue rawSize pathSize scope context environment before middle after id node value outcome contains _nonempty raw path =>
       cases typed with
       | @intro _ _ actual rawType plan typedContains typedForm rawTypeEq _ _ valid =>
@@ -1317,7 +1426,7 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
             ⟨id, node, contains, rfl, rawTypeEq⟩ typedForm valid raw
           have post := pathIH pathSize (Size.child_lt_stepSize (by simp))
             runtime rawPost.heap_typed (rawPost.value_typed _ rfl) valid.outputPath path
-          exact ⟨post.value_typed _ rfl, post.heap_typed, rawPost.heap_extends.trans post.heap_extends⟩
+          exact ⟨post.value_typed _ rfl, post.heap_typed, rawPost.heap_extends.trans post.heap_extends, rawPost.keeps.trans post.keeps⟩
   | @generalizedLocal pathSize scope context environment before after id node name binder owned
       location cell function substitution produced outcome contains _form _layout _lookup read descriptor contextFields instantiation path =>
       cases typed with
@@ -1334,7 +1443,7 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
           rw [rawTypeEq] at rawTyped
           have post := pathIH pathSize (Size.child_lt_stepSize (by simp))
             runtime heap rawTyped valid.outputPath path
-          exact ⟨post.value_typed _ rfl, post.heap_typed, post.heap_extends⟩
+          exact ⟨post.value_typed _ rfl, post.heap_typed, post.heap_extends, post.keeps⟩
   | @group childSize scope context environment before after id inner outcome occurrence child =>
       obtain ⟨_plan, formTyped, _valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
@@ -1353,19 +1462,19 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
                   have rightPost := expressionIH secondSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono leftPost.heap_extends) leftPost.heap_typed secondTyped second
                   exact ⟨.product ((leftPost.value_typed _ rfl).mono rightPost.heap_extends) (rightPost.value_typed _ rfl),
-                    rightPost.heap_typed, leftPost.heap_extends.trans rightPost.heap_extends⟩
+                    rightPost.heap_typed, leftPost.heap_extends.trans rightPost.heap_extends, leftPost.keeps.trans rightPost.keeps⟩
   | @tupleValue childrenSize scope context environment before after id elements values packed occurrence children pack =>
       obtain ⟨_plan, formTyped, _valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
       | tuple elementsTyped =>
           have post := expressionsIH childrenSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap elementsTyped children
-          exact ⟨pack.hasType (post.values_typed _ rfl), post.heap_typed, post.heap_extends⟩
+          exact ⟨pack.hasType (post.values_typed _ rfl), post.heap_typed, post.heap_extends, post.keeps⟩
   | @constructorValue childrenSize scope context environment before after id instantiation arguments values occurrence valid children =>
       obtain ⟨_plan, formTyped, _valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
       | constructor _valid argumentsTyped =>
           have post := expressionsIH childrenSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap argumentsTyped children
-          exact ⟨.constructed valid (post.values_typed _ rfl), post.heap_typed, post.heap_extends⟩
+          exact ⟨.constructed valid (post.values_typed _ rfl), post.heap_typed, post.heap_extends, post.keeps⟩
   | @indexResult firstSize secondSize scope context environment before middle after id base key baseValue keyValue outcome occurrence first second result =>
       obtain ⟨_plan, formTyped, _valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
@@ -1378,15 +1487,20 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
           | found shape located =>
               subst baseValue
               obtain ⟨rfl, rfl, entriesTyped⟩ := baseAfter.mappingComponents
-              exact ⟨located.preserves entriesTyped, rightPost.heap_typed, leftPost.heap_extends.trans rightPost.heap_extends⟩
+              exact ⟨located.preserves entriesTyped, rightPost.heap_typed, leftPost.heap_extends.trans rightPost.heap_extends, leftPost.keeps.trans rightPost.keeps⟩
           | default shape _absent defaulted =>
               subst baseValue
               obtain ⟨rfl, rfl, _entriesTyped⟩ := baseAfter.mappingComponents
-              exact ⟨defaulted.hasType, rightPost.heap_typed, leftPost.heap_extends.trans rightPost.heap_extends⟩
+              exact ⟨defaulted.hasType, rightPost.heap_typed, leftPost.heap_extends.trans rightPost.heap_extends, leftPost.keeps.trans rightPost.keeps⟩
   | @arrayResult childrenSize scope context environment before middle after id form children values outcome occurrence shape evaluated result =>
       obtain ⟨_plan, formTyped, _valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
-      exact array_value_preserved (expressionsIH childrenSize (Size.child_lt_stepSize (by simp))) runtime covers locals
-        heap formTyped shape evaluated result
+      obtain ⟨_types, childrenTyped⟩ := FaultPreservation.array_children_typed formTyped shape
+      have childrenPost := expressionsIH childrenSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap
+        childrenTyped evaluated
+      have post := array_value_preserved (expressionsIH childrenSize (Size.child_lt_stepSize (by simp))) runtime covers
+        locals heap formTyped shape evaluated result
+      exact ⟨post.value_typed, post.heap_typed, post.heap_extends,
+        childrenPost.keeps.trans (KeepsLengths.of_array_outcome result)⟩
   | @unary childSize scope context environment before after id operator operand input output occurrence child applies =>
       obtain ⟨_plan, formTyped, valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
@@ -1398,11 +1512,11 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap operandTyped child
               have lookupEq := Dynamic.operandType?_of_typing runtime.graph.nodeOccurrencesUnique operandTyped
               cases operatorTyped with
-              | logicalNot => exact ⟨applies.preserves .logicalNot lookupEq (post.value_typed _ rfl), post.heap_typed, post.heap_extends⟩
-              | wordBitNot => exact ⟨applies.preserves .wordBitNot lookupEq (post.value_typed _ rfl), post.heap_typed, post.heap_extends⟩
-              | integerBitNot => exact ⟨applies.preserves .integerBitNot lookupEq (post.value_typed _ rfl), post.heap_typed, post.heap_extends⟩
-              | fixedBitNot kind => exact ⟨applies.preserves (.fixedBitNot kind) lookupEq (post.value_typed _ rfl), post.heap_typed, post.heap_extends⟩
-              | fixedNarrowBitNot kind => exact ⟨applies.preserves_narrow kind lookupEq, post.heap_typed, post.heap_extends⟩
+              | logicalNot => exact ⟨applies.preserves .logicalNot lookupEq (post.value_typed _ rfl), post.heap_typed, post.heap_extends, post.keeps⟩
+              | wordBitNot => exact ⟨applies.preserves .wordBitNot lookupEq (post.value_typed _ rfl), post.heap_typed, post.heap_extends, post.keeps⟩
+              | integerBitNot => exact ⟨applies.preserves .integerBitNot lookupEq (post.value_typed _ rfl), post.heap_typed, post.heap_extends, post.keeps⟩
+              | fixedBitNot kind => exact ⟨applies.preserves (.fixedBitNot kind) lookupEq (post.value_typed _ rfl), post.heap_typed, post.heap_extends, post.keeps⟩
+              | fixedNarrowBitNot kind => exact ⟨applies.preserves_narrow kind lookupEq, post.heap_typed, post.heap_extends, post.keeps⟩
               | trait _dispatch profile requirementsProve => cases requirementsProve; cases profile
   | @binaryShortCircuit firstSize scope context environment before after id left operator right input output occurrence first circuit =>
       obtain ⟨_plan, formTyped, valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
@@ -1413,7 +1527,7 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
           all_goals try { rename_i kind _; cases kind; done }
           all_goals try { rename_i kind; cases kind }
           all_goals try { rename_i dispatch profile proof; cases dispatch }
-          all_goals exact ⟨.bool _, post.heap_typed, post.heap_extends⟩
+          all_goals exact ⟨.bool _, post.heap_typed, post.heap_extends, post.keeps⟩
   | @binary firstSize secondSize scope context environment before middle after id left operator right a b output occurrence first _continues second applies =>
       obtain ⟨_plan, formTyped, valid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
@@ -1428,37 +1542,38 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
               have aTyped := (firstPost.value_typed _ rfl).mono secondPost.heap_extends
               have bTyped := secondPost.value_typed _ rfl
               cases operatorTyped with
-              | wordArithmetic kind => exact ⟨applies.preserves (.wordArithmetic kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
+              | wordArithmetic kind => exact ⟨applies.preserves (.wordArithmetic kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
               | wordShift kind amount =>
                 -- A Word's shift gives a Word, whatever the amount's type.
-                refine ⟨?_, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
+                refine ⟨?_, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends,
+                  firstPost.keeps.trans secondPost.keeps⟩
                 cases applies with
                 | primitive _ primitive =>
                   cases kind <;> cases primitive <;> first | exact .word _ | cases aTyped
                 | fixed operandEq _ =>
                   rw [Dynamic.operandType?_of_typing runtime.graph.nodeOccurrencesUnique leftTyped] at operandEq
                   simp [TypeSystem.Ty.word, TypeSystem.Ty.fixed] at operandEq
-              | wordUnchecked kind => exact ⟨applies.preserves (.wordUnchecked kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
-              | integerArithmetic kind => exact ⟨applies.preserves (.integerArithmetic kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
-              | wordComparison kind => exact ⟨applies.preserves (.wordComparison kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
-              | integerComparison kind => exact ⟨applies.preserves (.integerComparison kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
-              | fixedComparison kind => exact ⟨applies.preserves (.fixedComparison kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
-              | fixedBitwise kind => exact ⟨applies.preserves (.fixedBitwise kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
-              | fixedSignedComparison kind => exact ⟨applies.preserves (.fixedSignedComparison kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
+              | wordUnchecked kind => exact ⟨applies.preserves (.wordUnchecked kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
+              | integerArithmetic kind => exact ⟨applies.preserves (.integerArithmetic kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
+              | wordComparison kind => exact ⟨applies.preserves (.wordComparison kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
+              | integerComparison kind => exact ⟨applies.preserves (.integerComparison kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
+              | fixedComparison kind => exact ⟨applies.preserves (.fixedComparison kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
+              | fixedBitwise kind => exact ⟨applies.preserves (.fixedBitwise kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
+              | fixedSignedComparison kind => exact ⟨applies.preserves (.fixedSignedComparison kind) aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
               | fixedArithmetic kind =>
                 exact ⟨applies.preserves_checked kind (Dynamic.operandType?_of_typing runtime.graph.nodeOccurrencesUnique leftTyped),
-                  secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
+                  secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
               | fixedDivision kind =>
                 exact ⟨applies.preserves_division kind (Dynamic.operandType?_of_typing runtime.graph.nodeOccurrencesUnique leftTyped),
-                  secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
+                  secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
               | fixedUnchecked kind =>
                 exact ⟨applies.preserves_unchecked kind (Dynamic.operandType?_of_typing runtime.graph.nodeOccurrencesUnique leftTyped),
-                  secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
+                  secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
               | fixedShift kind amount =>
                 exact ⟨applies.preserves_shift kind (Dynamic.operandType?_of_typing runtime.graph.nodeOccurrencesUnique leftTyped) aTyped,
-                  secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
-              | booleanAnd => exact ⟨applies.preserves .booleanAnd aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
-              | booleanOr => exact ⟨applies.preserves .booleanOr aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends⟩
+                  secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
+              | booleanAnd => exact ⟨applies.preserves .booleanAnd aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
+              | booleanOr => exact ⟨applies.preserves .booleanOr aTyped bTyped, secondPost.heap_typed, firstPost.heap_extends.trans secondPost.heap_extends, firstPost.keeps.trans secondPost.keeps⟩
               | trait _dispatch profile requirementsProve => cases requirementsProve; cases profile
   | @unaryMethod operandSize bodySize scope context environment before argumentsHeap bound after id operator operand input
       requirements traitName methodName bodyInstance dictionary roots child parameterTypes bodyContext finalContext bodyEnvironment outcome result
@@ -1470,7 +1585,7 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
           | ordinary _ _ requirementsEq =>
               simp [coercionRequirementIds] at requirementsEq
               subst requirements
-              obtain ⟨inputTyped, argumentsHeapTyped, operandExtends⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
+              obtain ⟨inputTyped, argumentsHeapTyped, operandExtends, operandKept⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
                 runtime covers locals heap operandTyped operandTrace
               cases operatorTyped with
               | logicalNot | wordBitNot | integerBitNot | fixedBitNot _ | fixedNarrowBitNot _ => cases method
@@ -1481,10 +1596,10 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
                     (selectedBodies.methods method rootsEq selected).certificateOfProfile selectedBodies.signatures runtime.signatures runtime.requirements.idsUnique
                       profile requirementsProve
                   have argumentsTyped := ValuesHaveTypes.cons inputTyped (.nil)
-                  obtain ⟨resultTyped, afterTyped, bodyExtends⟩ := body_success
+                  obtain ⟨resultTyped, afterTyped, bodyExtends, bodyKept⟩ := body_success
                     (StatementsAt.bodySuccess (statementsIH bodySize (Size.child_lt_stepSize (by simp)))) runtime certificate
                     (by cases method; assumption) argumentsHeapTyped argumentsTyped rootsEq selected parameters allocate body resultRule
-                  exact ⟨(by simpa [resultEq, Ty.productMany] using resultTyped), afterTyped, operandExtends.trans bodyExtends⟩
+                  exact ⟨(by simpa [resultEq, Ty.productMany] using resultTyped), afterTyped, operandExtends.trans bodyExtends, operandKept.trans bodyKept⟩
   | @binaryMethod leftSize rightSize bodySize scope context environment before middle argumentsHeap bound after id left operator right a b
       requirements traitName methodName bodyInstance dictionary roots child parameterTypes bodyContext finalContext bodyEnvironment outcome result
       occurrence dispatch method first continues second rootsEq selected parameters allocate body resultRule =>
@@ -1495,9 +1610,9 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
           | ordinary _ _ requirementsEq =>
               simp [coercionRequirementIds] at requirementsEq
               subst requirements
-              obtain ⟨leftValueTyped, middleTyped, firstExtends⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
+              obtain ⟨leftValueTyped, middleTyped, firstExtends, firstKept⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
                 runtime covers locals heap leftTyped first
-              obtain ⟨rightValueTyped, argumentsHeapTyped, secondExtends⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
+              obtain ⟨rightValueTyped, argumentsHeapTyped, secondExtends, secondKept⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
                 runtime covers (locals.mono firstExtends) middleTyped rightTyped second
               cases operatorTyped with
               | wordArithmetic | integerArithmetic | wordShift | wordUnchecked | wordComparison | integerComparison | fixedComparison | fixedBitwise | fixedSignedComparison | fixedArithmetic | fixedDivision | fixedUnchecked | fixedShift | booleanAnd | booleanOr => cases method
@@ -1509,28 +1624,28 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
                     profile requirementsProve
                 have argumentsTyped := ValuesHaveTypes.cons (leftValueTyped.mono secondExtends)
                   (.cons rightValueTyped (.nil))
-                obtain ⟨resultTyped, afterTyped, bodyExtends⟩ := body_success
+                obtain ⟨resultTyped, afterTyped, bodyExtends, bodyKept⟩ := body_success
                   (StatementsAt.bodySuccess (statementsIH bodySize (Size.child_lt_stepSize (by simp)))) runtime certificate
                   (by cases method; assumption) argumentsHeapTyped argumentsTyped rootsEq selected parameters allocate body resultRule
-                exact ⟨(by simpa [resultEq, Ty.productMany] using resultTyped), afterTyped, firstExtends.trans (secondExtends.trans bodyExtends)⟩
+                exact ⟨(by simpa [resultEq, Ty.productMany] using resultTyped), afterTyped, firstExtends.trans (secondExtends.trans bodyExtends), firstKept.trans (secondKept.trans bodyKept)⟩
   | @conditional testSize branchSize scope context environment before middle after id condition yes no truth outcome
       occurrence test branch =>
       obtain ⟨_plan, formTyped, _planValid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
       | conditional conditionTyped yesTyped noTyped =>
-          obtain ⟨_truthTyped, middleTyped, testExtends⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
+          obtain ⟨_truthTyped, middleTyped, testExtends, testKept⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
             runtime covers locals heap conditionTyped test
           have branchTyped : ExpressionHasType scope.source context (if truth then yes else no) type := by
             split <;> assumption
-          obtain ⟨resultTyped, afterTyped, branchExtends⟩ := expression_value (expressionIH branchSize (Size.child_lt_stepSize (by simp)))
+          obtain ⟨resultTyped, afterTyped, branchExtends, branchKept⟩ := expression_value (expressionIH branchSize (Size.child_lt_stepSize (by simp)))
             runtime covers (locals.mono testExtends) middleTyped branchTyped branch
-          exact ⟨resultTyped, afterTyped, testExtends.trans branchExtends⟩
+          exact ⟨resultTyped, afterTyped, testExtends.trans branchExtends, testKept.trans branchKept⟩
   | @builtinApplied childrenSize invocationSize scope context environment before argumentsHeap after
       id callee arguments function values outcome occurrence children invocation =>
       obtain ⟨_plan, formTyped, _planValid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
       | builtinCall _calleeValid argumentsTyped =>
-          obtain ⟨valuesTyped, argumentsHeapTyped, argumentExtends⟩ := expressions_values (expressionsIH _ (Size.child_lt_stepSize (by simp)))
+          obtain ⟨valuesTyped, argumentsHeapTyped, argumentExtends, argumentKept⟩ := expressions_values (expressionsIH _ (Size.child_lt_stepSize (by simp)))
             runtime covers locals heap argumentsTyped children
           have calleeTyped : ValueHasType context argumentsHeap (.builtin ⟨function⟩)
               (.function (TypeSystem.Ty.productMany function.parameterTypes) function.returnType) := by
@@ -1540,13 +1655,13 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
           have argumentTyped := packing.hasType valuesTyped
           have post := appliesIH invocationSize (Size.child_lt_stepSize (by simp))
             runtime argumentsHeapTyped calleeTyped packing argumentTyped invocation
-          exact ⟨post.value_typed _ rfl, post.heap_typed, argumentExtends.trans post.heap_extends⟩
+          exact ⟨post.value_typed _ rfl, post.heap_typed, argumentExtends.trans post.heap_extends, argumentKept.trans post.keeps⟩
   | @directApplied childrenSize invocationSize scope context environment before argumentsHeap after
       id callee arguments instantiation name values evidence outcome requirements occurrence _calleeOccurrence valid children callEvidence invocation =>
       obtain ⟨_plan, formTyped, _planValid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
       | @directCall _ callee arguments instantiation parameterTypes resultType predicates _calleeTyped application argumentsTyped =>
-          obtain ⟨valuesTyped, argumentsHeapTyped, argumentExtends⟩ := expressions_values (expressionsIH _ (Size.child_lt_stepSize (by simp)))
+          obtain ⟨valuesTyped, argumentsHeapTyped, argumentExtends, argumentKept⟩ := expressions_values (expressionsIH _ (Size.child_lt_stepSize (by simp)))
             runtime covers locals heap argumentsTyped children
           cases application with
           | intro _signature _admissible _declaration _parameters _result functionType _predicates =>
@@ -1562,15 +1677,15 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
                   have argumentTyped := packing.hasType valuesTyped
                   have post := appliesIH invocationSize (Size.child_lt_stepSize (by simp))
                     runtime argumentsHeapTyped calleeTyped packing argumentTyped invocation
-                  exact ⟨post.value_typed _ rfl, post.heap_typed, argumentExtends.trans post.heap_extends⟩
+                  exact ⟨post.value_typed _ rfl, post.heap_typed, argumentExtends.trans post.heap_extends, argumentKept.trans post.keeps⟩
   | @applied childSize childrenSize invocationSize scope context environment before calleeHeap argumentsHeap after
       id callee arguments metadata value values outcome occurrence uncoerced child _guard children _arity invocation =>
       obtain ⟨_plan, formTyped, _planValid⟩ := expression_form_exact runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with
       | indirectCall calleeTyped argumentsTyped application =>
-          obtain ⟨valueTyped, calleeHeapTyped, calleeExtends⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
+          obtain ⟨valueTyped, calleeHeapTyped, calleeExtends, calleeKept⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
             runtime covers locals heap calleeTyped child
-          obtain ⟨valuesTyped, argumentsHeapTyped, argumentExtends⟩ := expressions_values (expressionsIH _ (Size.child_lt_stepSize (by simp)))
+          obtain ⟨valuesTyped, argumentsHeapTyped, argumentExtends, argumentKept⟩ := expressions_values (expressionsIH _ (Size.child_lt_stepSize (by simp)))
             runtime covers (locals.mono calleeExtends) calleeHeapTyped argumentsTyped children
           obtain ⟨packed, packing⟩ := ValuesPack.exists_pack values
           have packedTyped := packing.hasType valuesTyped
@@ -1581,7 +1696,7 @@ theorem expression_value_step (selectedBodies : SelectedBodies program registry)
               have argumentTyped := empty_path_type path ▸ packedTyped
               have post := appliesIH invocationSize (Size.child_lt_stepSize (by simp))
                 runtime argumentsHeapTyped (valueTyped.mono argumentExtends) packing argumentTyped invocation
-              exact ⟨post.value_typed _ rfl, post.heap_typed, calleeExtends.trans (argumentExtends.trans post.heap_extends)⟩
+              exact ⟨post.value_typed _ rfl, post.heap_typed, calleeExtends.trans (argumentExtends.trans post.heap_extends), calleeKept.trans (argumentKept.trans post.keeps)⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end
@@ -1608,7 +1723,8 @@ theorem expression_step (selectedBodies : SelectedBodies program registry) (size
   | value value =>
       have post := expression_value_step selectedBodies size expressionIH expressionsIH appliesIH statementsIH
         rawIH pathIH runtime covers locals heap typed trace
-      exact ⟨post.heap_typed, post.heap_extends, by intro actual equal; cases equal; exact post.value_typed⟩
+      exact ⟨post.heap_typed, post.heap_extends, by intro actual equal; cases equal; exact post.value_typed,
+        by intro actual equal; cases equal; exact post.lengths⟩
   | fault failure =>
       have post := FaultPreservation.expression_fault_step selectedBodies size
         (fun n smaller => ExpressionAt.fault (expressionIH n smaller))
@@ -1618,7 +1734,7 @@ theorem expression_step (selectedBodies : SelectedBodies program registry) (size
         (fun n smaller => RawFormAt.fault (rawIH n smaller))
         (fun n smaller => CoercionPathAt.fault (pathIH n smaller))
         expressionIH expressionsIH rawIH runtime covers locals heap typed trace
-      exact ⟨post.1, post.2, by intro value equal; cases equal⟩
+      exact ⟨post.1, post.2, (by intro value equal; cases equal), by intro value equal; cases equal⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end
@@ -1643,9 +1759,13 @@ private theorem element_target_below (budget : Nat)
     (typed : SourcePlaceHasType scope.source context place type)
     (trace : Size.ElementTarget program registry size scope context environment before place outcome after) :
     HeapWellTyped context after ∧ HeapTypesExtend before after ∧
-      ∀ target, outcome = .resolved target → ∃ root, ResolvedPlaceHasType context after target root type :=
-  element_target_preserved budget runtime.graph.nodeOccurrencesUnique
-    (fun below locals heap typed trace => expression_value (expressionIH _ below) runtime covers locals heap typed trace)
+      ∀ target, outcome = .resolved target →
+        (∃ root, ResolvedPlaceHasType context after target root type) ∧ KeepsLengths before after :=
+  element_target_preserved budget runtime.graph.nodeOccurrencesUnique KeepsLengths.refl
+    (fun first second => first.trans second)
+    (fun below locals heap typed trace =>
+      have post := expressionIH _ below runtime covers locals heap typed trace
+      ⟨⟨post.value_typed _ rfl, post.heap_typed, post.heap_extends⟩, post.lengths _ rfl⟩)
     (fun below locals heap typed trace =>
       have post := expressionIH _ below runtime covers locals heap typed trace
       ⟨post.heap_typed, post.heap_extends⟩)
@@ -1690,7 +1810,7 @@ theorem for_items_step (size : Nat)
   cases trace with
   | empty =>
       cases typed
-      exact ⟨heap, .refl _, by intro environment equal; cases equal; exact ⟨rfl, locals⟩⟩
+      exact ⟨heap, .refl _, (by intro environment equal; cases equal; exact ⟨rfl, locals⟩), fun _ _ => .refl _⟩
   | @absent nextSize scope context middleContext finalContext environment before bound after binder rest location outcome
       mono extended allocated next =>
       cases typed with
@@ -1700,6 +1820,7 @@ theorem for_items_step (size : Nat)
               have same := Solcore.SourceSemantics.Dynamic.BinderExtends.functional extended staticExtended
               cases same
               have allocationExtends := HeapTypesExtend.of_allocation allocated
+              have allocationKept := KeepsLengths.of_allocation allocated
               have boundTyped := heap.allocate (.none _) allocated
               have boundLocals : EnvironmentAgrees bound middleContext.locals ((binder.id, location) :: environment) := by
                 cases extended
@@ -1712,7 +1833,8 @@ theorem for_items_step (size : Nat)
                 (fields.covers covers) boundLocals boundAtMiddle tailTyped next
               exact ⟨post.heap_typed.transportClosed fields.signatures.symm closed runtime.closed
                 (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
-                allocationExtends.trans post.heap_extends, post.done⟩
+                allocationExtends.trans post.heap_extends, post.done,
+                fun environment equal => allocationKept.trans (post.lengths environment equal)⟩
   | @initialized childSize nextSize scope context middleContext finalContext environment before middle bound after
       binder initializer rest value location outcome mono extended child allocated next =>
       cases typed with
@@ -1723,6 +1845,7 @@ theorem for_items_step (size : Nat)
               cases same
               have childPost := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap initializerTyped child
               have allocationExtends := HeapTypesExtend.of_allocation allocated
+              have allocationKept := KeepsLengths.of_allocation allocated
               have boundTyped := childPost.heap_typed.allocate (.some (childPost.value_typed _ rfl)) allocated
               have boundLocals : EnvironmentAgrees bound middleContext.locals ((binder.id, location) :: environment) := by
                 cases extended
@@ -1735,7 +1858,8 @@ theorem for_items_step (size : Nat)
                 (fields.covers covers) boundLocals boundAtMiddle tailTyped next
               exact ⟨post.heap_typed.transportClosed fields.signatures.symm closed runtime.closed
                 (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
-                childPost.heap_extends.trans (allocationExtends.trans post.heap_extends), post.done⟩
+                childPost.heap_extends.trans (allocationExtends.trans post.heap_extends), post.done,
+                fun environment equal => childPost.keeps.trans (allocationKept.trans (post.lengths environment equal))⟩
           | letInitializedGeneralized poly _ _ _ _ => exact (poly mono).elim
   | @initializedGeneralized nextSize scope context middleContext finalContext environment before snapshotHeap bound
       after binder initializer rest captured function location outcome snapshot captures polymorphic extended
@@ -1751,6 +1875,8 @@ theorem for_items_step (size : Nat)
                 generalizes initializerTyped staticExtended
               have allocationExtends :=
                 snapshot.metadata_extends.trans (HeapTypesExtend.of_generalized_allocation allocated)
+              have allocationKept :=
+                (KeepsLengths.of_copies snapshot).trans (KeepsLengths.of_generalized_allocation allocated)
               have boundTyped := (heap.copy snapshot).allocateGeneralized functionTyped allocated
               have boundLocals : EnvironmentAgrees bound middleContext.locals ((binder.id, location) :: environment) := by
                 cases extended
@@ -1767,14 +1893,15 @@ theorem for_items_step (size : Nat)
                 (fields.covers covers) boundLocals boundAtMiddle tailTyped next
               exact ⟨post.heap_typed.transportClosed fields.signatures.symm closed runtime.closed
                 (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
-                allocationExtends.trans post.heap_extends, post.done⟩
+                allocationExtends.trans post.heap_extends, post.done,
+                fun environment equal => allocationKept.trans (post.lengths environment equal)⟩
   | @initializerFault childSize scope context environment before after binder initializer rest failure mono child =>
       cases typed with
       | cons headTyped _ =>
           cases headTyped with
           | letInitialized initializerTyped _ _ _ =>
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap initializerTyped child
-              exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
+              exact ⟨post.heap_typed, post.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
           | letInitializedGeneralized poly _ _ _ _ => exact (poly mono).elim
   | @expression childSize nextSize scope context finalContext environment before middle after expression rest value outcome child next =>
       cases typed with
@@ -1784,16 +1911,17 @@ theorem for_items_step (size : Nat)
               have first := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap expressionTyped child
               have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono first.heap_extends) first.heap_typed tailTyped next
-              exact ⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.done⟩
+              exact ⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.done,
+                fun environment equal => first.keeps.trans (post.lengths environment equal)⟩
   | @expressionFailure childSize scope context environment before after expression rest failure child =>
       cases typed with
       | cons headTyped _ =>
           cases headTyped with
           | expression expressionTyped =>
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap expressionTyped child
-              exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
+              exact ⟨post.heap_typed, post.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @elementBitNot targetSize nextSize scope context finalContext environment before targetHeap written after assignment target updated rest outcome
-      _element resolved write next =>
+      element resolved write next =>
       cases typed with
       | cons headTyped tailTyped =>
           cases headTyped with
@@ -1802,13 +1930,15 @@ theorem for_items_step (size : Nat)
               | @intro _ _ targetType targetTyped kind _ =>
                   obtain ⟨targetHeapTyped, targetExtends, targetResolved⟩ := element_target_below _ expressionIH
                     (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
-                  obtain ⟨_, savedTyped⟩ := targetResolved _ rfl
+                  obtain ⟨⟨_, savedTyped⟩, targetKept⟩ := targetResolved _ rfl
                   rw [targetTyped.type_eq] at write
                   obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_bitNot kind savedTyped targetHeapTyped write
                   have totalExtends := targetExtends.trans writtenExtends
+                  have totalKept := targetKept.trans (element_write_lengths element resolved write)
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono totalExtends) writtenTyped tailTyped next
-                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done⟩
+                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done,
+                    fun environment equal => totalKept.trans (post.lengths environment equal)⟩
   | @elementBitNotTargetFault targetSize scope context environment before after assignment rest failure
       _element failed
   | @elementBitNotOperandFault targetSize scope context environment before after assignment _ _ rest
@@ -1821,23 +1951,27 @@ theorem for_items_step (size : Nat)
               | intro targetTyped _ _ =>
                   obtain ⟨afterTyped, targetExtends, _⟩ := element_target_below _ expressionIH
                     (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped failed
-                  exact ⟨afterTyped, targetExtends, by intro environment equal; cases equal⟩
+                  exact ⟨afterTyped, targetExtends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @elementAssignment targetSize childSize nextSize scope context finalContext environment before targetHeap middle written after assignment operator rhs target value updated rest outcome
-      _element resolved child write next =>
+      element resolved child write next =>
       cases typed with
       | cons headTyped tailTyped =>
           cases headTyped with
           | assignValue assignmentTyped =>
-              obtain ⟨_, _, targetTyped, _⟩ := assignment_parts_typed assignmentTyped
+              obtain ⟨_, _, targetTyped, rhsTyped⟩ := assignment_parts_typed assignmentTyped
               obtain ⟨targetHeapTyped, targetExtends, targetResolved⟩ := element_target_below _ expressionIH
                 (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
-              obtain ⟨writtenTyped, writtenExtends⟩ := resolved_write assignmentTyped targetTyped (targetResolved _ rfl)
-                (fun _ rhsTyped => expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
-                  runtime covers (locals.mono targetExtends) targetHeapTyped rhsTyped child) write
+              obtain ⟨writtenTyped, writtenExtends⟩ := resolved_write assignmentTyped targetTyped (targetResolved _ rfl).1
+                (fun _ rhsTyped => (expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+                  runtime covers (locals.mono targetExtends) targetHeapTyped rhsTyped child).preserved) write
               have totalExtends := targetExtends.trans writtenExtends
+              have rhsKept := (expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+                runtime covers (locals.mono targetExtends) targetHeapTyped rhsTyped child).keeps
+              have totalKept := (targetResolved _ rfl).2.trans (rhsKept.trans (element_write_lengths element resolved write))
               have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono totalExtends) writtenTyped tailTyped next
-              exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done⟩
+              exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done,
+                    fun environment equal => totalKept.trans (post.lengths environment equal)⟩
   | @elementAssignmentTargetFault targetSize scope context environment before after assignment operator rhs rest failure
       _element failed =>
       cases typed with
@@ -1847,7 +1981,7 @@ theorem for_items_step (size : Nat)
               obtain ⟨_, _, targetTyped, _⟩ := assignment_parts_typed assignmentTyped
               obtain ⟨afterTyped, targetExtends, _⟩ := element_target_below _ expressionIH
                 (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped failed
-              exact ⟨afterTyped, targetExtends, by intro environment equal; cases equal⟩
+              exact ⟨afterTyped, targetExtends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @elementAssignmentRhsFault targetSize childSize scope context environment before targetHeap after assignment operator rhs target rest failure
       _element resolved child
   | @elementAssignmentWriteFault targetSize childSize scope context environment before targetHeap after assignment operator rhs target _ rest _
@@ -1861,9 +1995,9 @@ theorem for_items_step (size : Nat)
                 (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono targetExtends) targetHeapTyped rhsTyped child
-              exact ⟨post.heap_typed, targetExtends.trans post.heap_extends, by intro environment equal; cases equal⟩
+              exact ⟨post.heap_typed, targetExtends.trans post.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @projectedBitNot keysSize nextSize scope context finalContext environment before targetHeap written after assignment values target updated rest outcome
-      _projected keys snapshot write next =>
+      projected keys snapshot write next =>
       cases typed with
       | cons headTyped tailTyped =>
           cases headTyped with
@@ -1881,10 +2015,12 @@ theorem for_items_step (size : Nat)
                   rw [stored] at write
                   obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_bitNot kind savedTyped keyPost.heap_typed write
                   have totalExtends := keyPost.heap_extends.trans writtenExtends
+                  have totalKept := keyPost.keeps.trans (projected_write_lengths projected snapshot write)
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono totalExtends) writtenTyped tailTyped next
-                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done⟩
-  | projectedBitNotRootFault => exact ⟨heap, .refl _, by intro environment equal; cases equal⟩
+                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done,
+                    fun environment equal => totalKept.trans (post.lengths environment equal)⟩
+  | projectedBitNotRootFault => exact ⟨heap, .refl _, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @projectedBitNotKeysFault keysSize scope context environment before after assignment rest failure
       _projected _ready keys =>
       cases typed with
@@ -1896,7 +2032,7 @@ theorem for_items_step (size : Nat)
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                     runtime covers locals heap keyTyped keys
-                  exact ⟨keyPost.heap_typed, keyPost.heap_extends, by intro environment equal; cases equal⟩
+                  exact ⟨keyPost.heap_typed, keyPost.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @projectedBitNotGetterFault keysSize scope context environment before after assignment values rest reason
       _projected keys _failed
   | @projectedBitNotOperandFault keysSize scope context environment before after assignment values _ _ rest
@@ -1910,9 +2046,9 @@ theorem for_items_step (size : Nat)
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                     runtime covers locals heap keyTyped keys
-                  exact ⟨keyPost.heap_typed, keyPost.heap_extends, by intro environment equal; cases equal⟩
+                  exact ⟨keyPost.heap_typed, keyPost.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @projectedAssignment keysSize childSize nextSize scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated rest outcome
-      _projected keys snapshot child write next =>
+      projected keys snapshot child write next =>
       cases typed with
       | cons headTyped tailTyped =>
           cases headTyped with
@@ -1926,11 +2062,13 @@ theorem for_items_step (size : Nat)
                     locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
                   have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
                     runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_equal savedTyped first write
+                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_equal savedTyped first.preserved write
                   have totalExtends := keyPost.heap_extends.trans writtenExtends
+                  have totalKept := keyPost.keeps.trans (first.keeps.trans (projected_write_lengths projected snapshot write))
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono totalExtends) writtenTyped tailTyped next
-                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done⟩
+                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done,
+                    fun environment equal => totalKept.trans (post.lengths environment equal)⟩
               | wordCompound kind targetTyped rhsTyped _ =>
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
@@ -1939,11 +2077,13 @@ theorem for_items_step (size : Nat)
                     locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
                   have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
                     runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.word kind) targetTyped.type_eq savedTyped first write
+                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.word kind) targetTyped.type_eq savedTyped first.preserved write
                   have totalExtends := keyPost.heap_extends.trans writtenExtends
+                  have totalKept := keyPost.keeps.trans (first.keeps.trans (projected_write_lengths projected snapshot write))
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono totalExtends) writtenTyped tailTyped next
-                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done⟩
+                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done,
+                    fun environment equal => totalKept.trans (post.lengths environment equal)⟩
               | fixedCompound kind targetTyped rhsTyped _ =>
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
@@ -1952,11 +2092,13 @@ theorem for_items_step (size : Nat)
                     locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
                   have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
                     runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.fixed kind) targetTyped.type_eq savedTyped first write
+                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.fixed kind) targetTyped.type_eq savedTyped first.preserved write
                   have totalExtends := keyPost.heap_extends.trans writtenExtends
+                  have totalKept := keyPost.keeps.trans (first.keeps.trans (projected_write_lengths projected snapshot write))
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono totalExtends) writtenTyped tailTyped next
-                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done⟩
+                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done,
+                    fun environment equal => totalKept.trans (post.lengths environment equal)⟩
               | shiftCompound kind targetTyped targetKind rhsTyped _ _ =>
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
@@ -1965,12 +2107,14 @@ theorem for_items_step (size : Nat)
                     locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
                   have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
                     runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_shift kind targetKind targetTyped.type_eq savedTyped first write
+                  obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_shift kind targetKind targetTyped.type_eq savedTyped first.preserved write
                   have totalExtends := keyPost.heap_extends.trans writtenExtends
+                  have totalKept := keyPost.keeps.trans (first.keeps.trans (projected_write_lengths projected snapshot write))
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono totalExtends) writtenTyped tailTyped next
-                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done⟩
-  | projectedAssignmentRootFault => exact ⟨heap, .refl _, by intro environment equal; cases equal⟩
+                  exact ⟨post.heap_typed, totalExtends.trans post.heap_extends, post.done,
+                    fun environment equal => totalKept.trans (post.lengths environment equal)⟩
+  | projectedAssignmentRootFault => exact ⟨heap, .refl _, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @projectedAssignmentKeysFault keysSize scope context environment before after assignment operator rhs rest failure
       _projected _ready keys =>
       cases typed with
@@ -1982,7 +2126,7 @@ theorem for_items_step (size : Nat)
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                     runtime covers locals heap keyTyped keys
-                  exact ⟨keyPost.heap_typed, keyPost.heap_extends, by intro environment equal; cases equal⟩
+                  exact ⟨keyPost.heap_typed, keyPost.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @projectedAssignmentGetterFault keysSize scope context environment before after assignment operator rhs values rest reason
       _projected keys _failed =>
       cases typed with
@@ -1994,7 +2138,7 @@ theorem for_items_step (size : Nat)
                   obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
                   have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                     runtime covers locals heap keyTyped keys
-                  exact ⟨keyPost.heap_typed, keyPost.heap_extends, by intro environment equal; cases equal⟩
+                  exact ⟨keyPost.heap_typed, keyPost.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @projectedAssignmentRhsFault keysSize childSize scope context environment before targetHeap after assignment operator rhs values target rest failure
       _projected keys _snapshot child =>
       cases typed with
@@ -2008,7 +2152,7 @@ theorem for_items_step (size : Nat)
                     runtime covers locals heap keyTyped keys
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-                  exact ⟨post.heap_typed, keyPost.heap_extends.trans post.heap_extends, by intro environment equal; cases equal⟩
+                  exact ⟨post.heap_typed, keyPost.heap_extends.trans post.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @projectedAssignmentWriteFault keysSize childSize scope context environment before targetHeap after assignment operator rhs values target right rest reason
       _projected keys _snapshot child _failed =>
       cases typed with
@@ -2022,7 +2166,7 @@ theorem for_items_step (size : Nat)
                     runtime covers locals heap keyTyped keys
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-                  exact ⟨post.heap_typed, keyPost.heap_extends.trans post.heap_extends, by intro environment equal; cases equal⟩
+                  exact ⟨post.heap_typed, keyPost.heap_extends.trans post.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @assignment childSize nextSize scope context finalContext environment before middle written after
       assignment operator rhs value target updated rest outcome snapshot child write next =>
       cases typed with
@@ -2032,28 +2176,40 @@ theorem for_items_step (size : Nat)
               cases assignmentTyped with
               | equal targetTyped rhsTyped _ =>
                   have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
-                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write locals heap targetTyped snapshot first write
+                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write locals heap targetTyped snapshot first.preserved write
+                  have writtenKept := first.keeps.trans
+                    (bare_write_lengths locals first.heap_typed first.heap_extends targetTyped snapshot write)
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono writtenExtends) writtenTyped tailTyped next
-                  exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done⟩
+                  exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done,
+                    fun environment equal => writtenKept.trans (post.lengths environment equal)⟩
               | wordCompound kind targetTyped rhsTyped _ =>
                   have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
-                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.word kind) targetTyped.type_eq locals heap targetTyped snapshot first write
+                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.word kind) targetTyped.type_eq locals heap targetTyped snapshot first.preserved write
+                  have writtenKept := first.keeps.trans
+                    (bare_write_lengths locals first.heap_typed first.heap_extends targetTyped snapshot write)
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono writtenExtends) writtenTyped tailTyped next
-                  exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done⟩
+                  exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done,
+                    fun environment equal => writtenKept.trans (post.lengths environment equal)⟩
               | fixedCompound kind targetTyped rhsTyped _ =>
                   have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
-                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.fixed kind) targetTyped.type_eq locals heap targetTyped snapshot first write
+                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.fixed kind) targetTyped.type_eq locals heap targetTyped snapshot first.preserved write
+                  have writtenKept := first.keeps.trans
+                    (bare_write_lengths locals first.heap_typed first.heap_extends targetTyped snapshot write)
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono writtenExtends) writtenTyped tailTyped next
-                  exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done⟩
+                  exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done,
+                    fun environment equal => writtenKept.trans (post.lengths environment equal)⟩
               | shiftCompound kind targetTyped targetKind rhsTyped _ _ =>
                   have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
-                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_shift kind targetKind targetTyped.type_eq locals heap targetTyped snapshot first write
+                  obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_shift kind targetKind targetTyped.type_eq locals heap targetTyped snapshot first.preserved write
+                  have writtenKept := first.keeps.trans
+                    (bare_write_lengths locals first.heap_typed first.heap_extends targetTyped snapshot write)
                   have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                     (locals.mono writtenExtends) writtenTyped tailTyped next
-                  exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done⟩
+                  exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done,
+                    fun environment equal => writtenKept.trans (post.lengths environment equal)⟩
   | @assignmentFailure childSize scope context environment before after assignment operator rhs target rest failure snapshot child =>
       cases typed with
       | cons headTyped _ =>
@@ -2062,10 +2218,10 @@ theorem for_items_step (size : Nat)
               cases assignmentTyped with
               | equal _targetTyped rhsTyped _ =>
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
-                  exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
+                  exact ⟨post.heap_typed, post.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
               | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ | shiftCompound _ _ _ rhsTyped _ _ =>
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
-                  exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
+                  exact ⟨post.heap_typed, post.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @assignmentOperands childSize scope context environment before after assignment operator rhs target right
       currentCell initial currentSelected rest _snapshot child _currentRead _rootType _initialValue _pathRead _invalid =>
       cases typed with
@@ -2075,7 +2231,7 @@ theorem for_items_step (size : Nat)
               cases assignmentTyped with
               | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ | shiftCompound _ _ _ rhsTyped _ _ =>
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
-                  exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
+                  exact ⟨post.heap_typed, post.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @assignmentPanic childSize scope context environment before after assignment operator rhs target right
       currentCell initial currentSelected rest code _snapshot child _currentRead _rootType _initialValue _pathRead _panics =>
       cases typed with
@@ -2085,8 +2241,8 @@ theorem for_items_step (size : Nat)
               cases assignmentTyped with
               | equal _ rhsTyped _ | wordCompound _ _ rhsTyped _ | fixedCompound _ _ rhsTyped _ | shiftCompound _ _ _ rhsTyped _ _ =>
                   have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap rhsTyped child
-                  exact ⟨post.heap_typed, post.heap_extends, by intro environment equal; cases equal⟩
-  | bitNotFault => exact ⟨heap, .refl _, by intro environment equal; cases equal⟩
+                  exact ⟨post.heap_typed, post.heap_extends, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
+  | bitNotFault => exact ⟨heap, .refl _, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
   | @bitNot nextSize scope context finalContext environment before written after assignment target updated rest outcome
       snapshot write next =>
       cases typed with
@@ -2094,10 +2250,15 @@ theorem for_items_step (size : Nat)
           cases headTyped with
           | assignBitNot assignmentTyped =>
               obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_bitNot locals heap assignmentTyped snapshot write
+              have writtenKept : KeepsLengths before written := by
+                cases assignmentTyped with
+                | intro targetTyped _ _ =>
+                    exact bare_write_lengths locals heap (.refl _) targetTyped snapshot write
               have post := itemsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono writtenExtends) writtenTyped tailTyped next
-              exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done⟩
-  | unbound | dangling => exact ⟨heap, .refl _, by intro environment equal; cases equal⟩
+              exact ⟨post.heap_typed, writtenExtends.trans post.heap_extends, post.done,
+                fun environment equal => writtenKept.trans (post.lengths environment equal)⟩
+  | unbound | dangling => exact ⟨heap, .refl _, (by intro environment equal; cases equal), (by intro environment equal; cases equal)⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end
@@ -2121,32 +2282,35 @@ theorem while_step (size : Nat)
   cases trace with
   | @done testSize scope context environment before after condition statements test =>
       have post := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
-      exact ⟨post.heap_typed, post.heap_extends, by intro value equal; cases equal⟩
+      exact ⟨post.heap_typed, post.heap_extends, (by intro value equal; cases equal), fun _ => post.keeps⟩
   | @conditionFault testSize scope context environment before after condition statements failure test =>
       have post := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
-      exact ⟨post.heap_typed, post.heap_extends, by intro value equal; cases equal⟩
+      exact ⟨post.heap_typed, post.heap_extends, (by intro value equal; cases equal), fun notFault => (notFault _ rfl).elim⟩
   | @returned testSize bodySize scope context innerContext environment before middle after condition statements value test body =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
       have post := statementsIH bodySize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed bodyTyped body
-      exact ⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp)⟩
+      exact ⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp),
+        fun _ => first.keeps.trans (post.lengths (by intro _ equal; cases equal))⟩
   | @breakFromBody testSize bodySize scope context innerContext environment before middle after condition statements innerEnvironment test body =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
       have post := statementsIH bodySize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed bodyTyped body
-      exact ⟨post.heap_typed, first.heap_extends.trans post.heap_extends, by intro value equal; cases equal⟩
+      exact ⟨post.heap_typed, first.heap_extends.trans post.heap_extends, (by intro value equal; cases equal),
+        fun _ => first.keeps.trans (post.lengths (by intro _ equal; cases equal))⟩
   | @bodyFault testSize bodySize scope context innerContext environment before middle after condition statements failure test body =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
       have post := statementsIH bodySize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed bodyTyped body
-      exact ⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp)⟩
+      exact ⟨post.heap_typed, first.heap_extends.trans post.heap_extends, post.returned (by simp), fun notFault => (notFault _ rfl).elim⟩
   | @next testSize bodySize nextSize scope context innerContext environment innerEnvironment before middle bodyHeap after condition statements outcome test body next =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
       have middlePost := statementsIH bodySize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed bodyTyped body
       have post := whileIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono (first.heap_extends.trans middlePost.heap_extends)) middlePost.heap_typed conditionTyped bodyTyped next
-      exact ⟨post.heap_typed, first.heap_extends.trans (middlePost.heap_extends.trans post.heap_extends), post.returned⟩
+      exact ⟨post.heap_typed, first.heap_extends.trans (middlePost.heap_extends.trans post.heap_extends), post.returned,
+        fun notFault => first.keeps.trans ((middlePost.lengths (by intro _ equal; cases equal)).trans (post.lengths notFault))⟩
 
   | @continueNext testSize bodySize nextSize scope context innerContext environment innerEnvironment before middle bodyHeap after condition statements outcome test body next =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
@@ -2154,7 +2318,8 @@ theorem while_step (size : Nat)
         (locals.mono first.heap_extends) first.heap_typed bodyTyped body
       have post := whileIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono (first.heap_extends.trans middlePost.heap_extends)) middlePost.heap_typed conditionTyped bodyTyped next
-      exact ⟨post.heap_typed, first.heap_extends.trans (middlePost.heap_extends.trans post.heap_extends), post.returned⟩
+      exact ⟨post.heap_typed, first.heap_extends.trans (middlePost.heap_extends.trans post.heap_extends), post.returned,
+        fun notFault => first.keeps.trans ((middlePost.lengths (by intro _ equal; cases equal)).trans (post.lengths notFault))⟩
 
 theorem for_loop_step (size : Nat)
     (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
@@ -2167,25 +2332,27 @@ theorem for_loop_step (size : Nat)
   cases trace with
   | @testFault testSize scope context environment before after condition post body failure test =>
       have result := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
-      exact ⟨result.heap_typed, result.heap_extends, by intro value equal; cases equal⟩
+      exact ⟨result.heap_typed, result.heap_extends, (by intro value equal; cases equal), fun notFault => (notFault _ rfl).elim⟩
   | @finished testSize scope context environment before after condition post body test =>
       have result := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
-      exact ⟨result.heap_typed, result.heap_extends, by intro value equal; cases equal⟩
+      exact ⟨result.heap_typed, result.heap_extends, (by intro value equal; cases equal), fun _ => result.keeps⟩
   | @bodyFailure testSize branchSize scope context innerContext environment before middle after condition post body failure test branch =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
       have result := statementsIH branchSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed bodyTyped branch
-      exact ⟨result.heap_typed, first.heap_extends.trans result.heap_extends, result.returned (by simp)⟩
+      exact ⟨result.heap_typed, first.heap_extends.trans result.heap_extends, result.returned (by simp), fun notFault => (notFault _ rfl).elim⟩
   | @returnedFromBody testSize branchSize scope context innerContext environment before middle after condition post body value test branch =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
       have result := statementsIH branchSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed bodyTyped branch
-      exact ⟨result.heap_typed, first.heap_extends.trans result.heap_extends, result.returned (by simp)⟩
+      exact ⟨result.heap_typed, first.heap_extends.trans result.heap_extends, result.returned (by simp),
+        fun _ => first.keeps.trans (result.lengths (by intro _ equal; cases equal))⟩
   | @forBreakFromBody testSize branchSize scope context innerContext environment before middle after condition post body innerEnvironment test branch =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
       have result := statementsIH branchSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed bodyTyped branch
-      exact ⟨result.heap_typed, first.heap_extends.trans result.heap_extends, by intro value equal; cases equal⟩
+      exact ⟨result.heap_typed, first.heap_extends.trans result.heap_extends, (by intro value equal; cases equal),
+        fun _ => first.keeps.trans (result.lengths (by intro _ equal; cases equal))⟩
   | @postFailure testSize branchSize postTraceSize scope context innerContext postContext environment innerEnvironment
       before middle bodyHeap after condition post body failure test branch postTrace =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
@@ -2193,7 +2360,8 @@ theorem for_loop_step (size : Nat)
         (locals.mono first.heap_extends) first.heap_typed bodyTyped branch
       have result := itemsIH postTraceSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono (first.heap_extends.trans second.heap_extends)) second.heap_typed postTyped postTrace
-      exact ⟨result.heap_typed, first.heap_extends.trans (second.heap_extends.trans result.heap_extends), by intro value equal; cases equal⟩
+      exact ⟨result.heap_typed, first.heap_extends.trans (second.heap_extends.trans result.heap_extends),
+        (by intro value equal; cases equal), fun notFault => (notFault _ rfl).elim⟩
   | @continuePostFailure testSize branchSize postTraceSize scope context innerContext postContext environment innerEnvironment
       before middle bodyHeap after condition post body failure test branch postTrace =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
@@ -2201,7 +2369,8 @@ theorem for_loop_step (size : Nat)
         (locals.mono first.heap_extends) first.heap_typed bodyTyped branch
       have result := itemsIH postTraceSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono (first.heap_extends.trans second.heap_extends)) second.heap_typed postTyped postTrace
-      exact ⟨result.heap_typed, first.heap_extends.trans (second.heap_extends.trans result.heap_extends), by intro value equal; cases equal⟩
+      exact ⟨result.heap_typed, first.heap_extends.trans (second.heap_extends.trans result.heap_extends),
+        (by intro value equal; cases equal), fun notFault => (notFault _ rfl).elim⟩
   | @iterate testSize branchSize postTraceSize nextSize scope context innerContext postContext environment innerEnvironment postEnvironment
       before middle bodyHeap postHeap after condition post body outcome test branch postTrace next =>
       have first := expressionIH testSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap conditionTyped test
@@ -2212,7 +2381,9 @@ theorem for_loop_step (size : Nat)
       have result := loopIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono (first.heap_extends.trans (second.heap_extends.trans third.heap_extends)))
         third.heap_typed conditionTyped bodyTyped postTyped next
-      exact ⟨result.heap_typed, first.heap_extends.trans (second.heap_extends.trans (third.heap_extends.trans result.heap_extends)), result.returned⟩
+      exact ⟨result.heap_typed, first.heap_extends.trans (second.heap_extends.trans (third.heap_extends.trans result.heap_extends)), result.returned,
+        fun notFault => first.keeps.trans ((second.lengths (by intro _ equal; cases equal)).trans ((third.lengths _ rfl).trans
+          (result.lengths notFault)))⟩
 
   | @continueIterate testSize branchSize postTraceSize nextSize scope context innerContext postContext environment innerEnvironment postEnvironment
       before middle bodyHeap postHeap after condition post body outcome test branch postTrace next =>
@@ -2224,7 +2395,9 @@ theorem for_loop_step (size : Nat)
       have result := loopIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono (first.heap_extends.trans (second.heap_extends.trans third.heap_extends)))
         third.heap_typed conditionTyped bodyTyped postTyped next
-      exact ⟨result.heap_typed, first.heap_extends.trans (second.heap_extends.trans (third.heap_extends.trans result.heap_extends)), result.returned⟩
+      exact ⟨result.heap_typed, first.heap_extends.trans (second.heap_extends.trans (third.heap_extends.trans result.heap_extends)), result.returned,
+        fun notFault => first.keeps.trans ((second.lengths (by intro _ equal; cases equal)).trans ((third.lengths _ rfl).trans
+          (result.lengths notFault)))⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end
@@ -2367,21 +2540,21 @@ theorem match_step (size : Nat)
   | @scrutineeFault childSize scope context environment before after resolution actualFailure scrutinee =>
       have post := expressionIH childSize (Size.child_lt_stepSize (by simp))
         runtime covers locals heap scrutineeTyped scrutinee
-      exact ⟨post.heap_typed, post.heap_extends, by intro value equal; cases equal⟩
+      exact ⟨post.heap_typed, post.heap_extends, (by intro value equal; cases equal), fun notFault => (notFault _ rfl).elim⟩
   | @patternFault childSize scope context environment before middle hidden resolution node value location
       contains scrutinee allocated invalid =>
-      obtain ⟨valueTyped, middleTyped, firstExtends⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
+      obtain ⟨valueTyped, middleTyped, firstExtends, firstKept⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
         runtime covers locals heap scrutineeTyped scrutinee
       obtain ⟨typedNode, typedContains, sameType⟩ := scrutineeTyped.stored_type
       have same := Option.some.inj ((lookupExpression?_complete runtime.graph.nodeOccurrencesUnique typedContains).symm.trans
           (lookupExpression?_complete runtime.graph.nodeOccurrencesUnique contains))
       subst typedNode
       exact ⟨middleTyped.allocate (.some (sameType ▸ valueTyped)) allocated,
-        firstExtends.trans (HeapTypesExtend.of_allocation allocated), by intro result equal; cases equal⟩
+        firstExtends.trans (HeapTypesExtend.of_allocation allocated), (by intro result equal; cases equal), fun notFault => (notFault _ rfl).elim⟩
   | @arm childSize bodySize scope context armContext finalContext environment armEnvironment
       before middle hidden bound after resolution node value location statements bindings outcome
       contains scrutinee hiddenAllocated selected extended allocated body =>
-      obtain ⟨valueTyped, middleTyped, firstExtends⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
+      obtain ⟨valueTyped, middleTyped, firstExtends, firstKept⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
         runtime covers locals heap scrutineeTyped scrutinee
       obtain ⟨typedNode, typedContains, sameType⟩ := scrutineeTyped.stored_type
       have same := Option.some.inj ((lookupExpression?_complete runtime.graph.nodeOccurrencesUnique typedContains).symm.trans
@@ -2416,10 +2589,16 @@ theorem match_step (size : Nat)
           intro result equal
           have returned : outcome = .returned result := by cases outcome <;> simp_all [BodyOutcome.restore]
           exact (bodyPost.returned (by simp) result returned).transportClosed fields.signatures.symm armClosed runtime.closed
-            (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open⟩
+            (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
+        fun notFault => firstKept.trans ((KeepsLengths.of_allocation hiddenAllocated).trans
+          ((KeepsLengths.of_binders allocated).trans (bodyPost.lengths (by
+            intro failure equal
+            apply notFault failure
+            subst equal
+            simp [BodyOutcome.restore]))))⟩
   | @default childSize bodySize scope context finalContext environment before middle hidden after
       resolution node value location statements outcome contains scrutinee hiddenAllocated selected body =>
-      obtain ⟨valueTyped, middleTyped, firstExtends⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
+      obtain ⟨valueTyped, middleTyped, firstExtends, firstKept⟩ := expression_value (expressionIH _ (Size.child_lt_stepSize (by simp)))
         runtime covers locals heap scrutineeTyped scrutinee
       obtain ⟨typedNode, typedContains, sameType⟩ := scrutineeTyped.stored_type
       have same := Option.some.inj ((lookupExpression?_complete runtime.graph.nodeOccurrencesUnique typedContains).symm.trans
@@ -2433,16 +2612,22 @@ theorem match_step (size : Nat)
       exact ⟨bodyPost.heap_typed, firstExtends.trans (hiddenExtends.trans bodyPost.heap_extends), by
           intro result equal
           have returned : outcome = .returned result := by cases outcome <;> simp_all [BodyOutcome.restore]
-          exact bodyPost.returned (by simp) result returned⟩
+          exact bodyPost.returned (by simp) result returned,
+        fun notFault => firstKept.trans ((KeepsLengths.of_allocation hiddenAllocated).trans (bodyPost.lengths (by
+          intro failure equal
+          apply notFault failure
+          subst equal
+          simp [BodyOutcome.restore])))⟩
   | @noBranch childSize scope context environment before middle hidden resolution node value location contains scrutinee allocated _selected =>
-      obtain ⟨valueTyped, middleTyped, firstExtends⟩ := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+      obtain ⟨valueTyped, middleTyped, firstExtends, firstKept⟩ := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
         runtime covers locals heap scrutineeTyped scrutinee
       obtain ⟨typedNode, typedContains, sameType⟩ := scrutineeTyped.stored_type
       have same := Option.some.inj ((lookupExpression?_complete runtime.graph.nodeOccurrencesUnique typedContains).symm.trans
           (lookupExpression?_complete runtime.graph.nodeOccurrencesUnique contains))
       subst typedNode
       exact ⟨middleTyped.allocate (.some (sameType ▸ valueTyped)) allocated,
-        firstExtends.trans (HeapTypesExtend.of_allocation allocated), by intro result equal; cases equal⟩
+        firstExtends.trans (HeapTypesExtend.of_allocation allocated), (by intro result equal; cases equal),
+        fun _ => firstKept.trans (KeepsLengths.of_allocation allocated)⟩
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end
@@ -2472,17 +2657,18 @@ theorem statements_step (size : Nat)
   cases trace with
   | nil =>
       cases typed
-      exact ⟨heap, .refl _, (by intro _ value equal; cases equal), by
-        intro result equal; cases equal; exact ⟨rfl, locals, rfl⟩⟩
+      exact ⟨heap, .refl _, (by intro _ value equal; cases equal), (by
+        intro result equal; cases equal; exact ⟨rfl, locals, rfl⟩), fun _ => .refl _⟩
   | breaking _ _ | continuing _ _ =>
       exact ⟨heap, .refl _, (by intro _ value equal; cases equal),
-        by intro result equal; cases equal⟩
+        (by intro result equal; cases equal), fun _ => .refl _⟩
   | returnUnit contains form =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped, _, _⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with
       | returnUnit resultEq =>
-          exact terminal_statements ⟨heap, .refl _, by intro value equal; cases equal; exact resultEq.symm ▸ .unit⟩
+          exact terminal_statements ⟨heap, .refl _, (by intro value equal; cases equal; exact resultEq.symm ▸ .unit),
+            fun _ => .refl _⟩
             (by intro env equal; cases equal)
   | @returnValue childSize mode scope context environment before after id rest node expression value contains form child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped, _, _⟩ := statement_head_tail typed
@@ -2490,8 +2676,9 @@ theorem statements_step (size : Nat)
       cases formTyped with
       | returnValue expressionTyped =>
           have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap expressionTyped child
-          exact terminal_statements ⟨post.heap_typed, post.heap_extends, by
-            intro actual equal; cases equal; exact post.value_typed _ rfl⟩ (by intro env equal; cases equal)
+          exact terminal_statements ⟨post.heap_typed, post.heap_extends, (by
+            intro actual equal; cases equal; exact post.value_typed _ rfl), fun _ => post.keeps⟩
+            (by intro env equal; cases equal)
   | @tail childSize scope context environment before after id node expression value contains form child =>
       cases typed with
       | singleton headTyped =>
@@ -2499,7 +2686,7 @@ theorem statements_step (size : Nat)
           cases controlTyped with
           | expressionValue expressionTyped =>
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap expressionTyped child
-              refine ⟨post.heap_typed, post.heap_extends, ?_, by intro env equal; cases equal⟩
+              refine ⟨post.heap_typed, post.heap_extends, ?_, (by intro env equal; cases equal), fun _ => post.keeps⟩
               intro complete actual equal
               cases equal
               have resultEq := complete rfl
@@ -2513,15 +2700,18 @@ theorem statements_step (size : Nat)
       cases formTyped with
       | assignBitNot assignmentTyped =>
           obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_bitNot locals heap assignmentTyped snapshot write
+          have writtenKept : KeepsLengths before written := by
+            cases assignmentTyped with
+            | intro targetTyped _ _ => exact bare_write_lengths locals heap (.refl _) targetTyped snapshot write
           have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
             (locals.mono writtenExtends) writtenTyped tailTyped next
           have headFalls : headFacts.control.canFallthrough = true := by
             have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
             cases controlTyped
             rfl
-          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
+          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends writtenKept
   | @bitNotProjected keysSize nextSize mode scope context finalContext environment before targetHeap written after assignment values target updated id rest node outcome
-      contains form _projected keys snapshot write next =>
+      contains form projected keys snapshot write next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with
@@ -2539,13 +2729,14 @@ theorem statements_step (size : Nat)
               rw [stored] at write
               obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_bitNot kind savedTyped keyPost.heap_typed write
               have totalExtends := keyPost.heap_extends.trans writtenExtends
+              have totalKept := keyPost.keeps.trans (projected_write_lengths projected snapshot write)
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono totalExtends) writtenTyped tailTyped next
               have headFalls : headFacts.control.canFallthrough = true := by
                 have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
                 cases controlTyped
                 rfl
-              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends totalKept
   | bitNotProjectedRootFault => exact fault_statements heap (.refl _)
   | @bitNotProjectedKeysFault keysSize mode scope context environment before after assignment id rest node failure
       contains form _projected _ready keys =>
@@ -2574,7 +2765,7 @@ theorem statements_step (size : Nat)
                 runtime covers locals heap keyTyped keys
               exact fault_statements keyPost.heap_typed keyPost.heap_extends
   | @bitNotElement targetSize nextSize mode scope context finalContext environment before targetHeap written after assignment target updated id rest node outcome
-      contains form _element resolved write next =>
+      contains form element resolved write next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with
@@ -2583,17 +2774,18 @@ theorem statements_step (size : Nat)
           | @intro _ _ targetType targetTyped kind _ =>
               obtain ⟨targetHeapTyped, targetExtends, targetResolved⟩ := element_target_below _ expressionIH
                 (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
-              obtain ⟨_, savedTyped⟩ := targetResolved _ rfl
+              obtain ⟨⟨_, savedTyped⟩, targetKept⟩ := targetResolved _ rfl
               rw [targetTyped.type_eq] at write
               obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_bitNot kind savedTyped targetHeapTyped write
               have totalExtends := targetExtends.trans writtenExtends
+              have totalKept := targetKept.trans (element_write_lengths element resolved write)
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono totalExtends) writtenTyped tailTyped next
               have headFalls : headFacts.control.canFallthrough = true := by
                 have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
                 cases controlTyped
                 rfl
-              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends totalKept
   | @bitNotElementTargetFault targetSize mode scope context environment before after assignment id rest node failure
       contains form _element failed
   | @bitNotElementOperandFault targetSize mode scope context environment before after assignment _ _ id rest node
@@ -2608,7 +2800,7 @@ theorem statements_step (size : Nat)
                 (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped failed
               exact fault_statements afterTyped targetExtends
   | @assignProjected keysSize childSize nextSize mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome
-      contains form _projected keys snapshot child write next =>
+      contains form projected keys snapshot child write next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with
@@ -2622,15 +2814,16 @@ theorem statements_step (size : Nat)
                 locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
               have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
                 runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_equal savedTyped first write
+              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_equal savedTyped first.preserved write
               have totalExtends := keyPost.heap_extends.trans writtenExtends
+              have totalKept := keyPost.keeps.trans (first.keeps.trans (projected_write_lengths projected snapshot write))
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono totalExtends) writtenTyped tailTyped next
               have headFalls : headFacts.control.canFallthrough = true := by
                 have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
                 cases controlTyped
                 rfl
-              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends totalKept
           | wordCompound kind targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
               have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
@@ -2639,15 +2832,16 @@ theorem statements_step (size : Nat)
                 locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
               have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
                 runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.word kind) targetTyped.type_eq savedTyped first write
+              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.word kind) targetTyped.type_eq savedTyped first.preserved write
               have totalExtends := keyPost.heap_extends.trans writtenExtends
+              have totalKept := keyPost.keeps.trans (first.keeps.trans (projected_write_lengths projected snapshot write))
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono totalExtends) writtenTyped tailTyped next
               have headFalls : headFacts.control.canFallthrough = true := by
                 have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
                 cases controlTyped
                 rfl
-              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends totalKept
           | fixedCompound kind targetTyped rhsTyped _ =>
               obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
               have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
@@ -2656,15 +2850,16 @@ theorem statements_step (size : Nat)
                 locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
               have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
                 runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.fixed kind) targetTyped.type_eq savedTyped first write
+              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_compound (.fixed kind) targetTyped.type_eq savedTyped first.preserved write
               have totalExtends := keyPost.heap_extends.trans writtenExtends
+              have totalKept := keyPost.keeps.trans (first.keeps.trans (projected_write_lengths projected snapshot write))
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono totalExtends) writtenTyped tailTyped next
               have headFalls : headFacts.control.canFallthrough = true := by
                 have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
                 cases controlTyped
                 rfl
-              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends totalKept
           | shiftCompound kind targetTyped targetKind rhsTyped _ _ =>
               obtain ⟨keyTypes, keyTyped⟩ := projected_place_keys_typed targetTyped
               have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
@@ -2673,15 +2868,16 @@ theorem statements_step (size : Nat)
                 locals keyPost.heap_typed keyPost.heap_extends targetTyped keyTyped (keyPost.values_typed _ rfl) snapshot
               have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
                 runtime covers (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
-              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_shift kind targetKind targetTyped.type_eq savedTyped first write
+              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_shift kind targetKind targetTyped.type_eq savedTyped first.preserved write
               have totalExtends := keyPost.heap_extends.trans writtenExtends
+              have totalKept := keyPost.keeps.trans (first.keeps.trans (projected_write_lengths projected snapshot write))
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono totalExtends) writtenTyped tailTyped next
               have headFalls : headFacts.control.canFallthrough = true := by
                 have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
                 cases controlTyped
                 rfl
-              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends totalKept
   | assignProjectedRootFault => exact fault_statements heap (.refl _)
   | @assignProjectedKeysFault keysSize mode scope context environment before after assignment operator rhs id rest node failure
       contains form _projected _ready keys =>
@@ -2736,25 +2932,28 @@ theorem statements_step (size : Nat)
                 (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
               exact fault_statements post.heap_typed (keyPost.heap_extends.trans post.heap_extends)
   | @assignElement targetSize childSize nextSize mode scope context finalContext environment before targetHeap middle written after assignment operator rhs target value updated id rest node outcome
-      contains form _element resolved child write next =>
+      contains form element resolved child write next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with
       | assignValue assignmentTyped =>
-          obtain ⟨_, _, targetTyped, _⟩ := assignment_parts_typed assignmentTyped
+          obtain ⟨_, _, targetTyped, rhsTyped⟩ := assignment_parts_typed assignmentTyped
           obtain ⟨targetHeapTyped, targetExtends, targetResolved⟩ := element_target_below _ expressionIH
             (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
-          obtain ⟨writtenTyped, writtenExtends⟩ := resolved_write assignmentTyped targetTyped (targetResolved _ rfl)
-            (fun _ rhsTyped => expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
-              runtime covers (locals.mono targetExtends) targetHeapTyped rhsTyped child) write
+          obtain ⟨writtenTyped, writtenExtends⟩ := resolved_write assignmentTyped targetTyped (targetResolved _ rfl).1
+            (fun _ rhsTyped => (expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+              runtime covers (locals.mono targetExtends) targetHeapTyped rhsTyped child).preserved) write
           have totalExtends := targetExtends.trans writtenExtends
+          have rhsKept := (expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+            runtime covers (locals.mono targetExtends) targetHeapTyped rhsTyped child).keeps
+          have totalKept := (targetResolved _ rfl).2.trans (rhsKept.trans (element_write_lengths element resolved write))
           have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
             (locals.mono totalExtends) writtenTyped tailTyped next
           have headFalls : headFacts.control.canFallthrough = true := by
             have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
             cases controlTyped
             rfl
-          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends totalKept
   | @assignElementTargetFault targetSize mode scope context environment before after assignment operator rhs id rest node failure
       contains form _element failed =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
@@ -2789,44 +2988,52 @@ theorem statements_step (size : Nat)
           cases assignmentTyped with
           | equal targetTyped rhsTyped _ =>
               have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
-              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write locals heap targetTyped snapshot first write
+              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write locals heap targetTyped snapshot first.preserved write
+              have writtenKept := first.keeps.trans
+                (bare_write_lengths locals first.heap_typed first.heap_extends targetTyped snapshot write)
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono writtenExtends) writtenTyped tailTyped next
               have headFalls : headFacts.control.canFallthrough = true := by
                 have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
                 cases controlTyped
                 rfl
-              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends writtenKept
           | wordCompound kind targetTyped rhsTyped _ =>
               have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
-              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.word kind) targetTyped.type_eq locals heap targetTyped snapshot first write
+              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.word kind) targetTyped.type_eq locals heap targetTyped snapshot first.preserved write
+              have writtenKept := first.keeps.trans
+                (bare_write_lengths locals first.heap_typed first.heap_extends targetTyped snapshot write)
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono writtenExtends) writtenTyped tailTyped next
               have headFalls : headFacts.control.canFallthrough = true := by
                 have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
                 cases controlTyped
                 rfl
-              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends writtenKept
           | fixedCompound kind targetTyped rhsTyped _ =>
               have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
-              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.fixed kind) targetTyped.type_eq locals heap targetTyped snapshot first write
+              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_compound (.fixed kind) targetTyped.type_eq locals heap targetTyped snapshot first.preserved write
+              have writtenKept := first.keeps.trans
+                (bare_write_lengths locals first.heap_typed first.heap_extends targetTyped snapshot write)
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono writtenExtends) writtenTyped tailTyped next
               have headFalls : headFacts.control.canFallthrough = true := by
                 have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
                 cases controlTyped
                 rfl
-              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends writtenKept
           | shiftCompound kind targetTyped targetKind rhsTyped _ _ =>
               have first := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp))) runtime covers locals heap rhsTyped child
-              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_shift kind targetKind targetTyped.type_eq locals heap targetTyped snapshot first write
+              obtain ⟨writtenTyped, writtenExtends⟩ := bare_write_shift kind targetKind targetTyped.type_eq locals heap targetTyped snapshot first.preserved write
+              have writtenKept := first.keeps.trans
+                (bare_write_lengths locals first.heap_typed first.heap_extends targetTyped snapshot write)
               have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono writtenExtends) writtenTyped tailTyped next
               have headFalls : headFacts.control.canFallthrough = true := by
                 have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
                 cases controlTyped
                 rfl
-              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend writtenExtends writtenKept
   | @returnFault childSize mode scope context environment before after id rest node expression failure contains form child =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -2914,7 +3121,7 @@ theorem statements_step (size : Nat)
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with
       | expressionDiscard expressionTyped =>
-          obtain ⟨_valueTyped, middleTyped, headExtends⟩ := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+          obtain ⟨_valueTyped, middleTyped, headExtends, headKept⟩ := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
             runtime covers locals heap expressionTyped child
           have post := statementsIH nextSize (Size.child_lt_stepSize (by simp))
             runtime covers (locals.mono headExtends) middleTyped tailTyped next
@@ -2922,14 +3129,14 @@ theorem statements_step (size : Nat)
             have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
             cases controlTyped
             rfl
-          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend headExtends
+          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend headExtends headKept
   | @discardValue childSize nextSize scope context finalContext environment before middle after id rest node expression
       value outcome contains form child next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with
       | expressionValue expressionTyped =>
-          obtain ⟨_valueTyped, middleTyped, headExtends⟩ := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+          obtain ⟨_valueTyped, middleTyped, headExtends, headKept⟩ := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
             runtime covers locals heap expressionTyped child
           have post := statementsIH nextSize (Size.child_lt_stepSize (by simp))
             runtime covers (locals.mono headExtends) middleTyped tailTyped next
@@ -2937,7 +3144,7 @@ theorem statements_step (size : Nat)
             have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
             cases controlTyped
             rfl
-          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend headExtends
+          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend headExtends headKept
   | @letUninitialized nextSize mode scope context middleContext finalContext environment before bound after id rest node
       binder location outcome contains form monomorphic extension allocate next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
@@ -2961,7 +3168,7 @@ theorem statements_step (size : Nat)
             have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
             cases controlTyped
             rfl
-          exact ((continue_tail headFalls completeTail fallthroughWhole next post).transportEntry runtime fields).prepend (allocationExtends)
+          exact ((continue_tail headFalls completeTail fallthroughWhole next post).transportEntry runtime fields).prepend (allocationExtends) (KeepsLengths.of_allocation allocate)
   | @letGeneralized nextSize mode scope context middleContext finalContext environment before snapshotHeap bound
       after id rest node binder initializer captured function location outcome contains form snapshot captures
       polymorphic extension allocate next =>
@@ -2995,6 +3202,7 @@ theorem statements_step (size : Nat)
             cases controlTyped
             rfl
           exact ((continue_tail headFalls completeTail fallthroughWhole next post).transportEntry runtime fields).prepend allocationExtends
+            ((KeepsLengths.of_copies snapshot).trans (KeepsLengths.of_generalized_allocation allocate))
   | @letInitialized childSize nextSize mode scope context middleContext finalContext environment before middle bound after
       id rest node binder expression value location outcome contains form child monomorphic extension allocate next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
@@ -3003,7 +3211,7 @@ theorem statements_step (size : Nat)
       | letInitialized expressionTyped _ staticExtension =>
           have sameContext := Solcore.SourceSemantics.Dynamic.BinderExtends.functional extension staticExtension
           subst staticMiddle
-          obtain ⟨valueTyped, middleTyped, headExtends⟩ := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+          obtain ⟨valueTyped, middleTyped, headExtends, headKept⟩ := expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
             runtime covers locals heap expressionTyped child
           have allocationExtends := HeapTypesExtend.of_allocation allocate
           have boundTyped := middleTyped.allocate (.some valueTyped) allocate
@@ -3022,6 +3230,7 @@ theorem statements_step (size : Nat)
             cases controlTyped
             rfl
           exact ((continue_tail headFalls completeTail fallthroughWhole next post).transportEntry runtime fields).prepend (headExtends.trans allocationExtends)
+            (headKept.trans (KeepsLengths.of_allocation allocate))
       | letInitializedGeneralized polymorphic _ _ _ _ => exact (polymorphic monomorphic).elim
   | @ifReturned testSize branchSize mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth value contains form test branch =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
@@ -3034,13 +3243,15 @@ theorem statements_step (size : Nat)
       have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       obtain ⟨first, firstFalls⟩ := if_branch expressionIH statementsIH
         (Size.child_lt_stepSize (by simp)) (Size.child_lt_stepSize (by simp)) runtime covers locals heap controlTyped test branch
-      exact terminal_statements ⟨first.heap_typed, first.heap_extends, by intro value equal; cases equal⟩ (by intro env equal; cases equal)
+      exact terminal_statements ⟨first.heap_typed, first.heap_extends, (by intro value equal; cases equal),
+            fun _ => first.lengths (by intro _ equal; cases equal)⟩ (by intro env equal; cases equal)
   | @ifBreaking testSize branchSize mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth innerEnvironment contains form test branch =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       obtain ⟨first, firstFalls⟩ := if_branch expressionIH statementsIH
         (Size.child_lt_stepSize (by simp)) (Size.child_lt_stepSize (by simp)) runtime covers locals heap controlTyped test branch
-      exact terminal_statements ⟨first.heap_typed, first.heap_extends, by intro value equal; cases equal⟩ (by intro env equal; cases equal)
+      exact terminal_statements ⟨first.heap_typed, first.heap_extends, (by intro value equal; cases equal),
+            fun _ => first.lengths (by intro _ equal; cases equal)⟩ (by intro env equal; cases equal)
   | @ifFault testSize branchSize mode scope context innerContext environment before middle after id rest node condition thenBody elseBody truth failure contains form test branch =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -3059,28 +3270,31 @@ theorem statements_step (size : Nat)
         (Size.child_lt_stepSize (by simp)) (Size.child_lt_stepSize (by simp)) runtime covers locals heap controlTyped test branch
       have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed tailTyped next
-      exact (continue_tail (firstFalls _ rfl) completeTail fallthroughWhole next post).prepend first.heap_extends
+      exact (continue_tail (firstFalls _ rfl) completeTail fallthroughWhole next post).prepend first.heap_extends (first.lengths (by intro _ equal; cases equal))
   | @blockReturned innerSize mode scope context innerContext environment before after id rest node statements value contains form inner =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases controlTyped with
       | block innerTyped =>
           have first := statementsIH innerSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap innerTyped inner
-          exact terminal_statements ⟨first.heap_typed, first.heap_extends, first.returned (by simp)⟩ (by intro env equal; cases equal)
+          exact terminal_statements ⟨first.heap_typed, first.heap_extends, first.returned (by simp),
+            fun _ => first.lengths (by intro _ equal; cases equal)⟩ (by intro env equal; cases equal)
   | @blockContinuing innerSize mode scope context innerContext environment before after id rest node statements innerEnvironment contains form inner =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases controlTyped with
       | block innerTyped =>
           have first := statementsIH innerSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap innerTyped inner
-          exact terminal_statements ⟨first.heap_typed, first.heap_extends, by intro value equal; cases equal⟩ (by intro env equal; cases equal)
+          exact terminal_statements ⟨first.heap_typed, first.heap_extends, (by intro value equal; cases equal),
+            fun _ => first.lengths (by intro _ equal; cases equal)⟩ (by intro env equal; cases equal)
   | @blockBreaking innerSize mode scope context innerContext environment before after id rest node statements innerEnvironment contains form inner =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases controlTyped with
       | block innerTyped =>
           have first := statementsIH innerSize (Size.child_lt_stepSize (by simp)) runtime covers locals heap innerTyped inner
-          exact terminal_statements ⟨first.heap_typed, first.heap_extends, by intro value equal; cases equal⟩ (by intro env equal; cases equal)
+          exact terminal_statements ⟨first.heap_typed, first.heap_extends, (by intro value equal; cases equal),
+            fun _ => first.lengths (by intro _ equal; cases equal)⟩ (by intro env equal; cases equal)
   | @blockFault innerSize mode scope context innerContext environment before after id rest node statements failure contains form inner =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -3101,7 +3315,7 @@ theorem statements_step (size : Nat)
           have headFalls := ControlSummary.eraseValue_canFallthrough (first.fallthrough _ rfl).2.2
           have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
             (locals.mono first.heap_extends) first.heap_typed tailTyped next
-          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend first.heap_extends
+          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend first.heap_extends (first.lengths (by intro _ equal; cases equal))
 
   | @whileReturned loopSize mode scope context environment before after id rest node condition statements value contains form loop =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
@@ -3129,7 +3343,7 @@ theorem statements_step (size : Nat)
             rfl
           have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
             (locals.mono first.heap_extends) first.heap_typed tailTyped next
-          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend first.heap_extends
+          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend first.heap_extends (first.lengths (by intro _ equal; cases equal))
   | @matchReturned matchSize mode scope context environment before after id rest node resolution value contains form matched =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -3233,7 +3447,7 @@ theorem statements_step (size : Nat)
         (statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form) matched rfl
       have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
         (locals.mono first.heap_extends) first.heap_typed tailTyped next
-      exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend first.heap_extends
+      exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend first.heap_extends (first.lengths (by intro _ equal; cases equal))
   | @forReturned initialSize loopSize mode scope context loopContext environment loopEnvironment before initialized after id rest node initial condition post body value contains form initialTrace loop =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
@@ -3253,7 +3467,8 @@ theorem statements_step (size : Nat)
               (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
             initialPost.heap_extends.trans loopPost.heap_extends,
             fun value equal => (loopPost.returned value equal).transportClosed fields.signatures.symm loopClosed runtime.closed
-              (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open⟩
+              (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
+            fun notFault => (initialPost.lengths _ rfl).trans (loopPost.lengths notFault)⟩
           exact terminal_statements first (by intro env equal; cases equal)
   | @forFault initialSize loopSize mode scope context loopContext environment loopEnvironment before initialized after id rest node initial condition post body failure contains form initialTrace loop =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
@@ -3274,7 +3489,8 @@ theorem statements_step (size : Nat)
               (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
             initialPost.heap_extends.trans loopPost.heap_extends,
             fun value equal => (loopPost.returned value equal).transportClosed fields.signatures.symm loopClosed runtime.closed
-              (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open⟩
+              (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
+            fun notFault => (initialPost.lengths _ rfl).trans (loopPost.lengths notFault)⟩
           exact fault_statements first.heap_typed first.heap_extends
   | @forFallthrough initialSize loopSize nextSize mode scope context loopContext finalContext environment loopEnvironment before initialized middle after id rest node initial condition post body outcome contains form initialTrace loop next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
@@ -3295,14 +3511,15 @@ theorem statements_step (size : Nat)
               (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
             initialPost.heap_extends.trans loopPost.heap_extends,
             fun value equal => (loopPost.returned value equal).transportClosed fields.signatures.symm loopClosed runtime.closed
-              (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open⟩
+              (fields.targetVariablesClosed runtime.variables_closed) runtime.residual_variables_open,
+            fun notFault => (initialPost.lengths _ rfl).trans (loopPost.lengths notFault)⟩
           have headFalls : headFacts.control.canFallthrough = true := by
             have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
             cases controlTyped
             rfl
           have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
             (locals.mono first.heap_extends) first.heap_typed tailTyped next
-          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend first.heap_extends
+          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend first.heap_extends (first.lengths (by intro _ equal; cases equal))
 
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end

@@ -332,7 +332,8 @@ private theorem element_target_below (wellFormed : ProgramWellFormed program) (b
     (trace : Size.ElementTarget program registry size scope context environment before place outcome after) :
     HeapWellTyped context after ∧ HeapTypesExtend before after :=
   have post := SelectedPreservation.element_target_preserved budget runtime.graph.nodeOccurrencesUnique
-    (fun _ locals heap typed trace => expression_value wellFormed runtime covers locals heap typed trace)
+    (Kept := fun _ _ => True) (fun _ => trivial) (fun _ _ => trivial)
+    (fun _ locals heap typed trace => ⟨expression_value wellFormed runtime covers locals heap typed trace, trivial⟩)
     (fun below locals heap typed trace => expressionIH _ below runtime covers locals heap typed trace)
     bound locals heap typed trace
   ⟨post.1, post.2.1⟩
