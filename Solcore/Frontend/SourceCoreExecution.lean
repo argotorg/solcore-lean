@@ -254,7 +254,7 @@ module.  Unsupported exported functions are diagnosed rather than skipped. -/
 def discoverStaticWordRoots (program : CheckedProgram)
     (entryModule : Workspace.ModuleId) :
     Except StaticWordRootError (List StaticWordRoot) := do
-  let interfaces ← (buildProgramInterfaces program.environment).mapError
+  let interfaces ← (buildProgramInterfacesFrom program.environment entryModule).mapError
     StaticWordRootError.interfaces
   let interface ← match interfaces.interface? entryModule with
     | some interface => pure interface

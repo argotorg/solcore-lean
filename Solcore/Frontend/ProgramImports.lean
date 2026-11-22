@@ -395,15 +395,16 @@ private def buildProgramImportsFrom
     }, [])
   (result.1, result.2.1)
 
-/-- Build public-interface-backed visibility for one program module.
-Scopes not owned by the environment retain the old empty-import behavior. -/
+/-- Build public-interface-backed visibility for one program module, refused for the interface
+errors of the modules it reaches (`buildProgramInterfacesFrom`). Scopes not owned by the
+environment retain the old empty-import behavior. -/
 def buildProgramImports
     (environment : ProgramEnvironment) (importer : Workspace.ModuleId) :
     Except (List ProgramImportError) ProgramImports :=
   match environment.modules.find? fun module => decide (module.id = importer) with
   | none => .ok {}
   | some module =>
-      match buildProgramInterfaces environment with
+      match buildProgramInterfacesFrom environment importer with
       | .error errors => .error [.publicInterface errors]
       | .ok interfaces =>
           let result := buildProgramImportsFrom environment interfaces importer

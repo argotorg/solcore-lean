@@ -7,9 +7,12 @@ an unknown module are refused where they are; an import of one of upstream's std
 and the rules count the names it exports with their namespaces (`upstreamStandardModuleExports`);
 of two import declarations that bind one name from one module, the first is kept; a name listed
 twice in one import (`SC0117`), a name brought from two modules (`SC0120`) and a qualifier beside a
-value (`SC0121`) are refused; and a module that no import or re-export reaches from the entry is
-not checked, as upstream validates only the reachable ones. Each case is a source that upstream's
-pinned checker was probed with, and gives upstream's answer. -/
+value (`SC0121`) are refused; the export checks refuse a local export that names nothing the
+module declares or imports (`SC0113`), a constructor its type does not show (`SC0114`) and a
+re-export that its module does not export (`SC0115`), std's modules by their export tables; and a
+module that no import or re-export reaches from the entry is not checked, as upstream validates only
+the reachable ones. Each case is a source that upstream's pinned checker was probed with, and gives
+upstream's answer. -/
 
 set_option autoImplicit false
 
@@ -69,6 +72,9 @@ private def describe : ProgramInterfaceError → String
   | .duplicateImportName _ name => s!"duplicate {name}"
   | .ambiguousImport _ name _ => s!"ambiguous {name}"
   | .importQualifierConflict _ name => s!"qualifier {name}"
+  | .unknownExportName _ name => s!"export {name}"
+  | .unknownExportConstructor _ typeName constructorName =>
+      s!"constructor {typeName}.{constructorName}"
   | error => reprStr error
 
 /-- What a load refuses at the imports, described; none when it loads, and `other` when it fails
@@ -321,6 +327,129 @@ private def testStandardModules : IO Unit := do
   expectRefused "a plain import's qualifier beside a std function"
     ["import pkg.lt;", "import * from std;"] [] ["qualifier lt"] (loose := standardNeighbours)
 
+/-- Modules for the export checks: a type with its constructors shown, a module that imports a
+function and does not export it, an unknown export reached by a plain import or a re-export, an
+unknown re-export, an unknown exported constructor, and two cycles of re-exports, one without the
+name. -/
+private def exportNeighbours : List Workspace.RawSourceFile := [
+  { path := "shown.solc", content := String.intercalate "\n" ["pragma solcore;",
+      "export { Color(*), f };", "enum Color { Red, Green }", localF] },
+  { path := "kept.solc", content := "pragma solcore;\nimport { f } from lib;" },
+  { path := "bad.solc", content := "pragma solcore;\nexport { f, nosuch };\n" ++ localF },
+  { path := "relay.solc", content := "pragma solcore;\nexport bad.*;" },
+  { path := "badre.solc", content := "pragma solcore;\nexport lib.{ f, nosuch };" },
+  { path := "badc.solc", content := "pragma solcore;\nexport { E(A, C) };\nenum E { A, B }" },
+  { path := "ca.solc", content := "pragma solcore;\nexport cb.{ f };" },
+  { path := "cb.solc", content := "pragma solcore;\nexport ca.{ f };" },
+  { path := "da.solc", content := "pragma solcore;\nexport db.{ f };" },
+  { path := "db.solc", content := "pragma solcore;\nexport lib.{ f };\nexport da.*;" }]
+
+/-- `SC0113`: a local export names a declaration of the module or a name a selected or wildcard
+import brings, under its alias, and not a constructor, a qualifier or a hidden name; with a
+constructor selection, a data type. A module is checked where an import or a re-export reaches
+it. -/
+private def testLocalExports : IO Unit := do
+  expectRefused "an unknown export" [] ["export { nosuch };"] ["export nosuch"]
+  expectRefused "a declaration and an unknown export" [] ["export { run, nosuch };"]
+    ["export nosuch"]
+  expectLoaded "a selected import's name, and a wildcard import's" ["import { f } from lib;"]
+    ["export { f };"]
+  expectLoaded "a wildcard import's name" ["import * from lib;"] ["export { f };"]
+  expectRefused "a hidden name" ["import * from lib hiding { f };"] ["export { f };"] ["export f"]
+  expectLoaded "a selected alias" ["import { f as g } from lib;"] ["export { g };"]
+  expectRefused "an alias's original name" ["import { f as g } from lib;"] ["export { f };"]
+    ["export f"]
+  expectRefused "a plain import's qualifier" ["import lib;"] ["export { lib };"] ["export lib"]
+  expectRefused "a namespace import's alias" ["import * as L from lib;"] ["export { L };"]
+    ["export L"]
+  expectRefused "a constructor alone" [] ["enum E { A, B }", "export { A };"] ["export A"]
+  expectRefused "a function with a constructor selection" [] ["export { run(A) };"]
+    ["export run"]
+  expectRefused "a type alias with all constructors" [] ["type TT = word;", "export { TT(*) };"]
+    ["export TT"]
+  expectLoaded "a trait, the module's wildcard and a module's" []
+    ["trait Tr<a> { function m(x: a) returns (a); }", "export { Tr };", "export { * };",
+      "export { lib.* };"]
+  expectLoaded "one name twice" [] ["export { run, run };"]
+  expectRefused "an unknown export in a plain-imported module" ["import bad;"] [] ["export nosuch"]
+    (loose := exportNeighbours)
+  expectRefused "an unknown export reached through a re-export" ["import relay;"] []
+    ["export nosuch"] (loose := exportNeighbours)
+  expectLoaded "an unknown export in an unreachable module" [] [] (loose := exportNeighbours)
+
+/-- `SC0114`: an exported constructor of a local type, or of an imported one that shows it; a
+constructor selection on an imported type that shows none names none. -/
+private def testExportedConstructors : IO Unit := do
+  expectRefused "a local enum, an unknown constructor" [] ["enum E { A, B }", "export { E(A, C) };"]
+    ["constructor E.C"]
+  expectLoaded "a local enum: all, one twice, and two exports" []
+    ["enum E { A, B }", "export { E(*) };", "export { E(A, A) };", "export { E(B) };"]
+  expectRefused "another type's constructor" [] ["enum E { A }", "enum F { B }", "export { E(B) };"]
+    ["constructor E.B"]
+  expectRefused "an opaque import, a constructor" ["import { Color } from lib;"]
+    ["export { Color(Red) };"] ["constructor Color.Red"]
+  expectLoaded "an opaque import, all constructors" ["import { Color } from lib;"]
+    ["export { Color(*) };"]
+  expectLoaded "a shown import, a constructor" ["import { Color } from shown;"]
+    ["export { Color(Red) };"] (loose := exportNeighbours)
+  expectRefused "a shown wildcard's type, an unknown constructor" ["import * from shown;"]
+    ["export { Color(Red, Blue) };"] ["constructor Color.Blue"] (loose := exportNeighbours)
+  expectRefused "an unknown constructor in a plain-imported module" ["import badc;"] []
+    ["constructor E.C"] (loose := exportNeighbours)
+
+/-- `SC0115`: a re-export names an item its module exports, through re-exports and their cycles,
+and a constructor its type shows there; a constructor alone, and a name the module imports and does
+not export, are none. -/
+private def testReexports : IO Unit := do
+  expectRefused "an unknown name" [] ["export lib.{ nosuch };"] ["export nosuch"]
+  expectLoaded "a function" [] ["export lib.{ f };"]
+  expectLoaded "a function through a module re-exporting all" [] ["export lib4.{ k };"]
+  expectLoaded "a re-exported import" [] ["export lib3.{ f };"]
+  expectRefused "an opaque type's constructor" [] ["export lib.{ Color(Red) };"]
+    ["constructor Color.Red"]
+  expectLoaded "a shown type's constructor" [] ["export shown.{ Color(Red) };"]
+    (loose := exportNeighbours)
+  expectRefused "a shown type's unknown constructor" [] ["export shown.{ Color(Blue) };"]
+    ["constructor Color.Blue"] (loose := exportNeighbours)
+  expectRefused "a function with a constructor selection" [] ["export lib.{ f(A) };"] ["export f"]
+  expectRefused "a constructor alone" [] ["export shown.{ Red };"] ["export Red"]
+    (loose := exportNeighbours)
+  expectRefused "a name its module imports and does not export" [] ["export kept.{ f };"]
+    ["export f"] (loose := exportNeighbours)
+  expectRefused "a known and an unknown name" [] ["export lib.{ k, nosuch };"] ["export nosuch"]
+  expectRefused "an unknown re-export in a plain-imported module" ["import badre;"] []
+    ["export nosuch"] (loose := exportNeighbours)
+  expectRefused "a cycle of re-exports without the name" ["import ca;"] []
+    ["export f", "export f"] (loose := exportNeighbours)
+  expectLoaded "a cycle of re-exports with the name" ["import { f } from da;"] []
+    (loose := exportNeighbours)
+
+/-- The export checks with upstream's std modules, by their export tables: a local export names a
+function, a type or a trait that a selected or wildcard import of one binds, and a re-export one
+that the module exports; a constructor selection is checked as no type's. -/
+private def testStandardExports : IO Unit := do
+  expectLoaded "a selected std.opcodes function" ["import { div } from std.opcodes;"]
+    ["export { div };"]
+  expectLoaded "a std.opcodes wildcard's function and an alias"
+    ["import * from std.opcodes;", "import { mod as m } from std.opcodes;"] ["export { div, m };"]
+  expectRefused "a hidden std.opcodes function" ["import * from std.opcodes hiding { div };"]
+    ["export { div };"] ["export div"]
+  expectRefused "a plain import of std.opcodes" ["import std.opcodes;"] ["export { div };"]
+    ["export div"]
+  expectLoaded "std's function, type and trait" ["import * from std;"]
+    ["export { tobool, Error, Typedef };"]
+  expectRefused "a std function with a constructor selection" ["import { tobool } from std;"]
+    ["export { tobool(A) };"] ["export tobool"]
+  expectRefused "a std name with no import" [] ["export { tobool };"] ["export tobool"]
+  expectLoaded "a std type's constructors" ["import { Error } from std;"]
+    ["export { Error(*) };", "export { Error(Empty) };"]
+  expectLoaded "re-exports of std's names and modules" []
+    ["export std.opcodes.{ div };", "export std.{ tobool, Error(Empty) };", "export std.opcodes.*;",
+      "export std.opcodes;"]
+  expectRefused "re-exports of names std does not export" []
+    ["export std.opcodes.{ nosuch };", "export std.{ nosuch2 };"]
+    ["export nosuch", "export nosuch2"]
+
 def testImportParity : IO Unit := do
   testImportedNameConflicts
   testUnknownImports
@@ -330,5 +459,9 @@ def testImportParity : IO Unit := do
   testQualifierConflicts
   testUnreachableModules
   testStandardModules
+  testLocalExports
+  testExportedConstructors
+  testReexports
+  testStandardExports
 
 end Tests.ImportParity

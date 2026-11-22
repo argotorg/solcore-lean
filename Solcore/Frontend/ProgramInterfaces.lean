@@ -979,9 +979,14 @@ inductive ProgramInterfaceError where
   | unknownImportName
       (owner target : Workspace.ModuleId)
       (name : String)
+  /-- A local export that names neither a declaration of the module nor a name a selected or
+  wildcard import brings, as upstream's `SC0113` refuses it, or a re-export of a name its module
+  does not export, as `SC0115` does. -/
   | unknownExportName
       (owner : Workspace.ModuleId)
       (name : String)
+  /-- An exported constructor that its type does not show, as upstream's `SC0114` refuses it, or
+  `SC0115` for a re-export. -/
   | unknownExportConstructor
       (owner : Workspace.ModuleId)
       (typeName constructorName : String)
@@ -1309,6 +1314,102 @@ private def importPath (declaration : Syntax.ImportDecl) : Syntax.ModulePath :=
   match declaration.value with
   | .plain path | .namespace path _ | .wildcard path _ | .selected _ path _ => path
 
+/-- Whether an import names upstream's `std.opcodes` where no module of the program resolves. -/
+def isStandardOpcodesImport (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
+    (declaration : Syntax.ImportDecl) : Bool :=
+  isStandardOpcodesPath (importPath declaration) &&
+    (resolveProgramModulePath? environment owner (importPath declaration)).isNone
+
+/-- The names a selected or wildcard import of upstream's `std.opcodes` binds, each with the
+function it denotes: its selected functions under their aliases, or all of them, less the hidden
+ones. A name it does not export binds nothing (`standardOpcodeImportErrors`). -/
+def standardOpcodeBindings (declaration : Syntax.ImportDecl) : List (String × String) :=
+  match declaration.value with
+  | .selected selection _ hidingClause =>
+      let hidden := hiddenNames hidingClause
+      selection.elements.toList.filterMap fun item =>
+        let source := selectorSpelling item.value.source
+        let localName := item.value.alias.map (·.value) |>.getD source
+        if standardOpcodeNames.contains source &&
+            !(hidden.contains source || hidden.contains localName) then
+          some (localName, source)
+        else none
+  | .wildcard _ hidingClause =>
+      let hidden := hiddenNames hidingClause
+      standardOpcodeNames.filterMap fun name =>
+        if hidden.contains name then none else some (name, name)
+  | _ => []
+
+/-- The names that one of upstream's std modules other than `std.opcodes` exports, with their
+namespaces (`upstreamStandardModuleExports`), where an import names it and no module of the program
+resolves at its path. Lean has none of its declarations. -/
+def standardModuleImportExports? (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
+    (declaration : Syntax.ImportDecl) : Option (List (String × StandardExportNamespace)) :=
+  let path := importPath declaration
+  if path.value.externalMarker.isNone &&
+      (resolveProgramModulePath? environment owner path).isNone then
+    (upstreamStandardModuleExports.find? (·.1 == programModulePathComponents path)).map (·.2)
+  else none
+
+/-- The identity that stands for one of upstream's std modules: the standard library's module at
+the path `std.X` and `std` resolve to (`X`, and `std`), as `standardOpcodesModule` stands for
+`std.opcodes`. -/
+def standardModuleId? (components : List String) : Option Workspace.ModuleId := do
+  let logical := match components with
+    | ["std"] => ["std"]
+    | "std" :: rest => rest
+    | other => other
+  match ← logical.mapM Workspace.PathSegment.parse with
+  | [] => none
+  | first :: rest => some ⟨.standard, ⟨first :: rest, List.cons_ne_nil first rest⟩⟩
+
+/-- The declaration namespace of a std export, whose import group `SC0108` compares. -/
+def StandardExportNamespace.declarationNamespace :
+    StandardExportNamespace → ProgramDeclarationNamespace
+  | .function => .value
+  | .type => .type
+  | .trait => .trait
+
+/-- The names a selected or wildcard import of one of upstream's std modules other than
+`std.opcodes` binds, each with its namespace: its selected names under their aliases, or all of
+them, less the hidden ones. A name it does not export, a constructor among them, binds nothing
+(`standardModuleImportErrors`). The names take no part in name lookups: Lean has none of their
+declarations, so a name is refused where it is used. -/
+def standardModuleBindings (exports : List (String × StandardExportNamespace))
+    (declaration : Syntax.ImportDecl) : List (String × StandardExportNamespace) :=
+  match declaration.value with
+  | .selected selection _ hidingClause =>
+      let hidden := hiddenNames hidingClause
+      selection.elements.toList.flatMap fun item =>
+        let source := selectorSpelling item.value.source
+        let localName := item.value.alias.map (·.value) |>.getD source
+        if hidden.contains source || hidden.contains localName then []
+        else (exports.filter (·.1 == source)).map fun entry => (localName, entry.2)
+  | .wildcard _ hidingClause =>
+      let hidden := hiddenNames hidingClause
+      exports.filter fun entry => !hidden.contains entry.1
+  | _ => []
+
+/-- The names a module's selected and wildcard imports of upstream's std modules bind, with their
+namespaces: `std.opcodes`' functions (`standardOpcodeBindings`) and the other modules' exports
+(`standardModuleBindings`). Lean has none of their declarations, so they enter no interface, but a
+local export may name them, as upstream's `SC0113` counts them. -/
+private def standardNamesBound (environment : ProgramEnvironment) (module : ProgramModule) :
+    List (String × StandardExportNamespace) :=
+  (importsIn module).flatMap fun declaration =>
+    if isStandardOpcodesImport environment module.id declaration then
+      (standardOpcodeBindings declaration).map fun (name, _) => (name, .function)
+    else match standardModuleImportExports? environment module.id declaration with
+      | some exports => standardModuleBindings exports declaration
+      | none => []
+
+/-- The names one of upstream's std modules exports, with their namespaces, where an export names
+its path: `std.opcodes`' functions, or the module's exports (`upstreamStandardModuleExports`). -/
+private def standardExportsAt? (components : List String) :
+    Option (List (String × StandardExportNamespace)) :=
+  if components == ["std", "opcodes"] then some (standardOpcodeNames.map (·, .function))
+  else (upstreamStandardModuleExports.find? (·.1 == components)).map (·.2)
+
 /-- A local name an earlier import declaration bound, with its import group and the module
 it came from. -/
 private structure EarlierImport where
@@ -1487,8 +1588,14 @@ private def visibleOfPublic (entity : ProgramPublicEntity) : VisibleEntity := {
   constructors := entity.constructors
 }
 
+/-- One name of a local export: a declaration of the module or a name a selected or wildcard
+import brings, else upstream's `SC0113` (`unknownExportName`); with a constructor selection, a data
+type that shows them (`SC0114`, `unknownExportConstructor`). A name an import of one of upstream's
+std modules binds is known but enters no interface; with a selection it must be a std type, whose
+constructors Lean's tables do not hold. -/
 private def processExportName
     (owner : Workspace.ModuleId) (locals imported : List VisibleEntity)
+    (standard : List (String × StandardExportNamespace))
     (contribution : Contribution) (name : Syntax.ExportName) : Contribution :=
   match name.value with
   | .wildcard _ =>
@@ -1499,18 +1606,23 @@ private def processExportName
       let spelling := identifier.value
       let candidates := visibleNamed locals imported spelling
       if candidates.isEmpty then
-        addError contribution (.unknownExportName owner spelling)
+        if standard.any (·.1 == spelling) then contribution
+        else addError contribution (.unknownExportName owner spelling)
       else
         addVisibleWithName contribution spelling
           (candidates.map stripVisibleConstructors)
   | .identifier identifier (some selection) =>
       let spelling := identifier.value
-      addSelectedConstructors owner spelling spelling selection
-        (visibleNamed locals imported spelling) contribution
+      let candidates := visibleNamed locals imported spelling
+      if candidates.all (!·.constructors.isData) && standard.any (· == (spelling, .type)) then
+        contribution
+      else
+        addSelectedConstructors owner spelling spelling selection candidates contribution
   | .operator spelling =>
       let candidates := visibleNamed locals imported spelling.value
       if candidates.isEmpty then
-        addError contribution (.unknownExportName owner spelling.value)
+        if standard.any (·.1 == spelling.value) then contribution
+        else addError contribution (.unknownExportName owner spelling.value)
       else
         addVisibleWithName contribution spelling.value
           (candidates.map stripVisibleConstructors)
@@ -1543,44 +1655,74 @@ private def processRemoteName
       else
         addPublicEntities contribution (candidates.map stripPublicConstructors)
 
+/-- One name of a re-export from one of upstream's std modules, which Lean has no interface for:
+a name the module does not export is upstream's `SC0115` (`unknownExportName`), and so is a
+constructor selection on a name that is no type. A std type's constructors are not checked, as
+Lean's tables do not hold them, and the names enter no interface. -/
+private def processStandardRemoteName (owner : Workspace.ModuleId)
+    (exports : List (String × StandardExportNamespace))
+    (contribution : Contribution) (name : Syntax.ExportName) : Contribution :=
+  let known (spelling : String) (selected : Bool) : Bool :=
+    exports.any fun (exported, nameSpace) =>
+      exported == spelling && (!selected || nameSpace == .type)
+  match name.value with
+  | .wildcard _ => contribution
+  | .identifier identifier selection =>
+      if known identifier.value selection.isSome then contribution
+      else addError contribution (.unknownExportName owner identifier.value)
+  | .operator spelling =>
+      if known spelling.value false then contribution
+      else addError contribution (.unknownExportName owner spelling.value)
+
+/-- The error of an export path that no module of the program resolves: none for one of
+upstream's std modules, which Lean has no interface for, and an unknown module otherwise. -/
+private def unresolvedExport (owner : Workspace.ModuleId) (path : Syntax.QualifiedName)
+    (contribution : Contribution) : Contribution :=
+  if (standardExportsAt? (programExportPathComponents path)).isSome then contribution
+  else addError contribution (.unknownModule owner (programExportPathComponents path))
+
 private def processLocalExportItem
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (owner : Workspace.ModuleId) (locals imported : List VisibleEntity)
+    (standard : List (String × StandardExportNamespace))
     (contribution : Contribution) (item : Syntax.LocalExportItem) : Contribution :=
   match item.value with
-  | .name name => processExportName owner locals imported contribution name
+  | .name name => processExportName owner locals imported standard contribution name
   | .moduleWildcard path _ =>
       match resolveProgramExportPath? environment owner path with
-      | none => addError contribution
-          (.unknownModule owner (programExportPathComponents path))
+      | none => unresolvedExport owner path contribution
       | some target =>
           addPublicEntities contribution (interfaceOf interfaces target).entities
 
 private def processExport
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (module : ProgramModule) (locals imported : List VisibleEntity)
+    (standard : List (String × StandardExportNamespace))
     (contribution : Contribution) (declaration : Syntax.ExportDecl) : Contribution :=
   match declaration.value with
   | .local items =>
       items.elements.foldl
-        (processLocalExportItem environment interfaces module.id locals imported)
+        (processLocalExportItem environment interfaces module.id locals imported standard)
         contribution
   | .module path =>
       match resolveProgramExportPath? environment module.id path with
-      | none => addError contribution
-          (.unknownModule module.id (programExportPathComponents path))
+      | none => unresolvedExport module.id path contribution
       | some target =>
           addPublicModule contribution
             (programExportPathComponents path).getLast! target
   | .moduleAs path alias =>
       match resolveProgramExportPath? environment module.id path with
-      | none => addError contribution
-          (.unknownModule module.id (programExportPathComponents path))
+      | none => unresolvedExport module.id path contribution
       | some target => addPublicModule contribution alias.value target
   | .itemsFrom path selection =>
       match resolveProgramExportPath? environment module.id path with
-      | none => addError contribution
-          (.unknownModule module.id (programExportPathComponents path))
+      | none =>
+          match standardExportsAt? (programExportPathComponents path), selection.value with
+          | some _, .wildcard _ => contribution
+          | some exports, .selected items =>
+              items.elements.foldl (processStandardRemoteName module.id exports) contribution
+          | none, _ => addError contribution
+              (.unknownModule module.id (programExportPathComponents path))
       | some target =>
           let targetInterface := interfaceOf interfaces target
           match selection.value with
@@ -1600,9 +1742,10 @@ private def moduleContribution
     (module : ProgramModule) : Contribution :=
   let locals := localEntities environment module.id
   let imported := importedVisibility environment interfaces module
+  let standard := standardNamesBound environment module
   let exported := (exportsIn module).foldl
       (fun (contribution : Contribution) declaration =>
-    processExport environment interfaces module locals imported.entities
+    processExport environment interfaces module locals imported.entities standard
       contribution declaration) ({} : Contribution)
   { exported with errors := imported.errors ++ exported.errors }
 
@@ -1817,15 +1960,17 @@ private def parseWorkspaceFiles :
       | .ok source => (restErrors, source :: restSources)
       | .error error => (error :: restErrors, restSources)
 
-/-- Whether a load reports an interface error where the import is, as upstream reports it: an
-unknown module other than one of upstream's std modules, an unknown selected or hidden item,
-and the import rules (`importRuleErrors`). The other errors are reported where a name
-resolves. -/
+/-- Whether a load reports an interface error where the import or export is, as upstream reports
+it: an unknown module other than one of upstream's std modules, an unknown selected or hidden item,
+the import rules (`importRuleErrors`), and the export checks: an unknown export or re-export
+(`SC0113`, `SC0115`) and a constructor its type does not show (`SC0114`, or `SC0115` for a
+re-export). -/
 def ProgramInterfaceError.reportedAtLoad : ProgramInterfaceError → Bool
   | .unknownModule _ components => !upstreamStandardModulePaths.contains components
   | .unknownImportName _ _ _ | .importedNameConflict _ _ _ | .duplicateImportName _ _
-  | .ambiguousImport _ _ _ | .importQualifierConflict _ _ => true
-  | .unknownExportName _ _ | .unknownExportConstructor _ _ _ | .fixedPointExhausted => false
+  | .ambiguousImport _ _ _ | .importQualifierConflict _ _ | .unknownExportName _ _
+  | .unknownExportConstructor _ _ _ => true
+  | .fixedPointExhausted => false
 
 /-- The module an interface error is in. -/
 def ProgramInterfaceError.owner? : ProgramInterfaceError → Option Workspace.ModuleId
@@ -1871,81 +2016,19 @@ def reachableProgramModules (environment : ProgramEnvironment) (entry : Workspac
     List Workspace.ModuleId :=
   reachableFrom environment (environment.modules.length + 1) [entry]
 
-/-- Whether an import names upstream's `std.opcodes` where no module of the program resolves. -/
-def isStandardOpcodesImport (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
-    (declaration : Syntax.ImportDecl) : Bool :=
-  isStandardOpcodesPath (importPath declaration) &&
-    (resolveProgramModulePath? environment owner (importPath declaration)).isNone
-
-/-- The names a selected or wildcard import of upstream's `std.opcodes` binds, each with the
-function it denotes: its selected functions under their aliases, or all of them, less the hidden
-ones. A name it does not export binds nothing (`standardOpcodeImportErrors`). -/
-def standardOpcodeBindings (declaration : Syntax.ImportDecl) : List (String × String) :=
-  match declaration.value with
-  | .selected selection _ hidingClause =>
-      let hidden := hiddenNames hidingClause
-      selection.elements.toList.filterMap fun item =>
-        let source := selectorSpelling item.value.source
-        let localName := item.value.alias.map (·.value) |>.getD source
-        if standardOpcodeNames.contains source &&
-            !(hidden.contains source || hidden.contains localName) then
-          some (localName, source)
-        else none
-  | .wildcard _ hidingClause =>
-      let hidden := hiddenNames hidingClause
-      standardOpcodeNames.filterMap fun name =>
-        if hidden.contains name then none else some (name, name)
-  | _ => []
-
-/-- The names that one of upstream's std modules other than `std.opcodes` exports, with their
-namespaces (`upstreamStandardModuleExports`), where an import names it and no module of the program
-resolves at its path. Lean has none of its declarations. -/
-def standardModuleImportExports? (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
-    (declaration : Syntax.ImportDecl) : Option (List (String × StandardExportNamespace)) :=
-  let path := importPath declaration
-  if path.value.externalMarker.isNone &&
-      (resolveProgramModulePath? environment owner path).isNone then
-    (upstreamStandardModuleExports.find? (·.1 == programModulePathComponents path)).map (·.2)
-  else none
-
-/-- The identity that stands for one of upstream's std modules: the standard library's module at
-the path `std.X` and `std` resolve to (`X`, and `std`), as `standardOpcodesModule` stands for
-`std.opcodes`. -/
-def standardModuleId? (components : List String) : Option Workspace.ModuleId := do
-  let logical := match components with
-    | ["std"] => ["std"]
-    | "std" :: rest => rest
-    | other => other
-  match ← logical.mapM Workspace.PathSegment.parse with
-  | [] => none
-  | first :: rest => some ⟨.standard, ⟨first :: rest, List.cons_ne_nil first rest⟩⟩
-
-/-- The declaration namespace of a std export, whose import group `SC0108` compares. -/
-def StandardExportNamespace.declarationNamespace :
-    StandardExportNamespace → ProgramDeclarationNamespace
-  | .function => .value
-  | .type => .type
-  | .trait => .trait
-
-/-- The names a selected or wildcard import of one of upstream's std modules other than
-`std.opcodes` binds, each with its namespace: its selected names under their aliases, or all of
-them, less the hidden ones. A name it does not export, a constructor among them, binds nothing
-(`standardModuleImportErrors`). The names take no part in name lookups: Lean has none of their
-declarations, so a name is refused where it is used. -/
-def standardModuleBindings (exports : List (String × StandardExportNamespace))
-    (declaration : Syntax.ImportDecl) : List (String × StandardExportNamespace) :=
-  match declaration.value with
-  | .selected selection _ hidingClause =>
-      let hidden := hiddenNames hidingClause
-      selection.elements.toList.flatMap fun item =>
-        let source := selectorSpelling item.value.source
-        let localName := item.value.alias.map (·.value) |>.getD source
-        if hidden.contains source || hidden.contains localName then []
-        else (exports.filter (·.1 == source)).map fun entry => (localName, entry.2)
-  | .wildcard _ hidingClause =>
-      let hidden := hiddenNames hidingClause
-      exports.filter fun entry => !hidden.contains entry.1
-  | _ => []
+/-- The converged public interfaces that a module's names resolve through, refused for the
+interface errors of the modules it reaches alone, as upstream validates only the modules reachable
+from the entry: an error of a module that nothing it imports or re-exports reaches does not refuse
+it. -/
+def buildProgramInterfacesFrom (environment : ProgramEnvironment) (root : Workspace.ModuleId) :
+    Except (List ProgramInterfaceError) ProgramInterfaces :=
+  match programInterfacesWithErrors environment with
+  | .error error => .error [error]
+  | .ok (interfaces, errors) =>
+      let reachable := reachableProgramModules environment root
+      match errors.filter (·.owner?.any reachable.contains) with
+      | [] => .ok interfaces
+      | reached => .error reached
 
 /-- A module's imports of std's other modules, each with the module's exports and identity. -/
 private def standardModuleImports (environment : ProgramEnvironment) (module : ProgramModule) :
@@ -2107,9 +2190,10 @@ private def importRuleErrors (environment : ProgramEnvironment) (interfaces : Pr
     ambiguousImports environment interfaces module ++
     importQualifierConflicts environment interfaces module
 
-/-- The import errors of a program that its load reports, for the modules reachable from its
-entry, as upstream validates only those: the interface errors reported where the import is, in
-`buildProgramInterfaces`' order, then each module's import rules. -/
+/-- The import and export errors of a program that its load reports, for the modules reachable
+from its entry, as upstream validates only those: the interface errors reported where the import or
+export is (`reportedAtLoad`), in `buildProgramInterfaces`' order, then each module's import
+rules. -/
 def programImportErrors (environment : ProgramEnvironment) (entry : Workspace.ModuleId) :
     List ProgramInterfaceError :=
   let reachable := reachableProgramModules environment entry
@@ -2121,8 +2205,8 @@ def programImportErrors (environment : ProgramEnvironment) (entry : Workspace.Mo
         (environment.modules.filter fun module => reachable.contains module.id).flatMap
           (importRuleErrors environment interfaces)
 
-/-- Parse and catalog an already validated workspace, and refuse the imports upstream refuses
-where they are. -/
+/-- Parse and catalog an already validated workspace, and refuse the imports and exports upstream
+refuses where they are. -/
 def loadValidatedProgram
     (workspace : Workspace.ValidatedUserWorkspace) :
     Except (List ProgramLoadError) LoadedProgram :=
