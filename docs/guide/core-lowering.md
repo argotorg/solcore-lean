@@ -38,7 +38,8 @@ API, and families with a finite profile.
 | [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedCalls.lean) | Direct calls at expression roots and their check on a compiled row |
 | [AcceptedConversions](../../Solcore/SourceSemantics/CoreLowering/AcceptedConversions.lean) | The builtin conversions as compiler sites: the native check, the compiler's receipt, the dirty-integer revert's token law (`CellAwareInvocationAcceptedConversionFaults.DirtyToken`) and the head |
 | [AcceptedBuiltins](../../Solcore/SourceSemantics/CoreLowering/AcceptedBuiltins.lean) | The builtin closures as compiler sites of named-row bodies, and the cell-aware head of their calls (`CellAwareInvocationAcceptedBuiltins.preserves`, `reflects`) |
-| [AcceptedNestedCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedNestedCalls.lean) | Direct calls, the builtin conversions, mapping indices and builtin closures with their calls inside expressions and as arguments (`CellAwareInvocationAcceptedNestedTrees.Nested`), their closure and check, and the closure of a family of rows by strong induction on the grade |
+| [AcceptedConstructors](../../Solcore/SourceSemantics/CoreLowering/AcceptedConstructors.lean) | Constructor applications as compiler sites of named-row bodies, and the cell-aware head of an application (`CellAwareInvocationAcceptedConstructors.preserves`, `reflects`) |
+| [AcceptedNestedCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedNestedCalls.lean) | Direct calls, the builtin conversions, mapping indices, builtin closures with their calls, tuples beyond pairs and constructor applications inside expressions and as arguments (`CellAwareInvocationAcceptedNestedTrees.Nested`), their closure and check, and the closure of a family of rows by strong induction on the grade |
 | [AcceptedCallLifting](../../Solcore/SourceSemantics/CoreLowering/AcceptedCallLifting.lean) | Staged traces lifted from Source for bodies with direct calls, the builtin conversions, mapping indices and builtin closures at any expression position and assignments through mapping indices, by strong induction on the size of the original derivation (`CellAwareInvocationAcceptedCallLifting.body`), and their fault executions (`CellAwareInvocationAcceptedFaultLifting.body_fault`) |
 | [AcceptedPublicRoots](../../Solcore/SourceSemantics/CoreLowering/AcceptedPublicRoots.lean) | Accepted bodies at the actual public start |
 | [PublicSupport](../../Solcore/SourceSemantics/CoreLowering/PublicSupport.lean) | `CompilerProgramStaticProfile.StaticProfile`, program support, `SelectedCompilationPublicSessionState.State` |
@@ -156,7 +157,8 @@ Build the umbrella and work up from the lowest failing file: its importers fail 
   other files add the case to their splits over `Literal`. Numeric patterns at `uint256` have
   `LiteralCode.uint256` in both pattern-leaf codes (`DataPatternLeaves`, `CompatiblePatternLeaves`).
   `case uint256(p)` needs no leaf: a `uint256` value's Core value is its word, so it compiles as
-  `p`'s matcher.
+  `p`'s matcher. `case true` and `case false` need none either: they compile to a Core test of
+  the boolean (`SourceCoreBasic.boolPatternMatcher`), in both pattern compilers' `Tree`s.
 - **A new builtin function**, such as the conversions `uint256(w)`, `uintN(w)` and `intN(w)`. A
   builtin that is not a closure stays out of `BuiltinFunctionId.all`, so no program's globals,
   callable table or closure identities change, and `lowerExpressionWithPolicy` lowers it inline.
@@ -301,7 +303,7 @@ The tests are by subject under
 | `Compatible/`, `Data/`, `Mixed/`, `Named/`, `Recursive/`, `Chosen/`, `Closed/` | Profiles and families: places, assignments, matches, loops, named and recursive rows |
 | [Selected/Profiles](../../Solcore/Test/SourceSemantics/CoreLowering/Selected/Profiles.lean), [Generalized/Export](../../Solcore/Test/SourceSemantics/CoreLowering/Generalized/Export.lean) | Instantiate the front's session and public-root theorems on fixtures |
 | `UnifiedCorpus`, `UnifiedOperatorCorpus` | The unified runtime on canonical checked programs |
-| `Accepted/Fixture`, `Accepted/OneCall` | A compiled program with its inventory, family rows and callees' receipts; the call root's theorems in both directions at a direct call, at a call whose argument is a call, at a conversion, at `Typedef.rep` of a conversion, at an index read of a local mapping after a write through the same index, at an in-place `~` through a local mapping's index, at a `while` loop that breaks and a `for` loop that continues, and at calls of an integer closure and of an imported opcode, and in reflection at dirty words |
+| `Accepted/Fixture`, `Accepted/OneCall` | A compiled program with its inventory, family rows and callees' receipts; the call root's theorems in both directions at a direct call, at a call whose argument is a call, at a conversion, at `Typedef.rep` of a conversion, at an index read of a local mapping after a write through the same index, at an in-place `~` through a local mapping's index, at a `while` loop that breaks and a `for` loop that continues, at calls of an integer closure and of an imported opcode, at a tuple beyond pairs and at a constructor application, and in reflection at dirty words |
 
 ```sh
 lake build Solcore.SourceSemantics.CoreLowering

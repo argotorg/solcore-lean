@@ -76,8 +76,8 @@ obligations. None follows from agreement in a test corpus.
   - Remaining: further state operations, ECRECOVER and P256VERIFY, init frames and public
     deployment, the rest of inline Yul, object linking, and then divergence and reverse
     correspondence.
-- **Upstream's match rules**: row 13, the literal `lidx` index and the declaration checks are
-  done; match exhaustiveness follows
+- **Upstream's match rules**: row 13, the literal `lidx` index, the declaration checks and the
+  boolean patterns are done; the bare-name rule and match exhaustiveness follow
   ([the upstream table](#following-upstreams-semantics-the-next-units)).
 - **Lean's native frontend as a fourth path**: the harness and the fuzz driver's `native` run kind
   compare the admitted pure cases with direct Core, memory arrays with their slices and memrefs
@@ -133,18 +133,24 @@ The last two are recorded without investigation, and the generators avoid them.
    `where` clause states beside the subclass. A method's own `where` predicates give their
    superclasses in its body too. Lean keeps ignoring `#[derive]`. Each impl's head and declared
    conditions are checked where it is declared, as upstream's `SC0219`, `SC0212` and `SC0213` do,
-   with its two pragmas. Then Lean follows upstream in a match's exhaustiveness: today Lean
-   counts constructors only for a scrutinee of a nominal type, so an exhaustive match over a pair
-   needs a `_` arm. Lean also reads a `true` or `false` pattern as a variable, so that arm
-   matches every value, where upstream matches the boolean.
+   with its two pragmas. A `true` or `false` pattern is the boolean, as upstream reads it. Next,
+   Lean reads any other bare name in a pattern as upstream does: a constructor that shares its
+   type's name is that constructor, and another visible constructor's name is refused
+   (`SC0106`), where Lean binds a variable today. Then Lean follows upstream in a match's
+   exhaustiveness: today Lean counts constructors only for a scrutinee of a nominal type, so an
+   exhaustive match over a pair or on `bool` needs a `_` arm.
 
-   One more difference is open: Lean's `&&` and `||` call a program's own `and` or `or`, where
-   upstream's are builtins.
+   Lean's `&&` and `||` still call a program's own `and` or `or`. They become builtins, as
+   upstream's are.
 2. **Meaning proofs.** The rest of native Source goal two
    ([remaining work](core-runtime-unification.md#remaining-work-for-the-second-goal)). Row 1 has
    no leftover, and the faults, the final values, the mapping indices and the builtin closures of
-   call-containing rows are lifted, with assignments and in-place `~` through mapping indices and
-   with loops. Next come tuples beyond pairs and constructors.
+   call-containing rows are lifted, with assignments and in-place `~` through mapping indices,
+   loops, tuples beyond pairs and constructor applications. Memory arrays are next
+   ([decision 6](memory-arrays-slices.md#6-meaning-proofs)): the staged traces gain the array
+   forms, and the heap relation relates an array object to its Core cell. This unit takes a
+   memref only as the operand of a load or a store, and `toArray` only of slices made where it
+   is called.
 3. **Lean's native frontend as a fourth differential path.** The harness runs the admitted pure
    cases through the native pipeline, alone or as the fuzz driver's `native` run kind, memory
    arrays with their slices and memrefs among them. Lean's imports follow upstream's `SC0108`,
@@ -167,8 +173,9 @@ The last two are recorded without investigation, and the generators avoid them.
 
 ### Then
 
-4. Row 4 in the meaning proofs: a unit that relates array objects to their Core cells
-   ([decision 6](memory-arrays-slices.md#6-meaning-proofs)).
+4. The rest of memory arrays in the meaning proofs: a memref in a local, a parameter or a
+   result, and `toArray` of a stored slice, need an invariant over views in the heap relation.
+   It is unscheduled.
 5. The remaining Hull public connections and emitter proofs.
 6. Deferred type resolution at finalization. It would lift row 4's differences 14, 15, 18, 19 and
    22 to 24 and the open `Typedef` call. It is unscheduled.

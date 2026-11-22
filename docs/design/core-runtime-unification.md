@@ -245,7 +245,10 @@ Direct calls are in [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/A
   indices (`Nested.index`), whose key equality and missing-default fault the family derives from
   the callable profile and the row's issuer, and references to builtin closures and calls of
   them (`Nested.builtinValue`, `Nested.builtin`), with the function model's inclusion of the
-  builtin values, which the family derives from the callable profile.
+  builtin values, which the family derives from the callable profile. So are tuples of more
+  than two elements (`Nested.tuple`), as compiler sites of their own (`TupleSite`), since the
+  first subset's sites stop at pairs, and constructor applications (`Nested.constructor`), as
+  compiler sites whose parameter substitution is closed (`ConstructorSite`).
 - **Authority.** `CellAwareInvocationAcceptedCallAuthority` derives `Ports` from a complete
   inventory: a call receipt's global slot names an indexed function, and the inventory's header for
   that index gives the `Port`.
@@ -347,7 +350,10 @@ program.
   the same way to `bitNotProjected`, and an invalid operand at its selected leaf to
   `bitNotProjectedOperandFault`, which the lowering heads refute from the heap representation. A
   call of a builtin closure lifts to the staged `builtinApplied` and `builtinArgumentsFault`, and a
-  reference to one to the staged atomic value.
+  reference to one to the staged atomic value. A tuple lifts to the staged `tupleValue` and
+  `tupleFault`, and a constructor application to `constructorValue`, `constructorFault` and
+  `constructorMetadataFault`. The last mirrors the Source's constructor metadata fault, and the
+  constructor heads refute it from the metadata's validity.
 - **Fault lifting.** `CellAwareInvocationAcceptedFaultLifting`, in the same file, lifts the
   original fault executions of the same bodies with the same reason and heap (`body_fault`). The
   staged traces express every reason but a type mismatch and a missing declaration
@@ -374,7 +380,7 @@ program.
   uses are general over the subset and the shape.
 - **One call.** The test
   [Accepted/OneCall](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/OneCall.lean) compiles
-  a fifteen-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
+  a seventeen-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
   `identity(value)`, `twice` returns `identity(identity(value))`, `narrow` returns `uint8(value)`,
   `roundTrip` returns `Typedef.rep(uint8(value))`, `doubled`, `shifted` and `flipped` update a
   `uint8` local in place with `+=`, `<<=` and `~`, `tailed` ends in `identity(value)` as its final
@@ -384,15 +390,17 @@ program.
   `iszero(value)` with `iszero` imported from `std.opcodes`, `broken` runs
   `while (true) { break; }`, and `counted` runs
   `for (let go: bool = true; go; go = false) { continue; }`, each before it returns its
-  parameter. Its `accepted_call` meets every premise of
+  parameter, `tripled` returns `(value, value, value)`, and `boxed` returns `.Item(value)` of the
+  program's enum `Box`. Its `accepted_call` meets every premise of
   `CellAwarePublicAcceptedCallForward.first_value_selected`,
   `CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected` and
   `checkpoint_reflects_selected` at the first public calls of `relay`, `tailed`, `zeroed`, `broken`
   and `counted`, at `twice`'s, where the inner call's result is the outer call's argument, and at
   `narrow`'s and
   `roundTrip`'s at a canonical word. At `stored` and `inverted`, `accepted_call_with_locals` meets
-  them with a Source execution that ends in the local's context, and at `summed`,
-  `accepted_call_returning` with one that returns an integer. At a dirty word,
+  them with a Source execution that ends in the local's context, and at `summed`, `tripled` and
+  `boxed`, `accepted_call_returning` with one that returns an integer, a triple and a
+  constructed value. At a dirty word,
   `accepted_reflection` meets the reflection's premises at `narrow` and `roundTrip`, and the call
   fails with the dirty-integer reason. At the
   faulting words of `narrow`, `doubled`, `shifted` and `flipped`, `accepted_failure` lifts the
@@ -427,15 +435,16 @@ On the accepted-body route above, the next connected steps are:
     available Source input.
 - **Extend the expression closure beyond its first subset**, over the same actual accepted
   expression compiler.
-  - Direct calls, the builtin conversions, mapping indices and builtin closures with their calls
-    at any expression position are closed over families of rows, with call authority from a
-    complete inventory. They are connected at the public root in both directions, original
+  - Direct calls, the builtin conversions, mapping indices, builtin closures with their calls,
+    tuples beyond pairs and constructor applications at any expression position are closed over
+    families of rows, with call authority from a complete inventory. They are connected at the
+    public root in both directions, original
     traces of call-containing bodies are lifted, and a program with a call, a nested call, a
     conversion, `Typedef.rep` of a conversion, an index read after a write through the same
-    index, a call of an integer closure and a call of an imported opcode instantiates both
-    directions.
-  - Next come indirect calls, methods, array indices, tuples, constructors, generalized reads,
-    closures and coercions.
+    index, a call of an integer closure, a call of an imported opcode, a triple and a constructor
+    application instantiates both directions.
+  - Next come the array forms, then indirect calls, methods, generalized reads, closures and
+    coercions.
   - Expressions of contextual closures need the relation between the compiler view and the Source
     that their writes and matches also need.
 - **Strengthen the named-row public connection.**
