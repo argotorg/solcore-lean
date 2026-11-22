@@ -14,14 +14,15 @@ parameter to a `uint8` local `x`, adds `x` to it in place and returns it, `shift
 an `x` left in place by the parameter, a `Word` amount, and `flipped` applies `~` to such an `x` in
 place; `tailed`'s body is `identity(value)` as its final value; `stored` declares a local mapping
 `table`, assigns its parameter at `table[value]` and returns `table[value]`; `summed` returns
-`integerAdd(wordToInteger(value), wordToInteger(value))`, calls of builtin closures, and `zeroed`
-returns `iszero(value)`, the opcode that the program imports from `std.opcodes`. Runtime checks place
-every expression node of the twelve rows among the nested sites that call `identity`'s
+`integerAdd(wordToInteger(value), wordToInteger(value))`, calls of builtin closures, `zeroed`
+returns `iszero(value)`, the opcode that the program imports from `std.opcodes`, and `inverted`
+declares a local mapping, complements `table[value]` in place and returns it. Runtime checks place
+every expression node of the thirteen rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
-`relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`, `narrow` and `roundTrip` (at words canonical
-for `uint8`) are lifted to staged traces, and the call root's theorems apply at the first public call of
+`relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`, `inverted`, `narrow` and `roundTrip` (at
+words canonical for `uint8`) are lifted to staged traces, and the call root's theorems apply at the first public call of
 each in both directions: the actual resumption succeeds, and actual native
 completion reconstructs a staged Source execution. `stored`'s index read returns the word its
 assignment wrote, not the default, and `summed` returns its integer, which at the largest word
@@ -44,6 +45,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.stored_source`,
 `Tests.SourceCoreAcceptedOneCall.summed_source`,
 `Tests.SourceCoreAcceptedOneCall.zeroed_source`,
+`Tests.SourceCoreAcceptedOneCall.inverted_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_source`,
 `Tests.SourceCoreAcceptedOneCall.roundTrip_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_fault`,
@@ -60,6 +62,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedMappingRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedBuiltinRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedOpcodeRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedProjectedBitNotRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run`,
@@ -69,7 +72,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 -/
 
 section
-/-! The program and the declarative typing of its twelve functions, constructed
+/-! The program and the declarative typing of its thirteen functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -95,7 +98,9 @@ def workspace : Workspace.RawWorkspace := {
       "return table[value]; }",
     "function summed(value: Word) returns (integer) { " ++
       "return integerAdd(wordToInteger(value), wordToInteger(value)); }",
-    "function zeroed(value: Word) returns (Word) { return iszero(value); }" ]}] }
+    "function zeroed(value: Word) returns (Word) { return iszero(value); }",
+    "function inverted(value: Word) returns (Word) { let table: mapping(Word => Word); table[value] ~=; " ++
+      "return table[value]; }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -1438,6 +1443,192 @@ def observeZeroed (function : CheckedFunction) (signature : ProgramFunctionSigna
   let ⟨statementType⟩ ← observed (parts.statement.type = .word) "zeroed statementType"
   return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, statementType⟩
 
+/-- The nodes of `inverted`'s body: the declaration of its local mapping
+`table`, `table[value] ~=`, whose key reads the parameter, and the return of
+`table[value]`, found by following the statement graph. -/
+structure InvertedParts (source : TypedSource) where
+  binder : TypedBinder
+  table : TypedBinder
+  keyRead : Tests.SourceCoreNamedBranch.Read source binder .word
+  baseRead : Tests.SourceCoreNamedBranch.Read source table (.mapping .word .word)
+  indexKey : Tests.SourceCoreNamedBranch.Read source binder .word
+  index : ExpressionNode
+  declared : StatementNode
+  flip : StatementNode
+  resolution : AssignmentResolution
+  returned : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement declared.id, .statement flip.id, .statement returned.id]
+  declaredFound : source.lookupStatement? declared.id = some declared
+  declaredForm : declared.form = .letDecl table none
+  flipFound : source.lookupStatement? flip.id = some flip
+  flipForm : flip.form = .assignBitNot resolution
+  targetRoot : resolution.target.root = table.id
+  targetProjections : resolution.target.projections = [.index keyRead.node.id]
+  targetType : resolution.target.type = .word
+  indexFound : source.lookupExpression? index.id = some index
+  indexForm : index.form = .index baseRead.node.id indexKey.node.id
+  indexRaw : index.rawType = .word
+  indexType : index.type = .word
+  indexRequirements : index.requirements = []
+  indexCoercions : index.coercions = []
+  returnedFound : source.lookupStatement? returned.id = some returned
+  returnedForm : returned.form = .returnStmt (some index.id)
+
+def observeInvertedParts (source : TypedSource) : IO (InvertedParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "inverted input")
+  let [.statement declaredId, .statement flipId, .statement returnedId] := source.roots
+    | throw (IO.userError "inverted roots")
+  let some declared := source.lookupStatement? declaredId | throw (IO.userError "inverted let")
+  let some flip := source.lookupStatement? flipId | throw (IO.userError "inverted flip")
+  let some returned := source.lookupStatement? returnedId | throw (IO.userError "inverted return")
+  let .letDecl table none := declared.form | throw (IO.userError "inverted let form")
+  let .assignBitNot resolution := flip.form | throw (IO.userError "inverted flip form")
+  let [.index keyId] := resolution.target.projections | throw (IO.userError "inverted target projections")
+  let .returnStmt (some indexId) := returned.form | throw (IO.userError "inverted return form")
+  let some keyNode := source.lookupExpression? keyId | throw (IO.userError "inverted key")
+  let some index := source.lookupExpression? indexId | throw (IO.userError "inverted index")
+  let .index baseId indexKeyId := index.form | throw (IO.userError "inverted index form")
+  let some baseNode := source.lookupExpression? baseId | throw (IO.userError "inverted base")
+  let some indexKeyNode := source.lookupExpression? indexKeyId | throw (IO.userError "inverted index key")
+  let keyRead ← Tests.SourceCoreNamedBranch.observeRead source binder keyNode .word
+  let baseRead ← Tests.SourceCoreNamedBranch.observeRead source table baseNode (.mapping .word .word)
+  let indexKey ← Tests.SourceCoreNamedBranch.observeRead source binder indexKeyNode .word
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "inverted inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement declared.id, .statement flip.id, .statement returned.id])
+    "inverted roots shape"
+  let ⟨declaredFound⟩ ← observed (source.lookupStatement? declared.id = some declared) "inverted declaredFound"
+  let ⟨declaredForm⟩ ← observed (declared.form = .letDecl table none) "inverted declaredForm"
+  let ⟨flipFound⟩ ← observed (source.lookupStatement? flip.id = some flip) "inverted flipFound"
+  let ⟨flipForm⟩ ← observed (flip.form = .assignBitNot resolution) "inverted flipForm"
+  let ⟨targetRoot⟩ ← observed (resolution.target.root = table.id) "inverted targetRoot"
+  let ⟨targetProjections⟩ ← observed (resolution.target.projections = [.index keyRead.node.id])
+    "inverted targetProjections"
+  let ⟨targetType⟩ ← observed (resolution.target.type = .word) "inverted targetType"
+  let ⟨indexFound⟩ ← observed (source.lookupExpression? index.id = some index) "inverted indexFound"
+  let ⟨indexForm⟩ ← observed (index.form = .index baseRead.node.id indexKey.node.id) "inverted indexForm"
+  let ⟨indexRaw⟩ ← observed (index.rawType = .word) "inverted indexRaw"
+  let ⟨indexType⟩ ← observed (index.type = .word) "inverted indexType"
+  let ⟨indexRequirements⟩ ← observed (index.requirements = []) "inverted indexRequirements"
+  let ⟨indexCoercions⟩ ← observed (index.coercions = []) "inverted indexCoercions"
+  let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "inverted returnedFound"
+  let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some index.id)) "inverted returnedForm"
+  return ⟨binder, table, keyRead, baseRead, indexKey, index, declared, flip, resolution, returned, inputs, roots,
+    declaredFound, declaredForm, flipFound, flipForm, targetRoot, targetProjections, targetType, indexFound,
+    indexForm, indexRaw, indexType, indexRequirements, indexCoercions, returnedFound, returnedForm⟩
+
+/-- `inverted`'s body: `let table: mapping(Word => Word)`, `table[value] ~=` through the local's index and
+the return of `table[value]`. -/
+structure InvertedShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : InvertedParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  binderScheme : parts.binder.scheme = .mono .word
+  binderRequirements : parts.binder.schemeRequirements = []
+  tableScheme : parts.table.scheme = .mono (.mapping .word .word)
+  tableRequirements : parts.table.schemeRequirements = []
+  tableOwner : parts.table.id.owner = function.typedBody.owner
+  tableDistinct : parts.table.id ≠ parts.binder.id
+  declaredType : parts.declared.type = .unit
+  flipType : parts.flip.type = .unit
+  returnedType : parts.returned.type = .word
+  flipRequirements : parts.resolution.requirements = []
+
+theorem InvertedShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : InvertedShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.declared.id, shape.parts.flip.id, shape.parts.returned.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := true, control := .returned}
+  let ordinary : StatementFacts := {type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit}
+  refine ⟨BodyFacts.cons ordinary (BodyFacts.cons ordinary (BodyFacts.singleton facts)), rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have mapping : TypeAdmissible lexical (.mapping .word .word) :=
+      ⟨binders, .mapping (.builtin .word) (.builtin .word)⟩
+    let locals := lexical.withLocal shape.parts.table.id shape.parts.table.scheme shape.parts.table.schemeRequirements
+    have tableExtended : BinderExtends function.typedBody.owner lexical shape.parts.table locals := by
+      apply BinderExtends.intro
+      · exact {
+          owned := shape.tableOwner
+          scheme := shape.tableScheme.symm ▸ SchemeWellFormed.monoAdmissible mapping
+          quantified_fresh := by rw [shape.tableScheme]; simp [SchemeQuantifiersFresh, TypeSystem.Scheme.mono]
+          monomorphic_requirements_empty := fun _ => shape.tableRequirements }
+      · cases head
+        simp [LocalFresh, Context.withLocal, checkedBodyContext, declarationContext,
+          Context.ofSignatures, Context.forDeclaration, Context.withAssumptions,
+          Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.tableDistinct]
+    have localWord : TypeAdmissible locals .word := ⟨binders, .builtin .word⟩
+    have localMapping : TypeAdmissible locals (.mapping .word .word) :=
+      ⟨binders, .mapping (.builtin .word) (.builtin .word)⟩
+    have declaredTyped : StatementHasType function.typedBody ⟨.word, 0⟩ lexical shape.parts.declared.id locals
+        ordinary := by
+      apply StatementHasType.letUninitialized (lookupStatement?_sound shape.parts.declaredFound)
+        shape.parts.declaredForm
+      · rw [shape.tableScheme]; rfl
+      · rw [shape.tableScheme]; rfl
+      · exact tableExtended
+      · exact shape.declaredType
+    have parameterLookup : locals.LocalLookup shape.parts.binder.id shape.parts.binder.scheme :=
+      .tail shape.tableDistinct head.local_self
+    have parameterRequirements :
+        locals.LocalSchemeRequirementsLookup shape.parts.binder.id shape.parts.binder.schemeRequirements :=
+      .tail shape.tableDistinct head.local_scheme_requirements_self
+    have keyTyped := shape.parts.keyRead.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have writable : WritableLocal locals shape.parts.resolution.target.root (.mapping .word .word) := by
+      rw [shape.parts.targetRoot]
+      exact .intro tableExtended.local_self (shape.tableScheme.symm ▸ SchemeWellFormed.monoAdmissible localMapping)
+        (by rw [shape.tableScheme]; rfl) (by rw [shape.tableScheme]; rfl)
+    have flipValid : SourceBitNotAssignmentValid function.typedBody locals shape.parts.resolution :=
+      .intro (.intro writable (by rw [shape.parts.targetProjections]; exact .index keyTyped (.nil _))
+        shape.parts.targetType) .word shape.flipRequirements
+    have flippedTyped : StatementHasType function.typedBody ⟨.word, 0⟩ locals shape.parts.flip.id locals ordinary :=
+      .assignBitNot (lookupStatement?_sound shape.parts.flipFound) shape.parts.flipForm flipValid shape.flipType
+    have baseTyped := shape.parts.baseRead.typed shape.tableScheme shape.tableRequirements localMapping
+      tableExtended.local_self tableExtended.local_scheme_requirements_self
+    have indexKeyTyped := shape.parts.indexKey.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have indexTyped : ExpressionHasType function.typedBody locals shape.parts.index.id shape.parts.index.type := by
+      refine .intro (lookupExpression?_sound shape.parts.indexFound)
+        (shape.parts.indexForm ▸ ExpressionFormHasRawType.index baseTyped indexKeyTyped) shape.parts.indexRaw
+        localWord (Eq.mp (congrArg (TypeAdmissible locals) shape.parts.indexType.symm) localWord) ?_
+      rw [shape.parts.indexRequirements, shape.parts.indexCoercions, shape.parts.indexType]
+      exact .ordinary (by intro id member; cases member) (.nil _) rfl
+    rw [shape.parts.indexType] at indexTyped
+    exact ⟨_, .cons declaredTyped (.cons flippedTyped (.singleton (.returnValue
+      (lookupStatement?_sound shape.parts.returnedFound) shape.parts.returnedForm indexTyped shape.returnedType)))⟩
+
+def observeInverted (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (InvertedShape function signature) := do
+  let parts ← observeInvertedParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "inverted parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "inverted inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "inverted returns"
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "inverted binderScheme"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "inverted binderRequirements"
+  let ⟨tableScheme⟩ ← observed (parts.table.scheme = .mono (.mapping .word .word)) "inverted tableScheme"
+  let ⟨tableRequirements⟩ ← observed (parts.table.schemeRequirements = []) "inverted tableRequirements"
+  let ⟨tableOwner⟩ ← observed (parts.table.id.owner = function.typedBody.owner) "inverted tableOwner"
+  let ⟨tableDistinct⟩ ← observed (parts.table.id ≠ parts.binder.id) "inverted tableDistinct"
+  let ⟨declaredType⟩ ← observed (parts.declared.type = .unit) "inverted declaredType"
+  let ⟨flipType⟩ ← observed (parts.flip.type = .unit) "inverted flipType"
+  let ⟨returnedType⟩ ← observed (parts.returned.type = .word) "inverted returnedType"
+  let ⟨flipRequirements⟩ ← observed (parts.resolution.requirements = []) "inverted flipRequirements"
+  return ⟨parts, parameters, inputTypes, returns, binderScheme, binderRequirements, tableScheme, tableRequirements,
+    tableOwner, tableDistinct, declaredType, flipType, returnedType, flipRequirements⟩
+
 /-- Two members of a list of signatures whose ids are distinct are equal when
 their ids are. -/
 private theorem signature_of_id {signatures : List ProgramFunctionSignature}
@@ -1464,9 +1655,11 @@ def observeWellFormed {program : CheckedProgram}
     IO (PLift (ProgramWellFormed (Program.ofChecked program))) := do
   match functions : program.functions, signatures : program.signatures.functions with
   | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction,
-      shiftedFunction, flippedFunction, tailedFunction, storedFunction, summedFunction, zeroedFunction],
+      shiftedFunction, flippedFunction, tailedFunction, storedFunction, summedFunction, zeroedFunction,
+      invertedFunction],
     [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature,
-      shiftedSignature, flippedSignature, tailedSignature, storedSignature, summedSignature, zeroedSignature] =>
+      shiftedSignature, flippedSignature, tailedSignature, storedSignature, summedSignature, zeroedSignature,
+      invertedSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
@@ -1479,6 +1672,7 @@ def observeWellFormed {program : CheckedProgram}
     let storedShape ← observeStored storedFunction storedSignature
     let summedShape ← observeSummed summedFunction summedSignature
     let zeroedShape ← observeZeroed zeroedFunction zeroedSignature
+    let invertedShape ← observeInverted invertedFunction invertedSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -1494,6 +1688,8 @@ def observeWellFormed {program : CheckedProgram}
     let ⟨storedDeclaration⟩ ← observed (storedFunction.declaration = storedSignature.id) "calls storedDeclaration"
     let ⟨summedDeclaration⟩ ← observed (summedFunction.declaration = summedSignature.id) "calls summedDeclaration"
     let ⟨zeroedDeclaration⟩ ← observed (zeroedFunction.declaration = zeroedSignature.id) "calls zeroedDeclaration"
+    let ⟨invertedDeclaration⟩ ← observed (invertedFunction.declaration = invertedSignature.id)
+      "calls invertedDeclaration"
     let ⟨distinct⟩ ← observed ((program.signatures.functions.map (·.id)).Nodup) "calls distinct signatures"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
@@ -1503,7 +1699,7 @@ def observeWellFormed {program : CheckedProgram}
             actual.declaration = signature.id → candidate = signature := fun signatureMember same =>
           signature_of_id distinct candidateMember signatureMember (declared.symm.trans same)
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
-        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
         · obtain rfl := selects (by simp [signatures]) identityDeclaration
           exact identityShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) relayDeclaration
@@ -1528,6 +1724,8 @@ def observeWellFormed {program : CheckedProgram}
           exact summedShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) zeroedDeclaration
           exact zeroedShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) invertedDeclaration
+          exact invertedShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -1536,13 +1734,15 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the twelve functions and their original Source
+/-! The cache rows of the thirteen functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `tailed` ends in the direct call of `identity` with
 its parameter as its final value, `stored` returns its parameter from the index of its local mapping
 where its assignment put it, `summed` returns the integer sum of its parameter's word with itself,
-`zeroed` returns the opcode `iszero` on its parameter, `narrow` returns the conversion of its parameter,
+`zeroed` returns the opcode `iszero` on its parameter, `inverted` returns the complement of the default
+word from the index of its local mapping where its in-place `~` put it, `narrow` returns the conversion of
+its parameter,
 and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
 a given body invocation. At a word not canonical for `uint8` the conversions of `narrow`, `doubled`,
 `shifted` and `flipped` fault with the dirty-integer reason, and at a canonical word whose double is
@@ -1796,6 +1996,20 @@ def observeZeroedBody (source : TypedSource) : IO (ZeroedBody source) := do
   let parts ← observeZeroedParts source
   let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "zeroed row binderScheme"
   return ⟨parts, binderScheme⟩
+
+/-- `inverted`'s cache row: the nodes of its body, its `Word` parameter and its local mapping. -/
+structure InvertedBody (source : TypedSource) where
+  parts : InvertedParts source
+  binderScheme : parts.binder.scheme = .mono .word
+  tableScheme : parts.table.scheme = .mono (.mapping .word .word)
+  tableDistinct : parts.table.id ≠ parts.binder.id
+
+def observeInvertedBody (source : TypedSource) : IO (InvertedBody source) := do
+  let parts ← observeInvertedParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "inverted row binderScheme"
+  let ⟨tableScheme⟩ ← observed (parts.table.scheme = .mono (.mapping .word .word)) "inverted row tableScheme"
+  let ⟨tableDistinct⟩ ← observed (parts.table.id ≠ parts.binder.id) "inverted row tableDistinct"
+  return ⟨parts, binderScheme, tableScheme, tableDistinct⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
 theorem read_value {source : TypedSource} {binder : TypedBinder}
@@ -2218,19 +2432,95 @@ theorem ZeroedBody.trace {source : TypedSource} (body : ZeroedBody source) {prog
   · exact .returnValue (lookupStatement?_sound body.parts.statementFound) body.parts.statementForm
       (builtin_value body.parts.tested (read_value body.parts.read evidence before word) (.wordOpcode rfl))
 
+/-- `inverted`'s body returns the complement of the default word: its local
+mapping starts empty, `table[value] ~=` complements the default at the
+parameter's key and inserts the result there, and the index read finds it. The
+local's context is a binder extension of the body's. -/
+theorem InvertedBody.trace {source : TypedSource} (body : InvertedBody source) {program : SourceSemantics.Program}
+    {context localContext : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment)
+    (before : Dynamic.Heap) (extension : BinderExtends source.owner context body.parts.table localContext)
+    (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.declared.id, body.parts.flip.id, body.parts.returned.id]
+      localContext (.returned (.word Core.Word.zero.bitNot))
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word Core.Word.zero.bitNot)]))) := by
+  let root : Dynamic.Location := ⟨(wordHeap before word).cells.length⟩
+  let environment : Dynamic.Environment := (body.parts.table.id, root) :: wordEnvironment body.parts.binder before
+  have parameterAllocation : Dynamic.Heap.Allocates before .word (some (.word word)) ⟨before.cells.length⟩
+      (wordHeap before word) := .append
+  have allocation : Dynamic.Heap.Allocates (wordHeap before word) (.mapping .word .word) none root
+      (mappingHeap (wordHeap before word) none) := .append
+  have flipped : Dynamic.Heap.Allocates (wordHeap before word) (.mapping .word .word)
+      (some (.mapping .word .word [(.word word, .word Core.Word.zero.bitNot)])) root
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word Core.Word.zero.bitNot)]))) :=
+    .append
+  have parameterLookup : Dynamic.Environment.LooksUp environment body.parts.binder.id ⟨before.cells.length⟩ :=
+    .tail body.tableDistinct .head
+  have declared : Dynamic.StatementExecutes program context evidence source
+      (wordEnvironment body.parts.binder before) (wordHeap before word) body.parts.declared.id localContext
+      (.fallthrough environment) (mappingHeap (wordHeap before word) none) :=
+    .letUninitialized (lookupStatement?_sound body.parts.declaredFound) body.parts.declaredForm
+      (by rw [body.tableScheme]; rfl) extension (by rw [body.tableScheme]; exact allocation)
+  have resolve : Dynamic.SourcePlaceResolves program localContext evidence source environment
+      (mappingHeap (wordHeap before word) none) body.parts.resolution.target
+      {location := root, rootType := .mapping .word .word, valueType := body.parts.resolution.target.type,
+        projections := [.index (.word word)], selected := some (.word Core.Word.zero)}
+      (mappingHeap (wordHeap before word) none) := by
+    apply Dynamic.SourcePlaceResolves.intro (initialCell := {type := .mapping .word .word, value := none})
+      (currentCell := {type := .mapping .word .word, value := none})
+    · rw [body.parts.targetRoot]
+      exact .head
+    · exact allocation.reads_new
+    · rw [body.parts.targetProjections]
+      exact .index (local_value body.parts.keyRead evidence parameterLookup
+        (allocation.preserves_read parameterAllocation.reads_new)) .nil
+    · exact allocation.reads_new
+    · exact .emptyMapping .word .word
+    · exact .indexDefault .nil .word .nil
+  have write : Dynamic.Heap.Writes (mappingHeap (wordHeap before word) none) root
+      (some (.mapping .word .word [(.word word, .word Core.Word.zero.bitNot)]))
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word Core.Word.zero.bitNot)]))) :=
+    .intro allocation.reads_new (write_last (wordHeap before word).cells _ _)
+  have complemented : Dynamic.StatementExecutes program localContext evidence source environment
+      (mappingHeap (wordHeap before word) none) body.parts.flip.id localContext (.fallthrough environment)
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word Core.Word.zero.bitNot)]))) := by
+    apply Dynamic.StatementExecutes.assignBitNot
+      (updatedRoot := .mapping .word .word [(.word word, .word Core.Word.zero.bitNot)])
+      (lookupStatement?_sound body.parts.flipFound) body.parts.flipForm
+    refine .intro resolve ?_
+    exact .intro allocation.reads_new rfl (.emptyMapping .word .word)
+      (.indexDefault .nil .word
+        (.leaf (.primitive (fun type same => by rw [body.parts.targetType] at same; cases same)
+          (.word Core.Word.zero))) (.append .nil)) write
+  have indexed : Dynamic.ExpressionEvaluates program localContext evidence source environment
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word Core.Word.zero.bitNot)])))
+      body.parts.index.id (.word Core.Word.zero.bitNot)
+      (mappingHeap (wordHeap before word) (some (.mapping .word .word [(.word word, .word Core.Word.zero.bitNot)]))) := by
+    apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound body.parts.indexFound)
+    · rw [body.parts.indexForm]
+      exact .indexFound (by rw [body.parts.indexRequirements, body.parts.indexCoercions]; rfl)
+        (local_value body.parts.baseRead evidence .head flipped.reads_new)
+        (local_value body.parts.indexKey evidence parameterLookup (flipped.preserves_read parameterAllocation.reads_new))
+        (.head (.refl (.word word)))
+    · rw [body.parts.indexCoercions]
+      exact .nil
+  exact .cons declared (.cons complemented (.singleton (lookupStatement?_sound body.parts.returnedFound)
+    (by rw [body.parts.returnedForm]; intro id impossible; cases impossible)
+    (.returnValue (lookupStatement?_sound body.parts.returnedFound) body.parts.returnedForm indexed)))
+
 end Tests.SourceCoreAcceptedOneCall
 end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the twelve rows among the nested sites or their callees
+every expression node of the thirteen rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
 receipts. The original Source executions of `relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`,
-`narrow` and `roundTrip`, whose calls run `identity`'s body instance, are lifted through the checked
+`inverted`, `narrow` and `roundTrip`, whose calls run `identity`'s body instance, are lifted through the checked
 shapes, and with the existing start receipts the call root's theorems apply at
-the first public call of each in both directions; `stored`'s execution ends in its local's
-context (`accepted_call_with_locals`), and `summed`'s returns an integer (`accepted_call_returning`). The call root's reflection
+the first public call of each in both directions; `stored`'s and `inverted`'s executions end in their
+local's context (`accepted_call_with_locals`), and `summed`'s returns an integer (`accepted_call_returning`). The call root's reflection
 needs no Source execution (`accepted_reflection`). At a faulting word the
 row's original Source fault is lifted to a staged fault trace, given that the
 direct calls of the row and of `identity` have plain callees, and the call
@@ -2551,6 +2841,33 @@ theorem zeroed_source (selected : SelectedInventory whole row) (zeroedBody : Zer
       (wordHeap ⟨[]⟩ word) := by
   rw [single_body selected zeroedBody.parts.roots, selected.source_eq]
   exact zeroedBody.trace selected.packet.header.function.evidence ⟨[]⟩ word
+
+/-- The original Source execution of `inverted`'s body at its header returns
+the complement of the default word, which its index read finds where the
+in-place `~` through the same index put it. The local's binder extension comes
+from the header's typing certificate. -/
+theorem inverted_source (selected : SelectedInventory whole row)
+    (invertedBody : InvertedBody row.original.function.typedBody)
+    (certified : SelectedCompilationNamedSourceTyping.Certified selected.packet.header) (word : Core.Word) :
+    ∃ finalContext, Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment invertedBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      finalContext (.returned (.word Core.Word.zero.bitNot))
+      (mappingHeap (wordHeap ⟨[]⟩ word) (some (.mapping .word .word [(.word word, .word Core.Word.zero.bitNot)]))) := by
+  have body := three_body selected invertedBody.parts.roots
+  have unique : NodeOccurrencesUnique row.original.function.typedBody :=
+    selected.source_eq ▸ selected.packet.header.unique
+  obtain ⟨_final, _facts, typed, _completes⟩ := certified.statements
+  rw [body, selected.source_eq] at typed
+  cases typed with
+  | cons head _ =>
+    obtain ⟨node, contains, formTyped⟩ := Dynamic.StatementHasType.formTyping head
+    cases Option.some.inj ((lookupStatement?_complete unique contains).symm.trans invertedBody.parts.declaredFound)
+    rw [invertedBody.parts.declaredForm] at formTyped
+    cases formTyped with
+    | letUninitialized _ extension =>
+      rw [body, selected.source_eq]
+      exact ⟨_, invertedBody.trace selected.packet.header.function.evidence ⟨[]⟩ extension word⟩
 
 /-- The callee premise of the fault lifting for the family that admits
 `identity`'s retained instantiation: its body instance is its header's, whose
@@ -3086,6 +3403,37 @@ def run : IO Unit := do
   IO.println "ACCEPTED_OPCODE_PUBLIC_PASS"
 
 end AcceptedOpcodeRuntime
+
+namespace AcceptedProjectedBitNotRuntime
+
+/-- As `AcceptedCallRuntime.run`, at `inverted`, whose index read of its local
+mapping finds the complement of the default word that its in-place `~` through
+the same index put there. -/
+def run : IO Unit := do
+  let observed ← observe
+  let inverted ← observeRow observed.fixture "inverted"
+  let invertedBody ← observeInvertedBody inverted.original.function.typedBody
+  for word in [Word.zero, Word.ofNatModulo 7] do
+    let started ← observeStarted observed.fixture inverted.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole inverted),
+        Nonempty (AcceptedCall selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select inverted
+      obtain ⟨_, sourceTrace⟩ := inverted_source selected invertedBody
+        ((SelectedCompilationNamedSupport.Support.of_program observed.wellFormed).certified selected.packet.header)
+        word
+      exact ⟨whole, selected, accepted_call_with_locals selected observed.calls
+        (fun admits => ⟨observed.identity, admits⟩) word observed.wellFormed started observed.callableProfile
+        invertedBody.parts.inputs invertedBody.binderScheme sourceTrace⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .succeeded returned =>
+      unless returned.value == .word Core.Word.zero.bitNot do
+        throw (IO.userError "accepted projected bit-not output changed")
+    | _ => throw (IO.userError "accepted projected bit-not did not succeed")
+  IO.println "ACCEPTED_PROJECTED_BIT_NOT_PUBLIC_PASS"
+
+end AcceptedProjectedBitNotRuntime
 
 namespace AcceptedConversionRuntime
 
