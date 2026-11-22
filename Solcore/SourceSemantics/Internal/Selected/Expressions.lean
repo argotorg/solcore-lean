@@ -4,6 +4,7 @@ import Solcore.SourceSemantics.Internal.Inference.ExpressionCalls
 import Solcore.SourceSemantics.Internal.Inference.RootedContracts
 import Solcore.SourceSemantics.Internal.Selected.Children
 import Solcore.SourceSemantics.Internal.Selected.State
+import Solcore.SourceSemantics.Internal.Selected.Calls
 
 /-!
 # Selected expressions
@@ -187,7 +188,7 @@ theorem actualInferExprFuelRetainedSoundness_literal {fuel : Nat}
         canonicalWhole invariant covered
 
 theorem actualInferExprFuelRetainedSoundness_identifier {fuel : Nat}
-    :
+    (recursive : ActualInferExprFuelRetainedSoundness fuel) :
   ∀ {wholeContext inferenceContext : Frontend.SourceInference.Context}
     {wholeReturn : Ty} {expression : Syntax.Expr} {name : Syntax.Identifier} {expected : Option Ty}
     {initial resultState evidenceState : State}
@@ -282,8 +283,36 @@ theorem actualInferExprFuelRetainedSoundness_identifier {fuel : Nat}
         | nil =>
           cases builtin : Detail.builtinNamed? inferenceContext name.value with
           | none =>
-            simp [Detail.inferExprFuel, allocationEq, expressionEq, found, boolean,
-              functions, builtin, bind, Except.bind] at success
+            -- A constructor sharing its type's name, applied to no payload.
+            have allocatedInvariant := invariant.allocateExpressionId allocationEq
+            have allocatedOperational := operational.allocateExpressionId allocationEq
+            have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
+              rw [allocateExpressionId_inferenceNext_eq allocationEq]; exact expectedBelow
+            unfold Detail.inferExprFuel at success
+            simp only [allocationEq, expressionEq, found, boolean, functions, builtin,
+              Bool.false_eq_true, if_false, bind, Except.bind] at success
+            cases discovery : Detail.constructorCalleeCandidates inferenceContext allocated expression with
+            | error error => simp [discovery] at success
+            | ok candidates =>
+              cases candidates with
+              | nil => simp [discovery] at success
+              | cons first rest =>
+                obtain ⟨dataType, constructor⟩ := first
+                cases rest with
+                | cons second tail => simp [discovery] at success
+                | nil =>
+                  simp only [discovery] at success
+                  have members :=
+                    Detail.constructorCalleeCandidates_success_members discovery dataType constructor (by simp)
+                  generalize fresh : Detail.freshDataConstructorInstantiation dataType constructor allocated = pair
+                    at success
+                  obtain ⟨instantiation, constructorState⟩ := pair
+                  exact actualFreshConstructorApplication_typing recursive members.1 members.2 fresh success
+                    resources interfaces resultSubstitutionExtension signaturesEq ownerEq typeParametersEq
+                    assumptionsEq signatureFormation functionsCanonical catalog canonical allocatedInvariant actual
+                    allocatedOperational allocatedExpected semanticPreserved finalPreserved rawProper
+                    integerPatternsSubset integerLiteralsSubset requirementsSubset retained coercionsRetained
+                    childrenRetained covered actualCovered
           | some function =>
             exact inferExprFuel_success_builtinFunctionIdentifier_expressionTypingBase_selected
               resources interfaces expressionEq allocationEq found boolean functions builtin success

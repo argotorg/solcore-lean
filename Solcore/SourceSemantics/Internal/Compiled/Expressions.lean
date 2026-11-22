@@ -1646,6 +1646,42 @@ theorem constructor_field_for {callProvenance : CallIndex → Prop}
         exact freshConstructorRetained_for checked descend recursive boundary allocation members.1 members.2 fresh
           (descend here (.expression_field_constructor boundary.accepted form allocation discovery fresh success)) success
 
+/-- A bare name read as the constructor sharing its type's name, applied to no payload: its child is
+that constructor's application, as the field form's is. -/
+theorem constructor_identifier_for {callProvenance : CallIndex → Prop}
+    (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
+    (descend : ChildClosed callProvenance)
+    (recursive : ExpressionRetainedSoundnessFor callProvenance selected childFuel)
+    {inferenceContext : SourceInference.Context} {expression : Syntax.Expr}
+    {name : Syntax.Identifier} {expected : Option Ty}
+    {initial resultState : State} {inferred : InferredExpression}
+    {frames : List InitializedLetBinding} {target : SourceSemantics.Context}
+    {id : ExpressionId} {allocated : State}
+    {dataType : ProgramDataSignature} {constructor : ProgramDataConstructorSignature}
+    (here : callProvenance (.expression (childFuel + 1) inferenceContext expression expected initial inferred resultState))
+    (form : expression.value = .identifier name)
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (unbound : allocated.lookupBinder? name.value = none)
+    (notBoolean : (name.value == "true" || name.value == "false") = false)
+    (functions : Detail.functionsNamed inferenceContext name.value = .ok [])
+    (builtin : Detail.builtinNamed? inferenceContext name.value = none)
+    (discovery : Detail.constructorCalleeCandidates inferenceContext allocated expression =
+      .ok [(dataType, constructor)])
+    (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
+      expected initial inferred resultState frames target) :
+    ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected)) selected.body.finalized.typedSource
+      target selected.body.finalized.substitution inferred := by
+  have success := boundary.accepted
+  unfold Detail.inferExprFuel at success
+  simp only [allocation, form, unbound, notBoolean, functions, builtin, Bool.false_eq_true, if_false,
+    discovery, bind, Except.bind] at success
+  have members := Detail.constructorCalleeCandidates_success_members discovery dataType constructor (by simp)
+  generalize fresh : Detail.freshDataConstructorInstantiation dataType constructor allocated = pair at success
+  obtain ⟨instantiation, constructorState⟩ := pair
+  exact freshConstructorRetained_for checked descend recursive boundary allocation members.1 members.2 fresh
+    (descend here (.expression_identifier_constructor boundary.accepted form allocation unbound notBoolean
+      functions builtin discovery fresh success)) success
+
 theorem constructor_call
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (recursive : ExpressionRetainedSoundness selected childFuel)
@@ -4547,6 +4583,9 @@ theorem expressionRetained_step_for {callProvenance : CallIndex → Prop}
       exact expressionRetained_literal checked form boundary
   | identifier name =>
       exact expressionRetained_identifier checked form boundary
+        (fun allocation unbound notBoolean functions builtin discovery =>
+          constructor_identifier_for checked descend predecessor here form allocation unbound notBoolean
+            functions builtin discovery boundary)
   | proxy marker type =>
       exact expressionRetained_proxy checked form boundary
   | group inner =>

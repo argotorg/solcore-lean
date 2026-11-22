@@ -391,6 +391,19 @@ theorem ChildStep.expression_shapes
       exact Except.ok.inj accepted
     cases same
     exact .refl _
+  | @expression_identifier_constructor fuel context source expected initial allocated final id value
+      name dataType constructor instantiation instantiated childFinal inferred
+      accepted form allocation unbound notBoolean functions builtin selected fresh childAccepted =>
+    change inferConstructorApplicationFuel fuel context source id instantiation [] expected
+      instantiated = .ok (inferred, childFinal) at childAccepted
+    have same : (inferred, childFinal) = (value, final) := by
+      change inferExprFuel (fuel + 1) context source expected initial = .ok (value, final) at accepted
+      unfold inferExprFuel at accepted
+      simp only [allocation, form, unbound, notBoolean, functions, builtin, Bool.false_eq_true,
+          if_false, selected, fresh, childAccepted, bind, Except.bind] at accepted
+      exact Except.ok.inj accepted
+    cases same
+    exact .refl _
 
 end Solcore.SourceSemantics.SourceInferenceExecution
 end
@@ -1426,6 +1439,8 @@ theorem ChildStep.nonexpression_shapes {parent child : CallIndex}
   | expression_contextual_constructor accepted form allocation selected child =>
       exact False.elim nonexpression
   | expression_field_constructor accepted form allocation selected fresh child =>
+      exact False.elim nonexpression
+  | expression_identifier_constructor accepted form allocation unbound notBoolean functions builtin selected fresh child =>
       exact False.elim nonexpression
   | matchCases_body accepted patternAccepted child =>
       exact ActualNodeShapeSuffix.matchCases_body accepted patternAccepted child

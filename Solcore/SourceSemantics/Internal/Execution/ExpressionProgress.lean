@@ -194,6 +194,28 @@ theorem ChildStep.lifetime_expression
         exact Except.ok.inj accepted
       cases sameResult
       exact life.weaken_entry (by simpa only [sameNext, CallIndex.initial] using properties.1.next_le)
+  | @expression_identifier_constructor fuel context source expected initial allocated final id value
+      name dataType constructor instantiation instantiated childFinal inferred
+      accepted form allocation unbound notBoolean functions builtin selected fresh childAccepted =>
+      have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+      have sameNext : allocated.inference.next = initial.inference.next := by rw [same]; rfl
+      obtain ⟨dataMember, constructorMember⟩ :=
+        constructorCalleeCandidates_success_members selected dataType constructor (by simp)
+      have properties := freshDataConstructorInstantiation_inferenceProperties dataType constructor
+        allocated (same ▸ inputs.ready.allocateExpressionId)
+        (inputs.catalog.formation.data_constructor_payloadTypes_variablesBelow dataMember constructorMember _)
+      simp only [fresh] at properties
+      have childRun := childAccepted
+      change inferConstructorApplicationFuel fuel context source id instantiation [] expected
+        instantiated = .ok (inferred, childFinal) at childRun
+      have sameResult : (inferred, childFinal) = (value, final) := by
+        change inferExprFuel (fuel + 1) context source expected initial = .ok (value, final) at accepted
+        unfold inferExprFuel at accepted
+        simp only [allocation, form, unbound, notBoolean, functions, builtin, Bool.false_eq_true,
+          if_false, selected, fresh, childRun, bind, Except.bind] at accepted
+        exact Except.ok.inj accepted
+      cases sameResult
+      exact life.weaken_entry (by simpa only [sameNext, CallIndex.initial] using properties.1.next_le)
 
 end Solcore.SourceSemantics.SourceInferenceExecution
 end
@@ -844,6 +866,19 @@ theorem ChildStep.progress_expression
         change inferExprFuel (fuel + 1) context source expected initial = .ok (value, final) at accepted
         unfold inferExprFuel at accepted
         simp only [allocation, form, selected, fresh, childAccepted, bind, Except.bind] at accepted
+        exact Except.ok.inj accepted
+      cases same
+      exact .refl childProperties.2.1.solved
+  | @expression_identifier_constructor fuel context source expected initial allocated final id value
+      name dataType constructor instantiation instantiated childFinal inferred
+      accepted form allocation unbound notBoolean functions builtin selected fresh childAccepted =>
+      change inferConstructorApplicationFuel fuel context source id instantiation [] expected
+        instantiated = .ok (inferred, childFinal) at childAccepted
+      have same : (inferred, childFinal) = (value, final) := by
+        change inferExprFuel (fuel + 1) context source expected initial = .ok (value, final) at accepted
+        unfold inferExprFuel at accepted
+        simp only [allocation, form, unbound, notBoolean, functions, builtin, Bool.false_eq_true,
+          if_false, selected, fresh, childAccepted, bind, Except.bind] at accepted
         exact Except.ok.inj accepted
       cases same
       exact .refl childProperties.2.1.solved

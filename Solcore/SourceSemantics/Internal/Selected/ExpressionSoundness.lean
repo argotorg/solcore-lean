@@ -976,7 +976,7 @@ theorem actualInferExprFuelRetainedSoundness_step {fuel : Nat}
         operational expectedBelow expectedAdmissible finalPreserved rawProper patterns literals requirements
         retained coercions operators children covered semanticPreserved actualCovered
   | identifier name =>
-      exact actualInferExprFuelRetainedSoundness_identifier expressionEq success resources interfaces extension
+      exact actualInferExprFuelRetainedSoundness_identifier predecessor expressionEq success resources interfaces extension
         signaturesEq ownerEq typeParametersEq assumptionsEq formation functions catalog canonical invariant actual
         operational expectedBelow expectedAdmissible finalPreserved rawProper patterns literals requirements
         retained coercions operators children covered semanticPreserved actualCovered

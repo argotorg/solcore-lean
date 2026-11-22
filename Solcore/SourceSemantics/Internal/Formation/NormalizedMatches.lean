@@ -315,8 +315,14 @@ private theorem pattern_call_formation (semantic : SourceSemantics.Context) (out
       exact integer_pattern_prefix_formation formation formed unified rfl rfl
   case case13 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
-      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments notUint256 contextualBranch childrenIH
+      leadingDot qualifiers constructorName sourceArguments patternEq notUint256 refused
+    unfold PatternCallFormation at *
+    intro result ready expectedBelow formation formed expectedFormed success continuation
+    unfold inferMatchPatternFlatFuel at success
+    simp_all
+  case case14 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq flatArguments notUint256 notRefused contextualBranch childrenIH
     unfold PatternCallFormation at *
     intro result ready expectedBelow formation formed expectedFormed success continuation
     unfold inferMatchPatternFlatFuel at success
@@ -340,10 +346,9 @@ private theorem pattern_call_formation (semantic : SourceSemantics.Context) (out
         have prefixFormed := beforeChildren.formed (continuation.trans childProperties.1.substitution_extends)
         exact childrenIH _ _ _ beforeChildren.ready beforeChildren.below formation prefixFormed.1 prefixFormed.2
           (by assumption) continuation
-  case case14 =>
+  case case15 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
-      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments notUint256 explicitBranch childrenIH
+      leadingDot qualifiers constructorName sourceArguments patternEq flatArguments notUint256 notRefused explicitBranch childrenIH
     unfold PatternCallFormation at *
     intro result ready expectedBelow formation formed expectedFormed success continuation
     unfold inferMatchPatternFlatFuel at success
@@ -379,7 +384,7 @@ private theorem pattern_call_formation (semantic : SourceSemantics.Context) (out
     all_goals try subst_vars
     have fields := unify_fields (by assumption)
     exact formed.congr fields.1 fields.2
-  case case15 =>
+  case case16 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq argument
       selectedEq childrenIH
@@ -398,7 +403,7 @@ private theorem pattern_call_formation (semantic : SourceSemantics.Context) (out
     have prefixFormed := beforeChildren.formed (continuation.trans childProperties.1.substitution_extends)
     exact childrenIH _ _ beforeChildren.ready beforeChildren.below formation prefixFormed.1 prefixFormed.2
       (by assumption) continuation
-  case case17 =>
+  case case18 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold PatternCallFormation at *
@@ -424,7 +429,7 @@ private theorem pattern_call_formation (semantic : SourceSemantics.Context) (out
     have prefixFormed := beforeChildren.formed (continuation.trans childProperties.1.substitution_extends)
     exact childrenIH _ _ beforeChildren.ready beforeChildren.below formation prefixFormed.1 prefixFormed.2
       childRun continuation
-  case case21 =>
+  case case22 =>
     intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
     unfold PatternsCallFormation
     unfold PatternCallFormation at ihHead

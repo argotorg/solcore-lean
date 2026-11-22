@@ -610,6 +610,35 @@ theorem expression_field_constructor
   subst instantiated
   exact backed.allocateExpressionId.freshConstructor dataType constructor
 
+theorem expression_identifier_constructor
+      {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
+      {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
+      {value : InferredExpression}
+      {name : Syntax.Identifier}
+      {dataType : ProgramDataSignature} {constructor : ProgramDataConstructorSignature}
+      {instantiation : DataConstructorInstantiation} {instantiated childFinal : State}
+      {inferred : InferredExpression}
+      (accepted : (CallIndex.expression (fuel + 1) context source expected initial value final).Accepted)
+      (form : source.value = .identifier name)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (unbound : allocated.lookupBinder? name.value = none)
+      (notBoolean : (name.value == "true" || name.value == "false") = false)
+      (functions : functionsNamed context name.value = .ok [])
+      (builtin : builtinNamed? context name.value = none)
+      (selected : constructorCalleeCandidates context allocated source = .ok [(dataType, constructor)])
+      (fresh : freshDataConstructorInstantiation dataType constructor allocated = (instantiation, instantiated))
+      (child : (CallIndex.constructorApplication fuel context source id instantiation [] expected instantiated inferred childFinal).Accepted)
+      (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs)
+      (backed : LiveTemplatesBacked initial) : LiveTemplatesBacked (CallIndex.constructorApplication fuel context source id instantiation [] expected instantiated inferred childFinal).initial := by
+  have step : ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.constructorApplication fuel context source id instantiation [] expected instantiated inferred childFinal) := .expression_identifier_constructor accepted form allocation unbound notBoolean functions builtin selected fresh child
+  have childInputs := step.inputs inputs
+  have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+  subst allocated
+  have sameFresh : instantiated = (freshDataConstructorInstantiation dataType constructor initial.allocateExpressionId.2).2 :=
+    (congrArg Prod.snd fresh).symm
+  subst instantiated
+  exact backed.allocateExpressionId.freshConstructor dataType constructor
+
 end Solcore.SourceSemantics.SourceInferenceExecution.ActualTemplateBacking
 end
 
@@ -1546,6 +1575,7 @@ theorem ChildStep.liveTemplatesBacked {parent child : CallIndex}
   | solve | apply ActualTemplateBacking.expression_call_callee <;> assumption
   | solve | apply ActualTemplateBacking.expression_contextual_constructor <;> assumption
   | solve | apply ActualTemplateBacking.expression_field_constructor <;> assumption
+  | solve | apply ActualTemplateBacking.expression_identifier_constructor <;> assumption
   | solve | apply ActualTemplateBacking.matchCases_body <;> assumption
   | solve | apply ActualTemplateBacking.matchCases_tail <;> assumption
   | solve | apply ActualTemplateBacking.statement_match_single <;> assumption

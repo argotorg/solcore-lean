@@ -1527,6 +1527,8 @@ theorem ChildStep.progress_nonexpression {parent child : CallIndex}
       exact False.elim nonexpression
   | expression_field_constructor accepted form allocation selected fresh child =>
       exact False.elim nonexpression
+  | expression_identifier_constructor accepted form allocation unbound notBoolean functions builtin selected fresh child =>
+      exact False.elim nonexpression
   | matchCases_body accepted patternAccepted child =>
       exact ActualSuffixProgress.matchCases_body accepted patternAccepted child inputs
   | matchCases_tail accepted patternAccepted bodyAccepted child =>

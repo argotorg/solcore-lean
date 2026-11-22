@@ -443,6 +443,19 @@ theorem ChildStep.expression_binders_retained
       exact Except.ok.inj accepted
     cases same
     exact .refl _
+  | @expression_identifier_constructor fuel context source expected initial allocated final id value
+      name dataType constructor instantiation instantiated childFinal inferred
+      accepted form allocation unbound notBoolean functions builtin selected fresh childAccepted =>
+    change inferConstructorApplicationFuel fuel context source id instantiation [] expected
+      instantiated = .ok (inferred, childFinal) at childAccepted
+    have same : (inferred, childFinal) = (value, final) := by
+      change inferExprFuel (fuel + 1) context source expected initial = .ok (value, final) at accepted
+      unfold inferExprFuel at accepted
+      simp only [allocation, form, unbound, notBoolean, functions, builtin, Bool.false_eq_true,
+          if_false, selected, fresh, childAccepted, bind, Except.bind] at accepted
+      exact Except.ok.inj accepted
+    cases same
+    exact .refl _
 
 end Solcore.SourceSemantics.SourceInferenceExecution
 end
@@ -1546,6 +1559,8 @@ theorem ChildStep.nonexpression_binders_retained {parent child : CallIndex}
       exact False.elim nonexpression
   | expression_field_constructor accepted form allocation selected fresh child =>
       exact False.elim nonexpression
+  | expression_identifier_constructor accepted form allocation unbound notBoolean functions builtin selected fresh child =>
+      exact False.elim nonexpression
   | matchCases_body accepted patternAccepted child =>
       exact ActualBinderRetention.matchCases_body accepted patternAccepted child
   | matchCases_tail accepted patternAccepted bodyAccepted child =>
@@ -2059,6 +2074,9 @@ theorem ChildStep.captureOrigins
     dsimp only [CallIndex.initial] at origins ⊢
     exact origins.allocateExpressionId allocation
   | @expression_field_constructor fuel context source expected initial allocated final id value base dot name dataType constructor instantiation instantiated childFinal inferred accepted form allocation selected fresh child =>
+    dsimp only [CallIndex.initial] at origins ⊢
+    exact freshConstructor (origins.allocateExpressionId allocation) fresh
+  | @expression_identifier_constructor fuel context source expected initial allocated final id value name dataType constructor instantiation instantiated childFinal inferred accepted form allocation unbound notBoolean functions builtin selected fresh child =>
     dsimp only [CallIndex.initial] at origins ⊢
     exact freshConstructor (origins.allocateExpressionId allocation) fresh
   | @matchCases_body fuel context scrutineeType expectedReturn saved arm arms initial patternState pattern result body accepted patternAccepted child =>

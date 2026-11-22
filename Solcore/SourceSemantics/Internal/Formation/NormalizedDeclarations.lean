@@ -1406,6 +1406,55 @@ theorem inferExprFuel_fieldConstructor_formation
           (fun type member => (expectedBelow type member).weaken freshProperties.1.next_le)
           expectedFormed result success continuation capture
 
+/-- A bare name that no local, function or builtin takes: the constructor sharing its type's name,
+applied to no payload, formed as the field form's constructor is. -/
+theorem inferExprFuel_identifierConstructor_formation
+    {semantic : SourceSemantics.Context} {outer : Substitution} {fuel : Nat} {context : SourceInference.Context}
+    {expression : Syntax.Expr} {name : Syntax.Identifier}
+    {expected : Option Ty} {initial : State}
+    (form : expression.value = .identifier name)
+    (lookupNone : initial.allocateExpressionId.2.lookupBinder? name.value = none)
+    (notBool : ¬(name.value == "true" || name.value == "false") = true)
+    (functionsResult : functionsNamed context name.value = .ok [])
+    (builtinResult : builtinNamed? context name.value = none)
+    (constructorIH : ∀ instantiation state,
+      InferConstructorApplicationFuelFormation semantic outer fuel context expression initial.allocateExpressionId.1
+        instantiation [] expected state) :
+    InferExprFuelFormation semantic outer (fuel+1) context expression expected initial := by
+  intro ready nodes formed formation expectedBelow expectedFormed result success continuation capture
+  let id := initial.allocateExpressionId.1
+  let allocated := initial.allocateExpressionId.2
+  have allocationEq : initial.allocateExpressionId = (id,allocated) := rfl
+  have lookupAllocated : allocated.lookupBinder? name.value = none := lookupNone
+  have allocatedReady : allocated.InferenceReady := State.InferenceReady.allocateExpressionId ready
+  have allocatedNodes := State.allocateExpressionId_preserves_nodesBelowNextOccurrence initial nodes
+  have allocatedFormed : NormalizedStateFormation semantic outer allocated := formed.congr rfl rfl
+  unfold inferExprFuel at success
+  simp only [allocationEq, form, lookupAllocated, notBool, Bool.false_eq_true, if_false, functionsResult,
+    builtinResult, bind, Except.bind]
+    at success
+  cases candidatesResult : constructorCalleeCandidates context allocated expression with
+  | error error => simp [candidatesResult] at success
+  | ok candidates =>
+    simp only [candidatesResult] at success
+    cases candidates with
+    | nil => simp at success
+    | cons candidate rest =>
+      cases rest with
+      | cons second tail => simp at success
+      | nil =>
+        rcases candidate with ⟨dataType,constructor⟩
+        let fresh := freshDataConstructorInstantiation dataType constructor allocated
+        have members := constructorCalleeCandidates_success_members candidatesResult dataType constructor (by simp)
+        have freshProperties := freshDataConstructorInstantiation_inferenceProperties dataType constructor allocated allocatedReady
+          (formation.validated.data_constructor_payloadTypes_variablesBelow members.1 members.2 _)
+        have freshFormed := fresh_constructor_normalized_formation formation allocatedFormed members.1 members.2
+        have freshNodes := (freshDataConstructorInstantiation_occurrenceBoundExtends dataType constructor allocated).nodesBelowNextOccurrence allocatedNodes
+        exact constructorIH fresh.1 fresh.2 freshProperties.2.1 freshNodes freshFormed.1 formation
+          freshProperties.2.2.2.1 freshFormed.2.1 freshProperties.2.2.2.2 freshFormed.2.2
+          (fun type member => (expectedBelow type member).weaken freshProperties.1.next_le)
+          expectedFormed result success continuation capture
+
 end Solcore.SourceSemantics.SourceInferenceNormalizedCoercionFormation
 end
 

@@ -868,6 +868,11 @@ theorem ChildStep.local_suffix {parent child : CallIndex} (step : ChildStep pare
       all_goals simp only [CallIndex.Accepted] at *
       all_goals unfold inferExprFuel at accepted
       finish_local_suffix accepted
+  | expression_identifier_constructor accepted form allocation unbound notBoolean functions builtin selected fresh child =>
+      all_goals simp only [CallIndex.Accepted] at *
+      all_goals unfold inferExprFuel at accepted
+      all_goals simp only [allocation, form, unbound, notBoolean, Bool.false_eq_true, if_false] at accepted
+      finish_local_suffix accepted
   | matchCases_body accepted patternAccepted child =>
       all_goals simp only [CallIndex.Accepted] at *
       all_goals unfold inferMatchCasesFuel at accepted

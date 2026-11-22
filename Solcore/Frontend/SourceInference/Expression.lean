@@ -1615,6 +1615,28 @@ def constructorLeafVisible (context : Context) (name : String) : Bool :=
         | some (.visible names) => names.contains name
         | _ => false
 
+/-- The constructors upstream builds in (`builtin_term`): `true`, `false`, `pair`, `inl` and `inr`.
+An unqualified head of one of these names is left to the scrutinee's type, as upstream defers it,
+even where a program's own constructor has that name. -/
+def builtinConstructorSpelling (name : String) : Bool :=
+  name == "true" || name == "false" || name == "pair" || name == "inl" || name == "inr"
+
+/-- The qualifiers a constructor pattern's head is resolved under: an unqualified head that names a
+constructor sharing its type's name is that constructor, as upstream reads `Box(v)` for
+`Box.Box(v)`; any other head keeps its own. -/
+def constructorHeadQualifiers (context : Context) (leadingDot : Option Syntax.SourceSpan)
+    (qualifiers : List Syntax.Identifier) (name : String) : List String :=
+  if leadingDot.isNone && qualifiers.isEmpty && sameNameConstructorVisible context name then [name]
+  else qualifiers.map (·.value)
+
+/-- An unqualified head, under no leading dot and no qualifier it is resolved under, that spells a
+visible constructor other than one of upstream's builtin ones: refused, as upstream's `SC0106`
+refuses it, whatever the scrutinee's type. -/
+def unqualifiedConstructorRefused (context : Context) (leadingDot : Option Syntax.SourceSpan)
+    (qualifiers : List Syntax.Identifier) (name : String) : Bool :=
+  leadingDot.isNone && (constructorHeadQualifiers context leadingDot qualifiers name).isEmpty &&
+    constructorLeafVisible context name && !builtinConstructorSpelling name
+
 def freshTypes : Nat → State → List Ty × State
   | 0, state => ([], state)
   | count + 1, state =>
@@ -1727,41 +1749,47 @@ mutual
           match uint256PatternArgument? leadingDot qualifiers name.value
               (arguments.map (·.elements.toList) |>.getD []) (state.resolve expected) with
           | none =>
-              let (constructor, instantiation, state) ←
-                if leadingDot.isSome || qualifierNames.isEmpty then
-                  let (dataType, constructor, typeArguments) ←
-                    contextualConstructorCandidate context state (some expected)
-                      name.value
-                  pure (constructor,
-                    instantiateDataConstructor dataType constructor typeArguments,
-                    state)
-                else
-                  let (dataType, constructor) ←
-                    explicitConstructorCandidate context qualifierNames name.value
-                  let (instantiation, state) :=
-                    freshDataConstructorInstantiation dataType constructor state
-                  pure (constructor, instantiation, state)
-              unless sourceArguments.length = instantiation.payloadTypes.length do
-                throw (.constructorArityMismatch constructor.id
-                  instantiation.payloadTypes.length sourceArguments.length)
-              let state ← unify state instantiation.resultType expected
-              let children ← inferMatchPatternsFlatFuel fuel context sourceArguments
-                instantiation.payloadTypes seen state
-              let instantiation := {
-                instantiation with
-                payloadTypes := instantiation.payloadTypes.map children.state.resolve
-                resultType := children.state.resolve instantiation.resultType
-              }
-              pure {
-                source := .constructor pattern.span leadingDot qualifierNames
-                  name.value sourceArguments.length
-                resolution := .constructor instantiation children.instructions
-                instructions := .constructor instantiation sourceArguments.length ::
-                  children.instructions
-                requirements := children.requirements
-                names := children.names
-                state := children.state
-              }
+              if unqualifiedConstructorRefused context leadingDot qualifiers name.value then
+                throw (.unqualifiedConstructorPattern name.value)
+              else
+                let (constructor, instantiation, state) ←
+                  -- The source keeps the head as written.
+                  if leadingDot.isSome ||
+                      (constructorHeadQualifiers context leadingDot qualifiers name.value).isEmpty then
+                    let (dataType, constructor, typeArguments) ←
+                      contextualConstructorCandidate context state (some expected)
+                        name.value
+                    pure (constructor,
+                      instantiateDataConstructor dataType constructor typeArguments,
+                      state)
+                  else
+                    let (dataType, constructor) ←
+                      explicitConstructorCandidate context
+                        (constructorHeadQualifiers context leadingDot qualifiers name.value) name.value
+                    let (instantiation, state) :=
+                      freshDataConstructorInstantiation dataType constructor state
+                    pure (constructor, instantiation, state)
+                unless sourceArguments.length = instantiation.payloadTypes.length do
+                  throw (.constructorArityMismatch constructor.id
+                    instantiation.payloadTypes.length sourceArguments.length)
+                let state ← unify state instantiation.resultType expected
+                let children ← inferMatchPatternsFlatFuel fuel context sourceArguments
+                  instantiation.payloadTypes seen state
+                let instantiation := {
+                  instantiation with
+                  payloadTypes := instantiation.payloadTypes.map children.state.resolve
+                  resultType := children.state.resolve instantiation.resultType
+                }
+                pure {
+                  source := .constructor pattern.span leadingDot qualifierNames
+                    name.value sourceArguments.length
+                  resolution := .constructor instantiation children.instructions
+                  instructions := .constructor instantiation sourceArguments.length ::
+                    children.instructions
+                  requirements := children.requirements
+                  names := children.names
+                  state := children.state
+                }
           | some argument =>
               let state ← unify state expected (.fixed .uint256)
               let children ← inferMatchPatternsFlatFuel fuel context [argument] [.word] seen
@@ -2033,60 +2061,6 @@ mutual
                   requirement
                 }) [requirement] expected state
           | .string _ => .error (.unsupportedLiteral "string")
-      | .identifier name =>
-          match state.lookupBinder? name.value with
-          | some binder =>
-              let localSchemeInstantiationStart := state.inference.next
-              let instantiated :=
-                binder.scheme.instantiateWithSubstitution
-                  localSchemeInstantiationStart
-              let inference := {
-                state.inference with next := instantiated.next
-              }
-              let state := { state with inference }
-              let type := state.resolve instantiated.body
-              let predicates := binder.schemeRequirements.map fun requirement =>
-                applyPredicate state
-                  (TypedTraitResolution.applySubstitution
-                    instantiated.substitution requirement.predicate)
-              let (requirements, state) :=
-                state.addRequirementsWithIds predicates
-              recordExpressionWithExpected context expression id type
-                (.reference name.value (.local binder.id)) requirements expected
-                state (localSchemeInstantiationStart :=
-                  some localSchemeInstantiationStart)
-          | none =>
-              if name.value == "true" || name.value == "false" then
-                recordExpressionWithExpected context expression id .bool
-                  (.reference name.value
-                    (.builtinBoolean (name.value == "true"))) [] expected state
-              else do
-                match ← functionsNamed context name.value with
-                | [] =>
-                    match builtinNamed? context name.value with
-                    | some function =>
-                        recordExpressionWithExpected context expression id
-                          function.type
-                          (.reference name.value (.builtinFunction function))
-                          [] expected state
-                    | none => .error (.unknownVariable name.value)
-                | [signature] =>
-                    let instantiated :=
-                      signature.scheme.instantiate state.inference.next
-                    let inference := {
-                      state.inference with next := instantiated.next
-                    }
-                    let (requirements, state) :=
-                      ({ state with inference }).addRequirementsWithIds
-                        instantiated.predicates
-                    recordExpressionWithExpected context expression id
-                      instantiated.body
-                      (.reference name.value (.declaration
-                        (DeclarationInstantiation.ofInstantiated
-                          signature instantiated)))
-                      requirements expected state
-                | candidates =>
-                    .error (.ambiguousOverload name.value (candidates.map (·.id)))
       | .group inner => do
           let (inner, state) ← inferExprFuel fuel context inner expected state
           recordExpressionWithExpected context expression id inner.type
@@ -2441,6 +2415,77 @@ mutual
             (Ty.arraySlice (state.resolve baseResult.type))
             (.arraySlice baseResult.id (sliceBoundIds start stop values.tail).1
               (sliceBoundIds start stop values.tail).2) [] expected state
+      -- A name. This arm comes after the others so that the call graph's order, and with it the
+      -- order of the motives of `inferExprFuel.mutual_induct`, stays as it was: its constructor
+      -- branch is the body's first call of `inferConstructorApplicationFuel` otherwise.
+      | .identifier name =>
+          match state.lookupBinder? name.value with
+          | some binder =>
+              let localSchemeInstantiationStart := state.inference.next
+              let instantiated :=
+                binder.scheme.instantiateWithSubstitution
+                  localSchemeInstantiationStart
+              let inference := {
+                state.inference with next := instantiated.next
+              }
+              let state := { state with inference }
+              let type := state.resolve instantiated.body
+              let predicates := binder.schemeRequirements.map fun requirement =>
+                applyPredicate state
+                  (TypedTraitResolution.applySubstitution
+                    instantiated.substitution requirement.predicate)
+              let (requirements, state) :=
+                state.addRequirementsWithIds predicates
+              recordExpressionWithExpected context expression id type
+                (.reference name.value (.local binder.id)) requirements expected
+                state (localSchemeInstantiationStart :=
+                  some localSchemeInstantiationStart)
+          | none =>
+              if name.value == "true" || name.value == "false" then
+                recordExpressionWithExpected context expression id .bool
+                  (.reference name.value
+                    (.builtinBoolean (name.value == "true"))) [] expected state
+              else do
+                match ← functionsNamed context name.value with
+                | [] =>
+                    match builtinNamed? context name.value with
+                    | some function =>
+                        recordExpressionWithExpected context expression id
+                          function.type
+                          (.reference name.value (.builtinFunction function))
+                          [] expected state
+                    | none => do
+                        -- A constructor that shares its type's name, visible unqualified and
+                        -- written bare, is that constructor applied to no payload, as upstream
+                        -- reads a bare `thing` for `thing.thing`.
+                        let candidates ← constructorCalleeCandidates context state expression
+                        match candidates with
+                        | [(dataType, constructor)] =>
+                            let (instantiation, state) :=
+                              freshDataConstructorInstantiation dataType constructor state
+                            inferConstructorApplicationFuel fuel context expression id
+                              instantiation [] expected state
+                        | _ :: _ :: _ =>
+                            throw (.ambiguousConstructor [] name.value
+                              (candidates.map fun candidate => candidate.2.id))
+                        | [] => .error (.unknownVariable name.value)
+                | [signature] =>
+                    let instantiated :=
+                      signature.scheme.instantiate state.inference.next
+                    let inference := {
+                      state.inference with next := instantiated.next
+                    }
+                    let (requirements, state) :=
+                      ({ state with inference }).addRequirementsWithIds
+                        instantiated.predicates
+                    recordExpressionWithExpected context expression id
+                      instantiated.body
+                      (.reference name.value (.declaration
+                        (DeclarationInstantiation.ofInstantiated
+                          signature instantiated)))
+                      requirements expected state
+                | candidates =>
+                    .error (.ambiguousOverload name.value (candidates.map (·.id)))
       -- The parser's recovery nodes.
       | _ => .error (.unsupportedExpression "parser recovery")
 

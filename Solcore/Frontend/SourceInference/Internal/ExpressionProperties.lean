@@ -5950,8 +5950,14 @@ private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
   -- Parenthesized/grouped expression.
   case case13 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
-      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments notUint256 contextualBranch childrenIH
+      leadingDot qualifiers constructorName sourceArguments patternEq notUint256 refused
+    unfold MatchPatternFlatInferenceProperties at *
+    intro result ready expectedBelow validated success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all
+  case case14 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq flatArguments notUint256 notRefused contextualBranch childrenIH
     unfold MatchPatternFlatInferenceProperties at *
     intro result ready expectedBelow validated success
     unfold inferMatchPatternFlatFuel at success
@@ -5974,10 +5980,9 @@ private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
           constructorPrefix.2.2 validated (by assumption)
         exact ⟨constructorPrefix.1.trans children.1, children.2⟩
   -- Tuple expression.
-  case case14 =>
+  case case15 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
-      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments notUint256 explicitBranch childrenIH
+      leadingDot qualifiers constructorName sourceArguments patternEq flatArguments notUint256 notRefused explicitBranch childrenIH
     unfold MatchPatternFlatInferenceProperties at *
     intro result ready expectedBelow validated success
     unfold inferMatchPatternFlatFuel at success
@@ -5999,7 +6004,7 @@ private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
         have children := childrenIH _ _ _ constructorPrefix.2.1
           constructorPrefix.2.2 validated (by assumption)
         exact ⟨constructorPrefix.1.trans children.1, children.2⟩
-  case case15 =>
+  case case16 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq argument
       selectedEq childrenIH
@@ -6023,7 +6028,7 @@ private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
         subst type
         exact Ty.variablesBelow_constructor _ _) validated (by assumption)
     exact ⟨unifiedProgress.trans children.1, children.2⟩
-  case case17 =>
+  case case18 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold MatchPatternFlatInferenceProperties at *
@@ -6049,7 +6054,7 @@ private theorem inferMatchPatternFlatFuel_inferenceProperties_internal
         rw [← argumentTypesEq]
         simpa only [sources] using (by assumption))
     exact ⟨tuplePrefix.1.trans children.1, children.2⟩
-  case case21 =>
+  case case22 =>
     intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
     unfold MatchPatternsFlatInferenceProperties
     unfold MatchPatternFlatInferenceProperties at ihHead
@@ -6185,27 +6190,14 @@ private theorem inferMatchPatternFlatFuel_advances_nextLocal
           (inferMatchPatternsFlatFuel fuel context patterns expected seen state))
   case case13 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
-      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments notUint256 contextualBranch childrenIH
+      leadingDot qualifiers constructorName sourceArguments patternEq notUint256 refused
     unfold AdvancesNextLocal at *
     intro result success
     unfold inferMatchPatternFlatFuel at success
-    simp_all [bind, Except.bind]
-    repeat' first | split at success
-    all_goals try cases success
-    all_goals simp_all [pure, Pure.pure, Except.pure]
-    all_goals try subst_vars
-    all_goals first
-      | have childrenNext := childrenIH _ _ _ (by assumption)
-        have unifiedNext := unify_preserves_nextLocal (by assumption)
-        omega
-      | have childrenNext := childrenIH _ _ _ (by assumption)
-        have unifiedNext := unify_preserves_nextLocal (by assumption)
-        simp_all <;> omega
+    simp_all
   case case14 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
-      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments notUint256 explicitBranch childrenIH
+      leadingDot qualifiers constructorName sourceArguments patternEq flatArguments notUint256 notRefused contextualBranch childrenIH
     unfold AdvancesNextLocal at *
     intro result success
     unfold inferMatchPatternFlatFuel at success
@@ -6223,6 +6215,24 @@ private theorem inferMatchPatternFlatFuel_advances_nextLocal
         simp_all <;> omega
   case case15 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq flatArguments notUint256 notRefused explicitBranch childrenIH
+    unfold AdvancesNextLocal at *
+    intro result success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    all_goals first
+      | have childrenNext := childrenIH _ _ _ (by assumption)
+        have unifiedNext := unify_preserves_nextLocal (by assumption)
+        omega
+      | have childrenNext := childrenIH _ _ _ (by assumption)
+        have unifiedNext := unify_preserves_nextLocal (by assumption)
+        simp_all <;> omega
+  case case16 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq argument
       selectedEq childrenIH
     unfold AdvancesNextLocal at *
@@ -6236,7 +6246,7 @@ private theorem inferMatchPatternFlatFuel_advances_nextLocal
     have childrenNext := childrenIH _ _ (by assumption)
     have unifiedNext := unify_preserves_nextLocal (by assumption)
     simp_all <;> omega
-  case case17 =>
+  case case18 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold AdvancesNextLocal at *
@@ -6267,7 +6277,7 @@ private theorem inferMatchPatternFlatFuel_advances_nextLocal
               inputState.nextLocal = allocatedState.nextLocal := allocatedNext
               _ = unifiedState.nextLocal := unifiedNext.symm
               _ ≤ children.state.nextLocal := childrenNext
-  case case21 =>
+  case case22 =>
     intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
     unfold AdvancesNextLocal at *
     intro result success
@@ -6345,30 +6355,14 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
       (motive2 := PatternsPreserveBinderBound context)
   case case13 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
-      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments notUint256 contextualBranch childrenIH
+      leadingDot qualifiers constructorName sourceArguments patternEq notUint256 refused
     unfold PatternPreservesBinderBound
     intro result below success
     unfold inferMatchPatternFlatFuel at success
-    simp_all [bind, Except.bind]
-    repeat' first | split at success
-    all_goals try cases success
-    all_goals simp_all [pure, Pure.pure, Except.pure]
-    all_goals try subst_vars
-    all_goals first
-      | exact childrenIH _ _ _
-          (unify_preserves_localBindersBelowNextLocal below (by assumption))
-          (by assumption)
-      | exact childrenIH _ _ _
-          (unify_preserves_localBindersBelowNextLocal
-            (freshDataConstructorInstantiation_preserves_localBindersBelowNextLocal
-              _ _ inputState below)
-            (by assumption))
-          (by assumption)
+    simp_all
   case case14 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
-      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments notUint256 explicitBranch childrenIH
+      leadingDot qualifiers constructorName sourceArguments patternEq flatArguments notUint256 notRefused contextualBranch childrenIH
     unfold PatternPreservesBinderBound
     intro result below success
     unfold inferMatchPatternFlatFuel at success
@@ -6389,6 +6383,27 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
           (by assumption)
   case case15 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq flatArguments notUint256 notRefused explicitBranch childrenIH
+    unfold PatternPreservesBinderBound
+    intro result below success
+    unfold inferMatchPatternFlatFuel at success
+    simp_all [bind, Except.bind]
+    repeat' first | split at success
+    all_goals try cases success
+    all_goals simp_all [pure, Pure.pure, Except.pure]
+    all_goals try subst_vars
+    all_goals first
+      | exact childrenIH _ _ _
+          (unify_preserves_localBindersBelowNextLocal below (by assumption))
+          (by assumption)
+      | exact childrenIH _ _ _
+          (unify_preserves_localBindersBelowNextLocal
+            (freshDataConstructorInstantiation_preserves_localBindersBelowNextLocal
+              _ _ inputState below)
+            (by assumption))
+          (by assumption)
+  case case16 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq argument
       selectedEq childrenIH
     unfold PatternPreservesBinderBound
@@ -6402,7 +6417,7 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
     exact childrenIH _ _
       (unify_preserves_localBindersBelowNextLocal below (by assumption))
       (by assumption)
-  case case17 =>
+  case case18 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold PatternPreservesBinderBound
@@ -6435,7 +6450,7 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
               (unify_preserves_localBindersBelowNextLocal allocatedBelow
                 unifiedResult)
               (by simpa only [sources] using childrenResult)
-  case case21 =>
+  case case22 =>
     intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
     unfold PatternsPreserveBinderBound at *
     unfold PatternPreservesBinderBound at ihHead
@@ -6527,7 +6542,7 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
         injection success with resultEq
         subst result
         exact induction inferred below innerResult
-  case case16 =>
+  case case17 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel inner
       patternEq induction
     unfold PatternPreservesBinderBound at *
@@ -6551,7 +6566,7 @@ theorem inferMatchPatternFlatFuel_preserves_localBindersBelowNextLocal
     simp_all [bind, Except.bind, pure, Pure.pure, Except.pure]
     subst result
     exact below
-  case case20 =>
+  case case21 =>
     intros
     unfold PatternsPreserveBinderBound
     intro result below success
@@ -10420,7 +10435,7 @@ private theorem inferFuel_inferenceProperties_internal :
       Except.bind]
   case case6 =>
     simp_all [InferExprFuelInferenceProperties, inferExprFuel]
-  case case7 =>
+  case case21 =>
     intros context expression expected initial fuel id allocated allocationEq
       name expressionEq binder lookupEq localSchemeInstantiationStart
       instantiated inference advanced predicates requirements recorded
@@ -10486,7 +10501,7 @@ private theorem inferFuel_inferenceProperties_internal :
         (instantiationProgress.trans
           (requirementsProgress.trans recordedProperties.1)),
       recordedProperties.2⟩
-  case case8 =>
+  case case22 =>
     intros context expression expected initial fuel id allocated allocationEq
       name expressionEq lookupNone isBoolean
     unfold InferExprFuelInferenceProperties
@@ -10506,9 +10521,9 @@ private theorem inferFuel_inferenceProperties_internal :
         (Ty.variablesBelow_constructor _ _) expectedAtAllocated success
     exact ⟨allocationProperties.1.trans recordedProperties.1,
       recordedProperties.2⟩
-  case case9 =>
+  case case23 =>
     intros context expression expected initial fuel id allocated allocationEq
-      name expressionEq lookupNone notBool
+      name expressionEq lookupNone notBool constructorInduction
     unfold InferExprFuelInferenceProperties
     intro ready validated canonical expectedBelow result success
     have allocationProgress : initial.InferenceProgress allocated := by
@@ -10536,7 +10551,47 @@ private theorem inferFuel_inferenceProperties_internal :
         cases candidates with
         | nil =>
             cases builtinResult : builtinNamed? context name.value with
-            | none => simp [builtinResult] at success
+            | none =>
+                simp only [builtinResult, Bool.false_eq_true, if_false, bind, Except.bind] at success
+                cases candidatesResult :
+                    constructorCalleeCandidates context allocated expression with
+                | error error =>
+                    simp [candidatesResult] at success
+                | ok constructorCandidates =>
+                    simp only [candidatesResult] at success
+                    cases constructorCandidates with
+                    | nil => simp at success
+                    | cons candidate rest =>
+                        cases rest with
+                        | cons second tail => simp at success
+                        | nil =>
+                            rcases candidate with ⟨dataType, constructor⟩
+                            let freshResult :=
+                              freshDataConstructorInstantiation dataType constructor
+                                allocated
+                            have candidateFacts :=
+                              constructorCalleeCandidates_success_members candidatesResult
+                                dataType constructor (by simp)
+                            have payloadTypesBelow :=
+                              validated.data_constructor_payloadTypes_variablesBelow
+                                candidateFacts.1 candidateFacts.2
+                                allocated.inference.next
+                            have freshProperties :=
+                              freshDataConstructorInstantiation_inferenceProperties
+                                dataType constructor allocated allocatedReady
+                                payloadTypesBelow
+                            have constructorProperties := constructorInduction
+                              freshResult.1 freshResult.2 freshProperties.2.1 validated
+                              canonical freshProperties.2.2.2.1 freshProperties.2.2.2.2
+                              (by
+                                intro expectedType member
+                                exact (expectedAtAllocated expectedType member).weaken
+                                  freshProperties.1.next_le)
+                              result
+                              (by simpa only [freshResult] using success)
+                            exact ⟨allocationProgress.trans
+                                (freshProperties.1.trans constructorProperties.1),
+                              constructorProperties.2⟩
             | some function =>
                 simp only [builtinResult] at success
                 have recordedProperties :=
@@ -10563,7 +10618,7 @@ private theorem inferFuel_inferenceProperties_internal :
                 exact ⟨allocationProgress.trans recordedProperties.1,
                   recordedProperties.2⟩
             | cons second tail => simp at success
-  case case10 =>
+  case case7 =>
     intros context expression expected initial fuel id allocated allocationEq
       inner expressionEq innerInduction
     unfold InferExprFuelInferenceProperties
@@ -10596,7 +10651,7 @@ private theorem inferFuel_inferenceProperties_internal :
             success
         exact ⟨prefixProgress.trans recordedProperties.1,
           recordedProperties.2⟩
-  case case11 =>
+  case case8 =>
     intros context expression expected initial fuel id allocated allocationEq
       elements expressionEq elementsInduction
     unfold InferExprFuelInferenceProperties
@@ -10635,7 +10690,7 @@ private theorem inferFuel_inferenceProperties_internal :
         exact ⟨prefixProgress.trans recordedProperties.1,
           recordedProperties.2⟩
   -- Unary operator expression, including overloaded dispatch.
-  case case12 =>
+  case case9 =>
     intros context expression expected initial fuel id allocated allocationEq
       operator operand expressionEq operandInduction
     unfold InferExprFuelInferenceProperties
@@ -10778,7 +10833,7 @@ private theorem inferFuel_inferenceProperties_internal :
                             (selectedProperties.1.trans recordedProperties.1),
                           recordedProperties.2⟩
   -- Binary operator expression, including overloaded dispatch.
-  case case13 =>
+  case case10 =>
     intros context expression expected initial fuel id allocated allocationEq
       left operator right expressionEq leftInduction rightInduction
     unfold InferExprFuelInferenceProperties
@@ -10966,7 +11021,7 @@ private theorem inferFuel_inferenceProperties_internal :
                                         recordedProperties.1)),
                                   recordedProperties.2⟩
   -- Conditional expression.
-  case case14 =>
+  case case11 =>
     intros context expression expected initial fuel id allocated allocationEq
       condition question thenBranch colon elseBranch expressionEq
       conditionInduction thenInduction elseInduction
@@ -11057,7 +11112,7 @@ private theorem inferFuel_inferenceProperties_internal :
                         unifiedReady resolvedThenBelow expectedAtUnified success
                     exact ⟨throughUnify.trans recordedProperties.1,
                       recordedProperties.2⟩
-  case case19 =>
+  case case16 =>
     intros context expression expected initial fuel id allocated allocationEq
       base brackets index expressionEq baseInduction indexInduction arrayIndexInduction
     unfold InferExprFuelInferenceProperties
@@ -11179,7 +11234,7 @@ private theorem inferFuel_inferenceProperties_internal :
                     success
                 exact ⟨prefixProgress.trans recordedProperties.1,
                   recordedProperties.2⟩
-  case case21 =>
+  case case18 =>
     intros context expression expected initial fuel id allocated allocationEq
       elements expressionEq elementsInduction
     unfold InferExprFuelInferenceProperties
@@ -11210,7 +11265,7 @@ private theorem inferFuel_inferenceProperties_internal :
           exact (expectedBelow expectedType member).weaken prefixProgress.next_le)
         recorded
     exact ⟨prefixProgress.trans recordedProperties.1, recordedProperties.2⟩
-  case case22 =>
+  case case19 =>
     intros context expression expected initial fuel id allocated allocationEq
       keyword sourceType length expressionEq lengthInduction
     unfold InferExprFuelInferenceProperties
@@ -11240,7 +11295,7 @@ private theorem inferFuel_inferenceProperties_internal :
       recordExpressionWithExpected_inferenceProperties
         lengthProperties.2.1 arrayBelow expectedAtLength recorded
     exact ⟨prefixProgress.trans recordedProperties.1, recordedProperties.2⟩
-  case case23 =>
+  case case20 =>
     intros context expression expected initial fuel id allocated allocationEq
       base brackets start colon stop expressionEq childrenInduction
     unfold InferExprFuelInferenceProperties
@@ -11271,7 +11326,7 @@ private theorem inferFuel_inferenceProperties_internal :
     exact ⟨prefixProgress.trans recordedProperties.1, recordedProperties.2⟩
   case case24 =>
     simp_all [InferExprFuelInferenceProperties, inferExprFuel]
-  case case17 =>
+  case case14 =>
     intros context expression expected initial fuel id allocated allocationEq
       dot name arguments expressionEq constructorInduction
     unfold InferExprFuelInferenceProperties
@@ -11302,7 +11357,7 @@ private theorem inferFuel_inferenceProperties_internal :
           success
         exact ⟨allocationProperties.1.trans constructorProperties.1,
           constructorProperties.2⟩
-  case case18 =>
+  case case15 =>
     intros context expression expected initial fuel id allocated allocationEq
       marker sourceType expressionEq
     unfold InferExprFuelInferenceProperties
@@ -11332,7 +11387,7 @@ private theorem inferFuel_inferenceProperties_internal :
             allocationProperties.2 proxyBelow expectedAtAllocated success
         exact ⟨allocationProperties.1.trans recordedProperties.1,
           recordedProperties.2⟩
-  case case20 =>
+  case case17 =>
     intros context expression expected initial fuel id allocated allocationEq
       base dot name expressionEq constructorInduction baseInduction
     unfold InferExprFuelInferenceProperties
@@ -12054,7 +12109,7 @@ private theorem inferFuel_inferenceProperties_internal :
                       unifiedReady.solved))),
               State.InferenceReady.recordNode _ unifiedReady,
               Ty.variablesBelow_constructor _ _⟩
-  case case15 =>
+  case case12 =>
     intros context expression expected initial fuel id allocated allocationEq
       keyword sourceParameters returnAnnotation body expressionEq bodyInduction
     unfold InferExprFuelInferenceProperties
@@ -12322,7 +12377,7 @@ private theorem inferFuel_inferenceProperties_internal :
                       (partsBelow.2.weaken fitProgress.next_le)
                       success
   -- Direct, indirect, builtin, and constructor application.
-  case case16 =>
+  case case13 =>
     intros context expression expected initial fuel id allocated allocationEq
       callee sourceArguments expressionEq constructorInduction
       argumentsInduction calleeInduction
@@ -14503,7 +14558,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
       RestoresOuterScope MatchCasesResult.state outerScope state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn
           outerScope cases state))
-  case case10 =>
+  case case7 =>
     intros context expression expected initial fuel id allocated allocationEq
       inner expressionEq innerInduction
     unfold PreservesLexicalScope at *
@@ -14520,7 +14575,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
         have recordedScope :=
           recordExpressionWithExpected_lexicalScope success
         exact recordedScope.trans (innerScope.trans allocationScope)
-  case case11 =>
+  case case8 =>
     intros context expression expected initial fuel id allocated allocationEq
       elements expressionEq elementsInduction
     unfold PreservesLexicalScope at *
@@ -14538,7 +14593,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
         have recordedScope :=
           recordExpressionWithExpected_lexicalScope success
         exact recordedScope.trans (elementsScope.trans allocationScope)
-  case case21 =>
+  case case18 =>
     intros context expression expected initial fuel id allocated allocationEq
       elements expressionEq elementsInduction
     unfold PreservesLexicalScope at *
@@ -14556,7 +14611,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
     have recordedScope := recordExpressionWithExpected_lexicalScope recorded
     exact recordedScope.trans (unifiedScope.trans (freshScope.trans
       (elementsScope.trans allocationScope)))
-  case case23 =>
+  case case20 =>
     intros context expression expected initial fuel id allocated allocationEq
       base brackets start colon stop expressionEq childrenInduction
     unfold PreservesLexicalScope at *
@@ -14569,7 +14624,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
     have unifiedScope := unify_preserves_lexicalScope unifyResult
     have recordedScope := recordExpressionWithExpected_lexicalScope recorded
     exact recordedScope.trans (unifiedScope.trans (childrenScope.trans allocationScope))
-  case case12 =>
+  case case9 =>
     intros context expression expected initial fuel id allocated allocationEq
       operator operand expressionEq operandInduction
     unfold PreservesLexicalScope at *
@@ -14601,7 +14656,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
             throughOperand
         all_goals simp_all [State.lexicalScope]
         all_goals grind
-  case case13 =>
+  case case10 =>
     intros context expression expected initial fuel id allocated allocationEq
       left operator right expressionEq leftInduction rightInduction
     unfold PreservesLexicalScope at *
@@ -14721,7 +14776,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                       fitted.state
                                     |>.trans (fittedScope.trans
                                       (selectedScope.trans throughArguments))
-  case case14 =>
+  case case11 =>
     intros context expression expected initial fuel id allocated allocationEq
       condition question thenBranch colon elseBranch expressionEq
       conditionInduction thenInduction elseInduction
@@ -14771,7 +14826,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                     exact recordedScope.trans (unifiedScope.trans
                       (elseScope.trans (thenScope.trans
                         (conditionScope.trans allocationScope))))
-  case case16 =>
+  case case13 =>
     intros context expression expected initial fuel id allocated allocationEq
       callee sourceArguments expressionEq constructorInduction
       argumentsInduction calleeInduction
@@ -15158,7 +15213,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                                               (candidate :: rest) attempt
                                               selectionResult resultEq
   -- Mapping index expression.
-  case case19 =>
+  case case16 =>
     intros context expression expected initial fuel id allocated allocationEq
       base brackets index expressionEq baseInduction indexInduction arrayIndexInduction
     unfold PreservesLexicalScope at *
@@ -15224,7 +15279,57 @@ private theorem inferFuel_preserves_lexicalScope_internal :
                   (unifiedScope.trans (valueScope.trans (keyScope.trans
                     (baseScope.trans allocationScope)))))
   -- Field selection or qualified constructor reference.
-  case case20 =>
+  case case23 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      name expressionEq lookupNone notBool constructorInduction
+    unfold PreservesLexicalScope at *
+    intro result success
+    have allocationScope :=
+      allocateExpressionId_success_lexicalScope allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, lookupNone, notBool, Bool.false_eq_true, if_false, bind,
+      Except.bind] at success
+    cases functionsResult : functionsNamed context name.value with
+    | error error => simp [functionsResult] at success
+    | ok functionCandidates =>
+        simp only [functionsResult] at success
+        cases functionCandidates with
+        | nil =>
+            cases builtinResult : builtinNamed? context name.value with
+            | some function =>
+                simp only [builtinResult] at success
+                exact (recordExpressionWithExpected_lexicalScope success).trans allocationScope
+            | none =>
+                simp only [builtinResult, bind, Except.bind] at success
+                cases candidatesResult :
+                    constructorCalleeCandidates context allocated expression with
+                | error error => simp [candidatesResult] at success
+                | ok candidates =>
+                    simp only [candidatesResult] at success
+                    cases candidates with
+                    | nil => simp at success
+                    | cons candidate rest =>
+                        cases rest with
+                        | cons second tail => simp at success
+                        | nil =>
+                            rcases candidate with ⟨dataType, constructor⟩
+                            let freshResult :=
+                              freshDataConstructorInstantiation dataType constructor
+                                allocated
+                            have constructorScope := constructorInduction
+                              freshResult.1 freshResult.2 result
+                              (by simpa only [freshResult] using success)
+                            exact constructorScope.trans
+                              ((freshDataConstructorInstantiation_preserves_lexicalScope
+                                dataType constructor allocated).trans allocationScope)
+        | cons signature rest =>
+            cases rest with
+            | cons second tail => simp at success
+            | nil =>
+                simp only at success
+                exact (recordExpressionWithExpected_lexicalScope success).trans
+                  ((addRequirementsWithIds_lexicalScope _ _).trans allocationScope)
+  case case17 =>
     intros context expression expected initial fuel id allocated allocationEq
       base dot name expressionEq constructorInduction baseInduction
     unfold PreservesLexicalScope at *
@@ -15372,7 +15477,7 @@ private theorem inferFuel_preserves_lexicalScope_internal :
       | uncheckedMultiply => exact finishNonEqual .uncheckedMultiply (valueInduction place) success
       | uncheckedDivide => exact finishNonEqual .uncheckedDivide (valueInduction place) success
       | uncheckedModulo => exact finishNonEqual .uncheckedModulo (valueInduction place) success
-  case case22 =>
+  case case19 =>
     intros context expression expected initial fuel id allocated allocationEq
       keyword sourceType length expressionEq lengthInduction
     unfold PreservesLexicalScope at *
@@ -15659,7 +15764,7 @@ private theorem inferFuel_advances_nextLocal_internal :
           outerScope cases state))
   -- Generated case 15 is lambda inference.  Parameter binding and body
   -- inference are the only steps which may advance the local allocator.
-  case case15 =>
+  case case12 =>
     intros context expression expected state fuel calleeId stateAfterId
       allocationEq keyword parameters returnType body expressionEq bodyInduction
     unfold AdvancesNextLocal at *

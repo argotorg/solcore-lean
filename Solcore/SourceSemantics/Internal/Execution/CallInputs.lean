@@ -169,6 +169,39 @@ theorem expression_field_constructor
   exact ⟨properties.2.1, wellFormed, inputs.catalog, properties.2.2.2.1,
     properties.2.2.2.2, fun type member => (inputs.bounds type member).weaken properties.1.next_le⟩
 
+theorem expression_identifier_constructor
+      {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
+      {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
+      {value : InferredExpression}
+      {name : Syntax.Identifier}
+      {dataType : ProgramDataSignature} {constructor : ProgramDataConstructorSignature}
+      {instantiation : DataConstructorInstantiation} {instantiated childFinal : State}
+      {inferred : InferredExpression}
+      (_accepted : (CallIndex.expression (fuel + 1) context source expected initial value final).Accepted)
+      (_form : source.value = .identifier name)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (_unbound : allocated.lookupBinder? name.value = none)
+      (_notBoolean : (name.value == "true" || name.value == "false") = false)
+      (_functions : functionsNamed context name.value = .ok [])
+      (_builtin : builtinNamed? context name.value = none)
+      (selected : constructorCalleeCandidates context allocated source = .ok [(dataType, constructor)])
+      (fresh : freshDataConstructorInstantiation dataType constructor allocated = (instantiation, instantiated))
+      (_child : (CallIndex.constructorApplication fuel context source id instantiation [] expected instantiated inferred childFinal).Accepted)
+      (inputs : (CallIndex.expression (fuel + 1) context source expected initial value final).Inputs) : (CallIndex.constructorApplication fuel context source id instantiation [] expected instantiated inferred childFinal).Inputs := by
+  have same : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocation).symm
+  subst allocated
+  obtain ⟨dataMember, constructorMember⟩ :=
+    constructorCalleeCandidates_success_members selected dataType constructor (by simp)
+  have properties := freshDataConstructorInstantiation_inferenceProperties dataType constructor
+    initial.allocateExpressionId.2 inputs.ready.allocateExpressionId
+    (inputs.catalog.formation.data_constructor_payloadTypes_variablesBelow dataMember constructorMember _)
+  simp only [fresh] at properties
+  have wellFormed := (freshDataConstructorInstantiation_direct_progress dataType constructor
+    initial.allocateExpressionId.2).wellFormed inputs.wellFormed
+  simp only [fresh] at wellFormed
+  exact ⟨properties.2.1, wellFormed, inputs.catalog, properties.2.2.2.1,
+    properties.2.2.2.2, fun type member => (inputs.bounds type member).weaken properties.1.next_le⟩
+
 end Solcore.SourceSemantics.SourceInferenceExecution.ActualExpressionInputs
 end
 
@@ -953,6 +986,7 @@ theorem ChildStep.inputs {parent child : CallIndex}
       | solve | apply ActualExpressionInputs.expression_contextual_constructor <;> assumption
       | solve | apply ActualExpressionInputs.expression_call_constructor <;> assumption
       | solve | apply ActualExpressionInputs.expression_field_constructor <;> assumption
+      | solve | apply ActualExpressionInputs.expression_identifier_constructor <;> assumption
       | solve | apply ActualExpressionInputs.expression_newArray_length <;> assumption
       | solve | apply ActualExpressionInputs.expression_field_length_base <;> assumption
   | constructorApplication => exact ChildStep.inputs_constructorApplication inputs step

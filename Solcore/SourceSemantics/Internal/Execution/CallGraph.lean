@@ -798,6 +798,27 @@ inductive ChildStep : CallIndex → CallIndex → Prop where
       (fresh : freshDataConstructorInstantiation dataType constructor allocated = (instantiation, instantiated))
       (child : (CallIndex.constructorApplication fuel context source id instantiation [] expected instantiated inferred childFinal).Accepted) :
       ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.constructorApplication fuel context source id instantiation [] expected instantiated inferred childFinal)
+  /-- A bare name that no local, function or builtin takes, read as the constructor that shares its
+  type's name, applied to no payload. -/
+  | expression_identifier_constructor
+      {fuel : Nat} {context : SourceInference.Context} {source : Syntax.Expr}
+      {expected : Option Ty} {initial allocated final : State} {id : ExpressionId}
+      {value : InferredExpression}
+      {name : Syntax.Identifier}
+      {dataType : ProgramDataSignature} {constructor : ProgramDataConstructorSignature}
+      {instantiation : DataConstructorInstantiation} {instantiated childFinal : State}
+      {inferred : InferredExpression}
+      (accepted : (CallIndex.expression (fuel + 1) context source expected initial value final).Accepted)
+      (form : source.value = .identifier name)
+      (allocation : initial.allocateExpressionId = (id, allocated))
+      (unbound : allocated.lookupBinder? name.value = none)
+      (notBoolean : (name.value == "true" || name.value == "false") = false)
+      (functions : functionsNamed context name.value = .ok [])
+      (builtin : builtinNamed? context name.value = none)
+      (selected : constructorCalleeCandidates context allocated source = .ok [(dataType, constructor)])
+      (fresh : freshDataConstructorInstantiation dataType constructor allocated = (instantiation, instantiated))
+      (child : (CallIndex.constructorApplication fuel context source id instantiation [] expected instantiated inferred childFinal).Accepted) :
+      ChildStep (CallIndex.expression (fuel + 1) context source expected initial value final) (CallIndex.constructorApplication fuel context source id instantiation [] expected instantiated inferred childFinal)
   | matchCases_body
       {fuel : Nat} {context : SourceInference.Context} {scrutineeType expectedReturn : Ty}
       {saved : LexicalScope} {arm : Syntax.MatchCase} {arms : List Syntax.MatchCase}

@@ -13446,8 +13446,13 @@ private theorem inferMatchPatternFlatFuel_success_constructor_sound
   let qualifierNames := qualifiers.map (fun qualifier => qualifier.value)
   let sourceArguments :=
     (arguments.map (fun retained => retained.elements.toList)).getD []
-  by_cases contextual : leadingDot.isSome || qualifierNames.isEmpty
-  · simp only [qualifierNames, contextual, if_true] at success
+  by_cases refused : Detail.unqualifiedConstructorRefused inferenceContext leadingDot qualifiers
+      name.value = true
+  · simp [refused] at success
+  simp only [refused] at success
+  by_cases contextual : leadingDot.isSome || (Detail.constructorHeadQualifiers inferenceContext
+      leadingDot qualifiers name.value).isEmpty
+  · simp only [contextual, if_true] at success
     cases selected : Detail.contextualConstructorCandidate inferenceContext
         initial (some expected) name.value with
     | error error => simp [selected] at success
@@ -13523,9 +13528,10 @@ private theorem inferMatchPatternFlatFuel_success_constructor_sound
                       unifiedBelow unifiedInvariant unifyResult childrenResult
                       arity)
         · simp [sourceArguments, instantiation, arity] at success
-  · simp only [qualifierNames, contextual] at success
+  · simp only [contextual] at success
     cases selected : Detail.explicitConstructorCandidate inferenceContext
-        (qualifiers.map (fun qualifier => qualifier.value)) name.value with
+        (Detail.constructorHeadQualifiers inferenceContext leadingDot qualifiers name.value)
+        name.value with
     | error error => simp [selected] at success
     | ok selectedResult =>
         rcases selectedResult with ⟨dataType, constructor⟩

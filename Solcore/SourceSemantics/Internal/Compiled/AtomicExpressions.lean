@@ -53,7 +53,17 @@ theorem expressionRetained_identifier {name : Syntax.Identifier}
     (checked : Frontend.checkProgram raw fuel = .ok compiled.program)
     (expressionEq : expression.value = .identifier name)
     (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression expected
-      initial inferred resultState frames target) :
+      initial inferred resultState frames target)
+    (constructorCase : ∀ {id : ExpressionId} {allocated : State}
+      {dataType : ProgramDataSignature} {constructor : ProgramDataConstructorSignature},
+      initial.allocateExpressionId = (id, allocated) →
+      allocated.lookupBinder? name.value = none →
+      (name.value == "true" || name.value == "false") = false →
+      Detail.functionsNamed inferenceContext name.value = .ok [] →
+      Detail.builtinNamed? inferenceContext name.value = none →
+      Detail.constructorCalleeCandidates inferenceContext allocated expression = .ok [(dataType, constructor)] →
+      ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
+        selected.body.finalized.typedSource target selected.body.finalized.substitution inferred) :
     ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected))
       selected.body.finalized.typedSource target selected.body.finalized.substitution inferred := by
   have success := boundary.accepted
@@ -82,8 +92,23 @@ theorem expressionRetained_identifier {name : Syntax.Identifier}
         | nil =>
           cases builtin : Detail.builtinNamed? inferenceContext name.value with
           | none =>
-            simp [Detail.inferExprFuel, allocationEq, expressionEq, found, boolean,
-              functions, builtin, bind, Except.bind] at success
+            cases discovery : Detail.constructorCalleeCandidates inferenceContext allocated expression with
+            | error error =>
+              simp [Detail.inferExprFuel, allocationEq, expressionEq, found, boolean,
+                functions, builtin, discovery, bind, Except.bind] at success
+            | ok candidates =>
+              cases candidates with
+              | nil =>
+                simp [Detail.inferExprFuel, allocationEq, expressionEq, found, boolean,
+                  functions, builtin, discovery, bind, Except.bind] at success
+              | cons first rest =>
+                cases rest with
+                | cons second tail =>
+                  simp [Detail.inferExprFuel, allocationEq, expressionEq, found, boolean,
+                    functions, builtin, discovery, bind, Except.bind] at success
+                | nil =>
+                  obtain ⟨dataType, constructor⟩ := first
+                  exact constructorCase allocationEq found boolean functions builtin discovery
           | some function =>
             exact inferExprFuel_success_builtinFunctionIdentifier_expressionTypingBase_selected
               selected.body.resources boundary.interfaces expressionEq allocationEq found boolean functions builtin success

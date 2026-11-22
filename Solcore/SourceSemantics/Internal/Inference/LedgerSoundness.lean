@@ -90,8 +90,18 @@ theorem inferExprFuelLedgerPreservation_step
           | nil =>
             cases builtin : Detail.builtinNamed? context name.value with
             | none =>
-              simp [Detail.inferExprFuel, allocation, form, found, boolean,
-                functions, builtin, bind, Except.bind] at accepted
+              cases discovery : Detail.constructorCalleeCandidates context allocated expression with
+              | error error =>
+                simp [Detail.inferExprFuel, allocation, form, found, boolean,
+                  functions, builtin, discovery, bind, Except.bind] at accepted
+              | ok candidates =>
+                unfold Detail.inferExprFuel at accepted
+                simp only [allocation, form, found, boolean, functions, builtin, discovery,
+                  Bool.false_eq_true, if_false, bind, Except.bind] at accepted
+                repeat' first | split at accepted
+                all_goals try contradiction
+                all_goals
+                  exact constructorIH accepted (allocatedTracked.freshDataConstructorInstantiation _ _)
             | some function =>
               exact allocatedTracked.recordExpressionWithExpected
                 (Detail.inferExprFuel_success_builtinFunctionIdentifier_record

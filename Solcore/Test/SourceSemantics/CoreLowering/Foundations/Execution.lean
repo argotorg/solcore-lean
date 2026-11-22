@@ -5393,6 +5393,114 @@ def runBareNamePatterns : IO Unit := do
     ["enum box { box(Word) }", "function f(b: box) returns (Word) { match (b) { case box { return 1; } } }"]
   IO.println "SOURCE_CORE_BARE_NAME_PATTERNS_PASS: a bare name in a pattern as upstream reads it through the public API, same-name constructors m and thing running as their constructors with case m beside case m.k covering m, a type name with no constructor of that name and an opaque import's constructor binding, and a visible constructor's spelling refused as upstream's SC0106 refuses it, upstream's unqualified_ctor_pattern, at an unrelated scrutinee, nested, beside a parameter of that name and through a selected, wildcard and plain import, and a bare same-name constructor with a payload refused for its argument"
 
+private def constructorNamesWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "enum Option { None, Some(Word) }",
+  "enum Box { Box(Word) }",
+  "enum E { inl(Word), other }",
+  "enum thing { thing }",
+  "enum Flag { Flag }",
+  "enum Tag<a> { Tag }",
+  "enum Cell<a> { Cell(a) }",
+  "enum Holder { Holder(thing, Word) }",
+  "enum tag { tag }",
+  "function unbox(b: Box) returns (Word) { match (b) { case Box(w) { return w; } } }",
+  "function getE(e: E) returns (Word) { match (e) { case inl(x) { return x; } case E.other { return 0; } } }",
+  "function getOption(o: Option) returns (Word) { match (o) { case .None { return 0; } case .Some(v) { return v; } } }",
+  "function pickThing(t: thing) returns (Word) { match (t) { case thing.thing { return 7; } } }",
+  "function pickFlag(f: Flag) returns (Word) { match (f) { case Flag { return 8; } } }",
+  "function tagged(t: Tag<Word>, c: Cell<Word>) returns (Word) { match (c) { case Cell.Cell(v) { return v; } } }",
+  "function count(h: Holder) returns (Word) { match (h) { case Holder.Holder(t, w) { return w; } } }",
+  "function make() returns (thing) { return thing; }",
+  "function tag() returns (Word) { return 3; }",
+  "function boxed(w: Word) returns (Word) { return unbox(Box(w)); }",
+  "function inlined(w: Word) returns (Word) { return getE(E.inl(w)); }",
+  "function optional(w: Word) returns (Word) { return getOption(Option.Some(w)); }",
+  "function bare() returns (Word) { return pickThing(thing); }",
+  "function made() returns (Word) { return pickThing(make()); }",
+  "function capital() returns (Word) { return pickFlag(Flag); }",
+  "function generic(w: Word) returns (Word) { return tagged(Tag, Cell(w)); }",
+  "function held(w: Word) returns (Word) { return count(Holder(thing, w)); }",
+  "function shadowed() returns (Word) { let thing: Word = 5; return thing; }",
+  "function parameter(thing: Word) returns (Word) { return thing; }",
+  "function viaFunction() returns (Word) { let f = tag; return f(); }"]
+
+private def constructorNamesNames : List String :=
+  ["boxed", "inlined", "optional", "bare", "made", "capital", "generic", "held", "shadowed", "parameter",
+    "viaFunction"]
+
+private def thingLibrary : String := "export { thing(*) };\nenum thing { thing }"
+
+private def pickThingIn (type : String) : String :=
+  s!"function pick(t: {type}) returns (Word) \{ match (t) \{ case _ \{ return 7; } } }\nfunction main() returns (Word) \{ return pick(thing); }"
+
+/-- Constructor names as upstream reads them, through the public API. In a pattern, an unqualified
+head that shares its type's name is that type's constructor, a head spelled like one of upstream's
+builtin constructors (`inl`) is left to the scrutinee's type, and a leading dot is unchanged; any
+other unqualified head that spells a visible constructor is refused, as upstream's `SC0106` refuses
+it. In an expression, a bare name that no local, parameter or function takes and that names a
+constructor sharing its type's name is that constructor applied to no payload, in the module and
+through a selected or wildcard import; through a plain or opaque import, or for any other
+constructor, the name stays unknown. -/
+def runConstructorNames : IO Unit := do
+  let program ← get "constructor names check" (checkProgram constructorNamesWorkspace)
+  let seeds ← constructorNamesNames.mapM (seed program)
+  let compiled ← get "constructor names compilation"
+    (compile constructorNamesWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match constructorNamesNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"constructor names root {name} missing")
+    | none => throw (IO.userError s!"constructor names {name} unknown")
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × List Value × Value) := [
+    ("boxed", [word 5], word 5), ("inlined", [word 9], word 9), ("optional", [word 4], word 4),
+    ("bare", [], word 7), ("made", [], word 7), ("capital", [], word 8), ("generic", [word 3], word 3),
+    ("held", [word 2], word 2), ("shadowed", [], word 5), ("parameter", [word 6], word 6),
+    ("viaFunction", [], word 3)]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) arguments
+    require (completed.value == expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  let _ := session
+  -- A bare same-name constructor through a selected or wildcard import.
+  for (label, main) in [("a selected import", "import { thing } from lib;\n"), ("a wildcard import", "import * from lib;\n")] do
+    match checkProgram (libraryWorkspace (main ++ pickThingIn "thing") thingLibrary) with
+    | .ok _ => pure ()
+    | .error errors => throw (IO.userError s!"a bare constructor through {label} gave {reprStr errors}")
+  -- Unqualified heads upstream refuses with `SC0106`.
+  refusedWith "an unqualified head" (workspaceOf ["enum Option { None, Some(Word) }",
+    "function get(o: Option) returns (Word) { match (o) { case None { return 0; } case Option.Some(v) { return v; } } }"])
+    (.unqualifiedConstructorPattern "None")
+  refusedWith "an unqualified head with a payload" (workspaceOf ["enum Option { None, Some(Word) }",
+    "function get(o: Option) returns (Word) { match (o) { case Some(v) { return v; } case Option.None { return 0; } } }"])
+    (.unqualifiedConstructorPattern "Some")
+  refusedWith "an unqualified head through a selected import" (libraryWorkspace
+    "import { Option } from lib;\nfunction get(o: Option) returns (Word) { match (o) { case Some(v) { return v; } case Option.None { return 0; } } }"
+    "export { Option(*) };\nenum Option { None, Some(Word) }") (.unqualifiedConstructorPattern "Some")
+  refusedWith "an unqualified head through a plain import" (libraryWorkspace
+    "import lib;\nfunction get(o: lib.Option) returns (Word) { match (o) { case None { return 0; } case lib.Option.Some(v) { return v; } } }"
+    "export { Option(*) };\nenum Option { None, Some(Word) }") (.unqualifiedConstructorPattern "None")
+  -- A same-name head is that type's constructor, so it does not match a scrutinee of another type.
+  rejectedByInference "a same-name head at another type"
+    ["enum Box { Box(Word) }", "enum Wrapper { Box(Word), Empty }",
+      "function f(w: Wrapper) returns (Word) { match (w) { case Box(v) { return v; } case Wrapper.Empty { return 0; } } }"]
+  -- Bare names upstream does not read as constructors stay unknown.
+  refusedWith "a bare constructor of another name" (workspaceOf ["enum flag { on, off }",
+    "function main() returns (Word) { let f: flag = on; return 1; }"]) (.unknownVariable "on")
+  refusedWith "a bare capitalized constructor of another name" (workspaceOf ["enum Option { None, Some(Word) }",
+    "function main() returns (Word) { let o: Option = None; return 1; }"]) (.unknownVariable "None")
+  refusedWith "a bare same-name constructor through a plain import" (libraryWorkspace
+    "import lib;\nfunction main() returns (Word) { let t: lib.thing = thing; return 1; }" thingLibrary)
+    (.unknownVariable "thing")
+  refusedWith "a bare same-name constructor through an opaque import" (libraryWorkspace
+    "import { thing, make } from lib;\nfunction main() returns (Word) { let t: thing = thing; return 1; }"
+    "export { thing, make };\nenum thing { thing }\nfunction make() returns (thing) { return thing.thing; }")
+    (.unknownVariable "thing")
+  -- A same-name constructor with a payload, written bare, is that constructor, short of its payload.
+  rejectedByInference "a bare same-name constructor with a payload"
+    ["enum Box { Box(Word) }", "function main() returns (Word) { let make = Box; return 1; }"]
+  IO.println "SOURCE_CORE_CONSTRUCTOR_NAMES_PASS: constructor names as upstream reads them through the public API, an unqualified same-name head running as its type's constructor, a head spelled like upstream's builtin inl left to the scrutinee's type and leading dots unchanged, any other unqualified head refused as upstream's SC0106 refuses it, in the module and through a selected and a plain import, a same-name head refused at another type, and a bare same-name constructor running as that constructor with no payload, as a value, an argument, a payload and a generic, through a selected and a wildcard import, under a local, a parameter and a function of that name, and unknown through a plain or an opaque import, for another constructor's name or with a payload"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -6265,6 +6373,7 @@ def run : IO Unit := do
   runUint256Patterns
   runBoolPatterns
   runBareNamePatterns
+  runConstructorNames
   runUpstreamFixtures
   runUpstreamArrayFixtures
   runArrayElementCases

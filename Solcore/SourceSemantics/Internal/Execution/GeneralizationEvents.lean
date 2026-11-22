@@ -204,6 +204,7 @@ local macro "actual_descend " parent:term : tactic => `(tactic|
    | (apply ChildStep.expression_call_callee <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.expression_contextual_constructor <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.expression_field_constructor <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
+   | (apply ChildStep.expression_identifier_constructor <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.matchCases_body <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.matchCases_tail <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
    | (apply ChildStep.statement_match_single <;> first | assumption | rfl | exact AnnotationExpected.absent | (apply AnnotationExpected.present; assumption))
@@ -493,7 +494,7 @@ private theorem inferFuel_origins_progress_internal :
         cases state =>
       PreservesOrigins (root := root) MatchCasesResult.state (fun r => .matchCases fuel context scrutineeType expectedReturn outerScope cases state r) state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope cases state))
-  case case10 =>
+  case case7 =>
     intro context source expected initial fuel id allocated allocation inner form ih
     intro result accepted here
     have original := accepted
@@ -506,7 +507,7 @@ private theorem inferFuel_origins_progress_internal :
       have record := RelativeReadProgress.recordExpressionWithExpected (root := root) (by simpa only [child, bind, Except.bind] using accepted)
         (by intro _ _ impossible; cases impossible)
       exact (allocateExpressionId_success_origins_progress allocation).trans (innerProgress.trans record)
-  case case21 =>
+  case case18 =>
     intro context source expected initial fuel id allocated allocation elements form ih
     intro result accepted here
     have original := accepted
@@ -521,7 +522,7 @@ private theorem inferFuel_origins_progress_internal :
     exact (allocateExpressionId_success_origins_progress allocation).trans
       (elementsProgress.trans (freshProgress.trans
         ((RelativeReadProgress.unify (root := root) unified).trans record)))
-  case case23 =>
+  case case20 =>
     intro context source expected initial fuel id allocated allocation base brackets start colon
       stop form ih
     intro result accepted here
@@ -534,7 +535,7 @@ private theorem inferFuel_origins_progress_internal :
       (by intro _ _ impossible; cases impossible)
     exact (allocateExpressionId_success_origins_progress allocation).trans
       (childrenProgress.trans ((RelativeReadProgress.unify (root := root) unified).trans record))
-  case case22 =>
+  case case19 =>
     intro context source expected initial fuel id allocated allocation keyword sourceType length form ih
     intro result accepted here
     have original := accepted
@@ -545,7 +546,7 @@ private theorem inferFuel_origins_progress_internal :
     have record := RelativeReadProgress.recordExpressionWithExpected (root := root) recorded
       (by intro _ _ impossible; cases impossible)
     exact (allocateExpressionId_success_origins_progress allocation).trans (lengthProgress.trans record)
-  case case15 =>
+  case case12 =>
     intro context source expected initial fuel id allocated allocation keyword parameters annotation body form ih
     intro result accepted here
     obtain ⟨boundParameters, parameterTypes, parameterState, resultType, resultState,
@@ -567,7 +568,7 @@ private theorem inferFuel_origins_progress_internal :
     exact (allocateExpressionId_success_origins_progress allocation).trans
       ((RelativeReadProgress.bindLambdaParameters parametersAccepted).trans
         (prefixProgress.trans (bodyProgress.trans ((RelativeReadProgress.unify resultUnify).trans recordProgress))))
-  case case16 =>
+  case case13 =>
     intro context source expected initial fuel id allocated allocation callee arguments form constructorIH argumentsIH calleeIH
     intro result accepted here
     have allocationProgress := allocateExpressionId_success_origins_progress (root := root) allocation
@@ -634,7 +635,62 @@ private theorem inferFuel_origins_progress_internal :
       exact allocationProgress.trans (argumentsProgress.trans (calleeProgress.trans
         (RelativeReadProgress.recordExpressionWithExpected (root := root) recording
           (by intro _ _ impossible; cases impossible))))
-  case case20 =>
+  case case23 =>
+    intro context source expected initial fuel id allocated allocation name form lookupNone notBool ih
+    intro result accepted here
+    have original := accepted
+    have notBoolean : (name.value == "true" || name.value == "false") = false := by simpa using notBool
+    unfold inferExprFuel at accepted
+    simp only [allocation, form, lookupNone, notBool, Bool.false_eq_true, if_false, bind, Except.bind]
+      at accepted
+    cases functions : functionsNamed context name.value with
+    | error error => simp [functions] at accepted
+    | ok functionCandidates =>
+      simp only [functions] at accepted
+      cases functionCandidates with
+      | nil =>
+        cases builtin : builtinNamed? context name.value with
+        | some function =>
+          have recorded := Detail.inferExprFuel_success_builtinFunctionIdentifier_record form allocation
+            lookupNone notBoolean functions builtin original
+          have record := RelativeReadProgress.recordExpressionWithExpected (root := root) recorded
+            (by intro _ _ impossible; cases impossible)
+          exact (allocateExpressionId_success_origins_progress allocation).trans record
+        | none =>
+          simp only [builtin, bind, Except.bind] at accepted
+          cases discovery : constructorCalleeCandidates context allocated source with
+          | error error => simp [discovery] at accepted
+          | ok candidates =>
+            cases candidates with
+            | nil => simp [discovery] at accepted
+            | cons first rest =>
+              rcases first with ⟨dataType, constructor⟩
+              cases rest with
+              | cons second rest => simp [discovery] at accepted
+              | nil =>
+                simp only [discovery] at accepted
+                generalize fresh : freshDataConstructorInstantiation dataType constructor allocated = pair
+                  at accepted
+                rcases pair with ⟨instantiation, childState⟩
+                have childProgress := ih instantiation childState result accepted
+                  (here.child (.expression_identifier_constructor original form allocation lookupNone
+                    notBoolean functions builtin discovery fresh accepted))
+                exact (allocateExpressionId_success_origins_progress allocation).trans
+                  ((freshDataConstructorInstantiation_success_origins_progress fresh).trans childProgress)
+      | cons signature rest =>
+        cases rest with
+        | cons second tail => simp at accepted
+        | nil =>
+          have recorded := Detail.inferExprFuel_success_declarationIdentifier_record form allocation
+            lookupNone notBoolean functions original
+          simp only at recorded
+          have record := RelativeReadProgress.recordExpressionWithExpected (root := root) recorded
+            (by intro _ _ impossible; cases impossible)
+          have afterRequirements := RelativeReadProgressFields.trans
+            (RelativeReadProgress.addRequirementsWithIds (root := root) _ _) record
+          exact RelativeReadProgressFields.trans
+            (allocateExpressionId_success_origins_progress (root := root) allocation) afterRequirements
+  case case17 =>
     intro context source expected initial fuel id allocated allocation base dot name form ih baseIH
     intro result accepted here
     have original := accepted

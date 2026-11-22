@@ -1656,8 +1656,14 @@ private theorem pattern_call_private (protectedVars : List TypeVarId) (fuel : Na
         (by assumption) rfl rfl
   case case13 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
-      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments notUint256 contextualBranch childrenIH
+      leadingDot qualifiers constructorName sourceArguments patternEq notUint256 refused
+    unfold PatternCallFixedness at *
+    intro result ready expectedBelow formation bound expectedSafe live fixed success
+    unfold Detail.inferMatchPatternFlatFuel at success
+    simp_all
+  case case14 =>
+    intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
+      leadingDot qualifiers constructorName sourceArguments patternEq flatArguments notUint256 notRefused contextualBranch childrenIH
     unfold PatternCallFixedness at *
     intro result ready expectedBelow formation bound expectedSafe live fixed success
     unfold Detail.inferMatchPatternFlatFuel at success
@@ -1681,10 +1687,9 @@ private theorem pattern_call_private (protectedVars : List TypeVarId) (fuel : Na
           (fun metavariable member => Nat.lt_of_lt_of_le (bound metavariable member) beforeChildren.2.1.next_le)
           (fun type member => (beforeChildren.2.2.2 type member).2) beforeChildren.1.2.1 beforeChildren.1.2.2 (by assumption)
         exact beforeChildren.1.trans child
-  case case14 =>
+  case case15 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
-      leadingDot qualifiers constructorName sourceArguments patternEq branchEq
-      flatArguments notUint256 explicitBranch childrenIH
+      leadingDot qualifiers constructorName sourceArguments patternEq flatArguments notUint256 notRefused explicitBranch childrenIH
     unfold PatternCallFixedness at *
     intro result ready expectedBelow formation bound expectedSafe live fixed success
     unfold Detail.inferMatchPatternFlatFuel at success
@@ -1724,7 +1729,7 @@ private theorem pattern_call_private (protectedVars : List TypeVarId) (fuel : Na
       (ProtectedVariables.unify expectedSafe boolSafe (by assumption))
       (live.unify expectedSafe boolSafe (by assumption))
       (unify_fixes_protected fixed expectedSafe boolSafe (by assumption))
-  case case15 =>
+  case case16 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       leadingDot qualifiers constructorName sourceArguments patternEq argument
       selectedEq childrenIH
@@ -1744,7 +1749,7 @@ private theorem pattern_call_private (protectedVars : List TypeVarId) (fuel : Na
       (fun type member => (beforeChildren.2.2.2 type member).2) beforeChildren.1.2.1 beforeChildren.1.2.2
       (by assumption)
     exact beforeChildren.1.trans child
-  case case17 =>
+  case case18 =>
     intros sourcePattern sourceExpected sourceSeen inputState sourceFuel
       elements patternEq sources argumentTypes allocatedState freshEq childrenIH
     unfold PatternCallFixedness at *
@@ -1769,7 +1774,7 @@ private theorem pattern_call_private (protectedVars : List TypeVarId) (fuel : Na
         rw [← argumentTypesEq]
         simpa only [sources] using (by assumption))
     exact beforeChildren.1.trans child
-  case case21 =>
+  case case22 =>
     intros fuel head rest expectedHead expectedTail seen state ihHead ihTail
     unfold PatternsCallFixedness
     unfold PatternCallFixedness at ihHead

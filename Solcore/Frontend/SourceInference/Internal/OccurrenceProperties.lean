@@ -2480,7 +2480,7 @@ private theorem inference_preserves_nextOccurrence :
       PreservesNextOccurrence MatchCasesResult.state state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
           cases state))
-  case case15 =>
+  case case12 =>
     intros context expression expected state fuel calleeId stateAfterId
       allocationEq keyword parameters returnType body expressionEq bodyInduction
     simp only [PreservesNextOccurrence, StrictlyAdvancesNextOccurrence] at *
@@ -3448,7 +3448,7 @@ private theorem inference_occurrenceBoundExtends :
       PreservesOccurrenceBound MatchCasesResult.state state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
           cases state))
-  case case15 =>
+  case case12 =>
     intros context expression expected state fuel calleeId stateAfterId
       allocationEq keyword parameters returnType body expressionEq bodyInduction
     unfold PreservesOccurrenceBound at *
@@ -4843,7 +4843,7 @@ private theorem inference_anchoredNodePrefixExtends :
       PreservesAnchoredNodePrefix MatchCasesResult.state state
         (inferMatchCasesFuel fuel context scrutineeType expectedReturn outerScope
           cases state))
-  case case12 =>
+  case case9 =>
     intros context expression expected initial fuel id allocated allocationEq
       operator operand expressionEq operandInduction
     unfold PreservesAnchoredNodePrefix
@@ -4957,7 +4957,7 @@ private theorem inference_anchoredNodePrefixExtends :
                           rw [inferExprFuel_success_id_index operandResult]
                           exact Nat.le_trans cutoffLe
                             allocationExtends.nextOccurrence_le
-  case case13 =>
+  case case10 =>
     intros context expression expected initial fuel id allocated allocationEq
       left operator right expressionEq leftInduction rightInduction
     unfold PreservesAnchoredNodePrefix
@@ -5121,7 +5121,7 @@ private theorem inference_anchoredNodePrefixExtends :
                                           allocationExtends.nextOccurrence_le
                                           leftExtends.nextOccurrence_le)
                                     · simp at member
-  case case15 =>
+  case case12 =>
     intros context expression expected state fuel calleeId stateAfterId
       allocationEq keyword parameters returnType body expressionEq bodyInduction
     unfold PreservesAnchoredNodePrefix at *
@@ -5177,7 +5177,7 @@ private theorem inference_anchoredNodePrefixExtends :
           fresh_anchoredNodePrefixExtends,
           restoreLexicalScope_anchoredNodePrefixExtends,
           unify_anchoredNodePrefixExtends]
-  case case16 =>
+  case case13 =>
     intros context expression expected initial fuel id allocated allocationEq
       callee sourceArguments expressionEq constructorInduction
       argumentsInduction calleeInduction
@@ -5578,7 +5578,63 @@ private theorem inference_anchoredNodePrefixExtends :
                                             exact finishSelected name
                                               (candidate :: rest) attempt
                                               selectionResult resultEq
-  case case20 =>
+  case case23 =>
+    intros context expression expected initial fuel id allocated allocationEq
+      name expressionEq lookupNone notBool constructorInduction
+    unfold PreservesAnchoredNodePrefix
+    intro result success
+    have allocationExtends :=
+      allocateExpressionId_success_anchoredNodePrefixExtends allocationEq
+    unfold inferExprFuel at success
+    simp only [allocationEq, expressionEq, lookupNone, notBool, Bool.false_eq_true, if_false, bind,
+      Except.bind] at success
+    cases functionsResult : functionsNamed context name.value with
+    | error error => simp [functionsResult] at success
+    | ok functionCandidates =>
+        simp only [functionsResult] at success
+        cases functionCandidates with
+        | nil =>
+            cases builtinResult : builtinNamed? context name.value with
+            | some function =>
+                simp only [builtinResult] at success
+                exact allocationExtends.trans
+                  (recordExpressionWithExpected_anchoredNodePrefixExtends success)
+            | none =>
+                simp only [builtinResult, bind, Except.bind] at success
+                cases candidatesResult :
+                    constructorCalleeCandidates context allocated expression with
+                | error error => simp [candidatesResult] at success
+                | ok candidates =>
+                    simp only [candidatesResult] at success
+                    cases candidates with
+                    | nil => simp at success
+                    | cons candidate rest =>
+                        cases rest with
+                        | cons second tail => simp at success
+                        | nil =>
+                            rcases candidate with ⟨dataType, constructor⟩
+                            let freshResult :=
+                              freshDataConstructorInstantiation dataType constructor
+                                allocated
+                            have freshExtends :=
+                              freshDataConstructorInstantiation_anchoredNodePrefixExtends
+                                dataType constructor allocated
+                            have constructorExtends := constructorInduction freshResult.1
+                              freshResult.2 result (by
+                                simpa only [freshResult] using success)
+                            exact allocationExtends.trans
+                              (freshExtends.trans constructorExtends)
+        | cons signature rest =>
+            cases rest with
+            | cons second tail => simp at success
+            | nil =>
+                simp only at success
+                exact recordExpressionWithExpected_after_allocation_anchoredNodePrefixExtends
+                  allocationEq success (by
+                    apply AnchoredNodePrefixExtends.trans _
+                      (addRequirementsWithIds_anchoredNodePrefixExtends _ _)
+                    exact .of_occurrenceState_eq rfl rfl)
+  case case17 =>
     intros context expression expected initial fuel id allocated allocationEq
       base dot name expressionEq constructorInduction baseInduction
     unfold PreservesAnchoredNodePrefix

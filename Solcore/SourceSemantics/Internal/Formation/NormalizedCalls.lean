@@ -1581,7 +1581,7 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
   case case6 =>
     simp_all [InferExprFuelFormation, inferExprFuel]
 
-  case case21 =>
+  case case18 =>
     intros context expression expected initial fuel id allocated allocationEq
       elements expressionEq elementsInduction
     unfold InferExprFuelFormation
@@ -1629,7 +1629,7 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
       simpa [Ty.array, Substitution.apply] using TypeAdmissible.array freshFormed
     exact recordExpressionWithExpected_normalized_state formation
       (freshFormation.unify unifyResult) continuation arrayFormed expectedFormed recorded
-  case case22 =>
+  case case19 =>
     intros context expression expected initial fuel id allocated allocationEq
       keyword sourceType length expressionEq lengthInduction
     unfold InferExprFuelFormation
@@ -1666,7 +1666,7 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
       rwa [(Detail.newArrayElement_ok elementResult).1] at resolved
     exact recordExpressionWithExpected_normalized_state formation childFormation.2 continuation
       arrayFormed expectedFormed recorded
-  case case23 =>
+  case case20 =>
     intros context expression expected initial fuel id allocated allocationEq
       base brackets start colon stop expressionEq childrenInduction
     unfold InferExprFuelFormation
@@ -1763,7 +1763,7 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
     have produced := inferExprFuel_numeric_normalized_formation formation.toFormationContext
       formation.scope.binders expressionEq literalEq numericEq allocationEq expectedFormed continuation success
     exact ⟨produced.1, expression_state_from_rows formed success produced.2⟩
-  case case7 =>
+  case case21 =>
     intros context expression expected initial fuel id allocated allocationEq
       name expressionEq binder lookupEq localSchemeInstantiationStart
       instantiated inference advanced predicates requirements recorded requirementsEq
@@ -1771,7 +1771,7 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
     intro ready nodes formed formation expectedBelow expectedFormed result success continuation captures
     exact inferExprFuel_local_normalized_state formation ready formed expressionEq allocationEq
       lookupEq expectedBelow expectedFormed success continuation
-  case case8 =>
+  case case22 =>
     intros context expression expected initial fuel id allocated allocationEq
       name expressionEq lookupNone isBoolean
     unfold InferExprFuelFormation
@@ -1779,9 +1779,9 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
     have produced := inferExprFuel_boolean_normalized_formation formation.toFormationContext
       formation.scope.binders expressionEq allocationEq lookupNone isBoolean expectedFormed continuation success
     exact ⟨produced.1, expression_state_from_rows formed success produced.2⟩
-  case case9 =>
+  case case23 =>
     intros context expression expected initial fuel id allocated allocationEq
-      name expressionEq lookupNone notBool
+      name expressionEq lookupNone notBool constructorInduction
     unfold InferExprFuelFormation
     intro ready nodes formed formation expectedBelow expectedFormed result success continuation captures
     have original := success
@@ -1795,7 +1795,11 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
       cases candidates with
       | nil =>
         cases builtinResult : builtinNamed? context name.value with
-        | none => simp [builtinResult] at success
+        | none =>
+          exact inferExprFuel_identifierConstructor_formation expressionEq
+            (by rw [allocationEq]; exact lookupNone) notBool functionsResult builtinResult
+            (fun instantiation state => by simpa only [allocationEq] using constructorInduction instantiation state)
+            ready nodes formed formation expectedBelow expectedFormed result original continuation captures
         | some function =>
           have produced := inferExprFuel_builtin_normalized_formation formation.toFormationContext
             formation.scope.binders expressionEq allocationEq lookupNone notBoolean functionsResult builtinResult
@@ -1941,7 +1945,7 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
         exact initialized_statement_receipt_normalized receipt
           (by simpa only [allocationEq] using initializerInduction resolvedType)
           ready nodes formed formation continuation captures
-  case case10 =>
+  case case7 =>
     intros context expression expected initial fuel id allocated allocationEq
       inner expressionEq innerInduction
     unfold InferExprFuelFormation
@@ -1968,7 +1972,7 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
         (captures.before_recordExpressionWithExpected success)
       exact recordExpressionWithExpected_normalized_state formation childFormation.2 continuation
         childFormation.1 expectedFormed success
-  case case11 =>
+  case case8 =>
     intros context expression expected initial fuel id allocated allocationEq
       elements expressionEq elementsInduction
     unfold InferExprFuelFormation
@@ -2311,7 +2315,7 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
         exact tailIH itemState itemProperties.2 itemNodes itemFormation formation
           tail tailRun continuation captures restCapture
 
-  case case18 =>
+  case case15 =>
     intros context expression expected initial fuel id allocated allocationEq marker sourceType expressionEq
     unfold InferExprFuelFormation
     intro ready nodes formed formation expectedBelow expectedFormed result success continuation captures
@@ -2329,7 +2333,7 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
       exact recordExpressionWithExpected_normalized_state formation allocation.2.2.1
         continuation proxyFormed expectedFormed success
 
-  case case15 =>
+  case case12 =>
     intros context expression expected initial fuel id allocated allocationEq
       keyword parameters returnType body expressionEq bodyIH
     exact inferExprFuel_lambda_formation expressionEq bodyIH
@@ -2587,7 +2591,7 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
       | uncheckedDivide => exact finishNonEqual (valueIH place) success
       | uncheckedModulo => exact finishNonEqual (valueIH place) success
 
-  case case14 =>
+  case case11 =>
     intros context expression expected initial fuel id allocated allocationEq
       condition question thenBranch colon elseBranch expressionEq conditionIH thenIH elseIH
     unfold InferExprFuelFormation
@@ -2753,35 +2757,35 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
             · exact (continuation expectedReturn).symm ▸ returnFormed
             · exact .unit formation.scope.binders
 
-  case case16 =>
+  case case13 =>
     intro context expression expected initial fuel id allocated allocationEq callee arguments expressionEq constructorIH argumentsIH calleeIH
     apply inferExprFuel_call_formation expressionEq
     · intro instantiation state
       simpa only [allocationEq] using constructorIH instantiation state
     · simpa only [allocationEq] using argumentsIH
     · exact calleeIH
-  case case17 =>
+  case case14 =>
     intro context expression expected initial fuel id allocated allocationEq dot name arguments expressionEq constructorIH
     apply inferExprFuel_dotConstructor_formation expressionEq
     intro dataType constructor typeArguments
     simpa only [allocationEq] using constructorIH dataType constructor typeArguments
-  case case20 =>
+  case case17 =>
     intro context expression expected initial fuel id allocated allocationEq base dot name expressionEq constructorIH baseIH
     apply inferExprFuel_fieldConstructor_formation expressionEq
     · intro instantiation state
       simpa only [allocationEq] using constructorIH instantiation state
     · simpa only [allocationEq] using baseIH
 
-  case case12 =>
+  case case9 =>
     intro context expression expected initial fuel id allocated allocationEq operator operand form operandIH
     apply inferExprFuel_unary_formation form
     simpa only [allocationEq] using operandIH
-  case case13 =>
+  case case10 =>
     intro context expression expected initial fuel id allocated allocationEq left operator right form leftIH rightIH
     apply inferExprFuel_binary_formation form
     · simpa only [allocationEq] using leftIH
     · exact rightIH
-  case case19 =>
+  case case16 =>
     intro context expression expected initial fuel id allocated allocationEq base brackets index form baseIH indexIH
       arrayIH
     apply inferExprFuel_index_formation form

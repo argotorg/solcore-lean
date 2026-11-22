@@ -580,7 +580,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
   case case6 =>
     simp_all [InferExprFuelPrivacy, inferExprFuel]
 
-  case case7 =>
+  case case21 =>
     intros context expression expected initial fuel id allocated allocationEq
       name expressionEq binder lookupEq localSchemeInstantiationStart
       instantiated inference advanced predicates requirements recorded requirementsEq
@@ -588,7 +588,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     intro ready _ bound live catalog _ _ expectedBelow expectedSafe result success
     exact UnrestrictedLocalLookup.inferExprFuel_local_private catalog expressionEq allocationEq lookupEq
       success ready bound live expectedBelow expectedSafe
-  case case8 =>
+  case case22 =>
     intros context expression expected initial fuel id allocated allocationEq
       name expressionEq lookupNone isBoolean
     unfold InferExprFuelPrivacy
@@ -620,9 +620,9 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     refine ⟨allocationPrivacy.1.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
     intro row member fresh
     exact recorded.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using fresh)
-  case case9 =>
+  case case23 =>
     intros context expression expected initial fuel id allocated allocationEq
-      name expressionEq lookupNone notBool
+      name expressionEq lookupNone notBool constructorInduction
     unfold InferExprFuelPrivacy
     intro ready wellFormed bound live catalog validated canonical expectedBelow expectedSafe result success
     have allocationProperties := allocateExpressionId_eq_inferenceProperties ready allocationEq
@@ -652,7 +652,51 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         cases candidates with
         | nil =>
             cases builtinResult : builtinNamed? context name.value with
-            | none => simp [builtinResult] at success
+            | none =>
+                simp only [builtinResult, Bool.false_eq_true, if_false] at success
+                cases candidatesResult :
+                    constructorCalleeCandidates context allocated expression with
+                | error error =>
+                    simp [candidatesResult] at success
+                | ok constructorCandidates =>
+                    simp only [candidatesResult] at success
+                    cases constructorCandidates with
+                    | nil => simp at success
+                    | cons candidate rest =>
+                        cases rest with
+                        | cons second tail => simp at success
+                        | nil =>
+                            rcases candidate with ⟨dataType, constructor⟩
+                            let freshResult :=
+                              freshDataConstructorInstantiation dataType constructor
+                                allocated
+                            have candidateFacts :=
+                              constructorCalleeCandidates_success_members candidatesResult
+                                dataType constructor (by simp)
+                            have payloadTypesBelow :=
+                              validated.data_constructor_payloadTypes_variablesBelow
+                                candidateFacts.1 candidateFacts.2
+                                allocated.inference.next
+                            have freshProperties :=
+                              freshDataConstructorInstantiation_inferenceProperties
+                                dataType constructor allocated allocationProperties.2
+                                payloadTypesBelow
+                            have payloadClosed := validated.data_constructor_payloadTypes_variablesBelow candidateFacts.1 candidateFacts.2 0
+                            have freshPrivacy := fresh_constructor (dataType := dataType) allocationProperties.2 boundAllocated payloadClosed
+                            have freshLive := allocationPrivacy.2.1.transport
+                              (congrArg LexicalScope.binders (freshDataConstructorInstantiation_preserves_lexicalScope dataType constructor allocated)) freshPrivacy.1
+                            have freshWF := (freshDataConstructorInstantiation_direct_progress dataType constructor allocated).wellFormed wfAllocated
+                            have finished := constructorInduction freshResult.1 freshResult.2 freshProperties.2.1 freshWF
+                              (fun metavariable member => Nat.lt_of_lt_of_le (boundAllocated metavariable member) freshProperties.1.next_le)
+                              freshLive catalog validated canonical freshProperties.2.2.2.1 freshPrivacy.2.1
+                              freshProperties.2.2.2.2 freshPrivacy.2.2
+                              (fun type member => (expectedAtAllocated type member).weaken freshProperties.1.next_le)
+                              (fun type member => freshPrivacy.1 _ (allocationPrivacy.1 _ (expectedSafe type member))) result
+                              (by simpa only [freshResult] using success)
+                            refine ⟨allocationPrivacy.1.trans (freshPrivacy.1.trans finished.1), finished.2.1, finished.2.2.1, ?_⟩
+                            intro row member freshRow
+                            apply finished.2.2.2 row member
+                            simpa only [freshResult, freshDataConstructorInstantiation_requirements, allocationPrivacy.2.2] using freshRow
             | some function =>
                 simp only [builtinResult] at success
                 have recorded := recordExpressionWithExpected_private catalog allocationProperties.2
@@ -675,7 +719,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                 intro row member fresh
                 exact recorded.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using fresh)
             | cons second tail => simp at success
-  case case10 =>
+  case case7 =>
     intros context expression expected initial fuel id allocated allocationEq
       inner expressionEq innerInduction
     unfold InferExprFuelPrivacy
@@ -718,7 +762,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         intro row member fresh
         exact new_requirements_trans innerPrivacy.2.2.2 recorded.2.2.2 recorded.1 row member
           (by simpa only [allocationPrivacy.2.2] using fresh)
-  case case11 =>
+  case case8 =>
     intros context expression expected initial fuel id allocated allocationEq
       elements expressionEq elementsInduction
     unfold InferExprFuelPrivacy
@@ -777,7 +821,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         exact new_requirements_trans elementsPrivacy.2.2.2 recorded.2.2.2 recorded.1 row member
           (by simpa only [allocationPrivacy.2.2] using fresh)
 
-  case case12 =>
+  case case9 =>
     intros context expression expected initial fuel id allocated allocationEq
       operator operand expressionEq operandInduction
     unfold InferExprFuelPrivacy
@@ -925,7 +969,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                           (new_requirements_trans selectedPrivacy.2.2.2 (new_rows_of_eq recorded.2.2.2) recorded.1)
                           tailTransport row member (by simpa only [allocationPrivacy.2.2] using fresh)
 
-  case case13 =>
+  case case10 =>
     intros context expression expected initial fuel id allocated allocationEq
       left operator right expressionEq leftInduction rightInduction
     unfold InferExprFuelPrivacy
@@ -1153,7 +1197,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                                     (fittedPrivacy.1.trans recorded.1))
                                   tailTransport row member (by simpa only [allocationPrivacy.2.2] using fresh)
 
-  case case14 =>
+  case case11 =>
     intros context expression expected initial fuel id allocated allocationEq
       condition question thenBranch colon elseBranch expressionEq
       conditionInduction thenInduction elseInduction
@@ -1296,11 +1340,11 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                     intro row member freshRow
                     exact new_requirements_trans unifiedRows recorded.2.2.2 recorded.1 row member
                       (by simpa only [allocationPrivacy.2.2] using freshRow)
-  case case15 =>
+  case case12 =>
     intro context expression expected initial fuel id allocated allocation keyword parameters returnType body form bodyIH
     exact inferExprFuel_lambda_private form bodyIH
 
-  case case21 =>
+  case case18 =>
     intros context expression expected initial fuel id allocated allocationEq
       elements expressionEq elementsInduction
     unfold InferExprFuelPrivacy
@@ -1380,7 +1424,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     intro row member freshRow
     exact new_requirements_trans unifiedRows recorded.2.2.2 recorded.1 row member
       (by simpa only [allocationPrivacy.2.2] using freshRow)
-  case case22 =>
+  case case19 =>
     intros context expression expected initial fuel id allocated allocationEq
       keyword sourceType length expressionEq lengthInduction
     unfold InferExprFuelPrivacy
@@ -1429,7 +1473,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     intro row member fresh
     exact new_requirements_trans lengthPrivacy.2.2.2 recorded.2.2.2 recorded.1 row member
       (by simpa only [allocationPrivacy.2.2] using fresh)
-  case case23 =>
+  case case20 =>
     intros context expression expected initial fuel id allocated allocationEq
       base brackets start colon stop expressionEq childrenInduction
     unfold InferExprFuelPrivacy
@@ -2387,7 +2431,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     exact ⟨allocationPrivacy.1.trans (.of_substitution_eq rfl),
       safe_closed _ _ (Ty.variablesBelow_constructor 0 _),
       allocationPrivacy.2.1.transport rfl (.of_substitution_eq rfl), new_rows_of_eq allocationPrivacy.2.2⟩
-  case case18 =>
+  case case15 =>
     intros context expression expected initial fuel id allocated allocationEq
       marker sourceType expressionEq
     unfold InferExprFuelPrivacy
@@ -2483,7 +2527,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
                 · split
                   · exact tailPrivacy.1 _ headPrivacy.2.1
                   · exact tailPrivacy.2.1
-  case case16 =>
+  case case13 =>
     intro context expression expected initial fuel id allocated allocationEq callee arguments expressionEq constructorIH argumentsIH calleeIH
     apply inferExprFuel_call_private expressionEq
     · intro instantiation state
@@ -2603,7 +2647,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         intro row member freshRow type typeMember
         apply SafeTransport.of_substitution_eq (before := valueState) rfl
         exact valuePrivacy.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using freshRow) type typeMember
-  case case17 =>
+  case case14 =>
     intros context expression expected initial fuel id allocated allocationEq
       dot name arguments expressionEq constructorInduction
     unfold InferExprFuelPrivacy
@@ -2651,7 +2695,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         intro row member freshRow
         exact finished.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using freshRow)
 
-  case case20 =>
+  case case17 =>
     intros context expression expected initial fuel id allocated allocationEq
       base dot name expressionEq constructorInduction baseInduction
     unfold InferExprFuelPrivacy
@@ -2991,7 +3035,7 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
     · exact conditionIH
     · exact bodyIH
     · exact postIH
-  case case19 =>
+  case case16 =>
     intros context expression expected initial fuel id allocated allocationEq
       base brackets index expressionEq baseInduction indexInduction arrayIndexInduction
     unfold InferExprFuelPrivacy
