@@ -499,6 +499,23 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {child : Expres
       obtain ⟨_, _, _, _, _, same⟩ := bitNotted_inv unique found form head
       subst same
       cases terminal
+  | projectedBitNotted found form assignable keys _ tailIH =>
+    intro size context environment before after finalContext outcome within
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after headSize
+        tailSize headBelow tailBelow head next
+      obtain ⟨_, _, childBelow, executes, rfl, same⟩ := bitNotted_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve write =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        obtain ⟨values, staged, snapshot⟩ := projected_target lift keys (by omega) resolve
+        exact .bitNotProjected (lookupStatement?_sound found) form assignable.2.1 staged snapshot write
+          (tailIH (by omega) next)
+    · intro context environment before finalContext outcome after _ _ head terminal
+      obtain ⟨_, _, _, _, _, same⟩ := bitNotted_inv unique found form head
+      subst same
+      cases terminal
   | discarded found form value _ tailIH =>
     intro size context environment before after finalContext outcome within
     apply sequence unique found (fun _ same => by rw [form] at same; cases same)
@@ -1656,7 +1673,8 @@ section
 /-! Original fault executions of supported statement lists are staged fault
 executions with the same reason and heap, given the value and fault liftings
 of their expressions below the size. A statement faults in its expression, its
-target, bare or through mapping indices, or its inner list, or a
+target, bare or through mapping indices, the operand of its in-place `~`, or
+its inner list, or a
 falling-through statement is followed by a fault in the rest of its list; the
 staged rule of the same form carries the fault, at the context, environment
 and heap of the original execution. -/
@@ -1777,15 +1795,15 @@ private theorem bitNotted_fault_inv (unique : NodeOccurrencesUnique source)
     (form : node.form = .assignBitNot assignment)
     (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
       reason after) :
-    ∃ child, SourceExecutionSize.SourcePlaceBitNotFaults program child context evidence source environment before
-      assignment.target reason after := by
+    ∃ child, child < size ∧ SourceExecutionSize.SourcePlaceBitNotFaults program child context evidence source
+      environment before assignment.target reason after := by
   cases fault with
   | missing absent => exact (Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)).elim
   | assignBitNot contains formEq fault =>
     obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
     rw [form] at formEq
     cases formEq
-    exact ⟨_, fault⟩
+    exact ⟨_, CellAwareInvocationAcceptedSizedLifting.below_one, fault⟩
   | _ =>
     exfalso
     obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
@@ -1940,6 +1958,33 @@ private theorem projections_fault {child : ExpressionId → Prop} {bound : Nat}
       simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
       exact .tailFault (lift admitted (by omega) head)
         (ih (fun other member => keys other (List.mem_cons_of_mem _ member)) (by omega) signatures expressible failed)
+
+/-- A read through a non-empty path, or from a present value, selects a value. -/
+private theorem read_selects : ∀ {start : Option Dynamic.Value} {evaluated : List Dynamic.EvaluatedProjection}
+    {result : Option Dynamic.Value}, Dynamic.ProjectionsRead start evaluated result →
+    (∃ value, start = some value) ∨ evaluated ≠ [] → ∃ value, result = some value := by
+  intro start evaluated result read
+  induction read with
+  | nil =>
+    intro present
+    rcases present with ⟨value, rfl⟩ | nonempty
+    · exact ⟨value, rfl⟩
+    · exact absurd rfl nonempty
+  | indexFound _ _ ih => intro _; exact ih (.inl ⟨_, rfl⟩)
+  | indexDefault _ _ _ ih => intro _; exact ih (.inl ⟨_, rfl⟩)
+  | member _ _ ih => intro _; exact ih (.inl ⟨_, rfl⟩)
+  | element _ _ ih => intro _; exact ih (.inl ⟨_, rfl⟩)
+
+/-- A non-empty path of projections evaluates to a non-empty path. -/
+private theorem evaluated_nonempty {size : Nat} {context : SourceSemantics.Context}
+    {environment : Dynamic.Environment} {before after : Dynamic.Heap} {projections : List PlaceProjection}
+    {evaluated : List Dynamic.EvaluatedProjection} (projected : projections ≠ [])
+    (evaluate : SourceExecutionSize.SourceProjectionsEvaluate program size context scope.evidence scope.source
+      environment before projections evaluated after) : evaluated ≠ [] := by
+  cases evaluate with
+  | nil => exact absurd rfl projected
+  | member _ => exact List.cons_ne_nil _ _
+  | index _ _ => exact List.cons_ne_nil _ _
 
 /-- One statement followed by the rest of its list, over sized fault
 derivations. A faulting head ends the list at its context; a falling-through
@@ -2184,10 +2229,74 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
         exact .bitNotBare (lookupStatement?_sound found) form snapshot write
           (tailIH (by omega) signatures expressible next)
     · intro context environment before after _ _ _ fault
-      obtain ⟨_, fault⟩ := bitNotted_fault_inv unique found form fault
+      obtain ⟨_, _, fault⟩ := bitNotted_fault_inv unique found form fault
       have unchanged := Staging.Recursive.bitNot_fault_heap assignable.2.1 fault.sound
       subst unchanged
       exact .bitNotBareFault (lookupStatement?_sound found) form assignable.2.1 fault.sound
+  | projectedBitNotted found form assignable keys _ tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, _, childBelow, executes, rfl, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.bitNotted_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve write =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        obtain ⟨values, staged, snapshot⟩ :=
+          CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+        exact .bitNotProjected (lookupStatement?_sound found) form assignable.2.1 staged snapshot write
+          (tailIH (by omega) signatures expressible next)
+    · intro context environment before after headSize headBelow signatures fault
+      have contains := lookupStatement?_sound found
+      obtain ⟨_, childBelow, fault⟩ := bitNotted_fault_inv unique found form fault
+      cases fault with
+      | target failed =>
+        cases failed with
+        | unbound missing => exact .bitNotProjectedRootFault contains form assignable.2.1 (.unbound missing)
+        | dangling lookup missing =>
+          exact .bitNotProjectedRootFault contains form assignable.2.1 (.dangling lookup missing)
+        | projectionExpression lookup read failed =>
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+          exact .bitNotProjectedKeysFault contains form assignable.2.1 (.intro lookup read)
+            (projections_fault lift faultLift keys (by omega) signatures expressible failed)
+        | danglingAfterProjections lookup read evaluate missing =>
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+          obtain ⟨values, staged, ordered⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+          exact .bitNotProjectedGetterFault contains form assignable.2.1 staged (.dangling lookup read ordered missing)
+        | projectionRead lookup initialRead evaluate currentRead initialValue failed =>
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+          obtain ⟨values, staged, ordered⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+          exact .bitNotProjectedGetterFault contains form assignable.2.1 staged
+            (.projection lookup initialRead ordered currentRead initialValue failed)
+        | uninitialized lookup initialRead evaluate currentRead empty notMapping nonempty =>
+          simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+          obtain ⟨values, staged, ordered⟩ :=
+            CellAwareInvocationAcceptedSizedLifting.projections_values lift keys (by omega) evaluate
+          exact .bitNotProjectedGetterFault contains form assignable.2.1 staged
+            (.uninitialized lookup initialRead ordered currentRead empty notMapping nonempty)
+        | elementPrefix projectionsEq _
+        | elementIndex projectionsEq _ _
+        | elementIndexType projectionsEq _ _ _ _
+        | elementOutOfBounds projectionsEq _ _ _ _ _ _
+        | elementUninitialized projectionsEq _ _ =>
+          exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
+      | uninitialized resolve empty =>
+        exfalso
+        cases resolve with
+        | intro _ _ evaluate _ _ selection =>
+          obtain ⟨_, present⟩ := read_selects selection (.inr (evaluated_nonempty assignable.2.1 evaluate))
+          cases present.symm.trans empty
+        | element projectionsEq =>
+          exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
+      | operand resolve selected invalid =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at childBelow
+        obtain ⟨values, staged, snapshot⟩ :=
+          CellAwareInvocationAcceptedSizedLifting.projected_target lift keys (by omega) resolve
+        exact .bitNotProjectedOperandFault contains form assignable.2.1 staged snapshot selected invalid
   | discarded found form value _ tailIH =>
     intro size context environment before after finalContext reason within signatures expressible original
     refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original

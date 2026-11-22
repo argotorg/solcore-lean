@@ -24,8 +24,8 @@ section
 -- leanmerge: from Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedBodyShape
 /-! Source statement lists that the accepted-body route closes at named rows:
 value and unit returns, monomorphic declarations, bare assignments, assignments
-through mapping indices and bare in-place `~` the compiler refines, expression
-statements, blocks and conditionals, and a function body's final value of its
+through mapping indices and in-place `~`, bare or through mapping indices, that
+the compiler refines, expression statements, blocks and conditionals, and a function body's final value of its
 declared type, each with its expressions in a given predicate. `Shape` recognizes these lists on the
 Source; `covered` shows that every refined accepted tree of such a list is
 covered by the statement closure, and `shapeWith?` recognizes them on an
@@ -36,7 +36,7 @@ set_option Elab.async false
 set_option maxHeartbeats 4000000
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedBodyShape
 open Core Frontend SourceInference
-open AcceptedNamedBodyFlow (Tree Assignable ProjectedAssignable BitNotAssignable)
+open AcceptedNamedBodyFlow (Tree Assignable ProjectedAssignable BitNotAssignable ProjectedBitNotAssignable)
 open CellAwareInvocationAcceptedFlow (Covered)
 
 /-- Statement lists of the supported forms. A list may end without returning
@@ -77,6 +77,11 @@ inductive Shape (source : TypedSource) (expected : TypeSystem.Ty) (child : Expre
   | bitNotted {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
       {assignment : AssignmentResolution} (found : source.lookupStatement? id = some node)
       (form : node.form = .assignBitNot assignment) (assignable : BitNotAssignable source assignment)
+      (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
+  | projectedBitNotted {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+      {assignment : AssignmentResolution} (found : source.lookupStatement? id = some node)
+      (form : node.form = .assignBitNot assignment) (assignable : ProjectedBitNotAssignable source assignment)
+      (keys : ∀ projection ∈ assignment.target.projections, ∃ key, projection = .index key ∧ child key)
       (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
   | discarded {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
       {expression : ExpressionId} (found : source.lookupStatement? id = some node)
@@ -191,6 +196,20 @@ def bitNotAssignable? (source : TypedSource) (assignment : AssignmentResolution)
     | _ :: _ => none
   else none
 
+/-- Proof-producing recognition of an in-place `~` through mapping indices the
+compiler refines. -/
+def projectedBitNotAssignable? (source : TypedSource) (assignment : AssignmentResolution) :
+    Option (PLift (ProjectedBitNotAssignable source assignment)) :=
+  if profile : assignment.target.type = .word ∨ ∃ type, assignment.target.type = .fixed type then
+    if projected : assignment.target.projections ≠ [] then
+      match root : SourceCoreDataPlaces.rootBinder source assignment.target.root with
+      | .ok binder => do
+        let ⟨route⟩ ← route? source binder.scheme.body assignment.target.projections assignment.target.type
+        pure ⟨⟨profile, projected, fun other found => by rw [root] at found; cases found; exact route⟩⟩
+      | .error _ => some ⟨⟨profile, projected, fun other found => by rw [root] at found; cases found⟩⟩
+    else none
+  else none
+
 /-- Proof-producing recognition of a supported statement list whose
 expressions satisfy `child`, which `child?` checks. The fuel bounds the nesting
 of statement lists. -/
@@ -234,10 +253,16 @@ def shapeWith? (source : TypedSource) (expected : TypeSystem.Ty) (child : Expres
           let ⟨value⟩ ← child? expression
           let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
           pure ⟨.projectedAssigned found form assignable keys value tail⟩
-      | .assignBitNot assignment => do
-        let ⟨assignable⟩ ← bitNotAssignable? source assignment
-        let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
-        pure ⟨.bitNotted found form assignable tail⟩
+      | .assignBitNot assignment =>
+        match bitNotAssignable? source assignment with
+        | some ⟨assignable⟩ => do
+          let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+          pure ⟨.bitNotted found form assignable tail⟩
+        | none => do
+          let ⟨assignable⟩ ← projectedBitNotAssignable? source assignment
+          let ⟨keys⟩ ← indexKeys? child? assignment.target.projections
+          let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+          pure ⟨.projectedBitNotted found form assignable keys tail⟩
       | .expression expression true => do
         let ⟨value⟩ ← child? expression
         let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
@@ -301,6 +326,7 @@ private theorem head_expanded {source : TypedSource} {expected : TypeSystem.Ty} 
   | assigned found form => exact ⟨_, found, by rw [form]; rfl⟩
   | projectedAssigned found form => exact ⟨_, found, by rw [form]; rfl⟩
   | bitNotted found form => exact ⟨_, found, by rw [form]; rfl⟩
+  | projectedBitNotted found form => exact ⟨_, found, by rw [form]; rfl⟩
   | discarded found form => exact ⟨_, found, by rw [form]; rfl⟩
   | block found form => exact ⟨_, found, by rw [form]; rfl⟩
   | conditional found form => exact ⟨_, found, by rw [form]; rfl⟩
@@ -414,6 +440,11 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       rw [form] at form'
       cases form'
       exact absurd (.inl assignable) ready.1
+    | projectedBitNotted found form' assignable _ _ =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      rw [form] at form'
+      cases form'
+      exact absurd (.inr assignable) ready.1
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
@@ -425,6 +456,9 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     | bitNotted found _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       exact ⟨sameSource, ih ready tail⟩
+    | projectedBitNotted found _ _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready tail⟩
     | _ =>
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
@@ -434,6 +468,9 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
     intro ready shape
     cases shape with
     | bitNotted found _ _ tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      exact ⟨sameSource, ih ready tail⟩
+    | projectedBitNotted found _ _ _ tail =>
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
       exact ⟨sameSource, ih ready tail⟩
     | _ =>
@@ -671,9 +708,9 @@ section
 executions. Every statement of `CellAwareInvocationAcceptedBodyShape.Shape`
 runs the same rule in both semantics once its subset expressions are staged:
 declarations allocate the same cell, a bare assignment resolves its target
-without changing the heap and writes it by the same rule, an assignment
-through mapping indices evaluates its keys in order before the same snapshot
-and write, and blocks and conditional arms restore their entry bindings while
+without changing the heap and writes it by the same rule, an assignment or an
+in-place `~` through mapping indices evaluates its keys in order before the
+same snapshot and write, and blocks and conditional arms restore their entry bindings while
 keeping their heap. Each control outcome is carried unchanged, with the
 context, environment and heap of the original execution. Fault executions are
 not lifted here. -/
@@ -1073,6 +1110,20 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {mode : Bool} {
       | intro resolve write =>
         obtain ⟨rfl, snapshot⟩ := Staging.Recursive.BareTarget.of_resolves assignable.2.1 resolve
         exact .bitNotBare (lookupStatement?_sound found) form snapshot write (tailIH next)
+    · intro context environment before finalContext outcome after head terminal
+      obtain ⟨_, _, _, same⟩ := bitNotted_inv unique found form head
+      subst same
+      cases terminal
+  | projectedBitNotted found form assignable keys _ tailIH =>
+    intro context environment before after finalContext outcome
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after head next
+      obtain ⟨_, executes, rfl, same⟩ := bitNotted_inv unique found form head
+      cases same
+      cases executes with
+      | intro resolve write =>
+        obtain ⟨values, staged, snapshot⟩ := projected_target unique keys resolve
+        exact .bitNotProjected (lookupStatement?_sound found) form assignable.2.1 staged snapshot write (tailIH next)
     · intro context environment before finalContext outcome after head terminal
       obtain ⟨_, _, _, same⟩ := bitNotted_inv unique found form head
       subst same
