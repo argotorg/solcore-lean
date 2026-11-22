@@ -1633,6 +1633,53 @@ open Frontend SourceInference TypeSystem
 open Solcore.SourceSemantics.Dynamic
 variable {program : Program} {registry : Registry}
 
+/-- An element target in a selected body keeps the heap typed, with its index by the induction hypothesis. -/
+private theorem element_target_below (budget : Nat)
+    (expressionIH : ∀ smaller, smaller < budget → ExpressionAt program registry smaller)
+    {size : Nat} {scope : Scope} {context : Context} {environment : Dynamic.Environment} {before after : Heap}
+    {place : PlaceResolution} {outcome : TargetOutcome} {type : Ty} (bound : size < budget)
+    (runtime : SourceRuntimeValid program context scope.source) (covers : scope.evidence.Covers context)
+    (locals : EnvironmentAgrees before context.locals environment) (heap : HeapWellTyped context before)
+    (typed : SourcePlaceHasType scope.source context place type)
+    (trace : Size.ElementTarget program registry size scope context environment before place outcome after) :
+    HeapWellTyped context after ∧ HeapTypesExtend before after ∧
+      ∀ target, outcome = .resolved target → ∃ root, ResolvedPlaceHasType context after target root type :=
+  element_target_preserved budget runtime.graph.nodeOccurrencesUnique
+    (fun below locals heap typed trace => expression_value (expressionIH _ below) runtime covers locals heap typed trace)
+    (fun below locals heap typed trace =>
+      have post := expressionIH _ below runtime covers locals heap typed trace
+      ⟨post.heap_typed, post.heap_extends⟩)
+    bound locals heap typed trace
+
+/-- A typed assignment writes through a typed resolved target, whichever operator it has. -/
+private theorem resolved_write {source : TypedSource} {context : Context} {before middle after : Heap}
+    {assignment : AssignmentResolution} {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    {target : ResolvedPlace} {value updated : Value} {targetType : Ty}
+    (typed : SourceAssignmentHasType source context assignment operator rhs)
+    (targetTyped : SourcePlaceHasType source context assignment.target targetType)
+    (resolved : ∃ root, ResolvedPlaceHasType context before target root targetType)
+    (rhsPost : ∀ type, ExpressionHasType source context rhs type → ExpressionEvaluationPreserved context before middle value type)
+    (write : ResolvedPlaceWrites
+      (fun _ replacement => CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
+      middle target updated after) :
+    HeapWellTyped context after ∧ HeapTypesExtend before after := by
+  obtain ⟨_, savedTyped⟩ := resolved
+  have same {type : Ty} (other : SourcePlaceHasType source context assignment.target type) : type = targetType :=
+    other.type_eq.symm.trans targetTyped.type_eq
+  cases typed with
+  | equal otherTyped rhsTyped _ =>
+      cases same otherTyped
+      exact projected_write_equal savedTyped (rhsPost _ rhsTyped) write
+  | wordCompound kind otherTyped rhsTyped _ =>
+      cases same otherTyped
+      exact projected_write_compound (.word kind) otherTyped.type_eq savedTyped (rhsPost _ rhsTyped) write
+  | fixedCompound kind otherTyped rhsTyped _ =>
+      cases same otherTyped
+      exact projected_write_compound (.fixed kind) otherTyped.type_eq savedTyped (rhsPost _ rhsTyped) write
+  | shiftCompound kind otherTyped targetKind rhsTyped _ _ =>
+      cases same otherTyped
+      exact projected_write_shift kind targetKind otherTyped.type_eq savedTyped (rhsPost _ rhsTyped) write
+
 theorem for_items_step (size : Nat)
     (expressionIH : ∀ smaller, smaller < size → ExpressionAt program registry smaller)
     (expressionsIH : ∀ smaller, smaller < size → ExpressionsAt program registry smaller)
@@ -2456,6 +2503,40 @@ theorem statements_step (size : Nat)
               have keyPost := expressionsIH keysSize (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap keyTyped keys
               exact fault_statements keyPost.heap_typed keyPost.heap_extends
+  | @bitNotElement targetSize nextSize mode scope context finalContext environment before targetHeap written after assignment target updated id rest node outcome
+      contains form _element resolved write next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignBitNot assignmentTyped =>
+          cases assignmentTyped with
+          | @intro _ _ targetType targetTyped kind _ =>
+              obtain ⟨targetHeapTyped, targetExtends, targetResolved⟩ := element_target_below _ expressionIH
+                (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
+              obtain ⟨_, savedTyped⟩ := targetResolved _ rfl
+              rw [targetTyped.type_eq] at write
+              obtain ⟨writtenTyped, writtenExtends⟩ := projected_write_bitNot kind savedTyped targetHeapTyped write
+              have totalExtends := targetExtends.trans writtenExtends
+              have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+                (locals.mono totalExtends) writtenTyped tailTyped next
+              have headFalls : headFacts.control.canFallthrough = true := by
+                have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+                cases controlTyped
+                rfl
+              exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+  | @bitNotElementTargetFault targetSize mode scope context environment before after assignment id rest node failure
+      contains form _element failed
+  | @bitNotElementOperandFault targetSize mode scope context environment before after assignment _ _ id rest node
+      contains form _element failed _ _ =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignBitNot assignmentTyped =>
+          cases assignmentTyped with
+          | intro targetTyped _ _ =>
+              obtain ⟨afterTyped, targetExtends, _⟩ := element_target_below _ expressionIH
+                (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped failed
+              exact fault_statements afterTyped targetExtends
   | @assignProjected keysSize childSize nextSize mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome
       contains form _projected keys snapshot child write next =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
@@ -2584,6 +2665,50 @@ theorem statements_step (size : Nat)
               have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers
                 (locals.mono keyPost.heap_extends) keyPost.heap_typed rhsTyped child
               exact fault_statements post.heap_typed (keyPost.heap_extends.trans post.heap_extends)
+  | @assignElement targetSize childSize nextSize mode scope context finalContext environment before targetHeap middle written after assignment operator rhs target value updated id rest node outcome
+      contains form _element resolved child write next =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          obtain ⟨_, _, targetTyped, _⟩ := assignment_parts_typed assignmentTyped
+          obtain ⟨targetHeapTyped, targetExtends, targetResolved⟩ := element_target_below _ expressionIH
+            (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
+          obtain ⟨writtenTyped, writtenExtends⟩ := resolved_write assignmentTyped targetTyped (targetResolved _ rfl)
+            (fun _ rhsTyped => expression_value (expressionIH childSize (Size.child_lt_stepSize (by simp)))
+              runtime covers (locals.mono targetExtends) targetHeapTyped rhsTyped child) write
+          have totalExtends := targetExtends.trans writtenExtends
+          have post := statementsIH nextSize (Size.child_lt_stepSize (by simp)) runtime covers
+            (locals.mono totalExtends) writtenTyped tailTyped next
+          have headFalls : headFacts.control.canFallthrough = true := by
+            have controlTyped := statement_control_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+            cases controlTyped
+            rfl
+          exact (continue_tail headFalls completeTail fallthroughWhole next post).prepend totalExtends
+  | @assignElementTargetFault targetSize mode scope context environment before after assignment operator rhs id rest node failure
+      contains form _element failed =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          obtain ⟨_, _, targetTyped, _⟩ := assignment_parts_typed assignmentTyped
+          obtain ⟨afterTyped, targetExtends, _⟩ := element_target_below _ expressionIH
+            (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped failed
+          exact fault_statements afterTyped targetExtends
+  | @assignElementRhsFault targetSize childSize mode scope context environment before targetHeap after assignment operator rhs target id rest node failure
+      contains form _element resolved child
+  | @assignElementWriteFault targetSize childSize mode scope context environment before targetHeap after assignment operator rhs target _ id rest node _
+      contains form _element resolved child _ =>
+      obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
+      have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
+      cases formTyped with
+      | assignValue assignmentTyped =>
+          obtain ⟨_, _, targetTyped, rhsTyped⟩ := assignment_parts_typed assignmentTyped
+          obtain ⟨targetHeapTyped, targetExtends, _⟩ := element_target_below _ expressionIH
+            (Size.child_lt_stepSize (by simp)) runtime covers locals heap targetTyped resolved
+          have post := expressionIH childSize (Size.child_lt_stepSize (by simp)) runtime covers
+            (locals.mono targetExtends) targetHeapTyped rhsTyped child
+          exact fault_statements post.heap_typed (targetExtends.trans post.heap_extends)
   | assignBareUnbound | assignBareDangling => exact fault_statements heap (.refl _)
   | @assignBare childSize nextSize mode scope context finalContext environment before middle written after
       id rest node assignment operator rhs value target updated outcome contains form snapshot child write next =>

@@ -211,8 +211,9 @@ namespace Solcore.SourceSemantics.Staging.Recursive.ProjectedTarget
 open Frontend Frontend.SourceInference Solcore.SourceSemantics.Dynamic
 
 /-- Members have no expression child; every index occurrence stays in order. An
-element projection ends the keys: this profile stages no element place, whose
-`Values` has no case, so only its root and leading keys can fault here. -/
+element projection ends the keys. `Values` has no element case, so on an element
+place, which `ElementTarget` stages, only the root and the leading keys can fault
+here. -/
 def keys : List PlaceProjection → List ExpressionId
   | [] => []
   | .member _ _ :: rest => keys rest
@@ -568,6 +569,20 @@ fault. -/
 inductive TargetOutcome where
   | resolved (target : ResolvedPlace)
   | fault (failure : Failure)
+
+/-- An element place: its projections end with an element. -/
+def ElementPlace (projections : List PlaceProjection) : Prop :=
+  ∃ leading index, projections = leading ++ [.element index]
+
+theorem ElementPlace.ne_nil {projections : List PlaceProjection} (element : ElementPlace projections) :
+    projections ≠ [] := by
+  obtain ⟨leading, index, rfl⟩ := element
+  simp
+
+theorem ElementPlace.mem {projections : List PlaceProjection} (element : ElementPlace projections) :
+    ∃ index, PlaceProjection.element index ∈ projections := by
+  obtain ⟨leading, index, rfl⟩ := element
+  exact ⟨index, by simp⟩
 
 /-- A fault after an array form's children keeps the heap they reached. -/
 theorem ArrayOutcome.fault_heap {form : ExpressionForm} {values : List Dynamic.Value} {heap after : Heap}
@@ -1131,6 +1146,34 @@ mutual
         (invalid : UnaryPrimitiveOperandInvalid .bitNot value) :
         StatementsIn program registry mode scope context environment before (id :: rest) context
           (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
+    | bitNotElement {mode scope context finalContext environment before targetHeap written after assignment target updated id rest node outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry scope context environment before assignment.target (.resolved target)
+          targetHeap)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
+          targetHeap target updated written)
+        (next : StatementsIn program registry mode scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | bitNotElementTargetFault {mode scope context environment before after assignment id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (element : ElementPlace assignment.target.projections)
+        (failed : ElementTarget program registry scope context environment before assignment.target (.fault failure)
+          after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | bitNotElementOperandFault {mode scope context environment before after assignment target value id rest node}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry scope context environment before assignment.target (.resolved target)
+          after)
+        (selected : target.selected = some value)
+        (invalid : UnaryPrimitiveOperandInvalid .bitNot value) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context
+          (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
     | assignProjected {mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment operator rhs)
@@ -1182,6 +1225,42 @@ mutual
         (keys : Expressions program registry scope context environment before
           (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
         (snapshot : ProjectedTarget.Snapshot environment before targetHeap assignment.target values target)
+        (child : Expression program registry scope context environment targetHeap rhs (.value right) after)
+        (failed : ProjectedTarget.WriteFault operator target right after reason) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault (.semantic reason)) after
+    | assignElement {mode scope context finalContext environment before targetHeap middle written after assignment operator rhs target value updated id rest node outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry scope context environment before assignment.target (.resolved target)
+          targetHeap)
+        (child : Expression program registry scope context environment targetHeap rhs (.value value) middle)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
+          middle target updated written)
+        (next : StatementsIn program registry mode scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) finalContext outcome after
+    | assignElementTargetFault {mode scope context environment before after assignment operator rhs id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (element : ElementPlace assignment.target.projections)
+        (failed : ElementTarget program registry scope context environment before assignment.target (.fault failure)
+          after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | assignElementRhsFault {mode scope context environment before targetHeap after assignment operator rhs target id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry scope context environment before assignment.target (.resolved target)
+          targetHeap)
+        (child : Expression program registry scope context environment targetHeap rhs (.fault failure) after) :
+        StatementsIn program registry mode scope context environment before (id :: rest) context (.fault failure) after
+    | assignElementWriteFault {mode scope context environment before targetHeap after assignment operator rhs target right id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry scope context environment before assignment.target (.resolved target)
+          targetHeap)
         (child : Expression program registry scope context environment targetHeap rhs (.value right) after)
         (failed : ProjectedTarget.WriteFault operator target right after reason) :
         StatementsIn program registry mode scope context environment before (id :: rest) context (.fault (.semantic reason)) after
@@ -1753,6 +1832,8 @@ namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
   assignProjected assignProjectedRootFault assignProjectedKeysFault assignProjectedGetterFault assignProjectedRhsFault assignProjectedWriteFault
   bitNotProjected bitNotProjectedRootFault bitNotProjectedKeysFault bitNotProjectedGetterFault bitNotProjectedOperandFault
+  assignElement assignElementTargetFault assignElementRhsFault assignElementWriteFault
+  bitNotElement bitNotElementTargetFault bitNotElementOperandFault
   bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBarePanic assignBareUnbound assignBareDangling letUninitialized letInitialized letGeneralized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
@@ -1857,6 +1938,15 @@ local macro "retain_stage_origin" : tactic =>
       intro s c r same
       cases same
       exact indexIH s c r rfl
+    case assignElementTargetFault contains form element failed ih
+      | bitNotElementTargetFault contains form element failed ih =>
+      intro s c r same
+      cases same
+      exact ih s c r rfl
+    case assignElementRhsFault contains form element resolved child resolvedIH childIH =>
+      intro s c r same
+      cases same
+      exact childIH s c r rfl
     all_goals simp_all [ExpressionOrigin, ValuesOrigin, BodyOrigin, ForItemsOrigin, TargetOrigin]
   ))
 

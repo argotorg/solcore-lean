@@ -39,6 +39,17 @@ inductive Shape (values : ValuesContext) (source : TypedSource)
       (ordinary : (∀ key value, prepared.route.rootSourceType ≠ .mapping key value) → prepared.route.rootMapping = none) :
       Shape values source context certificate scope administrative definitions place prepared codes leaf
 
+/-- The compiled target holds no element of a memory array. -/
+theorem Shape.elementFree {values : ValuesContext} {source : TypedSource} {context : SourceSemantics.Context}
+    {certificate : GenericExpressionMeaning.Certificate} {scope : Scope} {administrative : Core.Context}
+    {definitions : DataEnvironment} {place : PlaceResolution} {prepared : Prepared}
+    {codes : List SourceCoreBasic.LoweredExpr} {leaf : TypeSystem.Ty}
+    (shape : Shape values source context certificate scope administrative definitions place prepared codes leaf) :
+    ∀ index, PlaceProjection.element index ∉ place.projections := by
+  cases shape with
+  | bare empty _ => intro index; simp [empty]
+  | projected layout _ => exact layout.path.elementFree
+
 structure Head (values : ValuesContext) (source : TypedSource)
     (context : SourceSemantics.Context) (certificate : GenericExpressionMeaning.Certificate) (scope : Scope) (administrative : Core.Context)
     (definitions : DataEnvironment) (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp)

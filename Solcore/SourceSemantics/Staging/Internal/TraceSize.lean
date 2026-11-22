@@ -591,6 +591,36 @@ mutual
         (invalid : UnaryPrimitiveOperandInvalid .bitNot value) :
         StatementsIn program registry mode (stepSize [keysSize]) scope context environment before (id :: rest) context
           (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
+    | bitNotElement {targetSize nextSize : Nat} {mode scope context finalContext environment before targetHeap written after assignment target updated id rest node outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry targetSize scope context environment before assignment.target
+          (.resolved target) targetHeap)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => BitNotAssignmentApplies assignment.target.type target.selected replacement)
+          targetHeap target updated written)
+        (next : StatementsIn program registry mode nextSize scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [targetSize, nextSize]) scope context environment before (id :: rest)
+          finalContext outcome after
+    | bitNotElementTargetFault {targetSize : Nat} {mode scope context environment before after assignment id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (element : ElementPlace assignment.target.projections)
+        (failed : ElementTarget program registry targetSize scope context environment before assignment.target
+          (.fault failure) after) :
+        StatementsIn program registry mode (stepSize [targetSize]) scope context environment before (id :: rest) context
+          (.fault failure) after
+    | bitNotElementOperandFault {targetSize : Nat} {mode scope context environment before after assignment target value id rest node}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry targetSize scope context environment before assignment.target
+          (.resolved target) after)
+        (selected : target.selected = some value)
+        (invalid : UnaryPrimitiveOperandInvalid .bitNot value) :
+        StatementsIn program registry mode (stepSize [targetSize]) scope context environment before (id :: rest) context
+          (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
     | assignProjected {keysSize childSize nextSize : Nat} {mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment operator rhs)
@@ -645,6 +675,46 @@ mutual
         (child : Expression program registry childSize scope context environment targetHeap rhs (.value right) after)
         (failed : ProjectedTarget.WriteFault operator target right after reason) :
         StatementsIn program registry mode (stepSize [keysSize, childSize]) scope context environment before (id :: rest) context (.fault (.semantic reason)) after
+    | assignElement {targetSize childSize nextSize : Nat} {mode scope context finalContext environment before targetHeap middle written after assignment operator rhs target value updated id rest node outcome}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry targetSize scope context environment before assignment.target
+          (.resolved target) targetHeap)
+        (child : Expression program registry childSize scope context environment targetHeap rhs (.value value) middle)
+        (write : ResolvedPlaceWrites
+          (fun _ replacement => CompoundAssignmentApplies assignment.target.type operator target.selected value replacement)
+          middle target updated written)
+        (next : StatementsIn program registry mode nextSize scope context environment written rest finalContext outcome after) :
+        StatementsIn program registry mode (stepSize [targetSize, childSize, nextSize]) scope context environment before
+          (id :: rest) finalContext outcome after
+    | assignElementTargetFault {targetSize : Nat} {mode scope context environment before after assignment operator rhs id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (element : ElementPlace assignment.target.projections)
+        (failed : ElementTarget program registry targetSize scope context environment before assignment.target
+          (.fault failure) after) :
+        StatementsIn program registry mode (stepSize [targetSize]) scope context environment before (id :: rest) context
+          (.fault failure) after
+    | assignElementRhsFault {targetSize childSize : Nat} {mode scope context environment before targetHeap after assignment operator rhs target id rest node failure}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry targetSize scope context environment before assignment.target
+          (.resolved target) targetHeap)
+        (child : Expression program registry childSize scope context environment targetHeap rhs (.fault failure) after) :
+        StatementsIn program registry mode (stepSize [targetSize, childSize]) scope context environment before (id :: rest)
+          context (.fault failure) after
+    | assignElementWriteFault {targetSize childSize : Nat} {mode scope context environment before targetHeap after assignment operator rhs target right id rest node reason}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignValue assignment operator rhs)
+        (element : ElementPlace assignment.target.projections)
+        (resolved : ElementTarget program registry targetSize scope context environment before assignment.target
+          (.resolved target) targetHeap)
+        (child : Expression program registry childSize scope context environment targetHeap rhs (.value right) after)
+        (failed : ProjectedTarget.WriteFault operator target right after reason) :
+        StatementsIn program registry mode (stepSize [targetSize, childSize]) scope context environment before (id :: rest)
+          context (.fault (.semantic reason)) after
     | assignBare {childSize nextSize : Nat} {mode scope context finalContext environment before middle written after
           id rest node assignment operator rhs value target updated outcome}
         (contains : ContainsStatement scope.source id node)
@@ -1209,6 +1279,8 @@ namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
   assignProjected assignProjectedRootFault assignProjectedKeysFault assignProjectedGetterFault assignProjectedRhsFault assignProjectedWriteFault
   bitNotProjected bitNotProjectedRootFault bitNotProjectedKeysFault bitNotProjectedGetterFault bitNotProjectedOperandFault
+  assignElement assignElementTargetFault assignElementRhsFault assignElementWriteFault
+  bitNotElement bitNotElementTargetFault bitNotElementOperandFault
   bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBarePanic assignBareUnbound assignBareDangling letUninitialized letInitialized letGeneralized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
@@ -1396,6 +1468,13 @@ local macro "erase_stage_grade" : tactic =>
     case elementIndexFault => apply Recursive.ElementTarget.elementIndexFault <;> assumption
     case elementIndexType => apply Recursive.ElementTarget.elementIndexType <;> assumption
     case elementOutOfBounds => apply Recursive.ElementTarget.elementOutOfBounds <;> assumption
+    case assignElement => apply Recursive.StatementsIn.assignElement <;> assumption
+    case assignElementTargetFault => apply Recursive.StatementsIn.assignElementTargetFault <;> assumption
+    case assignElementRhsFault => apply Recursive.StatementsIn.assignElementRhsFault <;> assumption
+    case assignElementWriteFault => apply Recursive.StatementsIn.assignElementWriteFault <;> assumption
+    case bitNotElement => apply Recursive.StatementsIn.bitNotElement <;> assumption
+    case bitNotElementTargetFault => apply Recursive.StatementsIn.bitNotElementTargetFault <;> assumption
+    case bitNotElementOperandFault => apply Recursive.StatementsIn.bitNotElementOperandFault <;> assumption
   ))
 
 local macro "construct_stage_grade" : tactic =>
@@ -1971,6 +2050,32 @@ local macro "construct_stage_grade" : tactic =>
       obtain ⟨_, leadingGraded⟩ := leadingIH
       obtain ⟨_, indexGraded⟩ := indexIH
       exact ⟨_, .elementOutOfBounds projections_eq leadingGraded prefix_selected indexGraded read stored out_of_bounds⟩
+    case assignElement contains form element resolved child write next resolvedIH childIH nextIH =>
+      obtain ⟨_, resolvedGraded⟩ := resolvedIH
+      obtain ⟨_, childGraded⟩ := childIH
+      obtain ⟨_, nextGraded⟩ := nextIH
+      exact ⟨_, .assignElement contains form element resolvedGraded childGraded write nextGraded⟩
+    case assignElementTargetFault contains form element failed failedIH =>
+      obtain ⟨_, failedGraded⟩ := failedIH
+      exact ⟨_, .assignElementTargetFault contains form element failedGraded⟩
+    case assignElementRhsFault contains form element resolved child resolvedIH childIH =>
+      obtain ⟨_, resolvedGraded⟩ := resolvedIH
+      obtain ⟨_, childGraded⟩ := childIH
+      exact ⟨_, .assignElementRhsFault contains form element resolvedGraded childGraded⟩
+    case assignElementWriteFault contains form element resolved child failed resolvedIH childIH =>
+      obtain ⟨_, resolvedGraded⟩ := resolvedIH
+      obtain ⟨_, childGraded⟩ := childIH
+      exact ⟨_, .assignElementWriteFault contains form element resolvedGraded childGraded failed⟩
+    case bitNotElement contains form element resolved write next resolvedIH nextIH =>
+      obtain ⟨_, resolvedGraded⟩ := resolvedIH
+      obtain ⟨_, nextGraded⟩ := nextIH
+      exact ⟨_, .bitNotElement contains form element resolvedGraded write nextGraded⟩
+    case bitNotElementTargetFault contains form element failed failedIH =>
+      obtain ⟨_, failedGraded⟩ := failedIH
+      exact ⟨_, .bitNotElementTargetFault contains form element failedGraded⟩
+    case bitNotElementOperandFault contains form element resolved selected invalid resolvedIH =>
+      obtain ⟨_, resolvedGraded⟩ := resolvedIH
+      exact ⟨_, .bitNotElementOperandFault contains form element resolvedGraded selected invalid⟩
   ))
 
 theorem Expression.sound {program : Program} {registry : Registry} {size : Nat}
@@ -2546,6 +2651,9 @@ theorem Size.StatementsIn.breaking_view {program : Program} {registry : Registry
       cases (shape actual).symm.trans same
   | bitNotProjectedGetterFault actual same _ _ _ =>
       cases (shape actual).symm.trans same
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignProjected actual same _ _ _ _ _ _ =>
@@ -2558,6 +2666,10 @@ theorem Size.StatementsIn.breaking_view {program : Program} {registry : Registry
       cases (shape actual).symm.trans same
   | assignProjectedRhsFault actual same _ _ _ _ =>
       cases (shape actual).symm.trans same
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignBare actual same _ _ _ _ =>
@@ -2671,6 +2783,9 @@ theorem Size.StatementsIn.continuing_view {program : Program} {registry : Regist
       cases (shape actual).symm.trans same
   | bitNotProjectedGetterFault actual same _ _ _ =>
       cases (shape actual).symm.trans same
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignProjected actual same _ _ _ _ _ _ =>
@@ -2683,6 +2798,10 @@ theorem Size.StatementsIn.continuing_view {program : Program} {registry : Regist
       cases (shape actual).symm.trans same
   | assignProjectedRhsFault actual same _ _ _ _ =>
       cases (shape actual).symm.trans same
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignBare actual same _ _ _ _ =>

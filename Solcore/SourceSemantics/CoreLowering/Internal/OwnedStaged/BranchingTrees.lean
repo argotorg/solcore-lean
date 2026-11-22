@@ -1257,6 +1257,9 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | letFault actual same _ _ =>
@@ -1271,6 +1274,13 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
       cases (shape actual).symm.trans same
       have empty : assignment.target.projections = [] := by cases snapshot; assumption
       exact (projected empty).elim
+  | assignElement actual same element _ _ _ _
+  | assignElementTargetFault actual same element _
+  | assignElementRhsFault actual same element _ _
+  | assignElementWriteFault actual same element _ _ _ =>
+      cases (shape actual).symm.trans same
+      have empty : assignment.target.projections = [] := by cases snapshot; assumption
+      exact (element.ne_nil empty).elim
   | assignBare actual same actualSnapshot child write remaining =>
       have equal := (shape actual).symm.trans same
       cases equal

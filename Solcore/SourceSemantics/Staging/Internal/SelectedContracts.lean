@@ -712,5 +712,115 @@ theorem projected_write_bitNot {context : Context} {before after : Heap}
         exact updatedTyped
       exact ⟨heap.write currentRead (.some updatedCell) heapWrite, HeapTypesExtend.of_write heapWrite⟩
 
+/-- A typed assignment types its target and its right-hand side. -/
+theorem assignment_parts_typed {source : TypedSource} {context : Context} {assignment : AssignmentResolution}
+    {operator : Syntax.ValueAssignOp} {rhs : ExpressionId}
+    (typed : SourceAssignmentHasType source context assignment operator rhs) :
+    ∃ target right, SourcePlaceHasType source context assignment.target target ∧
+      ExpressionHasType source context rhs right := by
+  cases typed <;> exact ⟨_, _, by assumption, by assumption⟩
+
+/-- An element place's typing types its leading place, at the array of the place's type, and its index. -/
+theorem element_place_typed {source : TypedSource} {context : Context} {place : PlaceResolution}
+    {type : Ty} {leading : List PlaceProjection} {index : ExpressionId}
+    (typed : SourcePlaceHasType source context place type)
+    (projections_eq : place.projections = leading ++ [.element index]) :
+    SourcePlaceHasType source context { place with projections := leading, type := Ty.array place.type }
+        (Ty.array place.type) ∧ ∃ indexType, ExpressionHasType source context index indexType := by
+  cases typed with
+  | intro writable projections_type stored_type_eq =>
+      rw [projections_eq] at projections_type
+      obtain ⟨_, leading_type, element_type⟩ := SourceProjectionsHaveType.split projections_type
+      cases element_type with
+      | element index_type rest_type =>
+          cases rest_type
+          exact ⟨.intro writable (by rw [stored_type_eq]; exact leading_type) rfl, _, index_type⟩
+
+/-- An element target keeps the heap typed, given its typed index traces below a budget. A resolved
+target is typed at the place's type, as the Source's `SourcePlaceResolves.preserves` types it. -/
+theorem element_target_preserved {program : Program} {registry : Registry} (budget : Nat) {scope : Scope}
+    {context : Context} (unique : NodeOccurrencesUnique scope.source)
+    (values : ∀ {size : Nat} {environment : Dynamic.Environment} {before after : Heap} {id : ExpressionId}
+      {value : Dynamic.Value} {type : Ty}, size < budget →
+      EnvironmentAgrees before context.locals environment → HeapWellTyped context before →
+      ExpressionHasType scope.source context id type →
+      Size.Expression program registry size scope context environment before id (.value value) after →
+      ExpressionEvaluationPreserved context before after value type)
+    (faults : ∀ {size : Nat} {environment : Dynamic.Environment} {before after : Heap} {id : ExpressionId}
+      {failure : Failure} {type : Ty}, size < budget →
+      EnvironmentAgrees before context.locals environment → HeapWellTyped context before →
+      ExpressionHasType scope.source context id type →
+      Size.Expression program registry size scope context environment before id (.fault failure) after →
+      HeapWellTyped context after ∧ HeapTypesExtend before after)
+    {size : Nat} {environment : Dynamic.Environment} {before after : Heap} {place : PlaceResolution}
+    {outcome : TargetOutcome} {type : Ty} (bound : size < budget)
+    (locals : EnvironmentAgrees before context.locals environment) (heap : HeapWellTyped context before)
+    (typed : SourcePlaceHasType scope.source context place type)
+    (trace : Size.ElementTarget program registry size scope context environment before place outcome after) :
+    HeapWellTyped context after ∧ HeapTypesExtend before after ∧
+      ∀ target, outcome = .resolved target → ∃ root, ResolvedPlaceHasType context after target root type := by
+  cases trace with
+  | elementRoot bare lookup read initialValue =>
+      refine ⟨heap, .refl _, ?_⟩
+      intro target equal
+      cases equal
+      exact projected_target_typed unique locals heap (.refl _) typed (by rw [bare]; exact .nil _) .nil
+        (.intro lookup read (by rw [bare]; exact .nil) read initialValue .nil)
+  | elementRootFault => exact ⟨heap, .refl _, by intro _ equal; cases equal⟩
+  | @elementStep prefixSize indexSize _ _ _ _ middle _ _ leading index prefixTarget element location position cell
+      elements selected projections_eq leadingTarget prefix_selected indexed read initialValue selection =>
+      obtain ⟨prefixTyped, _, indexTyped⟩ := element_place_typed typed projections_eq
+      obtain ⟨middleTyped, prefixExtends, prefixResolved⟩ := element_target_preserved budget unique values faults
+        (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound) locals heap prefixTyped leadingTarget
+      obtain ⟨_, prefixPlaced⟩ := prefixResolved _ rfl
+      have referenceTyped : ValueHasType context middle (.arrayRef element location) (Ty.array place.type) := by
+        have selectedTyped := prefixPlaced.selected
+        rw [prefix_selected] at selectedTyped
+        cases selectedTyped with
+        | some typed => exact typed
+      have indexPost := values (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound)
+        (locals.mono prefixExtends) middleTyped indexTyped indexed
+      have referenceAfter := referenceTyped.mono indexPost.heap_extends
+      have selectedTyped := ValueHasType.arrayElement referenceAfter indexPost.heap_typed read
+        initialValue.arrayObject_value selection.getElem?_eq
+      refine ⟨indexPost.heap_typed, prefixExtends.trans indexPost.heap_extends, ?_⟩
+      intro target equal
+      cases equal
+      have stored := typed.type_eq
+      rcases referenceAfter.arrayRef_inv with ⟨typeEq, typedCell, typedRead, cellType⟩ | ⟨_, impossible, _⟩
+      · simp [Ty.array] at typeEq
+        subst typeEq
+        cases read.functional typedRead
+        exact ⟨Ty.arrayObject place.type, {
+          root_type := cellType
+          value_type := stored
+          projections := by rw [← stored]; exact .element (.nil _)
+          selected := by rw [← stored]; exact .some selectedTyped
+        }⟩
+      · simp [Ty.array] at impossible
+  | elementPrefixFault projections_eq leadingTarget
+  | elementUninitialized projections_eq leadingTarget _ =>
+      obtain ⟨prefixTyped, _⟩ := element_place_typed typed projections_eq
+      obtain ⟨afterTyped, prefixExtends, _⟩ := element_target_preserved budget unique values faults
+        (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound) locals heap prefixTyped leadingTarget
+      exact ⟨afterTyped, prefixExtends, by intro _ equal; cases equal⟩
+  | elementIndexFault projections_eq leadingTarget indexed =>
+      obtain ⟨prefixTyped, _, indexTyped⟩ := element_place_typed typed projections_eq
+      obtain ⟨middleTyped, prefixExtends, _⟩ := element_target_preserved budget unique values faults
+        (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound) locals heap prefixTyped leadingTarget
+      obtain ⟨afterTyped, indexExtends⟩ := faults (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound)
+        (locals.mono prefixExtends) middleTyped indexTyped indexed
+      exact ⟨afterTyped, prefixExtends.trans indexExtends, by intro _ equal; cases equal⟩
+  | elementIndexType projections_eq leadingTarget indexed _ _
+  | elementOutOfBounds projections_eq leadingTarget _ indexed _ _ _ =>
+      obtain ⟨prefixTyped, _, indexTyped⟩ := element_place_typed typed projections_eq
+      obtain ⟨middleTyped, prefixExtends, _⟩ := element_target_preserved budget unique values faults
+        (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound) locals heap prefixTyped leadingTarget
+      have indexPost := values (Nat.lt_trans (Size.child_lt_stepSize (by simp)) bound)
+        (locals.mono prefixExtends) middleTyped indexTyped indexed
+      exact ⟨indexPost.heap_typed, prefixExtends.trans indexPost.heap_extends, by intro _ equal; cases equal⟩
+termination_by size
+decreasing_by all_goals first | exact Size.child_lt_stepSize (by simp) | (simp_all [Size.stepSize] <;> omega)
+
 end Solcore.SourceSemantics.Staging.Recursive.SelectedPreservation
 end

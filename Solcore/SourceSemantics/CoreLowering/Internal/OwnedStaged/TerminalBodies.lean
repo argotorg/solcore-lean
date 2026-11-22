@@ -803,6 +803,9 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
     | bitNotProjectedRootFault actual form _ _
     | bitNotProjectedKeysFault actual form _ _ _
     | bitNotProjectedGetterFault actual form _ _ _
+    | bitNotElement actual form _ _ _ _
+    | bitNotElementTargetFault actual form _ _
+    | bitNotElementOperandFault actual form _ _ _ _
     | bitNotProjectedOperandFault actual form _ _ _ _ _
     | bitNotBare actual form _ _ _ | bitNotBareFault actual form _ _ =>
       have same := shape actual
@@ -813,6 +816,10 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
     | assignProjectedKeysFault actual form _ _ _
     | assignProjectedGetterFault actual form _ _ _
     | assignProjectedRhsFault actual form _ _ _ _
+    | assignElement actual form _ _ _ _ _
+    | assignElementTargetFault actual form _ _
+    | assignElementRhsFault actual form _ _ _
+    | assignElementWriteFault actual form _ _ _ _
     | assignProjectedWriteFault actual form _ _ _ _ _ =>
       have same := shape actual
       rw [form] at same
@@ -896,6 +903,9 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
     | bitNotProjectedRootFault actual form _ _
     | bitNotProjectedKeysFault actual form _ _ _
     | bitNotProjectedGetterFault actual form _ _ _
+    | bitNotElement actual form _ _ _ _
+    | bitNotElementTargetFault actual form _ _
+    | bitNotElementOperandFault actual form _ _ _ _
     | bitNotProjectedOperandFault actual form _ _ _ _ _
     | bitNotBare actual form _ _ _ | bitNotBareFault actual form _ _ =>
       have same := shape actual
@@ -906,6 +916,10 @@ theorem child_of_body {program : Program} {registry : Registry} {invocation : Sc
     | assignProjectedKeysFault actual form _ _ _
     | assignProjectedGetterFault actual form _ _ _
     | assignProjectedRhsFault actual form _ _ _ _
+    | assignElement actual form _ _ _ _ _
+    | assignElementTargetFault actual form _ _
+    | assignElementRhsFault actual form _ _ _
+    | assignElementWriteFault actual form _ _ _ _
     | assignProjectedWriteFault actual form _ _ _ _ _ =>
       have same := shape actual
       rw [form] at same

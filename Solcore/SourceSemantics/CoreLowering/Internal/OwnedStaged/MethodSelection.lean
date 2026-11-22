@@ -576,6 +576,9 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -583,6 +586,10 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
@@ -644,6 +651,9 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -651,6 +661,10 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
@@ -703,6 +717,9 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -710,6 +727,10 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>

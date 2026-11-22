@@ -1127,11 +1127,18 @@ private theorem return_fault {program : Program} {registry : Staging.Recursive.R
   | assignProjectedKeysFault contains otherForm _ _ _
   | assignProjectedGetterFault contains otherForm _ _ _
   | assignProjectedRhsFault contains otherForm _ _ _ _
+  | assignElement contains otherForm _ _ _ _ _
+  | assignElementTargetFault contains otherForm _ _
+  | assignElementRhsFault contains otherForm _ _ _
+  | assignElementWriteFault contains otherForm _ _ _ _
   | assignProjectedWriteFault contains otherForm _ _ _ _ _
   | bitNotProjected contains otherForm _ _ _ _ _
   | bitNotProjectedRootFault contains otherForm _ _
   | bitNotProjectedKeysFault contains otherForm _ _ _
   | bitNotProjectedGetterFault contains otherForm _ _ _
+  | bitNotElement contains otherForm _ _ _ _
+  | bitNotElementTargetFault contains otherForm _ _
+  | bitNotElementOperandFault contains otherForm _ _ _ _
   | bitNotProjectedOperandFault contains otherForm _ _ _ _ _
   | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
   | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBarePanic contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
@@ -1195,11 +1202,18 @@ theorem ActualHeader.failed_heap
   | assignProjectedKeysFault contains otherForm _ _ _
   | assignProjectedGetterFault contains otherForm _ _ _
   | assignProjectedRhsFault contains otherForm _ _ _ _
+  | assignElement contains otherForm _ _ _ _ _
+  | assignElementTargetFault contains otherForm _ _
+  | assignElementRhsFault contains otherForm _ _ _
+  | assignElementWriteFault contains otherForm _ _ _ _
   | assignProjectedWriteFault contains otherForm _ _ _ _ _
   | bitNotProjected contains otherForm _ _ _ _ _
   | bitNotProjectedRootFault contains otherForm _ _
   | bitNotProjectedKeysFault contains otherForm _ _ _
   | bitNotProjectedGetterFault contains otherForm _ _ _
+  | bitNotElement contains otherForm _ _ _ _
+  | bitNotElementTargetFault contains otherForm _ _
+  | bitNotElementOperandFault contains otherForm _ _ _ _
   | bitNotProjectedOperandFault contains otherForm _ _ _ _ _
   | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
   | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBarePanic contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
@@ -1278,7 +1292,9 @@ private theorem returned_expression
     rw [form] at impossible
     cases impossible
   | assignBare contains otherForm _ _ _ _
+  | assignElement contains otherForm _ _ _ _ _
   | assignProjected contains otherForm _ _ _ _ _ _
+  | bitNotElement contains otherForm _ _ _ _
   | bitNotProjected contains otherForm _ _ _ _ _
   | bitNotBare contains otherForm _ _ _ =>
     have impossible := (same contains) ▸ otherForm

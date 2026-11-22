@@ -337,7 +337,7 @@ theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : 
             last, callerProtocol.trans related lastRelated, post⟩
       ·
         have splitTrace := CallableIndexedOwnedPreparedStagedScopedProjectedAssignmentSourceInversion.child_and_tail
-          unique found form bare trace
+          unique found form bare head.shape.elementFree trace
         cases splitTrace with
         | rootFault failed => exact False.elim (failed.excluded head.writable locals)
         | keysFault ready keyTrace =>
@@ -429,7 +429,7 @@ theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : 
         obtain ⟨actualNode, nodeFound, nodeTyped, certified⟩ := generated
         exact children context size smaller certified found typed
       have splitTrace := CallableIndexedOwnedPreparedStagedScopedProjectedBitNotSourceInversion.child_and_tail
-        unique found form head.projected trace
+        unique found form head.projected head.layout.path.elementFree trace
       cases splitTrace with
       | rootFault failed => exact False.elim (failed.excluded head.writable locals)
       | keysFault ready keyTrace =>

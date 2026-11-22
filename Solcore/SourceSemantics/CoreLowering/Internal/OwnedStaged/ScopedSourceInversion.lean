@@ -349,6 +349,9 @@ theorem initial_loop_and_tail {program : Program} {registry : Registry} {mode : 
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -356,6 +359,10 @@ theorem initial_loop_and_tail {program : Program} {registry : Registry} {mode : 
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
@@ -514,6 +521,9 @@ theorem match_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -521,6 +531,10 @@ theorem match_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
@@ -687,6 +701,9 @@ theorem block_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -694,6 +711,10 @@ theorem block_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
@@ -823,6 +844,9 @@ theorem loop_and_tail {program : Program} {registry : Registry} {mode : Bool} {i
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -830,6 +854,10 @@ theorem loop_and_tail {program : Program} {registry : Registry} {mode : Bool} {i
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _
@@ -975,6 +1003,9 @@ theorem children {program : Program} {registry : Registry} {mode : Bool} {invoca
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -982,6 +1013,10 @@ theorem children {program : Program} {registry : Registry} {mode : Bool} {invoca
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
@@ -1070,6 +1105,9 @@ theorem absent {program : Program} {registry : Registry} {mode : Bool} {invocati
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -1077,6 +1115,10 @@ theorem absent {program : Program} {registry : Registry} {mode : Bool} {invocati
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
@@ -1139,6 +1181,9 @@ theorem initialized {program : Program} {registry : Registry} {mode : Bool} {inv
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -1146,6 +1191,10 @@ theorem initialized {program : Program} {registry : Registry} {mode : Bool} {inv
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
@@ -1199,6 +1248,9 @@ theorem return_unit {program : Program} {registry : Registry} {mode : Bool} {inv
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -1206,6 +1258,10 @@ theorem return_unit {program : Program} {registry : Registry} {mode : Bool} {inv
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _ | assignBareFault actual same _ _
   | assignBareUnbound actual same _ _ | assignBareDangling actual same _ _ _ =>
@@ -1288,6 +1344,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
     (found : invocation.source.lookupStatement? id = some node)
     (form : node.form = .assignBitNot assignment)
     (projected : assignment.target.projections ≠ [])
+    (elementFree : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (trace : Size.StatementsIn program registry mode size invocation context environment before
       (id :: rest) finalContext outcome after) :
     Result program registry mode invocation context environment before assignment rest size finalContext outcome after := by
@@ -1319,6 +1376,10 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _ | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _ | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | letFault actual same _ _ =>
       cases (shape actual).symm.trans same
@@ -1344,6 +1405,12 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjectedOperandFault actual same _ keys snapshot selected invalid =>
       cases (shape actual).symm.trans same
       exact .operandFault keys snapshot selected invalid
+  | bitNotElement actual same element _ _ _
+  | bitNotElementTargetFault actual same element _
+  | bitNotElementOperandFault actual same element _ _ _ =>
+      cases (shape actual).symm.trans same
+      obtain ⟨_, member⟩ := element.mem
+      exact (elementFree _ member).elim
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedProjectedBitNotSourceInversion
 end
@@ -1413,6 +1480,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
     (found : invocation.source.lookupStatement? id = some node)
     (form : node.form = .assignValue assignment operator rhs)
     (projected : assignment.target.projections ≠ [])
+    (elementFree : ∀ index, PlaceProjection.element index ∉ assignment.target.projections)
     (trace : Size.StatementsIn program registry mode size invocation context environment before
       (id :: rest) finalContext outcome after) :
     Result program registry mode invocation context environment before assignment operator rhs rest size finalContext outcome after := by
@@ -1442,6 +1510,9 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | letFault actual same _ _ =>
@@ -1476,6 +1547,13 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | assignProjectedWriteFault actual same _ keys snapshot child failed =>
       cases (shape actual).symm.trans same
       exact .writeFault keys snapshot child failed
+  | assignElement actual same element _ _ _ _
+  | assignElementTargetFault actual same element _
+  | assignElementRhsFault actual same element _ _
+  | assignElementWriteFault actual same element _ _ _ =>
+      cases (shape actual).symm.trans same
+      obtain ⟨_, member⟩ := element.mem
+      exact (elementFree _ member).elim
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedProjectedAssignmentSourceInversion
 end
@@ -1528,6 +1606,11 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjectedOperandFault actual same projected _ _ _ _ =>
       cases (shape actual).symm.trans same
       exact (projected bare).elim
+  | bitNotElement actual same element _ _ _
+  | bitNotElementTargetFault actual same element _
+  | bitNotElementOperandFault actual same element _ _ _ =>
+      cases (shape actual).symm.trans same
+      exact (element.ne_nil bare).elim
   | breaking actual same | continuing actual same
   | returnUnit actual same | returnValue actual same _ | returnFault actual same _
   | tail actual same _ | discard actual same _ _ | discardValue actual same _ _ | expressionFault actual same _
@@ -1548,6 +1631,10 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ | assignBareOperands actual same _ _ _ _ _ _ _ | assignBarePanic actual same _ _ _ _ _ _ _
   | assignBareFault actual same _ _ | assignBareUnbound actual same _ _
@@ -1657,6 +1744,9 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
     | bitNotProjectedRootFault actual form _ _
     | bitNotProjectedKeysFault actual form _ _ _
     | bitNotProjectedGetterFault actual form _ _ _
+    | bitNotElement actual form _ _ _ _
+    | bitNotElementTargetFault actual form _ _
+    | bitNotElementOperandFault actual form _ _ _ _
     | bitNotProjectedOperandFault actual form _ _ _ _ _
     | bitNotBare actual form _ _ _ | bitNotBareFault actual form _ _ =>
       have same := shape actual
@@ -1667,6 +1757,10 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
     | assignProjectedKeysFault actual form _ _ _
     | assignProjectedGetterFault actual form _ _ _
     | assignProjectedRhsFault actual form _ _ _ _
+    | assignElement actual form _ _ _ _ _
+    | assignElementTargetFault actual form _ _
+    | assignElementRhsFault actual form _ _ _
+    | assignElementWriteFault actual form _ _ _ _
     | assignProjectedWriteFault actual form _ _ _ _ _ =>
       have same := shape actual
       rw [form] at same
@@ -1748,6 +1842,9 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
     | bitNotProjectedRootFault actual form _ _
     | bitNotProjectedKeysFault actual form _ _ _
     | bitNotProjectedGetterFault actual form _ _ _
+    | bitNotElement actual form _ _ _ _
+    | bitNotElementTargetFault actual form _ _
+    | bitNotElementOperandFault actual form _ _ _ _
     | bitNotProjectedOperandFault actual form _ _ _ _ _
     | bitNotBare actual form _ _ _ | bitNotBareFault actual form _ _ =>
       have same := shape actual
@@ -1758,6 +1855,10 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
     | assignProjectedKeysFault actual form _ _ _
     | assignProjectedGetterFault actual form _ _ _
     | assignProjectedRhsFault actual form _ _ _ _
+    | assignElement actual form _ _ _ _ _
+    | assignElementTargetFault actual form _ _
+    | assignElementRhsFault actual form _ _ _
+    | assignElementWriteFault actual form _ _ _ _
     | assignProjectedWriteFault actual form _ _ _ _ _ =>
       have same := shape actual
       rw [form] at same
@@ -1890,6 +1991,9 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode semicolon
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -1897,6 +2001,10 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode semicolon
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ =>
     have impossible := shape actual
@@ -2009,6 +2117,9 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | letFault actual same _ _ =>
@@ -2023,6 +2134,13 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
       cases (shape actual).symm.trans same
       have empty : assignment.target.projections = [] := by cases snapshot; assumption
       exact (projected empty).elim
+  | assignElement actual same element _ _ _ _
+  | assignElementTargetFault actual same element _
+  | assignElementRhsFault actual same element _ _
+  | assignElementWriteFault actual same element _ _ _ =>
+      cases (shape actual).symm.trans same
+      have empty : assignment.target.projections = [] := by cases snapshot; assumption
+      exact (element.ne_nil empty).elim
   | assignBare actual same actualSnapshot child write remaining =>
       have equal := (shape actual).symm.trans same
       cases equal

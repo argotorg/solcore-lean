@@ -778,6 +778,31 @@ private theorem builtin_fault_evidence {program : Program} {context : Context}
 
 local macro "erase_recursive_plain" : tactic =>
   `(tactic| (
+    case assignElement contains form _element resolved child write _next resolvedIH childIH nextIH =>
+      exact StatementsPlain.prepend contains (by intro expression; simp [form])
+        (.assignValue contains form (.intro resolvedIH childIH write)) nextIH
+    case assignElementTargetFault contains form _element failed failedIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.assignValue contains form (.target failedIH))
+    case assignElementRhsFault contains form _element resolved child resolvedIH childIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.assignValue contains form (.rhs resolvedIH childIH))
+    case assignElementWriteFault contains form _element resolved child failed resolvedIH childIH =>
+      exact StatementsPlain.head_fault (.assignValue contains form (failed.source resolvedIH childIH))
+    case bitNotElement contains form _element resolved write _next resolvedIH nextIH =>
+      exact StatementsPlain.prepend contains (by intro expression; simp [form])
+        (.assignBitNot contains form (.intro resolvedIH write)) nextIH
+    case bitNotElementTargetFault contains form _element failed failedIH =>
+      rename_i failure
+      cases failure with
+      | stage => trivial
+      | semantic => exact StatementsPlain.head_fault (.assignBitNot contains form (.target failedIH))
+    case bitNotElementOperandFault contains form _element resolved selected invalid resolvedIH =>
+      exact StatementsPlain.head_fault (.assignBitNot contains form (.operand resolvedIH selected invalid))
     case elementRoot bare lookup read initialValue =>
       exact .intro lookup read (by rw [bare]; exact .nil) read initialValue .nil
     case elementRootFault bare failed =>
@@ -1928,6 +1953,34 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
   case bitNotProjectedOperandFault contains form _projected keys snapshot selected invalid _keysIH =>
     exact StatementsPlain.head_fault
       (.assignBitNot contains form (.operand (snapshot.resolves keys.values_plain) selected invalid))
+  case assignElement contains form _element resolved child write _next _resolvedIH _childIH nextIH =>
+    exact StatementsPlain.prepend contains (by intro expression; simp [form])
+      (.assignValue contains form (.intro resolved.resolved_plain child.value_plain write)) nextIH
+  case assignElementTargetFault contains form _element failed _failedIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (.assignValue contains form (.target failed.semanticFault_plain))
+  case assignElementRhsFault contains form _element resolved child _resolvedIH _childIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (.assignValue contains form
+        (.rhs resolved.resolved_plain child.semanticFault_plain))
+  case assignElementWriteFault contains form _element resolved child failed _resolvedIH _childIH =>
+    exact StatementsPlain.head_fault
+      (.assignValue contains form (failed.source resolved.resolved_plain child.value_plain))
+  case bitNotElement contains form _element resolved write _next _resolvedIH nextIH =>
+    exact StatementsPlain.prepend contains (by intro expression; simp [form])
+      (.assignBitNot contains form (.intro resolved.resolved_plain write)) nextIH
+  case bitNotElementTargetFault contains form _element failed _failedIH =>
+    rename_i failure
+    cases failure with
+    | stage => trivial
+    | semantic => exact StatementsPlain.head_fault (.assignBitNot contains form (.target failed.semanticFault_plain))
+  case bitNotElementOperandFault contains form _element resolved selected invalid _resolvedIH =>
+    exact StatementsPlain.head_fault
+      (.assignBitNot contains form (.operand resolved.resolved_plain selected invalid))
   case assignProjected contains form _projected keys snapshot child write _next _keysIH _childIH nextIH =>
     exact StatementsPlain.prepend contains (by intro expression; simp [form])
       (.assignValue contains form (.intro (snapshot.resolves keys.values_plain) child.value_plain write)) nextIH

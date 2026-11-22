@@ -2337,7 +2337,7 @@ theorem preserves [RecursiveStageMeaning.FaultTokens faults] (budget : Nat)
   have suffix := ProtectedStateImperativeStatementSuffixTyping.assignment
     (sourceEq ▸ unique) sourceTyped (sourceEq ▸ found) form
   have splitTrace := CallableIndexedOwnedPreparedStagedScopedProjectedAssignmentSourceInversion.child_and_tail
-    unique found form projected trace
+    unique found form projected head.shape.elementFree trace
   cases splitTrace with
   | rootFault failed => exact False.elim (failed.excluded head.writable locals)
   | keysFault ready keyTrace =>
@@ -2546,7 +2546,7 @@ theorem preserves (budget : Nat)
   have suffix := ProtectedStateImperativeStatementSuffixTyping.bitNot
     (sourceEq ▸ unique) sourceTyped (sourceEq ▸ found) form
   have splitTrace := CallableIndexedOwnedPreparedStagedScopedProjectedBitNotSourceInversion.child_and_tail
-    unique found form projected trace
+    unique found form projected head.layout.path.elementFree trace
   cases splitTrace with
   | rootFault failed => exact False.elim (failed.excluded head.writable locals)
   | keysFault ready keyTrace =>

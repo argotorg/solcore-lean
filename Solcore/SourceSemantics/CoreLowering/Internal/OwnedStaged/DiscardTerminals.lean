@@ -113,6 +113,9 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotElement actual same _ _ _ _
+  | bitNotElementTargetFault actual same _ _
+  | bitNotElementOperandFault actual same _ _ _ _
   | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
@@ -120,6 +123,10 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
   | assignProjectedKeysFault actual same _ _ _
   | assignProjectedGetterFault actual same _ _ _
   | assignProjectedRhsFault actual same _ _ _ _
+  | assignElement actual same _ _ _ _ _
+  | assignElementTargetFault actual same _ _
+  | assignElementRhsFault actual same _ _ _
+  | assignElementWriteFault actual same _ _ _ _
   | assignProjectedWriteFault actual same _ _ _ _ _
   | assignBare actual same _ _ _ _ =>
     have impossible := shape actual
