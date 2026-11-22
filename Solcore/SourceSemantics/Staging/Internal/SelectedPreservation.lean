@@ -2327,7 +2327,9 @@ theorem statements_step (size : Nat)
                 runtime covers locals heap keyTyped keys
               exact fault_statements keyPost.heap_typed keyPost.heap_extends
   | @bitNotProjectedGetterFault keysSize mode scope context environment before after assignment values id rest node reason
-      contains form _projected keys _failed =>
+      contains form _projected keys _failed
+  | @bitNotProjectedOperandFault keysSize mode scope context environment before after assignment values _ _ id rest node
+      contains form _projected keys _ _ _ =>
       obtain ⟨staticMiddle, headFacts, tailFacts, headTyped, tailTyped, completeTail, fallthroughWhole⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with

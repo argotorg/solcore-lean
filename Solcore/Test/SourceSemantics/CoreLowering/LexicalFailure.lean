@@ -1126,6 +1126,7 @@ private theorem return_fault {program : Program} {registry : Staging.Recursive.R
   | bitNotProjectedRootFault contains otherForm _ _
   | bitNotProjectedKeysFault contains otherForm _ _ _
   | bitNotProjectedGetterFault contains otherForm _ _ _
+  | bitNotProjectedOperandFault contains otherForm _ _ _ _ _
   | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
   | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBarePanic contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
   | assignBareUnbound contains otherForm _ _ | assignBareDangling contains otherForm _ _ _
@@ -1193,6 +1194,7 @@ theorem ActualHeader.failed_heap
   | bitNotProjectedRootFault contains otherForm _ _
   | bitNotProjectedKeysFault contains otherForm _ _ _
   | bitNotProjectedGetterFault contains otherForm _ _ _
+  | bitNotProjectedOperandFault contains otherForm _ _ _ _ _
   | bitNotBare contains otherForm _ _ _ | bitNotBareFault contains otherForm _ _
   | assignBareOperands contains otherForm _ _ _ _ _ _ _ | assignBarePanic contains otherForm _ _ _ _ _ _ _ | assignBareFault contains otherForm _ _
   | assignBareUnbound contains otherForm _ _ | assignBareDangling contains otherForm _ _ _

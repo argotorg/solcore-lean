@@ -215,6 +215,33 @@ theorem preserves_value (budget : Nat)
       simpa only [renamed_packed, Expr.rename, LanguageResult.success, writtenEnvironment, modifiedEnvironment, rhsEnvironment, snapshotEnvironment, keysEnvironment, referenceEnvironment, List.cons_append, List.nil_append] using
         commit.prefix_agreement resolution coreLookup (CompatiblePlaceModifier.passes_of_total rfl _ _) (next.rename ξ) output
 
+include transport extension head environments heaps locals agrees actualTyped initial admitted unique assignmentTyped projected faithful observations in
+/-- The snapshot's selected leaf is an operand of `~`: it is represented at the
+leaf's type, which in-place `~`'s profile at the target's type admits, so the
+staged operand fault has no run at an accepted head. -/
+theorem operand_valid (budget : Nat)
+    (meaning : PreservesBelow bridge context (payloadModel values.checked registry functions) stages invocation certificate faults budget)
+    {keySize : Nat} {sources : List Dynamic.Value} {target : Dynamic.ResolvedPlace} {getter : Dynamic.Heap}
+    (keyTrace : Staging.Recursive.Size.Expressions program stages keySize invocation context environment before
+      (Staging.Recursive.ProjectedTarget.keys assignment.target.projections) (.values sources) getter)
+    (keyBound : keySize ≤ budget)
+    (snapshot : Staging.Recursive.ProjectedTarget.Snapshot environment before getter assignment.target sources target)
+    {value : Dynamic.Value} (selected : target.selected = some value) :
+    ¬ Dynamic.UnaryPrimitiveOperandInvalid .bitNot value := by
+  have _nonempty := projected
+  cases assignmentTyped with
+  | intro targetTyped _kind _requirements =>
+    obtain ⟨_originalTypes, originalKeyTyped⟩ := CallableIndexedOwnedPlaceAdmission.place_keys_typed targetTyped
+    obtain ⟨resolution, _sameSources, _keyValues, _keyHeap, _coreLookup, _reached, _related, _admission⟩ :=
+      CallableIndexedOwnedAdmittedStagedProjectedAssignmentHeads.preserves_resolution bridge budget head.layout head.ordinary extension transport faithful observations
+        environments heaps locals agrees actualTyped initial admitted unique originalKeyTyped meaning
+        head.slot head.writable keyTrace keyBound snapshot
+    have same : resolution.selected = value := Option.some.inj (resolution.selectedEq.symm.trans selected)
+    subst same
+    obtain ⟨_, _, _, _, _, valid⟩ := CompatiblePlaceNumericBitNotModifier.wide_success head.profile head.leafView
+      resolution.snapshotRelated (environment := [_]) (rhs := .unit) (.var (index := 0) rfl) none store head.invalid
+    exact valid
+
 include environments heaps locals agrees actualTyped initial admitted unique assignmentTyped projected in
 theorem preserves_key_fault (budget : Nat)
     (meaning : PreservesBelow bridge context (payloadModel values.checked registry functions) stages invocation certificate faults budget)

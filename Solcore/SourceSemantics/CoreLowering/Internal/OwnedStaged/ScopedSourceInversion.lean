@@ -348,6 +348,7 @@ theorem initial_loop_and_tail {program : Program} {registry : Registry} {mode : 
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -512,6 +513,7 @@ theorem match_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -684,6 +686,7 @@ theorem block_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -819,6 +822,7 @@ theorem loop_and_tail {program : Program} {registry : Registry} {mode : Bool} {i
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -970,6 +974,7 @@ theorem children {program : Program} {registry : Registry} {mode : Bool} {invoca
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -1064,6 +1069,7 @@ theorem absent {program : Program} {registry : Registry} {mode : Bool} {invocati
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -1132,6 +1138,7 @@ theorem initialized {program : Program} {registry : Registry} {mode : Bool} {inv
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -1191,6 +1198,7 @@ theorem return_unit {program : Program} {registry : Registry} {mode : Bool} {inv
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -1251,6 +1259,14 @@ inductive Result (program : Program) (registry : Registry) (mode : Bool) (invoca
       (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
       Result program registry mode invocation context environment before assignment rest
         (Size.stepSize [keysSize]) context (.fault (.semantic reason)) after
+  | operandFault {keysSize values target value after}
+      (keys : Size.Expressions program registry keysSize invocation context environment before
+        (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+      (snapshot : ProjectedTarget.Snapshot environment before after assignment.target values target)
+      (selected : target.selected = some value)
+      (invalid : Dynamic.UnaryPrimitiveOperandInvalid .bitNot value) :
+      Result program registry mode invocation context environment before assignment rest
+        (Size.stepSize [keysSize]) context (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
   | success {keysSize tailSize values target targetHeap updated written finalContext outcome after}
       (keys : Size.Expressions program registry keysSize invocation context environment before
         (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
@@ -1324,6 +1340,9 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjectedGetterFault actual same _ keys failed =>
       cases (shape actual).symm.trans same
       exact .getterFault keys failed
+  | bitNotProjectedOperandFault actual same _ keys snapshot selected invalid =>
+      cases (shape actual).symm.trans same
+      exact .operandFault keys snapshot selected invalid
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedProjectedBitNotSourceInversion
 end
@@ -1422,6 +1441,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | letFault actual same _ _ =>
       have impossible := (shape actual).symm.trans same
@@ -1503,7 +1523,8 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjected actual same projected _ _ _ _
   | bitNotProjectedRootFault actual same projected _
   | bitNotProjectedKeysFault actual same projected _ _
-  | bitNotProjectedGetterFault actual same projected _ _ =>
+  | bitNotProjectedGetterFault actual same projected _ _
+  | bitNotProjectedOperandFault actual same projected _ _ _ _ =>
       cases (shape actual).symm.trans same
       exact (projected bare).elim
   | breaking actual same | continuing actual same
@@ -1635,6 +1656,7 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
     | bitNotProjectedRootFault actual form _ _
     | bitNotProjectedKeysFault actual form _ _ _
     | bitNotProjectedGetterFault actual form _ _ _
+    | bitNotProjectedOperandFault actual form _ _ _ _ _
     | bitNotBare actual form _ _ _ | bitNotBareFault actual form _ _ =>
       have same := shape actual
       rw [form] at same
@@ -1725,6 +1747,7 @@ theorem child_of_body {program : Program} {registry : Registry} {mode : Bool} {i
     | bitNotProjectedRootFault actual form _ _
     | bitNotProjectedKeysFault actual form _ _ _
     | bitNotProjectedGetterFault actual form _ _ _
+    | bitNotProjectedOperandFault actual form _ _ _ _ _
     | bitNotBare actual form _ _ _ | bitNotBareFault actual form _ _ =>
       have same := shape actual
       rw [form] at same
@@ -1866,6 +1889,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode semicolon
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -1984,6 +2008,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {mode : Bool} {
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | letFault actual same _ _ =>
       have impossible := (shape actual).symm.trans same

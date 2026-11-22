@@ -563,6 +563,17 @@ mutual
           (ProjectedTarget.keys assignment.target.projections) (.values values) after)
         (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
         StatementsIn program registry mode (stepSize [keysSize]) scope context environment before (id :: rest) context (.fault (.semantic reason)) after
+    | bitNotProjectedOperandFault {keysSize : Nat} {mode scope context environment before after assignment values target value id rest node}
+        (contains : ContainsStatement scope.source id node)
+        (form : node.form = .assignBitNot assignment)
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+        (snapshot : ProjectedTarget.Snapshot environment before after assignment.target values target)
+        (selected : target.selected = some value)
+        (invalid : UnaryPrimitiveOperandInvalid .bitNot value) :
+        StatementsIn program registry mode (stepSize [keysSize]) scope context environment before (id :: rest) context
+          (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
     | assignProjected {keysSize childSize nextSize : Nat} {mode scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated id rest node outcome}
         (contains : ContainsStatement scope.source id node)
         (form : node.form = .assignValue assignment operator rhs)
@@ -1092,7 +1103,7 @@ abbrev Statements (program : Program) (registry : Registry) := StatementsIn prog
 namespace Statements
 export StatementsIn (breaking continuing ifBreaking ifContinuing blockBreaking blockContinuing matchBreaking matchContinuing nil returnUnit returnValue returnFault tail discard expressionFault
   assignProjected assignProjectedRootFault assignProjectedKeysFault assignProjectedGetterFault assignProjectedRhsFault assignProjectedWriteFault
-  bitNotProjected bitNotProjectedRootFault bitNotProjectedKeysFault bitNotProjectedGetterFault
+  bitNotProjected bitNotProjectedRootFault bitNotProjectedKeysFault bitNotProjectedGetterFault bitNotProjectedOperandFault
   bitNotBare bitNotBareFault assignBare assignBareFault assignBareOperands assignBarePanic assignBareUnbound assignBareDangling letUninitialized letInitialized letGeneralized letFault
   ifConditionFault ifReturned ifFault ifFallthrough blockReturned blockFault blockFallthrough whileReturned whileFault whileFallthrough matchReturned matchFault matchFallthrough
   forInitializerFault forReturned forFault forFallthrough)
@@ -1201,6 +1212,7 @@ local macro "erase_stage_grade" : tactic =>
     case bitNotProjectedRootFault => apply Recursive.StatementsIn.bitNotProjectedRootFault <;> assumption
     case bitNotProjectedKeysFault => apply Recursive.StatementsIn.bitNotProjectedKeysFault <;> assumption
     case bitNotProjectedGetterFault => apply Recursive.StatementsIn.bitNotProjectedGetterFault <;> assumption
+    case bitNotProjectedOperandFault => apply Recursive.StatementsIn.bitNotProjectedOperandFault <;> assumption
     case assignProjected => apply Recursive.StatementsIn.assignProjected <;> assumption
     case assignProjectedRootFault => apply Recursive.StatementsIn.assignProjectedRootFault <;> assumption
     case assignProjectedKeysFault => apply Recursive.StatementsIn.assignProjectedKeysFault <;> assumption
@@ -1585,6 +1597,9 @@ local macro "construct_stage_grade" : tactic =>
     case bitNotProjectedGetterFault contains form projected keys failed keysIH =>
       obtain ⟨keysSize, keysGraded⟩ := keysIH
       exact ⟨_, .bitNotProjectedGetterFault contains form projected keysGraded failed⟩
+    case bitNotProjectedOperandFault contains form projected keys snapshot selected invalid keysIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      exact ⟨_, .bitNotProjectedOperandFault contains form projected keysGraded snapshot selected invalid⟩
     case assignProjected contains form projected keys snapshot child write next keysIH childIH nextIH =>
       obtain ⟨keysSize, keysGraded⟩ := keysIH
       obtain ⟨childSize, childGraded⟩ := childIH
@@ -2315,6 +2330,8 @@ theorem Size.StatementsIn.breaking_view {program : Program} {registry : Registry
       cases (shape actual).symm.trans same
   | bitNotProjectedGetterFault actual same _ _ _ =>
       cases (shape actual).symm.trans same
+  | bitNotProjectedOperandFault actual same _ _ _ _ _ =>
+      cases (shape actual).symm.trans same
   | assignProjected actual same _ _ _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignProjectedRootFault actual same _ _ =>
@@ -2437,6 +2454,8 @@ theorem Size.StatementsIn.continuing_view {program : Program} {registry : Regist
   | bitNotProjectedKeysFault actual same _ _ _ =>
       cases (shape actual).symm.trans same
   | bitNotProjectedGetterFault actual same _ _ _ =>
+      cases (shape actual).symm.trans same
+  | bitNotProjectedOperandFault actual same _ _ _ _ _ =>
       cases (shape actual).symm.trans same
   | assignProjected actual same _ _ _ _ _ _ =>
       cases (shape actual).symm.trans same

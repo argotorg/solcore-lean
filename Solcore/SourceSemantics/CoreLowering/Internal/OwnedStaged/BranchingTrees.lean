@@ -1257,6 +1257,7 @@ theorem child_and_tail {program : Program} {registry : Registry} {invocation : S
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | letFault actual same _ _ =>
       have impossible := (shape actual).symm.trans same

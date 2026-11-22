@@ -909,6 +909,8 @@ local macro "erase_recursive_plain" : tactic =>
       | semantic => exact StatementsPlain.head_fault (.assignBitNot contains form (.target (ready.key_fault keysIH)))
     case bitNotProjectedGetterFault contains form _projected keys failed keysIH =>
       exact StatementsPlain.head_fault (.assignBitNot contains form (.target (failed.source keysIH)))
+    case bitNotProjectedOperandFault contains form _projected keys snapshot selected invalid keysIH =>
+      exact StatementsPlain.head_fault (.assignBitNot contains form (.operand (snapshot.resolves keysIH) selected invalid))
     case assignProjected contains form _projected keys snapshot child write _next keysIH childIH nextIH =>
       exact StatementsPlain.prepend contains (by intro expression; simp [form])
         (.assignValue contains form (.intro (snapshot.resolves keysIH) childIH write)) nextIH
@@ -1650,6 +1652,9 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     | semantic => exact StatementsPlain.head_fault (.assignBitNot contains form (.target (ready.key_fault keys.semanticFault_plain)))
   case bitNotProjectedGetterFault contains form _projected keys failed _keysIH =>
     exact StatementsPlain.head_fault (.assignBitNot contains form (.target (failed.source keys.values_plain)))
+  case bitNotProjectedOperandFault contains form _projected keys snapshot selected invalid _keysIH =>
+    exact StatementsPlain.head_fault
+      (.assignBitNot contains form (.operand (snapshot.resolves keys.values_plain) selected invalid))
   case assignProjected contains form _projected keys snapshot child write _next _keysIH _childIH nextIH =>
     exact StatementsPlain.prepend contains (by intro expression; simp [form])
       (.assignValue contains form (.intro (snapshot.resolves keys.values_plain) child.value_plain write)) nextIH

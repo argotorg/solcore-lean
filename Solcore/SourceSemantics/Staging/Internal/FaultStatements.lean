@@ -422,7 +422,9 @@ theorem statements_step (wellFormed : ProgramWellFormed program) (size : Nat)
               exact expressions_fault_below wellFormed _ expressionIH (Size.child_lt_stepSize (by simp))
                 runtime covers locals heap keyTyped keys
   | @bitNotProjectedGetterFault keysSize mode scope context environment before after assignment values id rest node reason
-      contains form _projected keys _failed =>
+      contains form _projected keys _failed
+  | @bitNotProjectedOperandFault keysSize mode scope context environment before after assignment values _ _ id rest node
+      contains form _projected keys _ _ _ =>
       obtain ⟨middle, headFacts, tailFacts, headTyped, _tailTyped⟩ := statement_head_tail typed
       have formTyped := statement_form runtime.graph.nodeOccurrencesUnique headTyped contains form
       cases formTyped with

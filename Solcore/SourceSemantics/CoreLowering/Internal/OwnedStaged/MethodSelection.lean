@@ -576,6 +576,7 @@ theorem absent {program : Program} {registry : Registry} {invocation : Scope}
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -643,6 +644,7 @@ theorem initialized {program : Program} {registry : Registry} {invocation : Scop
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
@@ -701,6 +703,7 @@ theorem return_unit {program : Program} {registry : Registry} {invocation : Scop
   | bitNotProjectedRootFault actual same _ _
   | bitNotProjectedKeysFault actual same _ _ _
   | bitNotProjectedGetterFault actual same _ _ _
+  | bitNotProjectedOperandFault actual same _ _ _ _ _
   | bitNotBare actual same _ _ _ | bitNotBareFault actual same _ _
   | assignProjected actual same _ _ _ _ _ _
   | assignProjectedRootFault actual same _ _
