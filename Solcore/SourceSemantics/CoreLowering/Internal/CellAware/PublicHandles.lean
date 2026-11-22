@@ -705,7 +705,7 @@ private theorem named_result (covariant : CellAwarePublicCells.ExtendsRegistry c
     Result (cells := cells future) (functions := functions) (receiving := future) (anchor := anchor)
       owner caller header capture arguments outcome after native finalStore finalMap finalWorld faults :=
   ⟨result.1, outcome_extend result.2.1 extension,
-    result.2.2.1.includes (covariant extension), result.2.2.2⟩
+    result.2.2.1.includes (covariant.1 extension) (covariant.2 extension), result.2.2.2⟩
 
 private theorem packed_result (covariant : CellAwarePublicCells.ExtendsRegistry cells)
     {sourceType : TypeSystem.Ty} {nativeType : Core.Ty}
@@ -718,7 +718,7 @@ private theorem packed_result (covariant : CellAwarePublicCells.ExtendsRegistry 
     CellAwarePublicApplicationResult.ResultAt (registry := future) functions (cells future) caller
       anchor.function.context sourceType nativeType outcome after native finalStore finalMap finalWorld faults :=
   ⟨outcome_extend result.1 extension,
-    result.2.1.includes (covariant extension), result.2.2⟩
+    result.2.1.includes (covariant.1 extension) (covariant.2 extension), result.2.2⟩
 
 private theorem issued_entry {artifact : Artifact} {before after : Session artifact} {entry : Entry}
     (receipt : IssuedEntry headers keys functions registry anchor before after entry) :

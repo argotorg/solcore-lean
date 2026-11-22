@@ -468,6 +468,23 @@ structure CellModel (definitions : Core.DataEnvironment) where
     Represents mapping world cell value payload →
     LocationMap.Extends mapping futureMapping → Core.WorldExtends world futureWorld →
     Represents futureMapping futureWorld cell value payload
+  /-- The cells of array objects, beside the optional cells: an array's Core cell holds its contents at a
+  product type. A model that keeps the default has none. -/
+  Array : LocationMap → Core.StoreTyping → Dynamic.Cell → Core.Value → Core.Ty → Prop :=
+    fun _ _ _ _ _ => False
+  array_runtime_hasType : ∀ {mapping world cell value type},
+      Array mapping world cell value type → Core.RuntimeValueHasType world value type definitions := by
+    intro _ _ _ _ _ impossible; exact False.elim impossible
+  array_extend : ∀ {mapping futureMapping world futureWorld cell value type},
+      Array mapping world cell value type →
+      LocationMap.Extends mapping futureMapping → Core.WorldExtends world futureWorld →
+      Array futureMapping futureWorld cell value type := by
+    intro _ _ _ _ _ _ _ impossible; exact False.elim impossible
+  /-- An array cell holds an array object, and its Core type is a product, never an optional cell's. -/
+  array_shape : ∀ {mapping world cell value type}, Array mapping world cell value type →
+      (∃ element elements, cell = ⟨.arrayObject element, some (.arrayObject element elements), none⟩) ∧
+        ∃ left right, type = .product left right := by
+    intro _ _ _ _ _ impossible; exact False.elim impossible
 
 def CellModel.ordinary {catalog : SourceCoreDataCatalog.Catalog}
     {projects : Projection} {definitions : Core.DataEnvironment}
@@ -476,6 +493,15 @@ def CellModel.ordinary {catalog : SourceCoreDataCatalog.Catalog}
   runtime_hasType := CellRepresents.runtime_hasType
   extend := CellRepresents.extend
 
+/-- How a mapped Source cell stands for the Core cell at `target`: an optional cell of the model, or an
+array object's cell. -/
+inductive CellAt {definitions : Core.DataEnvironment} (model : CellModel definitions) (mapping : LocationMap)
+    (world : Core.StoreTyping) (target : Nat) (cell : Dynamic.Cell) (value : Core.Value) : Prop where
+  | optional {payload : Core.Ty} (typed : world[target]? = some (Core.OptionalCell.cellType payload))
+      (represented : model.Represents mapping world cell value payload)
+  | array {type : Core.Ty} (typed : world[target]? = some type)
+      (represented : model.Array mapping world cell value type)
+
 structure CellHeapRepresents {definitions : Core.DataEnvironment}
     (model : CellModel definitions) (mapping : LocationMap) (world : Core.StoreTyping)
     (heap : Dynamic.Heap) (store : Core.Store) : Prop where
@@ -483,10 +509,62 @@ structure CellHeapRepresents {definitions : Core.DataEnvironment}
   injective : LocationMap.Injective mapping
   runtime_hasTypes : Core.RuntimeStoreHasTypes world store definitions
   cells : ∀ {source target : Nat}, mapping[source]? = some target →
-    ∃ cell value payload,
-      Dynamic.Heap.Reads heap ⟨source⟩ cell ∧
-      world[target]? = some (Core.OptionalCell.cellType payload) ∧
-      store.read? target = some value ∧ model.Represents mapping world cell value payload
+    ∃ cell value,
+      Dynamic.Heap.Reads heap ⟨source⟩ cell ∧ store.read? target = some value ∧
+      CellAt model mapping world target cell value
+
+section CellAt
+variable {definitions : Core.DataEnvironment} {model : CellModel definitions}
+  {mapping : LocationMap} {world : Core.StoreTyping} {target : Nat} {cell : Dynamic.Cell} {value : Core.Value}
+
+theorem CellAt.typed (stands : CellAt model mapping world target cell value) : ∃ type, world[target]? = some type := by
+  cases stands with
+  | optional typed => exact ⟨_, typed⟩
+  | array typed => exact ⟨_, typed⟩
+
+theorem CellAt.runtime_hasType (stands : CellAt model mapping world target cell value) :
+    ∃ type, world[target]? = some type ∧ Core.RuntimeValueHasType world value type definitions := by
+  cases stands with
+  | optional typed represented => exact ⟨_, typed, model.runtime_hasType represented⟩
+  | array typed represented => exact ⟨_, typed, model.array_runtime_hasType represented⟩
+
+theorem CellAt.extend {futureMapping : LocationMap} {futureWorld : Core.StoreTyping}
+    (stands : CellAt model mapping world target cell value)
+    (maps : LocationMap.Extends mapping futureMapping) (worlds : Core.WorldExtends world futureWorld) :
+    CellAt model futureMapping futureWorld target cell value := by
+  cases stands with
+  | optional typed represented => exact .optional (worlds.lookup typed) (model.extend represented maps worlds)
+  | array typed represented => exact .array (worlds.lookup typed) (model.array_extend represented maps worlds)
+
+/-- A Core cell typed as an optional cell is the model's optional cell, never an array's. -/
+theorem CellAt.optional_of_typed {payload : Core.Ty} (stands : CellAt model mapping world target cell value)
+    (typed : world[target]? = some (Core.OptionalCell.cellType payload)) :
+    model.Represents mapping world cell value payload := by
+  cases stands with
+  | optional found represented =>
+      have same : Core.OptionalCell.cellType _ = Core.OptionalCell.cellType payload :=
+        Option.some.inj (found.symm.trans typed)
+      simp only [Core.OptionalCell.cellType, Core.Ty.sum.injEq, true_and] at same
+      subst same
+      exact represented
+  | array found represented =>
+      obtain ⟨_, left, right, product⟩ := model.array_shape represented
+      have same := Option.some.inj (found.symm.trans typed)
+      rw [product] at same
+      cases same
+
+/-- A cell that holds no array object is the model's optional cell. -/
+theorem CellAt.optional_of_cell (stands : CellAt model mapping world target cell value)
+    (notArray : ∀ element elements, cell ≠ ⟨.arrayObject element, some (.arrayObject element elements), none⟩) :
+    ∃ payload, world[target]? = some (Core.OptionalCell.cellType payload) ∧
+      model.Represents mapping world cell value payload := by
+  cases stands with
+  | optional typed represented => exact ⟨_, typed, represented⟩
+  | array _ represented =>
+      obtain ⟨⟨element, elements, same⟩, _⟩ := model.array_shape represented
+      exact (notArray element elements same).elim
+
+end CellAt
 
 theorem ordinaryHeap_iff {catalog : SourceCoreDataCatalog.Catalog}
     {projects : Projection} {definitions : Core.DataEnvironment}
@@ -496,11 +574,31 @@ theorem ordinaryHeap_iff {catalog : SourceCoreDataCatalog.Catalog}
       HeapRepresents model mapping world heap store := by
   constructor
   · intro related
-    exact ⟨related.length_eq, related.injective, related.runtime_hasTypes, related.cells⟩
+    refine ⟨related.length_eq, related.injective, related.runtime_hasTypes, ?_⟩
+    intro source target mapped
+    obtain ⟨cell, value, read, found, stands⟩ := related.cells mapped
+    cases stands with
+    | optional typed represents => exact ⟨cell, value, _, read, typed, found, represents⟩
+    | array _ impossible => exact False.elim impossible
   · intro related
-    exact ⟨related.length_eq, related.injective, related.runtime_hasTypes, related.cells⟩
+    refine ⟨related.length_eq, related.injective, related.runtime_hasTypes, ?_⟩
+    intro source target mapped
+    obtain ⟨cell, value, payload, read, typed, found, represents⟩ := related.cells mapped
+    exact ⟨cell, value, read, found, .optional typed represents⟩
 
 variable {definitions : Core.DataEnvironment} {model : CellModel definitions}
+
+/-- A mapped cell whose Core cell is typed as an optional cell is the model's optional cell. -/
+theorem CellHeapRepresents.referenced {mapping : LocationMap} {world : Core.StoreTyping}
+    {heap : Dynamic.Heap} {store : Core.Store} (related : CellHeapRepresents model mapping world heap store)
+    {source target : Nat} {payload : Core.Ty} (mapped : mapping[source]? = some target)
+    (typed : world[target]? = some (Core.OptionalCell.cellType payload)) :
+    ∃ cell value payload,
+      Dynamic.Heap.Reads heap ⟨source⟩ cell ∧
+      world[target]? = some (Core.OptionalCell.cellType payload) ∧
+      store.read? target = some value ∧ model.Represents mapping world cell value payload := by
+  obtain ⟨cell, value, read, found, stands⟩ := related.cells mapped
+  exact ⟨cell, value, payload, read, typed, found, stands.optional_of_typed typed⟩
 
 /-- Representation inclusion preserves the actual source heap, map and store.
 This embeds an ordinary initial heap into a model that also has descriptors. -/
@@ -508,12 +606,17 @@ theorem CellHeapRepresents.includes {other : CellModel definitions}
     {mapping : LocationMap} {world : Core.StoreTyping} {heap : Dynamic.Heap} {store : Core.Store}
     (included : ∀ {cell value payload}, model.Represents mapping world cell value payload →
       other.Represents mapping world cell value payload)
-    (related : CellHeapRepresents model mapping world heap store) :
+    (related : CellHeapRepresents model mapping world heap store)
+    (arrays : ∀ {cell value type}, model.Array mapping world cell value type →
+      other.Array mapping world cell value type := by
+      intro _ _ _ represented; first | exact represented | exact False.elim represented) :
     CellHeapRepresents other mapping world heap store := by
   refine ⟨related.length_eq, related.injective, related.runtime_hasTypes, ?_⟩
   intro source target mapped
-  obtain ⟨cell, value, payload, read, typed, found, represents⟩ := related.cells mapped
-  exact ⟨cell, value, payload, read, typed, found, included represents⟩
+  obtain ⟨cell, value, read, found, stands⟩ := related.cells mapped
+  cases stands with
+  | optional typed represents => exact ⟨cell, value, read, found, .optional typed (included represents)⟩
+  | array typed represents => exact ⟨cell, value, read, found, .array typed (arrays represents)⟩
 
 private theorem cell_append_lookup {mapping : LocationMap} {fresh index target : Nat}
     (found : (mapping ++ [fresh])[index]? = some target) :
@@ -534,20 +637,24 @@ theorem CellHeapRepresents.empty : CellHeapRepresents model [] [] ⟨[]⟩ [] :=
 theorem CellHeapRepresents.target_lt {mapping : LocationMap} {world : Core.StoreTyping}
     {heap : Dynamic.Heap} {store : Core.Store} (related : CellHeapRepresents model mapping world heap store)
     {source target : Nat} (mapped : mapping[source]? = some target) : target < store.length := by
-  obtain ⟨_, _, _, _, typed, _, _⟩ := related.cells mapped
+  obtain ⟨_, _, _, _, stands⟩ := related.cells mapped
+  obtain ⟨_, typed⟩ := stands.typed
   exact related.runtime_hasTypes.location_lt typed
 
+/-- A cell read that holds no array object is the model's optional cell at its Core reference. -/
 theorem CellHeapRepresents.read {mapping : LocationMap} {world : Core.StoreTyping}
     {heap : Dynamic.Heap} {store : Core.Store} (related : CellHeapRepresents model mapping world heap store)
-    {location : Dynamic.Location} {cell : Dynamic.Cell} (read : Dynamic.Heap.Reads heap location cell) :
+    {location : Dynamic.Location} {cell : Dynamic.Cell} (read : Dynamic.Heap.Reads heap location cell)
+    (notArray : ∀ element elements, cell ≠ ⟨.arrayObject element, some (.arrayObject element elements), none⟩) :
     ∃ target value payload,
       ReferenceRepresents mapping world location target payload ∧
       store.read? target = some value ∧ model.Represents mapping world cell value payload := by
   have bound : location.index < mapping.length := by rw [related.length_eq]; exact read.location_valid
   have mapped := List.getElem?_eq_getElem bound
-  obtain ⟨selected, value, payload, sourceRead, typed, coreRead, represents⟩ := related.cells mapped
+  obtain ⟨selected, value, sourceRead, coreRead, stands⟩ := related.cells mapped
   have same := read.functional sourceRead
   subst selected
+  obtain ⟨payload, typed, represents⟩ := stands.optional_of_cell notArray
   exact ⟨_, value, payload, ⟨mapped, typed⟩, coreRead, represents⟩
 
 /-- Appending an administrative cell changes neither the source heap nor its
@@ -560,10 +667,10 @@ theorem CellHeapRepresents.allocate_administrative
     CellHeapRepresents model mapping (world ++ [type]) heap (store.allocate value).1 := by
   refine ⟨related.length_eq, related.injective, related.runtime_hasTypes.allocate typed, ?_⟩
   intro source target mapped
-  obtain ⟨cell, old, payload, sourceRead, found, coreRead, represents⟩ := related.cells mapped
-  exact ⟨cell, old, payload, sourceRead, (Core.WorldExtends.lookup ⟨[type], rfl⟩ found),
+  obtain ⟨cell, old, sourceRead, coreRead, stands⟩ := related.cells mapped
+  exact ⟨cell, old, sourceRead,
     (Core.Store.allocate_old_lookup store value (related.target_lt mapped)).trans coreRead,
-    model.extend represents (.refl _) ⟨[type], rfl⟩⟩
+    stands.extend (.refl _) ⟨[type], rfl⟩⟩
 
 /-- Append one authenticated source cell and its independently typed native
 cell. Source and native locations use their respective heap lengths. -/
@@ -589,19 +696,18 @@ theorem CellHeapRepresents.append
     omega
   · intro source target mapped
     rcases cell_append_lookup mapped with old | ⟨sourceEq, targetEq⟩
-    · obtain ⟨oldCell, oldValue, oldPayload, sourceRead, found, coreRead, represents⟩ := related.cells old
+    · obtain ⟨oldCell, oldValue, sourceRead, coreRead, stands⟩ := related.cells old
       cases sourceRead with
       | intro sourceAt =>
-        exact ⟨oldCell, oldValue, oldPayload, .intro sourceAt.append_left,
-          extension.lookup found,
+        exact ⟨oldCell, oldValue, .intro sourceAt.append_left,
           (Core.Store.allocate_old_lookup store value (related.target_lt old)).trans coreRead,
-          model.extend represents ⟨[store.length], rfl⟩ extension⟩
+          stands.extend ⟨[store.length], rfl⟩ extension⟩
     · subst target
       rw [related.length_eq] at sourceEq
       subst source
-      exact ⟨cell, value, payload, .intro (Dynamic.Heap.CellAt.append_last _ _), freshType,
+      exact ⟨cell, value, .intro (Dynamic.Heap.CellAt.append_last _ _),
         Core.Store.allocate_fresh_lookup store value,
-        model.extend represented ⟨[store.length], rfl⟩ extension⟩
+        .optional freshType (model.extend represented ⟨[store.length], rfl⟩ extension)⟩
 
 theorem CellHeapRepresents.allocate_ordinary
     {mapping : LocationMap} {world : Core.StoreTyping} {heap after : Dynamic.Heap} {store : Core.Store}
@@ -645,10 +751,10 @@ theorem CellHeapRepresents.write_administrative
     CellHeapRepresents model mapping world heap updated := by
   refine ⟨related.length_eq, related.injective, related.runtime_hasTypes.write found typed written, ?_⟩
   intro source target mapped
-  obtain ⟨cell, stored, payload, sourceRead, typed, coreRead, represents⟩ := related.cells mapped
+  obtain ⟨cell, stored, sourceRead, coreRead, stands⟩ := related.cells mapped
   have different : target ≠ location := by intro same; exact absent (same ▸ mapped)
-  exact ⟨cell, stored, payload, sourceRead, typed,
-    (Core.Store.write?_preserves_other written different).trans coreRead, represents⟩
+  exact ⟨cell, stored, sourceRead,
+    (Core.Store.write?_preserves_other written different).trans coreRead, stands⟩
 
 /-- Structural replacement changes only the mapped Core location. Map
 injectivity is what prevents a write from changing a distinct source cell. -/
@@ -667,20 +773,20 @@ theorem CellHeapRepresents.replace
     related.injective, related.runtime_hasTypes.write reference.typed
       (model.runtime_hasType newCell) coreWritten, ?_⟩⟩
   intro source other mapped
-  obtain ⟨cell, stored, storedType, sourceRead, found, coreRead, represents⟩ := related.cells mapped
+  obtain ⟨cell, stored, sourceRead, coreRead, stands⟩ := related.cells mapped
   by_cases same : source = location.index
   · subst source
     have targetEq : other = target := Option.some.inj (mapped.symm.trans reference.mapped)
     subst other
-    exact ⟨replacement, value, payload, .intro written.reads_replacement,
-      reference.typed, Core.Store.write?_reads_written coreWritten, newCell⟩
+    exact ⟨replacement, value, .intro written.reads_replacement,
+      Core.Store.write?_reads_written coreWritten, .optional reference.typed newCell⟩
   · have different : other ≠ target := by
       intro equal
       exact same (related.injective (equal ▸ mapped) reference.mapped)
     cases sourceRead with
     | intro sourceAt =>
-        exact ⟨cell, stored, storedType, .intro (written.preserves_other same sourceAt), found,
-          (Core.Store.write?_preserves_other coreWritten different).trans coreRead, represents⟩
+        exact ⟨cell, stored, .intro (written.preserves_other same sourceAt),
+          (Core.Store.write?_preserves_other coreWritten different).trans coreRead, stands⟩
 
 variable {catalog : SourceCoreDataCatalog.Catalog}
 
@@ -698,11 +804,337 @@ theorem CellHeapRepresents.lookup_visible {mapping : LocationMap} {world : Core.
       Dynamic.Heap.Reads heap location cell ∧ store.read? target = some value ∧
       model.Represents mapping world cell value payload := by
   obtain ⟨target, coreLookup, reference⟩ := environments.lookup_visible sourceLookup slot
-  obtain ⟨cell, value, type, sourceRead, found, coreRead, represents⟩ := heaps.cells reference.mapped
+  obtain ⟨cell, value, type, sourceRead, found, coreRead, represents⟩ :=
+    heaps.referenced reference.mapped reference.typed
   have same : type = payload := by
     simpa [Core.OptionalCell.cellType] using Option.some.inj (found.symm.trans reference.typed)
   subst type
   exact ⟨target, cell, value, coreLookup, reference, sourceRead, coreRead, represents⟩
+
+end Solcore.SourceSemantics.CoreLowering.GenericHeap
+end
+
+section
+/-! Array objects' cells. An array object's Core cell holds the word of its length, a default element and
+an ordered mapping from the words of positions to the elements present. The payload model represents each
+element at the element type; a position without an entry reads the default. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering.GenericHeap
+open Frontend Frontend.SourceInference TypeSystem GeneralHeap
+
+/-- The equality an array's entries are looked up by. -/
+abbrev arrayKeyEqual : Core.OrderedMapping.Predicate := fun left right => decide (left = right)
+
+/-- The layout of an array's present elements, keyed by words. -/
+abbrev arrayLayout (payload : Core.Ty) (identity : Core.DataTypeId) : Core.OrderedMapping.Layout :=
+  ⟨.word, payload, identity⟩
+
+/-- The Core value an array holds at `position`: its entry, or the default element. -/
+def arrayEntry (entries : Core.OrderedMapping.Entries) (default : Core.Value) (position : Nat) : Core.Value :=
+  (Core.OrderedMapping.lookupEntries arrayKeyEqual (.word (Core.Word.ofNatModulo position)) entries).getD default
+
+/-- An array cell's contents: the Source `elements` at `element`, and on the Core side a default and
+entries at `payload`, keyed by the words of positions below the length. -/
+structure ArrayContents {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection}
+    {definitions : Core.DataEnvironment} (model : PayloadModel catalog projects definitions)
+    (mapping : LocationMap) (world : Core.StoreTyping) (element : Ty) (elements : List Dynamic.Value)
+    (payload : Core.Ty) (identity : Core.DataTypeId) (default : Core.Value)
+    (entries : Core.OrderedMapping.Entries) : Prop where
+  projection : projects element payload
+  registered : (arrayLayout payload identity).Registered definitions
+  bounded : elements.length < Core.wordModulus
+  default_typed : Core.RuntimeValueHasType world default payload definitions
+  keys : ∀ key value, (key, value) ∈ entries →
+    ∃ position, position < elements.length ∧ key = .word (Core.Word.ofNatModulo position)
+  entries_typed : ∀ key value, (key, value) ∈ entries →
+    Core.RuntimeValueHasType world value payload definitions
+  represented : ∀ position (below : position < elements.length),
+    model.Represents mapping world element elements[position] (arrayEntry entries default position) payload
+
+/-- An array object's cell and its Core cell `(n, (d, entries))`, where `n` is the length's word. -/
+def ArrayCellRepresents {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection}
+    {definitions : Core.DataEnvironment} (model : PayloadModel catalog projects definitions)
+    (mapping : LocationMap) (world : Core.StoreTyping) (cell : Dynamic.Cell) (value : Core.Value)
+    (type : Core.Ty) : Prop :=
+  ∃ element elements payload identity default entries,
+    cell = ⟨.arrayObject element, some (.arrayObject element elements), none⟩ ∧
+    value = .pair (.word (Core.Word.ofNatModulo elements.length))
+      (.pair default (Core.OrderedMapping.encode (arrayLayout payload identity) entries)) ∧
+    type = .product .word (.product payload (.namedData identity)) ∧
+    ArrayContents model mapping world element elements payload identity default entries
+
+variable {catalog : SourceCoreDataCatalog.Catalog} {projects : Projection} {definitions : Core.DataEnvironment}
+  {model : PayloadModel catalog projects definitions}
+
+theorem ArrayContents.encode_typed {mapping : LocationMap} {world : Core.StoreTyping} {element : Ty}
+    {elements : List Dynamic.Value} {payload : Core.Ty} {identity : Core.DataTypeId} {default : Core.Value}
+    {entries : Core.OrderedMapping.Entries}
+    (contents : ArrayContents model mapping world element elements payload identity default entries) :
+    Core.RuntimeValueHasType world (Core.OrderedMapping.encode (arrayLayout payload identity) entries)
+      (.namedData identity) definitions :=
+  Core.OrderedMapping.encode_hasType contents.registered entries fun key value member => by
+    obtain ⟨_, _, same⟩ := contents.keys key value member
+    refine ⟨?_, contents.entries_typed key value member⟩
+    rw [same]
+    exact .word
+
+theorem ArrayContents.extend {mapping futureMapping : LocationMap} {world futureWorld : Core.StoreTyping}
+    {element : Ty} {elements : List Dynamic.Value} {payload : Core.Ty} {identity : Core.DataTypeId}
+    {default : Core.Value} {entries : Core.OrderedMapping.Entries}
+    (contents : ArrayContents model mapping world element elements payload identity default entries)
+    (maps : LocationMap.Extends mapping futureMapping) (worlds : Core.WorldExtends world futureWorld) :
+    ArrayContents model futureMapping futureWorld element elements payload identity default entries where
+  projection := contents.projection
+  registered := contents.registered
+  bounded := contents.bounded
+  default_typed := contents.default_typed.weaken worlds
+  keys := contents.keys
+  entries_typed := fun key value member => (contents.entries_typed key value member).weaken worlds
+  represented := fun position below => model.extend (contents.represented position below) maps worlds
+
+theorem ArrayCellRepresents.runtime_hasType {mapping : LocationMap} {world : Core.StoreTyping}
+    {cell : Dynamic.Cell} {value : Core.Value} {type : Core.Ty}
+    (represented : ArrayCellRepresents model mapping world cell value type) :
+    Core.RuntimeValueHasType world value type definitions := by
+  obtain ⟨_, _, _, _, _, _, _, rfl, rfl, contents⟩ := represented
+  exact .pair .word (.pair contents.default_typed contents.encode_typed)
+
+theorem ArrayCellRepresents.extend {mapping futureMapping : LocationMap} {world futureWorld : Core.StoreTyping}
+    {cell : Dynamic.Cell} {value : Core.Value} {type : Core.Ty}
+    (represented : ArrayCellRepresents model mapping world cell value type)
+    (maps : LocationMap.Extends mapping futureMapping) (worlds : Core.WorldExtends world futureWorld) :
+    ArrayCellRepresents model futureMapping futureWorld cell value type := by
+  obtain ⟨element, elements, payload, identity, default, entries, cellEq, valueEq, typeEq, contents⟩ := represented
+  exact ⟨element, elements, payload, identity, default, entries, cellEq, valueEq, typeEq, contents.extend maps worlds⟩
+
+theorem ArrayCellRepresents.shape {mapping : LocationMap} {world : Core.StoreTyping}
+    {cell : Dynamic.Cell} {value : Core.Value} {type : Core.Ty}
+    (represented : ArrayCellRepresents model mapping world cell value type) :
+    (∃ element elements, cell = ⟨.arrayObject element, some (.arrayObject element elements), none⟩) ∧
+      ∃ left right, type = .product left right := by
+  obtain ⟨element, elements, _, _, _, _, cellEq, _, typeEq, _⟩ := represented
+  exact ⟨⟨element, elements, cellEq⟩, _, _, typeEq⟩
+
+/-- The insert finds the position it wrote. -/
+theorem lookupEntries_insert_same (key value : Core.Value) (entries : Core.OrderedMapping.Entries) :
+    Core.OrderedMapping.lookupEntries arrayKeyEqual key
+      (Core.OrderedMapping.insertEntries arrayKeyEqual key value entries) = some value := by
+  induction entries with
+  | nil => simp [Core.OrderedMapping.insertEntries, Core.OrderedMapping.lookupEntries]
+  | cons entry rest ih =>
+      obtain ⟨stored, old⟩ := entry
+      by_cases same : key = stored
+      · subst same
+        simp [Core.OrderedMapping.insertEntries, Core.OrderedMapping.lookupEntries]
+      · simp [Core.OrderedMapping.insertEntries, Core.OrderedMapping.lookupEntries, same, ih]
+
+/-- The insert leaves every other position as it was. -/
+theorem lookupEntries_insert_other {key other : Core.Value} (different : other ≠ key) (value : Core.Value)
+    (entries : Core.OrderedMapping.Entries) :
+    Core.OrderedMapping.lookupEntries arrayKeyEqual other
+        (Core.OrderedMapping.insertEntries arrayKeyEqual key value entries) =
+      Core.OrderedMapping.lookupEntries arrayKeyEqual other entries := by
+  induction entries with
+  | nil => simp [Core.OrderedMapping.insertEntries, Core.OrderedMapping.lookupEntries, different]
+  | cons entry rest ih =>
+      obtain ⟨stored, old⟩ := entry
+      by_cases same : key = stored
+      · subst same
+        simp [Core.OrderedMapping.insertEntries, Core.OrderedMapping.lookupEntries, different]
+      · by_cases found : other = stored
+        · subst found
+          simp [Core.OrderedMapping.insertEntries, Core.OrderedMapping.lookupEntries, same]
+        · simp [Core.OrderedMapping.insertEntries, Core.OrderedMapping.lookupEntries, same, found, ih]
+
+theorem mem_insertEntries {key value stored storedValue : Core.Value} {entries : Core.OrderedMapping.Entries}
+    (member : (stored, storedValue) ∈ Core.OrderedMapping.insertEntries arrayKeyEqual key value entries) :
+    (stored, storedValue) ∈ entries ∨ (stored = key ∧ storedValue = value) := by
+  induction entries with
+  | nil =>
+      simp only [Core.OrderedMapping.insertEntries, List.mem_singleton, Prod.mk.injEq] at member
+      exact .inr member
+  | cons entry rest ih =>
+      obtain ⟨first, firstValue⟩ := entry
+      by_cases same : key = first
+      · subst same
+        simp only [Core.OrderedMapping.insertEntries, arrayKeyEqual, decide_true, ↓reduceIte,
+          List.mem_cons, Prod.mk.injEq] at member
+        rcases member with ⟨rfl, rfl⟩ | inRest
+        · exact .inr ⟨rfl, rfl⟩
+        · exact .inl (List.mem_cons_of_mem _ inRest)
+      · simp only [Core.OrderedMapping.insertEntries, arrayKeyEqual, same, decide_false,
+          Bool.false_eq_true, ↓reduceIte, List.mem_cons, Prod.mk.injEq] at member
+        rcases member with ⟨rfl, rfl⟩ | inRest
+        · exact .inl (List.mem_cons_self ..)
+        · rcases ih inRest with old | new
+          · exact .inl (List.mem_cons_of_mem _ old)
+          · exact .inr new
+
+private theorem replace_getElem_other {values updated : List Dynamic.Value} {index other : Nat}
+    {replacement : Dynamic.Value} (replace : Dynamic.ValuesReplaceAt values index replacement updated)
+    (different : other ≠ index) : updated[other]? = values[other]? := by
+  induction replace generalizing other with
+  | head =>
+      cases other with
+      | zero => exact (different rfl).elim
+      | succ other => rfl
+  | tail _ ih =>
+      cases other with
+      | zero => rfl
+      | succ other => exact ih (fun same => different (congrArg (· + 1) same))
+
+private theorem ofNatModulo_injective {left right : Nat} (leftBound : left < Core.wordModulus)
+    (rightBound : right < Core.wordModulus) (same : Core.Word.ofNatModulo left = Core.Word.ofNatModulo right) :
+    left = right := by
+  have values := congrArg Fin.val same
+  simp only [Core.Word.ofNatModulo, Nat.mod_eq_of_lt leftBound, Nat.mod_eq_of_lt rightBound] at values
+  exact values
+
+/-- Writing a position below the length: the Source replaces the element, Core inserts its entry. -/
+theorem ArrayContents.write {mapping : LocationMap} {world : Core.StoreTyping} {element : Ty}
+    {elements updated : List Dynamic.Value} {payload : Core.Ty} {identity : Core.DataTypeId}
+    {default : Core.Value} {entries : Core.OrderedMapping.Entries} {position : Nat}
+    {source : Dynamic.Value} {core : Core.Value}
+    (contents : ArrayContents model mapping world element elements payload identity default entries)
+    (replace : Dynamic.ValuesReplaceAt elements position source updated)
+    (sourceRep : model.Represents mapping world element source core payload) :
+    ArrayContents model mapping world element updated payload identity default
+      (Core.OrderedMapping.insertEntries arrayKeyEqual (.word (Core.Word.ofNatModulo position)) core entries) := by
+  have length := replace.length_eq
+  have selected := replace.selects_replacement.getElem?_eq
+  have positionBound : position < elements.length := length ▸ replace.selects_replacement.lt_length
+  refine ⟨contents.projection, contents.registered, length ▸ contents.bounded, contents.default_typed, ?_, ?_, ?_⟩
+  · intro key value member
+    rcases mem_insertEntries member with old | ⟨rfl, _⟩
+    · obtain ⟨other, below, same⟩ := contents.keys key value old
+      exact ⟨other, length ▸ below, same⟩
+    · exact ⟨position, length ▸ positionBound, rfl⟩
+  · intro key value member
+    rcases mem_insertEntries member with old | ⟨_, rfl⟩
+    · exact contents.entries_typed key value old
+    · exact model.runtime_hasType sourceRep
+  · intro other below
+    by_cases same : other = position
+    · subst same
+      have entry : arrayEntry (Core.OrderedMapping.insertEntries arrayKeyEqual
+          (.word (Core.Word.ofNatModulo other)) core entries) default other = core := by
+        simp [arrayEntry, lookupEntries_insert_same]
+      have sourceEq : updated[other] = source := by
+        have := selected
+        rw [List.getElem?_eq_getElem below] at this
+        exact Option.some.inj this
+      rw [entry, sourceEq]
+      exact sourceRep
+    · have oldBelow : other < elements.length := length ▸ below
+      have keysDiffer : (Core.Value.word (Core.Word.ofNatModulo other)) ≠ .word (Core.Word.ofNatModulo position) := by
+        intro equal
+        injection equal with wordsEqual
+        exact same (ofNatModulo_injective (Nat.lt_trans oldBelow contents.bounded)
+          (Nat.lt_trans positionBound contents.bounded) wordsEqual)
+      have entry : arrayEntry (Core.OrderedMapping.insertEntries arrayKeyEqual
+          (.word (Core.Word.ofNatModulo position)) core entries) default other = arrayEntry entries default other := by
+        simp only [arrayEntry, lookupEntries_insert_other keysDiffer]
+      have elementEq : updated[other] = elements[other] := by
+        have := replace_getElem_other replace same
+        rw [List.getElem?_eq_getElem below, List.getElem?_eq_getElem oldBelow] at this
+        exact Option.some.inj this
+      rw [entry, elementEq]
+      exact contents.represented other oldBelow
+
+end Solcore.SourceSemantics.CoreLowering.GenericHeap
+end
+
+section
+/-! Allocating and writing array objects' cells in a whole-cell heap. -/
+set_option autoImplicit false
+namespace Solcore.SourceSemantics.CoreLowering.GenericHeap
+open Frontend Frontend.SourceInference TypeSystem GeneralHeap
+
+variable {definitions : Core.DataEnvironment} {model : CellModel definitions}
+
+/-- Append an array object's cell and its Core cell. Source and native locations use their heaps' lengths. -/
+theorem CellHeapRepresents.append_array
+    {mapping : LocationMap} {world : Core.StoreTyping} {heap : Dynamic.Heap} {store : Core.Store}
+    {cell : Dynamic.Cell} {value : Core.Value} {type : Core.Ty}
+    (related : CellHeapRepresents model mapping world heap store)
+    (represented : model.Array mapping world cell value type) :
+    CellHeapRepresents model (mapping ++ [store.length]) (world ++ [type])
+      ⟨heap.cells ++ [cell]⟩ (store.allocate value).1 ∧
+    (mapping ++ [store.length])[heap.cells.length]? = some store.length ∧
+      (world ++ [type])[store.length]? = some type := by
+  have extension : Core.WorldExtends world (world ++ [type]) := ⟨_, rfl⟩
+  have freshType : (world ++ [type])[store.length]? = some type := by
+    rw [← related.runtime_hasTypes.length_eq]; simp
+  have freshMap : (mapping ++ [store.length])[heap.cells.length]? = some store.length := by
+    rw [← related.length_eq]; simp
+  refine ⟨⟨?_, LocationMap.Injective.append related.injective store.length ?_,
+    related.runtime_hasTypes.allocate (model.array_runtime_hasType represented), ?_⟩, freshMap, freshType⟩
+  · simp [related.length_eq]
+  · intro index impossible
+    have bound := related.target_lt impossible
+    omega
+  · intro source target mapped
+    rcases cell_append_lookup mapped with old | ⟨sourceEq, targetEq⟩
+    · obtain ⟨oldCell, oldValue, sourceRead, coreRead, stands⟩ := related.cells old
+      cases sourceRead with
+      | intro sourceAt =>
+        exact ⟨oldCell, oldValue, .intro sourceAt.append_left,
+          (Core.Store.allocate_old_lookup store value (related.target_lt old)).trans coreRead,
+          stands.extend ⟨[store.length], rfl⟩ extension⟩
+    · subst target
+      rw [related.length_eq] at sourceEq
+      subst source
+      exact ⟨cell, value, .intro (Dynamic.Heap.CellAt.append_last _ _),
+        Core.Store.allocate_fresh_lookup store value,
+        .array freshType (model.array_extend represented ⟨[store.length], rfl⟩ extension)⟩
+
+/-- An array object's allocation appends its cell, and its Core cell at the store's length. -/
+theorem CellHeapRepresents.allocate_array
+    {mapping : LocationMap} {world : Core.StoreTyping} {heap after : Dynamic.Heap} {store : Core.Store}
+    {element : Ty} {elements : List Dynamic.Value} {location : Dynamic.Location}
+    {value : Core.Value} {type : Core.Ty}
+    (related : CellHeapRepresents model mapping world heap store)
+    (represented : model.Array mapping world
+      ⟨.arrayObject element, some (.arrayObject element elements), none⟩ value type)
+    (allocated : Dynamic.Heap.Allocates heap (.arrayObject element) (some (.arrayObject element elements))
+      location after) :
+    CellHeapRepresents model (mapping ++ [store.length]) (world ++ [type]) after (store.allocate value).1 ∧
+    (mapping ++ [store.length])[location.index]? = some store.length ∧
+      (world ++ [type])[store.length]? = some type := by
+  cases allocated
+  exact related.append_array represented
+
+/-- Writing an array object's cell replaces it with another array cell at the same mapped location and
+Core type. Map injectivity keeps every other cell. -/
+theorem CellHeapRepresents.replace_array
+    {mapping : LocationMap} {world : Core.StoreTyping} {heap after : Dynamic.Heap} {store : Core.Store}
+    {location : Dynamic.Location} {target : Core.Location} {type : Core.Ty}
+    {replacement : Dynamic.Cell} {value : Core.Value}
+    (related : CellHeapRepresents model mapping world heap store)
+    (mapped : mapping[location.index]? = some target) (typed : world[target]? = some type)
+    (written : Dynamic.Heap.CellsWrite heap.cells location.index replacement after.cells)
+    (newCell : model.Array mapping world replacement value type) :
+    ∃ updated, store.write? target value = some updated ∧
+      CellHeapRepresents model mapping world after updated := by
+  obtain ⟨updated, coreWritten⟩ := related.runtime_hasTypes.write_exists (value := value) typed
+  refine ⟨updated, coreWritten, ⟨related.length_eq.trans written.length_eq.symm,
+    related.injective, related.runtime_hasTypes.write typed
+      (model.array_runtime_hasType newCell) coreWritten, ?_⟩⟩
+  intro source other otherMapped
+  obtain ⟨cell, stored, sourceRead, coreRead, stands⟩ := related.cells otherMapped
+  by_cases same : source = location.index
+  · subst source
+    have targetEq : other = target := Option.some.inj (otherMapped.symm.trans mapped)
+    subst other
+    exact ⟨replacement, value, .intro written.reads_replacement,
+      Core.Store.write?_reads_written coreWritten, .array typed newCell⟩
+  · have different : other ≠ target := by
+      intro equal
+      exact same (related.injective (equal ▸ otherMapped) mapped)
+    cases sourceRead with
+    | intro sourceAt =>
+        exact ⟨cell, stored, .intro (written.preserves_other same sourceAt),
+          (Core.Store.write?_preserves_other coreWritten different).trans coreRead, stands⟩
 
 end Solcore.SourceSemantics.CoreLowering.GenericHeap
 end
@@ -743,10 +1175,11 @@ theorem CellHeapRepresents.read_ordinary (ordinary : OrdinaryCells payloads cell
     {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
     {location : Dynamic.Location} {cell : Dynamic.Cell}
     (heaps : CellHeapRepresents cells mapping world heap store)
-    (read : Dynamic.Heap.Reads heap location cell) (absent : cell.generalized = none) :
+    (read : Dynamic.Heap.Reads heap location cell) (absent : cell.generalized = none)
+    (notArray : ∀ element elements, cell ≠ ⟨.arrayObject element, some (.arrayObject element elements), none⟩) :
     ∃ target value type, ReferenceRepresents mapping world location target type ∧
       store.read? target = some value ∧ CellRepresents payloads mapping world cell value type := by
-  obtain ⟨target, value, type, reference, found, related⟩ := heaps.read read
+  obtain ⟨target, value, type, reference, found, related⟩ := heaps.read read notArray
   exact ⟨target, value, type, reference, found, ordinary.project related absent⟩
 
 theorem CellHeapRepresents.write_initialized (ordinary : OrdinaryCells payloads cells)

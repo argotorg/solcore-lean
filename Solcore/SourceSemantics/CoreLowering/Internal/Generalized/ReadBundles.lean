@@ -543,6 +543,10 @@ def cellModel {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.
     cases represented with
     | ordinary prior => exact .ordinary (prior.extend maps worlds)
     | generalized stored => exact .generalized (stored.extend maps worlds)
+  Array := GenericHeap.ArrayCellRepresents ordinary
+  array_runtime_hasType := GenericHeap.ArrayCellRepresents.runtime_hasType
+  array_extend := GenericHeap.ArrayCellRepresents.extend
+  array_shape := GenericHeap.ArrayCellRepresents.shape
 
 variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection}
   {ordinary : PayloadModel catalog projects definitions} {instances : InstanceModel definitions}
@@ -592,6 +596,7 @@ theorem read {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap}
       store.read? target = some (.inRight .unit bundle) ∧
       Stored instances mapping world function bundle payload := by
   obtain ⟨target, value, payload, reference, found, represented⟩ := heaps.read sourceRead
+    (fun _ _ same => by rw [same] at descriptor; cases descriptor)
   obtain ⟨_, bundle, same, stored⟩ := descriptor_cell represented descriptor
   exact ⟨target, bundle, payload, reference, same ▸ found, stored⟩
 

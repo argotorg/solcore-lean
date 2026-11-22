@@ -314,11 +314,13 @@ theorem ResultAt.includes
     {other : GenericHeap.CellModel (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions}
     (included : ∀ {cell value payload}, cells.Represents finalMap finalWorld cell value payload →
       other.Represents finalMap finalWorld cell value payload)
+    (arrays : ∀ {cell value type}, cells.Array finalMap finalWorld cell value type →
+      other.Array finalMap finalWorld cell value type)
     (result : ResultAt (registry := registry) functions cells caller context sourceResult nativeResult
       outcome after native finalStore finalMap finalWorld faults) :
     ResultAt (registry := registry) functions other caller context sourceResult nativeResult
       outcome after native finalStore finalMap finalWorld faults :=
-  ⟨result.1, result.2.1.includes included, result.2.2⟩
+  ⟨result.1, result.2.1.includes included arrays, result.2.2⟩
 
 theorem ResultAt.ordinary_iff :
     ResultAt (registry := registry) functions
@@ -2274,10 +2276,14 @@ abbrev Family (definitions : DataEnvironment) :=
 /-- This law only transports cell representation along a forward metadata
 extension. It does not supply expression, body or invocation semantics. -/
 def ExtendsRegistry {definitions : DataEnvironment} (cells : Family definitions) : Prop :=
-  ∀ {registry future}, SourceCoreRawMetadata.Extends registry future →
+  (∀ {registry future}, SourceCoreRawMetadata.Extends registry future →
     ∀ {mapping world cell value payload},
       (cells registry).Represents mapping world cell value payload →
-      (cells future).Represents mapping world cell value payload
+      (cells future).Represents mapping world cell value payload) ∧
+  ∀ {registry future}, SourceCoreRawMetadata.Extends registry future →
+    ∀ {mapping world cell value type},
+      (cells registry).Array mapping world cell value type →
+      (cells future).Array mapping world cell value type
 
 variable {checked : SourceCoreCompatibleCatalog.Checked}
   {ambient : AmbientDefinitions checked.catalog.definitions}
@@ -2292,10 +2298,18 @@ theorem generalized_extends_registry
     (functions : FunctionModel checked.catalog ambient)
     (instances : GeneralizedLocalDescriptorHeap.InstanceModel ambient.definitions) :
     ExtendsRegistry (generalized functions instances) := by
-  intro registry future extension mapping world cell value payload represented
-  cases represented with
-  | ordinary prior => exact .ordinary (CompatibleHeap.cell_extend_registry prior extension)
-  | generalized stored => exact .generalized stored
+  refine ⟨?_, ?_⟩
+  · intro registry future extension mapping world cell value payload represented
+    cases represented with
+    | ordinary prior => exact .ordinary (CompatibleHeap.cell_extend_registry prior extension)
+    | generalized stored => exact .generalized stored
+  · intro registry future extension mapping world cell value type represented
+    obtain ⟨element, elements, payload, identity, default, entries, cellEq, valueEq, typeEq, contents⟩ :=
+      represented
+    exact ⟨element, elements, payload, identity, default, entries, cellEq, valueEq, typeEq,
+      { contents with
+        represented := fun position below =>
+          CompatiblePayload.ValueRep.extend (contents.represented position below) extension (.refl _) (.refl _) }⟩
 
 /-- Initial ordinary cells embed at the same Source/native heap. There is no
 conversion in the reverse direction for a heap containing descriptors. -/

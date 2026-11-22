@@ -1795,7 +1795,7 @@ theorem marked_chain_prefix
           rw [show index + 1 + i = index + (i + 1) by omega]
           exact dropped (i + 1)
         obtain ⟨cell, value, payloadType, sourceRead, worldTyped, storeRead, cellRel⟩ :=
-          heaps.cells headReference.mapped
+          heaps.referenced headReference.mapped headReference.typed
         have samePayload : payloadType = type := by
           have same := Option.some.inj (worldTyped.symm.trans headReference.typed)
           simpa [OptionalCell.cellType] using same

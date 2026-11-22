@@ -292,7 +292,7 @@ theorem snapshot_of_cell_heap {compilation : SourceCoreCompatibleDataPlaces.Cont
   obtain ⟨target, nativeLookup, reference⟩ := environments.lookup_visible lookup slot
   have nativeLookup := agrees nativeLookup
   obtain ⟨actualCell, optional, payload, actualRead, payloadType, nativeRead, represented⟩ :=
-    heaps.cells reference.mapped
+    heaps.referenced reference.mapped reference.typed
   have sameCell := read.functional actualRead
   subst actualCell
   have samePayload : payload = prepared.route.rootType := by
@@ -373,7 +373,7 @@ theorem latest_of_cell_heap
   obtain ⟨cell, read, sameType, sameDescriptor⟩ := metadata _ _ snapshot.read
   have reference := snapshot.reference.extend maps worlds
   obtain ⟨selected, optional, payload, selectedRead, payloadType, nativeRead, represented⟩ :=
-    heaps.cells reference.mapped
+    heaps.referenced reference.mapped reference.typed
   have sameCell := read.functional selectedRead
   subst selected
   have samePayload : payload = prepared.route.rootType := by
@@ -782,7 +782,7 @@ private theorem read_at_cells
     (read : Dynamic.Heap.Reads before location cell) (ordinary : cell.generalized = none) :
     ∃ value, store.read? target = some value ∧
       GenericHeap.CellRepresents (payloadModel compilation.checked registry functions) mapping world cell value type := by
-  obtain ⟨actual, value, payload, sourceRead, typed, native, represented⟩ := heaps.cells reference.mapped
+  obtain ⟨actual, value, payload, sourceRead, typed, native, represented⟩ := heaps.referenced reference.mapped reference.typed
   have same := sourceRead.functional read
   subst actual
   have samePayload : payload = type := by
@@ -1322,7 +1322,7 @@ theorem reflects_storeCell {catalog : SourceCoreDataCatalog.Catalog} {projects :
       CellAwareScopeAuthority.Effect instances mapping world heap store mapping world after finalStore := by
   have written := DataPlaceCommitReflection.source_writes read sourceValue
   obtain ⟨updated, coreWritten, finalHeaps, frame⟩ := heaps.write_initialized ordinaryCells reference read ordinary represented written
-  obtain ⟨_, optional, _, _, _, coreRead, _⟩ := heaps.cells reference.mapped
+  obtain ⟨_, optional, _, _, _, coreRead, _⟩ := heaps.referenced reference.mapped reference.typed
   have actual : Evaluates environment store
       (.storeCell referenceExpression (.inRight .unit valueExpression)) .unit updated :=
     .storeCell (referenceSelected.evaluates store) coreRead (.inRight (valueSelected.evaluates store)) coreWritten
@@ -1350,10 +1350,10 @@ theorem heap_append {definitions : DataEnvironment} {model : CellModel definitio
     CellHeapRepresents model mapping futureWorld heap (store ++ suffix) := by
   refine ⟨related.length_eq, related.injective, typed, ?_⟩
   intro source target mapped
-  obtain ⟨cell, value, payload, sourceRead, typeRead, coreRead, represented⟩ := related.cells mapped
-  exact ⟨cell, value, payload, sourceRead, extension.lookup typeRead,
+  obtain ⟨cell, value, sourceRead, coreRead, stands⟩ := related.cells mapped
+  exact ⟨cell, value, sourceRead,
     by simpa [Store.read?, List.getElem?_append_left (related.target_lt mapped)] using coreRead,
-    model.extend represented (.refl _) extension⟩
+    stands.extend (.refl _) extension⟩
 
 theorem administrative_append (mapping : LocationMap) (store suffix : Store) :
     AdministrativePreserved mapping store mapping (store ++ suffix) := by
@@ -1539,7 +1539,7 @@ theorem read_at {location : Dynamic.Location} {target : Location} {type : Ty} {c
     (read : Dynamic.Heap.Reads heap location cell) (ordinary : cell.generalized = none) :
     ∃ value, store.read? target = some value ∧
       GenericHeap.CellRepresents (payloadModel checked registry functions) mapping world cell value type := by
-  obtain ⟨actual, value, payload, sourceRead, typed, native, represented⟩ := heaps.cells reference.mapped
+  obtain ⟨actual, value, payload, sourceRead, typed, native, represented⟩ := heaps.referenced reference.mapped reference.typed
   have same := sourceRead.functional read
   subst actual
   have samePayload : payload = type := by
