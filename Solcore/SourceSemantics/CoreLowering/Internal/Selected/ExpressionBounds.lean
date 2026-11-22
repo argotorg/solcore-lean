@@ -1919,7 +1919,7 @@ private theorem source_children
                 (by simp [Staging.Recursive.Size.stepSize]; omega) first second
           | tailFault _ rest => cases rest
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | constructorMetadataFault occurrence _
   | group occurrence _
   | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
@@ -2375,7 +2375,7 @@ theorem constructor_preserves {scope : SourceCoreLocalCell.Scope} {id : Expressi
   have valid := CompatibleSourceInstantiationClosure.constructor_valid admissible runtime.variables_closed ranges
   obtain ⟨_admissible, typing, sourceType⟩ := CompatibleExpressionConstructors.constructor_source_types
     unique receipt.metadata.found form receipt.metadata.coercions typed
-  rcases CallableIndexedOwnedPreparedStagedConstructorSourceInversion.children unique receipt.metadata.found form trace with
+  rcases CallableIndexedOwnedPreparedStagedConstructorSourceInversion.children unique receipt.metadata.found form valid trace with
     ⟨sequenceSize, sources, sameSize, outcomeEq, sourceTrace⟩ |
     ⟨sequenceSize, failure, sameSize, outcomeEq, sourceTrace⟩
   · subst outcome
@@ -2558,7 +2558,7 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
       subst ids
       exact ⟨_, _, Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp)), children, .fault _⟩
   | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
-  | constructorValue owned _ _ | constructorFault owned _
+  | constructorValue owned _ _ | constructorFault owned _ | constructorMetadataFault owned _
   | group owned _
   | unaryMethod owned _ _ _ _ _ _ _ _ _ | binaryMethod owned _ _ _ _ _ _ _ _ _ _ _
   | unary owned _ _ | unaryOperandFault owned _ | unaryInvalid owned _ _

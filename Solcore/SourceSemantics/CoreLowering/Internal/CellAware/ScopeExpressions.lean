@@ -1079,7 +1079,7 @@ private theorem unchanged {program : Program} {stages : Staging.Recursive.Regist
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _
   | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _
   | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorFault occurrence _ | tupleFault occurrence _
+  | constructorFault occurrence _ | constructorMetadataFault occurrence _ | tupleFault occurrence _
   | group occurrence _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _
   | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
   | unaryOperandFault occurrence _ | binaryLeftFault occurrence _ | binaryRightFault occurrence _ _
@@ -1991,7 +1991,7 @@ private theorem source_group_inv
       exact ⟨_, rfl, child⟩
   | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | constructorMetadataFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _
   | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
@@ -2542,7 +2542,7 @@ private theorem source_children
                 (by simp [Staging.Recursive.Size.stepSize]; omega) first second
           | tailFault _ rest => cases rest
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | constructorMetadataFault occurrence _
   | group occurrence _
   | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _

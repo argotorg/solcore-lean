@@ -519,7 +519,7 @@ theorem children
   | indexResult occurrence first second result =>
       obtain ⟨rfl, rfl⟩ := ExpressionForm.index.inj (actual occurrence)
       exact .result first second result (Size.child_lt_stepSize (by simp)) (Size.child_lt_stepSize (by simp))
-  | constructorValue occurrence _ _ | constructorFault occurrence _
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | constructorMetadataFault occurrence _
   | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
   | group occurrence _ | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _
   | tupleValue occurrence _ _ | tupleFault occurrence _ | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _

@@ -746,7 +746,7 @@ theorem source_children
                 (by simp [Staging.Recursive.Size.stepSize]; omega) first second
           | tailFault _ rest => cases rest
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | constructorMetadataFault occurrence _
   | group occurrence _
   | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _

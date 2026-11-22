@@ -1635,7 +1635,7 @@ theorem source_inv {program : Program} {stages : Staging.Recursive.Registry} {in
     subst ids
     exact ⟨_, children, .fault _⟩
   | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
-  | constructorValue owned _ _ | constructorFault owned _ =>
+  | constructorValue owned _ _ | constructorFault owned _ | constructorMetadataFault owned _ =>
     have impossible := form.symm.trans (occurrence_form unique metadata.found owned)
     cases impossible
   | group owned child =>

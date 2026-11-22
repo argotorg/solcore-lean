@@ -549,6 +549,12 @@ mutual
         (occurrence : Occurrence scope id (.constructor instantiation arguments))
         (children : Expressions program registry scope context environment before arguments (.fault failure) after) :
         Expression program registry scope context environment before id (.fault failure) after
+    /-- A constructor whose metadata disagrees with its catalog entry faults
+    before its arguments, as the Source's `constructorMetadata` does. -/
+    | constructorMetadataFault {scope context environment heap id instantiation arguments reason}
+        (occurrence : Occurrence scope id (.constructor instantiation arguments))
+        (fault : ConstructorMetadataFaults context instantiation reason) :
+        Expression program registry scope context environment heap id (.fault (.semantic reason)) heap
     | indexBaseFault {scope context environment before after id base key failure}
         (occurrence : Occurrence scope id (.index base key))
         (first : Expression program registry scope context environment before base (.fault failure) after) :

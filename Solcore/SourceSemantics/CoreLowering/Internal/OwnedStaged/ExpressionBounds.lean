@@ -387,7 +387,7 @@ private theorem source_group_inv
       exact ⟨_, rfl, child⟩
   | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | constructorMetadataFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _
   | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
   | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _
@@ -988,7 +988,7 @@ private theorem source_children
                 (by simp [Staging.Recursive.Size.stepSize]; omega) first second
           | tailFault _ rest => cases rest
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | constructorMetadataFault occurrence _
   | group occurrence _
   | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
@@ -1935,6 +1935,7 @@ theorem children
     (unique : NodeOccurrencesUnique invocation.source)
     (found : invocation.source.lookupExpression? id = some node)
     (form : node.form = .constructor instantiation arguments)
+    (valid : DataConstructorInstantiation.Valid context instantiation)
     (trace : Size.Expression program registry size invocation context environment before id outcome after) :
     (∃ sequenceSize values, size = Size.stepSize [sequenceSize] ∧
       outcome = .value (.constructed instantiation values) ∧
@@ -1968,6 +1969,9 @@ theorem children
   | constructorFault occurrence children =>
       obtain ⟨rfl, rfl⟩ := ExpressionForm.constructor.inj (actual occurrence)
       exact .inr ⟨_, _, rfl, rfl, children⟩
+  | constructorMetadataFault occurrence fault =>
+      obtain ⟨rfl, rfl⟩ := ExpressionForm.constructor.inj (actual occurrence)
+      exact False.elim (CompatibleExpressionConstructors.metadata_fault_excluded valid fault)
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
   | group occurrence _ | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _
   | tupleValue occurrence _ _ | tupleFault occurrence _ | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
@@ -2052,7 +2056,7 @@ theorem constructor_preserves {scope : SourceCoreLocalCell.Scope} {id : Expressi
   have valid := CompatibleSourceInstantiationClosure.constructor_valid admissible runtime.variables_closed ranges
   obtain ⟨_admissible, typing, _sourceType⟩ := CompatibleExpressionConstructors.constructor_source_types
     unique receipt.metadata.found form receipt.metadata.coercions typed
-  rcases CallableIndexedOwnedPreparedStagedConstructorSourceInversion.children unique receipt.metadata.found form trace with
+  rcases CallableIndexedOwnedPreparedStagedConstructorSourceInversion.children unique receipt.metadata.found form valid trace with
     ⟨sequenceSize, sources, sameSize, outcomeEq, sourceTrace⟩ |
     ⟨sequenceSize, failure, sameSize, outcomeEq, sourceTrace⟩
   · subst outcome
@@ -2229,7 +2233,7 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
       subst ids
       exact ⟨_, _, Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp)), children, .fault _⟩
   | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
-  | constructorValue owned _ _ | constructorFault owned _
+  | constructorValue owned _ _ | constructorFault owned _ | constructorMetadataFault owned _
   | group owned _
   | unaryMethod owned _ _ _ _ _ _ _ _ _ | binaryMethod owned _ _ _ _ _ _ _ _ _ _ _
   | unary owned _ _ | unaryOperandFault owned _ | unaryInvalid owned _ _
@@ -2532,7 +2536,7 @@ theorem unary_inv {operator : Syntax.UnaryOp} {operand : ExpressionId}
       obtain ⟨rfl, rfl⟩ := ExpressionForm.unary.inj (actual occurrence)
       refine .invalid child invalid ?_ <;> exact Staging.Recursive.Size.child_lt_stepSize (by simp)
   | group occurrence _ | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _ | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _ | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _ | conditional occurrence _ _ | conditionalFault occurrence _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | constructorMetadataFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _ | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _ | conditional occurrence _ _ | conditionalFault occurrence _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
 
 theorem binary_inv {operator : Syntax.BinaryOp} {left right : ExpressionId}
     (metadata : Metadata checked invocation.source id node type)
@@ -2581,7 +2585,7 @@ theorem binary_inv {operator : Syntax.BinaryOp} {left right : ExpressionId}
       obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.binary.inj (actual occurrence)
       refine .panic first continues second panics ?_ ?_ <;> exact Staging.Recursive.Size.child_lt_stepSize (by simp)
   | group occurrence _ | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _ | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _ | conditional occurrence _ _ | conditionalFault occurrence _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | constructorMetadataFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _ | conditional occurrence _ _ | conditionalFault occurrence _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
 
 theorem conditional_inv {condition thenId elseId : ExpressionId}
     (metadata : Metadata checked invocation.source id node type)
@@ -2610,7 +2614,7 @@ theorem conditional_inv {condition thenId elseId : ExpressionId}
       obtain ⟨rfl, rfl, rfl⟩ := ExpressionForm.conditional.inj (actual occurrence)
       refine .fault child ?_ <;> exact Staging.Recursive.Size.child_lt_stepSize (by simp)
   | group occurrence _ | pair occurrence _ _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _ | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _ | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _ | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | constructorMetadataFault occurrence _ | tupleValue occurrence _ _ | tupleFault occurrence _ | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _ | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _ | binaryLeftFault occurrence _ | binaryLeftInvalid occurrence _ _ | binaryShortCircuit occurrence _ _ | binaryRightFault occurrence _ _ _ | binary occurrence _ _ _ _ | binaryInvalid occurrence _ _ _ _ | binaryPanic occurrence _ _ _ _ | calleeFault occurrence _ | notCallable occurrence _ _ | rejected occurrence _ _ | argumentsFault occurrence _ _ _ | sourceArity occurrence _ _ _ _ | applied occurrence _ _ _ _ _ _ => cases actual occurrence
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedOperatorSourceBounds
 end
@@ -3719,7 +3723,7 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
       subst ids
       exact ⟨_, _, Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp)), children, .fault _⟩
   | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
-  | constructorValue owned _ _ | constructorFault owned _
+  | constructorValue owned _ _ | constructorFault owned _ | constructorMetadataFault owned _
   | group owned _
   | unaryMethod owned _ _ _ _ _ _ _ _ _ | binaryMethod owned _ _ _ _ _ _ _ _ _ _ _
   | unary owned _ _ | unaryOperandFault owned _ | unaryInvalid owned _ _

@@ -222,6 +222,7 @@ private theorem expression_step (wellFormed : ProgramWellFormed program) (size :
       | constructor _valid argumentsTyped =>
           exact expressionsIH childrenSize (Size.child_lt_stepSize (by simp))
             runtime covers locals heap argumentsTyped children
+  | constructorMetadataFault _ _ => exact ⟨heap, .refl _⟩
   | @indexBaseFault firstSize scope context environment before after id base key failure occurrence first =>
       obtain ⟨_raw, _plan, formTyped⟩ := expression_form runtime.graph.nodeOccurrencesUnique typed occurrence
       cases formTyped with

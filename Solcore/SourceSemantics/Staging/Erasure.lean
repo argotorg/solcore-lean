@@ -692,6 +692,8 @@ local macro "erase_recursive_plain" : tactic =>
       cases failure with
       | stage => trivial
       | semantic => exact fault_occurrence occurrence (.constructorArgument rfl ih)
+    case constructorMetadataFault occurrence fault =>
+      exact fault_occurrence occurrence (.constructorMetadata rfl fault)
     case indexBaseFault occurrence first a =>
       rename_i failure
       cases failure with

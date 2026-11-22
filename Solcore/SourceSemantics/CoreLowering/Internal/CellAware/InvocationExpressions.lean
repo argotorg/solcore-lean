@@ -1394,7 +1394,7 @@ private theorem source_children
                 (by simp [Staging.Recursive.Size.stepSize]; omega) first second
           | tailFault _ rest => cases rest
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _ | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _ | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorValue occurrence _ _ | constructorFault occurrence _
+  | constructorValue occurrence _ _ | constructorFault occurrence _ | constructorMetadataFault occurrence _
   | group occurrence _
   | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
   | unary occurrence _ _ | unaryOperandFault occurrence _ | unaryInvalid occurrence _ _
@@ -2387,7 +2387,7 @@ private theorem unchanged {program : Program} {stages : Staging.Recursive.Regist
   | indexBaseFault occurrence _ | indexKeyFault occurrence _ _ | indexResult occurrence _ _ _
   | builtinArgumentsFault occurrence _ | builtinApplied occurrence _ _
   | directArgumentsFault occurrence _ _ | directApplied occurrence _ _ _ _ _
-  | constructorFault occurrence _ | tupleFault occurrence _
+  | constructorFault occurrence _ | constructorMetadataFault occurrence _ | tupleFault occurrence _
   | group occurrence _ | pairLeftFault occurrence _ | pairRightFault occurrence _ _
   | unaryMethod occurrence _ _ _ _ _ _ _ _ _ | binaryMethod occurrence _ _ _ _ _ _ _ _ _ _ _
   | unaryOperandFault occurrence _ | binaryLeftFault occurrence _ | binaryRightFault occurrence _ _
@@ -2994,7 +2994,7 @@ private theorem source_sequence {program : Program} {registry : Staging.Recursiv
       subst ids
       exact ⟨_, _, Nat.le_of_lt (Staging.Recursive.Size.child_lt_stepSize (by simp)), children, .fault _⟩
   | indexBaseFault owned _ | indexKeyFault owned _ _ | indexResult owned _ _ _ | builtinArgumentsFault owned _ | builtinApplied owned _ _ | directArgumentsFault owned _ _ | directApplied owned _ _ _ _ _
-  | constructorValue owned _ _ | constructorFault owned _
+  | constructorValue owned _ _ | constructorFault owned _ | constructorMetadataFault owned _
   | group owned _
   | unaryMethod owned _ _ _ _ _ _ _ _ _ | binaryMethod owned _ _ _ _ _ _ _ _ _ _ _
   | unary owned _ _ | unaryOperandFault owned _ | unaryInvalid owned _ _

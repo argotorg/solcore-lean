@@ -120,6 +120,10 @@ mutual
         (occurrence : Occurrence scope id (.constructor instantiation arguments))
         (children : Expressions program registry childrenSize scope context environment before arguments (.fault failure) after) :
         Expression program registry (stepSize [childrenSize]) scope context environment before id (.fault failure) after
+    | constructorMetadataFault {scope context environment heap id instantiation arguments reason}
+        (occurrence : Occurrence scope id (.constructor instantiation arguments))
+        (fault : ConstructorMetadataFaults context instantiation reason) :
+        Expression program registry (stepSize []) scope context environment heap id (.fault (.semantic reason)) heap
     | indexBaseFault {firstSize : Nat} {scope context environment before after id base key failure}
         (occurrence : Occurrence scope id (.index base key))
         (first : Expression program registry firstSize scope context environment before base (.fault failure) after) :
@@ -1162,6 +1166,7 @@ local macro "erase_stage_grade" : tactic =>
     case tupleFault => apply Recursive.Expression.tupleFault <;> assumption
     case constructorValue => apply Recursive.Expression.constructorValue <;> assumption
     case constructorFault => apply Recursive.Expression.constructorFault <;> assumption
+    case constructorMetadataFault => apply Recursive.Expression.constructorMetadataFault <;> assumption
     case indexBaseFault => apply Recursive.Expression.indexBaseFault <;> assumption
     case indexKeyFault => apply Recursive.Expression.indexKeyFault <;> assumption
     case indexResult => apply Recursive.Expression.indexResult <;> assumption
@@ -1418,6 +1423,8 @@ local macro "construct_stage_grade" : tactic =>
     case constructorFault occurrence children ih_children =>
       obtain ⟨_, graded_children⟩ := ih_children
       exact ⟨_, .constructorFault occurrence graded_children⟩
+    case constructorMetadataFault occurrence fault =>
+      exact ⟨_, .constructorMetadataFault occurrence fault⟩
     case indexBaseFault occurrence first ih_first =>
       obtain ⟨_, first⟩ := ih_first
       exact ⟨_, .indexBaseFault occurrence first⟩
