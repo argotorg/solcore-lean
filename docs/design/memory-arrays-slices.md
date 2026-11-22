@@ -290,8 +290,9 @@ So `toArray(m[1:3])` has the type `uint256[]` where `m` has, `lidx(m, 1)`'s inde
 - **Rules.** Each rule comes with its fault rules and its sized copies, as row 1's rules do. Every
   form faults with its operands' faults. A read, a slice, `lidx(a, i)` and `new T[](n)` also fault
   on an index, a bound or a length that is not a word. The staged traces that the source-to-Core
-  theorems are stated over (`Staging.Recursive.Expression`) take no array form, since decision 6
-  keeps arrays outside the meaning proofs.
+  theorems are stated over (`Staging.Recursive.Expression`) mirror them: `arrayResult` evaluates
+  the children and then `ArrayOutcome`, which mirrors each rule after them, and `arrayFault`
+  takes the children's first fault.
 
 | Form | Typed form | Evaluation | Panics |
 | --- | --- | --- | --- |
@@ -323,8 +324,9 @@ So `toArray(m[1:3])` has the type `uint256[]` where `m` has, `lidx(m, 1)`'s inde
   - Before the right side, the place faults with its leading place's fault, the index's, an index
     that is not a word, `0x32` from the length on, or `uninitializedLocation` when its leading is a
     local not yet initialized, as reading that local does.
-  - The staged traces stage no element place: `Staging.Recursive.ProjectedTarget.keys` stops at an
-    element projection.
+  - The staged traces stage an element place with `Staging.Recursive.ElementTarget`: the root
+    local, then each element, with the place's faults. `StatementsIn` and `ForItems` write
+    through it (`assignElement`, `bitNotElement`, `elementAssignment`, `elementBitNot`).
 - **Preservation.**
   - A reference has the type `T[]` when the cell it names has the type `arrayObject T`, as Core's
     runtime typing reads a `cellRef`'s cell in its world, and an object's elements each have its
@@ -461,8 +463,8 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
   - The whole-language theorems `Dynamic.WholeLanguagePreservation` and
     `ProgramWellFormed.wholeLanguagePreservation` keep their text and cover arrays. The staged ones,
     `Staging.Recursive.SelectedPreservation.expression` and
-    `Staging.Recursive.FaultPreservation.expression`, keep their text but do not reach arrays,
-    since the staged traces take no array form (decision 6).
+    `Staging.Recursive.FaultPreservation.expression`, keep their text and reach the array forms
+    and element writes.
   - README's Proof status sentence on the source semantics' type preservation stays true, and
     nothing in the build-on table changes.
 - **Statements under byte memory.** `Dynamic.ValueHasType` and `Dynamic.HeapWellTyped` would take
@@ -531,6 +533,12 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
 
 - **Decided: compiled, outside the meaning proofs in row 4**, as row 1's conversions were. The
   proofs for arrays become a later unit, which relates array objects to their Core cells.
+- **That unit is under way.** The staged traces have the array forms and the element writes.
+  The unit takes a memref only as the operand of a load or a store, and `toArray` only of
+  slices made where it is called: the Source has no rule for a load, a store or a copy out of
+  bounds, and the bound of a stored memref or slice would be an invariant over the heap. The
+  relation that gains the array objects is the whole-cell `GenericHeap.CellHeapRepresents`;
+  `HeapRepresents` keeps its text.
 - **Other option: prove the lowering of arrays in row 4.**
 - **Statements under the decision.** Nothing in README, its Proof status or the build-on table
   changes. [What remains](../guide/core-lowering.md#what-remains) in core-lowering.md has arrays.
@@ -681,11 +689,10 @@ rejection in 22 to 24, as it could the open `Typedef` call. Nothing schedules it
   ([decision 4](#4-what-row-4s-lean-side-covers)). Contract declarations are catalogued, but their
   members are not typed (`ProgramContractSignature`). Persistent storage and external calls are not
   connected, and the ABI wrapper takes static words only ([README](../../README.md#proof-status)).
-- **The meaning proofs for arrays** ([decision 6](#6-meaning-proofs)). A later unit relates array
-  objects to their Core cells, and changes the build-on statements that decision 6 lists. Today the
-  staged traces take no array form (`Staging.Recursive.Expression`) and stage no element place
-  (`Staging.Recursive.ProjectedTarget.keys` stops at an element projection), and arrays stay
-  outside `StaticProfile`.
+- **The meaning proofs for arrays** ([decision 6](#6-meaning-proofs)). The unit that relates array
+  objects to their Core cells is under way, and changes the build-on statements that decision 6
+  lists. The staged traces have the array forms and the element writes; the heap relation, the
+  compiler receipts and the heads follow. Arrays stay outside `StaticProfile`.
 - **User collections indexed through `RValueIdxAccess`.** They need std's traits, and `Typedef` at
   a type parameter, which is row 1's open gap. Generic code over std's `Length` (`where c: Length`)
   waits for the same: Lean declares neither trait, so both are rejected with `unknownTrait`.

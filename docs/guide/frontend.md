@@ -33,8 +33,14 @@ file through `Syntax/Unchecked`, building the declaration environment), resolves
 signatures, and checks every function and method body. In the modules reachable from the entry,
 the load refuses the imports that upstream refuses where they are (`programImportErrors`): a name
 brought beside a declaration of the module, an unknown item, a name listed twice, a name brought
-from two modules, a qualifier beside a value of that name, and an unknown module other than one
-of upstream's std modules. An import of `std.opcodes` binds upstream's 81 names, of which the 26
+from two modules, a qualifier beside a value of that name, two imports under one qualifier, and
+an unknown module other than one of upstream's std modules. It refuses there too the exports
+upstream refuses: a local export that names nothing the module declares or a selected or
+wildcard import brings, a constructor that its type does not show, a re-export that its module
+does not show, std's modules by their export tables, and one public name for items of two
+origins. A module's names resolve through the modules it reaches
+(`buildProgramInterfacesFrom`), so an error in a module that nothing imports refuses no
+program. An import of `std.opcodes` binds upstream's 81 names, of which the 26
 pure functions are builtins (`builtinNamed?`), and `!` and `<` call the `not` and `lt` that it
 binds, as upstream's do (`operatorBuiltin?`). A plain import qualifies them by `opcodes` and
 `std.opcodes`, and a namespace import by its alias (`qualifiedBuiltinNamed?`). An import of
@@ -61,7 +67,7 @@ artifact. `SourceCoreExecution.prepare` turns that artifact into the recipe that
 | [`SourceInference/TypedIR`](../../Solcore/Frontend/SourceInference/TypedIR.lean) | The typed IR: `TypedSource`, `ExpressionNode`, `ExpressionForm`, `TypedBinder` |
 | [`SourceInference/Types`](../../Solcore/Frontend/SourceInference/Types.lean) | `State`, `Context`, `CheckedFunction`, `SolvedRequirement`, `Error` |
 | [`SourceInference/Resolution`](../../Solcore/Frontend/SourceInference/Resolution.lean) | Operator, overload and trait selection: `binaryOperatorDispatch`, `inferBinaryOperator`, `withExpected`; the builtin operators at the twelve fixed-width types (`fixedBinaryOperator`); operands that wait for their type (`binaryDefers`); the types of compound and in-place `~` targets (`compoundOperandType`, `bitNotTargetType`, `bitNotTargetFits`) |
-| [`SourceInference/Expression`](../../Solcore/Frontend/SourceInference/Expression.lean) | The traversal `inferExprFuel`, `inferStatementFuel`, `inferStatementsFuel`, with the shift and unchecked branches, a qualified call's `Typedef` branch (`typedefCall?`, `typedefFunction`), a constructor pattern's `uint256(p)` branch (`uint256PatternArgument?`), and a binder pattern's `true` and `false`, which name the booleans (`MatchPatternResolution.boolLiteral`) |
+| [`SourceInference/Expression`](../../Solcore/Frontend/SourceInference/Expression.lean) | The traversal `inferExprFuel`, `inferStatementFuel`, `inferStatementsFuel`, with the shift and unchecked branches, a qualified call's `Typedef` branch (`typedefCall?`, `typedefFunction`), a constructor pattern's `uint256(p)` branch (`uint256PatternArgument?`), a binder pattern's `true` and `false`, which name the booleans (`MatchPatternResolution.boolLiteral`), and its same-name constructor with the refusal of another constructor's spelling (`sameNameConstructorVisible`, `constructorLeafVisible`) |
 | [`SourceInference/Program`](../../Solcore/Frontend/SourceInference/Program.lean) | `checkFunctionBody` and `finalize`. `finalize` defaults an open numeric pattern to `uint256`, and an open literal where one of the uses that `Detail.literalDefaultsToUint256` lists takes it, rejecting it as ambiguous elsewhere. It checks literal ranges (`Detail.signedLiteralFitsTarget`), and runs the checks that wait for final types: assignment targets, unchecked, shift and array operands, array literals and element places (`Detail.validateAssignmentTargets`, `Detail.validateUncheckedOperand`, `Detail.validateShiftOperands`, `Detail.validateArrayIndex`, `Detail.validateArrayLiteral`, `Detail.validatePlaceElements`). `inferExpression`, whose own type stays open, leaves a lone open literal ambiguous where upstream's root rule gives it `uint256` |
 | [`SourceInference`](../../Solcore/Frontend/SourceInference.lean) | The inference umbrella, which also imports five of its proof files |
 | [`ProgramChecking`](../../Solcore/Frontend/ProgramChecking.lean) | `checkProgram`, `CheckedProgram`, `ProgramCheckError`; `missingSuperclassErrors`, upstream's `SC0248`, before the bodies, and `ambiguousGivenErrors`, its `SC0208` for a goal that two givens reach, after them |

@@ -76,8 +76,9 @@ obligations. None follows from agreement in a test corpus.
   - Remaining: further state operations, ECRECOVER and P256VERIFY, init frames and public
     deployment, the rest of inline Yul, object linking, and then divergence and reverse
     correspondence.
-- **Upstream's match rules**: row 13, the literal `lidx` index, the declaration checks and the
-  boolean patterns are done; the bare-name rule and match exhaustiveness follow
+- **Upstream's match rules**: row 13, the literal `lidx` index, the declaration checks, the
+  boolean patterns and the bare-name rule are done; constructor names and match exhaustiveness
+  follow
   ([the upstream table](#following-upstreams-semantics-the-next-units)).
 - **Lean's native frontend as a fourth path**: the harness and the fuzz driver's `native` run kind
   compare the admitted pure cases with direct Core, memory arrays with their slices and memrefs
@@ -133,24 +134,26 @@ The last two are recorded without investigation, and the generators avoid them.
    `where` clause states beside the subclass. A method's own `where` predicates give their
    superclasses in its body too. Lean keeps ignoring `#[derive]`. Each impl's head and declared
    conditions are checked where it is declared, as upstream's `SC0219`, `SC0212` and `SC0213` do,
-   with its two pragmas. A `true` or `false` pattern is the boolean, as upstream reads it. Next,
-   Lean reads any other bare name in a pattern as upstream does: a constructor that shares its
-   type's name is that constructor, and another visible constructor's name is refused
-   (`SC0106`), where Lean binds a variable today. Then Lean follows upstream in a match's
-   exhaustiveness: today Lean counts constructors only for a scrutinee of a nominal type, so an
-   exhaustive match over a pair or on `bool` needs a `_` arm.
+   with its two pragmas. A `true` or `false` pattern is the boolean, as upstream reads it, and
+   so is any other bare name in a pattern: a constructor that shares its type's name is that
+   constructor, and another visible constructor's spelling is refused (`SC0106`). Next come
+   constructor names ([where Lean and upstream differ](#where-lean-and-upstream-differ)), then
+   a match's exhaustiveness: today Lean counts constructors only for a scrutinee of a nominal
+   type, so an exhaustive match over a pair or on `bool` needs a `_` arm.
 
-   Lean's `&&` and `||` still call a program's own `and` or `or`. They become builtins, as
-   upstream's are.
+   Lean's `&&` and `||` are builtins, as upstream's are: they take `bool` operands,
+   short-circuit, and never call a program's own or an imported `and` or `or`. Next comes a
+   program's implementation of an operator's trait at a builtin type
+   ([where Lean and upstream differ](#where-lean-and-upstream-differ)).
 2. **Meaning proofs.** The rest of native Source goal two
    ([remaining work](core-runtime-unification.md#remaining-work-for-the-second-goal)). Row 1 has
    no leftover, and the faults, the final values, the mapping indices and the builtin closures of
    call-containing rows are lifted, with assignments and in-place `~` through mapping indices,
-   loops, tuples beyond pairs and constructor applications. Memory arrays are next
-   ([decision 6](memory-arrays-slices.md#6-meaning-proofs)): the staged traces gain the array
-   forms, and the heap relation relates an array object to its Core cell. This unit takes a
-   memref only as the operand of a load or a store, and `toArray` only of slices made where it
-   is called.
+   loops, tuples beyond pairs and constructor applications. Memory arrays are under way
+   ([decision 6](memory-arrays-slices.md#6-meaning-proofs)): the staged traces have the array
+   forms and the element writes, and next the heap relation relates an array object to its
+   Core cell. This unit takes a memref only as the operand of a load or a store, and
+   `toArray` only of slices made where it is called.
 3. **Lean's native frontend as a fourth differential path.** The harness runs the admitted pure
    cases through the native pipeline, alone or as the fuzz driver's `native` run kind, memory
    arrays with their slices and memrefs among them. Lean's imports follow upstream's `SC0108`,
@@ -167,9 +170,12 @@ The last two are recorded without investigation, and the generators avoid them.
    meet upstream's import rules, and their names, whose declarations Lean lacks, bind nothing, so
    a program resolves past them. A plain import of `std.opcodes` names the module `opcodes` and
    `std.opcodes`, and a namespace import by its alias: under them the 26 pure functions are
-   builtins in calls and as values, and the others are refused where they are used. Next come
-   the export checks. Two imports under one qualifier (`SC0116`) and a module that re-exports
-   two traits of one name (`SC0111`) are still accepted.
+   builtins in calls and as values, and the others are refused where they are used. The load
+   follows upstream's export checks (`SC0113` to `SC0115`, `SC0111`) and `SC0116`, std's
+   modules by their export tables. Still accepted are two modules exported under one alias
+   (`SC0112`) and, as Lean's std tables hold neither, a constructor selection on a std type and
+   a std name exported beside another origin's. A std name that a user module re-exports
+   reaches no importer.
 
 ### Then
 
@@ -226,6 +232,37 @@ code.
 
 The new `evm-word-boundaries` fixture checks the `word` operations at their extremes, which the
 scalar meaning already covers.
+
+### Where Lean and upstream differ
+
+Where the two differ on what a program means or on whether it is accepted, Lean takes the side
+that general language design supports, and upstream is not followed by default. The differences
+below come from running upstream's own test programs through Lean's native frontend.
+
+- **Lean follows upstream**, each as a checker rule to come:
+  - an unqualified constructor head in a pattern (`case None`) is refused unless it is a
+    same-name constructor, and a same-name constructor may be written bare in an expression;
+  - a tuple pattern in parentheses, `.true` and `.false`, an unannotated lambda's result, and
+    `returns (a, b)` for a trait's one tuple result are accepted;
+  - a weak trait argument is taken from the one implementation that fixes it;
+  - a type parameter that nothing fixes (`SC0299`) and statements after a `return` (`SC0222`)
+    are refused;
+  - upstream's primitive `primAddWord` is a name for the builtin, and two modules exported
+    under one alias are refused (`SC0112`).
+- **Lean keeps its own rule:**
+  - mutually recursive data is accepted, as directly recursive data is;
+  - a binder repeated in one pattern and cyclic superclasses are refused;
+  - a function type holds its parameters as one product, so a function of one pair takes two
+    arguments;
+  - `@T` is Lean's builtin proxy, whatever `Proxy` a program declares;
+  - expressions nest past 128 levels.
+- **Lean differs from both** in one place. At a builtin type, Lean applies its builtin operator
+  where the type is known, and runs a program's implementation of the operator's trait in
+  generic code, where upstream always runs the implementation. A program that has both can
+  mean two things. Lean will refuse it, and the form of that rule is being decided.
+- **To measure first:** the spellings `Word` and `Bool` beside `word` and `bool`, two functions
+  of one name (`SC0108`), a runtime value at a `comptime` parameter (`SC0240`), and compound
+  assignment through a program's operator trait.
 
 ## Handoff rules
 
