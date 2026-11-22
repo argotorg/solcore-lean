@@ -1014,6 +1014,16 @@ inductive ProgramInterfaceError where
   | importQualifierConflict
       (owner : Workspace.ModuleId)
       (name : String)
+  /-- Two plain or namespace imports under one qualifier, a namespace import's alias or a plain
+  import's last path component, as upstream's `SC0116` refuses them. -/
+  | duplicateImportQualifier
+      (owner : Workspace.ModuleId)
+      (name : String)
+  /-- One public name that a module's exports give to items of two origins, each the module that
+  declares it and its name there, in any namespace, as upstream's `SC0111` refuses it. -/
+  | duplicateExportName
+      (owner : Workspace.ModuleId)
+      (name : String)
   deriving Repr, DecidableEq
 
 namespace ProgramDeclaration
@@ -1737,6 +1747,17 @@ private def exportsIn (module : ProgramModule) : List Syntax.ExportDecl :=
     | .exportDecl declaration => some declaration
     | _ => none
 
+/-- Upstream's `SC0111` for one module's exports: each public name its exports give to items of
+two origins, each origin the module that declares the item and the item's name there, in any
+namespace. One item exported twice, through its module and a relay among them, is one origin. -/
+private def duplicateExportNames (owner : Workspace.ModuleId) (interface : ProgramInterface) :
+    List ProgramInterfaceError :=
+  let names := (interface.entities.map (·.publicName)).eraseDups
+  names.filterMap fun name =>
+    let origins := (interface.entities.filter (·.publicName == name)).map fun entity =>
+      (entity.declaration.id.moduleId, entity.declaration.name)
+    if origins.eraseDups.length > 1 then some (.duplicateExportName owner name) else none
+
 private def moduleContribution
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (module : ProgramModule) : Contribution :=
@@ -1747,7 +1768,9 @@ private def moduleContribution
       (fun (contribution : Contribution) declaration =>
     processExport environment interfaces module locals imported.entities standard
       contribution declaration) ({} : Contribution)
-  { exported with errors := imported.errors ++ exported.errors }
+  { exported with
+    errors := imported.errors ++ exported.errors ++
+      duplicateExportNames module.id exported.interface }
 
 private def closureRound
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces) :
@@ -1962,14 +1985,16 @@ private def parseWorkspaceFiles :
 
 /-- Whether a load reports an interface error where the import or export is, as upstream reports
 it: an unknown module other than one of upstream's std modules, an unknown selected or hidden item,
-the import rules (`importRuleErrors`), and the export checks: an unknown export or re-export
-(`SC0113`, `SC0115`) and a constructor its type does not show (`SC0114`, or `SC0115` for a
-re-export). -/
+the import rules (`importRuleErrors`), two imports under one qualifier (`SC0116`), and the export
+checks: an unknown export or re-export (`SC0113`, `SC0115`), a constructor its type does not show
+(`SC0114`, or `SC0115` for a re-export), and one public name for items of two origins
+(`SC0111`). -/
 def ProgramInterfaceError.reportedAtLoad : ProgramInterfaceError → Bool
   | .unknownModule _ components => !upstreamStandardModulePaths.contains components
   | .unknownImportName _ _ _ | .importedNameConflict _ _ _ | .duplicateImportName _ _
   | .ambiguousImport _ _ _ | .importQualifierConflict _ _ | .unknownExportName _ _
-  | .unknownExportConstructor _ _ _ => true
+  | .unknownExportConstructor _ _ _ | .duplicateImportQualifier _ _ | .duplicateExportName _ _ =>
+      true
   | .fixedPointExhausted => false
 
 /-- The module an interface error is in. -/
@@ -1977,7 +2002,8 @@ def ProgramInterfaceError.owner? : ProgramInterfaceError → Option Workspace.Mo
   | .unknownModule owner _ | .unknownImportName owner _ _ | .unknownExportName owner _
   | .unknownExportConstructor owner _ _ | .importedNameConflict owner _ _
   | .duplicateImportName owner _ | .ambiguousImport owner _ _
-  | .importQualifierConflict owner _ => some owner
+  | .importQualifierConflict owner _ | .duplicateImportQualifier owner _
+  | .duplicateExportName owner _ => some owner
   | .fixedPointExhausted => none
 
 /-- The modules that a module's imports and re-exports name, where they resolve. -/
@@ -2178,9 +2204,23 @@ private def importQualifierConflicts (environment : ProgramEnvironment)
         if nameSpace == .function then some name else none
   (qualifiers.eraseDups.filter values.contains).map (.importQualifierConflict module.id ·)
 
+/-- Upstream's `SC0116`: two plain or namespace imports under one qualifier, a namespace import's
+alias or a plain import's last path component, once per qualifier. It reads only the imports, so
+it holds for std's modules and for a module the load does not resolve too. -/
+private def duplicateImportQualifiers (module : ProgramModule) : List ProgramInterfaceError :=
+  let qualifiers := (importsIn module).filterMap fun declaration =>
+    match declaration.value with
+    | .plain path => (programModulePathComponents path).getLast?
+    | .namespace _ alias => some alias.value
+    | _ => none
+  let repeated := qualifiers.zipIdx.filterMap fun (name, index) =>
+    if (qualifiers.take index).contains name then some name else none
+  repeated.eraseDups.map (.duplicateImportQualifier module.id ·)
+
 /-- The import rules a load checks in each module, as upstream's validation does: a name brought
 beside a declaration (`SC0108`), a name listed twice (`SC0117`), a name from two modules
-(`SC0120`) and a qualifier beside a value (`SC0121`). -/
+(`SC0120`), a qualifier beside a value (`SC0121`) and two imports under one qualifier
+(`SC0116`). -/
 private def importRuleErrors (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (module : ProgramModule) : List ProgramInterfaceError :=
   importConflicts environment interfaces module (localEntities environment module.id) ++
@@ -2188,7 +2228,8 @@ private def importRuleErrors (environment : ProgramEnvironment) (interfaces : Pr
     standardModuleImportErrors environment module (localEntities environment module.id) ++
     duplicateImportNames module ++
     ambiguousImports environment interfaces module ++
-    importQualifierConflicts environment interfaces module
+    importQualifierConflicts environment interfaces module ++
+    duplicateImportQualifiers module
 
 /-- The import and export errors of a program that its load reports, for the modules reachable
 from its entry, as upstream validates only those: the interface errors reported where the import or

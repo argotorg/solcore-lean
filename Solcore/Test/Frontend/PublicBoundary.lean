@@ -3306,6 +3306,8 @@ private def testCanonicalPathDoesNotBypassImports : IO Unit := do
   | .ok _ => throw (IO.userError
       "a canonical module path reached an unimported function")
 
+/-- Two namespace imports under one alias are refused at the load, as upstream's `SC0116` refuses
+them, before any qualified name of the alias resolves. -/
 private def testAmbiguousNamespace : IO Unit := do
   let left := "export {*}; function choose(value: Word) returns (Word) { return value; }"
   let right := "export {*}; function choose(value: Word) returns (Word) { return value; }"
@@ -3319,11 +3321,13 @@ private def testAmbiguousNamespace : IO Unit := do
         ("consumer.solc", consumer)] "consumer.solc") with
   | .error errors =>
       assertTrue (errors.any fun error => match error with
-        | .body { error := .ambiguousImportedNamespace "Shared" modules, .. } =>
-            modules.length == 2
+        | .loading (.imports importErrors) => importErrors.any fun importError =>
+            match importError with
+            | .duplicateImportQualifier _ "Shared" => true
+            | _ => false
         | _ => false)
-        "ambiguous imported namespace lost its explicit diagnostic"
-  | .ok _ => throw (IO.userError "ambiguous imported namespace was selected")
+        "two namespace imports under one alias were not refused at the load"
+  | .ok _ => throw (IO.userError "two namespace imports under one alias were accepted")
 
 private def testReexportedEntitiesAndModulePath : IO Unit := do
   let provider := String.intercalate "\n" [

@@ -7,9 +7,11 @@ an unknown module are refused where they are; an import of one of upstream's std
 and the rules count the names it exports with their namespaces (`upstreamStandardModuleExports`);
 of two import declarations that bind one name from one module, the first is kept; a name listed
 twice in one import (`SC0117`), a name brought from two modules (`SC0120`) and a qualifier beside a
-value (`SC0121`) are refused; the export checks refuse a local export that names nothing the
-module declares or imports (`SC0113`), a constructor its type does not show (`SC0114`) and a
-re-export that its module does not export (`SC0115`), std's modules by their export tables; and a
+value (`SC0121`) are refused, and so are two imports under one qualifier (`SC0116`); the export
+checks refuse a local export that names nothing the module declares or imports (`SC0113`), a
+constructor its type does not show (`SC0114`), a re-export that its module does not export
+(`SC0115`), std's modules by their export tables, and one public name for items of two origins
+(`SC0111`); and a
 module that no import or re-export reaches from the entry is not checked, as upstream validates only
 the reachable ones. Each case is a source that upstream's pinned checker was probed with, and gives
 upstream's answer. -/
@@ -75,6 +77,8 @@ private def describe : ProgramInterfaceError → String
   | .unknownExportName _ name => s!"export {name}"
   | .unknownExportConstructor _ typeName constructorName =>
       s!"constructor {typeName}.{constructorName}"
+  | .duplicateImportQualifier _ name => s!"qualifier twice {name}"
+  | .duplicateExportName _ name => s!"exported twice {name}"
   | error => reprStr error
 
 /-- What a load refuses at the imports, described; none when it loads, and `other` when it fails
@@ -450,6 +454,79 @@ private def testStandardExports : IO Unit := do
     ["export std.opcodes.{ nosuch };", "export std.{ nosuch2 };"]
     ["export nosuch", "export nosuch2"]
 
+private def coerce : String := "pragma solcore;\nexport { Coerce };\ntrait Coerce<From, To> {}"
+
+/-- Modules for `SC0116` and `SC0111`: a root module and a nested one named like modules of the
+workspace, a module with two plain imports of one module, and a module that re-exports two traits
+of one name. -/
+private def duplicateNeighbours : List Workspace.RawSourceFile := [
+  { path := "mod.solc", content :=
+      "pragma solcore;\nexport { h };\nfunction h(x: word) returns (word) { return x; }" },
+  { path := "pkg/lib.solc", content :=
+      "pragma solcore;\nexport { g };\nfunction g(x: word) returns (word) { return x; }" },
+  { path := "dupq.solc", content := "pragma solcore;\nimport lib;\nimport lib;" },
+  { path := "left.solc", content := coerce },
+  { path := "right.solc", content := coerce },
+  { path := "hub.solc", content := "pragma solcore;\nexport left.*;\nexport right.*;" }]
+
+/-- `SC0116`: two plain or namespace imports under one qualifier, a namespace import's alias or a
+plain import's last path component, whatever modules they name, std's among them; a selective or
+wildcard import has none. -/
+private def testDuplicateQualifiers : IO Unit := do
+  expectRefused "one module plain-imported twice" ["import lib;", "import lib;"] []
+    ["qualifier twice lib"]
+  expectRefused "two modules with one last component" ["import lib;", "import pkg.lib;"] []
+    ["qualifier twice lib"] (loose := duplicateNeighbours)
+  expectRefused "two namespace imports under one alias"
+    ["import * as L from lib;", "import * as L from lib2;"] [] ["qualifier twice L"]
+  expectRefused "a namespace alias and a plain import's last component"
+    ["import * as lib from lib2;", "import lib;"] [] ["qualifier twice lib"]
+  expectLoaded "a plain import beside a selective import of its module"
+    ["import lib;", "import { f } from lib;"] []
+  expectLoaded "a namespace import beside a wildcard of its module"
+    ["import * as L from lib;", "import * from lib;"] []
+  expectLoaded "two namespace imports of one module under two aliases"
+    ["import * as L from lib;", "import * as N from lib;"] []
+  expectLoaded "a plain import beside a namespace alias of another name"
+    ["import lib;", "import * as L from lib;"] []
+  expectRefused "std.opcodes plain-imported twice" ["import std.opcodes;", "import std.opcodes;"]
+    [] ["qualifier twice opcodes"]
+  expectRefused "std plain-imported twice" ["import std;", "import std;"] [] ["qualifier twice std"]
+  expectRefused "std.opcodes beside a namespace alias opcodes"
+    ["import std.opcodes;", "import * as opcodes from lib;"] [] ["qualifier twice opcodes"]
+  expectRefused "a nested module beside a root module of its last component"
+    ["import pkg.mod;", "import mod;"] [] ["qualifier twice mod"] (loose := duplicateNeighbours)
+  expectRefused "two qualifiers in a plain-imported module" ["import dupq;"] []
+    ["qualifier twice lib"] (loose := duplicateNeighbours)
+  expectLoaded "the same module, unreachable" [] [] (loose := duplicateNeighbours)
+
+/-- `SC0111`: one public name that a module's exports give to items of two origins, each the
+module that declares it and its name there, in any namespace; one item reached twice, a local type
+and function of one name, and an alias beside its original are one origin or two names. -/
+private def testDuplicateExports : IO Unit := do
+  expectRefused "two functions exported under one name" ["import { f } from lib;"]
+    ["export { f };", "export lib2.{ f };"] ["exported twice f"]
+  expectLoaded "a local type and a local function of one name" []
+    ["enum Hue { A }", "function Hue(x: word) returns (word) { return x; }", "export { Hue };"]
+  expectRefused "a local function and another module's type of its name" []
+    ["function Color(x: word) returns (word) { return x; }", "export { Color };",
+      "export shown.{ Color };"] ["exported twice Color"] (loose := exportNeighbours)
+  expectRefused "two modules' wildcards sharing a name" [] ["export lib2.*;", "export lib3.*;"]
+    ["exported twice f"]
+  expectLoaded "one item through its module and a relay" []
+    ["export lib.{ f };", "export lib3.{ f };"]
+  expectLoaded "an alias beside its original" ["import { f as g } from lib;"]
+    ["export { g };", "export lib.{ f };"]
+  expectLoaded "a selected import and a re-export of the same item" ["import { f } from lib;"]
+    ["export { f };", "export lib.{ f };"]
+  expectRefused "a module's wildcard beside a local of a name it exports" []
+    [localF, "export { f };", "export lib.*;"] ["exported twice f"]
+  expectLoaded "a std.opcodes function selected and re-exported"
+    ["import { div } from std.opcodes;"] ["export { div };", "export std.opcodes.{ div };"]
+  expectRefused "a module re-exporting two traits of one name, plain-imported" ["import hub;"] []
+    ["exported twice Coerce"] (loose := duplicateNeighbours)
+  expectLoaded "the same module, unreachable" [] [] (loose := duplicateNeighbours)
+
 def testImportParity : IO Unit := do
   testImportedNameConflicts
   testUnknownImports
@@ -463,5 +540,7 @@ def testImportParity : IO Unit := do
   testExportedConstructors
   testReexports
   testStandardExports
+  testDuplicateQualifiers
+  testDuplicateExports
 
 end Tests.ImportParity
