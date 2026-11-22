@@ -310,14 +310,18 @@ program.
   ([AcceptedShapes](../../Solcore/SourceSemantics/CoreLowering/AcceptedShapes.lean)), recognizes on
   the Source statement lists of value and unit returns, monomorphic declarations, bare assignments
   that the compiler refines (`Assignable`), bare in-place `~` that it refines
-  (`BitNotAssignable`), assignments through mapping indices that it refines
-  (`ProjectedAssignable`), expression statements, blocks, conditionals and a function body's
-  final value whose node has the declared result type (`Shape.tail`), with every expression and
-  key in a given predicate. A list that may end without returning is a branch or block
+  (`BitNotAssignable`), assignments and in-place `~` through mapping indices that it refines
+  (`ProjectedAssignable`, `ProjectedBitNotAssignable`), expression statements, blocks,
+  conditionals, `while` and `for` loops, `break` and `continue`, and a function body's final
+  value whose node has the declared result type (`Shape.tail`), with every expression and key in
+  a given predicate. A `for` header is a vector of the same declarations, expression items and
+  refined writes (`ItemsShape`). A list that may end without returning is a branch or block
   body, or belongs to a Unit function. `covered` shows that every refined accepted tree of such a
   list is covered; a refined tree keeps the unrefined assignment branch only for writes that are not
   `ValueAssignable`, and the unrefined `~=` branch only for those that are not `UnaryAssignable`.
-  `shape?` checks a shape with subset-site expressions on an actually compiled row.
+  It also covers the loop trees and their headers, and refutes the header boundary, which no
+  header reaches. `shape?` checks a shape with subset-site expressions on an actually compiled
+  row.
 - **The receipts.** `CellAwarePublicAcceptedNamedRoot.refined_body` refines the actual body receipt
   at a prepared header with the header's own assignment, bit-not and match policies.
   `CellAwarePublicAcceptedNamedRoot.compilation_receipts` derives the original compilation receipt
@@ -326,9 +330,10 @@ program.
   stages every value execution of a subset expression, by structural induction on `Subset` with no
   typing or state input. `CellAwareInvocationAcceptedStatementLifting.statements` stages every
   ordinary execution of a shaped list whose expressions are subset sites, in both compiler modes,
-  by structural induction on `Shape`. Every control outcome is carried unchanged, with the context,
-  environment and heap of the original execution, and `body` gives the sized staged trace of a
-  function body.
+  by structural induction on `Shape`. A loop's iterations lift by strong induction on the size of
+  their Source derivation, and its header items by induction on `ItemsShape`. Every control
+  outcome is carried unchanged, with the context, environment and heap of the original execution,
+  and `body` gives the sized staged trace of a function body.
 - **Lifting with calls.** `CellAwareInvocationAcceptedCallLifting`
   ([AcceptedCallLifting](../../Solcore/SourceSemantics/CoreLowering/AcceptedCallLifting.lean))
   lifts original executions of bodies whose expressions are extended roots (`CallSubset`), over
@@ -338,14 +343,17 @@ program.
   call-containing function body. The admitted callees' static receipts are a premise (`Callees`).
   An assignment through mapping indices lifts to the staged `assignProjected`, with its keys and
   `ProjectedTarget.Snapshot` from the Source's place resolution (`projected_target`), and each of
-  its faults to the staged rule at the same point. A call of a builtin closure lifts to the
-  staged `builtinApplied` and `builtinArgumentsFault`, and a reference to one to the staged atomic
-  value.
+  its faults to the staged rule at the same point. An in-place `~` through mapping indices lifts
+  the same way to `bitNotProjected`, and an invalid operand at its selected leaf to
+  `bitNotProjectedOperandFault`, which the lowering heads refute from the heap representation. A
+  call of a builtin closure lifts to the staged `builtinApplied` and `builtinArgumentsFault`, and a
+  reference to one to the staged atomic value.
 - **Fault lifting.** `CellAwareInvocationAcceptedFaultLifting`, in the same file, lifts the
   original fault executions of the same bodies with the same reason and heap (`body_fault`). The
   staged traces express every reason but a type mismatch and a missing declaration
   (`Expressible`). The direct calls must have plain callee nodes (`CalleesPlain`, a finite
   check), because the Source's fault rule after a call's arguments does not record its callee.
+  A loop's condition, body, header items and later iterations fault as the staged loop rules do.
 
 ### Instances
 
@@ -366,22 +374,27 @@ program.
   uses are general over the subset and the shape.
 - **One call.** The test
   [Accepted/OneCall](../../Solcore/Test/SourceSemantics/CoreLowering/Accepted/OneCall.lean) compiles
-  a twelve-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
+  a fifteen-function program at runtime: `identity` returns its `Word` parameter, `relay` returns
   `identity(value)`, `twice` returns `identity(identity(value))`, `narrow` returns `uint8(value)`,
   `roundTrip` returns `Typedef.rep(uint8(value))`, `doubled`, `shifted` and `flipped` update a
   `uint8` local in place with `+=`, `<<=` and `~`, `tailed` ends in `identity(value)` as its final
   value, `stored` assigns its parameter at `table[value]` of a local mapping and returns
-  `table[value]`, `summed` returns `integerAdd(wordToInteger(value), wordToInteger(value))`, an
-  integer, and `zeroed` returns `iszero(value)` with `iszero` imported from `std.opcodes`. Its
-  `accepted_call` meets every premise of
+  `table[value]`, `inverted` complements `table[value]` in place and returns it, `summed` returns
+  `integerAdd(wordToInteger(value), wordToInteger(value))`, an integer, `zeroed` returns
+  `iszero(value)` with `iszero` imported from `std.opcodes`, `broken` runs
+  `while (true) { break; }`, and `counted` runs
+  `for (let go: bool = true; go; go = false) { continue; }`, each before it returns its
+  parameter. Its `accepted_call` meets every premise of
   `CellAwarePublicAcceptedCallForward.first_value_selected`,
   `CellAwarePublicAcceptedCallRoot.checkpoint_has_sufficient_fuel_selected` and
-  `checkpoint_reflects_selected` at `relay`'s, `tailed`'s and `zeroed`'s first public calls, at
-  `twice`'s, where the inner call's result is the outer call's argument, and at `narrow`'s and
-  `roundTrip`'s at a canonical word. At `stored`, `accepted_call_with_locals` meets them with a
-  Source execution that ends in the local's context, and at `summed`, `accepted_call_returning`
-  with one that returns an integer. At a dirty word, `accepted_reflection` meets the reflection's
-  premises at `narrow` and `roundTrip`, and the call fails with the dirty-integer reason. At the
+  `checkpoint_reflects_selected` at the first public calls of `relay`, `tailed`, `zeroed`, `broken`
+  and `counted`, at `twice`'s, where the inner call's result is the outer call's argument, and at
+  `narrow`'s and
+  `roundTrip`'s at a canonical word. At `stored` and `inverted`, `accepted_call_with_locals` meets
+  them with a Source execution that ends in the local's context, and at `summed`,
+  `accepted_call_returning` with one that returns an integer. At a dirty word,
+  `accepted_reflection` meets the reflection's premises at `narrow` and `roundTrip`, and the call
+  fails with the dirty-integer reason. At the
   faulting words of `narrow`, `doubled`, `shifted` and `flipped`, `accepted_failure` lifts the
   row's original Source fault and meets every premise of `first_fault_selected`: the actual call
   fails with the token of the Source fault, the dirty-integer reason or `0x11` from `doubled`'s
@@ -429,7 +442,8 @@ On the accepted-body route above, the next connected steps are:
   - Instantiate the theorems at a body with declarations, assignments, conditionals, operators and
     pairs. This needs a fixture with the older root's receipts and an independent Source trace of
     that body, or a proof-producing Source evaluator for the closed subset.
-  - Extend the shape, its coverage and the lifting to projected in-place `~` and loops.
+  - Extend the shape, its coverage and the lifting to the statement forms it does not have yet,
+    such as matches.
   - Carry the accepted instance model through public histories, so that later calls chain.
   - Issue program support from the compiler receipt for every accepted program, rather than from an
     observation of its typings.
