@@ -18,13 +18,14 @@ place; `tailed`'s body is `identity(value)` as its final value; `stored` declare
 returns `iszero(value)`, the opcode that the program imports from `std.opcodes`, `inverted`
 declares a local mapping, complements `table[value]` in place and returns it, `broken` runs
 `while (true) { break; }` before it returns its parameter, and `counted` runs
-`for (let go: bool = true; go; go = false) { continue; }` before it does. Runtime checks place
-every expression node of the fifteen rows among the nested sites that call `identity`'s
+`for (let go: bool = true; go; go = false) { continue; }` before it does, and `tripled` returns
+`(value, value, value)`, a tuple beyond pairs. Runtime checks place
+every expression node of the sixteen rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
-`relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`, `inverted`, `broken`, `counted`, `narrow` and
-`roundTrip` (at words canonical for `uint8`) are lifted to staged traces, and the call root's theorems apply at the first public call of
+`relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`, `inverted`, `broken`, `counted`, `tripled`,
+`narrow` and `roundTrip` (at words canonical for `uint8`) are lifted to staged traces, and the call root's theorems apply at the first public call of
 each in both directions: the actual resumption succeeds, and actual native
 completion reconstructs a staged Source execution. `stored`'s index read returns the word its
 assignment wrote, not the default, and `summed` returns its integer, which at the largest word
@@ -50,6 +51,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.inverted_source`,
 `Tests.SourceCoreAcceptedOneCall.broken_source`,
 `Tests.SourceCoreAcceptedOneCall.counted_source`,
+`Tests.SourceCoreAcceptedOneCall.tripled_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_source`,
 `Tests.SourceCoreAcceptedOneCall.roundTrip_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_fault`,
@@ -68,6 +70,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedOpcodeRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedProjectedBitNotRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedLoopRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedTupleRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run`,
@@ -77,7 +80,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 -/
 
 section
-/-! The program and the declarative typing of its fifteen functions, constructed
+/-! The program and the declarative typing of its sixteen functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -108,7 +111,8 @@ def workspace : Workspace.RawWorkspace := {
       "return table[value]; }",
     "function broken(value: Word) returns (Word) { while (true) { break; } return value; }",
     "function counted(value: Word) returns (Word) { for (let go: bool = true; go; go = false) { continue; } " ++
-      "return value; }" ]}] }
+      "return value; }",
+    "function tripled(value: Word) returns ((Word, Word, Word)) { return (value, value, value); }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -1980,6 +1984,117 @@ def observeCounted (function : CheckedFunction) (signature : ProgramFunctionSign
   return ⟨parts, parameters, inputTypes, returns, binderRequirements, goScheme, goRequirements, goOwner, goDistinct,
     loopType, jumpType, returnedType, assignmentRequirements⟩
 
+/-- The nodes of `tripled`'s body: three reads of its parameter, the tuple of
+them and its return, found by following the statement graph. -/
+structure TripledParts (source : TypedSource) where
+  binder : TypedBinder
+  first : Tests.SourceCoreNamedBranch.Read source binder .word
+  second : Tests.SourceCoreNamedBranch.Read source binder .word
+  third : Tests.SourceCoreNamedBranch.Read source binder .word
+  tuple : ExpressionNode
+  statement : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement statement.id]
+  statementFound : source.lookupStatement? statement.id = some statement
+  statementForm : statement.form = .returnStmt (some tuple.id)
+  tupleFound : source.lookupExpression? tuple.id = some tuple
+  tupleForm : tuple.form = .tuple [first.node.id, second.node.id, third.node.id]
+  tupleRaw : tuple.rawType = TypeSystem.Ty.productMany [.word, .word, .word]
+  tupleType : tuple.type = TypeSystem.Ty.productMany [.word, .word, .word]
+  tupleRequirements : tuple.requirements = []
+  tupleCoercions : tuple.coercions = []
+
+def observeTripledParts (source : TypedSource) : IO (TripledParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "tripled input")
+  let [.statement statementId] := source.roots | throw (IO.userError "tripled roots")
+  let some statement := source.lookupStatement? statementId | throw (IO.userError "tripled statement")
+  let .returnStmt (some tupleId) := statement.form | throw (IO.userError "tripled return")
+  let some tuple := source.lookupExpression? tupleId | throw (IO.userError "tripled tuple")
+  let .tuple [firstId, secondId, thirdId] := tuple.form | throw (IO.userError "tripled tuple form")
+  let some firstNode := source.lookupExpression? firstId | throw (IO.userError "tripled first")
+  let some secondNode := source.lookupExpression? secondId | throw (IO.userError "tripled second")
+  let some thirdNode := source.lookupExpression? thirdId | throw (IO.userError "tripled third")
+  let first ← Tests.SourceCoreNamedBranch.observeRead source binder firstNode .word
+  let second ← Tests.SourceCoreNamedBranch.observeRead source binder secondNode .word
+  let third ← Tests.SourceCoreNamedBranch.observeRead source binder thirdNode .word
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "tripled inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "tripled roots shape"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement) "tripled statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some tuple.id)) "tripled statementForm"
+  let ⟨tupleFound⟩ ← observed (source.lookupExpression? tuple.id = some tuple) "tripled tupleFound"
+  let ⟨tupleForm⟩ ← observed (tuple.form = .tuple [first.node.id, second.node.id, third.node.id]) "tripled tupleForm"
+  let ⟨tupleRaw⟩ ← observed (tuple.rawType = TypeSystem.Ty.productMany [.word, .word, .word]) "tripled tupleRaw"
+  let ⟨tupleType⟩ ← observed (tuple.type = TypeSystem.Ty.productMany [.word, .word, .word]) "tripled tupleType"
+  let ⟨tupleRequirements⟩ ← observed (tuple.requirements = []) "tripled tupleRequirements"
+  let ⟨tupleCoercions⟩ ← observed (tuple.coercions = []) "tripled tupleCoercions"
+  return ⟨binder, first, second, third, tuple, statement, inputs, roots, statementFound, statementForm, tupleFound,
+    tupleForm, tupleRaw, tupleType, tupleRequirements, tupleCoercions⟩
+
+/-- `tripled`'s body: the return of `(value, value, value)`. -/
+structure TripledShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : TripledParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [TypeSystem.Ty.productMany [.word, .word, .word]]
+  binderRequirements : parts.binder.schemeRequirements = []
+  statementType : parts.statement.type = TypeSystem.Ty.productMany [.word, .word, .word]
+
+theorem TripledShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : TripledShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.statement.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := TypeSystem.Ty.productMany [.word, .word, .word], hasValue := true, sawReturn := true, control := .returned}
+  refine ⟨BodyFacts.singleton facts, rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have triple : TypeAdmissible lexical (TypeSystem.Ty.productMany [.word, .word, .word]) :=
+      ⟨binders, .product (.builtin .word) (.product (.builtin .word) (.builtin .word))⟩
+    have firstTyped := shape.parts.first.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have secondTyped := shape.parts.second.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have thirdTyped := shape.parts.third.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have tupleTyped : ExpressionHasType function.typedBody lexical shape.parts.tuple.id shape.parts.tuple.type := by
+      apply ExpressionHasType.ofOrdinary (rawType := TypeSystem.Ty.productMany [.word, .word, .word]) (owned := [])
+        (lookupExpression?_sound shape.parts.tupleFound)
+      · rw [shape.parts.tupleForm]
+        exact .tuple (.cons firstTyped (.cons secondTyped (.cons thirdTyped (.nil _))))
+      · exact triple
+      · rw [shape.parts.tupleType]
+        exact triple
+      · intro id member
+        cases member
+      · rw [shape.parts.tupleCoercions, shape.parts.tupleType]
+        exact .nil _
+      · rw [shape.parts.tupleRequirements, shape.parts.tupleCoercions]
+        rfl
+    rw [shape.parts.tupleType] at tupleTyped
+    exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.parts.statementFound)
+      shape.parts.statementForm tupleTyped shape.statementType)⟩
+
+def observeTripled (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (TripledShape function signature) := do
+  let parts ← observeTripledParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "tripled parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "tripled inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [TypeSystem.Ty.productMany [.word, .word, .word]]) "tripled returns"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "tripled binderRequirements"
+  let ⟨statementType⟩ ← observed (parts.statement.type = TypeSystem.Ty.productMany [.word, .word, .word]) "tripled statementType"
+  return ⟨parts, parameters, inputTypes, returns, binderRequirements, statementType⟩
+
 /-- Two members of a list of signatures whose ids are distinct are equal when
 their ids are. -/
 private theorem signature_of_id {signatures : List ProgramFunctionSignature}
@@ -2007,10 +2122,10 @@ def observeWellFormed {program : CheckedProgram}
   match functions : program.functions, signatures : program.signatures.functions with
   | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction,
       shiftedFunction, flippedFunction, tailedFunction, storedFunction, summedFunction, zeroedFunction,
-      invertedFunction, brokenFunction, countedFunction],
+      invertedFunction, brokenFunction, countedFunction, tripledFunction],
     [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature,
       shiftedSignature, flippedSignature, tailedSignature, storedSignature, summedSignature, zeroedSignature,
-      invertedSignature, brokenSignature, countedSignature] =>
+      invertedSignature, brokenSignature, countedSignature, tripledSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
@@ -2026,6 +2141,7 @@ def observeWellFormed {program : CheckedProgram}
     let invertedShape ← observeInverted invertedFunction invertedSignature
     let brokenShape ← observeBroken brokenFunction brokenSignature
     let countedShape ← observeCounted countedFunction countedSignature
+    let tripledShape ← observeTripled tripledFunction tripledSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -2046,6 +2162,8 @@ def observeWellFormed {program : CheckedProgram}
     let ⟨brokenDeclaration⟩ ← observed (brokenFunction.declaration = brokenSignature.id) "calls brokenDeclaration"
     let ⟨countedDeclaration⟩ ← observed (countedFunction.declaration = countedSignature.id)
       "calls countedDeclaration"
+    let ⟨tripledDeclaration⟩ ← observed (tripledFunction.declaration = tripledSignature.id)
+      "calls tripledDeclaration"
     let ⟨distinct⟩ ← observed ((program.signatures.functions.map (·.id)).Nodup) "calls distinct signatures"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
@@ -2055,7 +2173,7 @@ def observeWellFormed {program : CheckedProgram}
             actual.declaration = signature.id → candidate = signature := fun signatureMember same =>
           signature_of_id distinct candidateMember signatureMember (declared.symm.trans same)
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
-        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
         · obtain rfl := selects (by simp [signatures]) identityDeclaration
           exact identityShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) relayDeclaration
@@ -2086,6 +2204,8 @@ def observeWellFormed {program : CheckedProgram}
           exact brokenShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) countedDeclaration
           exact countedShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) tripledDeclaration
+          exact tripledShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -2094,7 +2214,7 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the fifteen functions and their original Source
+/-! The cache rows of the sixteen functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `tailed` ends in the direct call of `identity` with
@@ -2102,7 +2222,8 @@ its parameter as its final value, `stored` returns its parameter from the index 
 where its assignment put it, `summed` returns the integer sum of its parameter's word with itself,
 `zeroed` returns the opcode `iszero` on its parameter, `inverted` returns the complement of the default
 word from the index of its local mapping where its in-place `~` put it, `broken` and `counted` return
-their parameter after their loops, `counted`'s after one iteration, `narrow` returns the conversion of
+their parameter after their loops, `counted`'s after one iteration, `tripled` returns the triple of its
+parameter, `narrow` returns the conversion of
 its parameter,
 and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
 a given body invocation. At a word not canonical for `uint8` the conversions of `narrow`, `doubled`,
@@ -2400,6 +2521,16 @@ def observeCountedBody (source : TypedSource) : IO (CountedBody source) := do
   let ⟨goScheme⟩ ← observed (parts.go.scheme = .mono .bool) "counted row goScheme"
   let ⟨goDistinct⟩ ← observed (parts.go.id ≠ parts.binder.id) "counted row goDistinct"
   return ⟨parts, binderScheme, goScheme, goDistinct⟩
+
+/-- `tripled`'s cache row: the nodes of its body and its `Word` parameter. -/
+structure TripledBody (source : TypedSource) where
+  parts : TripledParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeTripledBody (source : TypedSource) : IO (TripledBody source) := do
+  let parts ← observeTripledParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "tripled row binderScheme"
+  return ⟨parts, binderScheme⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
 theorem read_value {source : TypedSource} {binder : TypedBinder}
@@ -3008,19 +3139,46 @@ theorem CountedBody.trace {source : TypedSource} (body : CountedBody source) {pr
     (.returnValue (lookupStatement?_sound body.parts.returnedFound) body.parts.returnedForm
       (local_value body.parts.read evidence .head (lowered.preserves_read parameterAllocation.reads_new))))
 
+/-- `tripled`'s body returns the triple of its parameter's word, packed as a
+product of the first element and the pair of the others. -/
+theorem TripledBody.trace {source : TypedSource} (body : TripledBody source) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.statement.id] context
+      (.returned (.product (.word word) (.product (.word word) (.word word)))) (wordHeap before word) := by
+  have packed : Dynamic.ExpressionEvaluates program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) body.parts.tuple.id (.product (.word word) (.product (.word word) (.word word)))
+      (wordHeap before word) := by
+    apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound body.parts.tupleFound)
+    · rw [body.parts.tupleForm]
+      exact .tuple (by rw [body.parts.tupleRequirements, body.parts.tupleCoercions]; rfl)
+        (.cons (read_value body.parts.first evidence before word)
+          (.cons (read_value body.parts.second evidence before word)
+            (.cons (read_value body.parts.third evidence before word) .nil)))
+        (.cons (.cons (.singleton _)))
+    · rw [body.parts.tupleCoercions]
+      exact .nil
+  apply Dynamic.FunctionStatementsExecute.singleton (lookupStatement?_sound body.parts.statementFound)
+  · intro expression impossible
+    rw [body.parts.statementForm] at impossible
+    cases impossible
+  · exact .returnValue (lookupStatement?_sound body.parts.statementFound) body.parts.statementForm packed
+
 end Tests.SourceCoreAcceptedOneCall
 end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the fifteen rows among the nested sites or their callees
+every expression node of the sixteen rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
 receipts. The original Source executions of `relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`,
-`inverted`, `broken`, `counted`, `narrow` and `roundTrip`, whose calls run `identity`'s body instance, are lifted through the checked
+`inverted`, `broken`, `counted`, `tripled`, `narrow` and `roundTrip`, whose calls run `identity`'s body instance, are lifted through the checked
 shapes, and with the existing start receipts the call root's theorems apply at
 the first public call of each in both directions; `stored`'s and `inverted`'s executions end in their
-local's context (`accepted_call_with_locals`), and `summed`'s returns an integer (`accepted_call_returning`). The call root's reflection
+local's context (`accepted_call_with_locals`), and `summed`'s and `tripled`'s return an integer and a
+triple (`accepted_call_returning`). The call root's reflection
 needs no Source execution (`accepted_reflection`). At a faulting word the
 row's original Source fault is lifted to a staged fault trace, given that the
 direct calls of the row and of `identity` have plain callees, and the call
@@ -3420,6 +3578,18 @@ theorem counted_source (selected : SelectedInventory whole row)
           exact countedBody.trace selected.packet.header.function.evidence ⟨[]⟩ extension word
         | letInitializedGeneralized polymorphic =>
           exact absurd (by rw [countedBody.goScheme]; rfl) polymorphic
+
+/-- The original Source execution of `tripled`'s body at its header returns the
+triple of its parameter's word. -/
+theorem tripled_source (selected : SelectedInventory whole row)
+    (tripledBody : TripledBody row.original.function.typedBody) (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment tripledBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.product (.word word) (.product (.word word) (.word word))))
+      (wordHeap ⟨[]⟩ word) := by
+  rw [single_body selected tripledBody.parts.roots, selected.source_eq]
+  exact tripledBody.trace selected.packet.header.function.evidence ⟨[]⟩ word
 
 /-- The callee premise of the fault lifting for the family that admits
 `identity`'s retained instantiation: its body instance is its header's, whose
@@ -4033,6 +4203,33 @@ def run : IO Unit := do
   IO.println "ACCEPTED_LOOP_PUBLIC_PASS"
 
 end AcceptedLoopRuntime
+
+namespace AcceptedTupleRuntime
+
+/-- As `AcceptedCallRuntime.run`, at `tripled`, which returns the triple of its
+parameter's word, a tuple beyond pairs (`accepted_call_returning`). -/
+def run : IO Unit := do
+  let observed ← observe
+  let tripled ← observeRow observed.fixture "tripled"
+  let tripledBody ← observeTripledBody tripled.original.function.typedBody
+  for word in [Word.zero, Word.ofNatModulo 7] do
+    let started ← observeStarted observed.fixture tripled.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole tripled),
+        Nonempty (AcceptedCall selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select tripled
+      exact ⟨whole, selected, accepted_call_returning selected observed.calls
+        (fun admits => ⟨observed.identity, admits⟩) word observed.wellFormed started observed.callableProfile
+        tripledBody.parts.inputs tripledBody.binderScheme (tripled_source selected tripledBody word)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .succeeded returned =>
+      unless returned.value == .product (.word word) (.product (.word word) (.word word)) do
+        throw (IO.userError "accepted tuple output changed")
+    | _ => throw (IO.userError "accepted tuple did not succeed")
+  IO.println "ACCEPTED_TUPLE_PUBLIC_PASS"
+
+end AcceptedTupleRuntime
 
 namespace AcceptedConversionRuntime
 
