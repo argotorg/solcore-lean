@@ -18,14 +18,15 @@ place; `tailed`'s body is `identity(value)` as its final value; `stored` declare
 returns `iszero(value)`, the opcode that the program imports from `std.opcodes`, `inverted`
 declares a local mapping, complements `table[value]` in place and returns it, `broken` runs
 `while (true) { break; }` before it returns its parameter, and `counted` runs
-`for (let go: bool = true; go; go = false) { continue; }` before it does, and `tripled` returns
-`(value, value, value)`, a tuple beyond pairs. Runtime checks place
-every expression node of the sixteen rows among the nested sites that call `identity`'s
+`for (let go: bool = true; go; go = false) { continue; }` before it does, `tripled` returns
+`(value, value, value)`, a tuple beyond pairs, and `boxed` returns `.Item(value)`, an application of
+the constructor of the program's enum `Box`. Runtime checks place
+every expression node of the seventeen rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
 `relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`, `inverted`, `broken`, `counted`, `tripled`,
-`narrow` and `roundTrip` (at words canonical for `uint8`) are lifted to staged traces, and the call root's theorems apply at the first public call of
+`boxed`, `narrow` and `roundTrip` (at words canonical for `uint8`) are lifted to staged traces, and the call root's theorems apply at the first public call of
 each in both directions: the actual resumption succeeds, and actual native
 completion reconstructs a staged Source execution. `stored`'s index read returns the word its
 assignment wrote, not the default, and `summed` returns its integer, which at the largest word
@@ -52,6 +53,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.broken_source`,
 `Tests.SourceCoreAcceptedOneCall.counted_source`,
 `Tests.SourceCoreAcceptedOneCall.tripled_source`,
+`Tests.SourceCoreAcceptedOneCall.boxed_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_source`,
 `Tests.SourceCoreAcceptedOneCall.roundTrip_source`,
 `Tests.SourceCoreAcceptedOneCall.narrow_fault`,
@@ -71,6 +73,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedProjectedBitNotRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedLoopRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedTupleRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedConstructorRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedConversionRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run`,
@@ -80,7 +83,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 -/
 
 section
-/-! The program and the declarative typing of its sixteen functions, constructed
+/-! The program and the declarative typing of its seventeen functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -112,7 +115,9 @@ def workspace : Workspace.RawWorkspace := {
     "function broken(value: Word) returns (Word) { while (true) { break; } return value; }",
     "function counted(value: Word) returns (Word) { for (let go: bool = true; go; go = false) { continue; } " ++
       "return value; }",
-    "function tripled(value: Word) returns ((Word, Word, Word)) { return (value, value, value); }" ]}] }
+    "function tripled(value: Word) returns ((Word, Word, Word)) { return (value, value, value); }",
+    "enum Box { Item(Word) }",
+    "function boxed(value: Word) returns (Box) { return .Item(value); }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -2095,6 +2100,157 @@ def observeTripled (function : CheckedFunction) (signature : ProgramFunctionSign
   let ⟨statementType⟩ ← observed (parts.statement.type = TypeSystem.Ty.productMany [.word, .word, .word]) "tripled statementType"
   return ⟨parts, parameters, inputTypes, returns, binderRequirements, statementType⟩
 
+/-- The nodes of `boxed`'s body: a read of its parameter, the application of
+`Item` to it and its return, found by following the statement graph. -/
+structure BoxedParts (source : TypedSource) where
+  binder : TypedBinder
+  read : Tests.SourceCoreNamedBranch.Read source binder .word
+  instantiation : DataConstructorInstantiation
+  construct : ExpressionNode
+  statement : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement statement.id]
+  statementFound : source.lookupStatement? statement.id = some statement
+  statementForm : statement.form = .returnStmt (some construct.id)
+  constructFound : source.lookupExpression? construct.id = some construct
+  constructForm : construct.form = .constructor instantiation [read.node.id]
+  constructRaw : construct.rawType = instantiation.resultType
+  constructType : construct.type = instantiation.resultType
+  constructRequirements : construct.requirements = []
+  constructCoercions : construct.coercions = []
+  substitution : instantiation.parameterSubstitution = []
+  payloadTypes : instantiation.payloadTypes = [.word]
+
+def observeBoxedParts (source : TypedSource) : IO (BoxedParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "boxed input")
+  let [.statement statementId] := source.roots | throw (IO.userError "boxed roots")
+  let some statement := source.lookupStatement? statementId | throw (IO.userError "boxed statement")
+  let .returnStmt (some constructId) := statement.form | throw (IO.userError "boxed return")
+  let some construct := source.lookupExpression? constructId | throw (IO.userError "boxed construct")
+  let .constructor instantiation [argumentId] := construct.form | throw (IO.userError "boxed construct form")
+  let some argumentNode := source.lookupExpression? argumentId | throw (IO.userError "boxed argument")
+  let read ← Tests.SourceCoreNamedBranch.observeRead source binder argumentNode .word
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "boxed inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "boxed roots shape"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement) "boxed statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some construct.id)) "boxed statementForm"
+  let ⟨constructFound⟩ ← observed (source.lookupExpression? construct.id = some construct) "boxed constructFound"
+  let ⟨constructForm⟩ ← observed (construct.form = .constructor instantiation [read.node.id]) "boxed constructForm"
+  let ⟨constructRaw⟩ ← observed (construct.rawType = instantiation.resultType) "boxed constructRaw"
+  let ⟨constructType⟩ ← observed (construct.type = instantiation.resultType) "boxed constructType"
+  let ⟨constructRequirements⟩ ← observed (construct.requirements = []) "boxed constructRequirements"
+  let ⟨constructCoercions⟩ ← observed (construct.coercions = []) "boxed constructCoercions"
+  let ⟨substitution⟩ ← observed (instantiation.parameterSubstitution = []) "boxed substitution"
+  let ⟨payloadTypes⟩ ← observed (instantiation.payloadTypes = [.word]) "boxed payloadTypes"
+  return ⟨binder, read, instantiation, construct, statement, inputs, roots, statementFound, statementForm,
+    constructFound, constructForm, constructRaw, constructType, constructRequirements, constructCoercions,
+    substitution, payloadTypes⟩
+
+/-- `boxed`'s body: the return of `.Item(value)`, with `Box`'s declaration and
+`Item`'s signature among the program's data types. -/
+structure BoxedShape (function : CheckedFunction) (signature : ProgramFunctionSignature)
+    (dataTypes : List ProgramDataSignature) where
+  parts : BoxedParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [parts.instantiation.resultType]
+  binderRequirements : parts.binder.schemeRequirements = []
+  statementType : parts.statement.type = parts.instantiation.resultType
+  dataType : ProgramDataSignature
+  constructorSignature : ProgramDataConstructorSignature
+  dataMember : dataType ∈ dataTypes
+  constructorMember : constructorSignature ∈ dataType.constructors
+  owner : constructorSignature.id.dataType = dataType.id
+  constructorEq : parts.instantiation.constructor = constructorSignature.id
+  dataParameters : dataType.parameters = []
+  payload : parts.instantiation.payloadTypes = constructorSignature.payloadTypes.map
+    (TypeSystem.ParameterSubstitution.apply parts.instantiation.parameterSubstitution)
+  result : parts.instantiation.resultType = TypeSystem.Ty.nominal dataType.id
+    (ParameterSubstitution.orderedArguments parts.instantiation.parameterSubstitution dataType.parameters)
+
+theorem BoxedShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    {dataTypes : List ProgramDataSignature} (shape : BoxedShape function signature dataTypes)
+    (signatures : ProgramSignatures) (dataTypesEq : signatures.dataTypes = dataTypes) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.statement.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := shape.parts.instantiation.resultType, hasValue := true, sawReturn := true, control := .returned}
+  refine ⟨BodyFacts.singleton facts, rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have dataMember : shape.dataType ∈ lexical.signatures.dataTypes := by
+      rw [head.context_fields.1]
+      simpa [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, dataTypesEq]
+        using shape.dataMember
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have boxType : TypeAdmissible lexical shape.parts.instantiation.resultType := by
+      rw [shape.result, shape.parts.substitution, shape.dataParameters]
+      exact ⟨binders, .nominal shape.dataType [] dataMember (by simp [shape.dataParameters]) .nil⟩
+    have readTyped := shape.parts.read.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have admissible : DataConstructorInstantiation.Admissible lexical shape.parts.instantiation :=
+      .intro shape.dataType shape.constructorSignature dataMember shape.constructorMember shape.owner
+        shape.constructorEq
+        (by rw [shape.parts.substitution, shape.dataParameters]; exact ParameterSubstitution.exact_empty)
+        (by rw [shape.parts.substitution]; intro parameter replacement impossible; cases impossible)
+        shape.payload shape.result
+    have constructTyped : ExpressionHasType function.typedBody lexical shape.parts.construct.id
+        shape.parts.construct.type := by
+      apply ExpressionHasType.ofOrdinary (rawType := shape.parts.instantiation.resultType) (owned := [])
+        (lookupExpression?_sound shape.parts.constructFound)
+      · rw [shape.parts.constructForm]
+        exact .constructor admissible (by rw [shape.parts.payloadTypes]; exact .cons readTyped (.nil _))
+      · exact boxType
+      · rw [shape.parts.constructType]
+        exact boxType
+      · intro id member
+        cases member
+      · rw [shape.parts.constructCoercions, shape.parts.constructType]
+        exact .nil _
+      · rw [shape.parts.constructRequirements, shape.parts.constructCoercions]
+        rfl
+    rw [shape.parts.constructType] at constructTyped
+    exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.parts.statementFound)
+      shape.parts.statementForm constructTyped shape.statementType)⟩
+
+def observeBoxed (function : CheckedFunction) (signature : ProgramFunctionSignature)
+    (dataTypes : List ProgramDataSignature) : IO (BoxedShape function signature dataTypes) := do
+  let parts ← observeBoxedParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "boxed parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "boxed inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [parts.instantiation.resultType]) "boxed returns"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "boxed binderRequirements"
+  let ⟨statementType⟩ ← observed (parts.statement.type = parts.instantiation.resultType) "boxed statementType"
+  match dataFound : dataTypes.find? (fun dataType => dataType.id == parts.instantiation.constructor.dataType) with
+  | none => throw (IO.userError "boxed data type")
+  | some dataType =>
+    match constructorFound : dataType.constructors.find?
+        (fun constructor => constructor.id == parts.instantiation.constructor) with
+    | none => throw (IO.userError "boxed constructor signature")
+    | some constructorSignature =>
+      let ⟨owner⟩ ← observed (constructorSignature.id.dataType = dataType.id) "boxed owner"
+      let ⟨constructorEq⟩ ← observed (parts.instantiation.constructor = constructorSignature.id) "boxed constructorEq"
+      let ⟨dataParameters⟩ ← observed (dataType.parameters = []) "boxed dataParameters"
+      let ⟨payload⟩ ← observed (parts.instantiation.payloadTypes = constructorSignature.payloadTypes.map
+        (TypeSystem.ParameterSubstitution.apply parts.instantiation.parameterSubstitution)) "boxed payload"
+      let ⟨result⟩ ← observed (parts.instantiation.resultType = TypeSystem.Ty.nominal dataType.id
+        (ParameterSubstitution.orderedArguments parts.instantiation.parameterSubstitution dataType.parameters))
+        "boxed result"
+      return ⟨parts, parameters, inputTypes, returns, binderRequirements, statementType, dataType,
+        constructorSignature, List.mem_of_find?_eq_some dataFound, List.mem_of_find?_eq_some constructorFound,
+        owner, constructorEq, dataParameters, payload, result⟩
+
 /-- Two members of a list of signatures whose ids are distinct are equal when
 their ids are. -/
 private theorem signature_of_id {signatures : List ProgramFunctionSignature}
@@ -2122,10 +2278,10 @@ def observeWellFormed {program : CheckedProgram}
   match functions : program.functions, signatures : program.signatures.functions with
   | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction,
       shiftedFunction, flippedFunction, tailedFunction, storedFunction, summedFunction, zeroedFunction,
-      invertedFunction, brokenFunction, countedFunction, tripledFunction],
+      invertedFunction, brokenFunction, countedFunction, tripledFunction, boxedFunction],
     [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature,
       shiftedSignature, flippedSignature, tailedSignature, storedSignature, summedSignature, zeroedSignature,
-      invertedSignature, brokenSignature, countedSignature, tripledSignature] =>
+      invertedSignature, brokenSignature, countedSignature, tripledSignature, boxedSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
@@ -2142,6 +2298,7 @@ def observeWellFormed {program : CheckedProgram}
     let brokenShape ← observeBroken brokenFunction brokenSignature
     let countedShape ← observeCounted countedFunction countedSignature
     let tripledShape ← observeTripled tripledFunction tripledSignature
+    let boxedShape ← observeBoxed boxedFunction boxedSignature program.signatures.dataTypes
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -2164,6 +2321,8 @@ def observeWellFormed {program : CheckedProgram}
       "calls countedDeclaration"
     let ⟨tripledDeclaration⟩ ← observed (tripledFunction.declaration = tripledSignature.id)
       "calls tripledDeclaration"
+    let ⟨boxedDeclaration⟩ ← observed (boxedFunction.declaration = boxedSignature.id)
+      "calls boxedDeclaration"
     let ⟨distinct⟩ ← observed ((program.signatures.functions.map (·.id)).Nodup) "calls distinct signatures"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
@@ -2174,6 +2333,7 @@ def observeWellFormed {program : CheckedProgram}
           signature_of_id distinct candidateMember signatureMember (declared.symm.trans same)
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
         rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+          | rfl
         · obtain rfl := selects (by simp [signatures]) identityDeclaration
           exact identityShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) relayDeclaration
@@ -2206,6 +2366,8 @@ def observeWellFormed {program : CheckedProgram}
           exact countedShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) tripledDeclaration
           exact tripledShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) boxedDeclaration
+          exact boxedShape.statementTyping program.signatures rfl
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -2214,7 +2376,7 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the sixteen functions and their original Source
+/-! The cache rows of the seventeen functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `tailed` ends in the direct call of `identity` with
@@ -2223,7 +2385,7 @@ where its assignment put it, `summed` returns the integer sum of its parameter's
 `zeroed` returns the opcode `iszero` on its parameter, `inverted` returns the complement of the default
 word from the index of its local mapping where its in-place `~` put it, `broken` and `counted` return
 their parameter after their loops, `counted`'s after one iteration, `tripled` returns the triple of its
-parameter, `narrow` returns the conversion of
+parameter, `boxed` returns `Item` applied to it, `narrow` returns the conversion of
 its parameter,
 and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
 a given body invocation. At a word not canonical for `uint8` the conversions of `narrow`, `doubled`,
@@ -2530,6 +2692,16 @@ structure TripledBody (source : TypedSource) where
 def observeTripledBody (source : TypedSource) : IO (TripledBody source) := do
   let parts ← observeTripledParts source
   let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "tripled row binderScheme"
+  return ⟨parts, binderScheme⟩
+
+/-- `boxed`'s cache row: the nodes of its body and its `Word` parameter. -/
+structure BoxedBody (source : TypedSource) where
+  parts : BoxedParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeBoxedBody (source : TypedSource) : IO (BoxedBody source) := do
+  let parts ← observeBoxedParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "boxed row binderScheme"
   return ⟨parts, binderScheme⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
@@ -3165,6 +3337,29 @@ theorem TripledBody.trace {source : TypedSource} (body : TripledBody source) {pr
     cases impossible
   · exact .returnValue (lookupStatement?_sound body.parts.statementFound) body.parts.statementForm packed
 
+/-- `boxed`'s body returns `Item` applied to its parameter's word, at valid
+constructor metadata. -/
+theorem BoxedBody.trace {source : TypedSource} (body : BoxedBody source) {program : SourceSemantics.Program}
+    {context : SourceSemantics.Context} (evidence : Dynamic.EvidenceEnvironment) (before : Dynamic.Heap)
+    (valid : DataConstructorInstantiation.Valid context body.parts.instantiation) (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute program context evidence source (wordEnvironment body.parts.binder before)
+      (wordHeap before word) [body.parts.statement.id] context
+      (.returned (.constructed body.parts.instantiation [.word word])) (wordHeap before word) := by
+  have constructed : Dynamic.ExpressionEvaluates program context evidence source
+      (wordEnvironment body.parts.binder before) (wordHeap before word) body.parts.construct.id
+      (.constructed body.parts.instantiation [.word word]) (wordHeap before word) := by
+    apply Dynamic.ExpressionEvaluates.intro (lookupExpression?_sound body.parts.constructFound)
+    · rw [body.parts.constructForm]
+      exact .constructor (by rw [body.parts.constructRequirements, body.parts.constructCoercions]; rfl) valid
+        (.cons (read_value body.parts.read evidence before word) .nil)
+    · rw [body.parts.constructCoercions]
+      exact .nil
+  apply Dynamic.FunctionStatementsExecute.singleton (lookupStatement?_sound body.parts.statementFound)
+  · intro expression impossible
+    rw [body.parts.statementForm] at impossible
+    cases impossible
+  · exact .returnValue (lookupStatement?_sound body.parts.statementFound) body.parts.statementForm constructed
+
 end Tests.SourceCoreAcceptedOneCall
 end
 
@@ -3590,6 +3785,56 @@ theorem tripled_source (selected : SelectedInventory whole row)
       (wordHeap ⟨[]⟩ word) := by
   rw [single_body selected tripledBody.parts.roots, selected.source_eq]
   exact tripledBody.trace selected.packet.header.function.evidence ⟨[]⟩ word
+
+/-- A typed constructor application has an admissible instantiation. -/
+private theorem constructor_admissible {source : TypedSource} {context : SourceSemantics.Context}
+    {id : ExpressionId} {node : ExpressionNode} {type : TypeSystem.Ty}
+    {instantiation : DataConstructorInstantiation} {arguments : List ExpressionId}
+    (unique : NodeOccurrencesUnique source) (found : source.lookupExpression? id = some node)
+    (form : node.form = .constructor instantiation arguments)
+    (typing : ExpressionHasType source context id type) :
+    DataConstructorInstantiation.Admissible context instantiation := by
+  cases typing with
+  | intro contains raw _rawEq _rawType _type _plan =>
+    have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+    cases same
+    rw [form] at raw
+    cases raw with
+    | constructor valid _arguments => exact valid
+
+/-- The original Source execution of `boxed`'s body at its header returns
+`Item` applied to its parameter's word. The constructor's metadata is valid by
+the header's typing certificate and its empty substitution. -/
+theorem boxed_source (selected : SelectedInventory whole row)
+    (boxedBody : BoxedBody row.original.function.typedBody)
+    (certified : SelectedCompilationNamedSourceTyping.Certified selected.packet.header) (word : Core.Word) :
+    Dynamic.FunctionStatementsExecute (Program.ofChecked fixture.recipe.compiled.sourceProgram)
+      selected.packet.header.context selected.packet.header.function.evidence selected.packet.header.function.source
+      (wordEnvironment boxedBody.parts.binder ⟨[]⟩) (wordHeap ⟨[]⟩ word) selected.packet.header.function.body
+      selected.packet.header.context (.returned (.constructed boxedBody.parts.instantiation [.word word]))
+      (wordHeap ⟨[]⟩ word) := by
+  have body := single_body selected boxedBody.parts.roots
+  have unique : NodeOccurrencesUnique row.original.function.typedBody :=
+    selected.source_eq ▸ selected.packet.header.unique
+  obtain ⟨_final, _facts, typed, _completes⟩ := certified.statements
+  rw [body, selected.source_eq] at typed
+  cases typed with
+  | singleton head =>
+    obtain ⟨node, contains, formTyped⟩ := Dynamic.StatementHasType.formTyping head
+    cases Option.some.inj ((lookupStatement?_complete unique contains).symm.trans boxedBody.parts.statementFound)
+    rw [boxedBody.parts.statementForm] at formTyped
+    cases formTyped with
+    | returnValue expression =>
+      have admissible := constructor_admissible unique boxedBody.parts.constructFound boxedBody.parts.constructForm
+        expression
+      have valid : DataConstructorInstantiation.Valid selected.packet.header.context boxedBody.parts.instantiation := by
+        cases admissible with
+        | intro dataType signature dataMember signatureMember owner constructorEq exact _range payload result =>
+          exact .intro dataType signature dataMember signatureMember owner constructorEq exact
+            (by rw [boxedBody.parts.substitution]; intro parameter replacement impossible; cases impossible)
+            payload result
+      rw [body, selected.source_eq]
+      exact boxedBody.trace selected.packet.header.function.evidence ⟨[]⟩ valid word
 
 /-- The callee premise of the fault lifting for the family that admits
 `identity`'s retained instantiation: its body instance is its header's, whose
@@ -4230,6 +4475,36 @@ def run : IO Unit := do
   IO.println "ACCEPTED_TUPLE_PUBLIC_PASS"
 
 end AcceptedTupleRuntime
+
+namespace AcceptedConstructorRuntime
+
+/-- As `AcceptedCallRuntime.run`, at `boxed`, which returns `Item` applied to
+its parameter's word, a constructor application (`accepted_call_returning`). -/
+def run : IO Unit := do
+  let observed ← observe
+  let boxed ← observeRow observed.fixture "boxed"
+  let boxedBody ← observeBoxedBody boxed.original.function.typedBody
+  for word in [Word.zero, Word.ofNatModulo 7] do
+    let started ← observeStarted observed.fixture boxed.original.key [.word word]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole boxed),
+        Nonempty (AcceptedCall selected word started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select boxed
+      exact ⟨whole, selected, accepted_call_returning selected observed.calls
+        (fun admits => ⟨observed.identity, admits⟩) word observed.wellFormed started observed.callableProfile
+        boxedBody.parts.inputs boxedBody.binderScheme
+        (boxed_source selected boxedBody
+          ((SelectedCompilationNamedSupport.Support.of_program observed.wellFormed).certified selected.packet.header)
+          word)⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    match result.val with
+    | .succeeded returned =>
+      unless returned.value == .constructed boxedBody.parts.instantiation [.word word] do
+        throw (IO.userError "accepted constructor output changed")
+    | _ => throw (IO.userError "accepted constructor did not succeed")
+  IO.println "ACCEPTED_CONSTRUCTOR_PUBLIC_PASS"
+
+end AcceptedConstructorRuntime
 
 namespace AcceptedConversionRuntime
 
