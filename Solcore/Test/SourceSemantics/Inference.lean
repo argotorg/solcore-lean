@@ -2584,7 +2584,7 @@ private def testDeferredIntegerLiteralOperatorRejections : IO Unit := do
       let hasUnknown (name : String) := errors.any fun error => match error with
         | .body { error := .unknownVariable actual, .. } => actual == name
         | _ => false
-      assertTrue (hasUnknown "and" && hasUnknown "or" && hasUnknown "not")
+      assertTrue (hasUnknown "&&" && hasUnknown "||" && hasUnknown "not")
         "a Bool-domain logical operator was deferred over a Word literal target"
   | .ok _ => throw (IO.userError
       "Bool-domain logical operators were accepted over Word literal targets")

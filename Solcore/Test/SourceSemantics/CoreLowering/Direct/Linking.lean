@@ -978,6 +978,42 @@ private def testNamedOperatorCase (program : CheckedProgram)
       some (.done (.bool case.expected) [])))
     s!"{case.entryName}: selected named function body was not authoritative"
 
+/-- `&&` and `||` are builtins beside a program's own `and` and `or`, as upstream's are: the entry
+keeps its binary node and calls nothing, its plan specializes neither decoy, and it gives the
+builtin's result. -/
+private def testBuiltinLogicalEntry (program : CheckedProgram) (entryName : String)
+    (operator : Syntax.BinaryOp) (inputs : List Core.Value)
+    (decoys : List Resolved.DeclarationId) : IO Unit := do
+  let entry ← signatureNamed program entryName
+  let function ← functionFor program entry
+  let binaryMatches := match firstBinaryNode? function.typedBody.nodes with
+    | some node =>
+        (match node.form with
+          | .binary _ actual _ => actual == operator
+          | _ => false) && decide (node.type = .bool)
+    | none => false
+  assertTrue ((firstDirectCallNode? function.typedBody.nodes).isNone && binaryMatches)
+    s!"{entryName}: the operator called a program's own function"
+  let outcome ← runOrThrow s!"{entryName} builtin" program [monomorphicRequest entry] 2
+  let plan ← match outcome with
+    | .complete plan => pure plan
+    | other => throw (IO.userError
+        s!"{entryName}: expected a complete plan, found {reprStr other}")
+  assertTrue (decide (plan.specializations.map (·.declaration) = [entry.id] ∧
+      plan.callEdges.map (·.callee.declaration) = []) &&
+      !plan.specializations.any (fun specialized => decoys.contains specialized.declaration))
+    s!"{entryName}: the plan specialized a program's own and or or"
+  let linked ← linkOrThrow s!"{entryName} builtin" program outcome
+  let key : SourceSpecialization.SpecializationKey := {
+    declaration := entry.id
+    arguments := []
+  }
+  let linkedEntry ← match linked.findEntry? key with
+    | some linkedEntry => pure linkedEntry
+    | none => throw (IO.userError s!"{entryName}: linked root was absent")
+  assertTrue (decide (linkedEntry.run? inputs 2048 = some (.done (.bool true) [])))
+    s!"{entryName}: the builtin did not give its result"
+
 private def testNamedOperatorFunctionsAndOrd : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
     "trait Eq<T> {",
@@ -1039,8 +1075,8 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
   let lt ← signatureNamedWithGenericArity program "lt" 1
   let le ← signatureNamedWithGenericArity program "le" 1
   let ge ← signatureNamedWithGenericArity program "ge" 1
-  let and ← signatureNamedWithGenericArity program "and" 0
-  let or ← signatureNamedWithGenericArity program "or" 0
+  let andDecoy ← signatureNamedWithGenericArity program "and" 0
+  let orDecoy ← signatureNamedWithGenericArity program "or" 0
   let cases : List NamedOperatorCase := [
     {
       entryName := "notEqualEntry"
@@ -1073,26 +1109,14 @@ private def testNamedOperatorFunctionsAndOrd : IO Unit := do
       inputs := [.word (word 1), .word (word 2)]
       expected := true
       requirementCount := 2
-    },
-    {
-      entryName := "logicalAndEntry"
-      callee := and
-      operandType := .bool
-      inputs := [.bool true, .bool true]
-      expected := false
-      requirementCount := 0
-    },
-    {
-      entryName := "logicalOrEntry"
-      callee := or
-      operandType := .bool
-      inputs := [.bool false, .bool true]
-      expected := false
-      requirementCount := 0
     }
   ]
   for case in cases do
     testNamedOperatorCase program case
+  testBuiltinLogicalEntry program "logicalAndEntry" .logicalAnd [.bool true, .bool true]
+    [andDecoy.id, orDecoy.id]
+  testBuiltinLogicalEntry program "logicalOrEntry" .logicalOr [.bool false, .bool true]
+    [andDecoy.id, orDecoy.id]
 
   let ord ← match program.signatures.traits.filter fun trait =>
       trait.name == "Ord" with
@@ -1958,29 +1982,39 @@ private def testBuiltinLogicalNotFallback : IO Unit := do
       linkedEntry.run? [.bool false] 1024 = some (.done (.bool true) [])))
     "logical ! builtin fallback changed primitive Bool negation"
 
+/-- An operator that calls the function in scope does not fall back to a builtin: `<` beside an
+inapplicable visible `lt` keeps its selection diagnostic. `&&` calls no function, as upstream's does
+not, so beside an inapplicable visible `and` it is the builtin. -/
 private def testNamedOperatorMismatchDoesNotFallback : IO Unit := do
-  let raw : Workspace.RawWorkspace := {
+  let raw (lines : List String) : Workspace.RawWorkspace := {
     entry := "main.solc"
     mainSources := [{
       path := "main.solc"
-      content := "pragma solcore;\n" ++ String.intercalate "\n" [
-        "function and(left: Word, right: Word) returns (Bool) { return false; }",
-        "function entry(left: Bool, right: Bool) returns (Bool) {",
-        "  return left && right;",
-        "}"
-      ]
+      content := "pragma solcore;\n" ++ String.intercalate "\n" lines
     }]
     externalLibraries := []
   }
-  match checkProgram raw with
+  match checkProgram (raw [
+      "function lt(left: Bool, right: Bool) returns (Bool) { return false; }",
+      "function entry(left: Word, right: Word) returns (Bool) {",
+      "  return left < right;",
+      "}"]) with
   | .error errors =>
       assertTrue (errors.any fun error => match error with
-        | .inference { error := .noMatchingOverload "and" candidates, .. } =>
+        | .inference { error := .noMatchingOverload "lt" candidates, .. } =>
             candidates.length == 1
         | _ => false)
-        "an inapplicable visible and overload lost its selection diagnostic"
+        "an inapplicable visible lt overload lost its selection diagnostic"
   | .ok _ => throw (IO.userError
-      "an inapplicable visible and overload silently used builtin fallback")
+      "an inapplicable visible lt overload silently used builtin fallback")
+  match checkProgram (raw [
+      "function and(left: Word, right: Word) returns (Bool) { return false; }",
+      "function entry(left: Bool, right: Bool) returns (Bool) {",
+      "  return left && right;",
+      "}"]) with
+  | .ok _ => pure ()
+  | .error errors => throw (IO.userError
+      s!"&& beside an inapplicable visible and was not the builtin: {reprStr errors}")
 
 private def testHeterogeneousNamedOperator : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [

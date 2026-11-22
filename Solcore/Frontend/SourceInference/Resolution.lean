@@ -470,8 +470,11 @@ def binaryOperatorDispatch : Syntax.BinaryOp → OperatorDispatch
   | .greaterEqual => .function "ge"
   | .equal => .traitMethod "Eq" "eq"
   | .notEqual => .function "ne"
-  | .logicalAnd => .function "and"
-  | .logicalOr => .function "or"
+  -- `&&` and `||` are builtins whatever a program declares or imports, as upstream's are: they
+  -- short-circuit and take `bool` operands. No declaration or import binds the names `&&` and
+  -- `||`, so inference never selects a function for them.
+  | .logicalAnd => .function "&&"
+  | .logicalOr => .function "||"
   | .uncheckedAdd => .traitMethod "UncheckedAdd" "add"
   | .uncheckedSubtract => .traitMethod "UncheckedSub" "sub"
   | .uncheckedMultiply => .traitMethod "UncheckedMul" "mul"
