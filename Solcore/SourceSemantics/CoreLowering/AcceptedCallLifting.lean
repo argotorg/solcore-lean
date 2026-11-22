@@ -281,6 +281,49 @@ private theorem conditional_inv (unique : NodeOccurrencesUnique source)
     exfalso
     obtain rfl := same_node unique found (by assumption)
     simp_all
+
+private theorem break_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    (form : node.form = .breakStmt)
+    (head : SourceExecutionSize.StatementExecutes program size context evidence source environment before id
+      finalContext outcome after) :
+    finalContext = context ∧ outcome = .breaking environment ∧ after = before := by
+  cases head with
+  | breakStmt => exact ⟨rfl, rfl, rfl⟩
+  | _ =>
+    exfalso
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
+
+private theorem continue_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    (form : node.form = .continueStmt)
+    (head : SourceExecutionSize.StatementExecutes program size context evidence source environment before id
+      finalContext outcome after) :
+    finalContext = context ∧ outcome = .continuing environment ∧ after = before := by
+  cases head with
+  | continueStmt => exact ⟨rfl, rfl, rfl⟩
+  | _ =>
+    exfalso
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
+
+private theorem while_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    {condition : ExpressionId} {body : List StatementId} (form : node.form = .whileLoop condition body)
+    (head : SourceExecutionSize.StatementExecutes program size context evidence source environment before id
+      finalContext outcome after) :
+    ∃ child loopContext inner, child < size ∧
+      SourceExecutionSize.WhileExecutes program child context evidence source environment before condition body
+        loopContext inner after ∧
+      finalContext = context ∧ outcome = Dynamic.restoreControl environment inner := by
+  cases head with
+  | whileLoop contains formEq iterate =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, _, _, below_one, iterate, rfl, rfl⟩
+  | _ =>
+    exfalso
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
 end Inversion
 
 variable {program : Program} {registry : Staging.Recursive.Registry} {scope : Staging.Recursive.Scope}
@@ -384,6 +427,49 @@ private theorem projected_target {child : ExpressionId → Prop} {bound : Nat}
     obtain ⟨values, staged, ordered⟩ := projections_values lift keys (by omega) evaluate
     exact ⟨values, staged, .intro lookup initialRead ordered currentRead initialValue selection⟩
   | element projectionsEq => exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
+
+/-- The sized Source iterations of a `while` loop whose condition `child`
+admits and whose body lifts within the bound are the staged iterations, with
+the same outcome and heap. The loop falls through at its own bindings or
+returns. -/
+private theorem while_lift {child : ExpressionId → Prop} {bound : Nat}
+    (lift : ChildLifts program registry scope child bound) {condition : ExpressionId} {body : List StatementId}
+    (test : child condition)
+    (inner : ∀ {size : Nat} {context environment before innerContext outcome after}, size ≤ bound →
+      SourceExecutionSize.StatementsExecute program size context scope.evidence scope.source environment before body
+        innerContext outcome after →
+      Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
+        (control outcome) after) :
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {loopContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome},
+      size ≤ bound →
+      SourceExecutionSize.WhileExecutes program size context scope.evidence scope.source environment before condition
+        body loopContext outcome after →
+      Staging.Recursive.While program registry scope context environment before condition body (control outcome)
+          after ∧
+        (outcome = .fallthrough environment ∨ ∃ value, outcome = .returned value) := by
+  intro size
+  induction size using Nat.strongRecOn with
+  | ind size ih =>
+    intro context environment before after loopContext outcome within loop
+    cases loop with
+    | done evaluate => exact ⟨.done (lift test (Nat.lt_of_lt_of_le below_one within) evaluate), .inl rfl⟩
+    | nextFallthrough evaluate executes next =>
+      have below := within
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+      obtain ⟨staged, ended⟩ := ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) (by omega) next
+      exact ⟨.next (lift test (by omega) evaluate) (inner (by omega) executes) staged, ended⟩
+    | nextContinue evaluate executes next =>
+      have below := within
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+      obtain ⟨staged, ended⟩ := ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) (by omega) next
+      exact ⟨.continueNext (lift test (by omega) evaluate) (inner (by omega) executes) staged, ended⟩
+    | breaks evaluate executes =>
+      exact ⟨.breakFromBody (lift test (Nat.lt_of_lt_of_le below_left within) evaluate)
+        (inner (Nat.le_of_lt (Nat.lt_of_lt_of_le below_right within)) executes), .inl rfl⟩
+    | returns evaluate executes =>
+      exact ⟨.returned (lift test (Nat.lt_of_lt_of_le below_left within) evaluate)
+        (inner (Nat.le_of_lt (Nat.lt_of_lt_of_le below_right within)) executes), .inr ⟨_, rfl⟩⟩
 
 /-- A sized ordinary execution of a supported statement list is a staged
 execution with the same context, outcome and heap, given the lifting of its
@@ -583,6 +669,43 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {child : Expres
       | breaking => exact .ifBreaking (lookupStatement?_sound found) form tested staged
       | continuing => exact .ifContinuing (lookupStatement?_sound found) form tested staged
       | fault => exact .ifFault (lookupStatement?_sound found) form tested staged
+  | breaking found form =>
+    intro size context environment before after finalContext outcome _
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after _ _ _ _ head _
+      obtain ⟨_, impossible, _⟩ := break_inv unique found form head
+      cases impossible
+    · intro context environment before finalContext outcome after _ _ head _
+      obtain ⟨rfl, rfl, rfl⟩ := break_inv unique found form head
+      exact .breaking (lookupStatement?_sound found) form
+  | continuing found form =>
+    intro size context environment before after finalContext outcome _
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after _ _ _ _ head _
+      obtain ⟨_, impossible, _⟩ := continue_inv unique found form head
+      cases impossible
+    · intro context environment before finalContext outcome after _ _ head _
+      obtain ⟨rfl, rfl, rfl⟩ := continue_inv unique found form head
+      exact .continuing (lookupStatement?_sound found) form
+  | whileLooped found form test _ _ innerIH tailIH =>
+    intro size context environment before after finalContext outcome within
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after headSize
+        tailSize headBelow tailBelow head next
+      obtain ⟨_, _, loopOutcome, loopBelow, iterate, rfl, same⟩ := while_inv unique found form head
+      obtain ⟨loop, ended⟩ := while_lift lift test (fun within executes => innerIH within executes) (by omega)
+        iterate
+      rcases ended with rfl | ⟨_, rfl⟩
+      · cases same
+        exact .whileFallthrough (lookupStatement?_sound found) form loop (tailIH (by omega) next)
+      · cases same
+    · intro context environment before finalContext outcome after headSize headBelow head terminal
+      obtain ⟨_, _, loopOutcome, loopBelow, iterate, rfl, rfl⟩ := while_inv unique found form head
+      obtain ⟨loop, ended⟩ := while_lift lift test (fun within executes => innerIH within executes) (by omega)
+        iterate
+      rcases ended with rfl | ⟨_, rfl⟩
+      · cases terminal
+      · exact .whileReturned (lookupStatement?_sound found) form loop
   | tail found form _ value =>
     intro size context environment before after finalContext outcome within original
     unfold Original at original
@@ -1673,8 +1796,8 @@ section
 /-! Original fault executions of supported statement lists are staged fault
 executions with the same reason and heap, given the value and fault liftings
 of their expressions below the size. A statement faults in its expression, its
-target, bare or through mapping indices, the operand of its in-place `~`, or
-its inner list, or a
+target, bare or through mapping indices, the operand of its in-place `~`, its
+inner list or an iteration of its loop, or a
 falling-through statement is followed by a fault in the rest of its list; the
 staged rule of the same form carries the fault, at the context, environment
 and heap of the original execution. -/
@@ -1884,6 +2007,35 @@ private theorem conditional_fault_inv (unique : NodeOccurrencesUnique source)
     exfalso
     obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
     simp_all
+
+private theorem jump_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) (form : node.form = .breakStmt ∨ node.form = .continueStmt)
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) : False := by
+  cases fault with
+  | missing absent => exact Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)
+  | _ =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    rcases form with form | form <;> simp_all
+
+private theorem while_fault_inv (unique : NodeOccurrencesUnique source)
+    (found : source.lookupStatement? id = some node) {condition : ExpressionId} {body : List StatementId}
+    (form : node.form = .whileLoop condition body)
+    (fault : SourceExecutionSize.StatementFaults program size context evidence source environment before id
+      reason after) :
+    ∃ child, child < size ∧ SourceExecutionSize.WhileFaults program child context evidence source environment before
+      condition body reason after := by
+  cases fault with
+  | missing absent => exact (Dynamic.StatementAbsentIn.excludes_contains absent (lookupStatement?_sound found)).elim
+  | whileIteration contains formEq fault =>
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, CellAwareInvocationAcceptedSizedLifting.below_one, fault⟩
+  | _ =>
+    exfalso
+    obtain rfl := CellAwareInvocationAcceptedSizedLifting.same_node unique found (by assumption)
+    simp_all
 end Inversion
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared checked) {program : Program}
@@ -2032,6 +2184,56 @@ private theorem sequence_fault {mode : Bool} {id : StatementId} {rest : List Sta
     | tail head next =>
       exact step CellAwareInvocationAcceptedSizedLifting.below_left CellAwareInvocationAcceptedSizedLifting.below_right
         signatures head next
+
+/-- The sized Source fault of a `while` loop whose condition `child` admits and
+whose body lifts within the bound, with an expressible reason at a context with
+the program's signatures, is a staged fault of the loop with the same heap. -/
+private theorem while_fault_lift {child : ExpressionId → Prop} {bound : Nat}
+    (lift : ChildLifts program registry scope child bound)
+    (faultLift : ChildFaultLifts program registry scope child bound) {condition : ExpressionId}
+    {body : List StatementId} (test : child condition)
+    (inner : ∀ {size : Nat} {context environment before innerContext outcome after}, size ≤ bound →
+      SourceExecutionSize.StatementsExecute program size context scope.evidence scope.source environment before body
+        innerContext outcome after →
+      Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
+        (CellAwareInvocationAcceptedStatementLifting.control outcome) after)
+    (innerFault : ∀ {size : Nat} {context environment before innerContext after} {reason : Dynamic.SemanticFault},
+      size ≤ bound → context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.StatementsFault program size context scope.evidence scope.source environment before body
+        innerContext reason after →
+      Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
+        (.fault (.semantic reason)) after) :
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault},
+      size ≤ bound → context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.WhileFaults program size context scope.evidence scope.source environment before condition
+        body reason after →
+      Staging.Recursive.While program registry scope context environment before condition body
+        (.fault (.semantic reason)) after := by
+  intro size
+  induction size using Nat.strongRecOn with
+  | ind size ih =>
+    intro context environment before after reason within signatures expressible failed
+    cases failed with
+    | condition fault =>
+      exact .conditionFault (faultLift test
+        (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_one within) signatures expressible fault)
+    | conditionType => simp [Expressible] at expressible
+    | body evaluate fault =>
+      exact .bodyFault (lift test (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_left within)
+        evaluate)
+        (innerFault (Nat.le_of_lt (Nat.lt_of_lt_of_le CellAwareInvocationAcceptedSizedLifting.below_right within))
+          signatures expressible fault)
+    | nextFallthrough evaluate executes fault =>
+      have below := within
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+      exact .next (lift test (by omega) evaluate) (inner (by omega) executes)
+        (ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) (by omega) signatures expressible fault)
+    | nextContinue evaluate executes fault =>
+      have below := within
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at below
+      exact .continueNext (lift test (by omega) evaluate) (inner (by omega) executes)
+        (ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) (by omega) signatures expressible fault)
 
 /-- A sized fault execution of a supported statement list with an expressible
 reason, at a context with the program's signatures, is a staged fault
@@ -2370,6 +2572,44 @@ theorem statements_fault (unique : NodeOccurrencesUnique scope.source) {child : 
       · simp [Expressible] at expressible
       · exact .ifFault (lookupStatement?_sound found) form (lift test (by omega) evaluate)
           (branchFault (by omega) signatures failed)
+  | breaking found form =>
+    intro size context environment before after finalContext reason _ signatures _ original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after _ _ _ _ _ head _
+      obtain ⟨_, impossible, _⟩ := CellAwareInvocationAcceptedSizedLifting.break_inv unique found form head
+      cases impossible
+    · intro context environment before after _ _ _ fault
+      exact (jump_fault_inv unique found (.inl form) fault).elim
+  | continuing found form =>
+    intro size context environment before after finalContext reason _ signatures _ original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after _ _ _ _ _ head _
+      obtain ⟨_, impossible, _⟩ := CellAwareInvocationAcceptedSizedLifting.continue_inv unique found form head
+      cases impossible
+    · intro context environment before after _ _ _ fault
+      exact (jump_fault_inv unique found (.inr form) fault).elim
+  | whileLooped found form test inner _ innerIH tailIH =>
+    intro size context environment before after finalContext reason within signatures expressible original
+    refine sequence_fault unique found (fun _ same => by rw [form] at same; cases same) ?_ ?_ signatures original
+    · intro context environment before middleContext nextEnvironment middle finalContext after headSize
+        tailSize headBelow tailBelow signatures head next
+      obtain ⟨_, _, loopOutcome, loopBelow, iterate, rfl, same⟩ :=
+        CellAwareInvocationAcceptedSizedLifting.while_inv unique found form head
+      obtain ⟨loop, ended⟩ := CellAwareInvocationAcceptedSizedLifting.while_lift lift test
+        (fun within executes => CellAwareInvocationAcceptedSizedLifting.statements unique lift inner within executes)
+        (by omega) iterate
+      rcases ended with rfl | ⟨_, rfl⟩
+      · cases same
+        exact .whileFallthrough (lookupStatement?_sound found) form loop
+          (tailIH (by omega) signatures expressible next)
+      · cases same
+    · intro context environment before after headSize headBelow signatures fault
+      obtain ⟨_, loopBelow, failed⟩ := while_fault_inv unique found form fault
+      exact .whileFault (lookupStatement?_sound found) form
+        (while_fault_lift lift faultLift test
+          (fun within executes => CellAwareInvocationAcceptedSizedLifting.statements unique lift inner within executes)
+          (fun within signatures expressible failed => innerIH within signatures expressible failed)
+          (by omega) signatures expressible failed)
   | tail found form _ value =>
     intro size context environment before after finalContext reason within signatures expressible original
     unfold FaultOriginal at original

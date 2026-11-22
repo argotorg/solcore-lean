@@ -25,7 +25,8 @@ section
 /-! Source statement lists that the accepted-body route closes at named rows:
 value and unit returns, monomorphic declarations, bare assignments, assignments
 through mapping indices and in-place `~`, bare or through mapping indices, that
-the compiler refines, expression statements, blocks and conditionals, and a function body's final value of its
+the compiler refines, expression statements, blocks, conditionals, `while` loops,
+`break` and `continue`, and a function body's final value of its
 declared type, each with its expressions in a given predicate. `Shape` recognizes these lists on the
 Source; `covered` shows that every refined accepted tree of such a list is
 covered by the statement closure, and `shapeWith?` recognizes them on an
@@ -96,6 +97,17 @@ inductive Shape (source : TypedSource) (expected : TypeSystem.Ty) (child : Expre
       (found : source.lookupStatement? id = some node) (form : node.form = .ifThen condition thenBody elseBody)
       (test : child condition) (left : Shape source expected child false thenBody)
       (right : Shape source expected child false (elseBody.getD []))
+      (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
+  | breaking {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+      (found : source.lookupStatement? id = some node) (form : node.form = .breakStmt) :
+      Shape source expected child mode (id :: rest)
+  | continuing {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+      (found : source.lookupStatement? id = some node) (form : node.form = .continueStmt) :
+      Shape source expected child mode (id :: rest)
+  | whileLooped {mode : Bool} {id : StatementId} {rest : List StatementId} {node : StatementNode}
+      {condition : ExpressionId} {body : List StatementId}
+      (found : source.lookupStatement? id = some node) (form : node.form = .whileLoop condition body)
+      (test : child condition) (inner : Shape source expected child false body)
       (tail : Shape source expected child mode rest) : Shape source expected child mode (id :: rest)
   | tail {id : StatementId} {node : StatementNode} {expression : ExpressionId}
       (found : source.lookupStatement? id = some node) (form : node.form = .expression expression false)
@@ -284,6 +296,13 @@ def shapeWith? (source : TypedSource) (expected : TypeSystem.Ty) (child : Expres
         let ⟨right⟩ ← shapeWith? source expected child child? fuel false (elseBody.getD [])
         let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
         pure ⟨.conditional found form test left right tail⟩
+      | .breakStmt => pure ⟨.breaking found form⟩
+      | .continueStmt => pure ⟨.continuing found form⟩
+      | .whileLoop condition body => do
+        let ⟨test⟩ ← child? condition
+        let ⟨inner⟩ ← shapeWith? source expected child child? fuel false body
+        let ⟨tail⟩ ← shapeWith? source expected child child? fuel mode rest
+        pure ⟨.whileLooped found form test inner tail⟩
       | _ => none
 
 /-- Proof-producing recognition of a supported statement list whose expressions
@@ -330,6 +349,9 @@ private theorem head_expanded {source : TypedSource} {expected : TypeSystem.Ty} 
   | discarded found form => exact ⟨_, found, by rw [form]; rfl⟩
   | block found form => exact ⟨_, found, by rw [form]; rfl⟩
   | conditional found form => exact ⟨_, found, by rw [form]; rfl⟩
+  | breaking found form => exact ⟨_, found, by rw [form]; rfl⟩
+  | continuing found form => exact ⟨_, found, by rw [form]; rfl⟩
+  | whileLooped found form => exact ⟨_, found, by rw [form]; rfl⟩
   | tail found form => exact ⟨_, found, by rw [form]; rfl⟩
 
 variable {whole : SourceCoreUnifiedCompilation.Compiled} {bodyRelation : ActualBodyInvocation.BodyRelation}
@@ -514,6 +536,19 @@ theorem covered (index : ActualBodyInvocation.Index whole bodyRelation) {semanti
       exfalso
       obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
       clear leftIH rightIH tailIH ready
+      simp_all
+  | whileLoop read form _ _ _ _ _ _ innerIH tailIH =>
+    intro ready shape
+    cases shape with
+    | whileLooped found form' _ inner tail =>
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans found)
+      rw [form] at form'
+      cases form'
+      exact ⟨innerIH ready.1 inner, tailIH ready.2 tail⟩
+    | _ =>
+      exfalso
+      obtain rfl := Option.some.inj ((node_of_read index read).symm.trans (by assumption))
+      clear innerIH tailIH ready
       simp_all
   | tailValue read form _ _ _ _ =>
     intro _ shape
@@ -710,8 +745,9 @@ runs the same rule in both semantics once its subset expressions are staged:
 declarations allocate the same cell, a bare assignment resolves its target
 without changing the heap and writes it by the same rule, an assignment or an
 in-place `~` through mapping indices evaluates its keys in order before the
-same snapshot and write, and blocks and conditional arms restore their entry bindings while
-keeping their heap. Each control outcome is carried unchanged, with the
+same snapshot and write, blocks and conditional arms restore their entry bindings while
+keeping their heap, and a `while` loop runs the same iterations, falling
+through at its own bindings. Each control outcome is carried unchanged, with the
 context, environment and heap of the original execution. Fault executions are
 not lifted here. -/
 set_option autoImplicit false
@@ -916,6 +952,45 @@ private theorem conditional_inv (unique : NodeOccurrencesUnique source)
     exfalso
     obtain rfl := same_node unique found (by assumption)
     simp_all
+
+private theorem break_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    (form : node.form = .breakStmt)
+    (head : Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after) :
+    finalContext = context ∧ outcome = .breaking environment ∧ after = before := by
+  cases head with
+  | breakStmt => exact ⟨rfl, rfl, rfl⟩
+  | _ =>
+    exfalso
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
+
+private theorem continue_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    (form : node.form = .continueStmt)
+    (head : Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after) :
+    finalContext = context ∧ outcome = .continuing environment ∧ after = before := by
+  cases head with
+  | continueStmt => exact ⟨rfl, rfl, rfl⟩
+  | _ =>
+    exfalso
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
+
+private theorem while_inv (unique : NodeOccurrencesUnique source) (found : source.lookupStatement? id = some node)
+    {condition : ExpressionId} {body : List StatementId} (form : node.form = .whileLoop condition body)
+    (head : Dynamic.StatementExecutes program context evidence source environment before id finalContext outcome after) :
+    ∃ loopContext inner,
+      Dynamic.WhileExecutes program context evidence source environment before condition body loopContext inner after ∧
+      finalContext = context ∧ outcome = Dynamic.restoreControl environment inner := by
+  cases head with
+  | whileLoop contains formEq iterate =>
+    obtain rfl := same_node unique found contains
+    rw [form] at formEq
+    cases formEq
+    exact ⟨_, _, iterate, rfl, rfl⟩
+  | _ =>
+    exfalso
+    obtain rfl := same_node unique found (by assumption)
+    simp_all
 end Inversion
 
 variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
@@ -965,6 +1040,40 @@ private theorem projected_target (unique : NodeOccurrencesUnique scope.source) {
     obtain ⟨values, staged, ordered⟩ := projections_values unique keys evaluate
     exact ⟨values, staged, .intro lookup initialRead ordered currentRead initialValue selection⟩
   | element projectionsEq => exact absurd projectionsEq (CellAwareInvocationAcceptedBodyShape.indices_no_element keys)
+
+/-- The Source's iterations of a `while` loop whose condition and body lift are
+the staged iterations, with the same outcome and heap. The loop falls through
+at its own bindings or returns. -/
+private theorem while_lift {evidence : Dynamic.EvidenceEnvironment} {source : TypedSource}
+    {condition : ExpressionId} {body : List StatementId}
+    (test : ∀ {context environment before value after},
+      Dynamic.ExpressionEvaluates program context evidence source environment before condition value after →
+      Staging.Recursive.Expression program registry scope context environment before condition (.value value) after)
+    (inner : ∀ {context environment before innerContext outcome after},
+      Dynamic.StatementsExecute program context evidence source environment before body innerContext outcome after →
+      Staging.Recursive.StatementsIn program registry false scope context environment before body innerContext
+        (control outcome) after)
+    {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {loopContext : SourceSemantics.Context} {outcome : Dynamic.ControlOutcome}
+    (loop : Dynamic.WhileExecutes program context evidence source environment before condition body loopContext
+      outcome after) :
+    Staging.Recursive.While program registry scope context environment before condition body (control outcome)
+        after ∧
+      (outcome = .fallthrough environment ∨ ∃ value, outcome = .returned value) := by
+  obtain ⟨size, sized⟩ := SourceExecutionSize.WhileExecutes.has_size loop
+  clear loop
+  induction size using Nat.strongRecOn generalizing before loopContext outcome after with
+  | ind size ih =>
+    cases sized with
+    | done evaluate => exact ⟨.done (test evaluate.sound), .inl rfl⟩
+    | nextFallthrough evaluate executes next =>
+      obtain ⟨staged, ended⟩ := ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next
+      exact ⟨.next (test evaluate.sound) (inner executes.sound) staged, ended⟩
+    | nextContinue evaluate executes next =>
+      obtain ⟨staged, ended⟩ := ih _ (SourceExecutionSize.child_lt_stepSize (by simp)) next
+      exact ⟨.continueNext (test evaluate.sound) (inner executes.sound) staged, ended⟩
+    | breaks evaluate executes => exact ⟨.breakFromBody (test evaluate.sound) (inner executes.sound), .inl rfl⟩
+    | returns evaluate executes => exact ⟨.returned (test evaluate.sound) (inner executes.sound), .inr ⟨_, rfl⟩⟩
 
 /-- One statement followed by the rest of its list. A falling-through head runs
 the rest; a terminal head ends the list. Both compiler modes share this
@@ -1188,6 +1297,44 @@ theorem statements (unique : NodeOccurrencesUnique scope.source) {mode : Bool} {
       | breaking => exact .ifBreaking (lookupStatement?_sound found) form tested staged
       | continuing => exact .ifContinuing (lookupStatement?_sound found) form tested staged
       | fault => exact .ifFault (lookupStatement?_sound found) form tested staged
+  | breaking found form =>
+    intro context environment before after finalContext outcome
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after head _
+      obtain ⟨_, impossible, _⟩ := break_inv unique found form head
+      cases impossible
+    · intro context environment before finalContext outcome after head _
+      obtain ⟨rfl, rfl, rfl⟩ := break_inv unique found form head
+      exact .breaking (lookupStatement?_sound found) form
+  | continuing found form =>
+    intro context environment before after finalContext outcome
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after head _
+      obtain ⟨_, impossible, _⟩ := continue_inv unique found form head
+      cases impossible
+    · intro context environment before finalContext outcome after head _
+      obtain ⟨rfl, rfl, rfl⟩ := continue_inv unique found form head
+      exact .continuing (lookupStatement?_sound found) form
+  | whileLooped found form test _ _ innerIH tailIH =>
+    intro context environment before after finalContext outcome
+    apply sequence unique found (fun _ same => by rw [form] at same; cases same)
+    · intro context environment before middleContext nextEnvironment middle finalContext outcome after head next
+      obtain ⟨_, loopOutcome, iterate, rfl, same⟩ := while_inv unique found form head
+      obtain ⟨loop, ended⟩ := while_lift (registry := registry) (scope := scope) (evidence := scope.evidence)
+        (source := scope.source) (fun evaluate => expression_value unique test evaluate)
+        (fun executes => innerIH executes) iterate
+      rcases ended with rfl | ⟨_, rfl⟩
+      · cases same
+        exact .whileFallthrough (lookupStatement?_sound found) form loop (tailIH next)
+      · cases same
+    · intro context environment before finalContext outcome after head terminal
+      obtain ⟨_, loopOutcome, iterate, rfl, rfl⟩ := while_inv unique found form head
+      obtain ⟨loop, ended⟩ := while_lift (registry := registry) (scope := scope) (evidence := scope.evidence)
+        (source := scope.source) (fun evaluate => expression_value unique test evaluate)
+        (fun executes => innerIH executes) iterate
+      rcases ended with rfl | ⟨_, rfl⟩
+      · cases terminal
+      · exact .whileReturned (lookupStatement?_sound found) form loop
   | tail found form _ value =>
     intro context environment before after finalContext outcome original
     unfold Original at original
