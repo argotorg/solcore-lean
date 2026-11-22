@@ -1083,6 +1083,14 @@ theorem preserves_position [RecursiveStageMeaning.FaultTokens faults] {budget : 
               keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) failed body (LocalLoop.controlType type)
           exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
             preservation, metadata, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+      | operandFault keyTrace snapshot selected invalid =>
+          exact False.elim (CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.operand_valid
+            (compiled := compiled) (values := .initial compiled.compatible.checked)
+            (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+            (context := context) (scope := scope) (administrative := administrative)
+            bridge functions extension transport faithful observations
+            head head.projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+            budget typedChildren keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot selected invalid)
       | success keyTrace snapshot write remainingTrace =>
           obtain ⟨middleStore, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata,
               count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=

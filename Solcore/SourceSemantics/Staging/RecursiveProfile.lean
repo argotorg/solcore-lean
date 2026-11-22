@@ -1309,6 +1309,17 @@ mutual
           (ProjectedTarget.keys assignment.target.projections) (.values values) after)
         (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
         ForItems program registry scope context environment before (.assignBitNot assignment :: rest) context (.fault (.semantic reason)) after
+    /-- The snapshot's selected leaf is no operand of `~`, as the Source's
+    `SourcePlaceBitNotFaults.operand` says. -/
+    | projectedBitNotOperandFault {scope context environment before after assignment values target value rest}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+        (snapshot : ProjectedTarget.Snapshot environment before after assignment.target values target)
+        (selected : target.selected = some value)
+        (invalid : UnaryPrimitiveOperandInvalid .bitNot value) :
+        ForItems program registry scope context environment before (.assignBitNot assignment :: rest) context
+          (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
     | projectedAssignment {scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated rest outcome}
         (projected : assignment.target.projections ≠ [])
         (keys : Expressions program registry scope context environment before

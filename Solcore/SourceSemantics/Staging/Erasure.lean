@@ -1072,6 +1072,8 @@ local macro "erase_recursive_plain" : tactic =>
       | semantic => exact .head (.assignBitNot (.target (ready.key_fault keysIH)))
     case projectedBitNotGetterFault _projected keys failed keysIH =>
       exact .head (.assignBitNot (.target (failed.source keysIH)))
+    case projectedBitNotOperandFault _projected keys snapshot selected invalid keysIH =>
+      exact .head (.assignBitNot (.operand (snapshot.resolves keysIH) selected invalid))
     case projectedAssignment _projected keys snapshot child write _next keysIH childIH nextIH =>
       exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves keysIH) childIH write)) nextIH
     case projectedAssignmentRootFault _projected failed =>
@@ -1823,6 +1825,8 @@ theorem StatementsIn.body_plain {program : Program} {registry : Registry} {mode 
     | semantic => exact .head (.assignBitNot (.target (ready.key_fault keys.semanticFault_plain)))
   case projectedBitNotGetterFault _projected keys failed _keysIH =>
     exact .head (.assignBitNot (.target (failed.source keys.values_plain)))
+  case projectedBitNotOperandFault _projected keys snapshot selected invalid _keysIH =>
+    exact .head (.assignBitNot (.operand (snapshot.resolves keys.values_plain) selected invalid))
   case projectedAssignment _projected keys snapshot child write _next _keysIH _childIH nextIH =>
     exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves keys.values_plain) child.value_plain write)) nextIH
   case projectedAssignmentRootFault _projected failed =>
@@ -1994,6 +1998,8 @@ theorem ForItems.plain {program : Program} {registry : Registry} {scope : Scope}
     | semantic => exact .head (.assignBitNot (.target (ready.key_fault keys.semanticFault_plain)))
   case projectedBitNotGetterFault _projected keys failed _keysIH =>
     exact .head (.assignBitNot (.target (failed.source keys.values_plain)))
+  case projectedBitNotOperandFault _projected keys snapshot selected invalid _keysIH =>
+    exact .head (.assignBitNot (.operand (snapshot.resolves keys.values_plain) selected invalid))
   case projectedAssignment _projected keys snapshot child write _next _keysIH _childIH nextIH =>
     exact ForItemsPlain.prepend (.assignValue (.intro (snapshot.resolves keys.values_plain) child.value_plain write)) nextIH
   case projectedAssignmentRootFault _projected failed =>

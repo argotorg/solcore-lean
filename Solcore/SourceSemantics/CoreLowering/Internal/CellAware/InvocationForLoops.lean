@@ -1478,6 +1478,14 @@ theorem preserves (budget : Nat)
           keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) failed body (LocalLoop.controlType type)
       exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
         preservation, metadata, effect, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+  | projectedBitNotOperandFault _ keyTrace snapshot selected invalid =>
+      exact False.elim (CellAwareInvocationProjectedBitNotHeads.operand_valid
+        (compiled := compiled)
+        (invocation := invocation)
+        (context := context) (scope := scope) (administrative := administrative)
+        bridge functions extension transport faithful observations
+        head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
+        budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot selected invalid)
   | projectedBitNot _ keyTrace snapshot write remainingTrace =>
       obtain ⟨middleStore, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata,
           effect, count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=
@@ -2948,6 +2956,14 @@ theorem preserves (budget : Nat)
           keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) failed body (LocalLoop.controlType type)
       exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
         preservation, metadata, effect, reached, related, CallableIndexedOwnedAdmittedStagedImperativeFlow.fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+  | operandFault keyTrace snapshot selected invalid =>
+      exact False.elim (CellAwareInvocationProjectedBitNotHeads.operand_valid
+        (compiled := compiled)
+        (invocation := invocation)
+        (context := context) (scope := scope) (administrative := administrative)
+        bridge functions extension transport faithful observations
+        head projected environments heaps locals agrees actualTyped initial admitted authority physical owner sameLocation unique assignmentTyped
+        budget children keyTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil, Nat.add_zero] at within; omega) snapshot selected invalid)
   | success keyTrace snapshot write remainingTrace =>
       obtain ⟨middleStore, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata,
           effect, count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=

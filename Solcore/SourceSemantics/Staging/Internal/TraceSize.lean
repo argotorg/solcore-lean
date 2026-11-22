@@ -876,6 +876,15 @@ mutual
           (ProjectedTarget.keys assignment.target.projections) (.values values) after)
         (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
         ForItems program registry (stepSize [keysSize]) scope context environment before (.assignBitNot assignment :: rest) context (.fault (.semantic reason)) after
+    | projectedBitNotOperandFault {keysSize : Nat} {scope context environment before after assignment values target value rest}
+        (projected : assignment.target.projections ≠ [])
+        (keys : Expressions program registry keysSize scope context environment before
+          (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+        (snapshot : ProjectedTarget.Snapshot environment before after assignment.target values target)
+        (selected : target.selected = some value)
+        (invalid : UnaryPrimitiveOperandInvalid .bitNot value) :
+        ForItems program registry (stepSize [keysSize]) scope context environment before (.assignBitNot assignment :: rest) context
+          (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
     | projectedAssignment {keysSize childSize nextSize : Nat} {scope context finalContext environment before targetHeap middle written after assignment operator rhs values target value updated rest outcome}
         (projected : assignment.target.projections ≠ [])
         (keys : Expressions program registry keysSize scope context environment before
@@ -1223,6 +1232,7 @@ local macro "erase_stage_grade" : tactic =>
     case projectedBitNotRootFault => apply Recursive.ForItems.projectedBitNotRootFault <;> assumption
     case projectedBitNotKeysFault => apply Recursive.ForItems.projectedBitNotKeysFault <;> assumption
     case projectedBitNotGetterFault => apply Recursive.ForItems.projectedBitNotGetterFault <;> assumption
+    case projectedBitNotOperandFault => apply Recursive.ForItems.projectedBitNotOperandFault <;> assumption
     case projectedAssignment => apply Recursive.ForItems.projectedAssignment <;> assumption
     case projectedAssignmentRootFault => apply Recursive.ForItems.projectedAssignmentRootFault <;> assumption
     case projectedAssignmentKeysFault => apply Recursive.ForItems.projectedAssignmentKeysFault <;> assumption
@@ -1752,6 +1762,9 @@ local macro "construct_stage_grade" : tactic =>
     case projectedBitNotGetterFault projected keys failed keysIH =>
       obtain ⟨keysSize, keysGraded⟩ := keysIH
       exact ⟨_, .projectedBitNotGetterFault projected keysGraded failed⟩
+    case projectedBitNotOperandFault projected keys snapshot selected invalid keysIH =>
+      obtain ⟨keysSize, keysGraded⟩ := keysIH
+      exact ⟨_, .projectedBitNotOperandFault projected keysGraded snapshot selected invalid⟩
     case projectedAssignment projected keys snapshot child write next keysIH childIH nextIH =>
       obtain ⟨keysSize, keysGraded⟩ := keysIH
       obtain ⟨childSize, childGraded⟩ := childIH

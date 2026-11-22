@@ -180,7 +180,8 @@ theorem bitNot {assignment : AssignmentResolution}
   | bitNot snapshot write remaining => exact .inr ⟨_, _, _, _, rfl, snapshot, write, remaining⟩
   | bitNotFault _ failed => exact .inl ⟨_, rfl, rfl, rfl, rfl, failed⟩
   | projectedBitNot projected _ _ _ _ | projectedBitNotRootFault projected _
-  | projectedBitNotKeysFault projected _ _ | projectedBitNotGetterFault projected _ _ =>
+  | projectedBitNotKeysFault projected _ _ | projectedBitNotGetterFault projected _ _
+  | projectedBitNotOperandFault projected _ _ _ _ =>
       exact (projected bare).elim
 
 end Solcore.SourceSemantics.CoreLowering.CallableIndexedOwnedPreparedStagedScopedForItemsSourceInversion

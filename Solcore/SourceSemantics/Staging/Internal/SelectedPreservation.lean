@@ -1667,7 +1667,9 @@ theorem for_items_step (size : Nat)
                     runtime covers locals heap keyTyped keys
                   exact ⟨keyPost.heap_typed, keyPost.heap_extends, by intro environment equal; cases equal⟩
   | @projectedBitNotGetterFault keysSize scope context environment before after assignment values rest reason
-      _projected keys _failed =>
+      _projected keys _failed
+  | @projectedBitNotOperandFault keysSize scope context environment before after assignment values _ _ rest
+      _projected keys _ _ _ =>
       cases typed with
       | cons headTyped tailTyped =>
           cases headTyped with

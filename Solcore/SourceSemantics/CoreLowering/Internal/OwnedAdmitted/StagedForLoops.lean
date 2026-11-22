@@ -3535,6 +3535,14 @@ theorem preserves_at [RecursiveStageMeaning.FaultTokens faults] {budget : Nat}
             failed body (LocalLoop.controlType type)
         exact ⟨_, finalStore, finalMap, finalWorld, evaluated, .fault matched, finalHeaps, maps, worlds,
           preservation, metadata, reached, related, fault_post bridge (context := context) (expected := expected) (failure := .semantic _) reached stable⟩
+      | projectedBitNotOperandFault _ keysTrace snapshot selected invalid =>
+        exact False.elim (CallableIndexedOwnedAdmittedStagedProjectedBitNotHeads.operand_valid
+          (compiled := compiled) (values := .initial compiled.compatible.checked)
+          (ambient := CallableIndexedAmbient.ambientDefinitions compiled.indexed) (invocation := invocation)
+          (context := context) (scope := scope) (administrative := administrative)
+          bridge functions extension transport faithful observations head head.projected environments heaps locals agrees actualTyped initial admitted unique assignmentTyped
+          budget typedChildren keysTrace (by simp only [Staging.Recursive.Size.stepSize, List.sum_cons, List.sum_nil] at within; omega)
+          snapshot selected invalid)
       | projectedBitNot _ keysTrace snapshot write remainingTrace =>
         obtain ⟨middleStore, middleMap, middleWorld, slots, middleHeaps, maps, worlds, preservation, metadata,
             count, typed, ⟨reached, related, nextAdmitted⟩, continuation⟩ :=
@@ -3593,6 +3601,14 @@ inductive Result (program : Program) (registry : Registry) (invocation : Scope)
       (failed : ProjectedTarget.GetterFault environment before after assignment.target values reason) :
       Result program registry invocation context environment before assignment rest test post body
         (Size.stepSize [Size.stepSize [keysSize]]) (.fault (.semantic reason)) after
+  | operandFault {keysSize values target value after}
+      (keys : Size.Expressions program registry keysSize invocation context environment before
+        (ProjectedTarget.keys assignment.target.projections) (.values values) after)
+      (snapshot : ProjectedTarget.Snapshot environment before after assignment.target values target)
+      (selected : target.selected = some value)
+      (invalid : Dynamic.UnaryPrimitiveOperandInvalid .bitNot value) :
+      Result program registry invocation context environment before assignment rest test post body
+        (Size.stepSize [Size.stepSize [keysSize]]) (.fault (.semantic (.invalidUnaryOperand .bitNot))) after
   | success {keysSize tailSize values target targetHeap updated written outcome after}
       (keys : Size.Expressions program registry keysSize invocation context environment before
         (ProjectedTarget.keys assignment.target.projections) (.values values) targetHeap)
@@ -3632,6 +3648,7 @@ theorem projected_bitNot {program : Program} {registry : Registry} {invocation :
     | projectedBitNotRootFault _ failed => exact .rootFault failed
     | projectedBitNotKeysFault _ ready keys => exact .keysFault ready keys
     | projectedBitNotGetterFault _ keys failed => exact .getterFault keys failed
+    | projectedBitNotOperandFault _ keys snapshot selected invalid => exact .operandFault keys snapshot selected invalid
     | projectedBitNot _ keys snapshot write next =>
       have result := Result.success (test := test) (post := post) (body := body) keys snapshot write (Trace.initializerFault next)
       simpa only [fault_grade] using result
