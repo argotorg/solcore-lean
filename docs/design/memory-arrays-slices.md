@@ -522,7 +522,9 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
 ### 5. Arrays at the public API
 
 - **Decided:** a root whose signature mentions an array or a slice is rejected.
-- **Not enforced yet.** Such a root still compiles. The check is being added.
+- **Enforced.** `SourceCoreCompiler.compileChecked` rejects a root whose parameter or result
+  type holds a memory array, a slice or a memref anywhere, through type arguments, tuples,
+  function types and the payloads of the enums it names (`Error.rootWithoutPublicValue`).
 - **Other option: a new public value form**, a list of elements, for array arguments and results.
 - **Upstream.** [The ABI of `T[]`](#abi).
 - **Statements under the decision.** None.
