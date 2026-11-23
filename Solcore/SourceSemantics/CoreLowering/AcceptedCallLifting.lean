@@ -926,8 +926,10 @@ bodies: at a call of a given size, the callee body's derivation is smaller, and
 its lifting below that size gives the staged global application. A
 conversion's and a builtin closure call's original rule applies the builtin as
 the staged rule does, a reference to a builtin closure is the staged atomic
-value, a mapping index's original rules give the staged index outcome, and a
-tuple's original rule packs its elements' values as the staged rule does.
+value, a mapping index's original rules give the staged index outcome, a
+tuple's original rule packs its elements' values as the staged rule does, and
+an array form's original rules evaluate its children in the order of the
+staged rule and take its step.
 Inside one
 body, a nested site is lifted by induction on the site, over the sized
 derivations of its operands, branches, elements and arguments. The admitted
@@ -1329,6 +1331,58 @@ theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         (arguments_value (registry := registry) arguments (by
           simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
           omega) evaluated)
+  | @array id form site _ children =>
+    intro size context environment before after value within trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.found site.coercions
+      (CellAwareInvocationAcceptedArraySites.not_local site) trace
+    have occurrence : Staging.Recursive.Occurrence scope id form :=
+      ⟨site.node, lookupExpression?_sound site.found, site.formEq, site.requirements, site.coercions⟩
+    rw [site.formEq, site.requirements] at raw
+    cases site.shape with
+    | arrayLength base =>
+      cases raw with
+      | arrayLength _ first counted =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (children base (by simp [Staging.Recursive.arrayChildren]) (by omega) first) .nil)
+          (.arrayLength counted)
+    | arrayIndex base subscript =>
+      cases raw with
+      | arrayIndex _ first second reads =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (children base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (.cons (children subscript (by simp [Staging.Recursive.arrayChildren]) (by omega) second) .nil))
+          (.arrayIndex reads)
+    | arraySlice base start stop =>
+      cases raw with
+      | arraySlice _ first bounds counted chosen ordered inside =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (children base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (arguments_value (registry := registry) (ids := start.toList ++ stop.toList)
+              (fun bound member => children bound (List.mem_cons_of_mem _ member)) (by omega) bounds))
+          (.arraySlice counted chosen ordered inside)
+    | newArray length _ =>
+      cases raw with
+      | newArray _ first fits default allocates =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (children length (by simp [Staging.Recursive.arrayChildren]) (by omega) first) .nil)
+          (.newArray fits default allocates)
+    | arrayLiteral _ _ =>
+      cases raw with
+      | arrayLiteral _ evaluated allocates =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (arguments_value (registry := registry) children (by omega) evaluated) (.arrayLiteral allocates)
+    | @toArray _ _ slice _ _ _ _ _ _ _ =>
+      cases raw with
+      | toArray _ first copies allocates =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (children slice (by simp [Staging.Recursive.arrayChildren]) (by omega) first) .nil)
+          (.toArray copies allocates)
 
 /-- The value lifting of every nested site below a size, given the lifting of
 the callee bodies below it. -/
@@ -2037,6 +2091,115 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
           simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
           omega) signatures expressible failed)
     | constructorMetadata _ metadata => exact .constructorMetadataFault occurrence metadata
+  | @array id form site childrenNested children =>
+    intro size context environment before after reason within signatures expressible trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (CellAwareInvocationAcceptedArraySites.not_local site) trace
+    have occurrence : Staging.Recursive.Occurrence scope id form :=
+      ⟨site.node, lookupExpression?_sound site.found, site.formEq, site.requirements, site.coercions⟩
+    rw [site.formEq, site.requirements] at raw
+    have values : ∀ other ∈ (Staging.Recursive.arrayChildren form).getD [], ∀ {size : Nat}
+        {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+        {value : Dynamic.Value}, size ≤ bound →
+        SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment
+          before other value after →
+        Staging.Recursive.Expression program registry scope context environment before other (.value value)
+          after :=
+      fun other member => nested_value prepared unique bodies (childrenNested other member)
+    cases site.shape with
+    | arrayLength base =>
+      cases raw with
+      | arrayLengthBase _ failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayFault occurrence rfl
+          (.headFault (children base (by simp [Staging.Recursive.arrayChildren]) (by omega) signatures expressible
+            failed))
+    | arrayIndex base subscript =>
+      cases raw with
+      | arrayIndexBase _ failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayFault occurrence rfl
+          (.headFault (children base (by simp [Staging.Recursive.arrayChildren]) (by omega) signatures expressible
+            failed))
+      | arrayIndexIndex _ first failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayFault occurrence rfl
+          (.tailFault (values base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (.headFault (children subscript (by simp [Staging.Recursive.arrayChildren]) (by omega) signatures
+              expressible failed)))
+      | arrayIndexType _ first second notWord actual =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (values base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (.cons (values subscript (by simp [Staging.Recursive.arrayChildren]) (by omega) second) .nil))
+          (.arrayIndexType notWord actual)
+      | arrayIndexOutOfBounds _ first second outside =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (values base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (.cons (values subscript (by simp [Staging.Recursive.arrayChildren]) (by omega) second) .nil))
+          (.arrayIndexOutOfBounds outside)
+    | arraySlice base start stop =>
+      cases raw with
+      | arraySliceBase _ failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayFault occurrence rfl
+          (.headFault (children base (by simp [Staging.Recursive.arrayChildren]) (by omega) signatures expressible
+            failed))
+      | arraySliceBounds _ first failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayFault occurrence rfl
+          (.tailFault (values base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (arguments_fault (ids := start.toList ++ stop.toList)
+              (fun bound member => values bound (List.mem_cons_of_mem _ member))
+              (fun bound member => children bound (List.mem_cons_of_mem _ member)) (by omega) signatures
+              expressible failed))
+      | arraySliceBoundType _ first bounds member notWord actual =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (values base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (CellAwareInvocationAcceptedCallLifting.arguments_value (registry := registry)
+              (ids := start.toList ++ stop.toList)
+              (fun bound member => values bound (List.mem_cons_of_mem _ member)) (by omega) bounds))
+          (.arraySliceBoundType member notWord actual)
+      | arraySliceOutOfBounds _ first bounds counted chosen outside =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (values base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (CellAwareInvocationAcceptedCallLifting.arguments_value (registry := registry)
+              (ids := start.toList ++ stop.toList)
+              (fun bound member => values bound (List.mem_cons_of_mem _ member)) (by omega) bounds))
+          (.arraySliceOutOfBounds counted chosen outside)
+    | newArray length _ =>
+      cases raw with
+      | newArrayLength _ failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayFault occurrence rfl
+          (.headFault (children length (by simp [Staging.Recursive.arrayChildren]) (by omega) signatures
+            expressible failed))
+      | newArrayLengthType _ first notWord actual =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (values length (by simp [Staging.Recursive.arrayChildren]) (by omega) first) .nil)
+          (.newArrayLengthType notWord actual)
+      | newArrayTooLong _ first tooLong =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (values length (by simp [Staging.Recursive.arrayChildren]) (by omega) first) .nil)
+          (.newArrayTooLong tooLong)
+    | arrayLiteral _ _ =>
+      cases raw with
+      | arrayLiteralElements _ failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayFault occurrence rfl
+          (arguments_fault values children (by omega) signatures expressible failed)
+    | @toArray _ _ slice _ _ _ _ _ _ _ =>
+      cases raw with
+      | toArraySlice _ failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayFault occurrence rfl
+          (.headFault (children slice (by simp [Staging.Recursive.arrayChildren]) (by omega) signatures
+            expressible failed))
 
 /-- The fault lifting of every nested site below a size, given that the
 Source's direct calls have plain callees and the value and fault liftings of

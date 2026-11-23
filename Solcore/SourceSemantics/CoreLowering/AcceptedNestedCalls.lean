@@ -7,12 +7,14 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationArrayCe
 Extends the expression closure of named-row bodies to direct calls at every
 expression position: inside operators, conditionals, groups and pairs, and as
 the arguments of other direct calls, and to the builtin conversions, the
-mapping indices, the builtin closures and their calls, tuples beyond pairs and
-constructor applications there. Closes a family of such rows by one strong induction on the grade.
+mapping indices, the builtin closures and their calls, tuples beyond pairs,
+constructor applications and the memory array forms there. Closes a family of such rows by one strong induction on the grade.
 
 Main declarations:
 - `CellAwareInvocationAcceptedTupleSites.TupleSite`, a tuple of more than two
   elements as a compiler site;
+- `CellAwareInvocationAcceptedArraySites.ArraySite`, a memory array form of a
+  shape the heads take as a compiler site;
 - `CellAwareInvocationAcceptedNestedTrees.Nested`, the sites, and
   `CellAwareInvocationAcceptedNestedTrees.NestedTree`, their receipt trees;
 - `CellAwareInvocationAcceptedNestedTrees.of_nested`, the receipt tree from the
@@ -147,11 +149,219 @@ end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedTupleSites
 end
 
 section
+/-! Memory array forms in named-row bodies as compiler sites, of the shapes the
+heads take: a length, a read, a slice, `new`, a literal and `toArray` of a
+slice made on the spot of an array. A site has no coercions or requirements, is
+not a generalized initializer and lies in a row without evidence assumptions,
+as a tuple's, so the named policy declines it and reads it as the compatible
+reader. The arrays that `new` and a literal allocate have their default
+elements' layouts registered in the catalog (`defaultLayouts?`), and a literal
+has fewer than `2^256` elements. `arraySite?` recognizes one on an actually
+compiled row. -/
+set_option autoImplicit false
+set_option Elab.async false
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedArraySites
+open Core Frontend SourceInference
+open CallableIndexedNamedGeneration (Prepared Compilation context representation)
+open GeneralizedLocalInitializerCompilation (namedPolicy)
+
+/-- The array forms the heads take. -/
+inductive Shape (checked : SourceCoreCompatibleCatalog.Checked) (source : TypedSource) : ExpressionForm → Prop where
+  | arrayLength (base : ExpressionId) : Shape checked source (.arrayLength base)
+  | arrayIndex (base index : ExpressionId) : Shape checked source (.arrayIndex base index)
+  | arraySlice (base : ExpressionId) (start stop : Option ExpressionId) :
+      Shape checked source (.arraySlice base start stop)
+  | newArray {element : TypeSystem.Ty} (length : ExpressionId)
+      (layouts : CellAwareArrayCells.DefaultLayouts checked.catalog checked.catalog.definitions
+        (TypeSystem.Ty.array element)) :
+      Shape checked source (.newArray element length)
+  | arrayLiteral {element : TypeSystem.Ty} {elements : List ExpressionId} (short : elements.length < wordModulus)
+      (layouts : CellAwareArrayCells.DefaultLayouts checked.catalog checked.catalog.definitions
+        (TypeSystem.Ty.array element)) :
+      Shape checked source (.arrayLiteral element elements)
+  | toArray {element arrayElement : TypeSystem.Ty} {slice base : ExpressionId} {start stop : Option ExpressionId}
+      {sliceNode : ExpressionNode} (sliceFound : source.lookupExpression? slice = some sliceNode)
+      (sliceForm : sliceNode.form = .arraySlice base start stop)
+      (sliceType : sliceNode.type = TypeSystem.Ty.arraySlice (TypeSystem.Ty.array arrayElement)) :
+      Shape checked source (.toArray element slice)
+
+/-- A memory array form in a named-row body, of a shape the heads take. -/
+structure ArraySite {checked : SourceCoreCompatibleCatalog.Checked}
+    (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
+    (source : TypedSource) (id : ExpressionId) (form : ExpressionForm) where
+  node : ExpressionNode
+  found : source.lookupExpression? id = some node
+  formEq : node.form = form
+  shape : Shape checked source form
+  coercions : node.coercions = []
+  requirements : node.requirements = []
+  notInitializer : prepared.base.locals.bindings.find? (fun binding =>
+    decide (binding.caller = named.signature.key ∧ binding.initializer = id)) = none
+  assumptions : named.specialized.assumptions = []
+
+variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+  {named : SourceCoreGeneralFunctions.Function} {source : TypedSource} {id : ExpressionId}
+  {form : ExpressionForm}
+
+/-- An array site is not a local read. -/
+theorem not_local (site : ArraySite prepared named source id form) (name : String) (binder : Resolved.LocalId) :
+    site.node.form ≠ .reference name (.local binder) := by
+  rw [site.formEq]
+  cases site.shape <;> intro same <;> cases same
+
+theorem contextual (site : ArraySite prepared named source id form) :
+    SourceCoreGeneralFunctions.contextualSource prepared.base.sourceProgram
+      (context prepared named).plan prepared.base.locals named.signature.key none source id = .ok source := by
+  have formEq := site.formEq
+  cases site.shape <;> simp [SourceCoreGeneralFunctions.contextualSource, site.found, formEq]
+
+private theorem ordinary_nil {node : ExpressionNode} (requirements : node.requirements = [])
+    (coercions : node.coercions = []) : SourceCompilationPlan.ordinaryOwnedRequirements? node = some [] := by
+  unfold SourceCompilationPlan.ordinaryOwnedRequirements?
+  rw [requirements, coercions]
+  rfl
+
+private theorem evidence_none (site : ArraySite prepared named source id form)
+    (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat) (scope : SourceCoreLocalCell.Scope)
+    (reasonAt : ExpressionId → Word) :
+    SourceCoreEvidence.lowerWithProjector prepared.base.sourceProgram
+      ((representation prepared).atContext named.signature.key []).expressions.projectType
+      named.specialized (context prepared named) child budget source scope id reasonAt
+      (SourceCoreGeneralFunctions.callablePolicy prepared.base.callableContext []) = .ok none := by
+  have formEq := site.formEq
+  cases site.shape <;>
+    simp [SourceCoreEvidence.lowerWithProjector, ordinary_nil site.requirements site.coercions, site.found,
+      formEq, site.requirements, site.coercions, site.assumptions]
+
+variable {diagnostics : SourceCoreDataPlaceFaultSites.Program} {code : Expr}
+  (compiled : Compilation prepared named diagnostics code)
+
+/-- The named policy's special callback declines an array form. -/
+theorem special (site : ArraySite prepared named source id form) (rootFuel : Nat)
+    (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat) (scope : SourceCoreLocalCell.Scope)
+    (reasonAt : ExpressionId → Word) :
+    CallableIndexedOwnedContextualLambdaPolicyRecipes.special compiled rootFuel
+      (context prepared named) child budget source scope id reasonAt = .ok none := by
+  unfold CallableIndexedOwnedContextualLambdaPolicyRecipes.special
+  have ownerEq : (context prepared named).owner = named.signature.key := rfl
+  simp only [ownerEq, contextual site, bind, Except.bind, pure, Except.pure, site.found,
+    site.notInitializer, Option.filter_none]
+  rw [evidence_none site child budget scope reasonAt]
+  have formEq := site.formEq
+  cases site.shape <;> simp [formEq]
+
+theorem read (site : ArraySite prepared named source id form) (rootFuel : Nat) :
+    (namedPolicy compiled rootFuel).readExpression source id =
+      SourceCoreCompatibleDataExpressions.readExpression checked source id := by
+  simp only [namedPolicy, contextual site, bind, Except.bind]
+  rfl
+
+/-- The layouts of an element type's defaults, checked on the catalog: each
+nested array's layout, down to a scalar. -/
+def defaultLayouts? (checked : SourceCoreCompatibleCatalog.Checked) : TypeSystem.Ty → Bool
+  | .application (.constructor (.builtin .memoryArray)) inner =>
+      (match checked.catalog.mappingLayout (.constructor (.builtin .word)) inner with
+        | .ok _ => true
+        | .error _ => false) && defaultLayouts? checked inner
+  | _ => true
+
+theorem defaultLayouts?_sound {type : TypeSystem.Ty} (checkedLayouts : defaultLayouts? checked type = true) :
+    CellAwareArrayCells.DefaultLayouts checked.catalog checked.catalog.definitions type := by
+  induction type using defaultLayouts?.induct with
+  | case1 inner ih =>
+    simp only [defaultLayouts?, Bool.and_eq_true] at checkedLayouts
+    obtain ⟨mapped, rest⟩ := checkedLayouts
+    cases layoutEq : checked.catalog.mappingLayout (.constructor (.builtin .word)) inner with
+    | error => simp [layoutEq] at mapped
+    | ok layout =>
+      obtain ⟨identified, keyProjected, valueProjected, registered⟩ :=
+        CompatibleEncoding.mappingLayout_facts layoutEq
+      refine .array (fun innerType identity projected identity' => ?_) (ih rest)
+      have sameValue := Except.ok.inj (projected.symm.trans valueProjected)
+      have sameIdentity := Option.some.inj (identity'.symm.trans identified)
+      simp only [SourceCoreCompatibleCatalog.Catalog.project, pure, Except.pure, Except.ok.injEq] at keyProjected
+      cases layout
+      simp only at sameValue sameIdentity keyProjected
+      subst sameValue sameIdentity keyProjected
+      exact registered
+  | case2 type notArray =>
+    exact .scalar fun inner same => notArray inner same
+
+/-- Proof-producing recognition of a memory array form of the row, of a shape
+the heads take. -/
+def arraySite? (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
+    (source : TypedSource) (id : ExpressionId) :
+    Option (Σ' (form : ExpressionForm), ArraySite prepared named source id form) :=
+  match found : source.lookupExpression? id with
+  | none => none
+  | some node =>
+    match coercions : node.coercions, requirements : node.requirements with
+    | [], [] =>
+      match initializer : prepared.base.locals.bindings.find? (fun binding =>
+          decide (binding.caller = named.signature.key ∧ binding.initializer = id)) with
+      | some _ => none
+      | none =>
+        match assumptions : named.specialized.assumptions with
+        | _ :: _ => none
+        | [] =>
+          match form : node.form with
+          | .arrayLength base =>
+            some ⟨_, ⟨node, found, form, .arrayLength base, coercions, requirements, initializer, assumptions⟩⟩
+          | .arrayIndex base index =>
+            some ⟨_, ⟨node, found, form, .arrayIndex base index, coercions, requirements, initializer,
+              assumptions⟩⟩
+          | .arraySlice base start stop =>
+            some ⟨_, ⟨node, found, form, .arraySlice base start stop, coercions, requirements, initializer,
+              assumptions⟩⟩
+          | .newArray element length =>
+            if layouts : defaultLayouts? checked (TypeSystem.Ty.array element) = true then
+              some ⟨_, ⟨node, found, form, .newArray length (defaultLayouts?_sound layouts), coercions,
+                requirements, initializer, assumptions⟩⟩
+            else none
+          | .arrayLiteral element elements =>
+            if short : elements.length < wordModulus then
+              if layouts : defaultLayouts? checked (TypeSystem.Ty.array element) = true then
+                some ⟨_, ⟨node, found, form, .arrayLiteral short (defaultLayouts?_sound layouts), coercions,
+                  requirements, initializer, assumptions⟩⟩
+              else none
+            else none
+          | .toArray _element slice =>
+            match sliceFound : source.lookupExpression? slice with
+            | none => none
+            | some sliceNode =>
+              match sliceForm : sliceNode.form, sliceType : sliceNode.type with
+              | .arraySlice _base _start _stop, .application (.constructor (.builtin .arraySlice))
+                  (.application (.constructor (.builtin .memoryArray)) _arrayElement) =>
+                some ⟨_, ⟨node, found, form, .toArray sliceFound sliceForm sliceType, coercions, requirements,
+                  initializer, assumptions⟩⟩
+              | _, _ => none
+          | _ => none
+    | _, _ => none
+
+/-- An array site depends on its row only through the row's key and its empty
+assumptions. -/
+def transport {first second : SourceCoreGeneralFunctions.Function}
+    (keyEq : first.signature.key = second.signature.key) (assumptions : second.specialized.assumptions = [])
+    (site : ArraySite prepared first source id form) : ArraySite prepared second source id form where
+  node := site.node
+  found := site.found
+  formEq := site.formEq
+  shape := site.shape
+  coercions := site.coercions
+  requirements := site.requirements
+  notInitializer := keyEq ▸ site.notInitializer
+  assumptions := assumptions
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedArraySites
+end
+
+section
 /-! Direct calls and conversions inside the expressions of named-row bodies.
 `Nested` closes the first subset's forms, direct calls, builtin conversions,
-calls of builtin closures and tuples under one another: every operand, branch,
-pair and tuple element, every argument of a direct call or of a closure, and
-the argument of a conversion is again a `Nested` site.
+calls of builtin closures, tuples and the memory array forms under one another:
+every operand, branch, pair and tuple element, every argument of a direct call
+or of a closure, the argument of a conversion and every child of an array form
+is again a `Nested` site.
 `NestedTree` keeps the first subset's receipts at its forms, the direct-call
 receipts of `CellAwareInvocationAcceptedCallTrees.CallTree` at its calls, and
 the node's metadata at `word` at its conversions. A call's argument receipts
@@ -175,6 +385,7 @@ open CellAwareInvocationAcceptedConversionSites (ConversionSite)
 open CellAwareInvocationAcceptedBuiltinSites (BuiltinSite)
 open CellAwareInvocationAcceptedTupleSites (TupleSite)
 open CellAwareInvocationAcceptedConstructorSites (ConstructorSite)
+open CellAwareInvocationAcceptedArraySites (ArraySite)
 open CallableIndexedOwnedPreparedStagedDirectCallCertificates (Receipt Monomorphic)
 open CallableIndexedOwnedPreparedStagedDirectCallAuthority (Port)
 
@@ -183,7 +394,9 @@ children, direct calls with nested arguments whose instantiation the caller's
 family admits, builtin conversions with a nested argument, mapping indices
 with a nested base and key, references to builtin closures, calls of
 builtin closures with nested arguments, tuples of more than two nested
-elements, and constructor applications with nested arguments. -/
+elements, constructor applications with nested arguments, and array forms of
+the heads' shapes with nested children, in the order the Source evaluates
+them. -/
 inductive Nested {checked : SourceCoreCompatibleCatalog.Checked}
     (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
     (source : TypedSource) (called : DeclarationInstantiation → Prop) : ExpressionId → Prop where
@@ -227,6 +440,10 @@ inductive Nested {checked : SourceCoreCompatibleCatalog.Checked}
       Nested prepared named source called id
   | constructor {id instantiation ids} (site : ConstructorSite prepared named source id instantiation ids)
       (arguments : ∀ argument ∈ ids, Nested prepared named source called argument) :
+      Nested prepared named source called id
+  | array {id form} (site : ArraySite prepared named source id form)
+      (children : ∀ child ∈ (Staging.Recursive.arrayChildren form).getD [],
+        Nested prepared named source called child) :
       Nested prepared named source called id
 
 /-- Static receipts at nested sites. The forms of the first subset keep the
@@ -526,6 +743,7 @@ theorem nested_found {id : ExpressionId} (nested : Nested prepared named source 
   | builtin site _ => exact ⟨_, site.found⟩
   | tuple site _ => exact ⟨_, site.found⟩
   | constructor site _ => exact ⟨_, site.found⟩
+  | array site _ => exact ⟨_, site.found⟩
 
 end Embedding
 
@@ -748,6 +966,48 @@ theorem zip_of_rel {α β : Type} {relation : α → β → Prop} :
     rcases member with rfl | member
     · exact head
     · exact ih.2 pair member
+
+/-- The Core type of a slice of a memory array is a view inside one slice. -/
+private theorem slice_shape {catalog : SourceCoreCompatibleCatalog.Catalog} {arrayElement : TypeSystem.Ty}
+    {type : Ty} {depth : Nat} {layout : OrderedMapping.Layout}
+    (projected : catalog.project (TypeSystem.Ty.arraySlice (TypeSystem.Ty.array arrayElement)) = .ok type)
+    (shaped : SourceCoreDataExpressions.viewShape? type = some (depth + 1, layout)) :
+    depth = 0 ∧ ∃ valueType dataType, layout = ⟨.word, valueType, dataType⟩ := by
+  cases elementEq : catalog.project arrayElement with
+  | error reason =>
+    simp [TypeSystem.Ty.arraySlice, TypeSystem.Ty.array, SourceCoreCompatibleCatalog.Catalog.project,
+      SourceCoreRawMetadata.runtimeType, elementEq, bind, Except.bind] at projected
+  | ok elementType =>
+    cases identified : catalog.identity? (.mapping (.constructor (.builtin .word)) arrayElement) with
+    | none =>
+      simp [TypeSystem.Ty.arraySlice, TypeSystem.Ty.array, SourceCoreCompatibleCatalog.Catalog.project,
+        SourceCoreRawMetadata.runtimeType, elementEq, identified, bind, Except.bind, throw, throwThe] at projected
+    | some identity =>
+      simp only [TypeSystem.Ty.arraySlice, TypeSystem.Ty.array, SourceCoreCompatibleCatalog.Catalog.project,
+        SourceCoreRawMetadata.runtimeType, elementEq, identified, bind, Except.bind, pure, Except.pure,
+        Except.ok.injEq] at projected
+      subst type
+      have computed : SourceCoreDataExpressions.viewShape?
+          (.product (.cell (.product .word (.product elementType (.namedData identity)))) (.product .word .word)) =
+          some (0 + 1, ⟨.word, elementType, identity⟩) := rfl
+      rw [computed] at shaped
+      cases shaped
+      exact ⟨rfl, _, _, rfl⟩
+
+private theorem bound_some {lower : ExpressionId → Except SourceCoreBasic.Error SourceCoreBasic.LoweredExpr}
+    {bound : ExpressionId} {codes : Option SourceCoreBasic.LoweredExpr}
+    (mapped : (some bound).mapM lower = .ok codes) : ∃ code, lower bound = .ok code ∧ codes = some code := by
+  rw [Option.mapM_some] at mapped
+  cases generated : lower bound with
+  | error reason => rw [generated] at mapped; cases mapped
+  | ok code => rw [generated] at mapped; cases mapped; exact ⟨code, rfl, rfl⟩
+
+private theorem bound_none {lower : ExpressionId → Except SourceCoreBasic.Error SourceCoreBasic.LoweredExpr}
+    {codes : Option SourceCoreBasic.LoweredExpr}
+    (mapped : (none : Option ExpressionId).mapM lower = .ok codes) : codes = none := by
+  rw [Option.mapM_none] at mapped
+  cases mapped
+  rfl
 
 /-- The accepted named compiler yields the nested receipt tree at every nested
 site. A call's authority is the input `ports`, as for extended roots. -/
@@ -1068,6 +1328,152 @@ theorem of_nested {id : ExpressionId}
       obtain ⟨lengths, each⟩ := zip_of_rel relation
       exact .constructor receipt site.form site.ranges lengths
         (fun argument member => nested_found (arguments argument member)) each
+  | @array id form site children ih =>
+    have same := Option.some.inj (site.found.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      have special := fun child budget =>
+        CellAwareInvocationAcceptedArraySites.special generation site rootFuel child budget scope reasonAt
+      have read := CellAwareInvocationAcceptedArraySites.read generation site rootFuel
+      have leaf := (GeneralizedLocalInitializerCompilation.namedPolicy_recipe generation rootFuel).leafLowerer
+      have formEq := site.formEq
+      have lift : ∀ {child : ExpressionId} {childType : TypeSystem.Ty} {code : SourceCoreBasic.LoweredExpr},
+          child ∈ (Staging.Recursive.arrayChildren form).getD [] →
+          ExpressionHasType source sourceContext child childType →
+          SourceCoreFunctions.lowerExpressionWithPolicy (namedPolicy generation rootFuel) (namedLowerBody generation)
+            fuel (context whole.indexed named) source scope child reasonAt = .ok code →
+          ∃ childNode, source.lookupExpression? child = some childNode ∧
+            NestedTree whole headers called (context whole.indexed named) whole.indexed.fuel
+              (context whole.indexed named).solvedRequirements source sourceContext reasonAt scope child code := by
+        intro child childType code member childTyped generated
+        obtain ⟨childNode, contains, nodeType⟩ := childTyped.stored_type
+        have childFound := lookupExpression?_complete unique contains
+        rw [← nodeType] at childTyped
+        exact ⟨childNode, childFound, ih child member childFound childTyped generated⟩
+      cases site.shape with
+      | arrayLength base =>
+        obtain ⟨first, metadata, firstGenerated, code⟩ :=
+          CompatibleExpressionArrays.arrayLength_of_functions (policy := namedPolicy generation rootFuel)
+            (body := namedLowerBody generation) (context := context whole.indexed named)
+            (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt)
+            site.found special read leaf accepted formEq
+        obtain ⟨_, _, _, baseTyped, _⟩ :=
+          CellAwareInvocationArrayBounds.length_source_types unique site.found formEq site.coercions typed
+        obtain ⟨_, baseFound, baseTree⟩ :=
+          lift (by simp [Staging.Recursive.arrayChildren]) baseTyped firstGenerated
+        exact .arrayLength metadata formEq baseFound code baseTree
+      | arrayIndex base subscript =>
+        obtain ⟨depth, layout, comparison, first, second, rfl, metadata, firstGenerated, shaped, secondGenerated,
+            _, prepared⟩ :=
+          CompatibleExpressionArrays.arrayIndex_of_functions (policy := namedPolicy generation rootFuel)
+            (body := namedLowerBody generation) (context := context whole.indexed named)
+            (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt)
+            site.found special read leaf accepted formEq
+        obtain ⟨_, _, baseTyped, _, subscriptTyped, _⟩ :=
+          CellAwareInvocationArrayBounds.index_source_types unique site.found formEq site.coercions typed
+        obtain ⟨_, baseFound, baseTree⟩ :=
+          lift (by simp [Staging.Recursive.arrayChildren]) baseTyped firstGenerated
+        obtain ⟨_, subscriptFound, subscriptTree⟩ :=
+          lift (by simp [Staging.Recursive.arrayChildren]) subscriptTyped secondGenerated
+        exact .arrayIndex metadata formEq baseFound subscriptFound shaped prepared baseTree subscriptTree
+      | arraySlice base start stop =>
+        obtain ⟨depth, layout, first, starts, stops, rfl, metadata, firstGenerated, shaped, startsGenerated,
+            stopsGenerated, _⟩ :=
+          CompatibleExpressionArrays.arraySlice_of_functions (policy := namedPolicy generation rootFuel)
+            (body := namedLowerBody generation) (context := context whole.indexed named)
+            (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt)
+            site.found special read leaf accepted formEq
+        obtain ⟨_, _, _, baseTyped, boundsTyped⟩ :=
+          CellAwareInvocationArrayBounds.slice_source_types unique site.found formEq site.coercions typed
+        obtain ⟨_, baseFound, baseTree⟩ :=
+          lift (by simp [Staging.Recursive.arrayChildren]) baseTyped firstGenerated
+        have bound : ∀ {bound : ExpressionId} {code : SourceCoreBasic.LoweredExpr},
+            bound ∈ start.toList ++ stop.toList →
+            SourceCoreFunctions.lowerExpressionWithPolicy (namedPolicy generation rootFuel)
+              (namedLowerBody generation) fuel (context whole.indexed named) source scope bound reasonAt = .ok code →
+            ∃ boundNode, source.lookupExpression? bound = some boundNode ∧
+              NestedTree whole headers called (context whole.indexed named) whole.indexed.fuel
+                (context whole.indexed named).solvedRequirements source sourceContext reasonAt scope bound code := by
+          intro bound code member generated
+          obtain ⟨_, boundFound⟩ := nested_found (children bound (List.mem_cons_of_mem _ member))
+          exact lift (List.mem_cons_of_mem _ member)
+            (CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique boundsTyped member
+              boundFound) generated
+        cases start with
+        | none =>
+          cases bound_none startsGenerated
+          cases stop with
+          | none =>
+            cases bound_none stopsGenerated
+            exact .sliceWhole metadata formEq baseFound shaped baseTree
+          | some stop =>
+            obtain ⟨stopCode, stopGenerated, rfl⟩ := bound_some stopsGenerated
+            obtain ⟨_, stopFound, stopTree⟩ := bound (by simp) stopGenerated
+            exact .sliceTo metadata formEq baseFound stopFound shaped baseTree stopTree
+        | some start =>
+          obtain ⟨startCode, startGenerated, rfl⟩ := bound_some startsGenerated
+          obtain ⟨_, startFound, startTree⟩ := bound (by simp) startGenerated
+          cases stop with
+          | none =>
+            cases bound_none stopsGenerated
+            exact .sliceFrom metadata formEq baseFound startFound shaped baseTree startTree
+          | some stop =>
+            obtain ⟨stopCode, stopGenerated, rfl⟩ := bound_some stopsGenerated
+            obtain ⟨_, stopFound, stopTree⟩ := bound (by simp) stopGenerated
+            exact .sliceRange metadata formEq baseFound startFound stopFound shaped baseTree startTree stopTree
+      | @newArray element length layouts =>
+        obtain ⟨payload, identity, default, first, rfl, metadata, projectedArray, defined, firstGenerated, _⟩ :=
+          CompatibleExpressionArrays.newArray_of_functions (policy := namedPolicy generation rootFuel)
+            (body := namedLowerBody generation) (context := context whole.indexed named)
+            (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt)
+            site.found special read leaf accepted formEq
+        obtain ⟨_, _, lengthTyped⟩ :=
+          CellAwareInvocationArrayBounds.new_source_types unique site.found formEq site.coercions typed
+        obtain ⟨_, lengthFound, lengthTree⟩ :=
+          lift (by simp [Staging.Recursive.arrayChildren]) lengthTyped firstGenerated
+        exact .newArray metadata formEq lengthFound projectedArray defined
+          (layouts.extend (CallableIndexedAmbient.ambientDefinitions whole.indexed).basePrefix) lengthTree
+      | @arrayLiteral element elements short layouts =>
+        obtain ⟨payload, identity, default, codes, rfl, metadata, projectedArray, defined, generated, codeTypes⟩ :=
+          CompatibleExpressionArrays.arrayLiteral_of_functions (policy := namedPolicy generation rootFuel)
+            (body := namedLowerBody generation) (context := context whole.indexed named)
+            (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt)
+            site.found special read leaf accepted formEq
+        obtain ⟨_, typing⟩ :=
+          CellAwareInvocationArrayBounds.literal_source_types unique site.found formEq site.coercions typed
+        have relation := argument_rel
+          (relation := fun value lowered => NestedTree whole headers called (context whole.indexed named)
+            whole.indexed.fuel (context whole.indexed named).solvedRequirements source sourceContext reasonAt scope
+            value lowered)
+          (fun value member {lowered} valueGenerated => by
+            obtain ⟨_, valueFound⟩ := nested_found (children value member)
+            obtain ⟨_, _, tree⟩ := lift member
+              (CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique typing member
+                valueFound) valueGenerated
+            exact tree)
+          generated
+        obtain ⟨lengths, each⟩ := zip_of_rel relation
+        exact .arrayLiteral metadata formEq lengths (fun value member => nested_found (children value member))
+          codeTypes short projectedArray defined
+          (layouts.extend (CallableIndexedAmbient.ambientDefinitions whole.indexed).basePrefix) each
+      | @toArray element arrayElement slice sliceBase sliceStart sliceStop sliceNode sliceFound sliceForm
+          sliceType =>
+        obtain ⟨depth, layout, comparison, first, rfl, metadata, firstGenerated, shaped, prepared⟩ :=
+          CompatibleExpressionArrays.toArray_of_functions (policy := namedPolicy generation rootFuel)
+            (body := namedLowerBody generation) (context := context whole.indexed named)
+            (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt)
+            site.found special read leaf accepted formEq
+        obtain ⟨_, _, sliceTyped, _⟩ :=
+          CellAwareInvocationArrayBounds.copy_source_types unique site.found formEq site.coercions typed
+        obtain ⟨_, sliceFound', sliceTree⟩ :=
+          lift (by simp [Staging.Recursive.arrayChildren]) sliceTyped firstGenerated
+        cases Option.some.inj (sliceFound'.symm.trans sliceFound)
+        have sliceProjected := projected sliceTree sliceFound
+        rw [sliceType] at sliceProjected
+        obtain ⟨rfl, valueType, dataType, rfl⟩ := slice_shape sliceProjected shaped
+        exact .copy metadata formEq sliceFound sliceForm shaped prepared sliceTree
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedTrees
 end
@@ -2549,10 +2955,16 @@ def nested? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared
               pure ⟨.tuple site elements⟩
             | none =>
               match CellAwareInvocationAcceptedConstructorSites.constructorSite? prepared named source id with
-              | none => none
               | some ⟨_instantiation, ids, site⟩ => do
                 let ⟨arguments⟩ ← all? (nested? prepared named source called fuel) ids
                 pure ⟨.constructor site arguments⟩
+              | none =>
+                match CellAwareInvocationAcceptedArraySites.arraySite? prepared named source id with
+                | none => none
+                | some ⟨form, site⟩ => do
+                  let ⟨children⟩ ← all? (nested? prepared named source called fuel)
+                    ((Staging.Recursive.arrayChildren form).getD [])
+                  pure ⟨.array site children⟩
 
 /-- An expression node of the check: a nested site, a reference site, or the
 callee of a conversion. -/
@@ -2649,6 +3061,8 @@ theorem transport {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Pr
     exact .tuple (CellAwareInvocationAcceptedTupleSites.transport keyEq assumptions site) elements
   | constructor site _ arguments =>
     exact .constructor (CellAwareInvocationAcceptedConstructorSites.transport keyEq assumptions site) arguments
+  | array site _ children =>
+    exact .array (CellAwareInvocationAcceptedArraySites.transport keyEq assumptions site) children
 
 /-- A named row whose every expression node is a nested site, a reference site
 or a conversion's callee has every accepted expression a nested site. -/
