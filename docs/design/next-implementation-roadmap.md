@@ -180,11 +180,11 @@ The last two are recorded without investigation, and the generators avoid them.
    a program resolves past them. A plain import of `std.opcodes` names the module `opcodes` and
    `std.opcodes`, and a namespace import by its alias: under them the 26 pure functions are
    builtins in calls and as values, and the others are refused where they are used. The load
-   follows upstream's export checks (`SC0113` to `SC0115`, `SC0111`) and `SC0116`, std's
-   modules by their export tables. Still accepted are two modules exported under one alias
-   (`SC0112`) and, as Lean's std tables hold neither, a constructor selection on a std type and
-   a std name exported beside another origin's. A std name that a user module re-exports
-   reaches no importer.
+   follows upstream's export checks (`SC0111` to `SC0115`) and `SC0116`, std's modules by
+   their export tables, which hold each std name's origin and the constructors a std type
+   shows. A std name that a user module re-exports binds on through its importers,
+   `std.opcodes`' functions to their builtins. Next come a qualified function as a value and
+   a nested plain import's full path, which upstream accepts.
 
 ### Then
 
@@ -250,16 +250,16 @@ below come from running upstream's own test programs through Lean's native front
 
 - **Lean follows upstream.** Done: an unqualified constructor head in a pattern (`case None`)
   is refused unless it is a same-name or builtin constructor, a same-name constructor may be
-  written bare in an expression, upstream's primitive `primAddWord` is a name for the
-  builtin, and a match is exhaustive where its arms together cover the scrutinee's type, a
+  written bare in an expression, a call of a name that a function or a builtin takes calls it
+  before a constructor that shares its type's name, as a bare name does, upstream's primitive
+  `primAddWord` is a name for the builtin, two modules exported under one alias are refused
+  (`SC0112`), and a match is exhaustive where its arms together cover the scrutinee's type, a
   tuple pattern in parentheses among them. To come, each as a checker rule:
-  - a call of a name that is both a function and a same-name constructor calls the function;
   - `.true` and `.false`, an unannotated lambda's result, and `returns (a, b)` for a trait's
     one tuple result are accepted;
   - a weak trait argument is taken from the one implementation that fixes it;
   - a type parameter that nothing fixes (`SC0299`) and statements after a `return` (`SC0222`)
-    are refused;
-  - two modules exported under one alias are refused (`SC0112`).
+    are refused.
 - **Lean keeps its own rule:**
   - mutually recursive data is accepted, as directly recursive data is;
   - a binder repeated in one pattern and cyclic superclasses are refused;
@@ -280,8 +280,9 @@ below come from running upstream's own test programs through Lean's native front
   implementation, as upstream runs it.
 - **To measure first:** the spellings `Word`, `Bool` and `Unit` beside `word`, `bool` and `()`,
   two functions of one name (`SC0108`), a runtime value at a `comptime` parameter (`SC0240`),
-  and compound assignment at a type variable or at a program's own type, which Lean refuses
-  where upstream runs the implementation.
+  and two uses that Lean refuses where upstream runs the implementation: compound assignment
+  at a type variable or at a program's own type, and an operator in generic code whose trait
+  an import renames.
 
 ## Handoff rules
 
