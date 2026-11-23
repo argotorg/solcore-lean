@@ -150,8 +150,8 @@ end
 
 section
 /-! Memory array forms in named-row bodies as compiler sites, of the shapes the
-heads take: a length, a read, a slice, `new`, a literal and `toArray` of a
-slice made on the spot of an array. A site has no coercions or requirements, is
+heads take: a length, a read, a slice, `new`, a literal, `toArray` of a slice
+made on the spot of an array, and `lidx(a, i)`. A site has no coercions or requirements, is
 not a generalized initializer and lies in a row without evidence assumptions,
 as a tuple's, so the named policy declines it and reads it as the compatible
 reader. The arrays that `new` and a literal allocate have their default
@@ -169,6 +169,7 @@ open GeneralizedLocalInitializerCompilation (namedPolicy)
 inductive Shape (checked : SourceCoreCompatibleCatalog.Checked) (source : TypedSource) : ExpressionForm → Prop where
   | arrayLength (base : ExpressionId) : Shape checked source (.arrayLength base)
   | arrayIndex (base index : ExpressionId) : Shape checked source (.arrayIndex base index)
+  | elementRef (base index : ExpressionId) : Shape checked source (.elementRef base index)
   | arraySlice (base : ExpressionId) (start stop : Option ExpressionId) :
       Shape checked source (.arraySlice base start stop)
   | newArray {element : TypeSystem.Ty} (length : ExpressionId)
@@ -309,6 +310,9 @@ def arraySite? (prepared : Prepared checked) (named : SourceCoreGeneralFunctions
             some ⟨_, ⟨node, found, form, .arrayLength base, coercions, requirements, initializer, assumptions⟩⟩
           | .arrayIndex base index =>
             some ⟨_, ⟨node, found, form, .arrayIndex base index, coercions, requirements, initializer,
+              assumptions⟩⟩
+          | .elementRef base index =>
+            some ⟨_, ⟨node, found, form, .elementRef base index, coercions, requirements, initializer,
               assumptions⟩⟩
           | .arraySlice base start stop =>
             some ⟨_, ⟨node, found, form, .arraySlice base start stop, coercions, requirements, initializer,
@@ -886,6 +890,19 @@ inductive NestedTree (whole : SourceCoreUnifiedCompilation.Compiled)
       NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id ⟨.cell (.product .word (.product valueType (.namedData dataType))),
         SourceCoreDataExpressions.sliceCopy ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1) first.type
           first.expression⟩
+  | elementRef {id node base subscript baseNode subscriptNode layout first second}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node
+        (.product first.type .word))
+      (form : node.form = .elementRef base subscript)
+      (baseFound : source.lookupExpression? base = some baseNode)
+      (subscriptFound : source.lookupExpression? subscript = some subscriptNode)
+      (shaped : SourceCoreDataExpressions.viewShape? first.type = some (0, layout))
+      (baseTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope base
+        first)
+      (subscriptTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope
+        subscript second) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id
+        ⟨.product first.type .word, SourceCoreDataExpressions.elementRef layout first.expression second.expression⟩
   | memrefLoad {id node reference referenceNode base subscript baseNode subscriptNode layout comparison fuel first
       second}
       (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node layout.valueType)
@@ -1027,8 +1044,8 @@ theorem projected
     rcases code with ⟨_, _, rfl⟩ | ⟨_, _, rfl⟩ <;> exact metadata.projected
   | arrayIndex metadata _ _ _ _ _ _ _ | sliceRange metadata _ _ _ _ _ _ _ _ | sliceFrom metadata _ _ _ _ _ _
   | sliceTo metadata _ _ _ _ _ _ | sliceWhole metadata _ _ _ _ | newArray metadata _ _ _ _ _ _
-  | arrayLiteral metadata _ _ _ _ _ _ _ _ _ | copy metadata _ _ _ _ _ _ | memrefLoad metadata _ _ _ _ _ _ _ _ _
-  | memrefStore metadata _ _ _ _ _ _ _ _ _ _ _ _ =>
+  | arrayLiteral metadata _ _ _ _ _ _ _ _ _ | copy metadata _ _ _ _ _ _ | elementRef metadata _ _ _ _ _ _
+  | memrefLoad metadata _ _ _ _ _ _ _ _ _ | memrefStore metadata _ _ _ _ _ _ _ _ _ _ _ _ =>
     cases Option.some.inj (found.symm.trans metadata.found)
     exact metadata.projected
 
@@ -1616,6 +1633,19 @@ theorem of_nested {id : ExpressionId}
         obtain ⟨_, subscriptFound, subscriptTree⟩ :=
           lift (by simp [Staging.Recursive.arrayChildren]) subscriptTyped secondGenerated
         exact .arrayIndex metadata formEq baseFound subscriptFound shaped prepared baseTree subscriptTree
+      | elementRef base subscript =>
+        obtain ⟨layout, first, second, rfl, metadata, firstGenerated, shaped, secondGenerated, _⟩ :=
+          CompatibleExpressionArrays.elementRef_of_functions (policy := namedPolicy generation rootFuel)
+            (body := namedLowerBody generation) (context := context whole.indexed named)
+            (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt)
+            site.found special read leaf accepted formEq
+        obtain ⟨_, _, baseTyped, _, subscriptTyped, _⟩ :=
+          CellAwareInvocationArrayBounds.elementRef_source_types unique site.found formEq site.coercions typed
+        obtain ⟨_, baseFound, baseTree⟩ :=
+          lift (by simp [Staging.Recursive.arrayChildren]) baseTyped firstGenerated
+        obtain ⟨_, subscriptFound, subscriptTree⟩ :=
+          lift (by simp [Staging.Recursive.arrayChildren]) subscriptTyped secondGenerated
+        exact .elementRef metadata formEq baseFound subscriptFound shaped baseTree subscriptTree
       | arraySlice base start stop =>
         obtain ⟨depth, layout, first, starts, stops, rfl, metadata, firstGenerated, shaped, startsGenerated,
             stopsGenerated, _⟩ :=
@@ -2361,6 +2391,25 @@ theorem preserves_nested_tree [RecursiveStageMeaning.FaultTokens faults]
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareInvocationArrayBounds.copy_preserves callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form sliceFound
       ⟨rfl, rfl, rfl⟩ shaped prepared rfl size children ⟨rfl, rfl, rfl⟩
+  | @elementRef id node base subscript baseNode subscriptNode layout first second metadata form baseFound
+      subscriptFound shaped baseTree subscriptTree baseIH subscriptIH =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base subscript first second) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl left => obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr right => obtain ⟨rfl, rfl⟩ := right; intro _; exact subscriptIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.elementRef_preserves callerBridge.forgetSlots functions faults unique selectedBodies
+      runtime covers metadata form baseFound subscriptFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ shaped rfl
+      size children ⟨rfl, rfl, rfl⟩
   | @memrefLoad id node reference referenceNode base subscript baseNode subscriptNode layout comparison fuel first
       second metadata form referenceMetadata referenceForm baseFound subscriptFound shaped prepared baseTree
       subscriptTree baseIH subscriptIH =>
@@ -2789,6 +2838,25 @@ theorem reflects_nested_tree [RecursiveStageMeaning.FaultTokens faults]
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareInvocationArrayBounds.copy_reflects callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form sliceFound sliceForm
       ⟨rfl, rfl, rfl⟩ shaped prepared rfl size children ⟨rfl, rfl, rfl⟩
+  | @elementRef id node base subscript baseNode subscriptNode layout first second metadata form baseFound
+      subscriptFound shaped baseTree subscriptTree baseIH subscriptIH =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base subscript first second) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl left => obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr right => obtain ⟨rfl, rfl⟩ := right; intro _; exact subscriptIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.elementRef_reflects callerBridge.forgetSlots functions faults unique selectedBodies
+      runtime covers metadata form baseFound subscriptFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ shaped rfl
+      size children ⟨rfl, rfl, rfl⟩
   | @memrefLoad id node reference referenceNode base subscript baseNode subscriptNode layout comparison fuel first
       second metadata form referenceMetadata referenceForm baseFound subscriptFound shaped prepared baseTree
       subscriptTree baseIH subscriptIH =>

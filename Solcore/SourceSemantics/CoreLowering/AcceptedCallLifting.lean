@@ -1387,6 +1387,14 @@ theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Stag
           (.cons (children base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
             (.cons (children subscript (by simp [Staging.Recursive.arrayChildren]) (by omega) second) .nil))
           (.arrayIndex reads)
+    | elementRef base subscript =>
+      cases raw with
+      | elementRef _ first second counted inside =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (children base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (.cons (children subscript (by simp [Staging.Recursive.arrayChildren]) (by omega) second) .nil))
+          (.elementRef counted inside)
     | arraySlice base start stop =>
       cases raw with
       | arraySlice _ first bounds counted chosen ordered inside =>
@@ -2256,6 +2264,31 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
           (.cons (values base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
             (.cons (values subscript (by simp [Staging.Recursive.arrayChildren]) (by omega) second) .nil))
           (.arrayIndexOutOfBounds outside)
+    | elementRef base subscript =>
+      cases raw with
+      | elementRefBase _ failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayFault occurrence rfl
+          (.headFault (children base (by simp [Staging.Recursive.arrayChildren]) (by omega) signatures expressible
+            failed))
+      | elementRefIndex _ first failed =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayFault occurrence rfl
+          (.tailFault (values base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (.headFault (children subscript (by simp [Staging.Recursive.arrayChildren]) (by omega) signatures
+              expressible failed)))
+      | elementRefIndexType _ first second notWord actual =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (values base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (.cons (values subscript (by simp [Staging.Recursive.arrayChildren]) (by omega) second) .nil))
+          (.elementRefIndexType notWord actual)
+      | elementRefOutOfBounds _ first second outside =>
+        simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+        exact .arrayResult occurrence rfl
+          (.cons (values base (by simp [Staging.Recursive.arrayChildren]) (by omega) first)
+            (.cons (values subscript (by simp [Staging.Recursive.arrayChildren]) (by omega) second) .nil))
+          (.elementRefOutOfBounds outside)
     | arraySlice base start stop =>
       cases raw with
       | arraySliceBase _ failed =>
