@@ -9,12 +9,13 @@ session decodes to upstream's revert data, with the revert's output.
 
 Admission is a versioned predicate decided before the native tool runs. It reads the case's
 provenance (its emitter and the Core operations of its program), the adapter's reading of the source
-(one contract with functions only, no storage field, `uint256` parameters, no call of std's
-`tobool`) and, for memory arrays, the source's array forms (std's array traits are not admitted).
-The adapter keeps the source's imports of `std.opcodes`, whose pure functions the native frontend
-provides. Cases that are not admitted are counted by reason. A native rejection, crash or different
-observation of an admitted case is a finding, never an exclusion; the known differences from
-upstream are findings under their own labels. Out of fuel and timeouts are inconclusive.
+(one contract with functions only, no storage field, `uint256` parameters) and, for memory arrays,
+the source's array forms (std's array traits are not admitted). The adapter keeps the source's
+imports of `std.opcodes`, whose pure functions the native frontend provides, and adds std's own
+`tobool` where the source calls it and defines none. Cases that are not admitted are counted by
+reason. A native rejection, crash or different observation of an admitted case is a finding, never
+an exclusion; the known differences from upstream are findings under their own labels. Out of fuel
+and timeouts are inconclusive.
 
 Cases come from the pure runner's own preparation (`semantic-campaign.py`, with the arguments
 `semantic-suite.py` gives each profile), for the fixed corpora or a seeded random draw; preparation
@@ -54,8 +55,8 @@ runner = suite.pure_campaign
 SCHEMA = "solcore-lean.semantic-native.v1"
 REQUEST_SCHEMA = "solcore-lean.semantic-native-request.v1"
 RESULT_SCHEMA = "solcore-lean.semantic-native-result.v1"
-ADMISSION = "native-admission-v5"
-ADAPTER = "native-lift-v2"
+ADMISSION = "native-admission-v6"
+ADAPTER = "native-lift-v3"
 COMPARISON = "native-compare-v1"
 TOOL = ROOT / ".lake/build/bin/semantic-native-tool"
 SCRIPTS = ("semantic-native.py", "semantic-suite.py", "semantic-campaign.py", "semantic-differential.py",
@@ -87,9 +88,13 @@ EMITTERS = {
     "solcore-source-memory-arrays-v2": frozenset(),
 }
 # A call of std's `tobool(x: word) returns (bool)`, which the G0-derived emitters wrap around `sgt`'s word: std is not
-# a module of the native load, so a source that calls it and does not define it is not admitted.
+# a module of the native load, so where a source calls it and does not define it, the adapter adds std's own
+# definition, as `std/std.sol` has it at the pin (`d1b5ac28`).
 TOBOOL_CALL = re.compile(r"\btobool\s*\(")
 TOBOOL_DEFINITION = re.compile(r"\bfunction\s+tobool\b")
+STD_TOBOOL = ("function tobool(x: word) returns (bool) {\n    match (x) {\n        case 0 {\n"
+              "            return false;\n        }\n        default {\n            return true;\n"
+              "        }\n    }\n}\n")
 # The array form of the array emitters' sources that this version does not admit: std's array traits, which row 4's
 # Lean side leaves out (its lengths are compiler forms, and it declares no std trait). A `lidx` call whose index is an
 # integer literal is admitted since v5: Lean gives the index `uint256` at finalization, as upstream does.
@@ -265,10 +270,10 @@ def array_forms(source: str) -> dict[str, list[str]]:
 
 
 def lift(source: str, method: str) -> dict:
-    """native-lift-v2 on a case's source: its std imports other than those of `std.opcodes` dropped, each line kept
+    """native-lift-v3 on a case's source: its std imports other than those of `std.opcodes` dropped, each line kept
     as an empty line, and its one contract's functions moved to the top level without their visibility and
-    mutability words, then a Word entry of `method` appended. Gives the lifted source and the entry's name, or the
-    reason it cannot."""
+    mutability words; std's own `tobool` appended where the code calls it and defines none; then a Word entry of
+    `method` appended. Gives the lifted source and the entry's name, or the reason it cannot."""
     text = STD_IMPORT.sub(lambda match: match.group(0) if STD_OPCODES_IMPORT.search(match.group(0)) else "", source)
     contracts = list(CONTRACT.finditer(text))
     if len(contracts) != 1:
@@ -293,6 +298,9 @@ def lift(source: str, method: str) -> dict:
     if others:
         return {"reason": "contract member", "detail": f"{others} members"}
     lifted = text[:match.start()] + "\n".join(functions) + text[closing + 1:]
+    code = code_only(lifted)
+    if TOBOOL_CALL.search(code) and not TOBOOL_DEFINITION.search(code):
+        lifted = lifted + "\n" + STD_TOBOOL
     header = re.search(HEADER.format(name=re.escape(method)), "\n".join(functions))
     if not header:
         return {"reason": "parameters or result", "detail": "no method header"}
@@ -327,7 +335,7 @@ def arguments(contract: dict, count: int) -> list[str] | None:
 
 
 def admission(case: dict) -> dict:
-    """native-admission-v5, decided from the case alone before any native run: the program the native tool reads
+    """native-admission-v6, decided from the case alone before any native run: the program the native tool reads
     with the case's arguments, or the first reason in a fixed order that the case is not admitted."""
     def refuse(reason: str, detail=None) -> dict:
         return {"admitted": False, "reason": reason, "detail": detail}
@@ -353,9 +361,6 @@ def admission(case: dict) -> dict:
     words = arguments(contract, lifted["parameters"])
     if words is None:
         return refuse("calldata")
-    code = code_only(lifted["source"])
-    if TOBOOL_CALL.search(code) and not TOBOOL_DEFINITION.search(code):
-        return refuse("std's tobool")
     forms = array_forms(case["source"]) if emitter in ARRAY_EMITTERS else {}
     for reason in ARRAY_REASONS:
         if reason in forms:

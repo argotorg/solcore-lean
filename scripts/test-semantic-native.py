@@ -141,14 +141,22 @@ class AdmissionTests(unittest.TestCase):
         self.assertEqual(decided(emitter=shifts, shiftShapes={"values": ["int8"]}), "admitted")
         arithmetic = "solcore-source-checked-arithmetic-v2"
         self.assertEqual(decided(emitter=arithmetic, checkedArithmeticShapes={"types": ["int16"]}), "admitted")
-        # std's `tobool`, called and not defined, in code and not in a comment.
+        # std's `tobool`, called and not defined, in code and not in a comment: the adapter adds std's own, once.
         called = "let sc_x: word = Typedef.rep(input);\n        let sc_b: bool = tobool(sc_x);"
         tobool = SOURCE.replace("let sc_x: word = Typedef.rep(input);", called)
-        self.assertEqual(decided(source=tobool), "std's tobool")
-        self.assertEqual(decided(source=SOURCE.replace("// the method,", "// tobool(sc_x), the method,")), "admitted")
+        added = native.admission(make_case(source=tobool))
+        self.assertTrue(added["admitted"])
+        self.assertEqual(added["source"].count("function tobool"), 1)
+        self.assertIn("\n" + native.STD_TOBOOL + "\nfunction sc_native_run(", added["source"])
+        commented = native.admission(make_case(source=SOURCE.replace("// the method,", "// tobool(sc_x), the method,")))
+        self.assertTrue(commented["admitted"])
+        self.assertNotIn("function tobool", commented["source"])
         defined = tobool.replace("\ncontract", "\nfunction tobool(x: word) returns (bool) {\n    return x != 0;\n}\n"
                                                 "\ncontract")
-        self.assertEqual(decided(source=defined), "admitted")
+        own = native.admission(make_case(source=defined))
+        self.assertTrue(own["admitted"])
+        self.assertEqual(own["source"].count("function tobool"), 1)
+        self.assertNotIn(native.STD_TOBOOL, own["source"])
         self.assertEqual(decided(emitter=arithmetic, checkedArithmeticShapes={"types": ["uint16", "int256"]}),
                          "admitted")
         self.assertEqual(decided(emitter="solcore-source-enums-v2", program={"tag": "case"}), "admitted")
@@ -383,7 +391,7 @@ class RunTests(unittest.TestCase):
                                 "--profile", "runtime-word"])
         check = json.loads(output.getvalue())
         self.assertEqual((code, check["status"], sorted(check["corpora"])), (0, "ready", ["runtime-word"]))
-        self.assertEqual(check["versions"], {"admission": "native-admission-v5", "adapter": "native-lift-v2",
+        self.assertEqual(check["versions"], {"admission": "native-admission-v6", "adapter": "native-lift-v3",
                                              "comparison": "native-compare-v1"})
         self.assertEqual(sorted(check["scripts"]), sorted(native.SCRIPTS))
         args, _ = native.parse_args(["--check", "--mode", "random", "--seed", "5"])
