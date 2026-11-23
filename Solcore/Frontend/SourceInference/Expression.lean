@@ -1048,6 +1048,14 @@ def freshDataConstructorInstantiation
       (result.1 ++ [type], state)) ([], state)
   (instantiateDataConstructor dataType constructor arguments, state)
 
+/-- Whether a declared function or a builtin takes an unqualified name before a constructor
+that shares its type's name: upstream calls the function or the builtin, as a bare name in an
+expression reads it first. -/
+def functionOrBuiltinNamed (context : Context) (name : String) : Bool :=
+  match functionsNamed context name with
+  | .ok (_ :: _) => true
+  | _ => (builtinNamed? context name).isSome
+
 def constructorCalleeCandidates (context : Context) (state : State)
     (callee : Syntax.Expr) :
     Except Error
@@ -1066,6 +1074,7 @@ def constructorCalleeCandidates (context : Context) (state : State)
       | none => pure []
       | some name =>
           if (state.lookupBinder? name).isSome then pure []
+          else if functionOrBuiltinNamed context name then pure []
           else
             pure (constructorsInDataTypes
               ((← visibleDataTypesNamed context name).filter fun dataType =>
@@ -1125,19 +1134,26 @@ theorem constructorCalleeCandidates_success_members
               subst candidates
               simp at member
           | none =>
-              cases found : visibleDataTypesNamed context name with
-              | error errors =>
-                  simp [constructorCalleeCandidates, qualified, identifier,
-                    binder, found, bind, Except.bind] at success
-              | ok dataTypes =>
-                  simp [constructorCalleeCandidates, qualified, identifier,
-                    binder, found, bind, Except.bind, pure, Pure.pure,
-                    Except.pure] at success
+              cases taken : functionOrBuiltinNamed context name with
+              | true =>
+                  simp [constructorCalleeCandidates, qualified, identifier, binder,
+                    taken, pure, Pure.pure, Except.pure] at success
                   subst candidates
-                  apply constructorsInDataTypes_member_facts _ member
-                  intro accessible accessibleMember
-                  exact visibleDataTypesNamed_success_members found accessible
-                    (List.mem_filter.mp accessibleMember).1
+                  simp at member
+              | false =>
+                  cases found : visibleDataTypesNamed context name with
+                  | error errors =>
+                      simp [constructorCalleeCandidates, qualified, identifier,
+                        binder, taken, found, bind, Except.bind] at success
+                  | ok dataTypes =>
+                      simp [constructorCalleeCandidates, qualified, identifier,
+                        binder, taken, found, bind, Except.bind, pure, Pure.pure,
+                        Except.pure] at success
+                      subst candidates
+                      apply constructorsInDataTypes_member_facts _ member
+                      intro accessible accessibleMember
+                      exact visibleDataTypesNamed_success_members found accessible
+                        (List.mem_filter.mp accessibleMember).1
 
 /-- Distinguish an existing data namespace with a missing constructor from an
 ordinary qualified function/member expression.  Local roots continue to shadow

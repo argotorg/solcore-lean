@@ -5632,6 +5632,95 @@ def runMatchCoverage : IO Unit := do
     partialFlagLibrary)
   IO.println "SOURCE_CORE_MATCH_COVERAGE_PASS: upstream's coverage through the public API, matches that only their arms together cover running each arm, a bool match and a payload's boolean split (m4, m8), a nested same-name constructor (x19), a boolean matrix, a parenthesized tuple, a payload split over its constructors, a uint256 word beside a boolean and a generic payload at Bool, a hidden column covered through another accepted, and refused as upstream refuses them: a missing boolean pair, a payload's missing constructor, word literals, a generic payload's missing false, a uint256 column's missing boolean, and a hidden constructor's type with no catch-all at its column"
 
+/-- A call of a name that a declared function or a builtin takes, beside a constructor that shares
+its type's name, as upstream reads it (`f1` to `f10`): the function or the builtin is called, and
+the qualified constructor stays the constructor, as does a same-name constructor with no function
+of its name. -/
+private def callLookupWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "enum thing { thing }",
+  "enum Box { Box(Word) }",
+  "enum Cell<a> { Cell(a) }",
+  "enum Only { Only(Word) }",
+  "enum primAddWord { primAddWord(Word, Word) }",
+  "function thing() returns (Word) { return 3; }",
+  "function Box(w: Word) returns (Word) { return 7; }",
+  "function Cell(x: Word) returns (Word) { return 9; }",
+  "function unbox(b: Box) returns (Word) { match (b) { case Box.Box(v) { return v; } } }",
+  "function unonly(o: Only) returns (Word) { match (o) { case Only(v) { return v; } } }",
+  "function nullary() returns (Word) { return thing(); }",
+  "function payload(w: Word) returns (Word) { return Box(w); }",
+  "function generic(w: Word) returns (Word) { return Cell(w); }",
+  "function qualified(w: Word) returns (Word) { return unbox(Box.Box(w)); }",
+  "function constructed(w: Word) returns (Word) { return unonly(Only(w)); }",
+  "function builtin(a: Word, b: Word) returns (Word) { return primAddWord(a, b); }"]
+
+private def callLookupNames : List String :=
+  ["nullary", "payload", "generic", "qualified", "constructed", "builtin"]
+
+/-- Inference refuses the program because the function a call names does not take its
+arguments. -/
+private def refusedAsFunctionCall (label : String) (workspace : Workspace.RawWorkspace)
+    (name : String) : IO Unit :=
+  match checkProgram workspace with
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error [.inference failure] =>
+      match failure.error with
+      | .noMatchingOverload actual _ =>
+          if actual == name then pure ()
+          else throw (IO.userError s!"{label} gave {reprStr failure.error}")
+      | _ => throw (IO.userError s!"{label} gave {reprStr failure.error}")
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+private def boxFunctionLibrary : String :=
+  "export { Box };\nfunction Box(w: Word) returns (Word) { return 7; }"
+
+/-- The call rule through the public API: a declared function, local or imported, or a builtin
+takes an unqualified call before a constructor that shares its type's name, as a bare name in an
+expression reads it; a function that does not take the call's arguments refuses it, as upstream's
+`SC0203` and `SC0201` do, rather than leaving it to the constructor. -/
+def runCallLookup : IO Unit := do
+  let program ← get "call lookup check" (checkProgram callLookupWorkspace)
+  let seeds ← callLookupNames.mapM (seed program)
+  let compiled ← get "call lookup compilation"
+    (compile callLookupWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match callLookupNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"call lookup root {name} missing")
+    | none => throw (IO.userError s!"call lookup {name} unknown")
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × List Value × Value) := [
+    ("nullary", [], word 3), ("payload", [word 5], word 7), ("generic", [word 5], word 9),
+    ("qualified", [word 5], word 5), ("constructed", [word 4], word 4),
+    ("builtin", [word 1, word 2], word 3)]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) arguments
+    require (completed.value == expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  let _ := session
+  -- The function imported and the constructor local, the other way round, and both imported.
+  for (label, main, library) in [
+      ("an imported function",
+        "import { Box } from lib;\nenum Box { Box(Word) }\nfunction main() returns (Word) { let w: Word = 5; return Box(w); }",
+        boxFunctionLibrary),
+      ("an imported constructor",
+        "import { Box } from lib;\nfunction Box(w: Word) returns (Word) { return 7; }\nfunction main() returns (Word) { let w: Word = 5; return Box(w); }",
+        "export { Box(*) };\nenum Box { Box(Word) }"),
+      ("both through a wildcard import",
+        "import * from lib;\nfunction main() returns (Word) { let w: Word = 5; return Box(w); }",
+        "export { Box(*), Box };\nenum Box { Box(Word) }\nfunction Box(w: Word) returns (Word) { return 7; }")] do
+    match checkProgram (libraryWorkspace main library) with
+    | .ok _ => pure ()
+    | .error errors => throw (IO.userError s!"a function beside a constructor, {label}, gave {reprStr errors}")
+  -- A function that does not take the arguments refuses the call (`SC0203`, `SC0201`).
+  refusedAsFunctionCall "a function of no argument called with one" (workspaceOf ["enum Box { Box(Word) }",
+    "function Box() returns (Word) { return 7; }",
+    "function main() returns (Word) { let w: Word = 5; return Box(w); }"]) "Box"
+  refusedAsFunctionCall "a function of a Bool called with a Word" (workspaceOf ["enum Box { Box(Word) }",
+    "function Box(b: Bool) returns (Word) { return 7; }",
+    "function main() returns (Word) { let w: Word = 5; return Box(w); }"]) "Box"
+  IO.println "SOURCE_CORE_CALL_LOOKUP_PASS: a call of a name that a declared function or a builtin takes through the public API, the function called before a constructor that shares its type's name with no payload, with a payload and generic, the builtin primAddWord before a same-name constructor, the qualified constructor and a same-name constructor with no function of its name still constructors, an imported function before a local constructor, a local function before an imported one and both through a wildcard import, and a function that does not take the arguments refusing the call as upstream's SC0203 and SC0201 do"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -6506,6 +6595,7 @@ def run : IO Unit := do
   runBareNamePatterns
   runConstructorNames
   runMatchCoverage
+  runCallLookup
   runUpstreamFixtures
   runUpstreamArrayFixtures
   runArrayElementCases
