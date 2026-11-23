@@ -196,7 +196,7 @@ private def annotation : Syntax.TypeExpr := ⟨span, .named ⟨span, ⟨⟨⟨sp
 private def parameter : Syntax.FunctionParameter := ⟨span, .typed none ⟨span, "x"⟩ annotation⟩
 private def declaration : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "identity"⟩, none, ⟨span, [parameter]⟩, ⟨none, none⟩,
-    some ⟨span, ⟨span, [annotation]⟩⟩, none⟩, body (ref "x")⟩⟩
+    some ⟨span, ⟨span, [annotation]⟩⟩, none⟩, body (ref "x"), []⟩⟩
 private def types (type : Core.Ty) : TypeNameTable := [(["T"], type)]
 private def argument (type : Core.Ty) (value : Core.Value) (typed : Core.ValueHasType value type) :
     TypedRuntimeArgument := ⟨type, value, typed⟩

@@ -39,7 +39,7 @@ private def core : Nat → Core.Expr
 private def parameter (name type : String) : Syntax.FunctionParameter := ⟨span, .typed none ⟨span, name⟩ (named type)⟩
 private def parameters := [parameter "flag" "Flag", parameter "seed" "Payload"]
 private def entry (body : Syntax.Block) : Syntax.FunctionDecl := ⟨span,
-  ⟨⟨span, ⟨span, "tree"⟩, none, ⟨span, parameters⟩, ⟨none, none⟩, some ⟨span, ⟨span, [named "Payload"]⟩⟩, none⟩, body⟩⟩
+  ⟨⟨span, ⟨span, "tree"⟩, none, ⟨span, parameters⟩, ⟨none, none⟩, some ⟨span, ⟨span, [named "Payload"]⟩⟩, none⟩, body, []⟩⟩
 private def initial (type : Core.Ty) : LocalTypeInputs := (LocalTypeInputs.empty.bindFresh owner "flag" .bool).bindFresh owner "seed" type
 private def compiled (names : List String) (type : Core.Ty) : CompiledRuntimeFunction := ⟨initial type, core names.length, type⟩
 private theorem treeElab (names : List String) (previous : String) (type : Core.Ty)

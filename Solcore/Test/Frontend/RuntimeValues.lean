@@ -1628,7 +1628,7 @@ private def named : Syntax.TypeExpr := ⟨span,.named ⟨span,⟨⟨⟨span,"A"�
 private def ref : Syntax.Expr := ⟨span,.identifier ⟨span,"x"⟩⟩
 private def entry : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span,⟨span,"identity"⟩,none,⟨span,[⟨span,.typed none ⟨span,"x"⟩ named⟩]⟩,
-    ⟨none,none⟩,some ⟨span,⟨span,[named]⟩⟩,none⟩,⟨span,[⟨span,.returnStmt (some ref)⟩]⟩⟩⟩
+    ⟨none,none⟩,some ⟨span,⟨span,[named]⟩⟩,none⟩,⟨span,[⟨span,.returnStmt (some ref)⟩]⟩, []⟩⟩
 private def types (a : Core.Ty) : TypeNameTable := [(["A"],a),(["A"],.bool)]
 private def prepared (arg : TypedRuntimeArgument) : PreparedRuntimeFunction :=
   ⟨LocalInputs.empty.bindFresh owner "x" arg.type arg.value arg.valueTyped,.var 0,arg.type⟩
@@ -1974,7 +1974,7 @@ private def core : Core.Expr := .ifE (.var 1) (.var 0) (.var 0)
 private def declaration (body : Syntax.Expr := source) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "selected"⟩, none, ⟨span, params⟩, ⟨none, none⟩,
     some ⟨span, ⟨span, [annotation "Value"]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some body)⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some body)⟩]⟩, []⟩⟩
 private def prepared (owner : Resolved.DeclarationId) (argument : TypedRuntimeArgument) : PreparedRuntimeFunction :=
   ⟨inputs owner argument, core, argument.type⟩
 private theorem namesDifferent : "x" ≠ "c" := by decide
@@ -2171,7 +2171,7 @@ private def body : Syntax.Block := ⟨span, [⟨span, .block [
 private def core : Core.Expr := .letE (.var 1) (.letE (.pair (.var 0) (.var 1)) (.var 1))
 private def entry (result : String := "Payload") : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "same"⟩, none, ⟨span, parameters⟩, ⟨none, none⟩,
-    some ⟨span, ⟨span, [named result]⟩⟩, none⟩, body⟩⟩
+    some ⟨span, ⟨span, [named result]⟩⟩, none⟩, body, []⟩⟩
 private def static (type : Core.Ty) := (LocalTypeInputs.empty.bindFresh owner "p" type).bindFresh owner "c" .bool
 private abbrev Actual (type : Core.Ty) := { value : Core.Value // Core.ValueHasType value type }
 private def arguments {type : Core.Ty} (value : Actual type) (choice : Bool) : List TypedRuntimeArgument :=
@@ -2975,7 +2975,7 @@ private def parameters := [parameter "c" "Cond", parameter "x" "Payload", parame
 private def types (payload : Core.Ty) : TypeNameTable := [(["Payload"], payload), (["Cond"], .bool)]
 private def entry (result : String) (conditional : Bool) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "choose"⟩, none, ⟨span, parameters⟩, ⟨none, none⟩,
-    some ⟨span, ⟨span, [annotation result]⟩⟩, none⟩, body conditional⟩⟩
+    some ⟨span, ⟨span, [annotation result]⟩⟩, none⟩, body conditional, []⟩⟩
 private def inputs (id : Resolved.DeclarationId) (payload : Core.Ty) : LocalTypeInputs :=
   ((LocalTypeInputs.empty.bindFresh id "c" .bool).bindFresh id "x" payload).bindFresh id "y" payload
 private def core (conditional : Bool) : Core.Expr := if conditional then .ifE (.var 2) (.var 1) (.var 0) else .var 1

@@ -115,6 +115,12 @@ inductive RuntimeError where
   | comptimeResultStageMismatch
       (caller : Key) (use : ExpressionId) (callee : Key)
       (actual : SourceStageAnalysis.Stage)
+  /-- A `let` annotated `comptime<T>` whose binder is not comptime-staged: its value is
+  not known while staged (upstream's `SC0241`), it is assigned, or it has no value
+  (`SC0409`). -/
+  | comptimeLetStageMismatch
+      (caller : Key) (binder : Resolved.LocalId)
+      (actual : Option SourceStageAnalysis.Stage)
   | unsupportedStagedInput (expected : Ty)
   | inputValidationFuelExhausted (expected : Ty) (fuel : Nat)
   | missingExpression (id : ExpressionId)
@@ -2260,7 +2266,16 @@ private def validateSpecializationStaging
             match specialized.stageAnalysis.expressionStage? expression.id with
             | some .comptime => pure ()
             | _ => throw (.stagedExpressionType expression.id expression.type)
-      | .statement _ => pure ()
+      | .statement statement =>
+          -- A `let` annotated `comptime<T>` holds a value known while staged: its binder enters
+          -- its scope comptime-staged, so its initializer is comptime and it is never assigned.
+          match statement.form with
+          | .letDecl binder _ =>
+              if binder.span.any function.comptimeLets.contains then
+                match specialized.stageAnalysis.binderStage? binder.id with
+                | some .comptime => pure ()
+                | actual => throw (.comptimeLetStageMismatch specialized.key binder.id actual)
+          | _ => pure ()
 
 def validateSpecializationMetadataWith
     (allowAssumptions : Bool)

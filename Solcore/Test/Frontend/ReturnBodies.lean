@@ -668,7 +668,7 @@ theorem raw_success_skips_an_unresolved_arm_but_whole_checking_never_does
 private def boolAnnotation : Syntax.TypeExpr := ⟨span, .named ⟨span, ⟨⟨⟨span, "Bool"⟩, []⟩⟩⟩ none⟩
 private def declaration : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "terminal"⟩, none,
-    ⟨span, [⟨span, .typed none ⟨span, "c"⟩ boolAnnotation⟩]⟩, ⟨none, none⟩, none, none⟩, bareArms⟩⟩
+    ⟨span, [⟨span, .typed none ⟨span, "c"⟩ boolAnnotation⟩]⟩, ⟨none, none⟩, none, none⟩, bareArms, []⟩⟩
 
 theorem old_singleton_rejects_but_runtime_entry_compiles_conditional_statements
     (choice : Bool) (word : Core.Word) :

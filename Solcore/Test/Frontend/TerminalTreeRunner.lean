@@ -497,7 +497,7 @@ private def types (type : Core.Ty) : TypeNameTable := [(["Payload"], type), (["F
 private def entry : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "deep"⟩, none,
     ⟨span, [parameter "c" "Flag", parameter "x" "Payload", parameter "y" "Payload"]⟩,
-    ⟨none, none⟩, some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, tree⟩⟩
+    ⟨none, none⟩, some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, tree, []⟩⟩
 private def declaredInputs (type : Core.Ty) : LocalTypeInputs :=
   ((LocalTypeInputs.empty.bindFresh owner "c" .bool).bindFresh owner "x" type).bindFresh owner "y" type
 theorem deep_body_execution_and_exact_function_entry_compilation_agree

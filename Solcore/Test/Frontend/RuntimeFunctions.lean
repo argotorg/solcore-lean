@@ -41,7 +41,7 @@ private def ref (name : String) : Syntax.Expr := ⟨span, .identifier ⟨span, n
 private def declaration (parameters : List Syntax.FunctionParameter) (source : Syntax.Expr) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "entry"⟩, none, ⟨span, parameters⟩, ⟨none, none⟩,
     some ⟨span, ⟨span, [annotation "Output"]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩, []⟩⟩
 private def table (input output : Core.Ty) : TypeNameTable := [(["Input"], input), (["Output"], output)]
 private def argument (type : Core.Ty) (value : Core.Value) (typed : Core.ValueHasType value type) :
     TypedRuntimeArgument := ⟨type, value, typed⟩
@@ -177,7 +177,7 @@ theorem well_typed_forged_data_does_not_license_execution (store : Core.Store) :
   cases same
 
 private def emptyBody : Syntax.FunctionDecl :=
-  ⟨span, ⟨identity.value.signature, ⟨span, []⟩⟩⟩
+  ⟨span, ⟨identity.value.signature, ⟨span, []⟩, []⟩⟩
 
 theorem independent_body_failure_blocks_every_supplied_argument_list
     (arguments : List TypedRuntimeArgument) (fuel : Nat) (store : Core.Store) :
@@ -294,7 +294,7 @@ private def declaration (variant : Bool) (parameters : List Syntax.FunctionParam
   ⟨span variant, ⟨⟨span variant, ⟨span variant, if variant then "otherFunction" else "function"⟩,
     none, ⟨span variant, parameters⟩, ⟨none, none⟩,
     some ⟨span variant, ⟨span variant, [annotation variant (typeName variant)]⟩⟩, none⟩,
-    ⟨span variant, [⟨span variant, .returnStmt (some body)⟩]⟩⟩⟩
+    ⟨span variant, [⟨span variant, .returnStmt (some body)⟩]⟩, []⟩⟩
 private def parameters (variant : Bool) := [parameter variant (name variant) (typeName variant)]
 private def entry (variant : Bool) := declaration variant (parameters variant) (source variant)
 private def staticInputs (variant : Bool) := LocalTypeInputs.empty.bindFresh (owner variant) (name variant) .word
@@ -1492,7 +1492,7 @@ private def parameter (name type : String) : Syntax.FunctionParameter := ⟨span
 private def parameters := [parameter "f" "Fn", parameter "x" "Payload", parameter "y" "Payload"]
 private def entry (result : String := "Payload") (exposed : Bool := false) : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "invoke"⟩, none, ⟨span, parameters⟩, ⟨if exposed then some span else none, none⟩,
-    some ⟨span, ⟨span, [named result]⟩⟩, none⟩, body⟩⟩
+    some ⟨span, ⟨span, [named result]⟩⟩, none⟩, body, []⟩⟩
 private def initial (type : Core.Ty) : LocalTypeInputs :=
   ((LocalTypeInputs.empty.bindFresh owner "f" (.function type type)).bindFresh owner "x" type).bindFresh owner "y" type
 private def core : Core.Expr := .apply (.var 2) (.var 1)
@@ -1725,7 +1725,7 @@ private def parameter (name type : String) : Syntax.FunctionParameter := ⟨span
 private def parameters := [parameter "f" "Fn", parameter "x" "Payload", parameter "y" "Payload"]
 private def entry (result : String := "Payload") (exposed : Bool := false) (original : Syntax.Block := body) : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "mixed"⟩, none, ⟨span, parameters⟩, ⟨if exposed then some span else none, none⟩,
-    some ⟨span, ⟨span, [named result]⟩⟩, none⟩, original⟩⟩
+    some ⟨span, ⟨span, [named result]⟩⟩, none⟩, original, []⟩⟩
 private def initial (type : Core.Ty) : LocalTypeInputs :=
   ((LocalTypeInputs.empty.bindFresh owner "f" (.function type type)).bindFresh owner "x" type).bindFresh owner "y" type
 private def leafCore : Core.Expr := .apply (.var 2) (.var 1)
@@ -1965,7 +1965,7 @@ private def returned (value : Option Syntax.Expr) : Syntax.Block := ⟨span, [�
 private def declaration (parameters : List Syntax.FunctionParameter) (result : Option Syntax.TypeExpr)
     (body : Syntax.Block) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "entry"⟩, none, ⟨span, parameters⟩, ⟨none, none⟩,
-    result.map (fun type => ⟨span, ⟨span, [type]⟩⟩), none⟩, body⟩⟩
+    result.map (fun type => ⟨span, ⟨span, [type]⟩⟩), none⟩, body, []⟩⟩
 private def table (type : Core.Ty) : TypeNameTable := [(["Arg"], type), (["Result"], type), (["Bool"], .bool)]
 private def bare := declaration [] none (returned none)
 private def bareCompiled : CompiledRuntimeFunction := ⟨.empty, .unit, .unit⟩
@@ -2113,7 +2113,7 @@ theorem different_values_share_the_compiled_result_but_not_the_returned_value (s
   · rw [runRuntimeFunction?, (runtimePrepares false).complete]; rfl
 
 private def publicBare : Syntax.FunctionDecl :=
-  ⟨span, ⟨{ bare.value.signature with modifiers := ⟨some span, none⟩ }, bare.value.body⟩⟩
+  ⟨span, ⟨{ bare.value.signature with modifiers := ⟨some span, none⟩ }, bare.value.body, []⟩⟩
 private def emptyBody := declaration [] none ⟨span, []⟩
 
 theorem whole_header_and_body_restrictions_apply_without_any_runtime_arguments :
@@ -2159,7 +2159,7 @@ private def returned (source : Option Syntax.Expr) : Syntax.Block := ⟨span, [�
 private def declaration (params : List Syntax.FunctionParameter) (result : Option Syntax.TypeExpr)
     (body : Syntax.Block) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "caller_named"⟩, none, ⟨span, params⟩, ⟨none, none⟩,
-    result.map (fun type => ⟨span, ⟨span, [type]⟩⟩), none⟩, body⟩⟩
+    result.map (fun type => ⟨span, ⟨span, [type]⟩⟩), none⟩, body, []⟩⟩
 private def table (type : Core.Ty) : TypeNameTable := [(["Arg"], type), (["Result"], type)]
 private def boolArg (value : Bool) : TypedRuntimeArgument := ⟨.bool, .bool value, .bool⟩
 private def bare := declaration [] none (returned none)
@@ -2289,7 +2289,7 @@ private def badHeaders : List Syntax.FunctionSignature :=
 theorem every_excluded_header_shape_prevents_entry_before_body_execution
     (types : TypeNameTable) (header : Syntax.FunctionSignature) (present : header ∈ badHeaders)
     (arguments : List TypedRuntimeArgument) (fuel : Nat) (store : Core.Store) :
-    let decl : Syntax.FunctionDecl := ⟨span, ⟨header, returned none⟩⟩
+    let decl : Syntax.FunctionDecl := ⟨span, ⟨header, returned none, []⟩⟩
     (¬ ∃ type, RuntimeFunctionHeader types header type) ∧
     (¬ ∃ prepared, RuntimeFunctionPrepares types owner decl arguments prepared) ∧
     prepareRuntimeFunction? types owner decl arguments = none ∧
@@ -2387,7 +2387,7 @@ private def core : Nat → Core.Expr
 private def parameter (name type : String) : Syntax.FunctionParameter := ⟨span, .typed none ⟨span, name⟩ (named type)⟩
 private def parameters := [parameter "flag" "Flag", parameter "seed" "Payload"]
 private def entry (body : Syntax.Block) (result : String := "Payload") (exposed : Bool := false) : Syntax.FunctionDecl := ⟨span,
-  ⟨⟨span, ⟨span, "tree"⟩, none, ⟨span, parameters⟩, ⟨if exposed then some span else none, none⟩, some ⟨span, ⟨span, [named result]⟩⟩, none⟩, body⟩⟩
+  ⟨⟨span, ⟨span, "tree"⟩, none, ⟨span, parameters⟩, ⟨if exposed then some span else none, none⟩, some ⟨span, ⟨span, [named result]⟩⟩, none⟩, body, []⟩⟩
 private def initial (type : Core.Ty) : LocalTypeInputs := (LocalTypeInputs.empty.bindFresh owner "flag" .bool).bindFresh owner "seed" type
 private def compiled (names : List String) (type : Core.Ty) : CompiledRuntimeFunction := ⟨initial type, core names.length, type⟩
 private theorem treeElab (names : List String) (previous : String) (type : Core.Ty)

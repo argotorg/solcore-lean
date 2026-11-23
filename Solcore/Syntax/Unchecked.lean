@@ -16,6 +16,12 @@ spelling gains or loses a leading `-` and which then spans the negation:
 upstream reads it: `subtract`, or `uncheckedSubtract` in a block, with the `0`
 and the operator at the `-`. So inference never meets `negate`.
 
+`mark` also reads a `let` statement's annotation `comptime<T>` at its top as
+`T`, and records the `let`'s name span in its function's `comptimeLets`: the
+plan's staging check then requires that binder to be comptime-staged, as
+upstream requires a comptime `let`'s value to be known while staged. A loop
+header's `let` keeps its annotation.
+
 A block reaches every expression and statement written in it, including
 nested blocks, conditions, loop headers and match arms, but no lambda body:
 a lambda body starts outside any block and may hold its own. Patterns are not
@@ -87,17 +93,29 @@ def ValueAssignOp.unchecked : ValueAssignOp → ValueAssignOp
   | .modulo => .uncheckedModulo
   | operator => operator
 
-/-- The recorded `{` starts not yet met. -/
-abbrev M := StateT (List Nat) (Except Error)
+/-- The recorded `{` starts not yet met, and the name spans of the `let`s read so far in the
+current function body whose annotation is `comptime<T>` at its top. -/
+abbrev M := StateT (List Nat × List SourceSpan) (Except Error)
 
 /-- Whether a block statement starting here is an unchecked block. -/
 def claim (startByte : Nat) : M Bool := do
-  let pending ← get
+  let (pending, comptimeLets) ← get
   if pending.contains startByte then
-    set (pending.erase startByte)
+    set (pending.erase startByte, comptimeLets)
     pure true
   else
     pure false
+
+/-- A `let`'s annotation: `comptime<T>` at its top reads as `T`, and the `let`'s name span is
+recorded, since the binder must then be comptime-staged (`FunctionDeclValue.comptimeLets`). -/
+def letType (name : Identifier) : Option TypeExpr → M (Option TypeExpr)
+  | some type =>
+      match type.value with
+      | .comptime _ _ inner => do
+          modify fun (pending, comptimeLets) => (pending, comptimeLets ++ [name.span])
+          pure (some inner)
+      | _ => pure (some type)
+  | none => pure none
 
 /-- A compound arithmetic assignment in a block becomes unchecked. -/
 def assignOperator (inside : Bool) (operator : Located ValueAssignOp) : Located ValueAssignOp :=
@@ -214,7 +232,8 @@ def statement : Nat → Bool → Located StatementValue → M (Located Statement
   | 0, _, _ => throw .depthExhausted
   | fuel + 1, inside, written => do
       let value ← match written.value with
-        | .letDecl name type initializer => pure (.letDecl name type (← optional fuel inside initializer))
+        | .letDecl name type initializer =>
+            pure (.letDecl name (← letType name type) (← optional fuel inside initializer))
         | .returnStmt value => pure (.returnStmt (← optional fuel inside value))
         | .expression value trailingSemicolon =>
             pure (.expression (← expression fuel inside value) trailingSemicolon)
@@ -254,9 +273,14 @@ def statement : Nat → Bool → Located StatementValue → M (Located Statement
 
 end
 
-/-- Mark every body of a declaration. -/
-def functionBody (fuel : Nat) (declaration : FunctionDecl) : M FunctionDecl :=
-  return { declaration with value := { declaration.value with body := ← block fuel false declaration.value.body } }
+/-- Mark every body of a declaration, and record its comptime `let`s. -/
+def functionBody (fuel : Nat) (declaration : FunctionDecl) : M FunctionDecl := do
+  let (pending, outer) ← get
+  set (pending, ([] : List SourceSpan))
+  let body ← block fuel false declaration.value.body
+  let (pending, comptimeLets) ← get
+  set (pending, outer)
+  return { declaration with value := { declaration.value with body, comptimeLets } }
 
 def contractMember (fuel : Nat) (member : ContractMember) : M ContractMember := do
   let value ← match member.value with
@@ -290,7 +314,7 @@ def topItem (fuel : Nat) (item : TopItem) : M TopItem := do
 /-- Give each recorded block's arithmetic its unchecked operators. Every
 recorded `{` must start a block statement. -/
 def mark (fuel : Nat) (starts : List Nat) (file : ParsedFile) : Except Error ParsedFile := do
-  let (items, unclaimed) ← (file.items.mapM (topItem fuel)).run starts
+  let (items, (unclaimed, _)) ← (file.items.mapM (topItem fuel)).run (starts, [])
   match unclaimed with
   | [] => pure { file with items }
   | startByte :: _ => throw (.notStatement startByte)

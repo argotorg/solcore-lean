@@ -1950,7 +1950,7 @@ theorem omitted_parts_name_capture_unused_failures_and_outside_shapes_are_adapte
 private def parameter : Syntax.FunctionParameter := ⟨span, .typed none ⟨span, "seed"⟩ (annotation "Payload")⟩
 private def declaration : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "prefix"⟩, none, ⟨span, [parameter]⟩, ⟨none, none⟩,
-    some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, twoBody span span span span⟩⟩
+    some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, twoBody span span span span, []⟩⟩
 
 theorem valid_header_and_parameter_compile_the_exact_prefix_while_the_tree_adapter_still_rejects (type : Core.Ty) :
     RuntimeFunctionHeader (types type) declaration.value.signature type ∧
@@ -2256,7 +2256,7 @@ private def parameter (name type : String) : Syntax.FunctionParameter := ⟨span
 private def parameters := [parameter "flag" "Flag", parameter "seed" "Payload"]
 private def declaration (names : List String) : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "chain"⟩, none, ⟨span, parameters⟩, ⟨none, none⟩,
-    some ⟨span, ⟨span, [named "Payload"]⟩⟩, none⟩, chain names "seed"⟩⟩
+    some ⟨span, ⟨span, [named "Payload"]⟩⟩, none⟩, chain names "seed", []⟩⟩
 private def initial (type : Core.Ty) : LocalTypeInputs :=
   (LocalTypeInputs.empty.bindFresh owner "flag" .bool).bindFresh owner "seed" type
 private def compiled (names : List String) (type : Core.Ty) : CompiledRuntimeFunction := ⟨initial type, core names.length, type⟩

@@ -2569,7 +2569,7 @@ theorem nested_statement_conditionals_are_not_recursively_accepted
     by simp only [LocalInputs.runTerminalReturnBody?, rejected, bind, Option.bind_none]⟩
 
 private def declaration : Syntax.FunctionDecl :=
-  ⟨span, ⟨⟨span, ⟨span, "unchanged"⟩, none, ⟨span, []⟩, ⟨none, none⟩, none, none⟩, conditional⟩⟩
+  ⟨span, ⟨⟨span, ⟨span, "unchanged"⟩, none, ⟨span, []⟩, ⟨none, none⟩, none, none⟩, conditional, []⟩⟩
 
 theorem original_singleton_rejects_and_ill_scoped_function_entry_still_rejects
     (choice : Bool) (word : Core.Word) :
@@ -3057,7 +3057,7 @@ private def types (type : Core.Ty) : TypeNameTable := [(["Payload"], type), (["F
 private def entry (depth : Nat) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "deep"⟩, none,
     ⟨span, [parameter "c" "Flag", parameter "x" "Payload", parameter "y" "Payload"]⟩,
-    ⟨none, none⟩, some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, spine (depth + 2) x y⟩⟩
+    ⟨none, none⟩, some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, spine (depth + 2) x y, []⟩⟩
 private def inputs (type : Core.Ty) : LocalTypeInputs :=
   ((LocalTypeInputs.empty.bindFresh owner "c" .bool).bindFresh owner "x" type).bindFresh owner "y" type
 theorem a_valid_header_and_complete_parameters_compile_the_exact_deep_tree
@@ -3103,7 +3103,7 @@ private def body := branch (returned (ref "f"))
 private def declaration (source : Syntax.Block) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "choose"⟩, none,
     ⟨span, [parameter "c" "Bool", parameter "t" "Word", parameter "f" "Word"]⟩, ⟨none, none⟩,
-    some ⟨span, ⟨span, [annotation "Word"]⟩⟩, none⟩, source⟩⟩
+    some ⟨span, ⟨span, [annotation "Word"]⟩⟩, none⟩, source, []⟩⟩
 private def types : TypeNameTable := [(["Bool"], .bool), (["Word"], .word)]
 private def staticInputs := ((LocalTypeInputs.empty.bindFresh owner "c" .bool).bindFresh
   owner "t" .word).bindFresh owner "f" .word

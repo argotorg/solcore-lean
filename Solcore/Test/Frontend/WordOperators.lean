@@ -3186,7 +3186,7 @@ private def types : TypeNameTable := [(["Word"], .word)]
 private def declaration : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "sum"⟩, none, ⟨span, [parameter "l", parameter "r"]⟩,
     ⟨none, none⟩, some ⟨span, ⟨span, [annotation]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩, []⟩⟩
 private def compiled : CompiledRuntimeFunction :=
   ⟨(LocalTypeInputs.empty.bindFresh owner "l" .word).bindFresh owner "r" .word, core, .word⟩
 private theorem compilation : RuntimeFunctionCompiles types owner declaration compiled :=
@@ -3396,7 +3396,7 @@ private def types : TypeNameTable := [(["Word"], .word)]
 private def declaration (kind : Kind) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "arithmetic"⟩, none, ⟨span, [parameter "l", parameter "r"]⟩,
     ⟨none, none⟩, some ⟨span, ⟨span, [annotation]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some (source kind))⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some (source kind))⟩]⟩, []⟩⟩
 private def compiled (kind : Kind) : CompiledRuntimeFunction :=
   ⟨(LocalTypeInputs.empty.bindFresh owner "l" .word).bindFresh owner "r" .word, core kind, .word⟩
 private theorem compilation (kind : Kind) : RuntimeFunctionCompiles types owner (declaration kind) (compiled kind) := by
@@ -3654,7 +3654,7 @@ private def entryBody (kind : Kind) : Syntax.Block := ⟨span, [⟨span,
     (returned (source kind)) (some (returned (ref "l")))⟩]⟩
 private def declaration (kind : Kind) (name : String := "Word") : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "division"⟩, none, ⟨span, [parameter "l", parameter "r"]⟩,
-    ⟨none, none⟩, some ⟨span, ⟨span, [annotation name]⟩⟩, none⟩, entryBody kind⟩⟩
+    ⟨none, none⟩, some ⟨span, ⟨span, [annotation name]⟩⟩, none⟩, entryBody kind, []⟩⟩
 private def compiled (kind : Kind) : CompiledRuntimeFunction :=
   ⟨(LocalTypeInputs.empty.bindFresh owner "l" .word).bindFresh owner "r" .word,
     .ifE (.binary .wordEq (.var 1) (.var 0)) (core kind) (.var 1), .word⟩
@@ -3919,7 +3919,7 @@ private def types : TypeNameTable := [(["Bool"], .bool), (["Word"], .word)]
 private def declaration (returnName : String) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "equal"⟩, none, ⟨span, [parameter "l", parameter "r"]⟩,
     ⟨none, none⟩, some ⟨span, ⟨span, [annotation returnName]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩, []⟩⟩
 private def compiled : CompiledRuntimeFunction :=
   ⟨(LocalTypeInputs.empty.bindFresh owner "l" .word).bindFresh owner "r" .word, core, .bool⟩
 private theorem wordAnnotation : TypeNameDenotes types (annotation "Word") .word :=
@@ -4208,7 +4208,7 @@ private def types : TypeNameTable := [(["Bool"], .bool), (["Word"], .word)]
 private def declaration (returnName : String) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "greaterEqual"⟩, none, ⟨span, [parameter "l", parameter "r"]⟩,
     ⟨none, none⟩, some ⟨span, ⟨span, [annotation returnName]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩, []⟩⟩
 private def compiled : CompiledRuntimeFunction :=
   ⟨(LocalTypeInputs.empty.bindFresh owner "l" .word).bindFresh owner "r" .word, core, .bool⟩
 private theorem wordAnnotation : TypeNameDenotes types (annotation "Word") .word :=
@@ -4443,7 +4443,7 @@ private def types : TypeNameTable := [(["Bool"], .bool), (["Word"], .word)]
 private def declaration (returnName : String) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "greater"⟩, none, ⟨span, [parameter "l", parameter "r"]⟩,
     ⟨none, none⟩, some ⟨span, ⟨span, [annotation returnName]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩, []⟩⟩
 private def compiled : CompiledRuntimeFunction :=
   ⟨(LocalTypeInputs.empty.bindFresh owner "l" .word).bindFresh owner "r" .word, core, .bool⟩
 private theorem wordAnnotation : TypeNameDenotes types (annotation "Word") .word :=
@@ -4697,7 +4697,7 @@ private def types : TypeNameTable := [(["Bool"], .bool), (["Word"], .word)]
 private def declaration (returnName : String) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "notEqual"⟩, none, ⟨span, [parameter "l", parameter "r"]⟩,
     ⟨none, none⟩, some ⟨span, ⟨span, [annotation returnName]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩, []⟩⟩
 private def compiled : CompiledRuntimeFunction :=
   ⟨(LocalTypeInputs.empty.bindFresh owner "l" .word).bindFresh owner "r" .word, core, .bool⟩
 private theorem wordAnnotation : TypeNameDenotes types (annotation "Word") .word :=
@@ -5098,7 +5098,7 @@ private def types : TypeNameTable := [(["Bool"], .bool), (["Word"], .word)]
 private def declaration (returnName : String) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "lessEqual"⟩, none, ⟨span, [parameter "l", parameter "r"]⟩,
     ⟨none, none⟩, some ⟨span, ⟨span, [annotation returnName]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩, []⟩⟩
 private def compiled : CompiledRuntimeFunction :=
   ⟨(LocalTypeInputs.empty.bindFresh owner "l" .word).bindFresh owner "r" .word, core, .bool⟩
 private theorem wordAnnotation : TypeNameDenotes types (annotation "Word") .word :=
@@ -5383,7 +5383,7 @@ private def types : TypeNameTable := [(["Bool"], .bool), (["Word"], .word)]
 private def declaration (returnName : String) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "less"⟩, none, ⟨span, [parameter "l", parameter "r"]⟩,
     ⟨none, none⟩, some ⟨span, ⟨span, [annotation returnName]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩, []⟩⟩
 private def compiled : CompiledRuntimeFunction :=
   ⟨(LocalTypeInputs.empty.bindFresh owner "l" .word).bindFresh owner "r" .word, core, .bool⟩
 private theorem wordAnnotation : TypeNameDenotes types (annotation "Word") .word :=

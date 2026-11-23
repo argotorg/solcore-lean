@@ -5087,7 +5087,7 @@ theorem opaque_cells_and_captured_functions_are_whole_arguments (location : Core
 private def declaration (n : Nat) : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "packed"⟩, none, ⟨span, parameters n⟩, ⟨none, none⟩,
       some ⟨span, ⟨span, [shape n]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some ⟨span, .identifier ⟨span, "packed"⟩⟩)⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some ⟨span, .identifier ⟨span, "packed"⟩⟩)⟩]⟩, []⟩⟩
 private def compiled (type : Core.Ty) (n : Nat) : CompiledRuntimeFunction := ⟨static type n, .var 2, product type n⟩
 private theorem compilation (type : Core.Ty) (n : Nat) : RuntimeFunctionCompiles (table type) (owner 0) (declaration n) (compiled type n) :=
   ⟨⟨rfl, rfl, rfl, rfl, .single (meaning type n)⟩, declared type n,
@@ -5184,7 +5184,7 @@ private def value (actual : Core.Value) : Nat → Core.Value
 private def parameter (type : Syntax.TypeExpr) : Syntax.FunctionParameter := ⟨span, .typed none ⟨span, "seed"⟩ type⟩
 private def body (n : Nat) : Syntax.Block := ⟨span, [⟨span, .returnStmt (some (source n))⟩]⟩
 private def entry (returnClause : Option Syntax.ReturnClause) (parameters : List Syntax.FunctionParameter) (body : Syntax.Block) : Syntax.FunctionDecl :=
-  ⟨span, ⟨signature span returnClause parameters, body⟩⟩
+  ⟨span, ⟨signature span returnClause parameters, body, []⟩⟩
 private def declaration (n : Nat) := entry (clause span span [annotation n]) [parameter (named "Payload")] (body n)
 private def initial (type : Core.Ty) := LocalTypeInputs.empty.bindFresh owner "seed" type
 private def compiled (type : Core.Ty) (n : Nat) : CompiledRuntimeFunction := ⟨initial type, core n, product type n⟩

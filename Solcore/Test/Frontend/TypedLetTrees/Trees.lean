@@ -163,7 +163,7 @@ theorem same_typed_alternative_core_is_not_source_provenance (definitions : Core
 private def parameter (name typeName : String) : Syntax.FunctionParameter := ⟨span, .typed none ⟨span, name⟩ (annotation typeName)⟩
 private def declaration : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "sibling"⟩, none, ⟨span, [parameter "c" "Flag", parameter "x" "Payload", parameter "y" "Payload"]⟩,
-    ⟨none, none⟩, some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, sibling⟩⟩
+    ⟨none, none⟩, some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, sibling, []⟩⟩
 theorem valid_header_and_parameters_compile_recursive_bodies_while_old_adapters_reject :
     RuntimeFunctionHeader (types .word) declaration.value.signature .word ∧
     RuntimeParametersDeclare (types .word) owner declaration.value.signature.parameters.elements inputs ∧

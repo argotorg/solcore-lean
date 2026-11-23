@@ -327,7 +327,7 @@ private def parameter (name type : String) : Syntax.FunctionParameter := ⟨span
 private def parameters := [parameter "f" "Fn", parameter "x" "Payload", parameter "y" "Payload"]
 private def entry (n : Nat) (original : Syntax.Block := body n) : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "nested"⟩, none, ⟨span, parameters⟩, ⟨none, none⟩,
-    some ⟨span, ⟨span, [named "Payload"]⟩⟩, none⟩, original⟩⟩
+    some ⟨span, ⟨span, [named "Payload"]⟩⟩, none⟩, original, []⟩⟩
 private def initial (a : Core.Ty) : LocalTypeInputs :=
   ((LocalTypeInputs.empty.bindFresh owner "f" (.function a a)).bindFresh owner "x" a).bindFresh owner "y" a
 private def tailCore : Core.Expr := .letE (.var 0) (.var 1)

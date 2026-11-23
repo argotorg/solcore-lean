@@ -286,7 +286,7 @@ theorem branch_local_bindings_remain_outside_the_old_prefix_adapter (table : Typ
   | some pair => rcases pair with ⟨core, type⟩; simp [body, branch, binding, elaborateTypedLetReturnBody?, elaborateTerminalReturnTree?, checked]
 private def closedArm := binding (named "Payload") "z" zero (returned "z")
 private def closedEntry : Syntax.FunctionDecl := ⟨span, ⟨⟨span, ⟨span, "closed"⟩, none, ⟨span, []⟩,
-  ⟨none, none⟩, some ⟨span, ⟨span, [named "Payload"]⟩⟩, none⟩, branch guard closedArm closedArm⟩⟩
+  ⟨none, none⟩, some ⟨span, ⟨span, [named "Payload"]⟩⟩, none⟩, branch guard closedArm closedArm, []⟩⟩
 private def closedCore : Core.Expr := .ifE (.binary .wordEq (.word .zero) (.word .zero))
   (.letE (.word .zero) (.var 0)) (.letE (.word .zero) (.var 0))
 theorem valid_recursive_entry_has_independent_header_parameters_and_exact_compilation :

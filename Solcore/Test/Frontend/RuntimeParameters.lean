@@ -45,7 +45,7 @@ private def parameters := [parameter "c" "Cond", parameter "t" "Payload", parame
 private def types (payload condition : Core.Ty) : TypeNameTable := [(["Payload"], payload), (["Cond"], condition)]
 private def entry (params : List Syntax.FunctionParameter) (result : String) (body : Syntax.Block) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "pick"⟩, none, ⟨span, params⟩, ⟨none, none⟩,
-    some ⟨span, ⟨span, [annotation result]⟩⟩, none⟩, body⟩⟩
+    some ⟨span, ⟨span, [annotation result]⟩⟩, none⟩, body, []⟩⟩
 private def declaration (conditional : Bool) : Syntax.FunctionDecl :=
   entry parameters "Payload" (if conditional then selected "t" "f" else returned "t")
 private def inputs (id : Resolved.DeclarationId) (payload condition : Core.Ty) : LocalTypeInputs :=
@@ -2980,7 +2980,7 @@ private def ref (name : String) : Syntax.Expr := ⟨span, .identifier ⟨span, n
 private def declaration (source : Syntax.Expr) (result : String := "Output") : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "entry"⟩, none, ⟨span, [parameter]⟩, ⟨none, none⟩,
     some ⟨span, ⟨span, [annotation result]⟩⟩, none⟩,
-    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩⟩⟩
+    ⟨span, [⟨span, .returnStmt (some source)⟩]⟩, []⟩⟩
 private def boolArg (value : Bool) : TypedRuntimeArgument := ⟨.bool, .bool value, .bool⟩
 private def inputs (argument : TypedRuntimeArgument) : LocalInputs :=
   LocalInputs.empty.bindFresh owner "c" argument.type argument.value argument.valueTyped

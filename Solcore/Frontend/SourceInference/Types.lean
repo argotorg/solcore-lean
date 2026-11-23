@@ -282,6 +282,10 @@ structure CheckedFunction where
   substitution : Substitution
   solvedRequirements : List SolvedRequirement
   typedBody : TypedSource
+  /-- The name spans of the `let`s annotated `comptime<T>` at the top
+  (`Syntax.FunctionDeclValue.comptimeLets`), whose binders the plan requires to be
+  comptime-staged. -/
+  comptimeLets : List Syntax.SourceSpan := []
   deriving Repr, BEq
 
 namespace Result

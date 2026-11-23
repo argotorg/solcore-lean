@@ -75,6 +75,9 @@ structure FunctionSignature where
 structure FunctionDeclValue where
   signature : FunctionSignature
   body : Block
+  /-- The name spans of the body's `let`s annotated `comptime<T>` at the top, which
+  `Unchecked.mark` reads at `T`: each such binder must be comptime-staged. -/
+  comptimeLets : List SourceSpan := []
   deriving Repr, BEq
 
 abbrev FunctionDecl := Located FunctionDeclValue

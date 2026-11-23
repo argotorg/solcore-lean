@@ -228,7 +228,7 @@ theorem an_unknown_unselected_annotation_remains_whole_none_under_a_nonsurjectiv
 
 private def closedBody := branch guard (binding "x" zero (returned "x")) (binding "x" zero (returned "x"))
 private def declaration : Syntax.FunctionDecl := ⟨span,
-  ⟨⟨span, ⟨span, "closed"⟩, none, ⟨span, []⟩, ⟨none, none⟩, some ⟨span, ⟨span, [annotation]⟩⟩, none⟩, closedBody⟩⟩
+  ⟨⟨span, ⟨span, "closed"⟩, none, ⟨span, []⟩, ⟨none, none⟩, some ⟨span, ⟨span, [annotation]⟩⟩, none⟩, closedBody, []⟩⟩
 theorem valid_recursive_bodies_compile_at_each_owner_while_old_prefixes_reject :
     RuntimeFunctionHeader (types .word) declaration.value.signature .word ∧
     RuntimeParametersDeclare (types .word) (owner 0) declaration.value.signature.parameters.elements .empty ∧

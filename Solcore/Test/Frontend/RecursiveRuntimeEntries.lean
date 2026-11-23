@@ -327,7 +327,7 @@ private def parameters := [parameter "c" "Flag", parameter "x" "Payload", parame
 private def types (type : Core.Ty) : TypeNameTable := [(["Payload"], type), (["Flag"], .bool)]
 private def declaration (depth : Nat) : Syntax.FunctionDecl := ⟨span,
   ⟨⟨span, ⟨span, "recursive"⟩, none, ⟨span, parameters⟩, ⟨none, none⟩,
-    some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, body depth⟩⟩
+    some ⟨span, ⟨span, [annotation "Payload"]⟩⟩, none⟩, body depth, []⟩⟩
 private def staticInputs (type : Core.Ty) : LocalTypeInputs :=
   ((LocalTypeInputs.empty.bindFresh owner "c" .bool).bindFresh owner "x" type).bindFresh owner "y" type
 private def compiled (depth : Nat) (type : Core.Ty) : CompiledRuntimeFunction := ⟨staticInputs type, core depth, type⟩
@@ -539,9 +539,9 @@ theorem missing_or_wrong_ordered_actual_types_do_not_follow_from_static_compilat
     if_neg mismatch]
 
 private def publicEntry (depth : Nat) : Syntax.FunctionDecl :=
-  ⟨span, ⟨{ (declaration depth).value.signature with modifiers := ⟨some span, none⟩ }, body depth⟩⟩
+  ⟨span, ⟨{ (declaration depth).value.signature with modifiers := ⟨some span, none⟩ }, body depth, []⟩⟩
 private def duplicateEntry (depth : Nat) : Syntax.FunctionDecl := ⟨span,
-  ⟨{ (declaration depth).value.signature with parameters := ⟨span, [parameter "c" "Flag", parameter "x" "Payload", parameter "x" "Payload"]⟩ }, body depth⟩⟩
+  ⟨{ (declaration depth).value.signature with parameters := ⟨span, [parameter "c" "Flag", parameter "x" "Payload", parameter "x" "Payload"]⟩ }, body depth, []⟩⟩
 theorem whole_header_and_complete_parameter_policy_still_precede_deep_body_acceptance
     (depth : Nat) (type : Core.Ty) :
     TerminalReturnTreeElaborates (staticInputs type).names (staticInputs type).context (body depth) (core depth) type ∧

@@ -58,7 +58,8 @@ structure BodyReceipt (environment : ProgramEnvironment) (signatures : ProgramSi
     returnComptime := signature.returnComptime
     substitution := finalized.substitution
     solvedRequirements := finalized.solvedRequirements
-    typedBody := finalized.typedSource }
+    typedBody := finalized.typedSource
+    comptimeLets := signature.source.value.comptimeLets }
 
 namespace BodyReceipt
 variable {environment : ProgramEnvironment} {signatures : ProgramSignatures}

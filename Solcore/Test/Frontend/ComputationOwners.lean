@@ -46,7 +46,7 @@ private def body (conditional : Bool) : Syntax.Block :=
   if conditional then ⟨span, [⟨span, .ifThen (ref "c") (returned "x") (some (returned "y"))⟩]⟩ else returned "x"
 private def declaration (conditional : Bool) : Syntax.FunctionDecl :=
   ⟨span, ⟨⟨span, ⟨span, "choose"⟩, none, ⟨span, parameters⟩, ⟨none, none⟩,
-    some ⟨span, ⟨span, [annotation "Result"]⟩⟩, none⟩, body conditional⟩⟩
+    some ⟨span, ⟨span, [annotation "Result"]⟩⟩, none⟩, body conditional, []⟩⟩
 private def inputs (id : Resolved.DeclarationId) (type : Core.Ty) : LocalTypeInputs :=
   ((LocalTypeInputs.empty.bindFresh id "c" .bool).bindFresh id "x" type).bindFresh id "y" type
 private theorem freshOne (id : Resolved.DeclarationId) :
@@ -203,7 +203,7 @@ theorem no_actual_input_bundle_can_be_reconstructed_from_the_nominal_static_cont
       exact nominal_argument_absent dataType ⟨⟨first.type, first.value, first.valueTyped⟩, sameType⟩
 
 private def missing : Syntax.FunctionDecl := ⟨span,
-  ⟨(declaration true).value.signature, ⟨span, [⟨span, .ifThen (ref "c") (returned "x") (some (returned "missing"))⟩]⟩⟩⟩
+  ⟨(declaration true).value.signature, ⟨span, [⟨span, .ifThen (ref "c") (returned "x") (some (returned "missing"))⟩]⟩, []⟩⟩
 theorem invalid_unselected_arm_remains_none_for_every_owner_and_type
     (leftOwner rightOwner : Resolved.DeclarationId) (type : Core.Ty) :
     compileRuntimeFunction? (types type) leftOwner missing = none ∧
@@ -1048,7 +1048,7 @@ private def statements (s : Syntax.SourceSpan) : Nat → List Syntax.Statement
       ⟨s,.letDecl ⟨s,"x"⟩ none (some (ref s "x"))⟩::statements s n
 private def entry (s : Syntax.SourceSpan) (n : Nat) : Syntax.FunctionDecl := ⟨s,
   ⟨⟨s,⟨s,"independentArguments"⟩,none,⟨s,parameters s⟩,⟨none,none⟩,
-    some ⟨s,⟨s,[named s "B"]⟩⟩,none⟩,⟨s,statements s n⟩⟩⟩
+    some ⟨s,⟨s,[named s "B"]⟩⟩,none⟩,⟨s,statements s n⟩, []⟩⟩
 private def scope (o : Resolved.DeclarationId) (a b : Core.Ty) : Nat → LocalTypeInputs
   | 0 => (LocalTypeInputs.empty.bindFresh o "f" (.function a b)).bindFresh o "x" a
   | m+1 => (scope o a b m).bindFresh o "x" a
@@ -1314,7 +1314,7 @@ private def statements (s : Syntax.SourceSpan) : Nat → List Syntax.Statement
       ⟨s,.letDecl ⟨s,"x"⟩ none (some (ref s "x"))⟩::statements s n
 private def entry (s : Syntax.SourceSpan) (n : Nat) : Syntax.FunctionDecl := ⟨s,
   ⟨⟨s,⟨s,"checkpointShadows"⟩,none,⟨s,parameters s⟩,⟨none,none⟩,
-    some ⟨s,⟨s,[named s "B"]⟩⟩,none⟩,⟨s,statements s n⟩⟩⟩
+    some ⟨s,⟨s,[named s "B"]⟩⟩,none⟩,⟨s,statements s n⟩, []⟩⟩
 private def scope (o : Resolved.DeclarationId) (a b : Core.Ty) : Nat → LocalTypeInputs
   | 0 => (LocalTypeInputs.empty.bindFresh o "f" (.function a b)).bindFresh o "x" a
   | m+1 => (scope o a b m).bindFresh o "x" a
@@ -1556,7 +1556,7 @@ private def ref (s : Syntax.SourceSpan) : Syntax.Expr := ⟨s,.identifier ⟨s,"
 private def parameter (s : Syntax.SourceSpan) : Syntax.FunctionParameter := ⟨s,.typed none ⟨s,"x"⟩ (named s)⟩
 private def entry (s : Syntax.SourceSpan) : Syntax.FunctionDecl := ⟨s,
   ⟨⟨s,⟨s,"checkerBoundary"⟩,none,⟨s,[parameter s]⟩,⟨none,none⟩,some ⟨s,⟨s,[named s]⟩⟩,none⟩,
-    ⟨s,[⟨s,.letDecl ⟨s,"x"⟩ (some (named s)) (some (ref s))⟩,⟨s,.returnStmt (some (ref s))⟩]⟩⟩⟩
+    ⟨s,[⟨s,.letDecl ⟨s,"x"⟩ (some (named s)) (some (ref s))⟩,⟨s,.returnStmt (some (ref s))⟩]⟩, []⟩⟩
 private def staticInputs (o : Resolved.DeclarationId) (a : Core.Ty) := LocalTypeInputs.empty.bindFresh o "x" a
 private def inputs (o : Resolved.DeclarationId) (arg : TypedRuntimeArgument) :=
   LocalInputs.empty.bindFresh o "x" arg.type arg.value arg.valueTyped
@@ -1694,7 +1694,7 @@ private def statements (s : Syntax.SourceSpan) : Nat → List Syntax.Statement
       ⟨s,.letDecl ⟨s,"x"⟩ none (some (ref s "x"))⟩::statements s n
 private def entry (s : Syntax.SourceSpan) (n : Nat) : Syntax.FunctionDecl := ⟨s,
   ⟨⟨s,⟨s,"ownerCovariant"⟩,none,⟨s,parameters s⟩,⟨none,none⟩,
-    some ⟨s,⟨s,[named s "B"]⟩⟩,none⟩,⟨s,statements s n⟩⟩⟩
+    some ⟨s,⟨s,[named s "B"]⟩⟩,none⟩,⟨s,statements s n⟩, []⟩⟩
 private def scope (o : Resolved.DeclarationId) (a b : Core.Ty) : Nat → LocalTypeInputs
   | 0 => (LocalTypeInputs.empty.bindFresh o "f" (.function a b)).bindFresh o "x" a
   | m+1 => (scope o a b m).bindFresh o "x" a
@@ -1956,7 +1956,7 @@ private def body (s : Syntax.SourceSpan) : Syntax.Block := ⟨s,
 private def parameter (s : Syntax.SourceSpan) : Syntax.FunctionParameter := ⟨s,.typed none ⟨s,"x"⟩ (named s)⟩
 private def entry (s : Syntax.SourceSpan) : Syntax.FunctionDecl := ⟨s,
   ⟨⟨s,⟨s,"transported"⟩,none,⟨s,[parameter s]⟩,⟨none,none⟩,
-    some ⟨s,⟨s,[named s]⟩⟩,none⟩,body s⟩⟩
+    some ⟨s,⟨s,[named s]⟩⟩,none⟩,body s, []⟩⟩
 private def initial (o : Resolved.DeclarationId) (a : Core.Ty) := LocalTypeInputs.empty.bindFresh o "x" a
 private def core : Core.Expr := .letE (.var 0) (.var 0)
 private def compiled (o : Resolved.DeclarationId) (a : Core.Ty) : CompiledRuntimeFunction := ⟨initial o a,core,a⟩

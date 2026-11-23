@@ -1183,6 +1183,7 @@ private def checkedFunctionOfResult (signature : ProgramFunctionSignature)
     substitution := result.substitution
     solvedRequirements := result.solvedRequirements
     typedBody := result.typedSource
+    comptimeLets := signature.source.value.comptimeLets
   }
 
 /-- Check the parsed body owned by one resolved top-level function signature. -/
@@ -1260,6 +1261,7 @@ theorem checkFunctionBody_success_witness
                 substitution := result.substitution
                 solvedRequirements := result.solvedRequirements
                 typedBody := result.typedSource
+                comptimeLets := signature.source.value.comptimeLets
               } := by
   unfold checkFunctionBody at success
   cases resultEq :

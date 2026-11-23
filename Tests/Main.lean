@@ -72,6 +72,7 @@ import Solcore.Test.Frontend.ImportParity
 import Solcore.Test.Frontend.StdOpcodes
 import Solcore.Test.Frontend.QualifiedNames
 import Solcore.Test.Frontend.BuiltinSum
+import Solcore.Test.Frontend.ComptimeLocals
 import Solcore.Test.Frontend.OperatorImplementations
 import Solcore.Test.Frontend.LocalExpressions
 import Solcore.Test.Frontend.WordOperators
@@ -1026,6 +1027,7 @@ def staticSemanticsSpineTests : IO Unit := do
   Tests.StdOpcodes.run
   Tests.QualifiedNames.run
   Tests.BuiltinSum.run
+  Tests.ComptimeLocals.run
   Tests.OperatorImplementations.run
   Tests.ImportedResolutionConsumers.testImportedResolutionConsumers
   testProgramLoading

@@ -30,7 +30,7 @@ private def parameters (s : Syntax.SourceSpan) : List Syntax.FunctionParameter :
 private def ref (s : Syntax.SourceSpan) : Syntax.Expr := ⟨s,.identifier ⟨s,"y"⟩⟩
 private def entry (s : Syntax.SourceSpan) : Syntax.FunctionDecl := ⟨s,
   ⟨⟨s,⟨s,"artificialChoices"⟩,none,⟨s,parameters s⟩,⟨none,none⟩,
-    some ⟨s,⟨s,[named s "B"]⟩⟩,none⟩,⟨s,[⟨s,.returnStmt (some (ref s))⟩]⟩⟩⟩
+    some ⟨s,⟨s,[named s "B"]⟩⟩,none⟩,⟨s,[⟨s,.returnStmt (some (ref s))⟩]⟩, []⟩⟩
 private def Choice (_ : LocalNameTable) (_ : Resolved.Context) (_ : Syntax.Expr)
     (core : Core.Expr) (type : Core.Ty) : Prop := (∃ b,core=.bool b) ∧ type=.bool
 private def staticInputs (o : Resolved.DeclarationId) (a : Core.Ty) :=
