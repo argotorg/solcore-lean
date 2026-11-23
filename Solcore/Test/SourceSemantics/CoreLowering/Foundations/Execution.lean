@@ -453,7 +453,17 @@ private def testViewRoots : IO Unit := do
     let id ← declaration program name
     let compiled ← get s!"word root {name}" (compileChecked program [Seed.declaration id] options)
     require (compiled.rootCount == 1) s!"word root {name} lost its root"
-  IO.println "ROOT_PUBLIC_TYPES_PASS: roots holding a memory array, a slice or a memref, through tuples, type arguments, enum payloads and function types, rejected; word roots over arrays compiled"
+  -- The session's roots keep the same check, for a compilation that did not pass the compiler's.
+  let arrayResult ← declaration program "arrayResult"
+  let request ← get "array root request" (SourceProgramExecution.resolveSeed program (Seed.declaration arrayResult))
+  let plan ← match SourceSpecializationWorklist.run program [request] 256 with
+    | .ok (.complete plan) => pure plan
+    | _ => throw (IO.userError "array root plan missing")
+  let cached ← get "array root compilation" (SourceCoreUnifiedCompilation.prepare program plan 1000)
+  match SourceCoreIndexedSession.Recipe.prepare cached with
+  | .error { code := .rootWithoutPublicValue _ _, .. } => pure ()
+  | other => throw (IO.userError s!"a session root holding a view was not rejected: prepared {other.toOption.isSome}")
+  IO.println "ROOT_PUBLIC_TYPES_PASS: roots holding a memory array, a slice or a memref, through tuples, type arguments, enum payloads and function types, rejected by the compiler and by the session's roots; word roots over arrays compiled"
 
 def run : IO Unit := do
   testViewRoots

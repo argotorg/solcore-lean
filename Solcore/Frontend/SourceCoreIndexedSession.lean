@@ -3,6 +3,7 @@ import Solcore.Frontend.SourceCore.Internal.Entries
 import Solcore.Core.Fuel
 import Solcore.Frontend.SourceCoreUnified
 import Solcore.Frontend.SourceCore.Internal.CallableIndexed
+import Solcore.Frontend.SourceCore.RootTypes
 
 /-!
 # Indexed sessions
@@ -56,6 +57,8 @@ inductive ErrorCode where
   | principal (error : SourceCoreCallableIndexedPrincipalAllocations.Error)
   | heapMigration (error : SourceCoreIndexedHeapMigration.Error)
   | invalidExportedPrefix (validationFuel : Nat)
+  /-- A root's parameter or result type has no public value (`SourceCoreRootTypes.holdsView`). -/
+  | rootWithoutPublicValue (key : Key) (type : Ty)
   deriving Repr
 structure Error where
   path : List PathStep := []
@@ -145,6 +148,10 @@ structure Root (compiled : SourceCoreUnifiedCompilation.Compiled) where private 
   body : Core.Expr
   typed : Core.HasType (types.reverse ++ (SourceCoreCallableIndexedTemplates.globalEnvironment compiled.indexed).map Core.Value.type)
     body (Core.LanguageResult.resultType type) compiled.indexed.layouts.definitions
+  /-- Its result and parameter types have public values: none holds a memory array, a slice or a
+  memref (the memory arrays note, decision 5). -/
+  publicTypes : ∀ sourceType ∈ result :: inputs,
+    SourceCoreRootTypes.ViewFree compiled.sourceProgram.signatures sourceType
 
 private def prepareRoot (compiled : SourceCoreUnifiedCompilation.Compiled)
     (entry : SourceCoreCallableIndexedPrograms.Entry compiled.indexed.layouts) : Except Error (Root compiled) := do
@@ -161,8 +168,14 @@ private def prepareRoot (compiled : SourceCoreUnifiedCompilation.Compiled)
   | .ok resultType =>
     if same : resultType = function.signature.resultType then
       if accepted : Core.infer? context body compiled.indexed.layouts.definitions = some expected then
-        pure ⟨entry.key, entry.inputs.map (·.scheme.body), types, entry.sourceResultType,
-          function.signature.resultType, same ▸ projection, body, Core.infer_sound accepted⟩
+        let sourceTypes := entry.sourceResultType :: entry.inputs.map (·.scheme.body)
+        if publicTypes : (sourceTypes.all fun sourceType =>
+            !SourceCoreRootTypes.holdsView compiled.sourceProgram.signatures sourceType) = true then
+          pure ⟨entry.key, entry.inputs.map (·.scheme.body), types, entry.sourceResultType,
+            function.signature.resultType, same ▸ projection, body, Core.infer_sound accepted,
+            SourceCoreRootTypes.ViewFree.of_all publicTypes⟩
+        else throw ⟨[], .rootWithoutPublicValue entry.key ((sourceTypes.find? fun sourceType =>
+          SourceCoreRootTypes.holdsView compiled.sourceProgram.signatures sourceType).getD .error)⟩
       else throw ⟨[], .checkFailed expected (Core.infer? context body compiled.indexed.layouts.definitions)⟩
     else throw ⟨[], .invalidBootstrap⟩
 
@@ -1443,10 +1456,12 @@ private theorem root_factory_shape {compiled : SourceCoreUnifiedCompilation.Comp
       · rename_i same
         split at accepted
         · rename_i inferred
-          cases accepted
-          refine ⟨function, index, selected, ?_, rfl, rfl, rfl, rfl, rfl, ?_, rfl, inferred⟩
-          · simpa using List.find?_some selected
-          · simpa only [same] using projection
+          split at accepted
+          · cases accepted
+            refine ⟨function, index, selected, ?_, rfl, rfl, rfl, rfl, rfl, ?_, rfl, inferred⟩
+            · simpa using List.find?_some selected
+            · simpa only [same] using projection
+          · contradiction
         · contradiction
       · contradiction
 
