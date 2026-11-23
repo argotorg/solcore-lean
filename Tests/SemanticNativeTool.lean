@@ -81,7 +81,8 @@ private def compileStage : SourceCompiler.CompileError → String
     | .invalidPlan _ => "linking"
     | .planEvidence _ => "plan-validation"
     | .compilation _ => "core-lowering"
-    | .root _ _ | .rootCountMismatch _ _ | .rootOrderMismatch => "root-validation"
+    | .root _ _ | .rootCountMismatch _ _ | .rootOrderMismatch
+    | .rootWithoutPublicValue _ _ => "root-validation"
 
 private def word (text : String) : Except String SourceCompiler.Value :=
   match text.toNat? with
