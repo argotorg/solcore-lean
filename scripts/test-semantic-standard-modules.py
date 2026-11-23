@@ -59,6 +59,37 @@ function g(x: word) returns (word) {
         self.assertEqual(modules.exports("std.b"), [("z", "function"), ("Y", "trait")])
         self.assertEqual(modules.exports("std.c"), [("Y", "trait"), ("x", "function")])
 
+    def test_exports_carry_their_origins_and_the_constructors_they_show(self):
+        modules = library(
+            std__a="pragma solcore;\nexport { x, T(*), U, V(B) };\n"
+                   "function x(v: word) returns (word) { return v; }\n"
+                   "enum T { T(word), Other(memory<word>, word) }\nenum U { U }\nenum V { A, B }\n",
+            std__b="pragma solcore;\nimport { x as z, T } from std.a;\nexport { z, T(*) };\n"
+                   "export std.a.{ U, V(*) };\n",
+            std__c="pragma solcore;\nexport std.a.*;\n")
+        self.assertEqual(modules.module("std.a").constructors,
+                         {"T": ["T", "Other"], "U": ["U"], "V": ["A", "B"]})
+        self.assertEqual(modules.details("std.a"), {"x": ("std.a", "x", []), "T": ("std.a", "T", ["T", "Other"]),
+                                                    "U": ("std.a", "U", []), "V": ("std.a", "V", ["B"])})
+        self.assertEqual(modules.details("std.b"), {"z": ("std.a", "x", []), "T": ("std.a", "T", ["T", "Other"]),
+                                                    "U": ("std.a", "U", []), "V": ("std.a", "V", ["B"])})
+        self.assertEqual(modules.details("std.c"), modules.details("std.a"))
+        text = standard.render({f"{name.replace('.', '/')}.sol": text for name, text in {
+            "std/std": "pragma solcore;\nexport std.a.{ x, T(*) };\n",
+            "std/a": "pragma solcore;\nexport { x, T(*) };\nfunction x(v: word) returns (word) { return v; }\n"
+                     "enum T { T(word), Other }\n",
+            "std/opcodes": "pragma solcore;\nexport { add };\n"
+                           "function add(x: word, y: word) returns (word) { return x; }\n"}.items()})
+        self.assertIn('(["std"], [\n      ("x", ["std", "a"], "x"), ("T", ["std", "a"], "T")])]', text)
+        self.assertIn('(["std"], [\n      ("T", ["T", "Other"])]),\n'
+                      '  (["std", "a"], [\n      ("T", ["T", "Other"])])]', text)
+
+    def test_a_constructor_a_type_does_not_show_fails(self):
+        modules = library(std__a="pragma solcore;\nexport { T };\nenum T { A }\n",
+                          std__b="pragma solcore;\nexport std.a.{ T(A) };\n")
+        with self.assertRaises(standard.StandardError):
+            modules.details("std.b")
+
     def test_forms_it_does_not_read_fail(self):
         undeclared = library(std__std="pragma solcore;\nexport { missing };\n")
         with self.assertRaises(standard.StandardError):

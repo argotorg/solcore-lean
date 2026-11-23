@@ -64,6 +64,9 @@ structure ProgramImports where
   /-- The namespace paths that stand for upstream's `std.opcodes`: `opcodes` and `std.opcodes` for
   a plain import, the alias for a namespace import. -/
   builtinNamespaces : List (List String) := []
+  /-- The `std.opcodes` functions that a plain or namespace import of a user module names
+  qualified, the module re-exporting them: each namespace path, public name and function. -/
+  builtinQualified : List (List String × String × String) := []
   deriving Repr
 
 /-- Import construction failures which cannot be interpreted as name absence. -/
@@ -158,11 +161,27 @@ private def wildcardValues
       declaration := entity.declaration
     }
 
+/-- The std names a user module's interface carries (`ProgramPublicStandard`). -/
+private def targetStandard (interfaces : ProgramInterfaces) (target : Workspace.ModuleId) :
+    List ProgramPublicStandard :=
+  ((interfaces.interface? target).map (·.standard)).getD []
+
+/-- The builtins that std names a user module re-exports give under a local name: each of
+`std.opcodes`' functions its function, which `builtinNamed?` reads as it reads a direct import's.
+Another std name binds nothing, as an import of its std module binds nothing. -/
+private def relayedBuiltins (localName : String) (entries : List ProgramPublicStandard) :
+    List ProgramImportedBuiltin :=
+  entries.filterMap fun entry =>
+    if entry.originModule == ["std", "opcodes"] then
+      some { localName, function := entry.originName }
+    else none
+
 private structure SelectedDeclarations where
   errors : List ProgramImportError := []
   types : List ProgramImportedType := []
   traits : List ProgramImportedTrait := []
   values : List ProgramImportedValue := []
+  builtins : List ProgramImportedBuiltin := []
 
 private def selectedTrait
     (importer target : Workspace.ModuleId) (sourceName localName : String) :
@@ -202,8 +221,9 @@ private def selectedDeclarations
       traitCandidates
     let values := valueCandidates.map fun declaration =>
       { localName, declaration : ProgramImportedValue }
+    let standard := (targetStandard interfaces target).filter (·.publicName == sourceName)
     let absent := typeCandidates.isEmpty && traitCandidates.isEmpty &&
-      valueCandidates.isEmpty
+      valueCandidates.isEmpty && standard.isEmpty
     {
       errors :=
         (if absent then [.unknownSelectedType importer target sourceName]
@@ -211,6 +231,7 @@ private def selectedDeclarations
       types := typeResult.2
       traits := traitResult.2
       values
+      builtins := relayedBuiltins localName standard
     }
 
 private def selectedDeclarationsList
@@ -224,6 +245,7 @@ private def selectedDeclarationsList
       types := result.types ++ next.types
       traits := result.traits ++ next.traits
       values := result.values ++ next.values
+      builtins := result.builtins ++ next.builtins
     }) {}
 
 private def defaultNamespaceName (path : Syntax.ModulePath) : String :=
@@ -327,6 +349,15 @@ private def processStandardOpcodesImport (earlier : List EarlierBinding)
     bindings.map fun (localName, _) =>
       { localName, group := .value, target := standardOpcodesModule })
 
+/-- A plain or namespace import of a user module names qualified, under the import's namespace
+path, the `std.opcodes` functions the module re-exports. -/
+private def addRelayedQualified (interfaces : ProgramInterfaces) (target : Workspace.ModuleId)
+    (namespacePath : List String) (visibility : ProgramImports) : ProgramImports :=
+  { visibility with
+    builtinQualified := visibility.builtinQualified ++
+      ((targetStandard interfaces target).filter (·.originModule == ["std", "opcodes"])).map
+        fun entry => (namespacePath, entry.publicName, entry.originName) }
+
 private def processImport
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (importer : Workspace.ModuleId) (earlier : List EarlierBinding)
@@ -346,11 +377,14 @@ private def processImport
       match resolveProgramImportModule environment importer path with
       | .error error => ([error], visibility, [])
       | .ok target =>
-          ([], addNamespace visibility (defaultNamespaceName path) target, [])
+          ([], addRelayedQualified interfaces target [defaultNamespaceName path]
+            (addNamespace visibility (defaultNamespaceName path) target), [])
   | .namespace path alias =>
       match resolveProgramImportModule environment importer path with
       | .error error => ([error], visibility, [])
-      | .ok target => ([], addNamespace visibility alias.value target, [])
+      | .ok target =>
+          ([], addRelayedQualified interfaces target [alias.value]
+            (addNamespace visibility alias.value target), [])
   | .wildcard path hidingClause =>
       match resolveProgramImportModule environment importer path with
       | .error error => ([error], visibility, [])
@@ -360,7 +394,11 @@ private def processImport
             (wildcardTypes interfaces target hidden)
             (wildcardTraits interfaces target hidden)
             (wildcardValues interfaces target hidden)
-          ([], addWildcardDeclarations visibility types traits values, bindings)
+          let relayed := ((targetStandard interfaces target).filter fun entry =>
+            !hidden.contains entry.publicName).flatMap fun entry =>
+              relayedBuiltins entry.publicName [entry]
+          let visibility := addWildcardDeclarations visibility types traits values
+          ([], { visibility with builtins := visibility.builtins ++ relayed }, bindings)
   | .selected selection path hidingClause =>
       match resolveProgramImportModule environment importer path with
       | .error error => ([error], visibility, [])
@@ -369,7 +407,9 @@ private def processImport
             (hiddenSelectorNames hidingClause) selection.elements.toList
           let ((types, traits, values), bindings) := keepFirstBindings earlier target
             selected.types selected.traits selected.values
-          (selected.errors, addWildcardDeclarations visibility types traits values, bindings)
+          let visibility := addWildcardDeclarations visibility types traits values
+          (selected.errors,
+            { visibility with builtins := visibility.builtins ++ selected.builtins }, bindings)
 
 private def importsInModule (module : ProgramModule) : List Syntax.ImportDecl :=
   module.source.items.filterMap fun item =>

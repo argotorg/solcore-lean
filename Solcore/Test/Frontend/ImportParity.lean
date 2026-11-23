@@ -10,11 +10,13 @@ twice in one import (`SC0117`), a name brought from two modules (`SC0120`) and a
 value (`SC0121`) are refused, and so are two imports under one qualifier (`SC0116`); the export
 checks refuse a local export that names nothing the module declares or imports (`SC0113`), a
 constructor its type does not show (`SC0114`), a re-export that its module does not export
-(`SC0115`), std's modules by their export tables, and one public name for items of two origins
-(`SC0111`); and a
-module that no import or re-export reaches from the entry is not checked, as upstream validates only
-the reachable ones. Each case is a source that upstream's pinned checker was probed with, and gives
-upstream's answer. -/
+(`SC0115`), std's modules by their export tables, std types by the constructors they show, one
+public name for items of two origins (`SC0111`), std's names by the modules that declare them,
+and one public name for two modules (`SC0112`); a std name that a user module re-exports binds on
+through its importers, `std.opcodes`' functions to their builtins; and a module that no import or
+re-export reaches from the entry is not checked, as upstream validates only the reachable ones.
+Each case is a source that upstream's pinned checker was probed with, and gives upstream's
+answer. -/
 
 set_option autoImplicit false
 
@@ -79,6 +81,7 @@ private def describe : ProgramInterfaceError → String
       s!"constructor {typeName}.{constructorName}"
   | .duplicateImportQualifier _ name => s!"qualifier twice {name}"
   | .duplicateExportName _ name => s!"exported twice {name}"
+  | .duplicateExportModule _ name => s!"exported module twice {name}"
   | error => reprStr error
 
 /-- What a load refuses at the imports, described; none when it loads, and `other` when it fails
@@ -161,8 +164,9 @@ private def valueSources (visibility : ProgramImports) (name : String) : List St
     let module := ".".intercalate (declaration.id.moduleId.path.segments.map (·.text))
     s!"{module}.{declaration.name.getD ""}"
 
-private def checks (imports : List String) (body : String) : Bool :=
-  match checkProgram (workspace imports [] body) with
+private def checks (imports : List String) (body : String)
+    (loose : List Workspace.RawSourceFile := []) : Bool :=
+  match checkProgram (workspace imports [] body loose) with
   | .ok _ => true
   | .error _ => false
 
@@ -527,6 +531,133 @@ private def testDuplicateExports : IO Unit := do
     ["exported twice Coerce"] (loose := duplicateNeighbours)
   expectLoaded "the same module, unreachable" [] [] (loose := duplicateNeighbours)
 
+/-- Modules for `SC0112` and for the std names that user modules re-export: two module exports
+under one name, relays of `std.opcodes`' `div` by a re-export, a selection, a wildcard and a
+relay, of its `mload` and of std's `tobool`, and a user module's own `div`. -/
+private def relayNeighbours : List Workspace.RawSourceFile := [
+  { path := "twomods.solc", content := "pragma solcore;\nexport lib as M;\nexport lib2 as M;" },
+  { path := "relaystd.solc", content := "pragma solcore;\nexport std.opcodes.{ div };" },
+  { path := "relaysel.solc", content :=
+      "pragma solcore;\nimport { div } from std.opcodes;\nexport { div };" },
+  { path := "relaywild.solc", content := "pragma solcore;\nexport std.opcodes.*;" },
+  { path := "relaytwice.solc", content := "pragma solcore;\nexport relaystd.{ div };" },
+  { path := "relaym.solc", content := "pragma solcore;\nexport std.opcodes.{ mload };" },
+  { path := "relaytb.solc", content := "pragma solcore;\nexport std.{ tobool };" },
+  { path := "divlib.solc", content := String.intercalate "\n" ["pragma solcore;", "export { div };",
+      "function div(x: word, y: word) returns (word) { return x; }"] }]
+
+/-- `SC0112`: one public name that a module's module exports give to two modules, a std module
+counting by its path; one module exported twice under one name or under two names, and a module
+alias beside an item of its name, are none. -/
+private def testDuplicateModuleExports : IO Unit := do
+  expectRefused "two modules exported under one name" [] ["export lib as M;", "export lib2 as M;"]
+    ["exported module twice M"]
+  expectLoaded "one module exported twice under one name" []
+    ["export lib as M;", "export lib as M;"]
+  expectLoaded "one module under two names" [] ["export lib as M;", "export lib as N;"]
+  expectRefused "a module by its name beside another under that name" []
+    ["export lib;", "export lib2 as lib;"] ["exported module twice lib"]
+  expectLoaded "a module by its name and by an alias of that name" []
+    ["export lib;", "export lib as lib;"]
+  expectRefused "std.opcodes and a user module under one name" []
+    ["export std.opcodes as M;", "export lib as M;"] ["exported module twice M"]
+  expectRefused "std and std.opcodes under one name" []
+    ["export std as M;", "export std.opcodes as M;"] ["exported module twice M"]
+  expectRefused "std.opcodes by its name beside a user module as opcodes" []
+    ["export std.opcodes;", "export lib as opcodes;"] ["exported module twice opcodes"]
+  expectLoaded "std.opcodes by its name and as opcodes" []
+    ["export std.opcodes;", "export std.opcodes as opcodes;"]
+  expectLoaded "a module alias beside an item of its name" []
+    ["function M(x: word) returns (word) { return x; }", "export { M };", "export lib as M;"]
+  expectRefused "two modules under one name in a plain-imported module" ["import twomods;"] []
+    ["exported module twice M"] (loose := relayNeighbours)
+  expectLoaded "the same module, unreachable" [] [] (loose := relayNeighbours)
+
+/-- `SC0114` and `SC0115` for std types: a std type shows the constructors its std module's export
+shows, all of a type's own for `T(*)` and none for an opaque type. -/
+private def testStandardConstructors : IO Unit := do
+  expectRefused "a std type's unknown constructor" ["import { Error } from std;"]
+    ["export { Error(Nope) };"] ["constructor Error.Nope"]
+  expectLoaded "a std type's constructors" ["import { Error } from std;"]
+    ["export { Error(Empty, Msg) };"]
+  expectRefused "a known and an unknown constructor" ["import { Error } from std;"]
+    ["export { Error(Empty, Nope) };"] ["constructor Error.Nope"]
+  expectRefused "an opaque std type's constructor" ["import { DynArray } from std;"]
+    ["export { DynArray(Nope) };"] ["constructor DynArray.Nope"]
+  expectLoaded "an opaque std type with all its constructors" ["import { DynArray } from std;"]
+    ["export { DynArray(*) };"]
+  expectLoaded "a std wildcard's type with a constructor" ["import * from std;"]
+    ["export { Error(Msg) };"]
+  expectRefused "a re-export of a std type's unknown constructor" [] ["export std.{ Error(Nope) };"]
+    ["constructor Error.Nope"]
+  expectRefused "a re-export of an opaque std type's constructor" []
+    ["export std.{ DynArray(Nope) };"] ["constructor DynArray.Nope"]
+  expectLoaded "re-exports of std types' constructors" []
+    ["export std.{ Error(Error) };", "export std.{ DynArray(*) };"]
+  expectRefused "a submodule's opaque type with a constructor" []
+    ["export std.unsigned.{ uint8(uint8) };"] ["constructor uint8.uint8"]
+
+/-- `SC0111` with std's names: a std name's origin is the std module that declares it and its name
+there, so std's own `lt` and `std.opcodes`' are two, and so are a local function and std's of its
+name; one std item exported twice is one. -/
+private def testStandardOrigins : IO Unit := do
+  let tobool := "function tobool(x: word) returns (word) { return x; }"
+  expectRefused "one name re-exported from std and std.opcodes" []
+    ["export std.{ lt };", "export std.opcodes.{ lt };"] ["exported twice lt"]
+  expectRefused "a std.opcodes function and a user module's of its name"
+    ["import { div } from std.opcodes;"] ["export { div };", "export divlib.{ div };"]
+    ["exported twice div"] (loose := relayNeighbours)
+  expectRefused "a local function and std's of its name" []
+    [tobool, "export { tobool };", "export std.{ tobool };"] ["exported twice tobool"]
+  expectRefused "a local function and std's wildcard" []
+    [tobool, "export { tobool };", "export std.*;"] ["exported twice tobool"]
+  expectLoaded "one std name re-exported twice" []
+    ["export std.{ tobool };", "export std.{ tobool };"]
+  expectLoaded "a std name selected and re-exported" ["import { tobool } from std;"]
+    ["export { tobool };", "export std.{ tobool };"]
+  expectRefused "an alias of std's name beside std.opcodes' of that name"
+    ["import { tobool as lt } from std;"] ["export { lt };", "export std.opcodes.{ lt };"]
+    ["exported twice lt"]
+  let both := refusedImports [] ["export std.*;", "export std.opcodes.*;"]
+  assertTrue (both.any fun errors => errors.contains "exported twice addmod")
+    s!"std's and std.opcodes' wildcards: expected addmod twice, got {both}"
+
+/-- The std names a user module re-exports bind on through its importers: `std.opcodes`' functions
+to their builtins, through a re-export, a selection, a wildcard and a relay of a relay, selected,
+aliased, through a wildcard import and named qualified. Std's other names bind nothing, so they are
+refused where they are used, as an import of their module's are; so is an effectful function.
+Beside a local of its name, a second module's import of it, or a direct import, the name is
+refused, as upstream refuses it (`SC0108`, `SC0120`). -/
+private def testRelayedStandardNames : IO Unit := do
+  let relayed (imports : List String) (body : String) : Bool := checks imports body relayNeighbours
+  assertTrue (relayed ["import { div } from relaystd;"] "div(x, 4)") "a relay's re-export, used"
+  assertTrue (relayed ["import { div } from relaysel;"] "div(x, 4)") "a relay's selection, used"
+  assertTrue (relayed ["import { div } from relaywild;"] "div(x, 4)") "a relay's wildcard, used"
+  assertTrue (relayed ["import { div } from relaytwice;"] "div(x, 4)") "a relay of a relay, used"
+  assertTrue (relayed ["import * from relaystd;"] "div(x, 4)") "a relay through a wildcard import"
+  assertTrue (relayed ["import { div as d } from relaystd;"] "d(x, 4)") "a relay's function aliased"
+  assertTrue (relayed ["import relaystd;"] "relaystd.div(x, 4)") "a relay's function qualified"
+  expectLoaded "a relay's std name, unused" ["import { tobool } from relaytb;"] []
+    (loose := relayNeighbours)
+  assertTrue (!relayed ["import { tobool } from relaytb;"] "tobool(x) ? 1 : 0")
+    "a relay's std name, used, was not refused"
+  assertTrue (!relayed ["import { mload } from relaym;"] "mload(x)")
+    "a relay's effectful std.opcodes function, used, was not refused"
+  expectRefused "a relay's function beside a local of its name" ["import { div } from relaystd;"]
+    ["function div(x: word, y: word) returns (word) { return x; }"] ["value div"]
+    (loose := relayNeighbours)
+  expectRefused "two relays of one function"
+    ["import { div } from relaystd;", "import { div } from relaysel;"] [] ["ambiguous div"]
+    (loose := relayNeighbours)
+  expectRefused "a relay's function beside a user module's"
+    ["import { div } from relaystd;", "import { div } from divlib;"] [] ["ambiguous div"]
+    (loose := relayNeighbours)
+  expectRefused "a relay's function beside a direct import of it"
+    ["import { div } from relaystd;", "import { div } from std.opcodes;"] [] ["ambiguous div"]
+    (loose := relayNeighbours)
+  expectRefused "an unknown name from a relay" ["import { nosuch } from relaystd;"] []
+    ["item nosuch"] (loose := relayNeighbours)
+
 def testImportParity : IO Unit := do
   testImportedNameConflicts
   testUnknownImports
@@ -542,5 +673,9 @@ def testImportParity : IO Unit := do
   testStandardExports
   testDuplicateQualifiers
   testDuplicateExports
+  testDuplicateModuleExports
+  testStandardConstructors
+  testStandardOrigins
+  testRelayedStandardNames
 
 end Tests.ImportParity

@@ -10,9 +10,10 @@ verdict; an accepted one runs at 9 and 2^256 − 1 and gives the results upstrea
 gives. std's other modules bind no name, so a name resolves past their imports, and a name they
 export is refused where it is used (`testBesideStandardModules`). A plain import's last component
 and full path, and a namespace import's alias, qualify the module's functions (`testQualified`).
-Operators beside a bound name follow upstream's three kinds (`testOperators`). Upstream's primitive
-`primAddWord` is the builtin `add` wherever no local, declaration or import takes its name
-(`testPrimAddWord`).
+Operators beside a bound name follow upstream's three kinds (`testOperators`). Its functions that a
+user module re-exports run at the importer as they do imported directly (`testRelayed`).
+Upstream's primitive `primAddWord` is the builtin `add` wherever no local, declaration or import
+takes its name (`testPrimAddWord`).
 -/
 
 set_option autoImplicit false
@@ -33,13 +34,13 @@ private def library : String := String.intercalate "\n" [
   "function add(x: word, y: word) returns (word) { return y; }",
   "function f(x: word) returns (word) { return x; }"]
 
-private def workspace (imports declarations : List String) (body : String) :
-    Workspace.RawWorkspace := {
+private def workspace (imports declarations : List String) (body : String)
+    (modules : List Workspace.RawSourceFile := []) : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [
     { path := "main.solc", content := String.intercalate "\n" (["pragma solcore;"] ++ imports ++
         declarations ++ [s!"function main(a0: word) returns (word) \{ return {body}; }"]) },
-    { path := "lib.solc", content := library }]
+    { path := "lib.solc", content := library }] ++ modules
   externalLibraries := []
 }
 
@@ -77,8 +78,8 @@ private def runMain (raw : Workspace.RawWorkspace) (inputs : List Nat) : IO (Exc
   return .ok results
 
 private def expectResults (label : String) (imports declarations : List String) (body : String)
-    (expected : List Nat) : IO Unit := do
-  let found ← runMain (workspace imports declarations body) [9, maximum]
+    (expected : List Nat) (modules : List Workspace.RawSourceFile := []) : IO Unit := do
+  let found ← runMain (workspace imports declarations body modules) [9, maximum]
   assertTrue (match found with | .ok results => results == expected | .error _ => false)
     s!"{label}: expected {expected}, got {reprStr found}"
 
@@ -272,6 +273,26 @@ private def testPrimAddWord : IO Unit := do
   expectRefused "a bool operand" [] [] "primAddWord(true, a0)" "check"
   expectRefused "a uint256 operand" ["import * from std;"] [] "primAddWord(uint256(a0), a0)" "check"
 
+/-- A user module that re-exports `std.opcodes`' `div`, and one that relays that module's. -/
+private def relays : List Workspace.RawSourceFile := [
+  { path := "relaystd.solc", content := "pragma solcore;\nexport std.opcodes.{ div };" },
+  { path := "relaywild.solc", content := "pragma solcore;\nexport std.opcodes.*;" },
+  { path := "relaytwice.solc", content := "pragma solcore;\nexport relaystd.{ div };" }]
+
+/-- `std.opcodes`' functions that a user module re-exports run as the builtins at the importer,
+selected, through a relay of the relay, through a wildcard and named qualified, as upstream runs
+them. -/
+private def testRelayed : IO Unit := do
+  let quarter := [2, maximum / 4]
+  expectResults "a relay's re-export" ["import { div } from relaystd;"] [] "div(a0, 4)" quarter
+    relays
+  expectResults "a relay of a relay" ["import { div } from relaytwice;"] [] "div(a0, 4)" quarter
+    relays
+  expectResults "a relay's wildcard through a wildcard import" ["import * from relaywild;"] []
+    "div(a0, 4)" quarter relays
+  expectResults "a relay's function, qualified" ["import relaystd;"] [] "relaystd.div(a0, 4)"
+    quarter relays
+
 def run : IO Unit := do
   testAccepted
   testRefused
@@ -279,6 +300,7 @@ def run : IO Unit := do
   testQualified
   testOperators
   testPrimAddWord
+  testRelayed
   IO.println "std.opcodes and std imports, operators: upstream's forms and results GREEN"
 
 end Tests.StdOpcodes

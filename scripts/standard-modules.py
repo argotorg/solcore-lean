@@ -3,10 +3,12 @@
 
 Reads `std` at the pinned upstream commit from the retained checkout (through `git show`, so the
 exporter's patches to its working tree do not matter): each module's path, the names it exports
-and their namespaces (function, type or trait; constructors are no import items), and the
-functions `std.opcodes` exports. It writes `Solcore/Frontend/StandardModules.lean` (`--write`) or
-checks that file against the checkout (`--check`, the default). After a re-pin, `--write`
-regenerates the file.
+and their namespaces (function, type or trait; constructors are no import items), the functions
+`std.opcodes` exports, the exports that another std module declares, with that module and the
+item's name there (upstream's `SC0111` compares exports by these origins), and the constructors
+each exported type shows (upstream's `SC0114` and `SC0115` check selections against them). It
+writes `Solcore/Frontend/StandardModules.lean` (`--write`) or checks that file against the
+checkout (`--check`, the default). After a re-pin, `--write` regenerates the file.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ NAMESPACES = {"function": "function", "enum": "type", "struct": "type", "type": 
               "trait": "trait"}
 
 DECLARATION = re.compile(r"\b(function|enum|struct|type|contract|trait)\s+([A-Za-z_]\w*)")
+ENUM = re.compile(r"\benum\s+([A-Za-z_]\w*)")
 STATEMENT = re.compile(r"\b(import|export)\b([^;]*);")
 IDENTIFIER = re.compile(r"[A-Za-z_]\w*")
 MODULE = r"[A-Za-z_]\w*(?:\s*\.\s*[A-Za-z_]\w*)*"
@@ -68,6 +71,44 @@ def dotted(text: str) -> str:
     return ".".join(part.strip() for part in text.split("."))
 
 
+def entries(body: str) -> list[str]:
+    """A list's entries, split at the commas outside parentheses, brackets, braces and angles."""
+    parts, depth, current = [], 0, []
+    for character in body:
+        if character in "([{<":
+            depth += 1
+        elif character in ")]}>":
+            depth -= 1
+        if character == "," and depth == 0:
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(character)
+    parts.append("".join(current))
+    return [part.strip() for part in parts if part.strip()]
+
+
+def selections(text: str) -> list[tuple[str, str | list[str] | None]]:
+    """A braced item list's names, each with its constructor selection: `*`, the constructors named,
+    or `None` for a name without one."""
+    body = text.strip()
+    if not (body.startswith("{") and body.endswith("}")):
+        raise StandardError(f"not an item list: {text.strip()[:60]}")
+    result: list[tuple[str, str | list[str] | None]] = []
+    for item in entries(body[1:-1]):
+        found = re.fullmatch(r"([A-Za-z_]\w*)\s*(?:\(([^)]*)\))?", item)
+        if not found:
+            raise StandardError(f"an export item this script does not read: {item}")
+        selection = found.group(2)
+        if selection is None:
+            result.append((found.group(1), None))
+        elif selection.strip() == "*":
+            result.append((found.group(1), "*"))
+        else:
+            result.append((found.group(1), [name.strip() for name in selection.split(",") if name.strip()]))
+    return result
+
+
 def items(text: str) -> list[str]:
     """The names of a braced item list, each without its constructor selection (`T(*)`, `T(A, B)`)."""
     body = text.strip()
@@ -95,6 +136,21 @@ class Module:
                 found = self.declarations.setdefault(match.group(2), [])
                 if namespace not in found:
                     found.append(namespace)
+        self.constructors: dict[str, list[str]] = {}
+        for match in ENUM.finditer(text):
+            if depth[match.start()] == 0:
+                start = text.index("{", match.end())
+                end, level = start + 1, 1
+                while level:
+                    level += {"{": 1, "}": -1}.get(text[end], 0)
+                    end += 1
+                found = []
+                for entry in entries(text[start + 1:end - 1]):
+                    constructor = IDENTIFIER.match(entry)
+                    if not constructor:
+                        raise StandardError(f"a constructor this script does not read in {name}: {entry[:40]}")
+                    found.append(constructor.group(0))
+                self.constructors[match.group(1)] = found
         self.imports, self.exports = [], []
         for match in STATEMENT.finditer(text):
             if depth[match.start()] == 0:
@@ -138,6 +194,7 @@ class Library:
         self.modules = {module_name(path): Module(module_name(path), text) for path, text in sources.items()}
         self.memo: dict[str, list[tuple[str, str]]] = {}
         self.active: set[str] = set()
+        self.detail_memo: dict[str, dict[str, tuple[str, str, list[str]]]] = {}
 
     def module(self, name: str) -> Module:
         if name not in self.modules:
@@ -206,6 +263,70 @@ class Library:
         return unique
 
 
+    def shown(self, constructors: list[str], selection: str | list[str] | None, owner: str, item: str) -> list[str]:
+        """The constructors an export with this selection shows of a type that shows these."""
+        if selection == "*":
+            return constructors
+        if selection is None:
+            return []
+        missing = [name for name in selection if name not in constructors]
+        if missing:
+            raise StandardError(f"{owner} exports {item}({', '.join(missing)}), which it does not show")
+        return [name for name in constructors if name in selection]
+
+    def imported_detail(self, module: Module, name: str) -> tuple[str, str, list[str]] | None:
+        """The std item a name the module imports is, with the constructors its source shows."""
+        for body in module.imports:
+            selection = selection_of(body)
+            if selection is None:
+                continue
+            target, pairs, hidden = selection
+            if not target.startswith("std"):
+                continue
+            if pairs == ["*"]:
+                if name not in hidden and name in self.details(target):
+                    return self.details(target)[name]
+            else:
+                for pair in pairs:
+                    source, local = pair.split(":")
+                    if local == name and source in self.details(target):
+                        return self.details(target)[source]
+        return None
+
+    def details(self, name: str) -> dict[str, tuple[str, str, list[str]]]:
+        """Each export of the module, by its name, with the std item it is (the module that declares
+        it and the item's name there) and, for a type, the constructors the export shows: a type's
+        own for `T(*)`, those named, or none."""
+        if name in self.detail_memo:
+            return self.detail_memo[name]
+        self.exports(name)  # the forms are read, and cycles refused, there
+        module = self.module(name)
+        result: dict[str, tuple[str, str, list[str]]] = {}
+        for body in module.exports:
+            reexport = re.fullmatch(rf"({MODULE})\s*\.\s*(\{{[^}}]*\}}|\*)", body)
+            if body.startswith("{"):
+                for item, selection in selections(body):
+                    if item in module.declarations:
+                        own = module.constructors.get(item, [])
+                        result.setdefault(item, (name, item, self.shown(own, selection, name, item)))
+                    else:
+                        origin = self.imported_detail(module, item)
+                        if origin is None:
+                            raise StandardError(f"{name} exports {item}, which it neither declares nor imports")
+                        result.setdefault(item, (origin[0], origin[1], self.shown(origin[2], selection, name, item)))
+            elif reexport:
+                source = self.details(dotted(reexport.group(1)))
+                if reexport.group(2) == "*":
+                    for item, detail in source.items():
+                        result.setdefault(item, detail)
+                else:
+                    for item, selection in selections(reexport.group(2)):
+                        origin = source[item]
+                        result.setdefault(item, (origin[0], origin[1], self.shown(origin[2], selection, name, item)))
+        self.detail_memo[name] = result
+        return result
+
+
 def read_checkout(upstream: Path) -> dict[str, str]:
     def git(*args: str) -> str:
         return subprocess.check_output(["git", "-C", str(upstream), *args], text=True)
@@ -229,6 +350,34 @@ def lean_string_list(names: list[str], indent: str) -> str:
 def path_list(name: str) -> str:
     """A module's path components as a Lean list of strings."""
     return "[" + ", ".join(f'"{part}"' for part in name.split(".")) + "]"
+
+
+def wrapped(pieces: list[str], indent: str, tail: str) -> list[str]:
+    """Pieces joined by commas, each line within 100 characters, the last piece followed by `tail`."""
+    lines, line = [], indent
+    for index, piece in enumerate(pieces):
+        piece += tail if index + 1 == len(pieces) else ","
+        if len(line) + len(piece) > 100 and line.strip():
+            lines.append(line.rstrip())
+            line = indent
+        line += piece + " "
+    lines.append(line.rstrip())
+    return lines
+
+
+def lean_list(names: list[str]) -> str:
+    return "[" + ", ".join(f'"{name}"' for name in names) + "]"
+
+
+def table(rows: list[tuple[str, list[str]]]) -> list[str]:
+    """A Lean list of modules, each with its rendered entries, or the empty list."""
+    if not rows:
+        return ["  []"]
+    out = ["["]
+    for position, (name, pieces) in enumerate(rows):
+        out.append(f"  ({path_list(name)}, [")
+        out += wrapped(pieces, "      ", "])" + ("," if position + 1 < len(rows) else "]"))
+    return out
 
 
 def render(sources: dict[str, str]) -> str:
@@ -292,6 +441,32 @@ def render(sources: dict[str, str]) -> str:
         lines.append(line.rstrip())
         out.append(f"  ({path}, [")
         out += lines
+    origins, constructors = [], []
+    for name in sorted(library.modules):
+        details = library.details(name)
+        moved = [f'("{item}", {path_list(module)}, "{source}")' for item, (module, source, _) in details.items()
+                 if (module, source) != (name, item)]
+        if moved:
+            origins.append((name, moved))
+        shown = [f'("{item}", {lean_list(names)})' for item, (_, _, names) in details.items() if names]
+        if shown:
+            constructors.append((name, shown))
+    out += ["",
+            "/-- Each std module's exports that another std module declares, by path components: the name,",
+            "that module and the item's name there. Any other export is the module's own declaration of the",
+            "name. Upstream's `SC0111` compares exports by these origins. -/",
+            "def upstreamStandardExportOrigins :",
+            "    List (List String × List (String × List String × String)) :="]
+    rendered = table(origins)
+    out += [out.pop() + " " + rendered[0]] + rendered[1:] if rendered[0] == "[" else rendered
+    out += ["",
+            "/-- Each std module's exported types that show constructors, with the constructors they show: a",
+            "type exported as `T(*)` shows all of its own. Any other exported type shows none, as an opaque",
+            "type does. -/",
+            "def upstreamStandardExportConstructors :",
+            "    List (List String × List (String × List String)) :="]
+    rendered = table(constructors)
+    out += [out.pop() + " " + rendered[0]] + rendered[1:] if rendered[0] == "[" else rendered
     out += ["", "end Solcore.Frontend", ""]
     return "\n".join(out)
 

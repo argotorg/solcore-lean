@@ -138,4 +138,34 @@ def upstreamStandardModuleExports :
       ("uint8", .type), ("uint16", .type), ("uint32", .type), ("uint64", .type),
       ("uint128", .type)])]
 
+/-- Each std module's exports that another std module declares, by path components: the name,
+that module and the item's name there. Any other export is the module's own declaration of the
+name. Upstream's `SC0111` compares exports by these origins. -/
+def upstreamStandardExportOrigins :
+    List (List String × List (String × List String × String)) := [
+  (["std", "unchecked", "signed"], [
+      ("UncheckedAdd", ["std", "unchecked", "unsigned"], "UncheckedAdd"),
+      ("UncheckedSub", ["std", "unchecked", "unsigned"], "UncheckedSub"),
+      ("UncheckedMul", ["std", "unchecked", "unsigned"], "UncheckedMul"),
+      ("UncheckedDiv", ["std", "unchecked", "unsigned"], "UncheckedDiv"),
+      ("UncheckedMod", ["std", "unchecked", "unsigned"], "UncheckedMod")])]
+
+/-- Each std module's exported types that show constructors, with the constructors they show: a
+type exported as `T(*)` shows all of its own. Any other exported type shows none, as an opaque
+type does. -/
+def upstreamStandardExportConstructors :
+    List (List String × List (String × List String)) := [
+  (["std"], [
+      ("ABIDecoder", ["ABIDecoder"]), ("ABITuple", ["ABITuple"]),
+      ("CalldataWordReader", ["CalldataWordReader"]), ("ContractStorage", ["ContractStorage"]),
+      ("Error", ["Error", "Empty", "Msg"]), ("MemberAccessProxy", ["MemberAccessProxy"]),
+      ("MemoryWordReader", ["MemoryWordReader"]), ("Proxy", ["Proxy"]),
+      ("StructField", ["StructField"]), ("address", ["address"]), ("array", ["array"]),
+      ("byte", ["byte"]), ("bytes4", ["bytes4"]), ("bytes32", ["bytes32"]),
+      ("calldata", ["calldata"]), ("empty", ["empty"]), ("mapping", ["mapping"]),
+      ("memory", ["memory"]), ("arraySlice", ["arraySlice"]), ("returndata", ["returndata"]),
+      ("slice", ["slice"]), ("storage", ["storage"]), ("uint256", ["uint256"])]),
+  (["std", "dispatch"], [
+      ("Contract", ["Contract"]), ("Fallback", ["Fallback"]), ("Method", ["Method"])])]
+
 end Solcore.Frontend

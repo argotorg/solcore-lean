@@ -103,9 +103,12 @@ theorem qualifiedFunctionsNamed_success_subset_catalog
               | nil =>
                   simp [qualifiedFunctionsNamed, imported, root, targets]
                     at success
-                  subst candidates
-                  exact signaturesForDeclarations_subset_catalog context
-                    (visibility.valuesInNamespacePathNamed namespacePath name)
+                  split at success
+                  · simp at success
+                  · simp only [Except.ok.injEq, Option.some.injEq] at success
+                    subst candidates
+                    exact signaturesForDeclarations_subset_catalog context
+                      (visibility.valuesInNamespacePathNamed namespacePath name)
               | cons second tail =>
                   simp [qualifiedFunctionsNamed, imported, root, targets]
                     at success

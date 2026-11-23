@@ -960,10 +960,24 @@ structure ProgramPublicModule where
   target : Workspace.ModuleId
   deriving Repr, DecidableEq
 
+/-- One name a module exports that is an item of one of upstream's std modules, which Lean has no
+declaration for: its public name, the std module that declares the item, by path components, and
+its name there, its namespace, and, for a type, the constructors it shows. A module that
+re-exports it carries it on, and an import of the module binds it (`buildProgramImports`). -/
+structure ProgramPublicStandard where
+  publicName : String
+  originModule : List String
+  originName : String
+  nameSpace : StandardExportNamespace
+  constructors : List String := []
+  deriving Repr, DecidableEq
+
 /-- The public surface of one program module. -/
 structure ProgramInterface where
   entities : List ProgramPublicEntity := []
   modules : List ProgramPublicModule := []
+  /-- The std names the module exports. -/
+  standard : List ProgramPublicStandard := []
   deriving Repr
 
 /-- Public interfaces indexed by canonical module identity in program order. -/
@@ -1022,6 +1036,11 @@ inductive ProgramInterfaceError where
   /-- One public name that a module's exports give to items of two origins, each the module that
   declares it and its name there, in any namespace, as upstream's `SC0111` refuses it. -/
   | duplicateExportName
+      (owner : Workspace.ModuleId)
+      (name : String)
+  /-- One public name that a module's module exports give to two modules, a std module counting by
+  its path, as upstream's `SC0112` refuses it. -/
+  | duplicateExportModule
       (owner : Workspace.ModuleId)
       (name : String)
   deriving Repr, DecidableEq
@@ -1156,10 +1175,31 @@ private def mergeModules
     (left right : List ProgramPublicModule) : List ProgramPublicModule :=
   right.foldl appendModule left
 
+private def standardKeyEq (left right : ProgramPublicStandard) : Bool :=
+  left.publicName == right.publicName && left.originModule == right.originModule &&
+    left.originName == right.originName && left.nameSpace == right.nameSpace
+
+/-- A std name joined to a list: a second export of one item under one name shows the
+constructors either export shows. -/
+private def appendStandard (entries : List ProgramPublicStandard)
+    (entry : ProgramPublicStandard) : List ProgramPublicStandard :=
+  if entries.any (standardKeyEq · entry) then
+    entries.map fun previous =>
+      if standardKeyEq previous entry then
+        { previous with constructors := previous.constructors ++
+            entry.constructors.filter (!previous.constructors.contains ·) }
+      else previous
+  else entries ++ [entry]
+
+private def mergeStandard
+    (left right : List ProgramPublicStandard) : List ProgramPublicStandard :=
+  right.foldl appendStandard left
+
 private def mergeInterface
     (left right : ProgramInterface) : ProgramInterface := {
   entities := mergeEntities left.entities right.entities
   modules := mergeModules left.modules right.modules
+  standard := mergeStandard left.standard right.standard
 }
 
 private def interfaceEq (left right : ProgramInterface) : Bool :=
@@ -1168,7 +1208,8 @@ private def interfaceEq (left right : ProgramInterface) : Bool :=
     (left.entities.zip right.entities |>.all fun pair =>
       entityEq pair.1 pair.2) &&
     (left.modules.zip right.modules |>.all fun pair =>
-      moduleKeyEq pair.1 pair.2)
+      moduleKeyEq pair.1 pair.2) &&
+    left.standard == right.standard
 
 private def interfacesEq
     (left right : ProgramInterfaces) : Bool :=
@@ -1249,6 +1290,8 @@ private def publicAsVisible
 
 private structure VisibilityResult where
   entities : List VisibleEntity := []
+  /-- The std names an import of a user module brings, under their local names. -/
+  standard : List ProgramPublicStandard := []
   errors : List ProgramInterfaceError := []
 
 private def selectImported
@@ -1259,8 +1302,10 @@ private def selectImported
   let localName := selection.value.alias.map (·.value) |>.getD sourceName
   let candidates := interface.entities.filter fun entity =>
     entity.publicName == sourceName
+  let standard := (interface.standard.filter (·.publicName == sourceName)).map fun entry =>
+    { entry with publicName := localName }
   let isHidden := hidden.contains sourceName || hidden.contains localName
-  if candidates.isEmpty then
+  if candidates.isEmpty && standard.isEmpty then
     { errors := [.unknownImportName owner target sourceName] }
   else if isHidden then
     {}
@@ -1270,13 +1315,15 @@ private def selectImported
           localName
           declaration := entity.declaration
           constructors := entity.constructors
-        } }
+        }
+      standard }
 
 private def validateHidden
     (owner target : Workspace.ModuleId) (interface : ProgramInterface)
     (hidden : List String) : List ProgramInterfaceError :=
   hidden.filterMap fun name =>
-    if interface.entities.any fun entity => entity.publicName == name then none
+    if interface.entities.any (fun entity => entity.publicName == name) ||
+        interface.standard.any (·.publicName == name) then none
     else some (.unknownImportName owner target name)
 
 private def processImport
@@ -1300,6 +1347,7 @@ private def processImport
           let hidden := hiddenNames hidingClause
           {
             entities := publicAsVisible interface hidden
+            standard := interface.standard.filter fun entry => !hidden.contains entry.publicName
             errors := validateHidden owner target interface hidden
           }
       | .selected selection _ hidingClause =>
@@ -1309,6 +1357,7 @@ private def processImport
             let next := selectImported owner target interface hidden item
             {
               entities := mergeVisible result.entities next.entities
+              standard := mergeStandard result.standard next.standard
               errors := result.errors ++ next.errors
             }) ({} : VisibilityResult)
           { selected with
@@ -1400,17 +1449,73 @@ def standardModuleBindings (exports : List (String × StandardExportNamespace))
       exports.filter fun entry => !hidden.contains entry.1
   | _ => []
 
-/-- The names a module's selected and wildcard imports of upstream's std modules bind, with their
-namespaces: `std.opcodes`' functions (`standardOpcodeBindings`) and the other modules' exports
-(`standardModuleBindings`). Lean has none of their declarations, so they enter no interface, but a
-local export may name them, as upstream's `SC0113` counts them. -/
+/-- The std item that a std module's export of a name is: the module that declares it, by path
+components, and its name there (`upstreamStandardExportOrigins`), or the module's own declaration of
+the name. -/
+def standardExportOrigin (module : List String) (name : String) : List String × String :=
+  match (upstreamStandardExportOrigins.find? (·.1 == module)).bind fun entry =>
+      entry.2.find? (·.1 == name) with
+  | some (_, origin, source) => (origin, source)
+  | none => (module, name)
+
+/-- The constructors that a std module's export of a type shows
+(`upstreamStandardExportConstructors`): none for an opaque type and for any other name. -/
+def standardExportConstructors (module : List String) (name : String) : List String :=
+  (((upstreamStandardExportConstructors.find? (·.1 == module)).bind fun entry =>
+    entry.2.find? (·.1 == name)).map (·.2)).getD []
+
+/-- The std names that a std module's export of `name` gives under `publicName`: one per namespace
+the module exports it in, with its origin and, when `shown`, the constructors the export shows. -/
+private def standardPublicNamed (components : List String)
+    (exports : List (String × StandardExportNamespace)) (name publicName : String) (shown : Bool) :
+    List ProgramPublicStandard :=
+  (exports.filter (·.1 == name)).map fun (_, nameSpace) =>
+    let (originModule, originName) := standardExportOrigin components name
+    { publicName, originModule, originName, nameSpace
+      constructors := if shown then standardExportConstructors components name else [] }
+
+/-- Every std name a std module exports, under its own name, with the constructors it shows. -/
+private def standardPublicAll (components : List String)
+    (exports : List (String × StandardExportNamespace)) : List ProgramPublicStandard :=
+  (exports.map (·.1)).eraseDups.flatMap fun name =>
+    standardPublicNamed components exports name name true
+
+/-- The names a selected or wildcard import of one of upstream's std modules other than
+`std.opcodes` binds, each local name with the name the module exports, less the hidden ones. -/
+private def standardModuleSourceBindings (exports : List (String × StandardExportNamespace))
+    (declaration : Syntax.ImportDecl) : List (String × String) :=
+  match declaration.value with
+  | .selected selection _ hidingClause =>
+      let hidden := hiddenNames hidingClause
+      selection.elements.toList.filterMap fun item =>
+        let source := selectorSpelling item.value.source
+        let localName := item.value.alias.map (·.value) |>.getD source
+        if hidden.contains source || hidden.contains localName || !exports.any (·.1 == source) then
+          none
+        else some (localName, source)
+  | .wildcard _ hidingClause =>
+      let hidden := hiddenNames hidingClause
+      (exports.map (·.1)).eraseDups.filterMap fun name =>
+        if hidden.contains name then none else some (name, name)
+  | _ => []
+
+/-- The std names a module's selected and wildcard imports of upstream's std modules bind:
+`std.opcodes`' functions (`standardOpcodeBindings`) and the other modules' exports, each with its
+origin and, for a type, the constructors its module's export shows. Lean has none of their
+declarations, but a local export may name them, as upstream's `SC0113` counts them, and then
+gives them on (`ProgramPublicStandard`). -/
 private def standardNamesBound (environment : ProgramEnvironment) (module : ProgramModule) :
-    List (String × StandardExportNamespace) :=
+    List ProgramPublicStandard :=
   (importsIn module).flatMap fun declaration =>
     if isStandardOpcodesImport environment module.id declaration then
-      (standardOpcodeBindings declaration).map fun (name, _) => (name, .function)
+      (standardOpcodeBindings declaration).map fun (name, function) =>
+        { publicName := name, originModule := ["std", "opcodes"], originName := function
+          nameSpace := .function }
     else match standardModuleImportExports? environment module.id declaration with
-      | some exports => standardModuleBindings exports declaration
+      | some exports =>
+          let components := programModulePathComponents (importPath declaration)
+          (standardModuleSourceBindings exports declaration).flatMap fun (localName, source) =>
+            standardPublicNamed components exports source localName true
       | none => []
 
 /-- The names one of upstream's std modules exports, with their namespaces, where an export names
@@ -1461,6 +1566,7 @@ private def importedVisibility
     | some target =>
         let kept := next.entities.filter fun entity => !boundEarlier state.2 target entity
         ({ entities := mergeVisible state.1.entities kept
+           standard := mergeStandard state.1.standard next.standard
            errors := state.1.errors ++ next.errors },
           state.2 ++ earlierImports target next.entities)) ({}, [])
   result.1
@@ -1493,7 +1599,14 @@ private def importConflicts
         !decide (declared.declaration.id = entity.declaration.id)) then
       some (group, entity.localName)
     else none
-  let unique := clashes.foldl (fun seen clash =>
+  let standardClashes := ((importsIn module).flatMap fun declaration =>
+    (processImport environment interfaces module.id declaration).standard).filterMap fun entry =>
+      let group := entry.nameSpace.declarationNamespace.importGroup
+      if locals.any fun declared =>
+          declared.localName == entry.publicName && declared.importGroup? == some group then
+        some (group, entry.publicName)
+      else none
+  let unique := (clashes ++ standardClashes).foldl (fun seen clash =>
     if seen.contains clash then seen else seen ++ [clash]) []
   unique.map fun (group, name) => .importedNameConflict module.id group name
 
@@ -1510,7 +1623,15 @@ private def visibleNamed
 
 private structure Contribution where
   interface : ProgramInterface := {}
+  /-- The std modules the module exports, each under its public name, for `SC0112`. -/
+  standardModules : List (String × List String) := []
   errors : List ProgramInterfaceError := []
+
+private def addStandard
+    (contribution : Contribution) (entries : List ProgramPublicStandard) : Contribution :=
+  { contribution with
+    interface := { contribution.interface with
+      standard := mergeStandard contribution.interface.standard entries } }
 
 private def addVisibleWithName
     (contribution : Contribution) (publicName : String)
@@ -1542,6 +1663,24 @@ private def addPublicModule
 private def addError
     (contribution : Contribution) (error : ProgramInterfaceError) : Contribution :=
   { contribution with errors := contribution.errors ++ [error] }
+
+/-- A std type exported with a constructor selection: the constructors it shows that the selection
+names, all of them for `(*)`. One it does not show is `unknownExportConstructor`, upstream's
+`SC0114`, or `SC0115` for a re-export. -/
+private def addStandardSelected (owner : Workspace.ModuleId) (typeName : String)
+    (selection : Syntax.ConstructorSelection) (entries : List ProgramPublicStandard)
+    (contribution : Contribution) : Contribution :=
+  entries.foldl (fun result entry =>
+    let requested : List String := match selection.value with
+      | .all _ => entry.constructors
+      | .named constructors =>
+          (constructors.toList.map fun (constructor : Syntax.Identifier) =>
+            constructor.value).eraseDups
+    let missing := requested.filter fun name => !entry.constructors.contains name
+    let result := addStandard result
+      [{ entry with constructors := entry.constructors.filter requested.contains }]
+    missing.foldl (fun result name => addError result
+      (.unknownExportConstructor owner typeName name)) result) contribution
 
 private def stripVisibleConstructors (entity : VisibleEntity) : VisibleEntity :=
   { entity with constructors := entity.constructors.strip }
@@ -1600,12 +1739,12 @@ private def visibleOfPublic (entity : ProgramPublicEntity) : VisibleEntity := {
 
 /-- One name of a local export: a declaration of the module or a name a selected or wildcard
 import brings, else upstream's `SC0113` (`unknownExportName`); with a constructor selection, a data
-type that shows them (`SC0114`, `unknownExportConstructor`). A name an import of one of upstream's
-std modules binds is known but enters no interface; with a selection it must be a std type, whose
-constructors Lean's tables do not hold. -/
+type that shows them (`SC0114`, `unknownExportConstructor`). A std name that an import binds,
+directly or through a user module, enters the interface as one (`ProgramPublicStandard`); with a
+selection it must be a std type, which shows the constructors its std module's export shows. -/
 private def processExportName
     (owner : Workspace.ModuleId) (locals imported : List VisibleEntity)
-    (standard : List (String × StandardExportNamespace))
+    (standard : List ProgramPublicStandard)
     (contribution : Contribution) (name : Syntax.ExportName) : Contribution :=
   match name.value with
   | .wildcard _ =>
@@ -1616,23 +1755,29 @@ private def processExportName
       let spelling := identifier.value
       let candidates := visibleNamed locals imported spelling
       if candidates.isEmpty then
-        if standard.any (·.1 == spelling) then contribution
-        else addError contribution (.unknownExportName owner spelling)
+        match standard.filter (·.publicName == spelling) with
+        | [] => addError contribution (.unknownExportName owner spelling)
+        | entries =>
+            addStandard contribution (entries.map fun entry => { entry with constructors := [] })
       else
         addVisibleWithName contribution spelling
           (candidates.map stripVisibleConstructors)
   | .identifier identifier (some selection) =>
       let spelling := identifier.value
       let candidates := visibleNamed locals imported spelling
-      if candidates.all (!·.constructors.isData) && standard.any (· == (spelling, .type)) then
-        contribution
+      let types := standard.filter fun entry =>
+        entry.publicName == spelling && entry.nameSpace == .type
+      if candidates.all (!·.constructors.isData) && !types.isEmpty then
+        addStandardSelected owner spelling selection types contribution
       else
         addSelectedConstructors owner spelling spelling selection candidates contribution
   | .operator spelling =>
       let candidates := visibleNamed locals imported spelling.value
       if candidates.isEmpty then
-        if standard.any (·.1 == spelling.value) then contribution
-        else addError contribution (.unknownExportName owner spelling.value)
+        match standard.filter (·.publicName == spelling.value) with
+        | [] => addError contribution (.unknownExportName owner spelling.value)
+        | entries =>
+            addStandard contribution (entries.map fun entry => { entry with constructors := [] })
       else
         addVisibleWithName contribution spelling.value
           (candidates.map stripVisibleConstructors)
@@ -1640,49 +1785,66 @@ private def processExportName
 private def processRemoteName
     (owner : Workspace.ModuleId) (targetInterface : ProgramInterface)
     (contribution : Contribution) (name : Syntax.ExportName) : Contribution :=
+  let standardNamed (spelling : String) : List ProgramPublicStandard :=
+    (targetInterface.standard.filter (·.publicName == spelling)).map fun entry =>
+      { entry with constructors := [] }
   match name.value with
-  | .wildcard _ => addPublicEntities contribution targetInterface.entities
+  | .wildcard _ =>
+      addStandard (addPublicEntities contribution targetInterface.entities)
+        targetInterface.standard
   | .identifier identifier none =>
       let spelling := identifier.value
       let candidates := targetInterface.entities.filter fun entity =>
         entity.publicName == spelling
-      if candidates.isEmpty then
+      if candidates.isEmpty && (standardNamed spelling).isEmpty then
         addError contribution (.unknownExportName owner spelling)
       else
-        addPublicEntities contribution (candidates.map stripPublicConstructors)
+        addStandard (addPublicEntities contribution (candidates.map stripPublicConstructors))
+          (standardNamed spelling)
   | .identifier identifier (some selection) =>
       let spelling := identifier.value
       let candidates := targetInterface.entities.filterMap fun entity =>
         if entity.publicName == spelling then some (visibleOfPublic entity)
         else none
-      addSelectedConstructors owner spelling spelling selection candidates
-        contribution
+      let types := targetInterface.standard.filter fun entry =>
+        entry.publicName == spelling && entry.nameSpace == .type
+      if candidates.all (!·.constructors.isData) && !types.isEmpty then
+        addStandardSelected owner spelling selection types contribution
+      else
+        addSelectedConstructors owner spelling spelling selection candidates
+          contribution
   | .operator spelling =>
       let candidates := targetInterface.entities.filter fun entity =>
         entity.publicName == spelling.value
-      if candidates.isEmpty then
+      if candidates.isEmpty && (standardNamed spelling.value).isEmpty then
         addError contribution (.unknownExportName owner spelling.value)
       else
-        addPublicEntities contribution (candidates.map stripPublicConstructors)
+        addStandard (addPublicEntities contribution (candidates.map stripPublicConstructors))
+          (standardNamed spelling.value)
 
-/-- One name of a re-export from one of upstream's std modules, which Lean has no interface for:
-a name the module does not export is upstream's `SC0115` (`unknownExportName`), and so is a
-constructor selection on a name that is no type. A std type's constructors are not checked, as
-Lean's tables do not hold them, and the names enter no interface. -/
-private def processStandardRemoteName (owner : Workspace.ModuleId)
+/-- One name of a re-export from one of upstream's std modules, by its path components and export
+table: a name the module does not export is upstream's `SC0115` (`unknownExportName`), and so is a
+constructor selection on a name that is no type; a constructor the type does not show is
+`unknownExportConstructor`. The names enter the interface as std names, with their origins. -/
+private def processStandardRemoteName (owner : Workspace.ModuleId) (components : List String)
     (exports : List (String × StandardExportNamespace))
     (contribution : Contribution) (name : Syntax.ExportName) : Contribution :=
-  let known (spelling : String) (selected : Bool) : Bool :=
-    exports.any fun (exported, nameSpace) =>
-      exported == spelling && (!selected || nameSpace == .type)
+  let named (spelling : String) := standardPublicNamed components exports spelling spelling false
   match name.value with
-  | .wildcard _ => contribution
-  | .identifier identifier selection =>
-      if known identifier.value selection.isSome then contribution
-      else addError contribution (.unknownExportName owner identifier.value)
+  | .wildcard _ => addStandard contribution (standardPublicAll components exports)
+  | .identifier identifier none =>
+      match named identifier.value with
+      | [] => addError contribution (.unknownExportName owner identifier.value)
+      | entries => addStandard contribution entries
+  | .identifier identifier (some selection) =>
+      let types := (standardPublicNamed components exports identifier.value identifier.value
+        true).filter (·.nameSpace == .type)
+      if types.isEmpty then addError contribution (.unknownExportName owner identifier.value)
+      else addStandardSelected owner identifier.value selection types contribution
   | .operator spelling =>
-      if known spelling.value false then contribution
-      else addError contribution (.unknownExportName owner spelling.value)
+      match named spelling.value with
+      | [] => addError contribution (.unknownExportName owner spelling.value)
+      | entries => addStandard contribution entries
 
 /-- The error of an export path that no module of the program resolves: none for one of
 upstream's std modules, which Lean has no interface for, and an unknown module otherwise. -/
@@ -1691,10 +1853,20 @@ private def unresolvedExport (owner : Workspace.ModuleId) (path : Syntax.Qualifi
   if (standardExportsAt? (programExportPathComponents path)).isSome then contribution
   else addError contribution (.unknownModule owner (programExportPathComponents path))
 
+/-- A module export whose path no module of the program resolves: one of upstream's std modules is
+kept under its public name for `SC0112`, and any other path is an unknown module. -/
+private def unresolvedModuleExport (owner : Workspace.ModuleId) (path : Syntax.QualifiedName)
+    (publicName : String) (contribution : Contribution) : Contribution :=
+  let components := programExportPathComponents path
+  if (standardExportsAt? components).isSome then
+    { contribution with
+      standardModules := contribution.standardModules ++ [(publicName, components)] }
+  else addError contribution (.unknownModule owner components)
+
 private def processLocalExportItem
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (owner : Workspace.ModuleId) (locals imported : List VisibleEntity)
-    (standard : List (String × StandardExportNamespace))
+    (standard : List ProgramPublicStandard)
     (contribution : Contribution) (item : Syntax.LocalExportItem) : Contribution :=
   match item.value with
   | .name name => processExportName owner locals imported standard contribution name
@@ -1702,12 +1874,13 @@ private def processLocalExportItem
       match resolveProgramExportPath? environment owner path with
       | none => unresolvedExport owner path contribution
       | some target =>
-          addPublicEntities contribution (interfaceOf interfaces target).entities
+          addStandard (addPublicEntities contribution (interfaceOf interfaces target).entities)
+            (interfaceOf interfaces target).standard
 
 private def processExport
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (module : ProgramModule) (locals imported : List VisibleEntity)
-    (standard : List (String × StandardExportNamespace))
+    (standard : List ProgramPublicStandard)
     (contribution : Contribution) (declaration : Syntax.ExportDecl) : Contribution :=
   match declaration.value with
   | .local items =>
@@ -1716,27 +1889,33 @@ private def processExport
         contribution
   | .module path =>
       match resolveProgramExportPath? environment module.id path with
-      | none => unresolvedExport module.id path contribution
+      | none => unresolvedModuleExport module.id path
+          (programExportPathComponents path).getLast! contribution
       | some target =>
           addPublicModule contribution
             (programExportPathComponents path).getLast! target
   | .moduleAs path alias =>
       match resolveProgramExportPath? environment module.id path with
-      | none => unresolvedExport module.id path contribution
+      | none => unresolvedModuleExport module.id path alias.value contribution
       | some target => addPublicModule contribution alias.value target
   | .itemsFrom path selection =>
       match resolveProgramExportPath? environment module.id path with
       | none =>
-          match standardExportsAt? (programExportPathComponents path), selection.value with
-          | some _, .wildcard _ => contribution
+          let components := programExportPathComponents path
+          match standardExportsAt? components, selection.value with
+          | some exports, .wildcard _ =>
+              addStandard contribution (standardPublicAll components exports)
           | some exports, .selected items =>
-              items.elements.foldl (processStandardRemoteName module.id exports) contribution
+              items.elements.foldl (processStandardRemoteName module.id components exports)
+                contribution
           | none, _ => addError contribution
               (.unknownModule module.id (programExportPathComponents path))
       | some target =>
           let targetInterface := interfaceOf interfaces target
           match selection.value with
-          | .wildcard _ => addPublicEntities contribution targetInterface.entities
+          | .wildcard _ =>
+              addStandard (addPublicEntities contribution targetInterface.entities)
+                targetInterface.standard
           | .selected items =>
               items.elements.foldl
                 (processRemoteName module.id targetInterface) contribution
@@ -1749,28 +1928,46 @@ private def exportsIn (module : ProgramModule) : List Syntax.ExportDecl :=
 
 /-- Upstream's `SC0111` for one module's exports: each public name its exports give to items of
 two origins, each origin the module that declares the item and the item's name there, in any
-namespace. One item exported twice, through its module and a relay among them, is one origin. -/
+namespace, a std name's the std module's (`ProgramPublicStandard`). One item exported twice,
+through its module and a relay among them, is one origin. -/
 private def duplicateExportNames (owner : Workspace.ModuleId) (interface : ProgramInterface) :
     List ProgramInterfaceError :=
-  let names := (interface.entities.map (·.publicName)).eraseDups
+  let names := ((interface.entities.map (·.publicName)) ++
+    (interface.standard.map (·.publicName))).eraseDups
   names.filterMap fun name =>
-    let origins := (interface.entities.filter (·.publicName == name)).map fun entity =>
-      (entity.declaration.id.moduleId, entity.declaration.name)
+    let origins : List (Sum (Workspace.ModuleId × Option String) (List String × String)) :=
+      ((interface.entities.filter (·.publicName == name)).map fun entity =>
+        .inl (entity.declaration.id.moduleId, entity.declaration.name)) ++
+      ((interface.standard.filter (·.publicName == name)).map fun entry =>
+        .inr (entry.originModule, entry.originName))
     if origins.eraseDups.length > 1 then some (.duplicateExportName owner name) else none
+
+/-- Upstream's `SC0112` for one module's exports: each public name its module exports give to two
+modules, a std module counting by its path. One module exported under two names, or twice under
+one, is none. -/
+private def duplicateExportModules (owner : Workspace.ModuleId) (modules : List ProgramPublicModule)
+    (standard : List (String × List String)) : List ProgramInterfaceError :=
+  let names := ((modules.map (·.publicName)) ++ (standard.map (·.1))).eraseDups
+  names.filterMap fun name =>
+    let targets : List (Sum Workspace.ModuleId (List String)) :=
+      ((modules.filter (·.publicName == name)).map fun binding => .inl binding.target) ++
+        ((standard.filter (·.1 == name)).map fun binding => .inr binding.2)
+    if targets.eraseDups.length > 1 then some (.duplicateExportModule owner name) else none
 
 private def moduleContribution
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (module : ProgramModule) : Contribution :=
   let locals := localEntities environment module.id
   let imported := importedVisibility environment interfaces module
-  let standard := standardNamesBound environment module
+  let standard := standardNamesBound environment module ++ imported.standard
   let exported := (exportsIn module).foldl
       (fun (contribution : Contribution) declaration =>
     processExport environment interfaces module locals imported.entities standard
       contribution declaration) ({} : Contribution)
   { exported with
     errors := imported.errors ++ exported.errors ++
-      duplicateExportNames module.id exported.interface }
+      duplicateExportNames module.id exported.interface ++
+      duplicateExportModules module.id exported.interface.modules exported.standardModules }
 
 private def closureRound
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces) :
@@ -1987,13 +2184,14 @@ private def parseWorkspaceFiles :
 it: an unknown module other than one of upstream's std modules, an unknown selected or hidden item,
 the import rules (`importRuleErrors`), two imports under one qualifier (`SC0116`), and the export
 checks: an unknown export or re-export (`SC0113`, `SC0115`), a constructor its type does not show
-(`SC0114`, or `SC0115` for a re-export), and one public name for items of two origins
-(`SC0111`). -/
+(`SC0114`, or `SC0115` for a re-export), one public name for items of two origins (`SC0111`), and
+one public name for two modules (`SC0112`). -/
 def ProgramInterfaceError.reportedAtLoad : ProgramInterfaceError → Bool
   | .unknownModule _ components => !upstreamStandardModulePaths.contains components
   | .unknownImportName _ _ _ | .importedNameConflict _ _ _ | .duplicateImportName _ _
   | .ambiguousImport _ _ _ | .importQualifierConflict _ _ | .unknownExportName _ _
-  | .unknownExportConstructor _ _ _ | .duplicateImportQualifier _ _ | .duplicateExportName _ _ =>
+  | .unknownExportConstructor _ _ _ | .duplicateImportQualifier _ _ | .duplicateExportName _ _
+  | .duplicateExportModule _ _ =>
       true
   | .fixedPointExhausted => false
 
@@ -2003,7 +2201,7 @@ def ProgramInterfaceError.owner? : ProgramInterfaceError → Option Workspace.Mo
   | .unknownExportConstructor owner _ _ | .importedNameConflict owner _ _
   | .duplicateImportName owner _ | .ambiguousImport owner _ _
   | .importQualifierConflict owner _ | .duplicateImportQualifier owner _
-  | .duplicateExportName owner _ => some owner
+  | .duplicateExportName owner _ | .duplicateExportModule owner _ => some owner
   | .fixedPointExhausted => none
 
 /-- The modules that a module's imports and re-exports name, where they resolve. -/
@@ -2157,8 +2355,9 @@ private def ambiguousImports (environment : ProgramEnvironment) (interfaces : Pr
                   (standardModuleBindings exports declaration).map fun (name, _) => (name, target)
               | _, _ => []
         | some target =>
-            (processImport environment interfaces module.id declaration).entities.map
-              fun entity => (entity.localName, target)
+            let result := processImport environment interfaces module.id declaration
+            result.entities.map (fun entity => (entity.localName, target)) ++
+              result.standard.map fun entry => (entry.publicName, target)
     | _ => []
   (brought.map (·.1)).eraseDups.filterMap fun name =>
     let targets := ((brought.filter (·.1 == name)).map (·.2)).eraseDups

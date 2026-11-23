@@ -65,15 +65,20 @@ def operatorBuiltin? (context : Context) (callsInScope : Bool) (name : String) :
   else none
 
 /-- The builtin a qualified name denotes: one of the 26 under a namespace path that an import of
-upstream's `std.opcodes` gives the module (`ProgramImports.builtinNamespaces`). A name of one of
-its other functions denotes none, so it is refused where it is used. -/
+upstream's `std.opcodes` gives the module (`ProgramImports.builtinNamespaces`), or that a user
+module's import names because the module re-exports it (`ProgramImports.builtinQualified`). A
+name of one of its other functions denotes none, so it is refused where it is used. -/
 def qualifiedBuiltinNamed? (context : Context) (namespacePath : List String) (name : String) :
     Option BuiltinFunctionId :=
   match buildProgramImports context.environment context.scope.currentModule with
   | .ok visibility =>
       if visibility.builtinNamespaces.contains namespacePath then
         (WordOpcode.ofName? name).map .wordOpcode
-      else none
+      else
+        match visibility.builtinQualified.find? fun (path, publicName, _) =>
+            path == namespacePath && publicName == name with
+        | some (_, _, function) => (WordOpcode.ofName? function).map .wordOpcode
+        | none => none
   | .error _ => none
 
 def qualifiedFunctionsNamed (context : Context)
@@ -88,8 +93,15 @@ def qualifiedFunctionsNamed (context : Context)
         match visibility.namespacePathTargets namespacePath with
         | [] => .ok (some [])
         | [_] =>
-            .ok (some (signaturesForDeclarations context
-              (visibility.valuesInNamespacePathNamed namespacePath name)))
+            -- A `std.opcodes` function the module re-exports is no function of the program: the
+            -- builtin answers for it (`qualifiedBuiltinNamed?`).
+            if (visibility.valuesInNamespacePathNamed namespacePath name).isEmpty &&
+                visibility.builtinQualified.any (fun (path, publicName, _) =>
+                  path == namespacePath && publicName == name) then
+              .ok none
+            else
+              .ok (some (signaturesForDeclarations context
+                (visibility.valuesInNamespacePathNamed namespacePath name)))
         | modules => .error (.ambiguousImportedNamespace
             (String.intercalate "." namespacePath) modules)
 
