@@ -1023,5 +1023,147 @@ theorem sliceCopy_evaluates {environment : Environment} {before after : Store} {
 
 end CopyReads
 
+
+/-! ### Renaming
+
+A renaming of an array form's code renames its children and its comparison; the default element and the
+comparison are closed (`arrayDefault_rename`, `CoreProof.closed_rename`). -/
+
+section Renaming
+
+theorem ordered_lookup_rename (layout : OrderedMapping.Layout) (comparison value key : Expr) (ξ : Renaming) :
+    (OrderedMapping.lookup layout comparison value key).rename ξ =
+      OrderedMapping.lookup layout (comparison.rename ξ) (value.rename ξ) (key.rename ξ) := by
+  simp [OrderedMapping.lookup, OrderedMapping.runHelper, WordMapping.runHelper, OrderedMapping.lookupBody,
+    OrderedMapping.invoke, WordMapping.invoke, OptionalCell.allocate, OptionalCell.read,
+    LanguageResult.bind, LanguageResult.success, LanguageResult.failure, Expr.rename, Expr.renameList,
+    Expr.weakenAt, Renaming.lift]
+
+theorem ordered_insert_rename (layout : OrderedMapping.Layout) (comparison value key replacement : Expr)
+    (ξ : Renaming) :
+    (OrderedMapping.insert layout comparison value key replacement).rename ξ =
+      OrderedMapping.insert layout (comparison.rename ξ) (value.rename ξ) (key.rename ξ) (replacement.rename ξ) := by
+  simp [OrderedMapping.insert, OrderedMapping.runHelper, WordMapping.runHelper, OrderedMapping.insertBody,
+    OrderedMapping.cons, OrderedMapping.empty, OrderedMapping.invoke, WordMapping.invoke,
+    OptionalCell.allocate, OptionalCell.read, LanguageResult.bind, LanguageResult.success, LanguageResult.failure,
+    Expr.rename, Expr.renameList, Expr.weakenAt, Renaming.lift]
+
+variable (layout : OrderedMapping.Layout)
+
+theorem arrayLength_rename (base : Expr) (ξ : Renaming) :
+    (SourceCoreDataExpressions.arrayLength base).rename ξ = SourceCoreDataExpressions.arrayLength (base.rename ξ) := by
+  simp [SourceCoreDataExpressions.arrayLength, LanguageResult.bind, LanguageResult.success, Expr.rename,
+    Renaming.lift]
+
+theorem sliceLength_rename (base : Expr) (ξ : Renaming) :
+    (SourceCoreDataExpressions.sliceLength base).rename ξ = SourceCoreDataExpressions.sliceLength (base.rename ξ) := by
+  simp [SourceCoreDataExpressions.sliceLength, LanguageResult.bind, LanguageResult.success, Expr.rename,
+    Renaming.lift]
+
+theorem newArray_rename (default length : Expr) (ξ : Renaming) :
+    (SourceCoreDataExpressions.newArray layout default length).rename ξ =
+      SourceCoreDataExpressions.newArray layout (default.rename ξ) (length.rename ξ) := by
+  simp [SourceCoreDataExpressions.newArray, LanguageResult.bind, LanguageResult.success, LanguageResult.failure,
+    Expr.rename, Renaming.lift, OrderedMapping.empty, Expr.weakenAt]
+
+theorem arrayLiteralEntries_rename (ξ : Renaming) :
+    ∀ (index count : Nat) (value : Expr),
+      (SourceCoreDataExpressions.arrayLiteralEntries layout index count value).rename ξ =
+        SourceCoreDataExpressions.arrayLiteralEntries layout index count (value.rename ξ)
+  | _, 0, _ => by simp [SourceCoreDataExpressions.arrayLiteralEntries, OrderedMapping.empty, Expr.rename]
+  | _, 1, _ => by
+    simp [SourceCoreDataExpressions.arrayLiteralEntries, OrderedMapping.empty, OrderedMapping.cons, Expr.rename]
+  | index, count + 2, value => by
+    simp only [SourceCoreDataExpressions.arrayLiteralEntries, OrderedMapping.cons, Expr.rename,
+      arrayLiteralEntries_rename ξ (index + 1) (count + 1) (.second value)]
+
+theorem arrayLiteral_rename (default elements : Expr) (count : Nat) (ξ : Renaming) :
+    (SourceCoreDataExpressions.arrayLiteral layout default elements count).rename ξ =
+      SourceCoreDataExpressions.arrayLiteral layout (default.rename ξ) (elements.rename ξ) count := by
+  simp [SourceCoreDataExpressions.arrayLiteral, LanguageResult.bind, LanguageResult.success, Expr.rename,
+    Renaming.lift, arrayLiteralEntries_rename]
+
+theorem arrayIndex_rename (comparison base index : Expr) (ξ : Renaming) :
+    (SourceCoreDataExpressions.arrayIndex layout comparison base index).rename ξ =
+      SourceCoreDataExpressions.arrayIndex layout (comparison.rename ξ) (base.rename ξ) (index.rename ξ) := by
+  simp [SourceCoreDataExpressions.arrayIndex, LanguageResult.bind, LanguageResult.success, LanguageResult.failure,
+    Expr.rename, Renaming.lift, ordered_lookup_rename, Expr.weakenAt]
+
+theorem viewRead_rename (comparison : Expr) (ξ : Renaming) :
+    ∀ (depth : Nat) (view position : Expr),
+      (SourceCoreDataExpressions.viewRead layout comparison depth view position).rename ξ =
+        SourceCoreDataExpressions.viewRead layout (comparison.rename ξ) depth (view.rename ξ) (position.rename ξ)
+  | 0, view, position => by
+    simp only [SourceCoreDataExpressions.viewRead, arrayIndex_rename, LanguageResult.success, Expr.rename]
+  | depth + 1, view, position => by
+    simp [SourceCoreDataExpressions.viewRead, viewRead_rename comparison ξ depth, LanguageResult.failure,
+      Expr.rename, Renaming.lift]
+
+theorem viewIndex_rename (comparison : Expr) (depth : Nat) (base index : Expr) (ξ : Renaming) :
+    (SourceCoreDataExpressions.viewIndex layout comparison depth base index).rename ξ =
+      SourceCoreDataExpressions.viewIndex layout (comparison.rename ξ) depth (base.rename ξ) (index.rename ξ) := by
+  cases depth with
+  | zero => exact arrayIndex_rename layout comparison base index ξ
+  | succ depth =>
+    simp [SourceCoreDataExpressions.viewIndex, LanguageResult.bind, Expr.rename, Renaming.lift,
+      viewRead_rename]
+
+theorem viewLength_rename (depth : Nat) (view : Expr) (ξ : Renaming) :
+    (SourceCoreDataExpressions.viewLength depth view).rename ξ =
+      SourceCoreDataExpressions.viewLength depth (view.rename ξ) := by
+  cases depth <;> simp [SourceCoreDataExpressions.viewLength, Expr.rename]
+
+theorem viewArray_rename (ξ : Renaming) :
+    ∀ (depth : Nat) (view : Expr),
+      (SourceCoreDataExpressions.viewArray depth view).rename ξ = SourceCoreDataExpressions.viewArray depth (view.rename ξ)
+  | 0, _ => rfl
+  | depth + 1, view => by
+    simp only [SourceCoreDataExpressions.viewArray, viewArray_rename ξ depth (.first view), Expr.rename]
+
+theorem arraySlice_rename (baseType : Ty) (depth : Nat) (base : Expr) (start stop : Option Expr) (ξ : Renaming) :
+    (SourceCoreDataExpressions.arraySlice baseType depth base start stop).rename ξ =
+      SourceCoreDataExpressions.arraySlice baseType depth (base.rename ξ) (start.map (·.rename ξ))
+        (stop.map (·.rename ξ)) := by
+  cases start <;> cases stop <;>
+    simp [SourceCoreDataExpressions.arraySlice, LanguageResult.bind, LanguageResult.success, LanguageResult.failure,
+      Expr.rename, Renaming.lift, viewLength_rename]
+
+theorem elementRef_rename (base index : Expr) (ξ : Renaming) :
+    (SourceCoreDataExpressions.elementRef layout base index).rename ξ =
+      SourceCoreDataExpressions.elementRef layout (base.rename ξ) (index.rename ξ) := by
+  simp [SourceCoreDataExpressions.elementRef, LanguageResult.bind, LanguageResult.success, LanguageResult.failure,
+    Expr.rename, Renaming.lift, Expr.weakenAt]
+
+theorem memrefLoad_rename (comparison reference : Expr) (ξ : Renaming) :
+    (SourceCoreDataExpressions.memrefLoad layout comparison reference).rename ξ =
+      SourceCoreDataExpressions.memrefLoad layout (comparison.rename ξ) (reference.rename ξ) := by
+  simp [SourceCoreDataExpressions.memrefLoad, LanguageResult.bind, Expr.rename, Renaming.lift,
+    viewRead_rename]
+
+theorem memrefStore_rename (comparison reference value : Expr) (ξ : Renaming) :
+    (SourceCoreDataExpressions.memrefStore layout comparison reference value).rename ξ =
+      SourceCoreDataExpressions.memrefStore layout (comparison.rename ξ) (reference.rename ξ) (value.rename ξ) := by
+  simp [SourceCoreDataExpressions.memrefStore, LanguageResult.bind, LanguageResult.success, Expr.rename,
+    Renaming.lift, ordered_insert_rename]
+
+/-- The copy helper's body names only its own binders below four, so a renaming lifted past them renames
+only its comparison. -/
+theorem sliceCopyBody_rename (comparison : Expr) (depth : Nat) (sliceType : Ty) (ξ : Renaming) :
+    (SourceCoreDataExpressions.sliceCopyBody layout comparison depth sliceType).rename ξ.lift.lift.lift.lift =
+      SourceCoreDataExpressions.sliceCopyBody layout (comparison.rename ξ.lift.lift.lift.lift) depth sliceType := by
+  simp [SourceCoreDataExpressions.sliceCopyBody, LanguageResult.bind, LanguageResult.success, LanguageResult.failure,
+    Expr.rename, Renaming.lift, viewRead_rename, viewLength_rename, OrderedMapping.invoke, WordMapping.invoke,
+    OptionalCell.read, OrderedMapping.cons, OrderedMapping.empty, Expr.weakenAt]
+
+theorem sliceCopy_rename (comparison : Expr) (depth : Nat) (sliceType : Ty) (slice : Expr) (ξ : Renaming) :
+    (SourceCoreDataExpressions.sliceCopy layout comparison depth sliceType slice).rename ξ =
+      SourceCoreDataExpressions.sliceCopy layout (comparison.rename ξ) depth sliceType (slice.rename ξ) := by
+  simp [SourceCoreDataExpressions.sliceCopy, LanguageResult.bind, LanguageResult.success, LanguageResult.failure,
+    Expr.rename, Renaming.lift, OrderedMapping.runHelper, WordMapping.runHelper, OptionalCell.allocate,
+    WordMapping.invoke, OptionalCell.read, sliceCopyBody_rename, viewLength_rename,
+    viewArray_rename, Expr.weakenAt]
+
+end Renaming
+
 end Solcore.SourceSemantics.CoreLowering.CompatibleArrayEvaluation
 end
