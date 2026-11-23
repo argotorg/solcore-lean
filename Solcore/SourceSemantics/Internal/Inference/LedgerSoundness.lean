@@ -237,12 +237,16 @@ theorem inferExprFuelLedgerPreservation_step
     | ok candidates =>
       cases candidates with
       | nil =>
-        cases builtinResult : Detail.qualifiedBuiltinReference? context allocated expression with
+        cases builtinResult : Detail.qualifiedValueReference? context allocated expression with
         | some found =>
-            rcases found with ⟨reference, function⟩
-            have recorded := Detail.inferExprFuel_success_fieldBuiltin_facts form allocation
-              discovery builtinResult accepted
-            exact allocatedTracked.recordExpressionWithExpected recorded
+            rcases found with ⟨reference, function | signature⟩
+            · have recorded := Detail.inferExprFuel_success_fieldBuiltin_facts form allocation
+                discovery builtinResult accepted
+              exact allocatedTracked.recordExpressionWithExpected recorded
+            · have recorded := Detail.inferExprFuel_success_fieldDeclaration_record form allocation
+                discovery builtinResult accepted
+              exact ((allocatedTracked.withInference).addRequirementsWithIds _)
+                |>.recordExpressionWithExpected recorded
         | none =>
             obtain ⟨_, _, _, baseRun, _, recorded⟩ :=
               Detail.inferExprFuel_success_fieldLength_facts form allocation discovery builtinResult accepted

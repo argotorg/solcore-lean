@@ -2589,10 +2589,21 @@ mutual
               | some (qualifiers, missing) =>
                   throw (.unknownConstructor qualifiers missing)
               | none =>
-                  match qualifiedBuiltinReference? context state expression with
-                  | some (reference, function) =>
+                  match qualifiedValueReference? context state expression with
+                  | some (reference, .builtin function) =>
                       recordExpressionWithExpected context expression id function.type
                         (.reference reference (.builtinFunction function)) [] expected state
+                  -- A function named qualified is the reference its unqualified name gives.
+                  | some (reference, .declaration signature) =>
+                      let instantiated := signature.scheme.instantiate state.inference.next
+                      let inference := { state.inference with next := instantiated.next }
+                      let (requirements, state) :=
+                        ({ state with inference }).addRequirementsWithIds
+                          instantiated.predicates
+                      recordExpressionWithExpected context expression id instantiated.body
+                        (.reference reference (.declaration
+                          (DeclarationInstantiation.ofInstantiated signature instantiated)))
+                        requirements expected state
                   | none =>
                       if name.value == "length" then
                         let (array, state) ← inferExprFuel fuel context base none state
@@ -3266,9 +3277,9 @@ mutual
 end
 
 /-- Invert successful `a.length` inference, a field that names no constructor
-and no `std.opcodes` builtin: the field is `length`, and the base, inferred with
-no expected type, is a memory array once resolved, whose length is recorded at
-`uint256`. -/
+and no qualified value (`qualifiedValueReference?`): the field is `length`, and
+the base, inferred with no expected type, is a memory array once resolved, whose
+length is recorded at `uint256`. -/
 theorem inferExprFuel_success_fieldLength_facts
     {fuel : Nat} {context : Context} {expression base : Syntax.Expr}
     {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
@@ -3277,7 +3288,7 @@ theorem inferExprFuel_success_fieldLength_facts
     (expressionEq : expression.value = .field base dot name)
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (nonconstructor : constructorCalleeCandidates context allocated expression = .ok [])
-    (notBuiltin : qualifiedBuiltinReference? context allocated expression = none)
+    (notBuiltin : qualifiedValueReference? context allocated expression = none)
     (success : inferExprFuel (fuel + 1) context expression expected initial =
       .ok result) :
     ∃ arrayResult arrayState element,
@@ -3323,8 +3334,8 @@ theorem inferExprFuel_success_fieldBuiltin_facts
     (expressionEq : expression.value = .field base dot name)
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (nonconstructor : constructorCalleeCandidates context allocated expression = .ok [])
-    (builtin : qualifiedBuiltinReference? context allocated expression =
-      some (reference, function))
+    (builtin : qualifiedValueReference? context allocated expression =
+      some (reference, .builtin function))
     (success : inferExprFuel (fuel + 1) context expression expected initial =
       .ok result) :
     recordExpressionWithExpected context expression id function.type
@@ -3342,6 +3353,48 @@ theorem inferExprFuel_success_fieldBuiltin_facts
       | none =>
           simp only [missing, builtin] at success
           exact success
+
+/-- Invert successful inference of a function named qualified as a value, a field
+that names no constructor: the reference its unqualified name gives, through
+canonical scheme instantiation and predicate allocation, recorded under the name
+it is written as. -/
+theorem inferExprFuel_success_fieldDeclaration_record
+    {fuel : Nat} {context : Context} {expression base : Syntax.Expr}
+    {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {result : InferredExpression × State}
+    {reference : String} {signature : ProgramFunctionSignature}
+    (expressionEq : expression.value = .field base dot name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (nonconstructor : constructorCalleeCandidates context allocated expression = .ok [])
+    (declaration : qualifiedValueReference? context allocated expression =
+      some (reference, .declaration signature))
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    (let instantiated :=
+       signature.scheme.instantiate allocated.inference.next
+     let inference := {
+       allocated.inference with next := instantiated.next
+     }
+     let (requirements, recorded) :=
+       ({ allocated with inference }).addRequirementsWithIds
+         instantiated.predicates
+     recordExpressionWithExpected context expression id instantiated.body
+       (.reference reference (.declaration
+         (DeclarationInstantiation.ofInstantiated signature instantiated)))
+       requirements expected recorded = .ok result) := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, nonconstructor, bind, Except.bind] at success
+  cases missing : missingExplicitConstructor? context allocated expression with
+  | error error => simp [missing] at success
+  | ok missingResult =>
+      cases missingResult with
+      | some pair =>
+          rcases pair with ⟨qualifiers, missingName⟩
+          simp [missing] at success
+      | none =>
+          simp only [missing, declaration] at success
+          simpa only using success
 
 end Solcore.Frontend.SourceInference.Detail
 end

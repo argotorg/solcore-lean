@@ -899,27 +899,29 @@ theorem declarationInstantiation_afterSubstitution
     exact FlexibleSubstitution.PredicatesWellFormed.applyFlexible_composeParameters
       substitution instantiated.parameterSubstitution innerExact signatureWellFormed.predicates
 
-theorem inferExprFuel_success_declarationIdentifier_expressionTypingBase_selected
-    {fuel : Nat}
+/-- A reference to a catalog function, recorded with its exact fresh batch, as an identifier and a
+qualified name that name the function record it, has its selected expression typing. -/
+theorem recordDeclarationReference_expressionTypingBase_selected
     {inferenceContext solverContext : Frontend.SourceInference.Context}
     {expression : Syntax.Expr} {expected : Option TypeSystem.Ty}
-    {initial allocated later : Frontend.SourceInference.State}
-    {id : ExpressionId} {name : Syntax.Identifier}
+    {allocated later : Frontend.SourceInference.State}
+    {id : ExpressionId} {reference : String}
     {signature : ProgramFunctionSignature}
     {result : InferredExpression × Frontend.SourceInference.State}
     {roots : List NodeId}
     {solved : List SolvedRequirement}
     {base active : SourceSemantics.Context}
     {semanticSource evidenceSource : TypedSource}
-    (expressionEq : expression.value = .identifier name)
-    (allocationEq : initial.allocateExpressionId = (id, allocated))
-    (lookupEq : allocated.lookupBinder? name.value = none)
-    (notBoolean :
-      (name.value == "true" || name.value == "false") = false)
-    (functionsEq : Detail.functionsNamed inferenceContext name.value =
-      .ok [signature])
-    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
-      expected initial = .ok result)
+    (recordedSuccess :
+      let instantiated := signature.scheme.instantiate allocated.inference.next
+      let inference := { allocated.inference with next := instantiated.next }
+      let (requirements, recorded) :=
+        ({ allocated with inference }).addRequirementsWithIds instantiated.predicates
+      Detail.recordExpressionWithExpected inferenceContext expression id instantiated.body
+        (.reference reference (.declaration
+          (Frontend.SourceInference.DeclarationInstantiation.ofInstantiated signature instantiated)))
+        requirements expected recorded = .ok result)
+    (inferenceSignatureMember : signature ∈ inferenceContext.signatures.functions)
     (substitutionExtends :
       later.inference.substitution.SemanticallyExtends
         result.2.inference.substitution)
@@ -960,16 +962,12 @@ theorem inferExprFuel_success_declarationIdentifier_expressionTypingBase_selecte
     advanced.addRequirementsWithIds instantiated.predicates
   have recorded : Detail.recordExpressionWithExpected inferenceContext
       expression id instantiated.body
-      (.reference name.value (.declaration
+      (.reference reference (.declaration
         (Frontend.SourceInference.DeclarationInstantiation.ofInstantiated
           signature instantiated)))
       allocation.1 expected allocation.2 = .ok result := by
     simpa only [instantiated, inference, advanced, allocation] using
-      (Detail.inferExprFuel_success_declarationIdentifier_record expressionEq
-        allocationEq lookupEq notBoolean functionsEq success)
-  have inferenceSignatureMember :
-      signature ∈ inferenceContext.signatures.functions :=
-    Detail.functionsNamed_success_subset_catalog functionsEq (by simp)
+      recordedSuccess
   have signatureMember : signature ∈ active.signatures.functions := by
     rw [signaturesEq]
     exact inferenceSignatureMember
@@ -1022,7 +1020,7 @@ theorem inferExprFuel_success_declarationIdentifier_expressionTypingBase_selecte
       (later.inference.substitution.apply instantiated.body) allocation.1 :=
     .declaration mappedInstantiationValid finalSequence
   have formType : ExpressionFormHasRawType semanticSource active
-      ((ExpressionForm.reference name.value (ReferenceResolution.declaration
+      ((ExpressionForm.reference reference (ReferenceResolution.declaration
         (Frontend.SourceInference.DeclarationInstantiation.ofInstantiated
           signature instantiated))).applySubstitution
             later.inference.substitution)
@@ -1040,6 +1038,121 @@ theorem inferExprFuel_success_declarationIdentifier_expressionTypingBase_selecte
       activeSignaturesEq activeRequirementsEq assumptionsMono covered
 
 
+
+theorem inferExprFuel_success_declarationIdentifier_expressionTypingBase_selected
+    {fuel : Nat}
+    {inferenceContext solverContext : Frontend.SourceInference.Context}
+    {expression : Syntax.Expr} {expected : Option TypeSystem.Ty}
+    {initial allocated later : Frontend.SourceInference.State}
+    {id : ExpressionId} {name : Syntax.Identifier}
+    {signature : ProgramFunctionSignature}
+    {result : InferredExpression × Frontend.SourceInference.State}
+    {roots : List NodeId}
+    {solved : List SolvedRequirement}
+    {base active : SourceSemantics.Context}
+    {semanticSource evidenceSource : TypedSource}
+    (expressionEq : expression.value = .identifier name)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (lookupEq : allocated.lookupBinder? name.value = none)
+    (notBoolean :
+      (name.value == "true" || name.value == "false") = false)
+    (functionsEq : Detail.functionsNamed inferenceContext name.value =
+      .ok [signature])
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
+      expected initial = .ok result)
+    (substitutionExtends :
+      later.inference.substitution.SemanticallyExtends
+        result.2.inference.substitution)
+    (requirementsSubset : result.2.requirements ⊆ later.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      inferenceContext.signatures solved evidenceSource)
+    (coercionsRetained : ExpressionCoercionPrimariesRetainedAt
+      (result.2.toTypedSource roots) evidenceSource result.1.id)
+    (catalog : SignatureCatalogWellFormed active.signatures)
+    (binders : TypeParameterBindersWellFormed active)
+    (residual : active.residualTypeVariables = true)
+    (range : SubstitutionRangeAdmissible active later.inference.substitution)
+    (signaturesEq : active.signatures = inferenceContext.signatures)
+    (solveSuccess : Detail.solveRequirements solverContext later
+      later.requirements = .ok solved)
+    (solvedEq : base.solvedRequirements = solved)
+    (ledger : ScopedRequirementLedgerWellFormed base evidenceSource)
+    (ownership : RequirementOwnership base evidenceSource)
+    (activeSignaturesEq : active.signatures = base.signatures)
+    (activeRequirementsEq :
+      active.solvedRequirements = base.solvedRequirements)
+    (assumptionsMono : base.assumptions ⊆ active.assumptions)
+    (covered : TemplateScopeCovered evidenceSource active
+      (.expression result.1.id)) :
+    ExpressionTypingBase (result.2.toTypedSource roots) semanticSource active
+      later.inference.substitution result.1 := by
+  exact recordDeclarationReference_expressionTypingBase_selected
+    (Detail.inferExprFuel_success_declarationIdentifier_record expressionEq allocationEq lookupEq
+      notBoolean functionsEq success)
+    (Detail.functionsNamed_success_subset_catalog functionsEq (by simp))
+    substitutionExtends requirementsSubset retained interfaces coercionsRetained catalog binders residual range signaturesEq solveSuccess solvedEq ledger ownership activeSignaturesEq activeRequirementsEq assumptionsMono covered
+
+/-- A reference to a catalog function, recorded with its exact fresh batch, has its actual
+selected expression typing, an identifier's or a qualified name's. -/
+theorem recordDeclarationReference_expressionTypingBase_actual
+    {wholeContext inferenceContext : Frontend.SourceInference.Context}
+    {wholeReturn : Ty} {evidenceState : State} {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources wholeContext wholeReturn evidenceState roots finalized)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      wholeContext.signatures finalized.solvedRequirements finalized.typedSource)
+    {expression : Syntax.Expr} {expected : Option Ty}
+    {initial allocated resultState : State} {id : ExpressionId} {reference : String}
+    {signature : ProgramFunctionSignature} {inferred : InferredExpression}
+    {semanticSource : TypedSource} {active : SourceSemantics.Context}
+    (recordedSuccess :
+      let instantiated := signature.scheme.instantiate allocated.inference.next
+      let inference := { allocated.inference with next := instantiated.next }
+      let (requirements, recorded) :=
+        ({ allocated with inference }).addRequirementsWithIds instantiated.predicates
+      Detail.recordExpressionWithExpected inferenceContext expression id instantiated.body
+        (.reference reference (.declaration
+          (Frontend.SourceInference.DeclarationInstantiation.ofInstantiated signature instantiated)))
+        requirements expected recorded = .ok (inferred, resultState))
+    (inferenceSignatureMember : signature ∈ inferenceContext.signatures.functions)
+    (extension : finalized.substitution.SemanticallyExtends resultState.inference.substitution)
+    (requirementsSubset : resultState.requirements ⊆ evidenceState.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (coercionsRetained : ExpressionCoercionPrimariesRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (catalog : SignatureCatalogWellFormed inferenceContext.signatures)
+    (signaturesEq : inferenceContext.signatures = wholeContext.signatures)
+    (canonical : SignatureParametersWellFormed wholeContext.scope.genericOwner wholeContext.typeParameters)
+    (invariant : RecursiveExpressionInvariant wholeContext finalized initial active)
+    (covered : TemplateScopeCovered finalized.typedSource active (.expression inferred.id)) :
+    ExpressionTypingBase (resultState.toTypedSource roots) semanticSource active
+      finalized.substitution inferred := by
+  have finalSubstitutionEq := resources.substitution_eq.symm
+  have finalExtension : resources.finalState.inference.substitution.SemanticallyExtends
+      resultState.inference.substitution := by simpa only [finalSubstitutionEq] using extension
+  have finalRequirements : resultState.requirements ⊆ resources.finalState.requirements := by
+    rw [resources.requirements_eq]
+    exact requirementsSubset
+  have activeSignaturesEq : active.signatures = inferenceContext.signatures :=
+    invariant.signatures_eq_whole.trans signaturesEq.symm
+  have activeCatalog : SignatureCatalogWellFormed active.signatures := by
+    rw [activeSignaturesEq]
+    exact catalog
+  have binders := invariant.typeParameterBinders canonical
+  have range := resources.substitutionRangeAdmissible binders
+    invariant.signatures_eq_whole invariant.typeParametersEq invariant.declarationEq invariant.residual
+  simpa only [finalSubstitutionEq] using
+    (recordDeclarationReference_expressionTypingBase_selected
+      (base := finalizedRequirementContext wholeContext finalized)
+      recordedSuccess inferenceSignatureMember finalExtension
+      finalRequirements retained (by simpa only [signaturesEq] using interfaces) coercionsRetained
+      activeCatalog binders invariant.residual
+      (by simpa only [finalSubstitutionEq] using range) activeSignaturesEq
+      resources.solve_success resources.solved_context_eq resources.ledger resources.ownership
+      invariant.signaturesEq invariant.solvedRequirementsEq invariant.assumptionsMono covered)
 
 theorem inferExprFuel_success_declarationIdentifier_expressionTypingBase_actual
     {wholeContext inferenceContext : Frontend.SourceInference.Context}
@@ -1072,29 +1185,11 @@ theorem inferExprFuel_success_declarationIdentifier_expressionTypingBase_actual
     (covered : TemplateScopeCovered finalized.typedSource active (.expression inferred.id)) :
     ExpressionTypingBase (resultState.toTypedSource roots) semanticSource active
       finalized.substitution inferred := by
-  have finalSubstitutionEq := resources.substitution_eq.symm
-  have finalExtension : resources.finalState.inference.substitution.SemanticallyExtends
-      resultState.inference.substitution := by simpa only [finalSubstitutionEq] using extension
-  have finalRequirements : resultState.requirements ⊆ resources.finalState.requirements := by
-    rw [resources.requirements_eq]
-    exact requirementsSubset
-  have activeSignaturesEq : active.signatures = inferenceContext.signatures :=
-    invariant.signatures_eq_whole.trans signaturesEq.symm
-  have activeCatalog : SignatureCatalogWellFormed active.signatures := by
-    rw [activeSignaturesEq]
-    exact catalog
-  have binders := invariant.typeParameterBinders canonical
-  have range := resources.substitutionRangeAdmissible binders
-    invariant.signatures_eq_whole invariant.typeParametersEq invariant.declarationEq invariant.residual
-  simpa only [finalSubstitutionEq] using
-    (inferExprFuel_success_declarationIdentifier_expressionTypingBase_selected
-      (base := finalizedRequirementContext wholeContext finalized)
-      expressionEq allocationEq lookupEq notBoolean functionsEq success finalExtension
-      finalRequirements retained (by simpa only [signaturesEq] using interfaces) coercionsRetained
-      activeCatalog binders invariant.residual
-      (by simpa only [finalSubstitutionEq] using range) activeSignaturesEq
-      resources.solve_success resources.solved_context_eq resources.ledger resources.ownership
-      invariant.signaturesEq invariant.solvedRequirementsEq invariant.assumptionsMono covered)
+  exact recordDeclarationReference_expressionTypingBase_actual resources interfaces
+    (Detail.inferExprFuel_success_declarationIdentifier_record expressionEq allocationEq lookupEq
+      notBoolean functionsEq success)
+    (Detail.functionsNamed_success_subset_catalog functionsEq (by simp))
+    extension requirementsSubset retained coercionsRetained catalog signaturesEq canonical invariant covered
 
 end Solcore.SourceSemantics.SourceInferenceSoundness
 end

@@ -752,7 +752,7 @@ theorem actualFieldLength_typing {fuel : Nat}
     (expressionEq : expression.value = .field base dot name)
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (nonconstructor : Detail.constructorCalleeCandidates inferenceContext allocated expression = .ok [])
-    (notBuiltin : Detail.qualifiedBuiltinReference? inferenceContext allocated expression = none)
+    (notBuiltin : Detail.qualifiedValueReference? inferenceContext allocated expression = none)
     (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression expected initial =
       .ok (inferred, resultState))
     (resources : FinalInferenceResources wholeContext wholeReturn evidenceState roots finalized)
@@ -928,14 +928,20 @@ theorem actualInferExprFuelRetainedSoundness_field_constructor {fuel : Nat}
   | ok candidates =>
     cases candidates with
     | nil =>
-      cases builtinResult : Detail.qualifiedBuiltinReference? inferenceContext allocated expression with
+      cases builtinResult : Detail.qualifiedValueReference? inferenceContext allocated expression with
       | some found =>
-        rcases found with ⟨reference, function⟩
-        exact recordBuiltinFunctionReference_expressionTypingBase_selected resources interfaces
-          (Detail.inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq discovery
-            builtinResult original)
-          extension requirements retained coercionsRetained catalog signaturesEq
-          (by simpa only [ownerEq, typeParametersEq] using canonical) invariant covered
+        rcases found with ⟨reference, function | signature⟩
+        · exact recordBuiltinFunctionReference_expressionTypingBase_selected resources interfaces
+            (Detail.inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq discovery
+              builtinResult original)
+            extension requirements retained coercionsRetained catalog signaturesEq
+            (by simpa only [ownerEq, typeParametersEq] using canonical) invariant covered
+        · exact recordDeclarationReference_expressionTypingBase_actual resources interfaces
+            (Detail.inferExprFuel_success_fieldDeclaration_record expressionEq allocationEq discovery
+              builtinResult original)
+            (Detail.qualifiedValueReference?_declaration_member builtinResult)
+            extension requirements retained coercionsRetained catalog signaturesEq
+            (by simpa only [ownerEq, typeParametersEq] using canonical) invariant covered
       | none =>
         exact actualFieldLength_typing recursive expressionEq allocationEq discovery builtinResult
           original resources interfaces extension signaturesEq ownerEq typeParametersEq assumptionsEq

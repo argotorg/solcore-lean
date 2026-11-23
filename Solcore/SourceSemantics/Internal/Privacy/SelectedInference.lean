@@ -2744,20 +2744,31 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
         simp only [candidatesResult] at success
         cases candidates with
         | nil =>
-            cases builtinResult : Detail.qualifiedBuiltinReference? context allocated expression with
+            cases builtinResult : Detail.qualifiedValueReference? context allocated expression with
             | some found =>
-                rcases found with ⟨reference, function⟩
-                have recordedSuccess := Detail.inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq
-                  candidatesResult builtinResult overallSuccess
-                have recorded := recordExpressionWithExpected_private catalog allocationProperties.2
-                  ((builtinFunction_type_closed function).weaken (Nat.zero_le _))
-                  (fun type member => (expectedBelow type member).weaken allocationProperties.1.next_le)
-                  (safe_closed _ _ (builtinFunction_type_closed function))
-                  (fun type member => allocationPrivacy.1 _ (expectedSafe _ member))
-                  allocationPrivacy.2.1 recordedSuccess
-                refine ⟨allocationPrivacy.1.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
-                intro row member fresh
-                exact recorded.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using fresh)
+                rcases found with ⟨reference, function | signature⟩
+                · have recordedSuccess := Detail.inferExprFuel_success_fieldBuiltin_facts expressionEq
+                    allocationEq candidatesResult builtinResult overallSuccess
+                  have recorded := recordExpressionWithExpected_private catalog allocationProperties.2
+                    ((builtinFunction_type_closed function).weaken (Nat.zero_le _))
+                    (fun type member => (expectedBelow type member).weaken allocationProperties.1.next_le)
+                    (safe_closed _ _ (builtinFunction_type_closed function))
+                    (fun type member => allocationPrivacy.1 _ (expectedSafe _ member))
+                    allocationPrivacy.2.1 recordedSuccess
+                  refine ⟨allocationPrivacy.1.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+                  intro row member fresh
+                  exact recorded.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using fresh)
+                · have recordedSuccess := Detail.inferExprFuel_success_fieldDeclaration_record
+                    expressionEq allocationEq candidatesResult builtinResult overallSuccess
+                  have recorded := declaration_reference_private catalog
+                    (Detail.qualifiedValueReference?_declaration_member builtinResult)
+                    allocationProperties.2 boundAllocated
+                    (fun type member => (expectedBelow type member).weaken allocationProperties.1.next_le)
+                    (fun type member => allocationPrivacy.1 _ (expectedSafe _ member))
+                    allocationPrivacy.2.1 recordedSuccess
+                  refine ⟨allocationPrivacy.1.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+                  intro row member fresh
+                  exact recorded.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using fresh)
             | none =>
                 obtain ⟨arrayResult, arrayState, _, baseRun, _, recordedSuccess⟩ :=
                   Detail.inferExprFuel_success_fieldLength_facts expressionEq allocationEq candidatesResult builtinResult overallSuccess

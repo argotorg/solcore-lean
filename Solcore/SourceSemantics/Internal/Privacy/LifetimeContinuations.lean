@@ -345,7 +345,7 @@ theorem fieldLength
     (form : source.value = .field base dot name)
     (allocation : initial.allocateExpressionId = (id, allocated))
     (nonconstructor : constructorCalleeCandidates context allocated source = .ok [])
-    (notBuiltin : qualifiedBuiltinReference? context allocated source = none)
+    (notBuiltin : qualifiedValueReference? context allocated source = none)
     (childAccepted : inferExprFuel fuel context base none allocated = .ok child)
     (accepted : inferExprFuel (fuel + 1) context source expected initial = .ok final)
     (lifetime : GeneralizationLifetime event allocated.inference.next child.2 [child.1.type]) :

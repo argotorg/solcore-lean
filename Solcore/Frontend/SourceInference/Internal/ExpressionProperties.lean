@@ -113,6 +113,29 @@ theorem qualifiedFunctionsNamed_success_subset_catalog
                   simp [qualifiedFunctionsNamed, imported, root, targets]
                     at success
 
+/-- A function a qualified value names is one of the whole program's functions, the one its
+qualified lookup finds (`qualifiedFunctionsNamed_success_subset_catalog`). -/
+theorem qualifiedValueReference?_declaration_member
+    {context : Context} {state : State} {expression : Syntax.Expr}
+    {reference : String} {signature : ProgramFunctionSignature}
+    (found : qualifiedValueReference? context state expression =
+      some (reference, .declaration signature)) :
+    signature ∈ context.signatures.functions := by
+  unfold qualifiedValueReference? at found
+  split at found
+  · simp at found
+  · split at found
+    · simp at found
+    · split at found
+      · simp at found
+      · split at found
+        · rename_i candidate lookup
+          simp only [Option.some.injEq, Prod.mk.injEq, QualifiedValueTarget.declaration.injEq]
+            at found
+          obtain ⟨_, rfl⟩ := found
+          exact qualifiedFunctionsNamed_success_subset_catalog lookup (by simp)
+        · simp at found
+
 /-- Invert either numeric-literal branch through fresh target allocation,
 the builtin-`Int` requirement, origin-ledger insertion, and the final ordinary
 expression recording step.  Both pieces of provenance remain present in the
@@ -11469,15 +11492,25 @@ private theorem inferFuel_inferenceProperties_internal :
         simp only [candidatesResult, bind, Except.bind] at success
         cases candidates with
         | nil =>
-            cases builtinResult : qualifiedBuiltinReference? context allocated expression with
+            cases builtinResult : qualifiedValueReference? context allocated expression with
             | some found =>
-                rcases found with ⟨reference, function⟩
-                have recorded := inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq
-                  candidatesResult builtinResult overallSuccess
-                have recordedProperties := recordExpressionWithExpected_inferenceProperties
-                  allocationProperties.2 (builtinFunction_type_variablesBelow function _)
-                  expectedAtAllocated recorded
-                exact ⟨allocationProperties.1.trans recordedProperties.1, recordedProperties.2⟩
+                rcases found with ⟨reference, function | signature⟩
+                · have recorded := inferExprFuel_success_fieldBuiltin_facts expressionEq
+                    allocationEq candidatesResult builtinResult overallSuccess
+                  have recordedProperties := recordExpressionWithExpected_inferenceProperties
+                    allocationProperties.2 (builtinFunction_type_variablesBelow function _)
+                    expectedAtAllocated recorded
+                  exact ⟨allocationProperties.1.trans recordedProperties.1, recordedProperties.2⟩
+                · have recorded := inferExprFuel_success_fieldDeclaration_record expressionEq
+                    allocationEq candidatesResult builtinResult overallSuccess
+                  have catalogMember := qualifiedValueReference?_declaration_member builtinResult
+                  have schemeBelow :=
+                    validated.function_scheme_body_variablesBelow catalogMember
+                      (canonical signature catalogMember) allocated.inference.next
+                  have recordedProperties :=
+                    recordInstantiatedFunctionReference_inferenceProperties
+                      allocationProperties.2 schemeBelow expectedAtAllocated recorded
+                  exact ⟨allocationProperties.1.trans recordedProperties.1, recordedProperties.2⟩
             | none =>
                 obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
                   inferExprFuel_success_fieldLength_facts expressionEq allocationEq candidatesResult builtinResult overallSuccess
@@ -15406,12 +15439,17 @@ private theorem inferFuel_preserves_lexicalScope_internal :
         simp only [candidatesResult, bind, Except.bind] at success
         cases candidates with
         | nil =>
-            cases builtinResult : qualifiedBuiltinReference? context allocated expression with
+            cases builtinResult : qualifiedValueReference? context allocated expression with
             | some found =>
-                rcases found with ⟨reference, function⟩
-                have recorded := inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq
-                  candidatesResult builtinResult overallSuccess
-                exact (recordExpressionWithExpected_lexicalScope recorded).trans allocationScope
+                rcases found with ⟨reference, function | signature⟩
+                · have recorded := inferExprFuel_success_fieldBuiltin_facts expressionEq
+                    allocationEq candidatesResult builtinResult overallSuccess
+                  exact (recordExpressionWithExpected_lexicalScope recorded).trans allocationScope
+                · have recorded := inferExprFuel_success_fieldDeclaration_record expressionEq
+                    allocationEq candidatesResult builtinResult overallSuccess
+                  simp only at recorded
+                  exact (recordExpressionWithExpected_lexicalScope recorded).trans
+                    ((addRequirementsWithIds_lexicalScope _ _).trans allocationScope)
             | none =>
                 obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
                   inferExprFuel_success_fieldLength_facts expressionEq allocationEq candidatesResult builtinResult overallSuccess

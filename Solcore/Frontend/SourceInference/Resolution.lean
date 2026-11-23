@@ -1319,17 +1319,33 @@ def calleeQualifiedIdentifier? (expression : Syntax.Expr) :
   | _ :: _ :: _ => some (components.dropLast, components.getLast!)
   | _ => none
 
-/-- The builtin a qualified value names, with the name it is written as: a name under one of the
-namespace paths that stand for `std.opcodes` (`qualifiedBuiltinNamed?`), whose root no local
-binds. -/
-def qualifiedBuiltinReference? (context : Context) (state : State) (expression : Syntax.Expr) :
-    Option (String × BuiltinFunctionId) := do
-  let (namespacePath, name) ← calleeQualifiedIdentifier? expression
-  let root ← namespacePath.head?
-  match state.lookupBinder? root with
-  | some _ => none
-  | none =>
-      let function ← qualifiedBuiltinNamed? context namespacePath name
-      pure (String.intercalate "." (namespacePath ++ [name]), function)
+/-- What a qualified value names (`qualifiedValueReference?`). -/
+inductive QualifiedValueTarget where
+  /-- One of `std.opcodes`' builtins (`qualifiedBuiltinNamed?`). -/
+  | builtin (function : BuiltinFunctionId)
+  /-- The one function of an imported module that a qualified call finds under the path
+  (`qualifiedFunctionsNamed`). -/
+  | declaration (signature : ProgramFunctionSignature)
+
+/-- What a qualified value names, with the name it is written as, where no local binds the path's
+root: the one function under the path that a qualified call of the name finds, as upstream
+resolves a qualified name in a value as in a callee (`resolve_field_expr`), or else a builtin under
+one of the namespace paths that stand for `std.opcodes` (`qualifiedBuiltinNamed?`). -/
+def qualifiedValueReference? (context : Context) (state : State) (expression : Syntax.Expr) :
+    Option (String × QualifiedValueTarget) :=
+  match calleeQualifiedIdentifier? expression with
+  | none => none
+  | some (namespacePath, name) =>
+      match namespacePath.head? with
+      | none => none
+      | some root =>
+          match state.lookupBinder? root with
+          | some _ => none
+          | none =>
+              let reference := String.intercalate "." (namespacePath ++ [name])
+              match qualifiedFunctionsNamed context namespacePath name with
+              | .ok (some [signature]) => some (reference, .declaration signature)
+              | _ => (qualifiedBuiltinNamed? context namespacePath name).map
+                  fun function => (reference, .builtin function)
 
 end Solcore.Frontend.SourceInference.Detail

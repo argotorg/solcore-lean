@@ -1344,14 +1344,20 @@ theorem inferExprFuel_fieldConstructor_fixes_protected
       simp only [candidatesResult] at success
       cases candidates with
       | nil =>
-          cases builtinResult : qualifiedBuiltinReference? context allocated expression with
+          cases builtinResult : qualifiedValueReference? context allocated expression with
           | some found =>
-              rcases found with ⟨reference, function⟩
-              have recordedSuccess := inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq
-                candidatesResult builtinResult overallSuccess
-              exact recordExpressionWithExpected_fixes_protected allocatedFixed
-                (safe_closed _ _ (builtin_type_closed function))
-                (fun type member => allocationPrivacy.1 _ (expectedSafe _ member)) recordedSuccess
+              rcases found with ⟨reference, function | signature⟩
+              · have recordedSuccess := inferExprFuel_success_fieldBuiltin_facts expressionEq
+                  allocationEq candidatesResult builtinResult overallSuccess
+                exact recordExpressionWithExpected_fixes_protected allocatedFixed
+                  (safe_closed _ _ (builtin_type_closed function))
+                  (fun type member => allocationPrivacy.1 _ (expectedSafe _ member)) recordedSuccess
+              · have recordedSuccess := inferExprFuel_success_fieldDeclaration_record expressionEq
+                  allocationEq candidatesResult builtinResult overallSuccess
+                exact declaration_reference_fixes_protected catalog
+                  (qualifiedValueReference?_declaration_member builtinResult) allocationProperties.2
+                  boundAllocated (fun type member => allocationPrivacy.1 _ (expectedSafe _ member))
+                  allocatedFixed recordedSuccess
           | none =>
               obtain ⟨arrayResult, arrayState, _, baseRun, _, recordedSuccess⟩ :=
                 inferExprFuel_success_fieldLength_facts expressionEq allocationEq candidatesResult builtinResult overallSuccess

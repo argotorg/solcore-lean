@@ -216,6 +216,59 @@ theorem inferExprFuel_numeric_normalized_formation
   · cases List.mem_singleton.mp introduced
     exact builtin_integer_predicate rawFormed
 
+/-- Recording a reference to a catalog signature with its exact fresh batch, as
+an identifier and a qualified name that name the function record it, keeps the
+reference's type and new requirements formed. -/
+theorem recordDeclarationReference_normalized_formation
+    {semantic : SourceSemantics.Context} {outer : Substitution}
+    {context : SourceInference.Context} {expression : Syntax.Expr}
+    {reference : String} {expected : Option Ty} {initial allocated : State} {id : ExpressionId}
+    {signature : ProgramFunctionSignature} {result : InferredExpression × State}
+    (formation : FormationContext semantic context outer)
+    (binders : TypeParameterBindersWellFormed semantic)
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (signatureMember : signature ∈ semantic.signatures.functions)
+    (expectedFormed : ∀ type ∈ expected, TypeAdmissible semantic (outer.apply type))
+    (continuation : outer.SemanticallyExtends result.2.inference.substitution)
+    (recorded :
+      let instantiated := signature.scheme.instantiate allocated.inference.next
+      let inference := { allocated.inference with next := instantiated.next }
+      let (requirements, recorded) :=
+        ({ allocated with inference }).addRequirementsWithIds instantiated.predicates
+      Detail.recordExpressionWithExpected context expression id instantiated.body
+        (.reference reference (.declaration
+          (DeclarationInstantiation.ofInstantiated signature instantiated)))
+        requirements expected recorded = .ok result) :
+    TypeAdmissible semantic (outer.apply result.1.type) ∧
+      ∀ row ∈ result.2.requirements, row ∉ initial.requirements →
+        PredicateAdmissible semantic (TypedTraitResolution.applySubstitution outer row.predicate) := by
+  have signatureFormed := formation.catalog.functions_semantic signature signatureMember
+  let instantiated := signature.scheme.instantiate allocated.inference.next
+  let advanced : State := {allocated with inference := {allocated.inference with next := instantiated.next}}
+  let batch := advanced.addRequirementsWithIds instantiated.predicates
+  have rawFormed : TypeAdmissible semantic (outer.apply instantiated.body) := by
+    rw [ConstrainedDeclarationScheme.instantiate_body]
+    apply instantiated_declaration_type_normalized formation binders signatureMember
+    rw [signatureFormed.scheme_body]
+    exact .function
+      (StructuralSubstitution.TypesWellScoped.productMany
+        (StructuralSubstitution.TypesWellFormed.toTypesWellScoped signatureFormed.parameter_types))
+      (StructuralSubstitution.TypesWellScoped.productMany
+        (StructuralSubstitution.TypesWellFormed.toTypesWellScoped signatureFormed.return_types))
+  have predicatesFormed : ∀ predicate ∈ instantiated.predicates,
+      PredicateAdmissible semantic (TypedTraitResolution.applySubstitution outer predicate) := by
+    intro predicate member
+    exact predicate_applySubstitution_residual formation.residual formation.range
+      (instantiated_function_predicates formation.catalog binders formation.residual signatureMember _ predicate member)
+  have fitted := recordExpressionWithExpected_normalized_formation formation continuation rawFormed expectedFormed recorded
+  refine ⟨fitted.1, new_normalized_requirements_trans (middle := batch.2) ?_ fitted.2⟩
+  intro row member fresh
+  rcases batch_origin advanced instantiated.predicates member with old | introduced
+  · have present : row ∈ allocated.requirements := old
+    rw [allocation_requirements allocation] at present
+    exact (fresh present).elim
+  · exact predicatesFormed row.predicate introduced
+
 /-- A real named-reference lookup fixes the catalog signature whose exact
 fresh batch is recorded by this successful identifier inference. -/
 theorem inferExprFuel_declaration_normalized_formation
@@ -239,34 +292,10 @@ theorem inferExprFuel_declaration_normalized_formation
   have signatureMember : signature ∈ semantic.signatures.functions := by
     rw [formation.signatures]
     exact Detail.functionsNamed_success_subset_catalog functions (by simp)
-  have signatureFormed := formation.catalog.functions_semantic signature signatureMember
-  let instantiated := signature.scheme.instantiate allocated.inference.next
-  let advanced : State := {allocated with inference := {allocated.inference with next := instantiated.next}}
-  let batch := advanced.addRequirementsWithIds instantiated.predicates
-  have rawFormed : TypeAdmissible semantic (outer.apply instantiated.body) := by
-    rw [ConstrainedDeclarationScheme.instantiate_body]
-    apply instantiated_declaration_type_normalized formation binders signatureMember
-    rw [signatureFormed.scheme_body]
-    exact .function
-      (StructuralSubstitution.TypesWellScoped.productMany
-        (StructuralSubstitution.TypesWellFormed.toTypesWellScoped signatureFormed.parameter_types))
-      (StructuralSubstitution.TypesWellScoped.productMany
-        (StructuralSubstitution.TypesWellFormed.toTypesWellScoped signatureFormed.return_types))
-  have predicatesFormed : ∀ predicate ∈ instantiated.predicates,
-      PredicateAdmissible semantic (TypedTraitResolution.applySubstitution outer predicate) := by
-    intro predicate member
-    exact predicate_applySubstitution_residual formation.residual formation.range
-      (instantiated_function_predicates formation.catalog binders formation.residual signatureMember _ predicate member)
-  have recorded := Detail.inferExprFuel_success_declarationIdentifier_record
-    form allocation notLocal notBoolean functions accepted
-  have fitted := recordExpressionWithExpected_normalized_formation formation continuation rawFormed expectedFormed recorded
-  refine ⟨fitted.1, new_normalized_requirements_trans (middle := batch.2) ?_ fitted.2⟩
-  intro row member fresh
-  rcases batch_origin advanced instantiated.predicates member with old | introduced
-  · have present : row ∈ allocated.requirements := old
-    rw [allocation_requirements allocation] at present
-    exact (fresh present).elim
-  · exact predicatesFormed row.predicate introduced
+  exact recordDeclarationReference_normalized_formation formation binders allocation signatureMember
+    expectedFormed continuation
+    (Detail.inferExprFuel_success_declarationIdentifier_record form allocation notLocal notBoolean
+      functions accepted)
 
 /-- Builtin Boolean references have no initial batch; only their actual
 expected fitting can add requirements. -/
@@ -1388,17 +1417,27 @@ theorem inferExprFuel_fieldConstructor_formation
     simp only [candidatesResult] at success
     cases candidates with
     | nil =>
-      cases builtinResult : qualifiedBuiltinReference? context allocated expression with
+      cases builtinResult : qualifiedValueReference? context allocated expression with
       | some found =>
-          rcases found with ⟨reference, function⟩
-          have recorded := inferExprFuel_success_fieldBuiltin_facts form allocationEq
-            candidatesResult builtinResult overallSuccess
-          have produced := recordExpressionWithExpected_normalized_formation
-            formation.toFormationContext continuation
-            (type_applySubstitution_residual formation.residual formation.range
-              (.builtinFunction formation.scope.binders function)) expectedFormed recorded
-          exact ⟨produced.1, allocatedFormed.of_new_rows (congrArg LexicalScope.binders
-            (localReadScope_recordExpressionWithExpected_lexicalScope recorded)) produced.2⟩
+          rcases found with ⟨reference, function | signature⟩
+          · have recorded := inferExprFuel_success_fieldBuiltin_facts form allocationEq
+              candidatesResult builtinResult overallSuccess
+            have produced := recordExpressionWithExpected_normalized_formation
+              formation.toFormationContext continuation
+              (type_applySubstitution_residual formation.residual formation.range
+                (.builtinFunction formation.scope.binders function)) expectedFormed recorded
+            exact ⟨produced.1, allocatedFormed.of_new_rows (congrArg LexicalScope.binders
+              (localReadScope_recordExpressionWithExpected_lexicalScope recorded)) produced.2⟩
+          · have signatureMember : signature ∈ semantic.signatures.functions := by
+              rw [formation.toFormationContext.signatures]
+              exact qualifiedValueReference?_declaration_member builtinResult
+            have produced := recordDeclarationReference_normalized_formation
+              formation.toFormationContext formation.scope.binders allocationEq signatureMember
+              expectedFormed continuation
+              (inferExprFuel_success_fieldDeclaration_record form allocationEq candidatesResult
+                builtinResult overallSuccess)
+            exact ⟨produced.1, formed.of_new_rows (congrArg LexicalScope.binders
+              (inferExprFuel_success_lexicalScope_eq overallSuccess)) produced.2⟩
       | none =>
           obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
             inferExprFuel_success_fieldLength_facts form allocationEq candidatesResult builtinResult overallSuccess

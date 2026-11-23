@@ -701,14 +701,24 @@ private theorem inferFuel_origins_progress_internal :
     | ok candidates =>
       cases candidates with
       | nil =>
-        cases builtinResult : Detail.qualifiedBuiltinReference? context allocated source with
+        cases builtinResult : Detail.qualifiedValueReference? context allocated source with
         | some found =>
-            rcases found with ⟨reference, function⟩
-            have recorded := Detail.inferExprFuel_success_fieldBuiltin_facts form allocation
-              discovery builtinResult original
-            have record := RelativeReadProgress.recordExpressionWithExpected (root := root) recorded
-              (by intro _ _ impossible; cases impossible)
-            exact (allocateExpressionId_success_origins_progress allocation).trans record
+            rcases found with ⟨reference, function | signature⟩
+            · have recorded := Detail.inferExprFuel_success_fieldBuiltin_facts form allocation
+                discovery builtinResult original
+              have record := RelativeReadProgress.recordExpressionWithExpected (root := root) recorded
+                (by intro _ _ impossible; cases impossible)
+              exact (allocateExpressionId_success_origins_progress allocation).trans record
+            · have recorded := Detail.inferExprFuel_success_fieldDeclaration_record form allocation
+                discovery builtinResult original
+              simp only at recorded
+              have record := RelativeReadProgress.recordExpressionWithExpected (root := root) recorded
+                (by intro _ _ impossible; cases impossible)
+              have afterRequirements := RelativeReadProgressFields.trans
+                (RelativeReadProgress.addRequirementsWithIds (root := root) _ _) record
+              exact RelativeReadProgressFields.trans
+                (allocateExpressionId_success_origins_progress (root := root) allocation)
+                afterRequirements
         | none =>
             obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
               Detail.inferExprFuel_success_fieldLength_facts form allocation discovery builtinResult original

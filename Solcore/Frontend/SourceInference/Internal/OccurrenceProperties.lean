@@ -5652,13 +5652,21 @@ private theorem inference_anchoredNodePrefixExtends :
         simp only [candidatesResult, bind, Except.bind] at success
         cases candidates with
         | nil =>
-            cases builtinResult : qualifiedBuiltinReference? context allocated expression with
+            cases builtinResult : qualifiedValueReference? context allocated expression with
             | some found =>
-                rcases found with ⟨reference, function⟩
-                have recorded := inferExprFuel_success_fieldBuiltin_facts expressionEq allocationEq
-                  candidatesResult builtinResult overallSuccess
-                exact allocationExtends.trans
-                  (recordExpressionWithExpected_anchoredNodePrefixExtends recorded)
+                rcases found with ⟨reference, function | signature⟩
+                · have recorded := inferExprFuel_success_fieldBuiltin_facts expressionEq
+                    allocationEq candidatesResult builtinResult overallSuccess
+                  exact allocationExtends.trans
+                    (recordExpressionWithExpected_anchoredNodePrefixExtends recorded)
+                · have recorded := inferExprFuel_success_fieldDeclaration_record expressionEq
+                    allocationEq candidatesResult builtinResult overallSuccess
+                  simp only at recorded
+                  exact recordExpressionWithExpected_after_allocation_anchoredNodePrefixExtends
+                    allocationEq recorded (by
+                      apply AnchoredNodePrefixExtends.trans _
+                        (addRequirementsWithIds_anchoredNodePrefixExtends _ _)
+                      exact .of_occurrenceState_eq rfl rfl)
             | none =>
                 obtain ⟨arrayResult, arrayState, _, baseRun, _, recorded⟩ :=
                   inferExprFuel_success_fieldLength_facts expressionEq allocationEq candidatesResult builtinResult overallSuccess

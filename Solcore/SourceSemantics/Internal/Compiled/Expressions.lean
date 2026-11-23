@@ -1524,7 +1524,7 @@ theorem expressionRetained_fieldLength_for {callProvenance : CallIndex → Prop}
     (form : expression.value = .field base dot name)
     (allocationEq : initial.allocateExpressionId = (id, allocated))
     (nonconstructor : Detail.constructorCalleeCandidates inferenceContext allocated expression = .ok [])
-    (notBuiltin : Detail.qualifiedBuiltinReference? inferenceContext allocated expression = none)
+    (notBuiltin : Detail.qualifiedValueReference? inferenceContext allocated expression = none)
     (boundary : RetainedExpressionBoundary selected (childFuel + 1) inferenceContext expression
       expected initial inferred resultState frames target) :
     ExpressionTypingBase (resultState.toTypedSource (bodyRoots selected)) selected.body.finalized.typedSource
@@ -1630,16 +1630,24 @@ theorem constructor_field_for {callProvenance : CallIndex → Prop}
   | ok candidates =>
     cases candidates with
     | nil =>
-      cases builtinResult : Detail.qualifiedBuiltinReference? inferenceContext allocated expression with
+      cases builtinResult : Detail.qualifiedValueReference? inferenceContext allocated expression with
       | some found =>
-        rcases found with ⟨reference, function⟩
-        exact recordBuiltinFunctionReference_expressionTypingBase_selected
-          selected.body.resources boundary.interfaces
-          (Detail.inferExprFuel_success_fieldBuiltin_facts form allocation discovery builtinResult
-            boundary.accepted)
-          boundary.extension boundary.requirements boundary.expressionRequirements
-          boundary.coercionPrimaries (boundary.scope.catalog checked) boundary.scope.signatures
-          ((CheckingScope.refl selected).canonical checked) boundary.invariant boundary.covered
+        rcases found with ⟨reference, function | signature⟩
+        · exact recordBuiltinFunctionReference_expressionTypingBase_selected
+            selected.body.resources boundary.interfaces
+            (Detail.inferExprFuel_success_fieldBuiltin_facts form allocation discovery builtinResult
+              boundary.accepted)
+            boundary.extension boundary.requirements boundary.expressionRequirements
+            boundary.coercionPrimaries (boundary.scope.catalog checked) boundary.scope.signatures
+            ((CheckingScope.refl selected).canonical checked) boundary.invariant boundary.covered
+        · exact recordDeclarationReference_expressionTypingBase_actual
+            selected.body.resources boundary.interfaces
+            (Detail.inferExprFuel_success_fieldDeclaration_record form allocation discovery
+              builtinResult boundary.accepted)
+            (Detail.qualifiedValueReference?_declaration_member builtinResult)
+            boundary.extension boundary.requirements boundary.expressionRequirements
+            boundary.coercionPrimaries (boundary.scope.catalog checked) boundary.scope.signatures
+            ((CheckingScope.refl selected).canonical checked) boundary.invariant boundary.covered
       | none =>
         exact expressionRetained_fieldLength_for checked descend recursive here form allocation
           discovery builtinResult boundary
