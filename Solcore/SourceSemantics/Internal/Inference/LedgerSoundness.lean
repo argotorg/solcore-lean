@@ -218,11 +218,18 @@ theorem inferExprFuelLedgerPreservation_step
     rw [valueFresh] at valueTracked
     exact (expressionIH second (valueTracked.unify unified)).recordExpressionWithExpected recorded
   | dotConstructor keyword name arguments =>
-    unfold Detail.inferExprFuel at accepted
-    simp only [allocation, form, bind, Except.bind] at accepted
-    split at accepted
-    · contradiction
-    · exact constructorIH accepted allocatedTracked
+    cases booleanResult : Detail.leadingDotBoolean? allocated expected name.value arguments with
+    | some value =>
+      have recorded := Detail.inferExprFuel_success_leadingDotBoolean_record form allocation
+        booleanResult accepted
+      exact allocatedTracked.recordExpressionWithExpected recorded
+    | none =>
+      have accepted := Detail.inferExprFuel_success_dotConstructor_application form allocation
+        booleanResult accepted
+      simp only [bind, Except.bind] at accepted
+      split at accepted
+      · contradiction
+      · exact constructorIH accepted allocatedTracked
   | field base dot name =>
     cases discovery : Detail.constructorCalleeCandidates context allocated expression with
     | error error =>

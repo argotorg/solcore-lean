@@ -250,6 +250,96 @@ theorem
       resources.ownership invariant.signaturesEq
       invariant.solvedRequirementsEq invariant.assumptionsMono covered)
 
+/-- A leading-dot `true` or `false` at `bool` is source-independent, as a bare boolean is; only
+its optional output coercion consults the whole finalized ledger. -/
+theorem
+    inferExprFuel_success_leadingDotBoolean_expressionTypingBase_selected
+    {wholeContext inferenceContext : Frontend.SourceInference.Context}
+    {wholeReturn : Ty} {evidenceState : State} {roots : List NodeId}
+    {finalized : Frontend.SourceInference.Result}
+    (resources : FinalInferenceResources wholeContext wholeReturn
+      evidenceState roots finalized)
+    (interfaces : ExecutableCoercionInterfaces.SourceInterfaces
+      wholeContext.signatures finalized.solvedRequirements finalized.typedSource)
+    {fuel : Nat} {expression : Syntax.Expr} {expected : Option Ty}
+    {initial allocated resultState : State}
+    {id : ExpressionId} {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
+    {arguments : Option (Syntax.DelimitedList Syntax.Expr)} {value : Bool}
+    {inferred : InferredExpression}
+    {semanticSource : TypedSource} {active : SourceSemantics.Context}
+    (expressionEq : expression.value = .dotConstructor dot name arguments)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (boolean : Detail.leadingDotBoolean? allocated expected name.value arguments = some value)
+    (success : Detail.inferExprFuel (fuel + 1) inferenceContext expression
+      expected initial = .ok (inferred, resultState))
+    (resultSubstitutionExtension :
+      finalized.substitution.SemanticallyExtends
+        resultState.inference.substitution)
+    (requirementsSubset : resultState.requirements ⊆
+      evidenceState.requirements)
+    (retained : ExpressionRequirementsRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (coercionsRetained : ExpressionCoercionPrimariesRetainedAt
+      (resultState.toTypedSource roots) finalized.typedSource inferred.id)
+    (catalog : SignatureCatalogWellFormed inferenceContext.signatures)
+    (signaturesEq : inferenceContext.signatures = wholeContext.signatures)
+    (canonical : SignatureParametersWellFormed
+      wholeContext.scope.genericOwner wholeContext.typeParameters)
+    (invariant : RecursiveExpressionInvariant wholeContext finalized initial
+      active)
+    (covered : TemplateScopeCovered finalized.typedSource active
+      (.expression inferred.id)) :
+    ExpressionTypingBase (resultState.toTypedSource roots) semanticSource
+      active finalized.substitution inferred := by
+  have recorded : Detail.recordExpressionWithExpected inferenceContext
+      expression id .bool
+      (.reference name.value (.builtinBoolean value)) []
+      expected allocated = .ok (inferred, resultState) :=
+    Detail.inferExprFuel_success_leadingDotBoolean_record expressionEq
+      allocationEq boolean success
+  have formType : ExpressionFormHasRawType semanticSource active
+      ((ExpressionForm.reference name.value
+        (.builtinBoolean value)).applySubstitution
+          finalized.substitution)
+      (finalized.substitution.apply .bool) (.ordinary []) := by
+    simpa [ExpressionForm.applySubstitution,
+      ReferenceResolution.applySubstitution] using
+      (ExpressionFormHasRawType.reference (source := semanticSource)
+        (ReferenceUseValid.builtinBoolean (context := active)
+          value))
+  have rawAdmissible : TypeAdmissible active
+      (finalized.substitution.apply .bool) := by
+    simpa using TypeAdmissible.bool
+      (invariant.typeParameterBinders canonical)
+  have finalSubstitutionEq :
+      resources.finalState.inference.substitution = finalized.substitution :=
+    resources.substitution_eq.symm
+  have requirementsSubsetFinal :
+      resultState.requirements ⊆ resources.finalState.requirements := by
+    intro requirement member
+    rw [resources.requirements_eq]
+    exact requirementsSubset member
+  have activeSignaturesEq : active.signatures =
+      inferenceContext.signatures :=
+    invariant.signatures_eq_whole.trans signaturesEq.symm
+  have activeCatalog : SignatureCatalogWellFormed active.signatures := by
+    rw [activeSignaturesEq]
+    exact catalog
+  simpa only [finalSubstitutionEq] using
+    (recordExpressionWithExpected_success_ordinaryExpressionTypingBase_from_interfaces
+      (later := resources.finalState)
+      (base := finalizedRequirementContext wholeContext finalized)
+      recorded
+      (by simpa only [finalSubstitutionEq] using resultSubstitutionExtension)
+      requirementsSubsetFinal retained
+      (by simpa only [finalSubstitutionEq] using formType)
+      (by simpa only [finalSubstitutionEq] using rawAdmissible)
+      (by simpa only [signaturesEq] using interfaces) coercionsRetained
+      activeCatalog activeSignaturesEq
+      resources.solve_success resources.solved_context_eq resources.ledger
+      resources.ownership invariant.signaturesEq
+      invariant.solvedRequirementsEq invariant.assumptionsMono covered)
+
 /-- A recorded builtin-function reference has a closed, catalog-independent raw
 reference type in the active context, whatever name it is written as. -/
 theorem recordBuiltinFunctionReference_expressionTypingBase_selected

@@ -860,9 +860,14 @@ theorem ChildStep.local_suffix {parent child : CallIndex} (step : ChildStep pare
         exact Nat.le_trans (Nat.le_of_eq after.symm) finish
       · exact (LocalReadScopeProgress.Progress.recordExpressionWithExpected recorded
           (by intro _ _ impossible; cases impossible)).next
-  | expression_contextual_constructor accepted form allocation selected child =>
+  | @expression_contextual_constructor fuel context source expected initial allocated final id value
+      dot name arguments dataType constructor typeArguments inferred childFinal
+      accepted form allocation selected child =>
       all_goals simp only [CallIndex.Accepted] at *
+      have booleanNone := leadingDotBoolean?_eq_none_of_contextual_success
+        (arguments := arguments) selected
       all_goals unfold inferExprFuel at accepted
+      all_goals simp only [allocation, form, booleanNone, leadingDotChoice] at accepted
       finish_local_suffix accepted
   | expression_field_constructor accepted form allocation selected fresh child =>
       all_goals simp only [CallIndex.Accepted] at *

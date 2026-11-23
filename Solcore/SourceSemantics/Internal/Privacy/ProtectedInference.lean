@@ -2982,9 +2982,27 @@ private theorem inferFuel_fixedness_internal (protectedVars : List TypeVarId) :
     · exact calleeIH
   case case14 =>
     intro context expression expected initial fuel id allocated allocationEq dot name arguments expressionEq constructorIH
-    apply inferExprFuel_dotConstructor_fixes_protected expressionEq
-    intro dataType constructor typeArguments
-    simpa only [allocationEq] using constructorIH dataType constructor typeArguments
+    cases booleanResult : leadingDotBoolean? allocated expected name.value arguments with
+    | some value =>
+        unfold InferExprFuelFixedness
+        intro ready wellFormed bound live fixed catalog validated canonical expectedBelow expectedSafe result success
+        have allocationPrivacy := allocateExpressionId_privacy live allocationEq
+        have allocatedEq : allocated = initial.allocateExpressionId.2 := (congrArg Prod.snd allocationEq).symm
+        have fixedAllocated : FixesProtected protectedVars allocated := by
+          apply fixed.of_substitution_eq
+          rw [allocatedEq]
+          rfl
+        have expectedSafeAtAllocated : ∀ expectedType ∈ expected, Safe protectedVars allocated expectedType :=
+          fun expectedType member => allocationPrivacy.1 _ (expectedSafe _ member)
+        have recorded := inferExprFuel_success_leadingDotBoolean_record expressionEq allocationEq
+          booleanResult success
+        exact recordExpressionWithExpected_fixes_protected fixedAllocated
+          (safe_closed _ _ (Ty.variablesBelow_constructor 0 _)) expectedSafeAtAllocated recorded
+    | none =>
+        apply inferExprFuel_dotConstructor_fixes_protected expressionEq
+          (by simpa only [allocationEq] using booleanResult)
+        intro dataType constructor typeArguments
+        simpa only [allocationEq] using constructorIH dataType constructor typeArguments
   case case17 =>
     intro context expression expected initial fuel id allocated allocationEq base dot name expressionEq constructorIH baseIH
     apply inferExprFuel_fieldConstructor_fixes_protected expressionEq

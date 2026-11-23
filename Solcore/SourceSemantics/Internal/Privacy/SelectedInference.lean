@@ -2670,8 +2670,23 @@ private theorem inferFuel_privacy_internal (protectedVars : List TypeVarId) :
       rw [allocatedEq]
       change initial.RequirementsWellFormed
       exact wellFormed
-    unfold inferExprFuel at success
-    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases booleanResult : leadingDotBoolean? allocated expected name.value arguments with
+    | some value =>
+        have expectedSafeAtAllocated : ∀ expectedType ∈ expected, Safe protectedVars allocated expectedType :=
+          fun expectedType member => allocationPrivacy.1 _ (expectedSafe _ member)
+        have success := inferExprFuel_success_leadingDotBoolean_record expressionEq allocationEq
+          booleanResult success
+        have recorded := recordExpressionWithExpected_private catalog allocationProperties.2
+          (Ty.variablesBelow_constructor _ _) expectedAtAllocated
+          (safe_closed _ _ (Ty.variablesBelow_constructor _ _)) expectedSafeAtAllocated
+          allocationPrivacy.2.1 success
+        refine ⟨allocationPrivacy.1.trans recorded.1, recorded.2.1, recorded.2.2.1, ?_⟩
+        intro row member fresh
+        exact recorded.2.2.2 row member (by simpa only [allocationPrivacy.2.2] using fresh)
+    | none =>
+    have success := inferExprFuel_success_dotConstructor_application expressionEq allocationEq
+      booleanResult success
+    simp only [bind, Except.bind] at success
     cases candidateResult : contextualConstructorCandidate context allocated
         expected name.value with
     | error error =>

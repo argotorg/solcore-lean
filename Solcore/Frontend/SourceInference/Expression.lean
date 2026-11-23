@@ -997,6 +997,100 @@ theorem contextualConstructorCandidate_success_name
     constructor.name = name :=
   (contextualConstructorCandidate_success_facts_with_name success).2.2.1
 
+/-- `.true` and `.false` at an expected type that is `bool`, with no arguments or with `()`: the
+booleans, as upstream reads a leading dot at a builtin type (`builtin_ctor_for_expected`). With no
+expected type, or one that is not `bool`, the name is left to the data types, which refuse it. -/
+def leadingDotBoolean? (state : State) (expected : Option Ty) (name : String)
+    (arguments : Option (Syntax.DelimitedList Syntax.Expr)) : Option Bool :=
+  match expected with
+  | some type =>
+      if (name == "true" || name == "false") &&
+          (arguments.map (·.elements.isEmpty)).getD true &&
+          decide (state.resolve type = Ty.bool) then
+        some (name == "true")
+      else none
+  | none => none
+
+/-- The leading-dot arm's choice: the boolean that `leadingDotBoolean?` reads, or else the data
+type's constructor. It is a function, not a branch of the arm, so the arm stays one case of
+`inferExprFuel.mutual_induct`; `leadingDotChoice_eq` unfolds it to a `match` for `simp` and
+`split`. -/
+def leadingDotChoice {β : Type} (boolean : Option Bool) (data : β) (record : Bool → β) : β :=
+  match boolean with
+  | some value => record value
+  | none => data
+
+@[simp] theorem leadingDotChoice_eq {β : Type} (boolean : Option Bool) (data : β)
+    (record : Bool → β) :
+    leadingDotChoice boolean data record =
+      (match boolean with
+       | some value => record value
+       | none => data) := rfl
+
+/-- A boolean that `leadingDotBoolean?` reads has an expected type that resolves to `bool`, and is
+the one its name spells. -/
+theorem leadingDotBoolean?_some
+    {state : State} {expected : Option Ty} {name : String}
+    {arguments : Option (Syntax.DelimitedList Syntax.Expr)} {value : Bool}
+    (boolean : leadingDotBoolean? state expected name arguments = some value) :
+    ∃ type, expected = some type ∧ state.resolve type = Ty.bool ∧
+      (name == "true" || name == "false") = true ∧ value = (name == "true") := by
+  cases expected with
+  | none => simp [leadingDotBoolean?] at boolean
+  | some type =>
+      simp only [leadingDotBoolean?] at boolean
+      split at boolean
+      · rename_i condition
+        simp only [Bool.and_eq_true, decide_eq_true_eq] at condition
+        cases boolean
+        exact ⟨type, rfl, condition.2, condition.1.1, rfl⟩
+      · cases boolean
+
+private theorem foldl_application_ne_constructor :
+    ∀ (arguments : List Ty) (function argument : Ty) (head : TypeConstructorId),
+      arguments.foldl Ty.application (.application function argument) ≠ .constructor head
+  | [], _, _, _ => by intro equal; cases equal
+  | next :: rest, function, argument, head =>
+      foldl_application_ne_constructor rest (.application function argument) next head
+
+/-- A nominal type is never `bool`. -/
+theorem nominal_ne_bool (declaration : Resolved.DeclarationId) (arguments : List Ty) :
+    Ty.nominal declaration arguments ≠ Ty.bool := by
+  cases arguments with
+  | nil => intro equal; simp [Ty.nominal, Ty.applyMany, Ty.bool] at equal
+  | cons first rest => exact foldl_application_ne_constructor rest _ first _
+
+/-- No data type's constructor is selected where the expected type resolves to `bool`. -/
+theorem contextualConstructorCandidate_ne_ok_of_bool
+    {context : Context} {state : State} {type : Ty} {name : String}
+    (resolved : state.resolve type = Ty.bool) (result) :
+    contextualConstructorCandidate context state (some type) name ≠ .ok result := by
+  intro success
+  rcases contextualConstructorCandidate_success_facts success with
+    ⟨_, _, expectedType, expectedEq, nominalEq⟩
+  cases expectedEq
+  exact nominal_ne_bool _ _ (nominalEq.symm.trans resolved)
+
+/-- Where `leadingDotBoolean?` reads a boolean, no data type's constructor is selected. -/
+theorem contextualConstructorCandidate_ne_ok_of_leadingDotBoolean
+    {context : Context} {state : State} {expected : Option Ty} {name : String}
+    {arguments : Option (Syntax.DelimitedList Syntax.Expr)} {value : Bool}
+    (boolean : leadingDotBoolean? state expected name arguments = some value) (result) :
+    contextualConstructorCandidate context state expected name ≠ .ok result := by
+  rcases leadingDotBoolean?_some boolean with ⟨type, rfl, resolved, _, _⟩
+  exact contextualConstructorCandidate_ne_ok_of_bool resolved result
+
+/-- Where a data type's constructor is selected, `leadingDotBoolean?` reads no boolean. -/
+theorem leadingDotBoolean?_eq_none_of_contextual_success
+    {context : Context} {state : State} {expected : Option Ty} {name : String}
+    {arguments : Option (Syntax.DelimitedList Syntax.Expr)} {result}
+    (success : contextualConstructorCandidate context state expected name = .ok result) :
+    leadingDotBoolean? state expected name arguments = none := by
+  cases boolean : leadingDotBoolean? state expected name arguments with
+  | none => rfl
+  | some value =>
+      exact absurd success (contextualConstructorCandidate_ne_ok_of_leadingDotBoolean boolean _)
+
 def instantiateDataConstructor
     (dataType : ProgramDataSignature)
     (constructor : ProgramDataConstructorSignature)
@@ -2447,13 +2541,20 @@ mutual
                         let result ← applyFunctionType context id calleeResult.type
                           arguments expected state
                         pure <| recordIndirectCall expression calleeResult arguments result
-      | .dotConstructor _ name arguments => do
-          let (dataType, constructor, typeArguments) ←
-            contextualConstructorCandidate context state expected name.value
-          let instantiation := instantiateDataConstructor dataType constructor
-            typeArguments
-          inferConstructorApplicationFuel fuel context expression id instantiation
-            (arguments.map (·.elements) |>.getD []) expected state
+      | .dotConstructor _ name arguments =>
+          -- `.true` and `.false` at `bool` are the booleans. The choice is an application, not a
+          -- branch, so this arm stays one case of `inferExprFuel.mutual_induct`.
+          leadingDotChoice (leadingDotBoolean? state expected name.value arguments)
+            (do
+              let (dataType, constructor, typeArguments) ←
+                contextualConstructorCandidate context state expected name.value
+              let instantiation := instantiateDataConstructor dataType constructor
+                typeArguments
+              inferConstructorApplicationFuel fuel context expression id instantiation
+                (arguments.map (·.elements) |>.getD []) expected state)
+            fun value =>
+              recordExpressionWithExpected context expression id .bool
+                (.reference name.value (.builtinBoolean value)) [] expected state
       | .proxy _ sourceType => do
           let inner ← resolveSourceType context sourceType
           recordExpressionWithExpected context expression id (.proxy inner)

@@ -293,6 +293,32 @@ theorem inferExprFuel_boolean_normalized_formation
     (type_applySubstitution_residual formation.residual formation.range (.bool binders)) expectedFormed recorded
   simpa only [allocation_requirements allocation] using fitted
 
+/-- A leading-dot `true` or `false` at `bool` has no initial batch, as a bare boolean has none;
+only its actual expected fitting can add requirements. -/
+theorem inferExprFuel_dotBoolean_normalized_formation
+    {semantic : SourceSemantics.Context} {outer : Substitution}
+    {fuel : Nat} {context : SourceInference.Context} {expression : Syntax.Expr}
+    {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
+    {arguments : Option (Syntax.DelimitedList Syntax.Expr)} {value : Bool}
+    {expected : Option Ty} {initial allocated : State} {id : ExpressionId}
+    {result : InferredExpression × State}
+    (formation : FormationContext semantic context outer)
+    (binders : TypeParameterBindersWellFormed semantic)
+    (form : expression.value = .dotConstructor dot name arguments)
+    (allocation : initial.allocateExpressionId = (id, allocated))
+    (boolean : Detail.leadingDotBoolean? allocated expected name.value arguments = some value)
+    (expectedFormed : ∀ type ∈ expected, TypeAdmissible semantic (outer.apply type))
+    (continuation : outer.SemanticallyExtends result.2.inference.substitution)
+    (accepted : Detail.inferExprFuel (fuel + 1) context expression expected initial = .ok result) :
+    TypeAdmissible semantic (outer.apply result.1.type) ∧
+      ∀ row ∈ result.2.requirements, row ∉ initial.requirements →
+        PredicateAdmissible semantic (TypedTraitResolution.applySubstitution outer row.predicate) := by
+  have recorded := Detail.inferExprFuel_success_leadingDotBoolean_record form allocation boolean
+    accepted
+  have fitted := recordExpressionWithExpected_normalized_formation formation continuation
+    (type_applySubstitution_residual formation.residual formation.range (.bool binders)) expectedFormed recorded
+  simpa only [allocation_requirements allocation] using fitted
+
 /-- The actual builtin identifier lookup records its fixed admissible type
 before the same successful expected fitting. -/
 theorem inferExprFuel_builtin_normalized_formation
@@ -1293,6 +1319,8 @@ theorem inferExprFuel_dotConstructor_formation
     {expression : Syntax.Expr} {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
     {arguments : Option (Syntax.DelimitedList Syntax.Expr)} {expected : Option Ty} {initial : State}
     (form : expression.value = .dotConstructor dot name arguments)
+    (notBoolean : Detail.leadingDotBoolean? initial.allocateExpressionId.2 expected name.value
+      arguments = none)
     (constructorIH : ∀ dataType constructor typeArguments,
       InferConstructorApplicationFuelFormation semantic outer fuel context expression initial.allocateExpressionId.1
         (instantiateDataConstructor dataType constructor typeArguments)
@@ -1305,8 +1333,9 @@ theorem inferExprFuel_dotConstructor_formation
   have allocatedReady : allocated.InferenceReady := State.InferenceReady.allocateExpressionId ready
   have allocatedNodes := State.allocateExpressionId_preserves_nodesBelowNextOccurrence initial nodes
   have allocatedFormed : NormalizedStateFormation semantic outer allocated := formed.congr rfl rfl
-  unfold inferExprFuel at success
-  simp only [allocationEq,form,bind,Except.bind] at success
+  have success := Detail.inferExprFuel_success_dotConstructor_application form allocationEq
+    notBoolean success
+  simp only [bind,Except.bind] at success
   cases selected : contextualConstructorCandidate context allocated expected name.value with
   | error error => simp [selected] at success
   | ok candidate =>

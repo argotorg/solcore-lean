@@ -536,8 +536,18 @@ theorem actualInferExprFuelRetainedSoundness_dotConstructor {fuel : Nat}
   have allocatedOperational := operational.allocateExpressionId allocationEq
   have allocatedExpected : ∀ type ∈ expected, type.VariablesBelow allocated.inference.next := by
     rw [allocateExpressionId_inferenceNext_eq allocationEq]; exact expectedBelow
-  unfold Detail.inferExprFuel at success
-  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  cases booleanResult : Detail.leadingDotBoolean? allocated expected name.value arguments with
+  | some value =>
+    have canonicalWhole : SignatureParametersWellFormed wholeContext.scope.genericOwner
+        wholeContext.typeParameters := by
+      simpa [ownerEq, typeParametersEq] using canonical
+    exact inferExprFuel_success_leadingDotBoolean_expressionTypingBase_selected
+      resources interfaces expressionEq allocationEq booleanResult success extension
+      requirements retained coercionsRetained catalog signaturesEq canonicalWhole invariant covered
+  | none =>
+  have success := Detail.inferExprFuel_success_dotConstructor_application expressionEq allocationEq
+    booleanResult success
+  simp only [bind, Except.bind] at success
   cases selected : Detail.contextualConstructorCandidate inferenceContext allocated expected name.value with
   | error error => simp [selected] at success
   | ok selectedPair =>

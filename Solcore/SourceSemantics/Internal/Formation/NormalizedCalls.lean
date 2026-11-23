@@ -2766,9 +2766,18 @@ private theorem inferFuel_formation_internal (semantic : SourceSemantics.Context
     · exact calleeIH
   case case14 =>
     intro context expression expected initial fuel id allocated allocationEq dot name arguments expressionEq constructorIH
-    apply inferExprFuel_dotConstructor_formation expressionEq
-    intro dataType constructor typeArguments
-    simpa only [allocationEq] using constructorIH dataType constructor typeArguments
+    cases booleanResult : leadingDotBoolean? allocated expected name.value arguments with
+    | some value =>
+        unfold InferExprFuelFormation
+        intro ready nodes formed formation expectedBelow expectedFormed result success continuation captures
+        have produced := inferExprFuel_dotBoolean_normalized_formation formation.toFormationContext
+          formation.scope.binders expressionEq allocationEq booleanResult expectedFormed continuation success
+        exact ⟨produced.1, expression_state_from_rows formed success produced.2⟩
+    | none =>
+        apply inferExprFuel_dotConstructor_formation expressionEq
+          (by simpa only [allocationEq] using booleanResult)
+        intro dataType constructor typeArguments
+        simpa only [allocationEq] using constructorIH dataType constructor typeArguments
   case case17 =>
     intro context expression expected initial fuel id allocated allocationEq base dot name expressionEq constructorIH baseIH
     apply inferExprFuel_fieldConstructor_formation expressionEq

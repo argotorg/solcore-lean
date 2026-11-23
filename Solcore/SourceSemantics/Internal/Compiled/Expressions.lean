@@ -1455,8 +1455,17 @@ theorem constructor_dot_for {callProvenance : CallIndex → Prop}
     rw [allocatedSame]
     exact boundary.expectedSafe
   have success := boundary.accepted
-  unfold Detail.inferExprFuel at success
-  simp only [allocation, form, bind, Except.bind] at success
+  cases booleanResult : Detail.leadingDotBoolean? allocated expected name.value arguments with
+  | some value =>
+    exact inferExprFuel_success_leadingDotBoolean_expressionTypingBase_selected
+      selected.body.resources boundary.interfaces form allocation booleanResult success boundary.extension
+      boundary.requirements boundary.expressionRequirements boundary.coercionPrimaries
+      (boundary.scope.catalog checked) boundary.scope.signatures
+      ((CheckingScope.refl selected).canonical checked) boundary.invariant boundary.covered
+  | none =>
+  have success := Detail.inferExprFuel_success_dotConstructor_application form allocation
+    booleanResult success
+  simp only [bind, Except.bind] at success
   cases found : Detail.contextualConstructorCandidate inferenceContext allocated expected name.value with
   | error error => simp [found] at success
   | ok pair =>

@@ -273,6 +273,51 @@ theorem inferExprFuel_success_builtinBooleanIdentifier_record
     at success
   simpa only using success
 
+/-- Invert a successful leading-dot `true` or `false` that an expected `bool` reaches through the
+exact expression-recording operation, as a bare `true` or `false` is recorded. -/
+theorem inferExprFuel_success_leadingDotBoolean_record
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
+    {arguments : Option (Syntax.DelimitedList Syntax.Expr)} {value : Bool}
+    {result : InferredExpression × State}
+    (expressionEq : expression.value = .dotConstructor dot name arguments)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (boolean : leadingDotBoolean? allocated expected name.value arguments = some value)
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    recordExpressionWithExpected context expression id .bool
+      (.reference name.value (.builtinBoolean value)) []
+      expected allocated = .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, boolean, leadingDotChoice] at success
+  exact success
+
+/-- Invert a successful leading-dot constructor that is not a boolean through its data type's
+constructor and the constructor application. -/
+theorem inferExprFuel_success_dotConstructor_application
+    {fuel : Nat} {context : Context} {expression : Syntax.Expr}
+    {expected : Option Ty} {initial allocated : State}
+    {id : ExpressionId} {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
+    {arguments : Option (Syntax.DelimitedList Syntax.Expr)}
+    {result : InferredExpression × State}
+    (expressionEq : expression.value = .dotConstructor dot name arguments)
+    (allocationEq : initial.allocateExpressionId = (id, allocated))
+    (notBoolean : leadingDotBoolean? allocated expected name.value arguments = none)
+    (success : inferExprFuel (fuel + 1) context expression expected initial =
+      .ok result) :
+    (do
+      let (dataType, constructor, typeArguments) ←
+        contextualConstructorCandidate context allocated expected name.value
+      let instantiation := instantiateDataConstructor dataType constructor
+        typeArguments
+      inferConstructorApplicationFuel fuel context expression id instantiation
+        (arguments.map Syntax.DelimitedList.elements |>.getD []) expected allocated) =
+        .ok result := by
+  unfold inferExprFuel at success
+  simp only [allocationEq, expressionEq, notBoolean, leadingDotChoice] at success
+  exact success
+
 /-- Invert a successful nonlocal identifier with exactly one visible function
 candidate through canonical scheme instantiation, predicate allocation, and
 the precise declaration-reference recording operation. -/
@@ -11341,8 +11386,19 @@ private theorem inferFuel_inferenceProperties_internal :
       intro expectedType member
       exact (expectedBelow expectedType member).weaken
         allocationProperties.1.next_le
-    unfold inferExprFuel at success
-    simp only [allocationEq, expressionEq, bind, Except.bind] at success
+    cases booleanResult : leadingDotBoolean? allocated expected name.value arguments with
+    | some value =>
+        have recorded :=
+          inferExprFuel_success_leadingDotBoolean_record expressionEq allocationEq booleanResult success
+        have recordedProperties :=
+          recordExpressionWithExpected_inferenceProperties allocationProperties.2
+            (Ty.variablesBelow_constructor _ _) expectedAtAllocated recorded
+        exact ⟨allocationProperties.1.trans recordedProperties.1,
+          recordedProperties.2⟩
+    | none =>
+    have success :=
+      inferExprFuel_success_dotConstructor_application expressionEq allocationEq booleanResult success
+    simp only [bind, Except.bind] at success
     cases candidateResult : contextualConstructorCandidate context allocated
         expected name.value with
     | error error =>

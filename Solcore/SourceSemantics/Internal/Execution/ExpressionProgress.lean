@@ -167,8 +167,11 @@ theorem ChildStep.lifetime_expression
         .ok (inferred, childFinal) at childRun
       have sameResult : (inferred, childFinal) = (value, final) := by
         change inferExprFuel (fuel + 1) context source expected initial = .ok (value, final) at accepted
+        have booleanNone := leadingDotBoolean?_eq_none_of_contextual_success
+          (arguments := arguments) selected
         unfold inferExprFuel at accepted
-        simp only [allocation, form, selected, childRun, bind, Except.bind] at accepted
+        simp only [allocation, form, booleanNone, leadingDotChoice, selected, childRun, bind,
+          Except.bind] at accepted
         exact Except.ok.inj accepted
       cases sameResult
       have sameNext : allocated.inference.next = initial.inference.next := by rw [same]; rfl
@@ -852,8 +855,11 @@ theorem ChildStep.progress_expression
         .ok (inferred, childFinal) at childAccepted
       have same : (inferred, childFinal) = (value, final) := by
         change inferExprFuel (fuel + 1) context source expected initial = .ok (value, final) at accepted
+        have booleanNone := leadingDotBoolean?_eq_none_of_contextual_success
+          (arguments := arguments) selected
         unfold inferExprFuel at accepted
-        simp only [allocation, form, selected, childAccepted, bind, Except.bind] at accepted
+        simp only [allocation, form, booleanNone, leadingDotChoice, selected, childAccepted, bind,
+          Except.bind] at accepted
         exact Except.ok.inj accepted
       cases same
       exact .refl childProperties.2.1.solved

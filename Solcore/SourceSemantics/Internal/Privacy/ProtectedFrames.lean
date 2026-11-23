@@ -1239,6 +1239,8 @@ theorem inferExprFuel_dotConstructor_fixes_protected
     {dot : Syntax.SourceSpan} {name : Syntax.Identifier}
     {arguments : Option (Syntax.DelimitedList Syntax.Expr)}
     (expressionEq : expression.value = .dotConstructor dot name arguments)
+    (notBoolean : Detail.leadingDotBoolean? initial.allocateExpressionId.2 expected name.value
+      arguments = none)
     (constructorInduction : ∀ dataType constructor typeArguments,
       InferConstructorApplicationFuelFixedness protectedVars fuel context expression
         initial.allocateExpressionId.1 (instantiateDataConstructor dataType constructor typeArguments)
@@ -1270,8 +1272,9 @@ theorem inferExprFuel_dotConstructor_fixes_protected
     rw [allocatedEq]
     change initial.RequirementsWellFormed
     exact wellFormed
-  unfold inferExprFuel at success
-  simp only [allocationEq, expressionEq, bind, Except.bind] at success
+  have success := Detail.inferExprFuel_success_dotConstructor_application expressionEq allocationEq
+    notBoolean success
+  simp only [bind, Except.bind] at success
   cases candidateResult : contextualConstructorCandidate context allocated
       expected name.value with
   | error error =>

@@ -5757,6 +5757,74 @@ def runCallLookup : IO Unit := do
     "function main() returns (Word) { let w: Word = 5; return Box(w); }"]) "Box"
   IO.println "SOURCE_CORE_CALL_LOOKUP_PASS: a call of a name that a declared function or a builtin takes through the public API, the function called before a constructor that shares its type's name with no payload, with a payload and generic, the builtin primAddWord before a same-name constructor, the qualified constructor and a same-name constructor with no function of its name still constructors, an imported function before a local constructor, a local function before an imported one and both through a wildcard import, and a function that does not take the arguments refusing the call as upstream's SC0203 and SC0201 do"
 
+/-- `.true` and `.false` where an expected `bool` reaches them, as upstream reads a leading dot at
+a builtin type: a condition, a loop's condition, an annotated `let`, a result, an assignment, a
+conditional's condition and `()` after the name. -/
+private def leadingDotBooleanWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function pick(b: Bool) returns (Word) { if (b) { return 1; } return 2; }",
+  "function yes() returns (Bool) { return .true; }",
+  "function condition() returns (Word) { if (.true) { return 1; } return 2; }",
+  "function loops() returns (Word) { let n: Word = 4; while (.false) { n = 1; } for (let i: Word = 0; .false; i = 1) { n = 2; } return n; }",
+  "function annotated() returns (Word) { let b: Bool = .false; return pick(b); }",
+  "function returned() returns (Word) { return pick(yes()); }",
+  "function assigned() returns (Word) { let b: Bool = true; b = .false; return pick(b); }",
+  "function chosen() returns (Word) { return .true ? 1 : 2; }",
+  "function called() returns (Word) { let b: Bool = .true(); return pick(b); }"]
+
+private def leadingDotBooleanNames : List String :=
+  ["condition", "loops", "annotated", "returned", "assigned", "chosen", "called"]
+
+/-- Inference refuses the program at a leading-dot `true` or `false` that no expected `bool`
+reaches. -/
+private def refusedLeadingDotBoolean (label : String) (lines : List String) : IO Unit :=
+  match checkProgram (workspaceOf lines) with
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error [.inference failure] =>
+      match failure.error with
+      | .constructorNeedsExpectedType name =>
+          if name == "true" || name == "false" then pure ()
+          else throw (IO.userError s!"{label} gave {reprStr failure.error}")
+      | _ => throw (IO.userError s!"{label} gave {reprStr failure.error}")
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+/-- Leading-dot booleans through the public API: where an expected `bool` reaches `.true` or
+`.false`, they are the booleans; with no expected type, at another type, at a generic parameter, as
+an operand of `==` or `!`, or with an argument, they are refused, as upstream refuses them
+(`SC0224`). -/
+def runLeadingDotBooleans : IO Unit := do
+  let program ← get "leading-dot boolean check" (checkProgram leadingDotBooleanWorkspace)
+  let seeds ← leadingDotBooleanNames.mapM (seed program)
+  let compiled ← get "leading-dot boolean compilation"
+    (compile leadingDotBooleanWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match leadingDotBooleanNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"leading-dot boolean root {name} missing")
+    | none => throw (IO.userError s!"leading-dot boolean {name} unknown")
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × Value) := [
+    ("condition", word 1), ("loops", word 4), ("annotated", word 2), ("returned", word 1),
+    ("assigned", word 2), ("chosen", word 1), ("called", word 1)]
+  for (name, expected) in cases do
+    let completed ← execute session (← key name) []
+    require (completed.value == expected) s!"{name} gave {reprStr completed.value}"
+    session := completed.session
+  let _ := session
+  refusedLeadingDotBoolean "no expected type"
+    ["function bad() returns (Word) { let b = .true; return 1; }"]
+  refusedLeadingDotBoolean "an expected Word"
+    ["function bad() returns (Word) { let w: Word = .true; return 1; }"]
+  refusedLeadingDotBoolean "a generic parameter"
+    ["function h<T>(x: T) returns (T) { return x; }",
+      "function bad() returns (Word) { h(.true); return 1; }"]
+  refusedLeadingDotBoolean "an operand of =="
+    ["function bad(x: Bool) returns (Word) { if (.true == x) { return 1; } return 2; }"]
+  refusedLeadingDotBoolean "an operand of !"
+    ["function bad() returns (Word) { if (!.false) { return 1; } return 2; }"]
+  refusedLeadingDotBoolean "with an argument"
+    ["function bad() returns (Word) { let b: Bool = .true(1); return 1; }"]
+  IO.println "SOURCE_CORE_LEADING_DOT_BOOLEANS_PASS: .true and .false through the public API, the booleans where an expected bool reaches them (a condition, a loop's condition, an annotated let, a result, an assignment, a conditional's condition and () after the name), and refused with no expected type, at Word, at a generic parameter, as an operand of == or ! and with an argument, as upstream refuses them (SC0224)"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -6632,6 +6700,7 @@ def run : IO Unit := do
   runConstructorNames
   runMatchCoverage
   runCallLookup
+  runLeadingDotBooleans
   runUpstreamFixtures
   runUpstreamArrayFixtures
   runArrayElementCases

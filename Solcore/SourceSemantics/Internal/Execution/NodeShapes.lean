@@ -374,8 +374,11 @@ theorem ChildStep.expression_shapes
       .ok (inferred, childFinal) at childAccepted
     have same : (inferred, childFinal) = (value, final) := by
       change inferExprFuel (fuel + 1) context source expected initial = .ok (value, final) at accepted
+      have booleanNone := leadingDotBoolean?_eq_none_of_contextual_success
+        (arguments := arguments) selected
       unfold inferExprFuel at accepted
-      simp only [allocation, form, selected, childAccepted, bind, Except.bind] at accepted
+      simp only [allocation, form, booleanNone, leadingDotChoice, selected, childAccepted, bind,
+        Except.bind] at accepted
       exact Except.ok.inj accepted
     cases same
     exact .refl _
