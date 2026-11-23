@@ -180,6 +180,9 @@ negative for a negative literal. -/
   | unsupportedLiteral (kind : String)
   | unsupportedExpression (kind : String)
   | unsupportedStatement (kind : String)
+  /-- A `return` that another statement of its sequence follows, which upstream refuses with
+  `SC0222`. -/
+  | nonFinalReturn (span : Syntax.SourceSpan)
   | nestingLimit
   deriving Repr, DecidableEq
 

@@ -2502,11 +2502,11 @@ private def parserBoundaries : IO Unit := do
         | _ => false) "completion nested semicolon diagnostic changed"
     | .ok _ => throw (IO.userError "completion nested semicolon policy changed")
 
-/-- A stopped structured head still emits its outer suffix; direct return does not. -/
+/-- A stopped structured head still emits its outer suffix. A direct return has none: a statement
+after it is refused where the body is checked (`SC0222`). -/
 private def completionSuffixGuards : IO Unit := do
   for (content, stopped) in [
-      ("function suffix(flag: Bool, value: Word) returns (Word) { if (flag) { return value; } else { return value; } value }", true),
-      ("function suffix(value: Word) returns (Word) { return value; value }", false)] do
+      ("function suffix(flag: Bool, value: Word) returns (Word) { if (flag) { return value; } else { return value; } value }", true)] do
     let workspace : Workspace.RawWorkspace := {
       entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ content}]}
     let .ok checked := checkProgram workspace options.checkingFuel
@@ -2521,6 +2521,17 @@ private def completionSuffixGuards : IO Unit := do
     let duplicated := (AcceptedCompilerBodyCompletion.finish? source .word true [head, tail, tail]).isSome
     require (duplicated == !stopped)
       "completion emitted versus omitted bare suffix boundary changed"
+  let directReturn : Workspace.RawWorkspace := {
+    entry := "main.solc", externalLibraries := [], mainSources := [{
+      path := "main.solc"
+      content := "pragma solcore;\nfunction suffix(value: Word) returns (Word) { return value; value }"}]}
+  match checkProgram directReturn options.checkingFuel with
+  | .error [.inference failure] =>
+      match failure.error with
+      | .nonFinalReturn _ => pure ()
+      | error => throw (IO.userError s!"completion direct return suffix gave {reprStr error}")
+  | .error errors => throw (IO.userError s!"completion direct return suffix gave {reprStr errors}")
+  | .ok _ => throw (IO.userError "completion direct return suffix was accepted")
 
 def run : IO Unit := do
   completionSuffixGuards
@@ -2616,7 +2627,7 @@ def basicWorkspace : Workspace.RawWorkspace := {
     "  value = replacement; copied; return (copied, flag);",
     "}",
     "function early(initial: Word, replacement: Word) returns (Word) {",
-    "  let value: Word = initial; return value; value = replacement;",
+    "  let value: Word = initial; { return value; } value = replacement;",
     "}",
     "function initializerFailure(input: Word) returns (Word) {",
     "  let absent: Word; let never: Word = absent; let later: Word = input; return later;",

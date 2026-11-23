@@ -2951,7 +2951,7 @@ private def content : String := String.intercalate "\n" [
   "function mixed(flag: Bool, value: Word) returns (Bool) { let unused: Word; let first = flag; let absent: Bool; let last = !first; return last; }",
   "function lazy(flag: Bool) returns (Bool) { let before: Word; let m: mapping(Bool => Bool); let first = m[flag]; let gap: Bool; let last = m[!flag]; return first || last; }",
   "function nested(m: mapping(Bool => mapping(Bool => Bool)), flag: Bool) returns (Bool) { let before: Word; let first = m[flag][false]; let gap: Bool; let last = !m[!flag][true]; return first ? first : last; }",
-  "function early(flag: Bool) returns (Bool) { let first = flag; let gap: Word; return first; let unreachable: Word; }",
+  "function early(flag: Bool) returns (Bool) { let first = flag; let gap: Word; { return first; } let unreachable: Word; }",
   "function absent(flag: Bool) returns (Bool) { let first = flag; let gap: Bool; let failed = gap; let unreachable = true; return unreachable; }",
   "function missing(flag: Bool) returns (Bool) { let first = flag; let gap: Word; let m: mapping(Bool => Item); let failed = m[flag]; return true; }",
   "function identity(flag: Bool) returns (Bool) { return flag; }",
@@ -3113,7 +3113,7 @@ private def content : String := String.intercalate "\n" [
   "function empty(flag: Bool, value: Word) { }",
   "function repeated(m: mapping(Bool => Bool)) returns (Bool) { m[true]; return m[false]; }",
   "function nested(m: mapping(Bool => mapping(Bool => Bool))) returns (Bool) { (m[true][false], !m[false][true]); return m[false][false] ? m[true][true] : !m[true][false]; }",
-  "function early(m: mapping(Bool => Item)) returns (Bool) { return true; m[true]; }",
+  "function early(m: mapping(Bool => Item)) returns (Bool) { { return true; } m[true]; }",
   "function firstFault(m: mapping(Bool => Item)) returns (Bool) { m[true]; return false; }",
   "function identity(flag: Bool) returns (Bool) { return flag; }",
   "function keep(f: function(Bool) returns (Bool), flag: Bool) returns (function(Bool) returns (Bool)) { flag; return f; }"
@@ -4347,7 +4347,7 @@ private def rawWorkspace : Workspace.RawWorkspace := {
     "function repeated(m: mapping(Bool => Bool)) returns (Bool) { m[true]; return m[false]; }",
     "function lazy() returns (Bool) { let m: mapping(Bool => Bool); m[true]; return !m[false]; }",
     "function firstFailure() returns (Bool) { let m: mapping(Bool => Item); let n: mapping(Bool => Bool); m[true]; return n[false]; }",
-    "function early() returns (Bool) { let m: mapping(Bool => Item); return true; m[true]; }",
+    "function early() returns (Bool) { let m: mapping(Bool => Item); { return true; } m[true]; }",
     "function nested(m: mapping(Bool => mapping(Bool => Bool))) returns (Bool) { (m[true][false], !m[false][true]); return m[false][false] ? m[true][true] : !m[true][false]; }"]}] }
 
 def run : IO Unit := do

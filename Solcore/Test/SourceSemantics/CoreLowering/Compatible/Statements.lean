@@ -1620,7 +1620,7 @@ private def rawWorkspace : Workspace.RawWorkspace := {
     "function ordered() { let first: Word; let second: Bool; return; }",
     "function fail() returns (Bool) { let first: Word; let second: Bool; return second; }",
     "function lazy() returns (Word) { let first: Bool; let second: mapping(Word => Word); return second[8]; }",
-    "function early() returns (Bool) { let first: Word; return true; let never: Bool; }"]}] }
+    "function early() returns (Bool) { let first: Word; { return true; } let never: Bool; }"]}] }
 
 def run : IO Unit := do
   let checked ← SourceCompilerFeatureSupport.get "binding checker" (checkProgram rawWorkspace)
@@ -2494,7 +2494,7 @@ private def rawWorkspace : Workspace.RawWorkspace := {
     "function success() returns (Bool, Bool) { true; return (false, true); }",
     "function lazy() returns (Bool) { let m: mapping(Word => Word); m; return true; }",
     "function stopped() returns (Bool) { let missing: Bool; let m: mapping(Word => Word); missing; m; return true; }",
-    "function early() returns (Bool) { let missing: Bool; return true; missing; }",
+    "function early() returns (Bool) { let missing: Bool; { return true; } missing; }",
     "function tail() returns (Bool, Bool) { true; (true, false) }",
     "function boxed() returns (Box) { true; return .Box(7); }",
     "function unit() { true; return; }"]}] }

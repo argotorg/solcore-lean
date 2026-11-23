@@ -1061,7 +1061,7 @@ private def content : String := String.intercalate "\n" [
   "function bad() returns (Word) { let written: Word = 5; let gap: Word; return gap; }",
   "function badBool() returns (Bool) { let written: Word = 19; let gap: Bool; return gap; }",
   "function empty() {}",
-  "function unitReturn() { return; let skipped: Word = 99; }",
+  "function unitReturn() { { return; } let skipped: Word = 99; }",
   "function returned() returns (Word) { return side(7); }",
   "function tailed() returns (Word) { side(7) }",
   "function absent() { let gap: Word; }",

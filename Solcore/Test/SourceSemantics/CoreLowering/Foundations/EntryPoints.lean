@@ -622,9 +622,6 @@ private def workspace : Workspace.RawWorkspace := {
     "  let value: Word; value = initial; let copied: Word = value;",
     "  value = replacement; copied; return (copied, flag);",
     "}",
-    "function early(initial: Word, replacement: Word) returns (Word) {",
-    "  let value: Word = initial; return value; value = replacement;",
-    "}",
     "function initializerFailure(input: Word) returns (Word) {",
     "  let absent: Word; let never: Word = absent; let later: Word = input; return later;",
     "}",
@@ -717,9 +714,6 @@ private def testExecution (program : CheckedProgram) : IO Unit := do
           .done (.inRight .word (.pair (scalar 11) (.bool true))) sequenceStore)
         "resumption changed the lowered sequence's values or shared cells"
   | _ => throw (IO.userError "sequence fixture should retain a checkpoint at fuel 30")
-  let early ← compile (← named program "early") .word [literal 11, literal 29]
-  expectSuccess early (scalar 11) [present (scalar 11), present (scalar 29), present (scalar 11)]
-    "return must skip the subsequent assignment"
   let initializerFailure ← compile (← named program "initializerFailure") .word [literal 11]
   expectFailure initializerFailure .word [present (scalar 11), .inLeft .word .unit]
     "failed initializer must not allocate its binding or run the tail"
@@ -1517,7 +1511,6 @@ private def workspace : Workspace.RawWorkspace := {
     "}",
     "function nestedOnly(flag: Bool) { if (flag) { true; } else { false; } }",
     "function nonTail(value: Word, replacement: Word) returns (Word) { value; return replacement; }",
-    "function direct(value: Word) returns (Word) { return value; return 1; }",
     "function loop(flag: Bool) { while (flag) { break; } }"
   ] }]
   externalLibraries := []
@@ -1620,9 +1613,6 @@ private def testExecution (checked : CheckedProgram) : IO Unit := do
   let nestedOnly ← compile (← named checked "nestedOnly") .unit [.bool true]
   expect nestedOnly (.inRight .word .unit) [present (.bool true)]
     "nested conditional tail expression did not fall through as Unit"
-  let direct ← compile (← named checked "direct") .word [literal 11]
-  expect direct (.inRight .word (scalar 11)) [present (scalar 11)]
-    "explicit return lowered its unsupported trailing integer-literal evidence"
   match taken.runStateful 10 with
   | .outOfFuel checkpoint =>
       assertTrue (Core.runStateful 1990 checkpoint == taken.runStateful 2000)

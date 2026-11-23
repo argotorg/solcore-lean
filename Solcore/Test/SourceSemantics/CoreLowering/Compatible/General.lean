@@ -2663,7 +2663,7 @@ private def content : String := String.intercalate "\n" [
   "function falseValue() returns (Bool) { return false; }",
   "function pair() returns ((Word, Bool)) { return (7, false); }",
   "function discardReturn() returns (Word) { false; return 9; }",
-  "function early() returns (Word) { return 11; true; }"
+  "function early() returns (Word) { { return 11; } true; }"
 ]
 
 /-- Concrete named invocation uses the actual cached indexed compiler, with
@@ -2728,7 +2728,7 @@ private def content : String := String.intercalate "\n" [
   "function unitAfterTwo(flag: Bool, value: Word) { }",
   "function readSecond(flag: Bool, value: Word) returns (Word) { flag; return value; }",
   "function paired(value: Word, flag: Bool) returns ((Word, Bool)) { return (value, flag); }",
-  "function early(value: Word, flag: Bool) returns (Word) { return value; flag; }",
+  "function early(value: Word, flag: Bool) returns (Word) { { return value; } flag; }",
   "function identity(value: Word) returns (Word) { return value; }",
   "function keepFunction(f: function(Word) returns (Word), flag: Bool) returns (function(Word) returns (Word)) { flag; return f; }",
   "function keepMap(values: mapping(Word => Word)) returns (mapping(Word => Word)) { return values; }"

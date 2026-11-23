@@ -1071,12 +1071,93 @@ private def functionDeclaration?
     Option ProgramDeclaration :=
   environment.declaration? signature.id
 
+mutual
+/-- Upstream's `SC0222` (`infer_stmt_sequence`): the first `return` statement that another
+statement of its sequence follows. Every sequence is read, a body's and those of its blocks,
+branches, loops, match arms and lambdas, whether or not anything runs it. A block that ends in a
+`return` is not itself one, so statements after it stay. Fuel bounds the walk as it bounds
+inference. -/
+def nonFinalReturnInStatements : Nat → List Syntax.Statement → Option Syntax.SourceSpan
+  | 0, _ => none
+  | fuel + 1, statements =>
+      match statements with
+      | [] => none
+      | statement :: rest =>
+          match statement.value, rest with
+          | .returnStmt _, _ :: _ => some statement.span
+          | _, _ =>
+              (nonFinalReturnInStatement fuel statement).orElse
+                fun _ => nonFinalReturnInStatements fuel rest
+
+/-- The first non-final `return` in the sequences that one statement holds. -/
+def nonFinalReturnInStatement : Nat → Syntax.Statement → Option Syntax.SourceSpan
+  | 0, _ => none
+  | fuel + 1, statement =>
+      match statement.value with
+      | .letDecl _ _ initializer => initializer.bind (nonFinalReturnInExpr fuel)
+      | .returnStmt value => value.bind (nonFinalReturnInExpr fuel)
+      | .expression expression _ => nonFinalReturnInExpr fuel expression
+      | .assignValue target _ value =>
+          [target, value].findSome? (nonFinalReturnInExpr fuel)
+      | .assignBitNot target _ => nonFinalReturnInExpr fuel target
+      | .matchWith scrutinees arms =>
+          (scrutinees.elements.toList.findSome? (nonFinalReturnInExpr fuel)).orElse fun _ =>
+            (arms.value.cases.findSome? fun matchCase =>
+                nonFinalReturnInStatements fuel matchCase.value.body.value).orElse fun _ =>
+              arms.value.defaultBody.bind fun body => nonFinalReturnInStatements fuel body.value
+      | .forLoop _ initializer condition post body =>
+          ((initializer ++ post).findSome? fun item => match item.value with
+            | .letDecl _ _ initializer => initializer.bind (nonFinalReturnInExpr fuel)
+            | .expression expression => nonFinalReturnInExpr fuel expression
+            | .assignValue target _ value =>
+                [target, value].findSome? (nonFinalReturnInExpr fuel)
+            | .assignBitNot target _ => nonFinalReturnInExpr fuel target).orElse fun _ =>
+            (nonFinalReturnInExpr fuel condition).orElse fun _ =>
+              nonFinalReturnInStatements fuel body.value
+      | .whileLoop condition body =>
+          (nonFinalReturnInExpr fuel condition).orElse fun _ =>
+            nonFinalReturnInStatements fuel body.value
+      | .ifThen condition thenBody elseBody =>
+          (nonFinalReturnInExpr fuel condition).orElse fun _ =>
+            (nonFinalReturnInStatements fuel thenBody.value).orElse fun _ =>
+              elseBody.bind fun body => nonFinalReturnInStatements fuel body.value
+      | .block body => nonFinalReturnInStatements fuel body
+      | .assembly _ | .breakStmt | .continueStmt | .error => none
+
+/-- The first non-final `return` in the bodies of the lambdas that one expression holds. -/
+def nonFinalReturnInExpr : Nat → Syntax.Expr → Option Syntax.SourceSpan
+  | 0, _ => none
+  | fuel + 1, expression =>
+      match expression.value with
+      | .lambda _ _ _ body => nonFinalReturnInStatements fuel body.value
+      | .dotConstructor _ _ arguments =>
+          arguments.bind fun list => list.elements.findSome? (nonFinalReturnInExpr fuel)
+      | .unary _ operand => nonFinalReturnInExpr fuel operand
+      | .binary left _ right => [left, right].findSome? (nonFinalReturnInExpr fuel)
+      | .index base _ index => [base, index].findSome? (nonFinalReturnInExpr fuel)
+      | .call callee arguments =>
+          (callee :: arguments.elements).findSome? (nonFinalReturnInExpr fuel)
+      | .field base _ _ => nonFinalReturnInExpr fuel base
+      | .conditional condition _ thenBranch _ elseBranch =>
+          [condition, thenBranch, elseBranch].findSome? (nonFinalReturnInExpr fuel)
+      | .group inner => nonFinalReturnInExpr fuel inner
+      | .tuple elements => elements.elements.findSome? (nonFinalReturnInExpr fuel)
+      | .array elements => elements.elements.findSome? (nonFinalReturnInExpr fuel)
+      | .newArray _ _ length => nonFinalReturnInExpr fuel length
+      | .slice base _ start _ stop =>
+          (base :: start.toList ++ stop.toList).findSome? (nonFinalReturnInExpr fuel)
+      | .literal _ | .identifier _ | .proxy _ _ | .error => none
+end
+
 private def checkFunctionBodyResult (environment : ProgramEnvironment)
     (signatures : ProgramSignatures) (signature : ProgramFunctionSignature)
     (fuel : Nat) : Except Error Result := do
   let declaration ← match functionDeclaration? environment signature with
     | some declaration => pure declaration
     | none => throw (.malformedFunctionType signature.id)
+  -- Upstream's `SC0222`: a `return` that another statement of its sequence follows.
+  if let some span := nonFinalReturnInStatements fuel signature.source.value.body.value then
+    throw (.nonFinalReturn span)
   let context : Context := {
     environment
     signatures
@@ -1194,6 +1275,11 @@ theorem checkFunctionBody_success_witness
       | some declaration =>
           simp [declarationEq, functionLocals, pure, Except.pure, bind,
             Except.bind] at resultEq
+          cases returnEq : nonFinalReturnInStatements fuel
+              signature.source.value.body.value with
+          | some span => simp [returnEq] at resultEq
+          | none =>
+          simp only [returnEq] at resultEq
           cases bodyEq :
               Detail.inferStatementsFuel fuel
                 {

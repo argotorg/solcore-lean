@@ -5825,6 +5825,73 @@ def runLeadingDotBooleans : IO Unit := do
     ["function bad() returns (Word) { let b: Bool = .true(1); return 1; }"]
   IO.println "SOURCE_CORE_LEADING_DOT_BOOLEANS_PASS: .true and .false through the public API, the booleans where an expected bool reaches them (a condition, a loop's condition, an annotated let, a result, an assignment, a conditional's condition and () after the name), and refused with no expected type, at Word, at a generic parameter, as an operand of == or ! and with an argument, as upstream refuses them (SC0224)"
 
+/-- A block that ends in a `return`, with statements after it, and a `return` last in its branch:
+both accepted, as upstream accepts them, and the block returns early. -/
+private def nonFinalReturnWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "function blockEarly() returns (Word) { let x: Word = 0; { return 1; } x = 2; return x; }",
+  "function lastInBranch() returns (Word) { if (true) { return 1; } return 2; }"]
+
+private def nonFinalReturnNames : List String := ["blockEarly", "lastInBranch"]
+
+/-- Checking refuses the program at a `return` that another statement of its sequence follows. -/
+private def refusedNonFinalReturn (label : String) (lines : List String) : IO Unit :=
+  match checkProgram (workspaceOf lines) with
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error [.inference failure] =>
+      match failure.error with
+      | .nonFinalReturn _ => pure ()
+      | _ => throw (IO.userError s!"{label} gave {reprStr failure.error}")
+  | .error [.methodInference _ (.nonFinalReturn _)] => pure ()
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+/-- Upstream's `SC0222` through the public API: a `return` that another statement of its sequence
+follows is refused in every sequence, a body's, a block's, a branch's, a loop's, a match arm's, a
+lambda's and an implementation method's, whether or not anything calls it; a block that ends in a
+`return` is accepted with statements after it, and returns early. -/
+def runNonFinalReturns : IO Unit := do
+  let program ← get "non-final return check" (checkProgram nonFinalReturnWorkspace)
+  let seeds ← nonFinalReturnNames.mapM (seed program)
+  let compiled ← get "non-final return compilation"
+    (compile nonFinalReturnWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match nonFinalReturnNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"non-final return root {name} missing")
+    | none => throw (IO.userError s!"non-final return {name} unknown")
+  let mut session ← boot (← compiled.open)
+  for (name, expected) in [("blockEarly", word 1), ("lastInBranch", word 1)] do
+    let completed ← execute session (← key name) []
+    require (completed.value == expected) s!"{name} gave {reprStr completed.value}"
+    session := completed.session
+  let _ := session
+  refusedNonFinalReturn "two returns"
+    ["function bad() returns (Word) { return 1; return 2; }"]
+  refusedNonFinalReturn "a let after a return"
+    ["function bad() returns (Word) { return 1; let x: Word = 2; }"]
+  refusedNonFinalReturn "a block"
+    ["function bad() returns (Word) { let x: Word = 0; { return 1; x = 2; } return x; }"]
+  refusedNonFinalReturn "an if body"
+    ["function bad(flag: Bool) returns (Word) { let x: Word = 0; if (flag) { return 1; x = 2; } return x; }"]
+  refusedNonFinalReturn "an else body"
+    ["function bad(flag: Bool) returns (Word) { let x: Word = 0; if (flag) { x = 1; } else { return 2; x = 3; } return x; }"]
+  refusedNonFinalReturn "a match arm"
+    ["function bad(b: Bool) returns (Word) { match (b) { case true { return 1; b = false; } case false { return 2; } } }"]
+  refusedNonFinalReturn "a while body"
+    ["function bad(flag: Bool) returns (Word) { let x: Word = 0; while (flag) { return 1; x = 2; } return x; }"]
+  refusedNonFinalReturn "a for body"
+    ["function bad() returns (Word) { let x: Word = 0; for (let i: Word = 0; false; i = 1) { return 1; x = 2; } return x; }"]
+  refusedNonFinalReturn "a lambda"
+    ["function bad() returns (Word) { let f = lam (x: Word) -> Word { return x; return 2; }; return f(1); }"]
+  refusedNonFinalReturn "a unit return"
+    ["function bad() { return; let x: Word = 1; }"]
+  refusedNonFinalReturn "a function nothing calls"
+    ["function dead() returns (Word) { return 1; return 2; }",
+      "function main() returns (Word) { return 5; }"]
+  refusedNonFinalReturn "an implementation method"
+    ["trait Add<T> { function add(left: T, right: T) returns (T); }", "enum Box { Only }",
+      "impl Add<Box> { function add(left: Box, right: Box) returns (Box) { return left; return right; } }"]
+  IO.println "SOURCE_CORE_NON_FINAL_RETURN_PASS: upstream's SC0222 through the public API, a return that another statement of its sequence follows refused in a body, a block, an if and an else body, a match arm, a while and a for body, a lambda, a unit function, a function nothing calls and an implementation method, and a block that ends in a return accepted with statements after it, returning early, as a return last in its branch is"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -6701,6 +6768,7 @@ def run : IO Unit := do
   runMatchCoverage
   runCallLookup
   runLeadingDotBooleans
+  runNonFinalReturns
   runUpstreamFixtures
   runUpstreamArrayFixtures
   runArrayElementCases
