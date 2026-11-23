@@ -5954,6 +5954,94 @@ def runNonFinalReturns : IO Unit := do
       "impl Add<Box> { function add(left: Box, right: Box) returns (Box) { return left; return right; } }"]
   IO.println "SOURCE_CORE_NON_FINAL_RETURN_PASS: upstream's SC0222 through the public API, a return that another statement of its sequence follows refused in a body, a block, an if and an else body, a match arm, a while and a for body, a lambda, a unit function, a function nothing calls and an implementation method, and a block that ends in a return accepted with statements after it, returning early, as a return last in its branch is"
 
+/-- A program that checks and compiles, and whose `main` returns `expected`. -/
+private def mainRunsTo (label : String) (lines : List String) (expected : Value) : IO Unit := do
+  let workspace := workspaceOf lines
+  let program ← get s!"{label}: check" (checkProgram workspace)
+  let mainSeed ← seed program "main"
+  let compiled ← get s!"{label}: compilation"
+    (compile workspace [mainSeed] {specializationBudget := 256, compilationFuel := 1000})
+  let some key := compiled.keys[0]? | throw (IO.userError s!"{label}: root missing")
+  let session ← boot (← compiled.open)
+  let completed ← execute session key []
+  require (completed.value == expected) s!"{label} gave {reprStr completed.value}"
+
+/-- A program that trait resolution still refuses, as before the weak arguments. -/
+private def weakRefused (label : String) (lines : List String) : IO Unit :=
+  match checkProgram (workspaceOf lines) with
+  | .error [.noSolution _ _] => pure ()
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+
+/-- Upstream's weak trait arguments through the public API: a requirement's open argument is
+fixed from the one given, ordinary implementation or default whose head subject matches its
+closed subject, before a literal defaults and after, for every trait but Lean's own `Coerce`. -/
+def runWeakArguments : IO Unit := do
+  let phantom := "trait Phantom<T, R> {}"
+  let aword := "enum AWord { AWord(Word) }"
+  let run := "function run<T, R>(x: T) returns (Word) where T: Phantom<R> { return 7; }"
+  let main := "function main() returns (Word) { let value: AWord = AWord(0); return run(value); }"
+  let outer := ["function outer<T, R>(x: T) returns (Word) where T: Phantom<R> { return run(x); }",
+    "function main() returns (Word) { let value: AWord = AWord(0); return outer(value); }"]
+  let boxMain := "function main() returns (Word) { let value: Box<Word> = Box(1); return run(value); }"
+  mainRunsTo "the one impl" [phantom, aword, "impl Phantom<AWord, Word> {}", run, main] (word 7)
+  mainRunsTo "a requirement on the fixed argument" [phantom, "trait Size<T> {}", aword,
+    "impl Size<Word> {}", "impl Phantom<AWord, Word> {}",
+    "function run<T, R>(x: T) returns (Word) where T: Phantom<R>, R: Size { return 7; }", main]
+    (word 7)
+  mainRunsTo "a given" ([phantom, aword, "impl Phantom<AWord, Word> {}", run] ++ outer) (word 7)
+  mainRunsTo "a generic impl" [phantom, "enum Box<A> { Box(A) }",
+    "impl<A> Phantom<Box<A>, A> {}", run, boxMain] (word 7)
+  mainRunsTo "a chain" [phantom, "trait Second<T, R> {}", aword, "enum BWord { BWord(Word) }",
+    "impl Phantom<AWord, BWord> {}", "impl Second<BWord, Word> {}",
+    "function chain<T, R, S>(x: T) returns (Word) where T: Phantom<R>, R: Second<S> { return 7; }",
+    "function main() returns (Word) { let value: AWord = AWord(0); return chain(value); }"]
+    (word 7)
+  mainRunsTo "a given beside a generic impl"
+    ([phantom, aword, "impl<A> Phantom<A, Word> {}", run] ++ outer) (word 7)
+  mainRunsTo "a default alone" [phantom, aword, "default impl<A> Phantom<A, Word> {}", run, main]
+    (word 7)
+  mainRunsTo "a default beside an ordinary impl" [phantom, aword,
+    "default impl<A> Phantom<A, Bool> {}", "impl Phantom<AWord, Word> {}", run, main] (word 7)
+  mainRunsTo "a partly open argument" [phantom, aword, "enum Box<A> { Box(A) }",
+    "impl Phantom<AWord, Box<Word>> {}",
+    "function run<T, R>(x: T) returns (Word) where T: Phantom<Box<R>> { return 7; }", main]
+    (word 7)
+  mainRunsTo "two weak arguments" ["trait Two<T, A, B> {}", aword, "impl Two<AWord, Word, Bool> {}",
+    "function run<T, A, B>(x: T) returns (Word) where T: Two<A, B> { return 7; }", main] (word 7)
+  mainRunsTo "a generic impl with a condition" [phantom, "trait Ready<T> {}",
+    "enum Box<A> { Box(A) }", "impl Ready<Word> {}", "impl<A> Phantom<Box<A>, A> where A: Ready {}",
+    run, boxMain] (word 7)
+  -- Before a literal defaults: the sum stays at `Word` (`wa24`); the call is in a branch that
+  -- never runs, so `make`'s recursion never runs either.
+  mainRunsTo "before a literal defaults" [phantom, aword, "impl Phantom<AWord, Word> {}",
+    "function make<T, R>(x: T) returns (R) where T: Phantom<R> { return make(x); }",
+    "function main() returns (Word) { let value: AWord = AWord(0); if (false) { let y = make(value) + 1; } return 5; }"]
+    (word 5)
+  -- After a literal defaults: `1` is a `uint256`, whose impl then fixes `R` (`wa26`).
+  mainRunsTo "after a literal defaults" [phantom, "impl Phantom<uint256, Bool> {}", run,
+    "function main() returns (Word) { return run(1); }"] (word 7)
+  -- Refused as before.
+  weakRefused "no impl at the subject" [phantom, aword, "enum BWord { BWord(Word) }",
+    "impl Phantom<BWord, Word> {}", run, main]
+  weakRefused "Lean's Coerce" ["trait Coerce<From, To> {}", "enum A { A }", "enum B { B }",
+    "impl Coerce<A, B> {}",
+    "function conv<T, R>(x: T) returns (Word) where T: Coerce<R> { return 7; }",
+    "function main() returns (Word) { let value: A = A.A; return conv(value); }"]
+  weakRefused "an argument fixed otherwise" [phantom, aword, "impl Phantom<AWord, Word> {}",
+    "function both<T, R>(x: T, y: R) returns (Word) where T: Phantom<R> { return 7; }",
+    "function main() returns (Word) { let value: AWord = AWord(0); return both(value, true); }"]
+  weakRefused "two requirements that disagree" [phantom, aword, "enum BWord { BWord(Word) }",
+    "impl Phantom<AWord, Word> {}", "impl Phantom<BWord, Bool> {}",
+    "function both<T, U, R>(x: T, y: U) returns (Word) where T: Phantom<R>, U: Phantom<R> { return 7; }",
+    "function main() returns (Word) { return both(AWord(0), BWord(1)); }"]
+  weakRefused "an annotation that disagrees" [phantom, aword, "impl Phantom<AWord, Word> {}",
+    "function make<T, R>(x: T) returns (R) where T: Phantom<R> { return make(x); }",
+    "function main() returns (Word) { let value: AWord = AWord(0); if (false) { let y: Bool = make(value); } return 5; }"]
+  weakRefused "a literal subject at another type" [phantom, "impl Phantom<Word, Bool> {}", run,
+    "function main() returns (Word) { return run(1); }"]
+  IO.println "SOURCE_CORE_WEAK_ARGUMENTS_PASS: upstream's weak trait arguments through the public API, an open argument fixed from the one impl, a given, a generic impl, a default alone and a default beside an ordinary impl, through a requirement on it, a chain, a partly open argument, two arguments and a condition, before a literal defaults and after, and refused as before with no impl, at Lean's own Coerce, with the argument fixed otherwise, with two requirements or an annotation that disagree and at a literal subject of another type"
+
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
 fixtures (`tests/e2e/*/main.sol` at e2eef194) that need no conversion and no
@@ -6832,6 +6920,7 @@ def run : IO Unit := do
   runLeadingDotBooleans
   runNonFinalReturns
   runOverlappingImplementations
+  runWeakArguments
   runUpstreamFixtures
   runUpstreamArrayFixtures
   runArrayElementCases

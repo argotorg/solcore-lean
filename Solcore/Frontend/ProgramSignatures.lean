@@ -498,6 +498,15 @@ structure ProgramTraitSignature where
   source : Syntax.TraitDecl
   deriving Repr
 
+/-- A trait of the program named `Coerce` with two parameters: the conventional trait whose
+implementations Lean's coercion search reads, which upstream does not have. `SC0218` compares
+its heads on both arguments, and the weak arguments of `finalize` leave its target to the
+search. -/
+def isConventionalCoerce (traits : List ProgramTraitSignature) (trait : ProgramTraitId) :
+    Bool :=
+  traits.any fun signature => trait.declaration? == some signature.id &&
+    signature.name == "Coerce" && signature.parameters.length == 2
+
 /-- A predicate's direct superclasses: its trait's own where predicates at the
 predicate's arguments. -/
 def superclassPredicatesIn (traits : List ProgramTraitSignature)
@@ -2807,10 +2816,7 @@ subjects unify once both heads' parameters are apart (`implementationHeadsOverla
 coercion search, so its argument must unify as well. -/
 private def ordinaryHeadsOverlap (traits : List ProgramTraitSignature)
     (first second : ProgramImplementationSignature) : Bool :=
-  let conventionalCoerce := traits.any fun trait =>
-    first.head.trait.declaration? == some trait.id && trait.name == "Coerce" &&
-      trait.parameters.length == 2
-  if conventionalCoerce then
+  if isConventionalCoerce traits first.head.trait then
     let left := TypedTraitResolution.freshenRuleFor first.implRule second.head
     let right := TypedTraitResolution.freshenRuleFor second.implRule left.head
     match TypeSystem.Unification.unifyTypes

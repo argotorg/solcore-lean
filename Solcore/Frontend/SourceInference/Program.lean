@@ -1004,6 +1004,124 @@ finalization mutates inference substitutions. -/
 def validateIntegerLiteralLedger (state : State) : Except Error Unit :=
   validateIntegerLiteralNodes state state.nodes
 
+/-- The arguments that an implementation rule's head gives a goal whose subject the head
+matches one way, as upstream's `match_pred` matches a main type and unifies the other
+arguments: the rule is freshened, its subject unified with the goal's without binding a goal
+variable, and its arguments taken under that unifier. A head of another trait or arity, one
+whose subject does not match, and one whose arguments keep a variable of the rule give none;
+the coverage condition (`SC0212`) leaves none of the last kind among a program's own. -/
+def weakRuleArguments? (goal : ProgramPredicate) (rule : ProgramImplRule) :
+    Option (List Ty) := do
+  if rule.head.trait != goal.trait then none else pure ()
+  if rule.head.arguments.length != goal.arguments.length then none else pure ()
+  let freshened := TypedTraitResolution.freshenRuleFor rule goal
+  let substitution ← (Unification.unify [{
+    left := freshened.head.subject
+    right := goal.subject
+  }]).toOption
+  if substitution.domain.any goal.subject.freeVariables.contains then none else pure ()
+  let arguments := freshened.head.arguments.map substitution.apply
+  if arguments.all fun argument => argument.freeVariables.isEmpty then pure arguments
+  else none
+
+/-- The one source of a goal's other arguments, in resolution's order: a given of its trait
+and subject, which resolution takes first; else the one ordinary rule whose head subject
+matches; else, when none does, the one default. Two sources of one kind give none. -/
+def weakArgumentSource? (context : Context) (state : State) (goal : ProgramPredicate) :
+    Option (List Ty) :=
+  let givens := ((context.assumptions.map (applyPredicate state)).filter fun given =>
+      given.trait == goal.trait && given.subject == goal.subject &&
+        given.arguments.length == goal.arguments.length).eraseDups
+  match givens with
+  | [given] =>
+      if given.arguments.all fun argument => argument.freeVariables.isEmpty then
+        some given.arguments
+      else none
+  | _ :: _ :: _ => none
+  | [] =>
+      let rules := context.signatures.resolutionRules
+      match ((rules.filter fun rule => !rule.isDefault).filterMap
+          (weakRuleArguments? goal)).eraseDups with
+      | [arguments] => some arguments
+      | [] =>
+          match ((rules.filter fun rule => rule.isDefault).filterMap
+              (weakRuleArguments? goal)).eraseDups with
+          | [arguments] => some arguments
+          | _ => none
+      | _ => none
+
+/-- Unify each source argument, which has no metavariable, with the goal's, in order. The
+closed side is the left operand, so no protected variable is bound
+(`unify_closed_left_private`). -/
+def unifyWeakArguments : State → List (Ty × Ty) → Except Error State
+  | state, [] => .ok state
+  | state, (source, target) :: rest => do
+      let state ← unify state source target
+      unifyWeakArguments state rest
+
+/-- Whether every metavariable of a type lies below the allocator (`Ty.VariablesBelow`). -/
+def variablesBelowNext (next : Nat) (type : Ty) : Bool :=
+  type.freeVariables.all fun metavariable => decide (metavariable.index < next)
+
+/-- Fix one requirement's open arguments from its one source, as upstream fixes a weak trait
+argument: only a requirement whose trait is not the conventional `Coerce`, that is not a local
+scheme's assumption (finalization keeps those as assumptions), whose subject has no
+metavariable, and whose arguments hold one, all below the allocator. A requirement with no one
+source, or whose arguments do not unify with it, is left as it is, so resolution refuses it as
+before. -/
+def fixWeakArgument (context : Context) (state : State) (requirement : Requirement) :
+    Option State :=
+  let goal := applyPredicate state requirement.predicate
+  if state.localSchemeAssumptions.contains requirement.id ||
+      isConventionalCoerce context.signatures.traits goal.trait ||
+      !goal.subject.freeVariables.isEmpty ||
+      goal.arguments.all (fun argument => argument.freeVariables.isEmpty) ||
+      !goal.arguments.all (variablesBelowNext state.inference.next) then
+    none
+  else
+    match weakArgumentSource? context state goal with
+    | none => none
+    | some arguments =>
+        if arguments.length != goal.arguments.length ||
+            !arguments.all (fun argument => argument.freeVariables.isEmpty) then none
+        else
+          match unifyWeakArguments state (arguments.zip goal.arguments) with
+          | .ok next => some next
+          | .error _ => none
+
+/-- One round over the requirements, and whether it fixed any. -/
+def weakArgumentRound (context : Context) : State → List Requirement → State × Bool
+  | state, [] => (state, false)
+  | state, requirement :: rest =>
+      match fixWeakArgument context state requirement with
+      | some next => ((weakArgumentRound context next rest).1, true)
+      | none => weakArgumentRound context state rest
+
+/-- Rounds until one fixes nothing, within `fuel` rounds: a chain of requirements, each fixing
+the next one's subject (`t: Phantom<r>, r: Second<s>`), takes a round per link. -/
+def weakArgumentPasses (context : Context) : Nat → State → State
+  | 0, state => state
+  | fuel + 1, state =>
+      match weakArgumentRound context state state.requirements with
+      | (next, true) => weakArgumentPasses context fuel next
+      | (_, false) => state
+
+/-- Upstream's weak trait arguments (`match_pred`): each requirement's open arguments are fixed
+from the one given or implementation whose head subject matches its closed subject, for every
+trait but Lean's own `Coerce`. Finalization runs this before a literal defaults and after, as
+upstream fixes them on both sides. -/
+def fixWeakArguments (context : Context) (state : State) : State :=
+  weakArgumentPasses context (state.requirements.length + 1) state
+
+/-- Finalization's defaulting: the weak trait arguments, the numeric patterns' and literals'
+targets, and the weak arguments again, as upstream fixes a weak argument before a literal
+defaults (`wa24`) and after (`wa26`). -/
+def defaultTargets (context : Context) (state : State) : Except Error State := do
+  let state := fixWeakArguments context state
+  let state ← defaultIntegerPatternTargets state.integerPatterns state
+  let state ← defaultIntegerLiteralTargets state.integerLiterals state
+  pure (fixWeakArguments context state)
+
 def finalize (context : Context) (type : Ty) (state : State)
     (roots : List NodeId) :
     Except Error Result := do
@@ -1013,8 +1131,7 @@ def finalize (context : Context) (type : Ty) (state : State)
   validateSourceLocalIdentities (state.toTypedSource roots)
   validateSourceTemplateTracking (state.toTypedSource roots) state
   validateIntegerLiteralLedger state
-  let state ← defaultIntegerPatternTargets state.integerPatterns state
-  let state ← defaultIntegerLiteralTargets state.integerLiterals state
+  let state ← defaultTargets context state
   validateIntegerPatternTargets state state.integerPatterns
   validateIntegerLiteralTargets state state.integerLiterals
   validateAssignmentTargets state state.nodes

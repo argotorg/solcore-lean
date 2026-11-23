@@ -1919,6 +1919,383 @@ private theorem defaultIntegerLiteralTargets_toTypedSource
           exact (induction tailResult).trans
             (defaultIntegerLiteralTarget_toTypedSource headResult)
 
+/-! ### The weak trait arguments
+
+Each fix of `fixWeakArguments` unifies a requirement's open arguments with closed ones through
+`unify`, so it changes only `state.inference`. -/
+
+theorem unify_frame {state next : State} {left right : Ty}
+    (result : unify state left right = .ok next) :
+    ∃ inference, next = { state with inference } := by
+  unfold unify at result
+  cases unified : state.inference.unify left right <;>
+    simp [liftUnification, unified, bind, Except.bind] at result
+  cases result
+  exact ⟨_, rfl⟩
+
+theorem unifyWeakArguments_frame {state next : State} {pairs : List (Ty × Ty)}
+    (result : unifyWeakArguments state pairs = .ok next) :
+    ∃ inference, next = { state with inference } := by
+  induction pairs generalizing state with
+  | nil =>
+      simp [unifyWeakArguments] at result
+      cases result
+      exact ⟨_, rfl⟩
+  | cons pair rest induction =>
+      obtain ⟨source, target⟩ := pair
+      cases head : unify state source target with
+      | error error => simp [unifyWeakArguments, head, bind, Except.bind] at result
+      | ok middle =>
+          have tail : unifyWeakArguments middle rest = .ok next := by
+            simpa [unifyWeakArguments, head, bind, Except.bind] using result
+          obtain ⟨first, rfl⟩ := unify_frame head
+          obtain ⟨second, rfl⟩ := induction tail
+          exact ⟨second, rfl⟩
+
+theorem unifyWeakArguments_inferenceProperties {state next : State}
+    {pairs : List (Ty × Ty)} (ready : state.InferenceReady)
+    (below : ∀ pair ∈ pairs, pair.1.VariablesBelow state.inference.next ∧
+      pair.2.VariablesBelow state.inference.next)
+    (result : unifyWeakArguments state pairs = .ok next) :
+    state.InferenceProgress next ∧ next.InferenceReady := by
+  induction pairs generalizing state with
+  | nil =>
+      simp [unifyWeakArguments] at result
+      cases result
+      exact ⟨State.InferenceProgress.refl ready.solved, ready⟩
+  | cons pair rest induction =>
+      obtain ⟨source, target⟩ := pair
+      cases head : unify state source target with
+      | error error => simp [unifyWeakArguments, head, bind, Except.bind] at result
+      | ok middle =>
+          have tail : unifyWeakArguments middle rest = .ok next := by
+            simpa [unifyWeakArguments, head, bind, Except.bind] using result
+          have headBelow := below (source, target) (by simp)
+          have progress :=
+            unify_inferenceProgress ready.solved headBelow.1 headBelow.2 head
+          have middleReady :=
+            unify_preserves_inferenceReady ready headBelow.1 headBelow.2 head
+          have restBelow : ∀ pair ∈ rest,
+              pair.1.VariablesBelow middle.inference.next ∧
+                pair.2.VariablesBelow middle.inference.next := by
+            intro pair member
+            have pairBelow := below pair (by simp [member])
+            exact ⟨pairBelow.1.weaken progress.next_le,
+              pairBelow.2.weaken progress.next_le⟩
+          have tailProperties := induction middleReady restBelow tail
+          exact ⟨progress.trans tailProperties.1, tailProperties.2⟩
+
+theorem unifyWeakArguments_preserves_resolve_eq {state next : State}
+    {pairs : List (Ty × Ty)} {left right : Ty}
+    (equal : state.resolve left = state.resolve right)
+    (result : unifyWeakArguments state pairs = .ok next) :
+    next.resolve left = next.resolve right := by
+  induction pairs generalizing state with
+  | nil =>
+      simp [unifyWeakArguments] at result
+      cases result
+      exact equal
+  | cons pair rest induction =>
+      obtain ⟨source, target⟩ := pair
+      cases head : unify state source target with
+      | error error => simp [unifyWeakArguments, head, bind, Except.bind] at result
+      | ok middle =>
+          have tail : unifyWeakArguments middle rest = .ok next := by
+            simpa [unifyWeakArguments, head, bind, Except.bind] using result
+          exact induction (unify_preserves_resolve_eq equal head) tail
+
+theorem variablesBelow_of_variablesBelowNext {next : Nat} {type : Ty}
+    (below : variablesBelowNext next type = true) : type.VariablesBelow next := by
+  intro metavariable member
+  exact of_decide_eq_true (List.all_eq_true.mp below metavariable member)
+
+theorem variablesBelow_of_closed {next : Nat} {type : Ty}
+    (closed : type.freeVariables.isEmpty = true) : type.VariablesBelow next := by
+  intro metavariable member
+  cases free : type.freeVariables with
+  | nil => simp [free] at member
+  | cons first rest => simp [free] at closed
+
+/-- One fix of the weak step: a requirement's open arguments unified pair by pair with its
+source's, which hold no metavariable, while its own lie below the allocator. -/
+def WeakArgumentStep (before after : State) : Prop :=
+  ∃ pairs : List (Ty × Ty), unifyWeakArguments before pairs = .ok after ∧
+    ∀ pair ∈ pairs, pair.1.VariablesBelow 0 ∧
+      pair.2.VariablesBelow before.inference.next
+
+theorem fixWeakArgument_step {context : Context} {state next : State}
+    {requirement : Requirement}
+    (result : fixWeakArgument context state requirement = some next) :
+    WeakArgumentStep state next := by
+  dsimp only [fixWeakArgument] at result
+  split at result
+  · cases result
+  · rename_i considered
+    split at result
+    · cases result
+    · rename_i arguments _
+      split at result
+      · cases result
+      · rename_i sized
+        split at result
+        · rename_i middle unified
+          cases result
+          have targetsBelow :
+              (applyPredicate state requirement.predicate).arguments.all
+                (variablesBelowNext state.inference.next) = true := by
+            cases below : (applyPredicate state requirement.predicate).arguments.all
+                (variablesBelowNext state.inference.next)
+            · rw [below] at considered
+              simp at considered
+            · rfl
+          have sourcesClosed :
+              arguments.all (fun argument => argument.freeVariables.isEmpty) = true := by
+            cases closed : arguments.all (fun argument => argument.freeVariables.isEmpty)
+            · rw [closed] at sized
+              simp at sized
+            · rfl
+          refine ⟨_, unified, ?_⟩
+          intro ⟨source, target⟩ member
+          have members := List.of_mem_zip member
+          exact ⟨variablesBelow_of_closed (List.all_eq_true.mp sourcesClosed source members.1),
+            variablesBelow_of_variablesBelowNext
+              (List.all_eq_true.mp targetsBelow target members.2)⟩
+        · cases result
+
+/-- A relation that is reflexive and transitive and that every fix of the weak step makes
+relates a state to the result of its weak arguments. -/
+theorem fixWeakArguments_induction {context : Context} {motive : State → State → Prop}
+    (refl : ∀ state, motive state state)
+    (trans : ∀ {first second third : State}, motive first second →
+      motive second third → motive first third)
+    (step : ∀ {before after : State}, WeakArgumentStep before after → motive before after)
+    (state : State) : motive state (fixWeakArguments context state) := by
+  have round : ∀ (requirements : List Requirement) (state : State),
+      motive state (weakArgumentRound context state requirements).1 := by
+    intro requirements
+    induction requirements with
+    | nil => exact refl
+    | cons requirement rest induction =>
+        intro state
+        rw [weakArgumentRound]
+        split
+        · rename_i next fixed
+          exact trans (step (fixWeakArgument_step fixed)) (induction next)
+        · exact induction state
+  have passes : ∀ (fuel : Nat) (state : State),
+      motive state (weakArgumentPasses context fuel state) := by
+    intro fuel
+    induction fuel with
+    | zero => exact refl
+    | succ fuel induction =>
+        intro state
+        rw [weakArgumentPasses]
+        split
+        · rename_i next fixed
+          have first := round state.requirements state
+          rw [fixed] at first
+          exact trans first (induction next)
+        · exact refl state
+  exact passes _ state
+
+theorem fixWeakArguments_frame {context : Context} {state : State} :
+    ∃ inference, fixWeakArguments context state = { state with inference } := by
+  refine fixWeakArguments_induction
+    (motive := fun before after => ∃ inference, after = { before with inference })
+    (fun state => ⟨state.inference, rfl⟩) ?_ ?_ state
+  · intro first second third ⟨inner, secondEq⟩ ⟨outer, thirdEq⟩
+    subst thirdEq
+    subst secondEq
+    exact ⟨outer, rfl⟩
+  · intro before after ⟨_, unified, _⟩
+    exact unifyWeakArguments_frame unified
+
+theorem fixWeakArguments_requirements {context : Context} {state : State} :
+    (fixWeakArguments context state).requirements = state.requirements := by
+  obtain ⟨_, frame⟩ := fixWeakArguments_frame (context := context) (state := state)
+  exact (congrArg State.requirements frame).trans rfl
+
+theorem fixWeakArguments_localSchemeAssumptions {context : Context} {state : State} :
+    (fixWeakArguments context state).localSchemeAssumptions =
+      state.localSchemeAssumptions := by
+  obtain ⟨_, frame⟩ := fixWeakArguments_frame (context := context) (state := state)
+  exact (congrArg State.localSchemeAssumptions frame).trans rfl
+
+theorem fixWeakArguments_integerLiterals {context : Context} {state : State} :
+    (fixWeakArguments context state).integerLiterals = state.integerLiterals := by
+  obtain ⟨_, frame⟩ := fixWeakArguments_frame (context := context) (state := state)
+  exact (congrArg State.integerLiterals frame).trans rfl
+
+theorem fixWeakArguments_integerPatterns {context : Context} {state : State} :
+    (fixWeakArguments context state).integerPatterns = state.integerPatterns := by
+  obtain ⟨_, frame⟩ := fixWeakArguments_frame (context := context) (state := state)
+  exact (congrArg State.integerPatterns frame).trans rfl
+
+private theorem fixWeakArguments_toTypedSource {context : Context} {state : State}
+    {roots : List NodeId} :
+    (fixWeakArguments context state).toTypedSource roots =
+      state.toTypedSource roots := by
+  obtain ⟨_, frame⟩ := fixWeakArguments_frame (context := context) (state := state)
+  exact (congrArg (fun next : State => next.toTypedSource roots) frame).trans rfl
+
+/-- The weak arguments are ordinary inference progress and keep readiness. -/
+theorem fixWeakArguments_inferenceProperties {context : Context} {state : State}
+    (ready : state.InferenceReady) :
+    state.InferenceProgress (fixWeakArguments context state) ∧
+      (fixWeakArguments context state).InferenceReady := by
+  refine fixWeakArguments_induction
+    (motive := fun before after => before.InferenceReady →
+      before.InferenceProgress after ∧ after.InferenceReady)
+    (fun state ready => ⟨State.InferenceProgress.refl ready.solved, ready⟩) ?_ ?_
+    state ready
+  · intro first second third firstStep secondStep ready
+    have head := firstStep ready
+    have tail := secondStep head.2
+    exact ⟨head.1.trans tail.1, tail.2⟩
+  · intro before after ⟨_, unified, below⟩ ready
+    exact unifyWeakArguments_inferenceProperties ready
+      (fun pair member => ⟨(below pair member).1.weaken (Nat.zero_le _),
+        (below pair member).2⟩)
+      unified
+
+/-- The weak arguments keep every type equality visible through the input state. -/
+theorem fixWeakArguments_preserves_resolve_eq {context : Context} {state : State}
+    {left right : Ty} (equal : state.resolve left = state.resolve right) :
+    (fixWeakArguments context state).resolve left =
+      (fixWeakArguments context state).resolve right := by
+  refine fixWeakArguments_induction
+    (motive := fun before after => before.resolve left = before.resolve right →
+      after.resolve left = after.resolve right)
+    (fun _ equal => equal) ?_ ?_ state equal
+  · intro first second third firstStep secondStep equal
+    exact secondStep (firstStep equal)
+  · intro before after ⟨_, unified, _⟩ equal
+    exact unifyWeakArguments_preserves_resolve_eq equal unified
+
+/-! ### Finalization's defaulting -/
+
+/-- A successful `defaultTargets` is the weak arguments, the pattern targets, the literal
+targets and the weak arguments again. -/
+theorem defaultTargets_success {context : Context} {state next : State}
+    (success : defaultTargets context state = .ok next) :
+    ∃ patternState literalState,
+      defaultIntegerPatternTargets (fixWeakArguments context state).integerPatterns
+          (fixWeakArguments context state) = .ok patternState ∧
+        defaultIntegerLiteralTargets patternState.integerLiterals patternState =
+          .ok literalState ∧
+        fixWeakArguments context literalState = next := by
+  unfold defaultTargets at success
+  cases patternResult : defaultIntegerPatternTargets
+      (fixWeakArguments context state).integerPatterns
+      (fixWeakArguments context state) with
+  | error error => simp [patternResult, bind, Except.bind] at success
+  | ok patternState =>
+      cases literalResult :
+          defaultIntegerLiteralTargets patternState.integerLiterals patternState with
+      | error error =>
+          simp [patternResult, literalResult, bind, Except.bind] at success
+      | ok literalState =>
+          simp only [patternResult, literalResult, bind, Except.bind] at success
+          cases success
+          exact ⟨patternState, literalState, rfl, literalResult, rfl⟩
+
+theorem defaultTargets_requirements {context : Context} {state next : State}
+    (success : defaultTargets context state = .ok next) :
+    next.requirements = state.requirements := by
+  obtain ⟨patternState, literalState, patternResult, literalResult, rfl⟩ :=
+    defaultTargets_success success
+  rw [fixWeakArguments_requirements,
+    defaultIntegerLiteralTargets_requirements literalResult,
+    defaultIntegerPatternTargets_requirements patternResult,
+    fixWeakArguments_requirements]
+
+theorem defaultTargets_localSchemeAssumptions {context : Context} {state next : State}
+    (success : defaultTargets context state = .ok next) :
+    next.localSchemeAssumptions = state.localSchemeAssumptions := by
+  obtain ⟨patternState, literalState, patternResult, literalResult, rfl⟩ :=
+    defaultTargets_success success
+  rw [fixWeakArguments_localSchemeAssumptions,
+    defaultIntegerLiteralTargets_localSchemeAssumptions literalResult,
+    defaultIntegerPatternTargets_localSchemeAssumptions patternResult,
+    fixWeakArguments_localSchemeAssumptions]
+
+theorem defaultTargets_integerLiterals {context : Context} {state next : State}
+    (success : defaultTargets context state = .ok next) :
+    next.integerLiterals = state.integerLiterals := by
+  obtain ⟨patternState, literalState, patternResult, literalResult, rfl⟩ :=
+    defaultTargets_success success
+  rw [fixWeakArguments_integerLiterals,
+    defaultIntegerLiteralTargets_integerLiterals literalResult,
+    defaultIntegerPatternTargets_integerLiterals patternResult,
+    fixWeakArguments_integerLiterals]
+
+theorem defaultTargets_integerPatterns {context : Context} {state next : State}
+    (success : defaultTargets context state = .ok next) :
+    next.integerPatterns = state.integerPatterns := by
+  obtain ⟨patternState, literalState, patternResult, literalResult, rfl⟩ :=
+    defaultTargets_success success
+  rw [fixWeakArguments_integerPatterns,
+    defaultIntegerLiteralTargets_integerPatterns literalResult,
+    defaultIntegerPatternTargets_integerPatterns patternResult,
+    fixWeakArguments_integerPatterns]
+
+private theorem defaultTargets_toTypedSource {context : Context} {state next : State}
+    {roots : List NodeId}
+    (success : defaultTargets context state = .ok next) :
+    next.toTypedSource roots = state.toTypedSource roots := by
+  obtain ⟨patternState, literalState, patternResult, literalResult, rfl⟩ :=
+    defaultTargets_success success
+  rw [fixWeakArguments_toTypedSource,
+    defaultIntegerLiteralTargets_toTypedSource literalResult,
+    defaultIntegerPatternTargets_toTypedSource patternResult,
+    fixWeakArguments_toTypedSource]
+
+/-- Finalization's defaulting is ordinary inference progress and keeps readiness when every
+numeric origin lies below the allocator. -/
+theorem defaultTargets_inferenceProperties {context : Context} {state next : State}
+    (ready : state.InferenceReady) (originsBelow : state.NumericOriginsBelowNext)
+    (success : defaultTargets context state = .ok next) :
+    state.InferenceProgress next ∧ next.InferenceReady := by
+  obtain ⟨patternState, literalState, patternResult, literalResult, rfl⟩ :=
+    defaultTargets_success success
+  have weakProperties :=
+    fixWeakArguments_inferenceProperties (context := context) ready
+  have patternOriginsBelow :
+      ∀ origin ∈ (fixWeakArguments context state).integerPatterns,
+        origin.metavariable.index < (fixWeakArguments context state).inference.next := by
+    intro origin member
+    rw [fixWeakArguments_integerPatterns] at member
+    exact Nat.lt_of_lt_of_le (originsBelow.1 origin member) weakProperties.1.next_le
+  have patternProperties := defaultIntegerPatternTargets_inferenceProperties
+    weakProperties.2 patternOriginsBelow patternResult
+  have literalOriginsBelow : ∀ origin ∈ patternState.integerLiterals,
+      origin.metavariable.index < patternState.inference.next := by
+    intro origin member
+    rw [defaultIntegerPatternTargets_integerLiterals patternResult,
+      fixWeakArguments_integerLiterals] at member
+    exact Nat.lt_of_lt_of_le (originsBelow.2 origin member)
+      (Nat.le_trans weakProperties.1.next_le patternProperties.1.next_le)
+  have literalProperties := defaultIntegerLiteralTargets_inferenceProperties
+    patternProperties.2 literalOriginsBelow literalResult
+  have secondProperties :=
+    fixWeakArguments_inferenceProperties (context := context) literalProperties.2
+  exact ⟨weakProperties.1.trans
+      (patternProperties.1.trans (literalProperties.1.trans secondProperties.1)),
+    secondProperties.2⟩
+
+/-- Finalization's defaulting keeps every type equality visible through the input state. -/
+theorem defaultTargets_preserves_resolve_eq {context : Context} {state next : State}
+    {left right : Ty} (equal : state.resolve left = state.resolve right)
+    (success : defaultTargets context state = .ok next) :
+    next.resolve left = next.resolve right := by
+  obtain ⟨patternState, literalState, patternResult, literalResult, rfl⟩ :=
+    defaultTargets_success success
+  exact fixWeakArguments_preserves_resolve_eq
+    (defaultIntegerLiteralTargets_preserves_resolve_eq
+      (defaultIntegerPatternTargets_preserves_resolve_eq
+        (fixWeakArguments_preserves_resolve_eq equal) patternResult)
+      literalResult)
+
 private theorem validateNumericOriginsBelow_success
     {α : Type} {next : Nat} {metavariable : α → TypeVarId}
     {origins : List α}
@@ -2030,7 +2407,6 @@ each proof to unfold the whole executable pipeline. -/
 structure FinalizeSuccessWitness
     (context : Context) (type : Ty) (state : State)
     (roots : List NodeId) (result : Result) where
-  patternState : State
   finalState : State
   solvedRequirements : List SolvedRequirement
   graphValidation :
@@ -2040,12 +2416,8 @@ structure FinalizeSuccessWitness
   templateTrackingValidation :
     validateSourceTemplateTracking (state.toTypedSource roots) state = .ok ()
   ledgerValidation : validateIntegerLiteralLedger state = .ok ()
-  patternDefault :
-    defaultIntegerPatternTargets state.integerPatterns state =
-      .ok patternState
-  literalDefault :
-    defaultIntegerLiteralTargets patternState.integerLiterals patternState =
-      .ok finalState
+  /-- The weak trait arguments, the numeric targets and the weak arguments again. -/
+  defaulting : defaultTargets context state = .ok finalState
   patternValidation :
     validateIntegerPatternTargets finalState finalState.integerPatterns =
       .ok ()
@@ -2130,213 +2502,200 @@ def finalize_success_witness
         templateTrackingValidation, ledgerResult, bind, Except.bind] at success
   | ok ledgerValue =>
       cases ledgerValue
-      cases patternResult :
-          defaultIntegerPatternTargets state.integerPatterns state with
+      cases defaultingResult : defaultTargets context state with
       | error error =>
           simp [graphValidation, localIdentityValidation,
-            templateTrackingValidation, ledgerResult, patternResult, bind,
+            templateTrackingValidation, ledgerResult, defaultingResult, bind,
             Except.bind] at success
-      | ok patternState =>
-          cases literalResult :
-              defaultIntegerLiteralTargets patternState.integerLiterals
-                patternState with
+      | ok finalState =>
+          cases patternValidationResult :
+              validateIntegerPatternTargets finalState
+                finalState.integerPatterns with
           | error error =>
               simp [graphValidation, localIdentityValidation,
-                templateTrackingValidation, ledgerResult, patternResult,
-                literalResult, bind, Except.bind] at success
-          | ok finalState =>
-              cases patternValidationResult :
-                  validateIntegerPatternTargets finalState
-                    finalState.integerPatterns with
+                templateTrackingValidation, ledgerResult, defaultingResult,
+                patternValidationResult, bind, Except.bind]
+                at success
+          | ok patternValidation =>
+              cases patternValidation
+              cases literalValidationResult :
+                  validateIntegerLiteralTargets finalState
+                    finalState.integerLiterals with
               | error error =>
                   simp [graphValidation, localIdentityValidation,
-                    templateTrackingValidation, ledgerResult, patternResult,
-                    literalResult, patternValidationResult, bind, Except.bind]
-                    at success
-              | ok patternValidation =>
-                  cases patternValidation
-                  cases literalValidationResult :
-                      validateIntegerLiteralTargets finalState
-                        finalState.integerLiterals with
+                    templateTrackingValidation, ledgerResult,
+                    defaultingResult, patternValidationResult,
+                    literalValidationResult, bind, Except.bind] at success
+              | ok literalValidation =>
+                  cases literalValidation
+                  have assignmentResult :
+                      validateAssignmentTargets finalState finalState.nodes =
+                        .ok () := by
+                    cases assignmentRun :
+                        validateAssignmentTargets finalState
+                          finalState.nodes with
+                    | error error =>
+                        simp [graphValidation, localIdentityValidation,
+                          templateTrackingValidation, ledgerResult,
+                          defaultingResult,
+                          patternValidationResult, literalValidationResult,
+                          assignmentRun, bind, Except.bind] at success
+                    | ok assignmentValue =>
+                        cases assignmentValue
+                        rfl
+                  have placeElementResult :
+                      validatePlaceElements finalState finalState.nodes =
+                        .ok () := by
+                    cases placeElementRun :
+                        validatePlaceElements finalState
+                          finalState.nodes with
+                    | error error =>
+                        simp [graphValidation, localIdentityValidation,
+                          templateTrackingValidation, ledgerResult,
+                          defaultingResult,
+                          patternValidationResult, literalValidationResult,
+                          assignmentResult, placeElementRun, bind, Except.bind] at success
+                    | ok placeElementValue =>
+                        cases placeElementValue
+                        rfl
+                  have builtinOperatorResult :
+                      validateBuiltinOperatorUses context finalState
+                        finalState.nodes = .ok () := by
+                    cases builtinOperatorRun :
+                        validateBuiltinOperatorUses context finalState
+                          finalState.nodes with
+                    | error error =>
+                        simp [graphValidation, localIdentityValidation,
+                          templateTrackingValidation, ledgerResult,
+                          defaultingResult,
+                          patternValidationResult, literalValidationResult,
+                          assignmentResult, placeElementResult, builtinOperatorRun, bind,
+                          Except.bind] at success
+                    | ok builtinOperatorValue =>
+                        cases builtinOperatorValue
+                        rfl
+                  cases ownershipResult :
+                      validateSourceRequirementOwnership
+                        (finalState.toTypedSource roots)
+                        finalState.requirements with
                   | error error =>
                       simp [graphValidation, localIdentityValidation,
                         templateTrackingValidation, ledgerResult,
-                        patternResult, literalResult, patternValidationResult,
-                        literalValidationResult, bind, Except.bind] at success
-                  | ok literalValidation =>
-                      cases literalValidation
-                      have assignmentResult :
-                          validateAssignmentTargets finalState finalState.nodes =
-                            .ok () := by
-                        cases assignmentRun :
-                            validateAssignmentTargets finalState
-                              finalState.nodes with
-                        | error error =>
-                            simp [graphValidation, localIdentityValidation,
-                              templateTrackingValidation, ledgerResult,
-                              patternResult, literalResult,
-                              patternValidationResult, literalValidationResult,
-                              assignmentRun, bind, Except.bind] at success
-                        | ok assignmentValue =>
-                            cases assignmentValue
-                            rfl
-                      have placeElementResult :
-                          validatePlaceElements finalState finalState.nodes =
-                            .ok () := by
-                        cases placeElementRun :
-                            validatePlaceElements finalState
-                              finalState.nodes with
-                        | error error =>
-                            simp [graphValidation, localIdentityValidation,
-                              templateTrackingValidation, ledgerResult,
-                              patternResult, literalResult,
-                              patternValidationResult, literalValidationResult,
-                              assignmentResult, placeElementRun, bind, Except.bind] at success
-                        | ok placeElementValue =>
-                            cases placeElementValue
-                            rfl
-                      have builtinOperatorResult :
-                          validateBuiltinOperatorUses context finalState
-                            finalState.nodes = .ok () := by
-                        cases builtinOperatorRun :
-                            validateBuiltinOperatorUses context finalState
-                              finalState.nodes with
-                        | error error =>
-                            simp [graphValidation, localIdentityValidation,
-                              templateTrackingValidation, ledgerResult,
-                              patternResult, literalResult,
-                              patternValidationResult, literalValidationResult,
-                              assignmentResult, placeElementResult, builtinOperatorRun, bind,
-                              Except.bind] at success
-                        | ok builtinOperatorValue =>
-                            cases builtinOperatorValue
-                            rfl
-                      cases ownershipResult :
-                          validateSourceRequirementOwnership
-                            (finalState.toTypedSource roots)
-                            finalState.requirements with
+                        defaultingResult,
+                        patternValidationResult, literalValidationResult, assignmentResult,
+                        placeElementResult, builtinOperatorResult,
+                        ownershipResult, bind, Except.bind] at success
+                  | ok ownershipValidation =>
+                      cases ownershipValidation
+                      cases rangeResult :
+                          validateFinalSubstitutionRangeFormation context
+                            finalState.inference.substitution with
                       | error error =>
                           simp [graphValidation, localIdentityValidation,
                             templateTrackingValidation, ledgerResult,
-                            patternResult, literalResult,
-                            patternValidationResult, literalValidationResult, assignmentResult,
-                            placeElementResult, builtinOperatorResult,
-                            ownershipResult, bind, Except.bind] at success
-                      | ok ownershipValidation =>
-                          cases ownershipValidation
-                          cases rangeResult :
-                              validateFinalSubstitutionRangeFormation context
+                            defaultingResult,
+                            patternValidationResult,
+                            literalValidationResult, assignmentResult, placeElementResult, builtinOperatorResult,
+                            ownershipResult,
+                            rangeResult, bind, Except.bind]
+                            at success
+                      | ok rangeValidation =>
+                          cases rangeValidation
+                          cases captureResult :
+                              validateSourceLocalSchemeNoCapture
+                                (finalState.toTypedSource roots)
                                 finalState.inference.substitution with
                           | error error =>
-                              simp [graphValidation, localIdentityValidation,
+                              simp [graphValidation,
+                                localIdentityValidation,
                                 templateTrackingValidation, ledgerResult,
-                                patternResult, literalResult,
+                                defaultingResult,
                                 patternValidationResult,
                                 literalValidationResult, assignmentResult, placeElementResult, builtinOperatorResult,
                                 ownershipResult,
-                                rangeResult, bind, Except.bind]
+                                rangeResult, captureResult, bind,
+                                Except.bind]
                                 at success
-                          | ok rangeValidation =>
-                              cases rangeValidation
-                              cases captureResult :
-                                  validateSourceLocalSchemeNoCapture
-                                    (finalState.toTypedSource roots)
-                                    finalState.inference.substitution with
+                          | ok captureValidation =>
+                              cases captureValidation
+                              cases templateScopeResult :
+                                  validateSourceTemplateScopes
+                                    ((finalState.toTypedSource roots
+                                      ).applySubstitution
+                                        finalState.inference.substitution)
+                                    finalState with
                               | error error =>
                                   simp [graphValidation,
                                     localIdentityValidation,
-                                    templateTrackingValidation, ledgerResult,
-                                    patternResult, literalResult,
+                                    templateTrackingValidation,
+                                    ledgerResult, defaultingResult,
                                     patternValidationResult,
-                                    literalValidationResult, assignmentResult, placeElementResult, builtinOperatorResult,
-                                    ownershipResult,
-                                    rangeResult, captureResult, bind,
-                                    Except.bind]
+                                    literalValidationResult, assignmentResult,
+                                    placeElementResult, builtinOperatorResult,
+                                    ownershipResult, rangeResult,
+                                    captureResult, templateScopeResult,
+                                    bind, Except.bind]
                                     at success
-                              | ok captureValidation =>
-                                  cases captureValidation
-                                  cases templateScopeResult :
-                                      validateSourceTemplateScopes
-                                        ((finalState.toTypedSource roots
-                                          ).applySubstitution
-                                            finalState.inference.substitution)
-                                        finalState with
+                              | ok templateScopeValidation =>
+                                  cases templateScopeValidation
+                                  cases requirementsResult :
+                                      solveRequirements context finalState
+                                        finalState.requirements with
                                   | error error =>
                                       simp [graphValidation,
                                         localIdentityValidation,
                                         templateTrackingValidation,
-                                        ledgerResult, patternResult,
-                                        literalResult, patternValidationResult,
+                                        ledgerResult, defaultingResult,
+                                        patternValidationResult,
                                         literalValidationResult, assignmentResult,
                                         placeElementResult, builtinOperatorResult,
                                         ownershipResult, rangeResult,
                                         captureResult, templateScopeResult,
-                                        bind, Except.bind]
+                                        requirementsResult, bind,
+                                        Except.bind]
                                         at success
-                                  | ok templateScopeValidation =>
-                                      cases templateScopeValidation
-                                      cases requirementsResult :
-                                          solveRequirements context finalState
-                                            finalState.requirements with
-                                      | error error =>
-                                          simp [graphValidation,
-                                            localIdentityValidation,
-                                            templateTrackingValidation,
-                                            ledgerResult, patternResult,
-                                            literalResult,
-                                            patternValidationResult,
-                                            literalValidationResult, assignmentResult,
-                                            placeElementResult, builtinOperatorResult,
-                                            ownershipResult, rangeResult,
-                                            captureResult, templateScopeResult,
-                                            requirementsResult, bind,
-                                            Except.bind]
-                                            at success
-                                      | ok requirements =>
-                                          simp [graphValidation,
-                                            localIdentityValidation,
-                                            templateTrackingValidation,
-                                            ledgerResult, patternResult,
-                                            literalResult,
-                                            patternValidationResult,
-                                            literalValidationResult, assignmentResult,
-                                            placeElementResult, builtinOperatorResult,
-                                            ownershipResult, rangeResult,
-                                            captureResult, templateScopeResult,
-                                            requirementsResult, bind,
-                                            Except.bind]
-                                            at success
-                                          cases success
-                                          exact {
-                                            patternState
-                                            finalState
-                                            solvedRequirements := requirements
-                                            graphValidation
-                                            localIdentityValidation
-                                            templateTrackingValidation
-                                            ledgerValidation := ledgerResult
-                                            patternDefault := patternResult
-                                            literalDefault := literalResult
-                                            patternValidation :=
-                                              patternValidationResult
-                                            literalValidation :=
-                                              literalValidationResult
-                                            requirementOwnershipValidation :=
-                                              ownershipResult
-                                            templateScopeValidation :=
-                                              templateScopeResult
-                                            requirementsSolved :=
-                                              requirementsResult
-                                            assignmentValidation := assignmentResult
-                                            placeElementValidation := placeElementResult
-                                            builtinOperatorValidation := builtinOperatorResult
-                                            result_eq := rfl
-                                          }
+                                  | ok requirements =>
+                                      simp [graphValidation,
+                                        localIdentityValidation,
+                                        templateTrackingValidation,
+                                        ledgerResult, defaultingResult,
+                                        patternValidationResult,
+                                        literalValidationResult, assignmentResult,
+                                        placeElementResult, builtinOperatorResult,
+                                        ownershipResult, rangeResult,
+                                        captureResult, templateScopeResult,
+                                        requirementsResult, bind,
+                                        Except.bind]
+                                        at success
+                                      cases success
+                                      exact {
+                                        finalState
+                                        solvedRequirements := requirements
+                                        graphValidation
+                                        localIdentityValidation
+                                        templateTrackingValidation
+                                        ledgerValidation := ledgerResult
+                                        defaulting := defaultingResult
+                                        patternValidation :=
+                                          patternValidationResult
+                                        literalValidation :=
+                                          literalValidationResult
+                                        requirementOwnershipValidation :=
+                                          ownershipResult
+                                        templateScopeValidation :=
+                                          templateScopeResult
+                                        requirementsSolved :=
+                                          requirementsResult
+                                        assignmentValidation := assignmentResult
+                                        placeElementValidation := placeElementResult
+                                        builtinOperatorValidation := builtinOperatorResult
+                                        result_eq := rfl
+                                      }
 
 /-- Finalization validates numeric-origin allocator safety before composing
-both defaulting passes as ordinary semantic inference progress.  The
-existential final state is the internal state whose substitution is exposed by
-the public result. -/
+its defaulting as ordinary semantic inference progress.  The existential final
+state is the internal state whose substitution is exposed by the public
+result. -/
 theorem finalize_inferenceProperties
     {context : Context} {type : Ty} {state : State}
     {roots : List NodeId} {result : Result}
@@ -2347,28 +2706,11 @@ theorem finalize_inferenceProperties
         finalState.InferenceReady ∧
         result.substitution = finalState.inference.substitution := by
   have originsBelow := finalize_numericOriginsBelowNext success
-  obtain ⟨patternState, finalState, _, _, _, _, _, patternDefault,
-      literalDefault, _, _, _, _, _, resultEq⟩ :=
+  obtain ⟨finalState, _, _, _, _, _, defaulting, _, _, _, _, _, resultEq⟩ :=
     finalize_success_witness success
   subst result
-  have patternProperties :=
-    defaultIntegerPatternTargets_inferenceProperties ready originsBelow.1
-      patternDefault
-  have patternLiteralOrigins :=
-    defaultIntegerPatternTargets_integerLiterals patternDefault
-  have literalOriginsBelow : ∀ origin ∈ patternState.integerLiterals,
-      origin.metavariable.index < patternState.inference.next := by
-    intro origin member
-    have inputMember : origin ∈ state.integerLiterals := by
-      rw [patternLiteralOrigins] at member
-      exact member
-    exact Nat.lt_of_lt_of_le (originsBelow.2 origin inputMember)
-      patternProperties.1.next_le
-  have literalProperties :=
-    defaultIntegerLiteralTargets_inferenceProperties patternProperties.2
-      literalOriginsBelow literalDefault
-  exact ⟨finalState, patternProperties.1.trans literalProperties.1,
-    literalProperties.2, rfl⟩
+  have properties := defaultTargets_inferenceProperties ready originsBelow defaulting
+  exact ⟨finalState, properties.1, properties.2, rfl⟩
 
 /-- The substitution returned by successful finalization is solved below the
 allocator of its hidden final state.  The leading executable validation makes
@@ -2430,8 +2772,7 @@ private theorem finalize_success_witness_rangeFormationValidation
   simp only [witness.localIdentityValidation] at pipeline
   simp only [witness.templateTrackingValidation] at pipeline
   simp only [witness.ledgerValidation] at pipeline
-  simp only [witness.patternDefault] at pipeline
-  simp only [witness.literalDefault] at pipeline
+  simp only [witness.defaulting] at pipeline
   simp only [witness.patternValidation] at pipeline
   simp only [witness.literalValidation] at pipeline
   simp only [witness.assignmentValidation] at pipeline
@@ -2503,8 +2844,8 @@ theorem checkFunctionBody_success_substitutionRangeFormationValidated
   simpa [ProgramTypeScope.ofDeclaration, declarationId] using validated
 
 /-- Successful finalization exposes the hidden post-defaulting state at which
-local-scheme capture was checked.  The source carrier is unchanged by both
-defaulting passes and the state's substitution is exactly the public result
+local-scheme capture was checked.  The source carrier is unchanged by the
+defaulting and the state's substitution is exactly the public result
 substitution. -/
 theorem finalize_validateSourceLocalSchemeNoCapture
     {context : Context} {type : Ty} {state : State}
@@ -2519,8 +2860,7 @@ theorem finalize_validateSourceLocalSchemeNoCapture
   let witness := finalize_success_witness success
   have sourceEq : witness.finalState.toTypedSource roots =
       state.toTypedSource roots :=
-    (defaultIntegerLiteralTargets_toTypedSource witness.literalDefault).trans
-      (defaultIntegerPatternTargets_toTypedSource witness.patternDefault)
+    defaultTargets_toTypedSource witness.defaulting
   have substitutionEq :
       result.substitution = witness.finalState.inference.substitution := by
     exact congrArg Result.substitution witness.result_eq
@@ -2537,8 +2877,7 @@ theorem finalize_validateSourceLocalSchemeNoCapture
     simp only [witness.localIdentityValidation] at pipeline
     simp only [witness.templateTrackingValidation] at pipeline
     simp only [witness.ledgerValidation] at pipeline
-    simp only [witness.patternDefault] at pipeline
-    simp only [witness.literalDefault] at pipeline
+    simp only [witness.defaulting] at pipeline
     simp only [witness.patternValidation] at pipeline
     simp only [witness.literalValidation] at pipeline
     simp only [witness.assignmentValidation] at pipeline
@@ -2580,7 +2919,7 @@ theorem finalize_localBinderInstantiationNoCapture
   exact validateSourceLocalSchemeNoCapture_success validation binder finalMember
 
 /-- Successful finalization establishes the exact primary-to-ledger ownership
-boundary.  Numeric defaulting changes neither the source carrier nor the raw
+boundary.  The defaulting changes neither the source carrier nor the raw
 requirement ledger, so the validation is exposed at the input state. -/
 theorem finalize_validateSourceRequirementOwnership
     {context : Context} {type : Ty} {state : State}
@@ -2591,11 +2930,9 @@ theorem finalize_validateSourceRequirementOwnership
   let witness := finalize_success_witness success
   have sourceEq : witness.finalState.toTypedSource roots =
       state.toTypedSource roots :=
-    (defaultIntegerLiteralTargets_toTypedSource witness.literalDefault).trans
-      (defaultIntegerPatternTargets_toTypedSource witness.patternDefault)
-  have requirementsEq : witness.finalState.requirements = state.requirements := by
-    rw [defaultIntegerLiteralTargets_requirements witness.literalDefault,
-      defaultIntegerPatternTargets_requirements witness.patternDefault]
+    defaultTargets_toTypedSource witness.defaulting
+  have requirementsEq : witness.finalState.requirements = state.requirements :=
+    defaultTargets_requirements witness.defaulting
   rw [← sourceEq, ← requirementsEq]
   exact witness.requirementOwnershipValidation
 
@@ -2626,19 +2963,15 @@ theorem finalize_integerPatternTarget_supported
     (success : finalize context type state roots = .ok result) :
     ∀ origin, origin ∈ state.integerPatterns →
       (result.substitution.apply (.variable origin.metavariable)).IntegerPatternCarrier := by
-  obtain ⟨patternState, finalState, _, _, _, _, _, patternResult,
-      literalResult, patternValidation, _, _, _, resultEq⟩ :=
-    finalize_success_witness success
-  have patternOrigins :=
-    defaultIntegerPatternTargets_integerPatterns patternResult
-  have finalOrigins :=
-    defaultIntegerLiteralTargets_integerPatterns literalResult
+  obtain ⟨finalState, _, _, _, _, _, defaulting, patternValidation, _, _, _, _,
+      resultEq⟩ := finalize_success_witness success
+  have finalOrigins := defaultTargets_integerPatterns defaulting
   have supported :=
     validateIntegerPatternTargets_success_supported patternValidation
   subst result
   intro origin member
   have finalMember : origin ∈ finalState.integerPatterns := by
-    rw [finalOrigins, patternOrigins]
+    rw [finalOrigins]
     exact member
   simpa [State.resolve, TypeSystem.InferState.resolve] using
     supported origin finalMember
@@ -2651,19 +2984,15 @@ theorem finalize_integerLiteralTarget_supported
     (success : finalize context type state roots = .ok result) :
     ∀ origin, origin ∈ state.integerLiterals →
       (result.substitution.apply (.variable origin.metavariable)).IntegerLiteralCarrier := by
-  obtain ⟨patternState, finalState, _, _, _, _, _, patternResult,
-      literalResult, _, literalValidation, _, _, resultEq⟩ :=
-    finalize_success_witness success
-  have patternOrigins :=
-    defaultIntegerPatternTargets_integerLiterals patternResult
-  have finalOrigins :=
-    defaultIntegerLiteralTargets_integerLiterals literalResult
+  obtain ⟨finalState, _, _, _, _, _, defaulting, _, literalValidation, _, _, _,
+      resultEq⟩ := finalize_success_witness success
+  have finalOrigins := defaultTargets_integerLiterals defaulting
   have supported :=
     validateIntegerLiteralTargets_success_supported literalValidation
   subst result
   intro origin member
   have finalMember : origin ∈ finalState.integerLiterals := by
-    rw [finalOrigins, patternOrigins]
+    rw [finalOrigins]
     exact member
   simpa [State.resolve, TypeSystem.InferState.resolve] using
     supported origin finalMember
@@ -2681,46 +3010,36 @@ theorem finalize_integerLiteral_fits
         node.form = .integerLiteral source resolution →
         signedLiteralFitsTarget source (result.substitution.apply (.variable origin.metavariable))
           resolution.rawValue = true := by
-  obtain ⟨patternState, finalState, _, _, _, _, _, patternResult,
-      literalResult, _, literalValidation, _, _, _, resultEq⟩ :=
-    finalize_success_witness success
-  have patternOrigins :=
-    defaultIntegerPatternTargets_integerLiterals patternResult
-  have finalOrigins :=
-    defaultIntegerLiteralTargets_integerLiterals literalResult
-  have patternNodes : patternState.nodes = state.nodes :=
+  obtain ⟨finalState, _, _, _, _, _, defaulting, _, literalValidation, _, _, _,
+      resultEq⟩ := finalize_success_witness success
+  have finalOrigins := defaultTargets_integerLiterals defaulting
+  have finalNodes : finalState.nodes = state.nodes :=
     congrArg TypedSource.nodes
-      (defaultIntegerPatternTargets_toTypedSource (roots := roots) patternResult)
-  have finalNodes : finalState.nodes = patternState.nodes :=
-    congrArg TypedSource.nodes
-      (defaultIntegerLiteralTargets_toTypedSource (roots := roots) literalResult)
+      (defaultTargets_toTypedSource (roots := roots) defaulting)
   have fits := validateIntegerLiteralTargets_success_fits literalValidation
   subst result
   intro origin member node source resolution nodeMember identity form
   have finalMember : origin ∈ finalState.integerLiterals := by
-    rw [finalOrigins, patternOrigins]
+    rw [finalOrigins]
     exact member
   have finalNode : Node.expression node ∈ finalState.nodes := by
-    rw [finalNodes, patternNodes]
+    rw [finalNodes]
     exact nodeMember
   simpa [State.resolve, TypeSystem.InferState.resolve] using
     literalNodesFit_member (fits origin finalMember) finalNode identity form
 
-/-- Finalization may extend the inference substitution while defaulting
-numeric targets, but it cannot invalidate a type equality already established
-by the input state. -/
+/-- Finalization may extend the inference substitution while fixing weak
+trait arguments and defaulting numeric targets, but it cannot invalidate a type
+equality already established by the input state. -/
 theorem finalize_preserves_resolve_eq
     {context : Context} {type left right : Ty} {state : State}
     {roots : List NodeId} {result : Result}
     (equal : state.resolve left = state.resolve right)
     (success : finalize context type state roots = .ok result) :
     result.substitution.apply left = result.substitution.apply right := by
-  obtain ⟨patternState, finalState, _, _, _, _, _, patternResult,
-      literalResult, _, _, _, _, resultEq⟩ := finalize_success_witness success
-  have patternEqual :=
-    defaultIntegerPatternTargets_preserves_resolve_eq equal patternResult
-  have finalEqual :=
-    defaultIntegerLiteralTargets_preserves_resolve_eq patternEqual literalResult
+  obtain ⟨finalState, _, _, _, _, _, defaulting, _, _, _, _, _, resultEq⟩ :=
+    finalize_success_witness success
+  have finalEqual := defaultTargets_preserves_resolve_eq equal defaulting
   subst result
   exact finalEqual
 
@@ -2761,7 +3080,7 @@ theorem finalize_type
     {result : Result}
     (success : finalize context type state roots = .ok result) :
     result.type = result.substitution.apply type := by
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, resultEq⟩ :=
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, resultEq⟩ :=
     finalize_success_witness success
   subst result
   rfl
@@ -2774,11 +3093,10 @@ theorem finalize_typedSource
     (success : finalize context type state roots = .ok result) :
     result.typedSource =
       (state.toTypedSource roots).applySubstitution result.substitution := by
-  obtain ⟨patternState, _, _, _, _, _, _, patternResult, literalResult, _,
-      _, _, _, resultEq⟩ := finalize_success_witness success
+  obtain ⟨_, _, _, _, _, _, defaulting, _, _, _, _, _, resultEq⟩ :=
+    finalize_success_witness success
   subst result
-  rw [defaultIntegerLiteralTargets_toTypedSource literalResult,
-    defaultIntegerPatternTargets_toTypedSource patternResult]
+  rw [defaultTargets_toTypedSource defaulting]
 
 /-- Finalization preserves the declaration owning the inferred source. -/
 theorem finalize_typedSource_owner

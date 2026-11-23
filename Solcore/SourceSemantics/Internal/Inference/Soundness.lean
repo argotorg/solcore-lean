@@ -26786,14 +26786,11 @@ theorem finalize_template_evidence
   intro row member template
   have initialTemplate : row.id ∈ state.localSchemeAssumptions :=
     (finalize_templateIdsAligned aligned success row.id).mp template
-  obtain ⟨patternState, finalState, requirements, _, _, _, _, patternResult,
-      literalResult, _, _, _, _, requirementsResult, resultEq⟩ :=
+  obtain ⟨finalState, requirements, _, _, _, _, defaulting, _, _, _, _,
+      requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have finalTemplate : row.id ∈ finalState.localSchemeAssumptions := by
-    rw [Detail.defaultIntegerLiteralTargets_localSchemeAssumptions
-      literalResult,
-      Detail.defaultIntegerPatternTargets_localSchemeAssumptions
-        patternResult]
+    rw [Detail.defaultTargets_localSchemeAssumptions defaulting]
     exact initialTemplate
   subst result
   exact solveRequirements_template_evidence requirementsResult row member
@@ -26854,9 +26851,8 @@ theorem finalize_scopedRequirementLedgerWellFormed
     ScopedRequirementLedgerWellFormed
       (finalizedRequirementContext inferenceContext result)
       result.typedSource := by
-  obtain ⟨patternState, finalState, solved, _, _, trackingValidation, _,
-      patternDefault, literalDefault, _, _, ownershipValidation,
-      scopeValidation, requirementsSolved, resultEq⟩ :=
+  obtain ⟨finalState, solved, _, _, trackingValidation, _, defaulting, _, _,
+      ownershipValidation, scopeValidation, requirementsSolved, resultEq⟩ :=
     Detail.finalize_success_witness success
   have aligned := finalize_templateIdsAligned_validated success
   have templateOwnership := finalize_localSchemeTemplateOwnership success
@@ -26864,11 +26860,8 @@ theorem finalize_scopedRequirementLedgerWellFormed
     Detail.validateSourceRequirementOwnership_success ownershipValidation
   subst result
   have assumptionsEq : finalState.localSchemeAssumptions =
-      state.localSchemeAssumptions := by
-    rw [Detail.defaultIntegerLiteralTargets_localSchemeAssumptions
-      literalDefault,
-      Detail.defaultIntegerPatternTargets_localSchemeAssumptions
-        patternDefault]
+      state.localSchemeAssumptions :=
+    Detail.defaultTargets_localSchemeAssumptions defaulting
   have templateIff : ∀ requirement,
       requirement ∈ finalState.requirements →
       (requirement.id ∈ finalState.localSchemeAssumptions ↔
@@ -26962,8 +26955,8 @@ theorem finalize_requirementOwnership
       semanticContext.solvedRequirements = result.solvedRequirements)
     (success : Detail.finalize inferenceContext type state roots = .ok result) :
     RequirementOwnership semanticContext result.typedSource := by
-  obtain ⟨_, finalState, solved, _, _, _, _, _, _, _, _,
-      ownershipValidation, _, requirementsSolved, resultEq⟩ :=
+  obtain ⟨finalState, solved, _, _, _, _, _, _, _, ownershipValidation, _,
+      requirementsSolved, resultEq⟩ :=
     Detail.finalize_success_witness success
   have validated :=
     Detail.validateSourceRequirementOwnership_success ownershipValidation
@@ -27507,11 +27500,8 @@ def ofFinalize
     FinalInferenceResources inferenceContext type state roots result := by
   let witness := Detail.finalize_success_witness success
   have requirementsEq :
-      witness.finalState.requirements = state.requirements := by
-    rw [Detail.defaultIntegerLiteralTargets_requirements
-      witness.literalDefault,
-      Detail.defaultIntegerPatternTargets_requirements
-        witness.patternDefault]
+      witness.finalState.requirements = state.requirements :=
+    Detail.defaultTargets_requirements witness.defaulting
   have substitutionEq :
       result.substitution = witness.finalState.inference.substitution :=
     congrArg Frontend.SourceInference.Result.substitution witness.result_eq
@@ -27549,25 +27539,8 @@ def ofFinalize
     array_indexes_fit := finalize_arrayIndexesFit success
   }
   · intro ready
-    have originsBelow := Detail.finalize_numericOriginsBelowNext success
-    have patternProperties :=
-      Detail.defaultIntegerPatternTargets_inferenceProperties ready
-        originsBelow.1 witness.patternDefault
-    have patternLiteralOrigins :=
-      Detail.defaultIntegerPatternTargets_integerLiterals
-        witness.patternDefault
-    have literalOriginsBelow : ∀ origin ∈ witness.patternState.integerLiterals,
-        origin.metavariable.index < witness.patternState.inference.next := by
-      intro origin member
-      have inputMember : origin ∈ state.integerLiterals := by
-        rw [patternLiteralOrigins] at member
-        exact member
-      exact Nat.lt_of_lt_of_le (originsBelow.2 origin inputMember)
-        patternProperties.1.next_le
-    have literalProperties :=
-      Detail.defaultIntegerLiteralTargets_inferenceProperties
-        patternProperties.2 literalOriginsBelow witness.literalDefault
-    exact patternProperties.1.trans literalProperties.1
+    exact (Detail.defaultTargets_inferenceProperties ready
+      (Detail.finalize_numericOriginsBelowNext success) witness.defaulting).1
   · rw [solvedEq]
     exact witness.requirementsSolved
 
@@ -28296,9 +28269,8 @@ theorem finalize_integerLiteralValid_of_mem
       (finalizedRequirementContext inferenceContext result)
       source
       (resolution.applySubstitution result.substitution) := by
-  obtain ⟨patternState, finalState, requirements, _, _, _, ledgerValidation,
-      patternResult, literalResult, _, literalValidation, _,
-      _, requirementsResult, resultEq⟩ :=
+  obtain ⟨finalState, requirements, _, _, _, ledgerValidation, defaulting, _,
+      literalValidation, _, _, requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
   have ledger :=
     Detail.validateIntegerLiteralLedger_success_correspondence
@@ -28306,8 +28278,7 @@ theorem finalize_integerLiteralValid_of_mem
   obtain ⟨decoded, origin, originMember, _, targetEq, _, requirementMember⟩ :=
     ledger node source resolution member form_eq
   have finalOriginMember : origin ∈ finalState.integerLiterals := by
-    rw [Detail.defaultIntegerLiteralTargets_integerLiterals literalResult,
-      Detail.defaultIntegerPatternTargets_integerLiterals patternResult]
+    rw [Detail.defaultTargets_integerLiterals defaulting]
     exact originMember
   have supported :=
     Detail.validateIntegerLiteralTargets_success_supported literalValidation
@@ -28315,8 +28286,7 @@ theorem finalize_integerLiteralValid_of_mem
   have finalRequirementMember :
       ({ id := resolution.requirement, predicate := resolution.predicate } :
         Requirement) ∈ finalState.requirements := by
-    rw [Detail.defaultIntegerLiteralTargets_requirements literalResult,
-      Detail.defaultIntegerPatternTargets_requirements patternResult]
+    rw [Detail.defaultTargets_requirements defaulting]
     exact requirementMember
   subst result
   refine integerLiteralValid_of_solved decoded ?_ finalRequirementMember
@@ -28338,15 +28308,11 @@ theorem finalize_solvedRequirementsValid
     SolvedRequirementsValid
       (finalizedRequirementContext inferenceContext result)
       result.solvedRequirements := by
-  obtain ⟨patternState, finalState, requirements, _, _, _, _, patternResult,
-      literalResult, _, _, _, _, requirementsResult, resultEq⟩ :=
+  obtain ⟨finalState, requirements, _, _, _, _, defaulting, _, _, _, _,
+      requirementsResult, resultEq⟩ :=
     Detail.finalize_success_witness success
-  have patternOrdinary : patternState.localSchemeAssumptions = [] := by
-    rw [Detail.defaultIntegerPatternTargets_localSchemeAssumptions
-      patternResult, ordinary]
   have finalOrdinary : finalState.localSchemeAssumptions = [] := by
-    rw [Detail.defaultIntegerLiteralTargets_localSchemeAssumptions
-      literalResult, patternOrdinary]
+    rw [Detail.defaultTargets_localSchemeAssumptions defaulting, ordinary]
   subst result
   apply solveRequirements_ordinary_sound
     (inferenceContext := inferenceContext)
