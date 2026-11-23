@@ -377,6 +377,25 @@ private def importsInModule (module : ProgramModule) : List Syntax.ImportDecl :=
     | .importDecl declaration => some declaration
     | _ => none
 
+/-- The module path of one import declaration, whatever its form. -/
+private def importDeclarationPath (declaration : Syntax.ImportDecl) : Syntax.ModulePath :=
+  match declaration.value with
+  | .plain path => path
+  | .namespace path _ => path
+  | .wildcard path _ => path
+  | .selected _ path _ => path
+
+/-- The program modules that a module's imports name, whatever the import's form, in import
+order. An import of an unknown module or of one of upstream's std modules names none. These are
+the modules whose scope upstream's lookup of an operator's trait method searches after the
+module's own (`lookup_imported_operator_class_method`). -/
+def ProgramEnvironment.importedModules (environment : ProgramEnvironment)
+    (importer : Workspace.ModuleId) : List Workspace.ModuleId :=
+  match environment.modules.find? fun module => decide (module.id = importer) with
+  | none => []
+  | some module => (importsInModule module).filterMap fun declaration =>
+      resolveProgramModulePath? environment importer (importDeclarationPath declaration)
+
 private def buildProgramImportsFrom
     (environment : ProgramEnvironment) (interfaces : ProgramInterfaces)
     (importer : Workspace.ModuleId)

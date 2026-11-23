@@ -98,6 +98,12 @@ inductive Error where
   | coercionDepthLimit (source target : Ty) (limit : Nat)
   | importVisibility (errors : List ProgramImportError)
   | operatorNotSupported (operator : String) (operand : Ty)
+  /-- An operator that took its builtin at `word` or a fixed-width type beside an
+  implementation of its trait there that declares the operator's method and that upstream's
+  lookup reaches (`validateBuiltinOperatorUses`): the builtin and the program's meaning meet,
+  so the use is refused, the user's rule of 2026-11-23. -/
+  | builtinOperatorMeetsImplementation (trait : String)
+      (implementation : Resolved.DeclarationId) (operand : Ty)
   | numericOriginOutOfBounds
       (metavariable : TypeVarId) (next : Nat)
   | unsupportedIntegerLiteralTarget

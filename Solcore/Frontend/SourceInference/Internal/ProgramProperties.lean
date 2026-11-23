@@ -2077,6 +2077,10 @@ structure FinalizeSuccessWitness
   checked after the assignment targets. -/
   placeElementValidation :
     validatePlaceElements finalState finalState.nodes = .ok ()
+  /-- No operator that took its builtin at `word` or a fixed-width type meets a
+  program's implementation of its trait there, checked after the element places. -/
+  builtinOperatorValidation :
+    validateBuiltinOperatorUses context finalState finalState.nodes = .ok ()
 
 /-- Invert one successful `finalize` call into all successful pipeline stages
 and the exact result assembled from the final state. -/
@@ -2191,6 +2195,22 @@ def finalize_success_witness
                         | ok placeElementValue =>
                             cases placeElementValue
                             rfl
+                      have builtinOperatorResult :
+                          validateBuiltinOperatorUses context finalState
+                            finalState.nodes = .ok () := by
+                        cases builtinOperatorRun :
+                            validateBuiltinOperatorUses context finalState
+                              finalState.nodes with
+                        | error error =>
+                            simp [graphValidation, localIdentityValidation,
+                              templateTrackingValidation, ledgerResult,
+                              patternResult, literalResult,
+                              patternValidationResult, literalValidationResult,
+                              assignmentResult, placeElementResult, builtinOperatorRun, bind,
+                              Except.bind] at success
+                        | ok builtinOperatorValue =>
+                            cases builtinOperatorValue
+                            rfl
                       cases ownershipResult :
                           validateSourceRequirementOwnership
                             (finalState.toTypedSource roots)
@@ -2200,7 +2220,7 @@ def finalize_success_witness
                             templateTrackingValidation, ledgerResult,
                             patternResult, literalResult,
                             patternValidationResult, literalValidationResult, assignmentResult,
-                            placeElementResult,
+                            placeElementResult, builtinOperatorResult,
                             ownershipResult, bind, Except.bind] at success
                       | ok ownershipValidation =>
                           cases ownershipValidation
@@ -2212,7 +2232,7 @@ def finalize_success_witness
                                 templateTrackingValidation, ledgerResult,
                                 patternResult, literalResult,
                                 patternValidationResult,
-                                literalValidationResult, assignmentResult, placeElementResult,
+                                literalValidationResult, assignmentResult, placeElementResult, builtinOperatorResult,
                                 ownershipResult,
                                 rangeResult, bind, Except.bind]
                                 at success
@@ -2228,7 +2248,7 @@ def finalize_success_witness
                                     templateTrackingValidation, ledgerResult,
                                     patternResult, literalResult,
                                     patternValidationResult,
-                                    literalValidationResult, assignmentResult, placeElementResult,
+                                    literalValidationResult, assignmentResult, placeElementResult, builtinOperatorResult,
                                     ownershipResult,
                                     rangeResult, captureResult, bind,
                                     Except.bind]
@@ -2248,7 +2268,7 @@ def finalize_success_witness
                                         ledgerResult, patternResult,
                                         literalResult, patternValidationResult,
                                         literalValidationResult, assignmentResult,
-                                        placeElementResult,
+                                        placeElementResult, builtinOperatorResult,
                                         ownershipResult, rangeResult,
                                         captureResult, templateScopeResult,
                                         bind, Except.bind]
@@ -2266,7 +2286,7 @@ def finalize_success_witness
                                             literalResult,
                                             patternValidationResult,
                                             literalValidationResult, assignmentResult,
-                                            placeElementResult,
+                                            placeElementResult, builtinOperatorResult,
                                             ownershipResult, rangeResult,
                                             captureResult, templateScopeResult,
                                             requirementsResult, bind,
@@ -2280,7 +2300,7 @@ def finalize_success_witness
                                             literalResult,
                                             patternValidationResult,
                                             literalValidationResult, assignmentResult,
-                                            placeElementResult,
+                                            placeElementResult, builtinOperatorResult,
                                             ownershipResult, rangeResult,
                                             captureResult, templateScopeResult,
                                             requirementsResult, bind,
@@ -2309,6 +2329,7 @@ def finalize_success_witness
                                               requirementsResult
                                             assignmentValidation := assignmentResult
                                             placeElementValidation := placeElementResult
+                                            builtinOperatorValidation := builtinOperatorResult
                                             result_eq := rfl
                                           }
 
@@ -2415,6 +2436,7 @@ private theorem finalize_success_witness_rangeFormationValidation
   simp only [witness.literalValidation] at pipeline
   simp only [witness.assignmentValidation] at pipeline
   simp only [witness.placeElementValidation] at pipeline
+  simp only [witness.builtinOperatorValidation] at pipeline
   simp only [witness.requirementOwnershipValidation] at pipeline
   cases validation : validateFinalSubstitutionRangeFormation context
       witness.finalState.inference.substitution with
@@ -2521,6 +2543,7 @@ theorem finalize_validateSourceLocalSchemeNoCapture
     simp only [witness.literalValidation] at pipeline
     simp only [witness.assignmentValidation] at pipeline
     simp only [witness.placeElementValidation] at pipeline
+    simp only [witness.builtinOperatorValidation] at pipeline
     simp only [witness.requirementOwnershipValidation] at pipeline
     have rangeValidation :
         validateFinalSubstitutionRangeFormation context

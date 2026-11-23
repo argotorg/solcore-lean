@@ -812,6 +812,151 @@ def validatePlaceElements (state : State) : List Node → Except Error Unit
       validatePlaceElementNode state node
       validatePlaceElements state rest
 
+/-- Whether Lean's operators are builtins at a type: `word` and the twelve fixed-width types. -/
+def builtinOperatorOperand (type : Ty) : Bool :=
+  match type with
+  | .constructor (.builtin .word) => true
+  | .constructor (.builtin (.fixed _)) => true
+  | _ => false
+
+/-- The binary operator a compound assignment applies, as upstream reads `x op= e` as
+`x = x op e`; none for `=` and the shifts, whose traits are refused where they are implemented at
+a builtin type (`shiftImplementationAtBuiltinType`). -/
+def compoundBinaryOperator? : Syntax.ValueAssignOp → Option Syntax.BinaryOp
+  | .add => some .add
+  | .subtract => some .subtract
+  | .multiply => some .multiply
+  | .divide => some .divide
+  | .modulo => some .modulo
+  | .bitAnd => some .bitAnd
+  | .bitXor => some .bitXor
+  | .bitOr => some .bitOr
+  | .uncheckedAdd => some .uncheckedAdd
+  | .uncheckedSubtract => some .uncheckedSubtract
+  | .uncheckedMultiply => some .uncheckedMultiply
+  | .uncheckedDivide => some .uncheckedDivide
+  | .uncheckedModulo => some .uncheckedModulo
+  | .equal | .shiftLeft | .shiftRight => none
+
+/-- Whether a module's scope sees a trait: declared there, or bound there by an import. -/
+def traitInModuleScope (environment : ProgramEnvironment) (module : Workspace.ModuleId)
+    (trait : Resolved.DeclarationId) (name : String) : Bool :=
+  decide (trait.moduleId = module) ||
+    match buildProgramImports environment module with
+    | .ok visibility => (visibility.traitsNamed name).any fun declaration =>
+        decide (declaration.id = trait)
+    | .error _ => false
+
+/-- Whether upstream's lookup of an operator's trait method reaches a trait from a module
+(`lookup_operator_class_method`): the module's own scope, else the scope of each module it
+imports, whatever the import's form (`lookup_imported_operator_class_method`), together with the
+modules that one imports, whose names its imports qualify (`unique_visible_class_method`). -/
+def operatorTraitReachable (environment : ProgramEnvironment) (module : Workspace.ModuleId)
+    (trait : Resolved.DeclarationId) (name : String) : Bool :=
+  traitInModuleScope environment module trait name ||
+    (environment.importedModules module).any fun imported =>
+      traitInModuleScope environment imported trait name ||
+        (environment.importedModules imported).any fun further =>
+          decide (trait.moduleId = further)
+
+/-- The implementation that meets an operator's builtin at `operand`, if any: one at `operand`
+or at a type parameter, of a trait named `traitName` that declares `methodName` and that
+upstream's lookup reaches from the module being checked (`operatorTraitReachable`). A trait of
+that name without the method gives the operator no second meaning. -/
+def builtinOperatorMeeting? (context : Context) (traitName methodName : String) (operand : Ty) :
+    Option ProgramImplementationSignature :=
+  if !builtinOperatorOperand operand then none
+  else
+    context.signatures.implementations.find? fun implementation =>
+      let atOperand := (match implementation.head.subject with
+        | .parameter _ => true
+        | subject => decide (subject = operand))
+      atOperand && (match implementation.head.trait with
+        | .builtin _ => false
+        | .declaration trait =>
+            context.signatures.traits.any (fun signature =>
+              decide (signature.id = trait) && signature.name == traitName &&
+                signature.methods.any (·.name == methodName)) &&
+              operatorTraitReachable context.environment context.scope.currentModule trait
+                traitName)
+
+/-- Refuse a use that took an operator's builtin at `operand` where a program's implementation
+meets it (`builtinOperatorMeeting?`). -/
+def validateBuiltinOperatorUse (context : Context) (traitName methodName : String)
+    (operand : Ty) : Except Error Unit :=
+  match builtinOperatorMeeting? context traitName methodName operand with
+  | some implementation =>
+      throw (.builtinOperatorMeetsImplementation traitName implementation.id operand)
+  | none => .ok ()
+
+/-- The builtin use of one value assignment: a compound operator at its target's type, which
+Lean always takes as the builtin there (`compoundOperandType`). -/
+def validateBuiltinCompoundUse (context : Context) (state : State)
+    (assignment : AssignmentResolution) (operator : Syntax.ValueAssignOp) : Except Error Unit :=
+  match compoundBinaryOperator? operator with
+  | some binary =>
+      match binaryOperatorDispatch binary with
+      | .traitMethod traitName methodName =>
+          validateBuiltinOperatorUse context traitName methodName
+            (state.resolve assignment.target.type)
+      | .function _ => .ok ()
+  | none => .ok ()
+
+/-- The builtin uses among a `for` header's items. -/
+def validateBuiltinOperatorForItems (context : Context) (state : State) :
+    List ForItemForm → Except Error Unit
+  | [] => .ok ()
+  | .assignValue assignment operator _ :: rest => do
+      validateBuiltinCompoundUse context state assignment operator
+      validateBuiltinOperatorForItems context state rest
+  | .assignBitNot assignment :: rest => do
+      validateBuiltinOperatorUse context "BitNot" "bnot" (state.resolve assignment.target.type)
+      validateBuiltinOperatorForItems context state rest
+  | _ :: rest => validateBuiltinOperatorForItems context state rest
+
+/-- The builtin uses of one node: a binary or unary trait-method operator that took its builtin,
+its node owning no requirement but its coercions', as an unchecked operator's builtin is told
+apart (`validateUncheckedOperand`); a compound assignment; an in-place `~`, which upstream reads
+as `x = ~x`; and a `for` header's items. -/
+def validateBuiltinOperatorNode (context : Context) (state : State) : Node → Except Error Unit
+  | .expression node =>
+      let builtin := decide (node.requirements = coercionRequirements node.coercions)
+      match node.form with
+      | .binary left operator _ =>
+          match binaryOperatorDispatch operator, expressionTypeAt? state left with
+          | .traitMethod traitName methodName, some operand =>
+              if builtin then validateBuiltinOperatorUse context traitName methodName operand
+              else .ok ()
+          | _, _ => .ok ()
+      | .unary operator inner =>
+          match unaryOperatorDispatch operator, expressionTypeAt? state inner with
+          | .traitMethod traitName methodName, some operand =>
+              if builtin then validateBuiltinOperatorUse context traitName methodName operand
+              else .ok ()
+          | _, _ => .ok ()
+      | _ => .ok ()
+  | .statement node =>
+      match node.form with
+      | .assignValue assignment operator _ =>
+          validateBuiltinCompoundUse context state assignment operator
+      | .assignBitNot assignment =>
+          validateBuiltinOperatorUse context "BitNot" "bnot" (state.resolve assignment.target.type)
+      | .forLoop initializer _ post _ => do
+          validateBuiltinOperatorForItems context state initializer
+          validateBuiltinOperatorForItems context state post
+      | _ => .ok ()
+
+/-- Refuse every use where an operator's builtin at `word` or a fixed-width type meets a
+program's implementation of its trait there, the user's rule of 2026-11-23 ("使用箇所に絞る"),
+checked after the element places. Generic code, which runs the implementation as upstream does,
+and a trait of the operator's name without its method refuse nothing. -/
+def validateBuiltinOperatorUses (context : Context) (state : State) :
+    List Node → Except Error Unit
+  | [] => .ok ()
+  | node :: rest => do
+      validateBuiltinOperatorNode context state node
+      validateBuiltinOperatorUses context state rest
+
 /-- Check the source spelling and exact inference metadata retained by one
 integer-literal expression node. -/
 def validateIntegerLiteralNode (state : State) : Node → Except Error Unit
@@ -871,6 +1016,7 @@ def finalize (context : Context) (type : Ty) (state : State)
   validateIntegerLiteralTargets state state.integerLiterals
   validateAssignmentTargets state state.nodes
   validatePlaceElements state state.nodes
+  validateBuiltinOperatorUses context state state.nodes
   validateSourceRequirementOwnership (state.toTypedSource roots)
     state.requirements
   let substitution := state.inference.substitution

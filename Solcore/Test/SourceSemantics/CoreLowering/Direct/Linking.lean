@@ -30,7 +30,7 @@ private def workspace : Workspace.RawWorkspace := {
       "}",
       "impl Eq<Word> {",
       "  function eq(left: Word, right: Word) returns (Bool) {",
-      "    return !(left == right);",
+      "    return left < right || right < left;",
       "  }",
       "}",
       "impl Add<Word> {",
@@ -808,8 +808,8 @@ private def testStrictRuntimeBinaryEvidence : IO Unit := do
         some (.done expected [])))
       s!"{name} did not execute its selected strict binary method body"
 
-private def testRuntimeBitNotEvidence : IO Unit := do
-  let program ← checkedProgramOf (String.intercalate "\n" [
+/-- `BitNot<Word>` whose `bnot` gives 91, and a generic `~` that runs it at `Word`. -/
+private def bitNotEvidenceSource : List String := [
     "trait BitNot<T> {",
     "  function bnot(value: T) returns (T);",
     "}",
@@ -821,9 +821,10 @@ private def testRuntimeBitNotEvidence : IO Unit := do
     "}",
     "function evidenceEntry(value: Word) returns (Word) {",
     "  return bitNotWithEvidence(value);",
-    "}",
-    "function builtinEntry(value: Word) returns (Word) { return ~value; }"
-  ])
+    "}"]
+
+private def testRuntimeBitNotEvidence : IO Unit := do
+  let program ← checkedProgramOf (String.intercalate "\n" bitNotEvidenceSource)
   let bitNotWithEvidence ← signatureNamed program "bitNotWithEvidence"
   let genericFunction ← functionFor program bitNotWithEvidence
   let unary ← match firstUnaryNode? genericFunction.typedBody.nodes with
@@ -873,26 +874,25 @@ private def testRuntimeBitNotEvidence : IO Unit := do
       some (.done (.word (word 91)) [])))
     "BitNot evidence did not execute the selected nonstandard bnot method body"
 
-  let builtinEntry ← signatureNamed program "builtinEntry"
-  let builtinFunction ← functionFor program builtinEntry
-  let builtinUnary ← match firstUnaryNode? builtinFunction.typedBody.nodes with
-    | some unary => pure unary
-    | none => throw (IO.userError "builtin ~ occurrence was absent")
-  assertTrue (builtinUnary.requirements.isEmpty)
-    "concrete Word ~ unexpectedly acquired BitNot evidence"
-  let builtinOutcome ← runOrThrow "builtin bit-not" program
-    [monomorphicRequest builtinEntry] 1
-  let builtinLinked ← linkOrThrow "builtin bit-not" program builtinOutcome
-  let builtinKey : SourceSpecialization.SpecializationKey := {
-    declaration := builtinEntry.id
-    arguments := []
+  -- A concrete `~` at `Word` beside the implementation is where the builtin and the program's
+  -- `bnot` meet, so the user's rule of 2026-11-23 refuses it (`validateBuiltinOperatorUses`).
+  let concrete : Workspace.RawWorkspace := {
+    entry := "main.solc"
+    mainSources := [{ path := "main.solc", content := "pragma solcore;\n" ++
+      String.intercalate "\n" (bitNotEvidenceSource ++
+        ["function builtinEntry(value: Word) returns (Word) { return ~value; }"]) }]
+    externalLibraries := []
   }
-  let linkedBuiltin ← match builtinLinked.findEntry? builtinKey with
-    | some entry => pure entry
-    | none => throw (IO.userError "builtin bit-not: linked root was absent")
-  assertTrue (decide (linkedBuiltin.run? [.word (word 7)] 2048 =
-      some (.done (.word (word 7).bitNot) [])))
-    "concrete Word ~ stopped using the builtin compatibility operation"
+  match checkProgram concrete with
+  | .error [.inference failure] =>
+      match failure.error with
+      | .builtinOperatorMeetsImplementation trait _ operand =>
+          assertTrue (trait == "BitNot" && operand == .word)
+            "concrete Word ~ was refused for another trait or type"
+      | error => throw (IO.userError s!"concrete Word ~ was refused for {reprStr error}")
+  | .error errors => throw (IO.userError
+      s!"concrete Word ~ beside BitNot<Word> was refused otherwise: {reprStr errors}")
+  | .ok _ => throw (IO.userError "concrete Word ~ beside BitNot<Word> was accepted")
 
 private structure NamedOperatorCase where
   entryName : String

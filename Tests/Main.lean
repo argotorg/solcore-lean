@@ -70,6 +70,7 @@ import Solcore.Test.Frontend.PublicBoundary
 import Solcore.Test.Frontend.Programs
 import Solcore.Test.Frontend.ImportParity
 import Solcore.Test.Frontend.StdOpcodes
+import Solcore.Test.Frontend.OperatorImplementations
 import Solcore.Test.Frontend.LocalExpressions
 import Solcore.Test.Frontend.WordOperators
 import Solcore.Test.Core.LocalFragments
@@ -1021,6 +1022,7 @@ def staticSemanticsSpineTests : IO Unit := do
   testProgramImports
   Tests.ImportParity.testImportParity
   Tests.StdOpcodes.run
+  Tests.OperatorImplementations.run
   Tests.ImportedResolutionConsumers.testImportedResolutionConsumers
   testProgramLoading
   TypedTraitResolution.testTypedTraitResolution

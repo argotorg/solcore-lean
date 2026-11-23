@@ -1247,6 +1247,10 @@ inductive ProgramSignatureError where
   /-- An implementation with a declared condition no smaller than its head, the
   Patterson condition (`SC0213`). -/
   | pattersonCondition (implementation : Resolved.DeclarationId)
+  /-- An implementation of a trait named `Shl` or `Shr` that declares `bshl` or `bshr`, at `word`
+  or a fixed-width type, where Lean's shifts are builtins that never take it, even in generic
+  code (`shiftImplementationErrors`). -/
+  | shiftImplementationAtBuiltinType (implementation : Resolved.DeclarationId)
   | duplicateDataConstructor
       (dataType : Resolved.DeclarationId) (name : String)
       (firstIndex duplicateIndex : Nat)
@@ -1280,6 +1284,7 @@ private def programSignatureErrorDeclaration :
   | .invalidDefaultImplementation implementation => implementation
   | .coverageCondition implementation _ => implementation
   | .pattersonCondition implementation => implementation
+  | .shiftImplementationAtBuiltinType implementation => implementation
   | .duplicateDataConstructor dataType _ _ _ => dataType
 
 private def declarationParameters
@@ -2910,6 +2915,26 @@ private def implementationConditionErrors (environment : ProgramEnvironment)
         [ProgramSignatureError.pattersonCondition implementation.id]
       else [])
 
+/-- Lean's shifts are builtins at `word` and the twelve fixed-width types and never take a
+program's trait, even in generic code, where upstream's `<<` and `>>` run `Shl.bshl` and
+`Shr.bshr`. So an implementation of a trait named `Shl` or `Shr` that declares that method, at one
+of those types, is refused where it is declared, the user's rule of 2026-11-23; one at a
+program's own type stays, as Lean refuses a shift there. -/
+private def shiftImplementationErrors (traits : List ProgramTraitSignature)
+    (implementations : List ProgramImplementationSignature) : List ProgramSignatureError :=
+  implementations.filterMap fun implementation =>
+    let shiftTrait := traits.any fun trait =>
+      decide (implementation.head.trait = ProgramTraitId.declaration trait.id) &&
+        ((trait.name == "Shl" && trait.methods.any (·.name == "bshl")) ||
+          (trait.name == "Shr" && trait.methods.any (·.name == "bshr")))
+    let builtinSubject := match implementation.head.subject with
+      | .constructor (.builtin .word) => true
+      | .constructor (.builtin (.fixed _)) => true
+      | _ => false
+    if shiftTrait && builtinSubject then
+      some (.shiftImplementationAtBuiltinType implementation.id)
+    else none
+
 /-- The closure keeps every condition and every method predicate, and adds to a
 method only predicates that its closed trait method or the closed conditions
 provide, so the method catalog stays validated against the closed traits. -/
@@ -3029,7 +3054,8 @@ def buildProgramSignatures (environment : ProgramEnvironment) :
   let collectedErrors := traitState.errors ++ nonCascadingErrors ++
     overlappingDefaultErrors [] state.implementations ++
     orphanImplementationErrors environment state.implementations ++
-    implementationConditionErrors environment state.implementations
+    implementationConditionErrors environment state.implementations ++
+    shiftImplementationErrors traitState.traits state.implementations
   let errors := environment.declarations.flatMap fun declaration =>
     collectedErrors.filter fun error =>
       decide (programSignatureErrorDeclaration error = declaration.id)

@@ -246,7 +246,8 @@ private def testQualified : IO Unit := do
 /-- `primAddWord`, upstream's builtin term for word addition: in scope with no import and beside
 std and `std.opcodes`, below a program's own function of its name, whatever its type, and an import
 that binds the name, and refused at a wrong arity or type. As a value it is the builtin, which
-upstream's checker types and its Hull lowering refuses (`SC0422`). -/
+upstream's checker types and its Hull lowering refuses (`SC0422`). Upstream's own `Add<word>`
+through it runs in generic code; a concrete `+` beside it is refused (`OperatorImplementations`). -/
 private def testPrimAddWord : IO Unit := do
   expectResults "no import" [] [] "primAddWord(a0, 1)" [10, 0]
   expectResults "literal operands" [] [] "primAddWord(1, 2)" [3, 3]
@@ -260,11 +261,12 @@ private def testPrimAddWord : IO Unit := do
     ["function primAddWord(x: bool) returns (word) { return 5; }"] "primAddWord(true)" [5, 5]
   expectResults "an import binding the name" ["import { sub as primAddWord } from std.opcodes;"] []
     "primAddWord(a0, 1)" [8, maximum - 1]
-  expectResults "upstream's Add at word through primAddWord" []
+  expectResults "upstream's Add at word through primAddWord, in generic code" []
     ["trait Add<t> { function add(l: t, r: t) returns (t); }",
       "impl Add<word> { function add(l: word, r: word) returns (word) " ++
-        "{ return primAddWord(l, r); } }"]
-    "a0 + 1" [10, 0]
+        "{ return primAddWord(l, r); } }",
+      "function twice<t>(x: t) returns (t) where t: Add { return x + x; }"]
+    "twice(a0)" [18, maximum - 1]
   expectResults "a value" [] [apply] "apply(primAddWord, a0)" [13, 3]
   expectRefused "a wrong arity" [] [] "primAddWord(a0)" "check"
   expectRefused "a bool operand" [] [] "primAddWord(true, a0)" "check"
