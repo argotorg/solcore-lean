@@ -546,8 +546,12 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
   lengths, reads (through slices too), the four shapes of a slice, `new`, literals,
   `toArray(a[s:e])`, and `CanStore.load(lidx(a, i))` and `CanStore.store(lidx(a, i), v)` with
   the `lidx` made on the spot. `new` and literals need their default elements' layouts
-  registered, which the site check reads. The array forms are nested sites; the accepted
-  rows that run them follow.
+  registered, which the site check reads. The array forms are nested sites, `lidx(a, i)`
+  among them wherever it stands, and accepted rows run them through the public root. A memref
+  is related as the pair of its array's Core cell and its position's word (`ValueRep.memref`);
+  like an array's reference it is a view (`ViewCarrier.memref`), so no comparison takes one.
+  `CanStore.load(r)` and `CanStore.store(r, v)` are sites only when `r` is a `lidx(a, i)` made
+  on the spot (`MemrefSite`). The element writes are under way.
   The unit takes a memref only as the operand of a load or a store, and `toArray` only of
   slices made where it is called: the Source has no rule for a load, a store or a copy out of
   bounds, and the bound of a stored memref or slice would be an invariant over the heap. The
@@ -706,7 +710,7 @@ rejection in 22 to 24, as it could the open `Typedef` call. Nothing schedules it
 - **The meaning proofs for arrays** ([decision 6](#6-meaning-proofs)). The unit that relates array
   objects to their Core cells is under way, and changes the build-on statements that decision 6
   lists. The staged traces, the whole-cell heap relation, the payload relation, the compiler
-  receipts and the heads have the array forms; the accepted rows and a head for `lidx` alone
+  receipts, the heads and the accepted rows have the array expressions; the element writes
   follow. Arrays stay outside `StaticProfile`.
 - **User collections indexed through `RValueIdxAccess`.** They need std's traits, and `Typedef` at
   a type parameter, which is row 1's open gap. Generic code over std's `Length` (`where c: Length`)

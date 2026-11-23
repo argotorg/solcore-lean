@@ -252,8 +252,8 @@ work, under "Remaining work for the second goal". In short:
   outside `StaticProfile` and the meaning proofs
   ([decision 6](../design/memory-arrays-slices.md#6-meaning-proofs)). Relating array objects to
   their Core cells, and slices and memrefs to their Core products, is under way: the staged
-  traces, the heap and payload relations, the compiler receipts and the heads have the arrays,
-  and the accepted rows do not yet.
+  traces, the heap and payload relations, the compiler receipts, the heads and the accepted
+  rows have the array expressions, and the element writes do not yet.
 
 ## Pitfalls
 

@@ -252,8 +252,9 @@ Direct calls are in [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/A
   than two elements (`Nested.tuple`), as compiler sites of their own (`TupleSite`), since the
   first subset's sites stop at pairs, and constructor applications (`Nested.constructor`), as
   compiler sites whose parameter substitution is closed (`ConstructorSite`). So are the memory
-  array forms (`Nested.array`, over `ArraySite`), and a load or a store through a `lidx` made
-  on the spot (`Nested.memrefLoad`, `Nested.memrefStore`, over `MemrefSite`).
+  array forms (`Nested.array`, over `ArraySite`), `lidx(a, i)` among them wherever it stands,
+  and a load or a store through a `lidx` made on the spot (`Nested.memrefLoad`,
+  `Nested.memrefStore`, over `MemrefSite`).
 - **Authority.** `CellAwareInvocationAcceptedCallAuthority` derives `Ports` from a complete
   inventory: a call receipt's global slot names an indexed function, and the inventory's header for
   that index gives the `Port`.

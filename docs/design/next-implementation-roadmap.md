@@ -158,8 +158,9 @@ The last two are recorded without investigation, and the generators avoid them.
    ([decision 6](memory-arrays-slices.md#6-meaning-proofs)): the staged traces have the array
    forms and the element writes, the selected preservation keeps every array object's length,
    the heap and payload relations relate array objects and views to their Core cells, and the
-   compiler's receipts and the cell-aware heads take the array forms as nested sites. Next
-   come the accepted rows and a head for `lidx` alone. This unit takes a memref only as the
+   compiler's receipts and the cell-aware heads take the array forms as nested sites, which
+   accepted rows run through the public root. Next come the element writes. This unit takes
+   a memref only as the
    operand of a load or a store, and `toArray` only of slices made where it is called. The
    public compiler rejects a root whose signature holds an array, a slice or a memref, and a
    session does not call a handle whose type holds one
