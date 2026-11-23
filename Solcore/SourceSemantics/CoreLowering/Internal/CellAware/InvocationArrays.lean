@@ -6,8 +6,9 @@ import Solcore.SourceSemantics.CoreLowering.Internal.Compatible.ArrayEvaluation
 
 The heads of the memory array forms in one actual body invocation: each form's staged trace, its
 children's meanings and its Core run (`CompatibleArrayEvaluation`), with the arrays' cells in the whole-cell
-heap relation. Main declarations: `CellAwareInvocationArrayBounds.length_preserves`, `length_reflects`,
-`index_preserves` and `index_reflects`.
+heap relation. Main declarations: `CellAwareInvocationArrayBounds.length_preserves`, `index_preserves`
+and, for the four shapes of a slice's bounds, `slice_range_preserves` to `slice_whole_preserves`, each with its
+`reflects`.
 -/
 
 section
@@ -325,13 +326,74 @@ theorem pair_values {childrenSize : Nat} {first second : ExpressionId} {values :
       refine ⟨_, _, _, _, _, Size.child_lt_stepSize (by simp), ?_, rfl, head, second⟩
       exact Nat.lt_trans (Size.child_lt_stepSize (List.Mem.head [Size.stepSize []])) (Size.child_lt_stepSize (by simp))
 
+private theorem lt_tail {child tail head : Nat} (inner : child < tail) : child < Size.stepSize [head, tail] :=
+  Nat.lt_trans inner (Size.child_lt_stepSize (by simp))
+
+/-- Three children's list: the first faults, or it evaluates and the second faults, or both evaluate and the
+third faults. -/
+theorem triple_fault {childrenSize : Nat} {first second third : ExpressionId} {failure : Failure}
+    (failed : Size.Expressions program registry childrenSize invocation context environment before
+      [first, second, third] (.fault failure) after) :
+    (∃ firstSize, firstSize < childrenSize ∧
+      Size.Expression program registry firstSize invocation context environment before first (.fault failure) after) ∨
+    (∃ firstSize secondSize value middle, firstSize < childrenSize ∧ secondSize < childrenSize ∧
+      Size.Expression program registry firstSize invocation context environment before first (.value value) middle ∧
+      Size.Expression program registry secondSize invocation context environment middle second (.fault failure)
+        after) ∨
+    ∃ firstSize secondSize thirdSize firstValue secondValue firstHeap secondHeap,
+      firstSize < childrenSize ∧ secondSize < childrenSize ∧ thirdSize < childrenSize ∧
+      Size.Expression program registry firstSize invocation context environment before first (.value firstValue)
+        firstHeap ∧
+      Size.Expression program registry secondSize invocation context environment firstHeap second
+        (.value secondValue) secondHeap ∧
+      Size.Expression program registry thirdSize invocation context environment secondHeap third (.fault failure)
+        after := by
+  cases failed with
+  | headFault head => exact .inl ⟨_, Size.child_lt_stepSize (by simp), head⟩
+  | tailFault head tail =>
+    cases tail with
+    | headFault second =>
+      exact .inr (.inl ⟨_, _, _, _, Size.child_lt_stepSize (by simp),
+        lt_tail (Size.child_lt_stepSize (List.Mem.head [])), head, second⟩)
+    | tailFault second rest =>
+      cases rest with
+      | headFault third =>
+        exact .inr (.inr ⟨_, _, _, _, _, _, _, Size.child_lt_stepSize (by simp),
+          lt_tail (Size.child_lt_stepSize (by simp)), lt_tail (lt_tail (Size.child_lt_stepSize (List.Mem.head []))),
+          head, second, third⟩)
+      | tailFault _ last => cases last
+
+/-- Three children's list: all evaluate, in order. -/
+theorem triple_values {childrenSize : Nat} {first second third : ExpressionId} {values : List Dynamic.Value}
+    (evaluated : Size.Expressions program registry childrenSize invocation context environment before
+      [first, second, third] (.values values) after) :
+    ∃ firstSize secondSize thirdSize firstValue secondValue thirdValue firstHeap secondHeap,
+      firstSize < childrenSize ∧ secondSize < childrenSize ∧ thirdSize < childrenSize ∧
+      values = [firstValue, secondValue, thirdValue] ∧
+      Size.Expression program registry firstSize invocation context environment before first (.value firstValue)
+        firstHeap ∧
+      Size.Expression program registry secondSize invocation context environment firstHeap second
+        (.value secondValue) secondHeap ∧
+      Size.Expression program registry thirdSize invocation context environment secondHeap third
+        (.value thirdValue) after := by
+  cases evaluated with
+  | cons head tail =>
+    cases tail with
+    | cons second rest =>
+      cases rest with
+      | cons third last =>
+        cases last
+        exact ⟨_, _, _, _, _, _, _, _, Size.child_lt_stepSize (by simp), lt_tail (Size.child_lt_stepSize (by simp)),
+          lt_tail (lt_tail (Size.child_lt_stepSize (List.Mem.head [Size.stepSize []]))), rfl, head, second, third⟩
+
 end Solcore.SourceSemantics.CoreLowering.CellAwareArraySourceInversion
 end
 
 section
 /-! A read through a view on Core values runs as its Source read does: through each slice to the array's
 cell, whose entry or default at the position represents the Source element, or `0x32` at a position the view
-has no element at. The read appends only its lookup's cells. -/
+has no element at. The read appends only its lookup's cells. A view's length is its Source length's word, and a
+slice's bounds check is the Source's on the words of its bounds. -/
 set_option autoImplicit false
 set_option maxHeartbeats 4000000
 namespace Solcore.SourceSemantics.CoreLowering.CellAwareArrayReads
@@ -693,6 +755,148 @@ theorem reads_cases (heaps : GenericHeap.CellHeapRepresents cells mapping world 
 
 end Reads
 
+theorem ofNatModulo_sub {first last : Nat} (ordered : first ≤ last) (small : last < wordModulus) :
+    (Word.ofNatModulo last).sub (Word.ofNatModulo first) = Word.ofNatModulo (last - first) := by
+  have firstSmall : first < wordModulus := by omega
+  apply Fin.ext
+  have le : Word.ofNatModulo first ≤ Word.ofNatModulo last := by
+    rw [Fin.le_def, ofNatModulo_val firstSmall, ofNatModulo_val small]
+    exact ordered
+  rw [Word.sub, Fin.sub_val_of_le le, ofNatModulo_val small, ofNatModulo_val firstSmall,
+    ofNatModulo_val (by omega)]
+
+theorem zero_ofNatModulo : Word.zero = Word.ofNatModulo 0 := rfl
+
+/-- The bounds check of a slice inside its base: the base, the start and the length. -/
+theorem sliced_within {sliceType : Ty} {view : Value} {first last count : Nat}
+    (lastSmall : last < wordModulus) (countSmall : count < wordModulus) (ordered : first ≤ last)
+    (within : last ≤ count) :
+    sliced sliceType view (Word.ofNatModulo first) (Word.ofNatModulo last) (Word.ofNatModulo count) =
+      .inRight .word (.pair view (.pair (.word (Word.ofNatModulo first)) (.word (Word.ofNatModulo (last - first))))) := by
+  have firstSmall : first < wordModulus := by omega
+  have notAbove : ¬ Word.ofNatModulo first > Word.ofNatModulo last := by
+    intro above
+    have := (ofNatModulo_lt lastSmall firstSmall).mp above
+    omega
+  have notBeyond : ¬ Word.ofNatModulo last > Word.ofNatModulo count := by
+    intro above
+    have := (ofNatModulo_lt countSmall lastSmall).mp above
+    omega
+  unfold sliced
+  rw [if_pos ⟨notAbove, notBeyond⟩, ofNatModulo_sub ordered lastSmall]
+
+/-- A slice that is not inside its base panics with `0x32`. -/
+theorem sliced_outside {sliceType : Ty} {view : Value} {first last count : Nat}
+    (firstSmall : first < wordModulus) (lastSmall : last < wordModulus) (countSmall : count < wordModulus)
+    (outside : last < first ∨ count < last) :
+    sliced sliceType view (Word.ofNatModulo first) (Word.ofNatModulo last) (Word.ofNatModulo count) =
+      .inLeft sliceType (.word outOfBounds) := by
+  have bad : ¬ (¬ Word.ofNatModulo first > Word.ofNatModulo last ∧
+      ¬ Word.ofNatModulo last > Word.ofNatModulo count) := by
+    rintro ⟨notAbove, notBeyond⟩
+    rcases outside with below | beyond
+    · exact notAbove ((ofNatModulo_lt lastSmall firstSmall).mpr below)
+    · exact notBeyond ((ofNatModulo_lt countSmall lastSmall).mpr beyond)
+  unfold sliced
+  rw [if_neg bad]
+
+theorem viewShape_carrier {type : Ty} {depth : Nat} {layout : OrderedMapping.Layout}
+    (shaped : SourceCoreDataExpressions.viewShape? type = some (depth, layout)) : ViewCarrier type := by
+  induction type using SourceCoreDataExpressions.viewShape?.induct generalizing depth layout with
+  | case1 => exact .cell _
+  | case2 base ih =>
+    simp only [SourceCoreDataExpressions.viewShape?] at shaped
+    cases inner : SourceCoreDataExpressions.viewShape? base with
+    | none => simp [inner] at shaped
+    | some pair =>
+      obtain ⟨innerDepth, innerLayout⟩ := pair
+      exact .slice (ih inner)
+  | case3 => simp [SourceCoreDataExpressions.viewShape?] at shaped
+
+theorem allowed_cases {type : TypeSystem.Ty} (allowed : type.arraySliceBaseAllowed = true) :
+    (∃ element, type = TypeSystem.Ty.array element) ∨ ∃ base, type = TypeSystem.Ty.arraySlice base := by
+  unfold TypeSystem.Ty.arraySliceBaseAllowed at allowed
+  split at allowed
+  · exact .inl ⟨_, rfl⟩
+  · exact .inr ⟨_, rfl⟩
+  · cases allowed
+
+section Lengths
+variable {checked : SourceCoreCompatibleCatalog.Checked} {layout : OrderedMapping.Layout}
+  {registry : SourceCoreRawMetadata.Registry}
+  {ambient : AmbientDefinitions checked.catalog.definitions} {functions : FunctionModel checked.catalog ambient}
+  {instances : GeneralizedLocalDescriptorHeap.InstanceModel ambient.definitions}
+  {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
+
+local notation "cells" => GeneralizedLocalDescriptorHeap.cellModel
+  (CompatibleAmbientHeap.payloadModel checked registry functions) instances
+
+/-- A view's Source length, on its representation: the Core length, within a word. -/
+theorem length_preserve (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
+    {view : Dynamic.Value} {count : Nat} (counted : Dynamic.ViewLength heap view count)
+    {repType : TypeSystem.Ty} {coreView : Value} {coreType : Ty} {depth : Nat}
+    (rep : ValueRep checked registry functions mapping world repType view coreView coreType)
+    (shape : SourceCoreDataExpressions.viewShape? coreType = some (depth, layout)) :
+    CompatibleArrayEvaluation.ViewLength store depth coreView (Word.ofNatModulo count) ∧ count < wordModulus := by
+  cases counted with
+  | @array arrayElement location cell elements read stored =>
+    obtain ⟨target, payload, identity, rfl, rfl, mapped, typed, _⟩ := arrayRef_fields rep rfl
+    simp only [SourceCoreDataExpressions.viewShape?, Option.some.injEq, Prod.mk.injEq] at shape
+    obtain ⟨rfl, rfl⟩ := shape
+    obtain ⟨actualCell, coreValue, sourceRead, coreRead, stands⟩ := heaps.cells mapped
+    have sameCell := Dynamic.Heap.Reads.functional read sourceRead
+    subst sameCell
+    cases stands with
+    | optional optionalTyped _ =>
+      have impossible := optionalTyped.symm.trans typed
+      simp [Core.OptionalCell.cellType] at impossible
+    | array _ arrayed =>
+      obtain ⟨element', elements', payload', identity', default, entries, cellEq, valueEq, _, contents⟩ := arrayed
+      subst cellEq
+      simp only [Option.some.injEq, Dynamic.Value.arrayObject.injEq] at stored
+      obtain ⟨sameElement, sameElements⟩ := stored
+      subst element' elements'
+      subst valueEq
+      exact ⟨.array coreRead, contents.bounded⟩
+  | @slice base start length =>
+    obtain ⟨baseType, baseValue, baseCore, rfl, rfl, _, bounded, _, _⟩ := arraySlice_fields rep rfl
+    cases depth with
+    | zero =>
+      cases innerShape : SourceCoreDataExpressions.viewShape? baseCore <;>
+        simp [SourceCoreDataExpressions.viewShape?, innerShape] at shape
+    | succ depth => exact ⟨.slice, by omega⟩
+
+/-- A view the heap types at a type a slice may be taken of has a length. -/
+theorem length_cases (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
+    {sourceContext : SourceSemantics.Context} {viewType repType : TypeSystem.Ty} {view : Dynamic.Value}
+    {coreView : Value} {coreType : Ty} (allowed : viewType.arraySliceBaseAllowed = true)
+    (rep : ValueRep checked registry functions mapping world repType view coreView coreType)
+    (runtime : SourceCoreRawMetadata.runtimeType repType = SourceCoreRawMetadata.runtimeType viewType)
+    (typed : Dynamic.ValueHasType sourceContext heap view viewType) :
+    ∃ count, Dynamic.ViewLength heap view count := by
+  rcases allowed_cases allowed with ⟨element, rfl⟩ | ⟨base, rfl⟩
+  · obtain ⟨element', location, rfl⟩ := array_source rep runtime
+    obtain ⟨target, payload, identity, rfl, rfl, mapped, typedTarget, _⟩ := arrayRef_fields rep rfl
+    rcases typed.arrayRef_inv with ⟨_, cell, read, cellType⟩ | ⟨_, impossible, _⟩
+    · obtain ⟨actualCell, coreValue, sourceRead, coreRead, stands⟩ := heaps.cells mapped
+      have sameCell := Dynamic.Heap.Reads.functional read sourceRead
+      subst sameCell
+      cases stands with
+      | optional optionalTyped _ =>
+        have impossible := optionalTyped.symm.trans typedTarget
+        simp [Core.OptionalCell.cellType] at impossible
+      | array _ arrayed =>
+        obtain ⟨element'', elements, _, _, _, _, cellEq, _, _, _⟩ := arrayed
+        subst cellEq
+        simp only [TypeSystem.Ty.arrayObject, TypeSystem.Ty.application.injEq, true_and] at cellType
+        subst cellType
+        exact ⟨_, .array read rfl⟩
+    · simp [TypeSystem.Ty.array] at impossible
+  · obtain ⟨inner, start, length, rfl⟩ := slice_source rep runtime
+    exact ⟨_, .slice⟩
+
+end Lengths
+
 end Solcore.SourceSemantics.CoreLowering.CellAwareArrayReads
 end
 
@@ -764,6 +968,41 @@ theorem viewIndex_split (layout : OrderedMapping.Layout) (comparison : Expr) (de
   cases depth with
   | zero => exact ⟨_, rfl⟩
   | succ depth => exact ⟨_, rfl⟩
+
+/-- A slice is of its base's type, a type a slice may be taken of, and its present bounds are `uint256`s. -/
+theorem slice_source_types {source : TypedSource} {context : SourceSemantics.Context} {id base : ExpressionId}
+    {start stop : Option ExpressionId} {node : ExpressionNode} (unique : NodeOccurrencesUnique source)
+    (found : source.lookupExpression? id = some node) (form : node.form = .arraySlice base start stop)
+    (coercions : node.coercions = []) (typed : ExpressionHasType source context id node.type) :
+    ∃ baseType, node.type = TypeSystem.Ty.arraySlice baseType ∧ baseType.arraySliceBaseAllowed = true ∧
+      ExpressionHasType source context base baseType ∧
+      ExpressionsHaveTypes source context (start.toList ++ stop.toList)
+        (List.replicate (start.toList ++ stop.toList).length (.fixed .uint256)) := by
+  generalize typeEq : node.type = type at typed
+  cases typed with
+  | @intro _ _ actualNode rawType plan contains raw _ _ _ valid =>
+    have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+    subst actualNode
+    have path := valid.outputPath
+    rw [coercions] at path
+    cases path
+    rw [form] at raw
+    generalize resultEq : node.type = result at raw
+    cases raw with
+    | arraySlice allowed baseTyped boundsTyped => exact ⟨_, rfl, allowed, baseTyped, boundsTyped⟩
+
+theorem replicate_typed {source : TypedSource} {context : SourceSemantics.Context} {ids : List ExpressionId}
+    {type : TypeSystem.Ty} (typed : ExpressionsHaveTypes source context ids (List.replicate ids.length type)) :
+    ∀ id ∈ ids, ExpressionHasType source context id type := by
+  induction ids with
+  | nil => intro _ member; cases member
+  | cons head rest ih =>
+    cases typed with
+    | cons headTyped restTyped =>
+      intro id member
+      rcases List.mem_cons.mp member with rfl | inRest
+      · exact headTyped
+      · exact ih restTyped id inRest
 
 variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
   {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
@@ -1338,6 +1577,1168 @@ theorem index_reflects [RecursiveStageMeaning.FaultTokens faults] {children : Ge
                 .fault (RecursiveStageMeaning.FaultTokens.panic _), keyHeaps, firstMaps.trans maps,
                 firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata,
                 firstEffect.trans effect, reached, callerProtocol.trans firstRelated related⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- `a[s:e]`'s head: the base's, the start's and the stop's meanings, then the bounds check against the
+view's length. -/
+theorem slice_range_preserves [RecursiveStageMeaning.FaultTokens faults]
+    {children : GenericExpressionMeaning.Certificate} {start stop : ExpressionId} {startNode stopNode : ExpressionNode}
+    {depth : Nat} {layout : OrderedMapping.Layout} {startCode stopCode : SourceCoreBasic.LoweredExpr}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (.product first.type (.product .word .word)))
+    (form : node.form = .arraySlice base (some start) (some stop))
+    (baseFound : invocation.source.lookupExpression? base = some baseNode)
+    (startFound : invocation.source.lookupExpression? start = some startNode)
+    (stopFound : invocation.source.lookupExpression? stop = some stopNode)
+    (firstChild : children scope base first) (startChild : children scope start startCode)
+    (stopChild : children scope stop stopCode)
+    (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+    (code : lowered = ⟨.product first.type (.product .word .word),
+      SourceCoreDataExpressions.arraySlice first.type depth first.expression (some startCode.expression)
+        (some stopCode.expression)⟩)
+    (size : Nat)
+    (childMeaning : PreservesBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    PreservesAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ outcome after environments heaps locals agrees actualTyped initial admitted authority
+    physical owner ownerFrame trace
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨baseType, nodeType, allowed, baseTypedAt, boundsTyped⟩ :=
+    slice_source_types unique found form metadata.coercions sourceTyped
+  have baseTypeEq := CellAwareArraySourceInversion.typed_type unique baseFound baseTypedAt
+  have startTypeEq := CellAwareArraySourceInversion.typed_type unique startFound
+    (replicate_typed boundsTyped start (by simp))
+  have stopTypeEq := CellAwareArraySourceInversion.typed_type unique stopFound
+    (replicate_typed boundsTyped stop (by simp))
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have baseTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change base ∈ [base, start, stop]; simp) baseFound
+  have startTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change start ∈ [base, start, stop]; simp) startFound
+  have stopTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change stop ∈ [base, start, stop]; simp) stopFound
+  have firstIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ firstChild _ baseFound baseTyped
+  have startIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ startChild _ startFound startTyped
+  have stopIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ stopChild _ stopFound stopTyped
+  have carrier := CellAwareArrayReads.viewShape_carrier shaped
+  have raw : ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreDataExpressions.arraySlice first.type depth first.expression
+        (some startCode.expression) (some stopCode.expression)).rename ξ) value finalStore ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (.product first.type (.product .word .word)) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    rw [arraySlice_rename]
+    simp only [Option.map_some]
+    cases CellAwareArraySourceInversion.children unique found form rfl trace with
+    | fault failed smaller =>
+      rcases triple_fault failed with ⟨firstSize, firstSmaller, firstTrace⟩ |
+        ⟨firstSize, secondSize, baseSource, middle, firstSmaller, secondSmaller, firstTrace, secondTrace⟩ |
+        ⟨firstSize, secondSize, thirdSize, baseSource, startSource, firstHeap, secondHeap, firstSmaller,
+          secondSmaller, thirdSmaller, firstTrace, secondTrace, thirdTrace⟩
+      · obtain ⟨_, finalStore, finalMap, finalWorld, firstEval, represented, finalHeaps, maps, worlds, frame,
+          heapMetadata, effect, reached, related, _⟩ :=
+          firstIH firstSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+            owner ownerFrame firstTrace
+        cases represented with
+        | fault matched =>
+          exact ⟨_, finalStore, finalMap, finalWorld, arraySlice_base_failure firstEval, .fault matched, finalHeaps,
+            maps, worlds, frame, heapMetadata, effect, reached, related⟩
+      · obtain ⟨_, middleStore, middleMap, middleWorld, firstEval, represented, middleHeaps, firstMaps, firstWorlds,
+          firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
+          firstIH firstSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+            owner ownerFrame firstTrace
+        cases represented with
+        | @value _ coreValue payload =>
+          obtain ⟨_, finalStore, finalMap, finalWorld, secondEval, represented, finalHeaps, maps, worlds, frame,
+            heapMetadata, effect, reached, related, _⟩ :=
+            startIH secondSize (by omega) (environments.extend firstMaps firstWorlds) middleHeaps
+              (locals.mono firstMetadata) (agree_prefix agrees coreValue)
+              (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState firstPost.at_value.2
+              (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner ownerFrame secondTrace
+          cases represented with
+          | fault matched =>
+            rw [rename_prefix] at secondEval
+            exact ⟨_, finalStore, finalMap, finalWorld, arraySlice_both_start_failure firstEval secondEval,
+              .fault matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame,
+              firstMetadata.trans heapMetadata, firstEffect.trans effect, reached,
+              callerProtocol.trans firstRelated related⟩
+      · obtain ⟨_, middleStore, middleMap, middleWorld, firstEval, represented, middleHeaps, firstMaps, firstWorlds,
+          firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
+          firstIH firstSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+            owner ownerFrame firstTrace
+        cases represented with
+        | @value _ coreValue payload =>
+          obtain ⟨_, startStore, startMap, startWorld, secondEval, represented, startHeaps, secondMaps, secondWorlds,
+            secondFrame, secondMetadata, secondEffect, startState, secondRelated, secondPost⟩ :=
+            startIH secondSize (by omega) (environments.extend firstMaps firstWorlds) middleHeaps
+              (locals.mono firstMetadata) (agree_prefix agrees coreValue)
+              (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState firstPost.at_value.2
+              (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner ownerFrame secondTrace
+          cases represented with
+          | @value _ coreStart startPayload =>
+            rw [rename_prefix] at secondEval
+            rw [← startTypeEq] at startPayload
+            obtain ⟨startWord, rfl, rfl, _⟩ := index_word_fields (.fixed .uint256) startPayload
+            obtain ⟨_, finalStore, finalMap, finalWorld, thirdEval, represented, finalHeaps, maps, worlds, frame,
+              heapMetadata, effect, reached, related, _⟩ :=
+              stopIH thirdSize (by omega) ((environments.extend firstMaps firstWorlds).extend secondMaps secondWorlds)
+                startHeaps ((locals.mono firstMetadata).mono secondMetadata)
+                (agree_prefix (agree_prefix agrees coreValue) (.word startWord))
+                (.cons .word (.cons (payload.extend (.refl _) secondMaps secondWorlds).runtime_hasType
+                  (actualTyped.weaken (firstWorlds.trans secondWorlds))))
+                startState secondPost.at_value.2 ((authority.transport firstEffect).transport secondEffect)
+                ((physical.transport firstEffect firstFrame).transport secondEffect secondFrame) owner ownerFrame
+                thirdTrace
+            cases represented with
+            | fault matched =>
+              rw [rename_prefix, rename_prefix] at thirdEval
+              exact ⟨_, finalStore, finalMap, finalWorld,
+                arraySlice_both_stop_failure firstEval secondEval thirdEval, .fault matched, finalHeaps,
+                (firstMaps.trans secondMaps).trans maps, (firstWorlds.trans secondWorlds).trans worlds,
+                (firstFrame.trans secondFrame).trans frame, (firstMetadata.trans secondMetadata).trans heapMetadata,
+                (firstEffect.trans secondEffect).trans effect, reached,
+                callerProtocol.trans (callerProtocol.trans firstRelated secondRelated) related⟩
+    | result evaluated result smaller =>
+      obtain ⟨firstSize, secondSize, thirdSize, baseSource, startSource, stopSource, firstHeap, secondHeap,
+        firstSmaller, secondSmaller, thirdSmaller, rfl, firstTrace, secondTrace, thirdTrace⟩ := triple_values evaluated
+      obtain ⟨_, middleStore, middleMap, middleWorld, firstEval, represented, middleHeaps, firstMaps, firstWorlds,
+        firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
+        firstIH firstSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+          owner ownerFrame firstTrace
+      cases represented with
+      | @value _ coreValue payload =>
+        obtain ⟨_, startStore, startMap, startWorld, secondEval, represented, startHeaps, secondMaps, secondWorlds,
+          secondFrame, secondMetadata, secondEffect, startState, secondRelated, secondPost⟩ :=
+          startIH secondSize (by omega) (environments.extend firstMaps firstWorlds) middleHeaps
+            (locals.mono firstMetadata) (agree_prefix agrees coreValue)
+            (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState firstPost.at_value.2
+            (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner ownerFrame secondTrace
+        cases represented with
+        | @value _ coreStart startPayload =>
+          rw [rename_prefix] at secondEval
+          rw [← startTypeEq] at startPayload
+          obtain ⟨startWord, rfl, rfl, _⟩ := index_word_fields (.fixed .uint256) startPayload
+          obtain ⟨_, keyStore, keyMap, keyWorld, thirdEval, represented, keyHeaps, maps, worlds, frame,
+            heapMetadata, effect, reached, related, _⟩ :=
+            stopIH thirdSize (by omega) ((environments.extend firstMaps firstWorlds).extend secondMaps secondWorlds)
+              startHeaps ((locals.mono firstMetadata).mono secondMetadata)
+              (agree_prefix (agree_prefix agrees coreValue) (.word startWord))
+              (.cons .word (.cons (payload.extend (.refl _) secondMaps secondWorlds).runtime_hasType
+                (actualTyped.weaken (firstWorlds.trans secondWorlds))))
+              startState secondPost.at_value.2 ((authority.transport firstEffect).transport secondEffect)
+              ((physical.transport firstEffect firstFrame).transport secondEffect secondFrame) owner ownerFrame
+              thirdTrace
+          cases represented with
+          | @value _ coreStop stopPayload =>
+            rw [rename_prefix, rename_prefix] at thirdEval
+            rw [← stopTypeEq] at stopPayload
+            obtain ⟨stopWord, rfl, rfl, _⟩ := index_word_fields (.fixed .uint256) stopPayload
+            have basePayload := payload.extend (.refl _) (secondMaps.trans maps) (secondWorlds.trans worlds)
+            have startEq := CellAwareArrayReads.ofNatModulo_self startWord
+            have stopEq := CellAwareArrayReads.ofNatModulo_self stopWord
+            cases result with
+            | arraySlice counted chosen ordered within =>
+              cases chosen
+              obtain ⟨measured, countSmall⟩ := CellAwareArrayReads.length_preserve keyHeaps counted basePayload shaped
+              have coreRun := arraySlice_both (baseType := first.type) firstEval secondEval thirdEval measured
+              rw [← startEq, ← stopEq, CellAwareArrayReads.sliced_within stopWord.isLt countSmall ordered within]
+                at coreRun
+              exact ⟨_, keyStore, keyMap, keyWorld, coreRun,
+                .value (by rw [nodeType, baseTypeEq]; exact .arraySlice basePayload (by omega) carrier), keyHeaps,
+                (firstMaps.trans secondMaps).trans maps, (firstWorlds.trans secondWorlds).trans worlds,
+                (firstFrame.trans secondFrame).trans frame, (firstMetadata.trans secondMetadata).trans heapMetadata,
+                (firstEffect.trans secondEffect).trans effect, reached,
+                callerProtocol.trans (callerProtocol.trans firstRelated secondRelated) related⟩
+            | arraySliceBoundType member notWord _ =>
+              simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+              rcases member with rfl | rfl <;> exact (notWord trivial).elim
+            | arraySliceOutOfBounds counted chosen outside =>
+              cases chosen
+              obtain ⟨measured, countSmall⟩ := CellAwareArrayReads.length_preserve keyHeaps counted basePayload shaped
+              have coreRun := arraySlice_both (baseType := first.type) firstEval secondEval thirdEval measured
+              rw [← startEq, ← stopEq,
+                CellAwareArrayReads.sliced_outside startWord.isLt stopWord.isLt countSmall outside] at coreRun
+              exact ⟨_, keyStore, keyMap, keyWorld, coreRun, .fault (RecursiveStageMeaning.FaultTokens.panic _),
+                keyHeaps, (firstMaps.trans secondMaps).trans maps, (firstWorlds.trans secondWorlds).trans worlds,
+                (firstFrame.trans secondFrame).trans frame, (firstMetadata.trans secondMetadata).trans heapMetadata,
+                (firstEffect.trans secondEffect).trans effect, reached,
+                callerProtocol.trans (callerProtocol.trans firstRelated secondRelated) related⟩
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- `a[s:e]`'s head, reflected: the children's Core runs give their Source runs, and the bounds check is the
+Source's against the view's length. -/
+theorem slice_range_reflects [RecursiveStageMeaning.FaultTokens faults]
+    {children : GenericExpressionMeaning.Certificate} {start stop : ExpressionId} {startNode stopNode : ExpressionNode}
+    {depth : Nat} {layout : OrderedMapping.Layout} {startCode stopCode : SourceCoreBasic.LoweredExpr}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (.product first.type (.product .word .word)))
+    (form : node.form = .arraySlice base (some start) (some stop))
+    (baseFound : invocation.source.lookupExpression? base = some baseNode)
+    (startFound : invocation.source.lookupExpression? start = some startNode)
+    (stopFound : invocation.source.lookupExpression? stop = some stopNode)
+    (firstChild : children scope base first) (startChild : children scope start startCode)
+    (stopChild : children scope stop stopCode)
+    (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+    (code : lowered = ⟨.product first.type (.product .word .word),
+      SourceCoreDataExpressions.arraySlice first.type depth first.expression (some startCode.expression)
+        (some stopCode.expression)⟩)
+    (size : Nat)
+    (childMeaning : ReflectsBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    ReflectsAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ value finalStore environments heaps locals agrees actualTyped initial admitted
+    authority physical owner ownerFrame evaluated
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨baseType, nodeType, allowed, baseTypedAt, boundsTyped⟩ :=
+    slice_source_types unique found form metadata.coercions sourceTyped
+  have baseTypeEq := CellAwareArraySourceInversion.typed_type unique baseFound baseTypedAt
+  have startTypeEq := CellAwareArraySourceInversion.typed_type unique startFound
+    (replicate_typed boundsTyped start (by simp))
+  have stopTypeEq := CellAwareArraySourceInversion.typed_type unique stopFound
+    (replicate_typed boundsTyped stop (by simp))
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have baseTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change base ∈ [base, start, stop]; simp) baseFound
+  have startTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change start ∈ [base, start, stop]; simp) startFound
+  have stopTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change stop ∈ [base, start, stop]; simp) stopFound
+  have firstIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ firstChild _ baseFound baseTyped
+  have startIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ startChild _ startFound startTyped
+  have stopIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ stopChild _ stopFound stopTyped
+  have occurrence : Staging.Recursive.Occurrence invocation id (.arraySlice base (some start) (some stop)) :=
+    ⟨_, lookupExpression?_sound metadata.found, form, metadata.requirements, metadata.coercions⟩
+  have carrier := CellAwareArrayReads.viewShape_carrier shaped
+  have raw : ∃ sourceSize outcome after finalMap finalWorld,
+      Staging.Recursive.Size.Expression program registry sourceSize invocation context environment before id
+        outcome after ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (.product first.type (.product .word .word)) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    change EvaluationSize size actual store ((SourceCoreDataExpressions.arraySlice first.type depth first.expression
+      (some startCode.expression) (some stopCode.expression)).rename ξ) value finalStore at evaluated
+    rw [arraySlice_rename] at evaluated
+    simp only [Option.map_some] at evaluated
+    have complete := evaluated.sound
+    unfold SourceCoreDataExpressions.arraySlice at evaluated
+    cases evaluated with
+    | caseLeft firstEvaluation branch =>
+      obtain ⟨firstSize, firstOutcome, after, finalMap, finalWorld, firstTrace, represented, finalHeaps, maps, worlds,
+        frame, heapMetadata, effect, reached, related, _post⟩ :=
+        firstIH _ (by omega) environments heaps locals agrees actualTyped initial admitted authority physical owner
+          ownerFrame firstEvaluation
+      cases represented with
+      | fault matched =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
+          (arraySlice_base_failure (baseType := first.type) (depth := depth) (start := some _) (stop := some _)
+            firstEvaluation.sound)
+        exact ⟨_, _, after, finalMap, finalWorld, .arrayFault occurrence rfl (.headFault firstTrace),
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+    | caseRight firstEvaluation branch =>
+      obtain ⟨firstSize, firstOutcome, middle, middleMap, middleWorld, firstTrace, represented, middleHeaps, firstMaps,
+        firstWorlds, firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
+        firstIH _ (by omega) environments heaps locals agrees actualTyped initial admitted authority physical owner
+          ownerFrame firstEvaluation
+      cases represented with
+      | @value baseSource coreValue payload =>
+        cases branch with
+        | caseLeft secondEvaluation rest =>
+          have shifted := secondEvaluation
+          rw [← rename_prefix] at shifted
+          obtain ⟨secondSize, secondOutcome, after, finalMap, finalWorld, secondTrace, represented, finalHeaps, maps,
+            worlds, frame, heapMetadata, effect, reached, related, _post⟩ :=
+            startIH _ (by omega) (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+              (agree_prefix agrees _) (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState
+              firstPost.at_value.2 (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner
+              ownerFrame shifted
+          cases represented with
+          | fault matched =>
+            obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
+              (arraySlice_both_start_failure (baseType := first.type) (depth := depth) firstEvaluation.sound
+                secondEvaluation.sound)
+            exact ⟨_, _, after, finalMap, finalWorld,
+              .arrayFault occurrence rfl (.tailFault firstTrace (.headFault secondTrace)), .fault matched, finalHeaps,
+              firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata,
+              firstEffect.trans effect, reached, callerProtocol.trans firstRelated related⟩
+        | caseRight secondEvaluation rest =>
+          have shifted := secondEvaluation
+          rw [← rename_prefix] at shifted
+          obtain ⟨secondSize, secondOutcome, startHeap, startMap, startWorld, secondTrace, represented, startHeaps,
+            secondMaps, secondWorlds, secondFrame, secondMetadata, secondEffect, startState, secondRelated,
+            secondPost⟩ :=
+            startIH _ (by omega) (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+              (agree_prefix agrees _) (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState
+              firstPost.at_value.2 (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner
+              ownerFrame shifted
+          cases represented with
+          | @value startSource coreStart startPayload =>
+            rw [← startTypeEq] at startPayload
+            obtain ⟨startWord, rfl, rfl, _⟩ := index_word_fields (.fixed .uint256) startPayload
+            cases rest with
+            | caseLeft thirdEvaluation last =>
+              have shiftedStop := thirdEvaluation
+              rw [← rename_prefix, ← rename_prefix] at shiftedStop
+              obtain ⟨thirdSize, thirdOutcome, after, finalMap, finalWorld, thirdTrace, represented, finalHeaps, maps,
+                worlds, frame, heapMetadata, effect, reached, related, _post⟩ :=
+                stopIH _ (by omega) ((environments.extend firstMaps firstWorlds).extend secondMaps secondWorlds)
+                  startHeaps ((locals.mono firstMetadata).mono secondMetadata)
+                  (agree_prefix (agree_prefix agrees _) (.word startWord))
+                  (.cons .word (.cons (payload.extend (.refl _) secondMaps secondWorlds).runtime_hasType
+                    (actualTyped.weaken (firstWorlds.trans secondWorlds))))
+                  startState secondPost.at_value.2 ((authority.transport firstEffect).transport secondEffect)
+                  ((physical.transport firstEffect firstFrame).transport secondEffect secondFrame) owner ownerFrame
+                  shiftedStop
+              cases represented with
+              | fault matched =>
+                obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
+                  (arraySlice_both_stop_failure (baseType := first.type) (depth := depth) firstEvaluation.sound
+                    secondEvaluation.sound thirdEvaluation.sound)
+                exact ⟨_, _, after, finalMap, finalWorld,
+                  .arrayFault occurrence rfl (.tailFault firstTrace (.tailFault secondTrace (.headFault thirdTrace))),
+                  .fault matched, finalHeaps, (firstMaps.trans secondMaps).trans maps,
+                  (firstWorlds.trans secondWorlds).trans worlds, (firstFrame.trans secondFrame).trans frame,
+                  (firstMetadata.trans secondMetadata).trans heapMetadata, (firstEffect.trans secondEffect).trans effect,
+                  reached, callerProtocol.trans (callerProtocol.trans firstRelated secondRelated) related⟩
+            | caseRight thirdEvaluation last =>
+              have shiftedStop := thirdEvaluation
+              rw [← rename_prefix, ← rename_prefix] at shiftedStop
+              obtain ⟨thirdSize, thirdOutcome, after, keyMap, keyWorld, thirdTrace, represented, keyHeaps, maps,
+                worlds, frame, heapMetadata, effect, reached, related, _post⟩ :=
+                stopIH _ (by omega) ((environments.extend firstMaps firstWorlds).extend secondMaps secondWorlds)
+                  startHeaps ((locals.mono firstMetadata).mono secondMetadata)
+                  (agree_prefix (agree_prefix agrees _) (.word startWord))
+                  (.cons .word (.cons (payload.extend (.refl _) secondMaps secondWorlds).runtime_hasType
+                    (actualTyped.weaken (firstWorlds.trans secondWorlds))))
+                  startState secondPost.at_value.2 ((authority.transport firstEffect).transport secondEffect)
+                  ((physical.transport firstEffect firstFrame).transport secondEffect secondFrame) owner ownerFrame
+                  shiftedStop
+              cases represented with
+              | @value stopSource coreStop stopPayload =>
+                rw [← stopTypeEq] at stopPayload
+                obtain ⟨stopWord, rfl, rfl, _⟩ := index_word_fields (.fixed .uint256) stopPayload
+                have basePayload := payload.extend (.refl _) (secondMaps.trans maps) (secondWorlds.trans worlds)
+                have baseRuntime : SourceCoreRawMetadata.runtimeType baseNode.type =
+                    SourceCoreRawMetadata.runtimeType baseType := by rw [baseTypeEq]
+                have baseSourceTyped := Dynamic.ValueHasType.mono (secondMetadata.trans heapMetadata)
+                  firstPost.at_value.1
+                rw [← baseTypeEq] at baseSourceTyped
+                obtain ⟨count, counted⟩ := CellAwareArrayReads.length_cases keyHeaps allowed basePayload baseRuntime
+                  baseSourceTyped
+                obtain ⟨measured, countSmall⟩ := CellAwareArrayReads.length_preserve keyHeaps counted basePayload shaped
+                have coreRun := arraySlice_both (baseType := first.type) firstEvaluation.sound secondEvaluation.sound
+                  thirdEvaluation.sound measured
+                have startEq := CellAwareArrayReads.ofNatModulo_self startWord
+                have stopEq := CellAwareArrayReads.ofNatModulo_self stopWord
+                rw [← startEq, ← stopEq] at coreRun
+                by_cases inside : startWord.val ≤ stopWord.val ∧ stopWord.val ≤ count
+                · rw [CellAwareArrayReads.sliced_within stopWord.isLt countSmall inside.1 inside.2] at coreRun
+                  obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete coreRun
+                  exact ⟨_, _, after, keyMap, keyWorld,
+                    .arrayResult occurrence rfl (.cons firstTrace (.cons secondTrace (.cons thirdTrace .nil)))
+                      (.arraySlice counted .range inside.1 inside.2),
+                    .value (by rw [nodeType, baseTypeEq]; exact .arraySlice basePayload (by omega) carrier), keyHeaps,
+                    (firstMaps.trans secondMaps).trans maps, (firstWorlds.trans secondWorlds).trans worlds,
+                    (firstFrame.trans secondFrame).trans frame, (firstMetadata.trans secondMetadata).trans heapMetadata,
+                    (firstEffect.trans secondEffect).trans effect, reached,
+                    callerProtocol.trans (callerProtocol.trans firstRelated secondRelated) related⟩
+                · have outside : stopWord.val < startWord.val ∨ count < stopWord.val := by omega
+                  rw [CellAwareArrayReads.sliced_outside startWord.isLt stopWord.isLt countSmall outside] at coreRun
+                  obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete coreRun
+                  exact ⟨_, _, after, keyMap, keyWorld,
+                    .arrayResult occurrence rfl (.cons firstTrace (.cons secondTrace (.cons thirdTrace .nil)))
+                      (.arraySliceOutOfBounds counted .range outside),
+                    .fault (RecursiveStageMeaning.FaultTokens.panic _), keyHeaps,
+                    (firstMaps.trans secondMaps).trans maps, (firstWorlds.trans secondWorlds).trans worlds,
+                    (firstFrame.trans secondFrame).trans frame, (firstMetadata.trans secondMetadata).trans heapMetadata,
+                    (firstEffect.trans secondEffect).trans effect, reached,
+                    callerProtocol.trans (callerProtocol.trans firstRelated secondRelated) related⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- `a[s:]`'s head: the base's and the start's meanings, then the bounds check, with the view's length as the stop. -/
+theorem slice_from_preserves [RecursiveStageMeaning.FaultTokens faults]
+    {children : GenericExpressionMeaning.Certificate} {bound : ExpressionId} {boundNode : ExpressionNode}
+    {depth : Nat} {layout : OrderedMapping.Layout} {boundCode : SourceCoreBasic.LoweredExpr}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (.product first.type (.product .word .word)))
+    (form : node.form = .arraySlice base (some bound) none)
+    (baseFound : invocation.source.lookupExpression? base = some baseNode)
+    (boundFound : invocation.source.lookupExpression? bound = some boundNode)
+    (firstChild : children scope base first) (boundChild : children scope bound boundCode)
+    (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+    (code : lowered = ⟨.product first.type (.product .word .word),
+      SourceCoreDataExpressions.arraySlice first.type depth first.expression (some boundCode.expression) none⟩)
+    (size : Nat)
+    (childMeaning : PreservesBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    PreservesAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ outcome after environments heaps locals agrees actualTyped initial admitted authority
+    physical owner ownerFrame trace
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨baseType, nodeType, allowed, baseTypedAt, boundsTyped⟩ :=
+    slice_source_types unique found form metadata.coercions sourceTyped
+  have baseTypeEq := CellAwareArraySourceInversion.typed_type unique baseFound baseTypedAt
+  have boundTypeEq := CellAwareArraySourceInversion.typed_type unique boundFound
+    (replicate_typed boundsTyped bound (by simp))
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have baseTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change base ∈ [base, bound]; simp) baseFound
+  have boundTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change bound ∈ [base, bound]; simp) boundFound
+  have firstIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ firstChild _ baseFound baseTyped
+  have boundIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ boundChild _ boundFound boundTyped
+  have carrier := CellAwareArrayReads.viewShape_carrier shaped
+  have raw : ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreDataExpressions.arraySlice first.type depth first.expression
+        (some boundCode.expression) none).rename ξ) value finalStore ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (.product first.type (.product .word .word)) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    rw [arraySlice_rename]
+    simp only [Option.map_some, Option.map_none]
+    cases CellAwareArraySourceInversion.children unique found form rfl trace with
+    | fault failed smaller =>
+      rcases pair_fault failed with ⟨firstSize, firstSmaller, firstTrace⟩ |
+        ⟨firstSize, secondSize, baseSource, middle, firstSmaller, secondSmaller, firstTrace, secondTrace⟩
+      · obtain ⟨_, finalStore, finalMap, finalWorld, firstEval, represented, finalHeaps, maps, worlds, frame,
+          heapMetadata, effect, reached, related, _⟩ :=
+          firstIH firstSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+            owner ownerFrame firstTrace
+        cases represented with
+        | fault matched =>
+          exact ⟨_, finalStore, finalMap, finalWorld, arraySlice_base_failure firstEval, .fault matched, finalHeaps,
+            maps, worlds, frame, heapMetadata, effect, reached, related⟩
+      · obtain ⟨_, middleStore, middleMap, middleWorld, firstEval, represented, middleHeaps, firstMaps, firstWorlds,
+          firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
+          firstIH firstSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+            owner ownerFrame firstTrace
+        cases represented with
+        | @value _ coreValue payload =>
+          obtain ⟨_, finalStore, finalMap, finalWorld, secondEval, represented, finalHeaps, maps, worlds, frame,
+            heapMetadata, effect, reached, related, _⟩ :=
+            boundIH secondSize (by omega) (environments.extend firstMaps firstWorlds) middleHeaps
+              (locals.mono firstMetadata) (agree_prefix agrees coreValue)
+              (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState firstPost.at_value.2
+              (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner ownerFrame secondTrace
+          cases represented with
+          | fault matched =>
+            rw [rename_prefix] at secondEval
+            exact ⟨_, finalStore, finalMap, finalWorld, arraySlice_from_start_failure firstEval secondEval,
+              .fault matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame,
+              firstMetadata.trans heapMetadata, firstEffect.trans effect, reached,
+              callerProtocol.trans firstRelated related⟩
+    | result evaluated result smaller =>
+      obtain ⟨firstSize, secondSize, baseSource, boundSource, middle, firstSmaller, secondSmaller, rfl, firstTrace,
+        secondTrace⟩ := pair_values evaluated
+      obtain ⟨_, middleStore, middleMap, middleWorld, firstEval, represented, middleHeaps, firstMaps, firstWorlds,
+        firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
+        firstIH firstSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+          owner ownerFrame firstTrace
+      cases represented with
+      | @value _ coreValue payload =>
+        obtain ⟨_, keyStore, keyMap, keyWorld, secondEval, represented, keyHeaps, maps, worlds, frame,
+          heapMetadata, effect, reached, related, _⟩ :=
+          boundIH secondSize (by omega) (environments.extend firstMaps firstWorlds) middleHeaps
+            (locals.mono firstMetadata) (agree_prefix agrees coreValue)
+            (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState firstPost.at_value.2
+            (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner ownerFrame secondTrace
+        cases represented with
+        | @value _ coreBound boundPayload =>
+          rw [rename_prefix] at secondEval
+          rw [← boundTypeEq] at boundPayload
+          obtain ⟨boundWord, rfl, rfl, _⟩ := index_word_fields (.fixed .uint256) boundPayload
+          have basePayload := payload.extend (.refl _) maps worlds
+          have boundEq := CellAwareArrayReads.ofNatModulo_self boundWord
+          cases result with
+          | arraySlice counted chosen ordered within =>
+            cases chosen
+            obtain ⟨measured, countSmall⟩ := CellAwareArrayReads.length_preserve keyHeaps counted basePayload shaped
+            have coreRun := arraySlice_from (baseType := first.type) firstEval secondEval measured
+            rw [← boundEq, CellAwareArrayReads.sliced_within countSmall countSmall ordered within] at coreRun
+            exact ⟨_, keyStore, keyMap, keyWorld, coreRun,
+              .value (by rw [nodeType, baseTypeEq]; exact .arraySlice basePayload (by omega) carrier), keyHeaps,
+              firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame,
+              firstMetadata.trans heapMetadata, firstEffect.trans effect, reached,
+              callerProtocol.trans firstRelated related⟩
+          | arraySliceBoundType member notWord _ =>
+            simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+            subst member
+            exact (notWord trivial).elim
+          | arraySliceOutOfBounds counted chosen outside =>
+            cases chosen
+            obtain ⟨measured, countSmall⟩ := CellAwareArrayReads.length_preserve keyHeaps counted basePayload shaped
+            have coreRun := arraySlice_from (baseType := first.type) firstEval secondEval measured
+            rw [← boundEq, CellAwareArrayReads.sliced_outside boundWord.isLt countSmall countSmall outside] at coreRun
+            exact ⟨_, keyStore, keyMap, keyWorld, coreRun, .fault (RecursiveStageMeaning.FaultTokens.panic _),
+              keyHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame,
+              firstMetadata.trans heapMetadata, firstEffect.trans effect, reached,
+              callerProtocol.trans firstRelated related⟩
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- `a[s:]`'s head, reflected. -/
+theorem slice_from_reflects [RecursiveStageMeaning.FaultTokens faults]
+    {children : GenericExpressionMeaning.Certificate} {bound : ExpressionId} {boundNode : ExpressionNode}
+    {depth : Nat} {layout : OrderedMapping.Layout} {boundCode : SourceCoreBasic.LoweredExpr}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (.product first.type (.product .word .word)))
+    (form : node.form = .arraySlice base (some bound) none)
+    (baseFound : invocation.source.lookupExpression? base = some baseNode)
+    (boundFound : invocation.source.lookupExpression? bound = some boundNode)
+    (firstChild : children scope base first) (boundChild : children scope bound boundCode)
+    (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+    (code : lowered = ⟨.product first.type (.product .word .word),
+      SourceCoreDataExpressions.arraySlice first.type depth first.expression (some boundCode.expression) none⟩)
+    (size : Nat)
+    (childMeaning : ReflectsBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    ReflectsAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ value finalStore environments heaps locals agrees actualTyped initial admitted
+    authority physical owner ownerFrame evaluated
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨baseType, nodeType, allowed, baseTypedAt, boundsTyped⟩ :=
+    slice_source_types unique found form metadata.coercions sourceTyped
+  have baseTypeEq := CellAwareArraySourceInversion.typed_type unique baseFound baseTypedAt
+  have boundTypeEq := CellAwareArraySourceInversion.typed_type unique boundFound
+    (replicate_typed boundsTyped bound (by simp))
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have baseTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change base ∈ [base, bound]; simp) baseFound
+  have boundTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change bound ∈ [base, bound]; simp) boundFound
+  have firstIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ firstChild _ baseFound baseTyped
+  have boundIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ boundChild _ boundFound boundTyped
+  have carrier := CellAwareArrayReads.viewShape_carrier shaped
+  have occurrence : Staging.Recursive.Occurrence invocation id (.arraySlice base (some bound) none) :=
+    ⟨_, lookupExpression?_sound metadata.found, form, metadata.requirements, metadata.coercions⟩
+  have raw : ∃ sourceSize outcome after finalMap finalWorld,
+      Staging.Recursive.Size.Expression program registry sourceSize invocation context environment before id
+        outcome after ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (.product first.type (.product .word .word)) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    change EvaluationSize size actual store ((SourceCoreDataExpressions.arraySlice first.type depth first.expression
+      (some boundCode.expression) none).rename ξ) value finalStore at evaluated
+    rw [arraySlice_rename] at evaluated
+    simp only [Option.map_some, Option.map_none] at evaluated
+    have complete := evaluated.sound
+    unfold SourceCoreDataExpressions.arraySlice at evaluated
+    cases evaluated with
+    | caseLeft firstEvaluation branch =>
+      obtain ⟨firstSize, firstOutcome, after, finalMap, finalWorld, firstTrace, represented, finalHeaps, maps, worlds,
+        frame, heapMetadata, effect, reached, related, _post⟩ :=
+        firstIH _ (by omega) environments heaps locals agrees actualTyped initial admitted authority physical owner
+          ownerFrame firstEvaluation
+      cases represented with
+      | fault matched =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
+          (arraySlice_base_failure (baseType := first.type) (depth := depth) (start := some _) (stop := none)
+            firstEvaluation.sound)
+        exact ⟨_, _, after, finalMap, finalWorld, .arrayFault occurrence rfl (.headFault firstTrace),
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+    | caseRight firstEvaluation branch =>
+      obtain ⟨firstSize, firstOutcome, middle, middleMap, middleWorld, firstTrace, represented, middleHeaps, firstMaps,
+        firstWorlds, firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
+        firstIH _ (by omega) environments heaps locals agrees actualTyped initial admitted authority physical owner
+          ownerFrame firstEvaluation
+      cases represented with
+      | @value baseSource coreValue payload =>
+        cases branch with
+        | caseLeft secondEvaluation rest =>
+          have shifted := secondEvaluation
+          rw [← rename_prefix] at shifted
+          obtain ⟨secondSize, secondOutcome, after, finalMap, finalWorld, secondTrace, represented, finalHeaps, maps,
+            worlds, frame, heapMetadata, effect, reached, related, _post⟩ :=
+            boundIH _ (by omega) (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+              (agree_prefix agrees _) (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState
+              firstPost.at_value.2 (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner
+              ownerFrame shifted
+          cases represented with
+          | fault matched =>
+            obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
+              (arraySlice_from_start_failure (baseType := first.type) (depth := depth) firstEvaluation.sound
+                secondEvaluation.sound)
+            exact ⟨_, _, after, finalMap, finalWorld,
+              .arrayFault occurrence rfl (.tailFault firstTrace (.headFault secondTrace)), .fault matched, finalHeaps,
+              firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata,
+              firstEffect.trans effect, reached, callerProtocol.trans firstRelated related⟩
+        | caseRight secondEvaluation rest =>
+          have shifted := secondEvaluation
+          rw [← rename_prefix] at shifted
+          obtain ⟨secondSize, secondOutcome, after, keyMap, keyWorld, secondTrace, represented, keyHeaps, maps,
+            worlds, frame, heapMetadata, effect, reached, related, _post⟩ :=
+            boundIH _ (by omega) (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+              (agree_prefix agrees _) (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState
+              firstPost.at_value.2 (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner
+              ownerFrame shifted
+          cases represented with
+          | @value boundSource coreBound boundPayload =>
+            rw [← boundTypeEq] at boundPayload
+            obtain ⟨boundWord, rfl, rfl, _⟩ := index_word_fields (.fixed .uint256) boundPayload
+            have basePayload := payload.extend (.refl _) maps worlds
+            have baseRuntime : SourceCoreRawMetadata.runtimeType baseNode.type =
+                SourceCoreRawMetadata.runtimeType baseType := by rw [baseTypeEq]
+            have baseSourceTyped := Dynamic.ValueHasType.mono heapMetadata firstPost.at_value.1
+            rw [← baseTypeEq] at baseSourceTyped
+            obtain ⟨count, counted⟩ := CellAwareArrayReads.length_cases keyHeaps allowed basePayload baseRuntime
+              baseSourceTyped
+            obtain ⟨measured, countSmall⟩ := CellAwareArrayReads.length_preserve keyHeaps counted basePayload shaped
+            have coreRun := arraySlice_from (baseType := first.type) firstEvaluation.sound secondEvaluation.sound measured
+            have boundEq := CellAwareArrayReads.ofNatModulo_self boundWord
+            rw [← boundEq] at coreRun
+            by_cases inside : boundWord.val ≤ count
+            · rw [CellAwareArrayReads.sliced_within countSmall countSmall inside (Nat.le_refl _)] at coreRun
+              obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete coreRun
+              exact ⟨_, _, after, keyMap, keyWorld,
+                .arrayResult occurrence rfl (.cons firstTrace (.cons secondTrace .nil))
+                  (.arraySlice counted .suffix inside (Nat.le_refl _)),
+                .value (by rw [nodeType, baseTypeEq]; exact .arraySlice basePayload (by omega) carrier), keyHeaps,
+                firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame,
+                firstMetadata.trans heapMetadata, firstEffect.trans effect, reached,
+                callerProtocol.trans firstRelated related⟩
+            · have outside : count < boundWord.val ∨ count < count := by omega
+              rw [CellAwareArrayReads.sliced_outside boundWord.isLt countSmall countSmall outside] at coreRun
+              obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete coreRun
+              exact ⟨_, _, after, keyMap, keyWorld,
+                .arrayResult occurrence rfl (.cons firstTrace (.cons secondTrace .nil))
+                  (.arraySliceOutOfBounds counted .suffix outside),
+                .fault (RecursiveStageMeaning.FaultTokens.panic _), keyHeaps,
+                firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame,
+                firstMetadata.trans heapMetadata, firstEffect.trans effect, reached,
+                callerProtocol.trans firstRelated related⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- `a[:e]`'s head: the base's and the stop's meanings, then the bounds check, with zero as the start. -/
+theorem slice_to_preserves [RecursiveStageMeaning.FaultTokens faults]
+    {children : GenericExpressionMeaning.Certificate} {bound : ExpressionId} {boundNode : ExpressionNode}
+    {depth : Nat} {layout : OrderedMapping.Layout} {boundCode : SourceCoreBasic.LoweredExpr}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (.product first.type (.product .word .word)))
+    (form : node.form = .arraySlice base none (some bound))
+    (baseFound : invocation.source.lookupExpression? base = some baseNode)
+    (boundFound : invocation.source.lookupExpression? bound = some boundNode)
+    (firstChild : children scope base first) (boundChild : children scope bound boundCode)
+    (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+    (code : lowered = ⟨.product first.type (.product .word .word),
+      SourceCoreDataExpressions.arraySlice first.type depth first.expression none (some boundCode.expression)⟩)
+    (size : Nat)
+    (childMeaning : PreservesBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    PreservesAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ outcome after environments heaps locals agrees actualTyped initial admitted authority
+    physical owner ownerFrame trace
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨baseType, nodeType, allowed, baseTypedAt, boundsTyped⟩ :=
+    slice_source_types unique found form metadata.coercions sourceTyped
+  have baseTypeEq := CellAwareArraySourceInversion.typed_type unique baseFound baseTypedAt
+  have boundTypeEq := CellAwareArraySourceInversion.typed_type unique boundFound
+    (replicate_typed boundsTyped bound (by simp))
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have baseTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change base ∈ [base, bound]; simp) baseFound
+  have boundTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change bound ∈ [base, bound]; simp) boundFound
+  have firstIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ firstChild _ baseFound baseTyped
+  have boundIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ boundChild _ boundFound boundTyped
+  have carrier := CellAwareArrayReads.viewShape_carrier shaped
+  have raw : ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreDataExpressions.arraySlice first.type depth first.expression
+        none (some boundCode.expression)).rename ξ) value finalStore ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (.product first.type (.product .word .word)) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    rw [arraySlice_rename]
+    simp only [Option.map_some, Option.map_none]
+    cases CellAwareArraySourceInversion.children unique found form rfl trace with
+    | fault failed smaller =>
+      rcases pair_fault failed with ⟨firstSize, firstSmaller, firstTrace⟩ |
+        ⟨firstSize, secondSize, baseSource, middle, firstSmaller, secondSmaller, firstTrace, secondTrace⟩
+      · obtain ⟨_, finalStore, finalMap, finalWorld, firstEval, represented, finalHeaps, maps, worlds, frame,
+          heapMetadata, effect, reached, related, _⟩ :=
+          firstIH firstSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+            owner ownerFrame firstTrace
+        cases represented with
+        | fault matched =>
+          exact ⟨_, finalStore, finalMap, finalWorld, arraySlice_base_failure firstEval, .fault matched, finalHeaps,
+            maps, worlds, frame, heapMetadata, effect, reached, related⟩
+      · obtain ⟨_, middleStore, middleMap, middleWorld, firstEval, represented, middleHeaps, firstMaps, firstWorlds,
+          firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
+          firstIH firstSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+            owner ownerFrame firstTrace
+        cases represented with
+        | @value _ coreValue payload =>
+          obtain ⟨_, finalStore, finalMap, finalWorld, secondEval, represented, finalHeaps, maps, worlds, frame,
+            heapMetadata, effect, reached, related, _⟩ :=
+            boundIH secondSize (by omega) (environments.extend firstMaps firstWorlds) middleHeaps
+              (locals.mono firstMetadata) (agree_prefix agrees coreValue)
+              (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState firstPost.at_value.2
+              (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner ownerFrame secondTrace
+          cases represented with
+          | fault matched =>
+            rw [rename_prefix] at secondEval
+            exact ⟨_, finalStore, finalMap, finalWorld, arraySlice_to_stop_failure firstEval secondEval,
+              .fault matched, finalHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame,
+              firstMetadata.trans heapMetadata, firstEffect.trans effect, reached,
+              callerProtocol.trans firstRelated related⟩
+    | result evaluated result smaller =>
+      obtain ⟨firstSize, secondSize, baseSource, boundSource, middle, firstSmaller, secondSmaller, rfl, firstTrace,
+        secondTrace⟩ := pair_values evaluated
+      obtain ⟨_, middleStore, middleMap, middleWorld, firstEval, represented, middleHeaps, firstMaps, firstWorlds,
+        firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
+        firstIH firstSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+          owner ownerFrame firstTrace
+      cases represented with
+      | @value _ coreValue payload =>
+        obtain ⟨_, keyStore, keyMap, keyWorld, secondEval, represented, keyHeaps, maps, worlds, frame,
+          heapMetadata, effect, reached, related, _⟩ :=
+          boundIH secondSize (by omega) (environments.extend firstMaps firstWorlds) middleHeaps
+            (locals.mono firstMetadata) (agree_prefix agrees coreValue)
+            (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState firstPost.at_value.2
+            (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner ownerFrame secondTrace
+        cases represented with
+        | @value _ coreBound boundPayload =>
+          rw [rename_prefix] at secondEval
+          rw [← boundTypeEq] at boundPayload
+          obtain ⟨boundWord, rfl, rfl, _⟩ := index_word_fields (.fixed .uint256) boundPayload
+          have basePayload := payload.extend (.refl _) maps worlds
+          have boundEq := CellAwareArrayReads.ofNatModulo_self boundWord
+          cases result with
+          | arraySlice counted chosen ordered within =>
+            cases chosen
+            obtain ⟨measured, countSmall⟩ := CellAwareArrayReads.length_preserve keyHeaps counted basePayload shaped
+            have coreRun := arraySlice_to (baseType := first.type) firstEval secondEval measured
+            rw [CellAwareArrayReads.zero_ofNatModulo, ← boundEq, CellAwareArrayReads.sliced_within boundWord.isLt countSmall ordered within] at coreRun
+            exact ⟨_, keyStore, keyMap, keyWorld, coreRun,
+              .value (by rw [nodeType, baseTypeEq]; exact .arraySlice basePayload (by omega) carrier), keyHeaps,
+              firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame,
+              firstMetadata.trans heapMetadata, firstEffect.trans effect, reached,
+              callerProtocol.trans firstRelated related⟩
+          | arraySliceBoundType member notWord _ =>
+            simp only [List.mem_cons, List.not_mem_nil, or_false] at member
+            subst member
+            exact (notWord trivial).elim
+          | arraySliceOutOfBounds counted chosen outside =>
+            cases chosen
+            obtain ⟨measured, countSmall⟩ := CellAwareArrayReads.length_preserve keyHeaps counted basePayload shaped
+            have coreRun := arraySlice_to (baseType := first.type) firstEval secondEval measured
+            rw [CellAwareArrayReads.zero_ofNatModulo, ← boundEq, CellAwareArrayReads.sliced_outside (by simp [wordModulus]) boundWord.isLt countSmall outside] at coreRun
+            exact ⟨_, keyStore, keyMap, keyWorld, coreRun, .fault (RecursiveStageMeaning.FaultTokens.panic _),
+              keyHeaps, firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame,
+              firstMetadata.trans heapMetadata, firstEffect.trans effect, reached,
+              callerProtocol.trans firstRelated related⟩
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- `a[:e]`'s head, reflected. -/
+theorem slice_to_reflects [RecursiveStageMeaning.FaultTokens faults]
+    {children : GenericExpressionMeaning.Certificate} {bound : ExpressionId} {boundNode : ExpressionNode}
+    {depth : Nat} {layout : OrderedMapping.Layout} {boundCode : SourceCoreBasic.LoweredExpr}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (.product first.type (.product .word .word)))
+    (form : node.form = .arraySlice base none (some bound))
+    (baseFound : invocation.source.lookupExpression? base = some baseNode)
+    (boundFound : invocation.source.lookupExpression? bound = some boundNode)
+    (firstChild : children scope base first) (boundChild : children scope bound boundCode)
+    (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+    (code : lowered = ⟨.product first.type (.product .word .word),
+      SourceCoreDataExpressions.arraySlice first.type depth first.expression none (some boundCode.expression)⟩)
+    (size : Nat)
+    (childMeaning : ReflectsBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    ReflectsAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ value finalStore environments heaps locals agrees actualTyped initial admitted
+    authority physical owner ownerFrame evaluated
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨baseType, nodeType, allowed, baseTypedAt, boundsTyped⟩ :=
+    slice_source_types unique found form metadata.coercions sourceTyped
+  have baseTypeEq := CellAwareArraySourceInversion.typed_type unique baseFound baseTypedAt
+  have boundTypeEq := CellAwareArraySourceInversion.typed_type unique boundFound
+    (replicate_typed boundsTyped bound (by simp))
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have baseTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change base ∈ [base, bound]; simp) baseFound
+  have boundTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change bound ∈ [base, bound]; simp) boundFound
+  have firstIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ firstChild _ baseFound baseTyped
+  have boundIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ boundChild _ boundFound boundTyped
+  have carrier := CellAwareArrayReads.viewShape_carrier shaped
+  have occurrence : Staging.Recursive.Occurrence invocation id (.arraySlice base none (some bound)) :=
+    ⟨_, lookupExpression?_sound metadata.found, form, metadata.requirements, metadata.coercions⟩
+  have raw : ∃ sourceSize outcome after finalMap finalWorld,
+      Staging.Recursive.Size.Expression program registry sourceSize invocation context environment before id
+        outcome after ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (.product first.type (.product .word .word)) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    change EvaluationSize size actual store ((SourceCoreDataExpressions.arraySlice first.type depth first.expression
+      none (some boundCode.expression)).rename ξ) value finalStore at evaluated
+    rw [arraySlice_rename] at evaluated
+    simp only [Option.map_some, Option.map_none] at evaluated
+    have complete := evaluated.sound
+    unfold SourceCoreDataExpressions.arraySlice at evaluated
+    cases evaluated with
+    | caseLeft firstEvaluation branch =>
+      obtain ⟨firstSize, firstOutcome, after, finalMap, finalWorld, firstTrace, represented, finalHeaps, maps, worlds,
+        frame, heapMetadata, effect, reached, related, _post⟩ :=
+        firstIH _ (by omega) environments heaps locals agrees actualTyped initial admitted authority physical owner
+          ownerFrame firstEvaluation
+      cases represented with
+      | fault matched =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
+          (arraySlice_base_failure (baseType := first.type) (depth := depth) (start := none) (stop := some _)
+            firstEvaluation.sound)
+        exact ⟨_, _, after, finalMap, finalWorld, .arrayFault occurrence rfl (.headFault firstTrace),
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+    | caseRight firstEvaluation branch =>
+      obtain ⟨firstSize, firstOutcome, middle, middleMap, middleWorld, firstTrace, represented, middleHeaps, firstMaps,
+        firstWorlds, firstFrame, firstMetadata, firstEffect, middleState, firstRelated, firstPost⟩ :=
+        firstIH _ (by omega) environments heaps locals agrees actualTyped initial admitted authority physical owner
+          ownerFrame firstEvaluation
+      cases represented with
+      | @value baseSource coreValue payload =>
+        cases branch with
+        | caseLeft secondEvaluation rest =>
+          have shifted := secondEvaluation
+          rw [← rename_prefix] at shifted
+          obtain ⟨secondSize, secondOutcome, after, finalMap, finalWorld, secondTrace, represented, finalHeaps, maps,
+            worlds, frame, heapMetadata, effect, reached, related, _post⟩ :=
+            boundIH _ (by omega) (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+              (agree_prefix agrees _) (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState
+              firstPost.at_value.2 (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner
+              ownerFrame shifted
+          cases represented with
+          | fault matched =>
+            obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
+              (arraySlice_to_stop_failure (baseType := first.type) (depth := depth) firstEvaluation.sound
+                secondEvaluation.sound)
+            exact ⟨_, _, after, finalMap, finalWorld,
+              .arrayFault occurrence rfl (.tailFault firstTrace (.headFault secondTrace)), .fault matched, finalHeaps,
+              firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame, firstMetadata.trans heapMetadata,
+              firstEffect.trans effect, reached, callerProtocol.trans firstRelated related⟩
+        | caseRight secondEvaluation rest =>
+          have shifted := secondEvaluation
+          rw [← rename_prefix] at shifted
+          obtain ⟨secondSize, secondOutcome, after, keyMap, keyWorld, secondTrace, represented, keyHeaps, maps,
+            worlds, frame, heapMetadata, effect, reached, related, _post⟩ :=
+            boundIH _ (by omega) (environments.extend firstMaps firstWorlds) middleHeaps (locals.mono firstMetadata)
+              (agree_prefix agrees _) (.cons payload.runtime_hasType (actualTyped.weaken firstWorlds)) middleState
+              firstPost.at_value.2 (authority.transport firstEffect) (physical.transport firstEffect firstFrame) owner
+              ownerFrame shifted
+          cases represented with
+          | @value boundSource coreBound boundPayload =>
+            rw [← boundTypeEq] at boundPayload
+            obtain ⟨boundWord, rfl, rfl, _⟩ := index_word_fields (.fixed .uint256) boundPayload
+            have basePayload := payload.extend (.refl _) maps worlds
+            have baseRuntime : SourceCoreRawMetadata.runtimeType baseNode.type =
+                SourceCoreRawMetadata.runtimeType baseType := by rw [baseTypeEq]
+            have baseSourceTyped := Dynamic.ValueHasType.mono heapMetadata firstPost.at_value.1
+            rw [← baseTypeEq] at baseSourceTyped
+            obtain ⟨count, counted⟩ := CellAwareArrayReads.length_cases keyHeaps allowed basePayload baseRuntime
+              baseSourceTyped
+            obtain ⟨measured, countSmall⟩ := CellAwareArrayReads.length_preserve keyHeaps counted basePayload shaped
+            have coreRun := arraySlice_to (baseType := first.type) firstEvaluation.sound secondEvaluation.sound measured
+            have boundEq := CellAwareArrayReads.ofNatModulo_self boundWord
+            rw [CellAwareArrayReads.zero_ofNatModulo, ← boundEq] at coreRun
+            by_cases inside : boundWord.val ≤ count
+            · rw [CellAwareArrayReads.sliced_within boundWord.isLt countSmall (Nat.zero_le _) inside] at coreRun
+              obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete coreRun
+              exact ⟨_, _, after, keyMap, keyWorld,
+                .arrayResult occurrence rfl (.cons firstTrace (.cons secondTrace .nil))
+                  (.arraySlice counted .prefix (Nat.zero_le _) inside),
+                .value (by rw [nodeType, baseTypeEq]; exact .arraySlice basePayload (by omega) carrier), keyHeaps,
+                firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame,
+                firstMetadata.trans heapMetadata, firstEffect.trans effect, reached,
+                callerProtocol.trans firstRelated related⟩
+            · have outside : boundWord.val < 0 ∨ count < boundWord.val := by omega
+              rw [CellAwareArrayReads.sliced_outside (by simp [wordModulus]) boundWord.isLt countSmall outside] at coreRun
+              obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete coreRun
+              exact ⟨_, _, after, keyMap, keyWorld,
+                .arrayResult occurrence rfl (.cons firstTrace (.cons secondTrace .nil))
+                  (.arraySliceOutOfBounds counted .prefix outside),
+                .fault (RecursiveStageMeaning.FaultTokens.panic _), keyHeaps,
+                firstMaps.trans maps, firstWorlds.trans worlds, firstFrame.trans frame,
+                firstMetadata.trans heapMetadata, firstEffect.trans effect, reached,
+                callerProtocol.trans firstRelated related⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- `a[:]`'s head: the base's meaning, then the whole view. -/
+theorem slice_whole_preserves [RecursiveStageMeaning.FaultTokens faults]
+    {children : GenericExpressionMeaning.Certificate} {depth : Nat} {layout : OrderedMapping.Layout}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (.product first.type (.product .word .word)))
+    (form : node.form = .arraySlice base none none)
+    (baseFound : invocation.source.lookupExpression? base = some baseNode)
+    (firstChild : children scope base first)
+    (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+    (code : lowered = ⟨.product first.type (.product .word .word),
+      SourceCoreDataExpressions.arraySlice first.type depth first.expression none none⟩)
+    (size : Nat)
+    (childMeaning : PreservesBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    PreservesAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ outcome after environments heaps locals agrees actualTyped initial admitted authority
+    physical owner ownerFrame trace
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨baseType, nodeType, allowed, baseTypedAt, _⟩ :=
+    slice_source_types unique found form metadata.coercions sourceTyped
+  have baseTypeEq := CellAwareArraySourceInversion.typed_type unique baseFound baseTypedAt
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have baseTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change base ∈ [base]; simp) baseFound
+  have firstIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ firstChild _ baseFound baseTyped
+  have carrier := CellAwareArrayReads.viewShape_carrier shaped
+  have raw : ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreDataExpressions.arraySlice first.type depth first.expression
+        none none).rename ξ) value finalStore ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (.product first.type (.product .word .word)) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    rw [arraySlice_rename]
+    simp only [Option.map_none]
+    cases CellAwareArraySourceInversion.children unique found form rfl trace with
+    | fault failed smaller =>
+      obtain ⟨childSize, childSmaller, childTrace⟩ := single_fault failed
+      obtain ⟨_, finalStore, finalMap, finalWorld, firstEval, represented, finalHeaps, maps, worlds, frame,
+        heapMetadata, effect, reached, related, _⟩ :=
+        firstIH childSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+          owner ownerFrame childTrace
+      cases represented with
+      | fault matched =>
+        exact ⟨_, finalStore, finalMap, finalWorld, arraySlice_base_failure firstEval, .fault matched, finalHeaps,
+          maps, worlds, frame, heapMetadata, effect, reached, related⟩
+    | result evaluated result smaller =>
+      obtain ⟨childSize, baseSource, childSmaller, rfl, childTrace⟩ := single_values evaluated
+      obtain ⟨_, keyStore, keyMap, keyWorld, firstEval, represented, keyHeaps, maps, worlds, frame, heapMetadata,
+        effect, reached, related, _⟩ :=
+        firstIH childSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+          owner ownerFrame childTrace
+      cases represented with
+      | @value _ coreValue payload =>
+        cases result with
+        | arraySlice counted chosen ordered within =>
+          cases chosen
+          obtain ⟨measured, countSmall⟩ := CellAwareArrayReads.length_preserve keyHeaps counted payload shaped
+          have coreRun := arraySlice_all (baseType := first.type) firstEval measured
+          rw [CellAwareArrayReads.zero_ofNatModulo, CellAwareArrayReads.sliced_within countSmall countSmall ordered
+            within] at coreRun
+          exact ⟨_, keyStore, keyMap, keyWorld, coreRun,
+            .value (by rw [nodeType, baseTypeEq]; exact .arraySlice payload (by omega) carrier), keyHeaps, maps,
+            worlds, frame, heapMetadata, effect, reached, related⟩
+        | arraySliceBoundType member _ _ => cases member
+        | arraySliceOutOfBounds counted chosen outside =>
+          cases chosen
+          omega
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- `a[:]`'s head, reflected. -/
+theorem slice_whole_reflects [RecursiveStageMeaning.FaultTokens faults]
+    {children : GenericExpressionMeaning.Certificate} {depth : Nat} {layout : OrderedMapping.Layout}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (.product first.type (.product .word .word)))
+    (form : node.form = .arraySlice base none none)
+    (baseFound : invocation.source.lookupExpression? base = some baseNode)
+    (firstChild : children scope base first)
+    (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+    (code : lowered = ⟨.product first.type (.product .word .word),
+      SourceCoreDataExpressions.arraySlice first.type depth first.expression none none⟩)
+    (size : Nat)
+    (childMeaning : ReflectsBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    ReflectsAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ value finalStore environments heaps locals agrees actualTyped initial admitted
+    authority physical owner ownerFrame evaluated
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨baseType, nodeType, allowed, baseTypedAt, _⟩ :=
+    slice_source_types unique found form metadata.coercions sourceTyped
+  have baseTypeEq := CellAwareArraySourceInversion.typed_type unique baseFound baseTypedAt
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have baseTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change base ∈ [base]; simp) baseFound
+  have firstIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ firstChild _ baseFound baseTyped
+  have occurrence : Staging.Recursive.Occurrence invocation id (.arraySlice base none none) :=
+    ⟨_, lookupExpression?_sound metadata.found, form, metadata.requirements, metadata.coercions⟩
+  have carrier := CellAwareArrayReads.viewShape_carrier shaped
+  have raw : ∃ sourceSize outcome after finalMap finalWorld,
+      Staging.Recursive.Size.Expression program registry sourceSize invocation context environment before id
+        outcome after ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (.product first.type (.product .word .word)) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    change EvaluationSize size actual store ((SourceCoreDataExpressions.arraySlice first.type depth first.expression
+      none none).rename ξ) value finalStore at evaluated
+    rw [arraySlice_rename] at evaluated
+    simp only [Option.map_none] at evaluated
+    have complete := evaluated.sound
+    unfold SourceCoreDataExpressions.arraySlice at evaluated
+    cases evaluated with
+    | caseLeft firstEvaluation branch =>
+      obtain ⟨firstSize, firstOutcome, after, finalMap, finalWorld, firstTrace, represented, finalHeaps, maps, worlds,
+        frame, heapMetadata, effect, reached, related, _post⟩ :=
+        firstIH _ (by omega) environments heaps locals agrees actualTyped initial admitted authority physical owner
+          ownerFrame firstEvaluation
+      cases represented with
+      | fault matched =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
+          (arraySlice_base_failure (baseType := first.type) (depth := depth) (start := none) (stop := none)
+            firstEvaluation.sound)
+        exact ⟨_, _, after, finalMap, finalWorld, .arrayFault occurrence rfl (.headFault firstTrace),
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+    | caseRight firstEvaluation branch =>
+      obtain ⟨firstSize, firstOutcome, after, keyMap, keyWorld, firstTrace, represented, keyHeaps, maps,
+        worlds, frame, heapMetadata, effect, reached, related, post⟩ :=
+        firstIH _ (by omega) environments heaps locals agrees actualTyped initial admitted authority physical owner
+          ownerFrame firstEvaluation
+      cases represented with
+      | @value baseSource coreValue payload =>
+        have baseRuntime : SourceCoreRawMetadata.runtimeType baseNode.type =
+            SourceCoreRawMetadata.runtimeType baseType := by rw [baseTypeEq]
+        have baseSourceTyped := post.at_value.1
+        rw [← baseTypeEq] at baseSourceTyped
+        obtain ⟨count, counted⟩ := CellAwareArrayReads.length_cases keyHeaps allowed payload baseRuntime
+          baseSourceTyped
+        obtain ⟨measured, countSmall⟩ := CellAwareArrayReads.length_preserve keyHeaps counted payload shaped
+        have coreRun := arraySlice_all (baseType := first.type) firstEvaluation.sound measured
+        rw [CellAwareArrayReads.zero_ofNatModulo, CellAwareArrayReads.sliced_within countSmall countSmall
+          (Nat.zero_le _) (Nat.le_refl _)] at coreRun
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete coreRun
+        exact ⟨_, _, after, keyMap, keyWorld,
+          .arrayResult occurrence rfl (.cons firstTrace .nil) (.arraySlice counted .whole (Nat.zero_le _) (Nat.le_refl _)),
+          .value (by rw [nodeType, baseTypeEq]; exact .arraySlice payload (by omega) carrier), keyHeaps, maps,
+          worlds, frame, heapMetadata, effect, reached, related⟩
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
     frame, heapMetadata, effect, reached, related⟩ := raw
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
