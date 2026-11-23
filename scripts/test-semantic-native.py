@@ -83,13 +83,6 @@ def binary(operator: str) -> dict:
 
 
 class AdmissionTests(unittest.TestCase):
-    def test_operations_are_node_tags_with_the_operators_of_operator_nodes(self):
-        branch = {"tag": "unary", "op": "wordNot"}
-        program = {"tag": "apply", "function": binary("wordDiv"),
-                   "argument": {"tag": "case", "scrutinee": {"tag": "inLeft"}, "branches": [branch]}}
-        self.assertEqual(native.operations(program),
-                         {"apply", "lambda", "binary:wordDiv", "var", "word", "case", "inLeft", "unary:wordNot"})
-
     def test_the_adapter_lifts_the_contract_drops_std_imports_but_std_opcodes_and_appends_a_word_entry(self):
         lifted = native.lift(SOURCE, "run")
         self.assertIsNone(lifted["reason"])
@@ -142,8 +135,9 @@ class AdmissionTests(unittest.TestCase):
         self.assertEqual(decided(emitter="solcore-source-unknown-v9"), "emitter")
         # std.opcodes' aliases and the plans' `signextend` come from the import the adapter keeps.
         self.assertEqual(decided(program=binary("wordDiv")), "admitted")
-        self.assertEqual(decided(program={"tag": "case", "scrutinee": {"tag": "inLeft"}}), "sum")
-        self.assertEqual(decided(program={"tag": "inRight", "value": binary("wordSmod")}), "sum")
+        # Core sums are upstream's builtin `sum`, which the native frontend builds in.
+        self.assertEqual(decided(program={"tag": "case", "scrutinee": {"tag": "inLeft"}}), "admitted")
+        self.assertEqual(decided(program={"tag": "inRight", "value": binary("wordSmod")}), "admitted")
         shifts = "solcore-source-shifts-v2"
         self.assertEqual(decided(emitter=shifts, program=binary("wordShl")), "admitted")
         self.assertEqual(decided(emitter=shifts, program=binary("wordSignExtend")), "admitted")
@@ -341,7 +335,7 @@ class RunTests(unittest.TestCase):
         cases = [make_case(data=calldata(7)), make_case(data=calldata(8), core=returned("9")),
                  make_case(source=rejected), make_case(source=rejected, data=calldata(5)),
                  make_case(emitter="solcore-source-halt-v2"),
-                 make_case(program={"tag": "case", "scrutinee": {"tag": "inLeft"}})]
+                 make_case(signature="run(uint8)")]
         args, suite_args = self.arguments()
         args.output.mkdir()
         run = native.NativeRun(args, suite_args)
@@ -351,7 +345,7 @@ class RunTests(unittest.TestCase):
         counts = run.profiles["runtime-functions"]["counts"]
         self.assertEqual(counts, {"cases": 6, "generationExcluded": 1, "notAdmitted": 2, "admitted": 4, "programs": 2,
                                   "agree": 1, "mismatch": 1, "rejected": 2, "inconclusive": 0, "unexecuted": 0})
-        self.assertEqual(run.profiles["runtime-functions"]["reasons"], {"emitter": 1, "sum": 1})
+        self.assertEqual(run.profiles["runtime-functions"]["reasons"], {"emitter": 1, "parameters or result": 1})
         self.assertEqual([program["cases"] for program in run.programs], [[0, 1], [2, 3]])
         findings = sorted(run.findings.values(), key=lambda item: item["kind"])
         self.assertEqual([(item["kind"], item["count"], item["known"]) for item in findings],
@@ -416,7 +410,7 @@ class RunTests(unittest.TestCase):
                                 "--profile", "runtime-word"])
         check = json.loads(output.getvalue())
         self.assertEqual((code, check["status"], sorted(check["corpora"])), (0, "ready", ["runtime-word"]))
-        self.assertEqual(check["versions"], {"admission": "native-admission-v7", "adapter": "native-lift-v4",
+        self.assertEqual(check["versions"], {"admission": "native-admission-v8", "adapter": "native-lift-v4",
                                              "comparison": "native-compare-v1"})
         self.assertEqual(sorted(check["scripts"]), sorted(native.SCRIPTS))
         args, _ = native.parse_args(["--check", "--mode", "random", "--seed", "5"])

@@ -8,7 +8,7 @@ case's own direct Core result: a returned Word with the Word, and a native panic
 session decodes to upstream's revert data, with the revert's output.
 
 Admission is a versioned predicate decided before the native tool runs. It reads the case's
-provenance (its emitter and the Core operations of its program), the adapter's reading of the source
+provenance (its emitter), the adapter's reading of the source
 (one contract with functions only, no storage field, parameters and a result of the twelve
 fixed-width types or a Word result, calldata in the parameters' ranges) and, for memory arrays, the
 source's array forms (std's array traits are not admitted). The adapter keeps the source's imports
@@ -56,7 +56,7 @@ runner = suite.pure_campaign
 SCHEMA = "solcore-lean.semantic-native.v1"
 REQUEST_SCHEMA = "solcore-lean.semantic-native-request.v1"
 RESULT_SCHEMA = "solcore-lean.semantic-native-result.v1"
-ADMISSION = "native-admission-v7"
+ADMISSION = "native-admission-v8"
 ADAPTER = "native-lift-v4"
 COMPARISON = "native-compare-v1"
 TOOL = ROOT / ".lake/build/bin/semantic-native-tool"
@@ -68,26 +68,17 @@ WRAPPER = "sc_native_"
 PROFILE_SECONDS = 900.0
 PROFILE_DISK_BYTES = 256 * 1024**2
 
-# Core sums, which the G0-derived emitters write as upstream's builtin `sum<a, b>` with unqualified `inl` and `inr`:
-# the native frontend has neither. Their std.opcodes aliases (`sc_div`, ...) and the plans' `signextend` for signed
-# narrow types come from the import the adapter keeps.
-SUMS = frozenset(("inLeft", "inRight", "case"))
-# Each admitted emitter, with the Core operations that exclude a case.
-EMITTERS = {
-    **{version: SUMS for version in (
-        "solcore-source-g0-v2", "solcore-source-input-v2", "solcore-source-functions-v2",
-        "solcore-source-mutation-v2", "solcore-source-aggregates-v3", "solcore-source-aggregate-call-graphs-v2",
-        "solcore-source-call-graphs-v2", "solcore-source-call-graph-loops-v2", "solcore-source-closures-v3",
-        "solcore-source-generics-v3", "solcore-source-loops-v3", "solcore-source-nested-loops-v2",
-        "solcore-source-recursion-v2", "solcore-source-recursive-loops-v2", "solcore-source-loop-closures-v2",
-        "solcore-source-primitives-v2")},
-    "solcore-source-shifts-v2": frozenset(),
-    "solcore-source-checked-arithmetic-v2": frozenset(),
-    "solcore-source-enums-v2": frozenset(),
-    "solcore-source-closure-captures-v2": frozenset(),
-    "solcore-source-closure-factories-v2": frozenset(),
-    "solcore-source-memory-arrays-v2": frozenset(),
-}
+# The admitted emitters. The G0-derived ones write Core sums as upstream's builtin `sum<a, b>` with unqualified `inl`
+# and `inr`, which the native frontend builds in as upstream does (since v8); their std.opcodes aliases (`sc_div`, ...)
+# and the plans' `signextend` for signed narrow types come from the import the adapter keeps.
+EMITTERS = frozenset((
+    "solcore-source-g0-v2", "solcore-source-input-v2", "solcore-source-functions-v2", "solcore-source-mutation-v2",
+    "solcore-source-aggregates-v3", "solcore-source-aggregate-call-graphs-v2", "solcore-source-call-graphs-v2",
+    "solcore-source-call-graph-loops-v2", "solcore-source-closures-v3", "solcore-source-generics-v3",
+    "solcore-source-loops-v3", "solcore-source-nested-loops-v2", "solcore-source-recursion-v2",
+    "solcore-source-recursive-loops-v2", "solcore-source-loop-closures-v2", "solcore-source-primitives-v2",
+    "solcore-source-shifts-v2", "solcore-source-checked-arithmetic-v2", "solcore-source-enums-v2",
+    "solcore-source-closure-captures-v2", "solcore-source-closure-factories-v2", "solcore-source-memory-arrays-v2"))
 # The twelve fixed-width types a method's parameters and result may have, each with whether it is unsigned and its
 # width. The entry takes a parameter of one of them by `Typedef.abs` at a local of its type, as a call's argument has no
 # expected type in Lean's inference, and gives such a result by `Typedef.rep`; `uint256` keeps v2's `uint256(...)`.
@@ -119,8 +110,8 @@ NOT_ADMITTED = {
     "solcore-source-revert-data-v2": "std's Error type and revert data",
     "solcore-source-memory-values-v2": "std's memory traits and bytes",
     "solcore-source-memory-calls-v2": "std's memory traits and bytes",
-    "solcore-source-traits-v2": "std's sum in instance types",
-    "solcore-source-trait-hierarchies-v2": "std's sum in instance types",
+    "solcore-source-traits-v2": "qualified trait method calls",
+    "solcore-source-trait-hierarchies-v2": "qualified trait method calls and trait methods' own generics",
     "solcore-source-comptime-v3": "comptime constant functions",
     "solcore-source-modules-v3": "comptime constant functions and module bundles",
     "solcore-source-array-abi-v2": "array parameters",
@@ -165,22 +156,6 @@ def digest(data: bytes) -> str:
 
 def key_digest(value) -> str:
     return digest(json.dumps(value, sort_keys=True, separators=(",", ":")).encode())
-
-
-def operations(program) -> set[str]:
-    """The Core operations of a program: its node tags, each unary, binary or ternary node with its operator."""
-    found, pending = set(), [program]
-    while pending:
-        node = pending.pop()
-        if isinstance(node, dict):
-            tag, operator = node.get("tag"), node.get("op")
-            if isinstance(tag, str):
-                lifted = tag in ("unary", "binary", "ternary") and isinstance(operator, str)
-                found.add(f"{tag}:{operator}" if lifted else tag)
-            pending.extend(node.values())
-        elif isinstance(node, list):
-            pending.extend(node)
-    return found
 
 
 def skip(text: str, index: int) -> int:
@@ -360,7 +335,7 @@ def arguments(contract: dict, count: int) -> list[str] | None:
 
 
 def admission(case: dict) -> dict:
-    """native-admission-v7, decided from the case alone before any native run: the program the native tool reads
+    """native-admission-v8, decided from the case alone before any native run: the program the native tool reads
     with the case's arguments, or the first reason in a fixed order that the case is not admitted."""
     def refuse(reason: str, detail=None) -> dict:
         return {"admitted": False, "reason": reason, "detail": detail}
@@ -369,9 +344,6 @@ def admission(case: dict) -> dict:
     emitter = provenance.get("emitterVersion")
     if emitter not in EMITTERS:
         return refuse("emitter", emitter)
-    found = sorted(operations(case.get("program")) & EMITTERS[emitter])
-    if found:
-        return refuse("sum", ", ".join(found))
     if not isinstance(case.get("source"), str) or "sourceBundle" in case or "sources" in case:
         return refuse("sources")
     contract = case.get("contract") if isinstance(case.get("contract"), dict) else {}

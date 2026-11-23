@@ -861,10 +861,27 @@ private def externalLibraryNamed?
         if external.render == name then some module.id.library else none
     | _ => none)
 
+/-- The path of the module that holds upstream's builtin `sum<a, b>` (`builtinSumSource`), in the
+standard library, which a user workspace never holds (`noStandardFile`). -/
+def builtinSumPath : String := "builtinsum"
+
+/-- Whether a module is the builtin `sum`'s, which no import resolves to. -/
+def isBuiltinSumModule (moduleId : Workspace.ModuleId) : Bool :=
+  moduleId.library == .standard && moduleId.path.render == builtinSumPath
+
+/-- The builtin types of a name: the builtin `sum`'s declaration where the load added its module,
+looked up after a module's own types and its imports', as upstream's builtins are. -/
+def ProgramEnvironment.builtinTypesNamed (environment : ProgramEnvironment) (name : String) :
+    List ProgramDeclaration :=
+  environment.declarations.filter fun declaration =>
+    isBuiltinSumModule declaration.id.moduleId && declaration.name == some name &&
+      declaration.nameSpace == some .type
+
 /-- Resolve a source module path to one loaded canonical module identity.
 
 `external = true` means the first component names an external library.  The
-remaining cases follow the canonical relative / `lib` / `std` path policy.
+remaining cases follow the canonical relative / `lib` / `std` path policy. The builtin `sum`'s
+module is no std module an import names.
 -/
 def resolveProgramModuleComponents?
     (environment : ProgramEnvironment) (owner : Workspace.ModuleId)
@@ -880,7 +897,8 @@ def resolveProgramModuleComponents?
     match components with
     | "std" :: rest =>
         let standardPath := if rest.isEmpty then ["std"] else rest
-        match moduleWithIdentity? environment .standard standardPath with
+        match (moduleWithIdentity? environment .standard standardPath).filter
+            (!isBuiltinSumModule ·) with
         | some target => some target
         | none =>
             if rest.isEmpty then none
@@ -2445,6 +2463,43 @@ def programImportErrors (environment : ProgramEnvironment) (entry : Workspace.Mo
         (environment.modules.filter fun module => reachable.contains module.id).flatMap
           (importRuleErrors environment interfaces)
 
+/-- Upstream's builtin `sum<a, b>` with its constructors `inl` and `inr`, as one data declaration
+of its own module (`builtinSumPath`): Lean's nominal rules read it as they read any data type. -/
+def builtinSumSource : String := "pragma solcore;\nenum sum<a, b> { inl(a), inr(b) }\n"
+
+/-- Whether the characters from here on start `word` before `next`, with whitespace between. -/
+private def startsWordBefore (word : List Char) (next : Char) (characters : List Char) : Bool :=
+  word.isPrefixOf characters &&
+    ((characters.drop word.length).dropWhile Char.isWhitespace).head? == some next
+
+private def namesBuiltinSumAux : List Char → Bool → Bool
+  | [], _ => false
+  | characters@(character :: rest), boundary =>
+      (boundary && (startsWordBefore "sum".toList '<' characters ||
+        startsWordBefore "inl".toList '(' characters ||
+        startsWordBefore "inr".toList '(' characters)) ||
+      namesBuiltinSumAux rest !(character.isAlphanum || character == '_')
+
+/-- Whether a source names the builtin `sum`: `sum` before `<`, or `inl` or `inr` before `(`, each
+a whole word. Where a comment names it, the load adds its declaration too, which nothing reads. -/
+def namesBuiltinSum (content : String) : Bool :=
+  namesBuiltinSumAux content.toList true
+
+/-- A load's parsed sources, with the builtin `sum`'s module added where a workspace file names it,
+as upstream's builtins are there for every program. -/
+private def withBuiltinSum (workspace : Workspace.ValidatedUserWorkspace)
+    (sources : List Syntax.ParsedFile) : List Syntax.ParsedFile :=
+  if workspace.files.any (fun file => namesBuiltinSum file.content) then
+    match Workspace.CanonicalSourcePath.parse (builtinSumPath ++ ".solc") with
+    | some path =>
+        let file : Workspace.WorkspaceFile :=
+          { id := { library := .standard, path }, content := builtinSumSource }
+        match parseWorkspaceFile file with
+        | .ok source => sources ++ [source]
+        | .error _ => sources
+    | none => sources
+  else sources
+
 /-- Parse and catalog an already validated workspace, and refuse the imports and exports upstream
 refuses where they are. -/
 def loadValidatedProgram
@@ -2452,6 +2507,7 @@ def loadValidatedProgram
     Except (List ProgramLoadError) LoadedProgram :=
   let (parseErrors, sources) := parseWorkspaceFiles workspace.files
   if parseErrors.isEmpty then
+    let sources := withBuiltinSum workspace sources
     match buildProgramEnvironment sources with
     | .ok environment =>
         match programImportErrors environment workspace.entry.toModuleId with
@@ -2480,7 +2536,7 @@ theorem loadValidatedProgram_success_environment
       simp only [loadValidatedProgram, parsed] at success
       by_cases noParseErrors : parseErrors.isEmpty
       · simp only [noParseErrors, if_true] at success
-        cases environmentResult : buildProgramEnvironment sources with
+        cases environmentResult : buildProgramEnvironment (withBuiltinSum workspace sources) with
         | error errors => simp [environmentResult] at success
         | ok environment =>
             cases importErrors : programImportErrors environment workspace.entry.toModuleId with

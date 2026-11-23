@@ -162,7 +162,9 @@ private def resolveNamedProgramType
                   | .ok visibility =>
                       match visibility.typesNamed name with
                       | [] =>
-                          resolveBuiltinFallback components name arguments
+                          match environment.builtinTypesNamed name with
+                          | [] => resolveBuiltinFallback components name arguments
+                          | builtin => uniqueDeclaredType components arguments builtin
                       | importedCandidates =>
                           uniqueDeclaredType components arguments
                             importedCandidates
@@ -728,7 +730,9 @@ private theorem resolveNamedProgramType_variablesBelow
               · split at success
                 · simp at success
                 · split at success
-                  · exact resolveBuiltinFallback_variablesBelow argumentsBelow success
+                  · split at success
+                    · exact resolveBuiltinFallback_variablesBelow argumentsBelow success
+                    · exact uniqueDeclaredType_variablesBelow argumentsBelow success
                   · exact uniqueDeclaredType_variablesBelow argumentsBelow success
               · exact uniqueDeclaredType_variablesBelow argumentsBelow success
       | cons second tail =>

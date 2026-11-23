@@ -824,8 +824,10 @@ def contextualConstructorCandidate (context : Context) (state : State)
   let dataType ← match context.signatures.dataType? declaration with
     | some dataType => pure dataType
     | none => throw (.unknownConstructor [] name)
+  -- The builtin `sum`'s constructors are visible everywhere, as upstream's builtin ones are.
   let constructorVisibility ←
-    if decide (dataType.id.moduleId = context.scope.currentModule) then
+    if decide (dataType.id.moduleId = context.scope.currentModule) ||
+        isBuiltinSumModule dataType.id.moduleId then
       pure (fullyAccessibleDataType dataType).constructors
     else
       match buildProgramImports context.environment context.scope.currentModule with
@@ -900,8 +902,9 @@ theorem contextualConstructorCandidate_success_facts_with_name
                 subst selectedDataType
                 exact ⟨rfl, sourceDataTypeMember, constructorMember,
                   constructorName⟩
-              cases isLocal : decide
-                  (sourceDataType.id.moduleId = context.scope.currentModule) with
+              cases isLocal : (decide
+                  (sourceDataType.id.moduleId = context.scope.currentModule) ||
+                    isBuiltinSumModule sourceDataType.id.moduleId) with
               | true =>
                   cases selected : exactConstructorCandidate [] name
                       (constructorsInDataTypes [{
@@ -1150,6 +1153,20 @@ def functionOrBuiltinNamed (context : Context) (name : String) : Bool :=
   | .ok (_ :: _) => true
   | _ => (builtinNamed? context name).isSome
 
+/-- The builtin `sum`'s data type, where the load added its module (`isBuiltinSumModule`), whose
+`inl` and `inr` construct it unqualified after a program's own names, as upstream's builtin terms
+come last. -/
+def builtinSumDataTypes (context : Context) : List AccessibleDataType :=
+  (context.signatures.dataTypes.filter fun dataType =>
+    isBuiltinSumModule dataType.id.moduleId).map fullyAccessibleDataType
+
+private theorem builtinSumDataTypes_members {context : Context} :
+    ∀ accessible ∈ builtinSumDataTypes context,
+      accessible.signature ∈ context.signatures.dataTypes := by
+  intro accessible member
+  rcases List.mem_map.mp member with ⟨dataType, dataTypeMember, rfl⟩
+  exact (List.mem_filter.mp dataTypeMember).1
+
 def constructorCalleeCandidates (context : Context) (state : State)
     (callee : Syntax.Expr) :
     Except Error
@@ -1170,9 +1187,12 @@ def constructorCalleeCandidates (context : Context) (state : State)
           if (state.lookupBinder? name).isSome then pure []
           else if functionOrBuiltinNamed context name then pure []
           else
-            pure (constructorsInDataTypes
-              ((← visibleDataTypesNamed context name).filter fun dataType =>
-                dataType.signature.name == name) name)
+            let sameName := (← visibleDataTypesNamed context name).filter fun dataType =>
+              dataType.signature.name == name
+            if sameName.isEmpty && (name == "inl" || name == "inr") then
+              pure (constructorsInDataTypes (builtinSumDataTypes context) name)
+            else
+              pure (constructorsInDataTypes sameName name)
 
 /-- Constructor-callee discovery only returns constructors paired with their
 owning declarations from the whole-program data catalog. -/
@@ -1240,14 +1260,19 @@ theorem constructorCalleeCandidates_success_members
                       simp [constructorCalleeCandidates, qualified, identifier,
                         binder, taken, found, bind, Except.bind] at success
                   | ok dataTypes =>
-                      simp [constructorCalleeCandidates, qualified, identifier,
+                      simp only [constructorCalleeCandidates, qualified, identifier,
                         binder, taken, found, bind, Except.bind, pure, Pure.pure,
-                        Except.pure] at success
-                      subst candidates
-                      apply constructorsInDataTypes_member_facts _ member
-                      intro accessible accessibleMember
-                      exact visibleDataTypesNamed_success_members found accessible
-                        (List.mem_filter.mp accessibleMember).1
+                        Except.pure, Option.isSome_none, Bool.false_eq_true, if_false] at success
+                      split at success
+                      · simp only [Except.ok.injEq] at success
+                        subst candidates
+                        exact constructorsInDataTypes_member_facts builtinSumDataTypes_members member
+                      · simp only [Except.ok.injEq] at success
+                        subst candidates
+                        apply constructorsInDataTypes_member_facts _ member
+                        intro accessible accessibleMember
+                        exact visibleDataTypesNamed_success_members found accessible
+                          (List.mem_filter.mp accessibleMember).1
 
 /-- Distinguish an existing data namespace with a missing constructor from an
 ordinary qualified function/member expression.  Local roots continue to shadow
