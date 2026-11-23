@@ -30,7 +30,9 @@ The [umbrella](../../Solcore/Frontend.lean) imports the pipeline (through
 
 A program flows down this table. `checkProgram` loads it (validating the workspace, parsing each
 file through `Syntax/Unchecked`, building the declaration environment), resolves imports, types and
-signatures, and checks every function and method body. In the modules reachable from the entry,
+signatures, and checks every function and method body. `Syntax/Unchecked` also reads a `let`'s
+top-level `comptime<T>` annotation as `T`, and the compilation plan requires that binder to be
+comptime-staged (`comptimeLetStageMismatch`). In the modules reachable from the entry,
 the load refuses the imports that upstream refuses where they are (`programImportErrors`): a name
 brought beside a declaration of the module, an unknown item, a name listed twice, a name brought
 from two modules, a qualifier beside a value of that name, two imports under one qualifier, and
@@ -53,7 +55,11 @@ by its last component and by the full path it is seen by, a leading `lib` and an
 library's name dropped (`ProgramImportedNamespace.path`). Upstream's
 primitive `primAddWord` is the builtin word addition wherever no local, declaration or import
 takes the name, since upstream's builtin terms come last in its lookup
-(`builtinFunctionNamed?`). An import of
+(`builtinFunctionNamed?`). Upstream's builtin `sum<a, b>`, with `inl` and `inr`, is one data
+type of a standard module that the load adds where a workspace file names it
+(`builtinSumSource`). No import names that module; its type and its unqualified constructor
+calls come after a module's own and imported names, and its constructors are visible in every
+module (`builtinTypesNamed`, `builtinSumDataTypes`). An import of
 another std module binds no name and is checked by the names that the module exports
 (`upstreamStandardModuleExports`). `SourceCoreCompiler.compileChecked` then
 plans the specializations of the requested roots, validates the plan, and compiles one cached Core

@@ -173,7 +173,9 @@ The last two are recorded without investigation, and the generators avoid them.
    and of two imports that bind one name from one module the first is kept. The load resolves
    `std.opcodes` with its 81 names: selected, aliased, wildcard and hiding imports bind them,
    the 26 pure functions are builtins, and the others are refused where they are used. The
-   harness admits the cases that import them. Beside a name that such an import binds, Lean's
+   harness admits the cases that import them, those whose method takes or returns one of the
+   twelve fixed-width types, those that call std's `tobool` or name upstream's builtin `sum`,
+   and the comptime and modules emitters. Beside a name that such an import binds, Lean's
    operators follow upstream's: `<` and `!` call the bound `lt` and `not`, so `<` is refused
    (each of the 26 gives a word where `<` wants a bool), and the trait methods and `&&` and `||`
    see no bound name. The load knows upstream's other std modules by the names they export and
@@ -201,8 +203,8 @@ The last two are recorded without investigation, and the generators avoid them.
 ### Later
 
 7. The fuzzing leftovers.
-8. Generic code over the twelve integer types, `where` with builtin `Int`, `comptime<T>` locals and
-   contract storage at the twelve types.
+8. Generic code over the twelve integer types, `where` with builtin `Int`, and contract storage at
+   the twelve types.
 9. Storage and calldata arrays, which first need native contract storage and a calldata ABI.
 
 CI has no passing hosted run, and its automatic triggers are disabled: the
@@ -266,7 +268,12 @@ below come from running upstream's own test programs through Lean's native front
     in a `return` may be followed by more statements;
   - two ordinary impls of a trait are refused where their main types unify, among the impls a
     module sees, with aliases expanded and the occurs check, and with the other arguments and
-    the conditions not compared (`SC0218`).
+    the conditions not compared (`SC0218`);
+  - upstream's builtin `sum<a, b>`, with `inl` and `inr`, is a data type every module sees after
+    its own and imported names;
+  - a local annotated `comptime<T>` holds a `T` whose binder Lean's own stage analysis must
+    stage comptime, so a runtime initializer, a later assignment and a missing one are refused
+    as upstream refuses them (`SC0241`, `SC0411`, `SC0409`).
 
   To come, each as a checker rule:
   - `.true` or `.false` as a call's argument, a tuple's element or an operand of `&&` or
@@ -286,6 +293,8 @@ below come from running upstream's own test programs through Lean's native front
   - `@T` is Lean's builtin proxy, whatever `Proxy` a program declares;
   - a trait named as an operator's but without the operator's method leaves the builtin
     operator as it is, where upstream refuses the operator (`SC0207`);
+  - a comptime value may sit in a tuple or a constructor's payload, which upstream's Hull
+    lowering cannot represent;
   - expressions nest past 128 levels.
 - **Lean differs from both** in one place. At `word` and the fixed-width types, Lean applies
   its builtin operator where the type is known, and runs a program's implementation of the
@@ -297,12 +306,15 @@ below come from running upstream's own test programs through Lean's native front
   where it is declared, since Lean never runs one. Generic code keeps the program's
   implementation, as upstream runs it.
 - **To measure first:** the spellings `Word`, `Bool` and `Unit` beside `word`, `bool` and `()`,
-  two functions of one name (`SC0108`), a runtime value at a `comptime` parameter (`SC0240`),
+  two functions of one name (`SC0108`), a match binder's stage, which Lean takes from the
+  whole scrutinee where upstream takes it from the part it binds (the `SC0240` class),
   and two uses that Lean refuses where upstream runs the implementation: compound assignment
   at a type variable or at a program's own type, and an operator in generic code whose trait
   an import renames. Also `let` generalization: upstream leaves a `let`'s open type for later
   statements to fix and refuses it where nothing does (`SC0299`), and Lean generalizes it, so
-  a type that nothing fixes is refused only where specialization reaches it.
+  a type that nothing fixes is refused only where specialization reaches it. And an
+  initializer that Lean's staging defers, an ordinary function's call or a lambda, is refused
+  at a comptime local, where upstream evaluates it while staged.
 
 ## Handoff rules
 

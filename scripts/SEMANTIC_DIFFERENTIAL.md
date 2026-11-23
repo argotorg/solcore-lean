@@ -1980,18 +1980,22 @@ recorded step agreed on all four paths and met its recorded expectation. Known f
 
 `scripts/semantic-native.py` takes the pure runner's own cases, the fixed corpora or a draw seeded
 as `semantic-suite.py` seeds it (`--mode random --seed N`), and runs each admitted case through
-`semantic-native-tool`. The case's source is lifted out of its contract by `native-lift-v3`, which
+`semantic-native-tool`. The case's source is lifted out of its contract by `native-lift-v5`, which
 keeps its imports of `std.opcodes`, drops std's other imports and adds std's own `tobool` where the
-source calls it and defines none; a Word entry for its method is appended, and the program is
+source calls it and defines none. A Word entry for its method is appended, which takes each
+parameter of the twelve fixed-width types by `Typedef.abs` at a local of its type and gives such a
+result by `Typedef.rep`. Of a source bundle it lifts the entry so and keeps the other files beside
+it, each with std's imports dropped and std's `tobool` added where it calls it. The program is
 compiled once and run once per input. The path is opt-in: no suite
 or CI job runs it, and the fuzz driver runs it only with
 `--backend native` ([continuous fuzzing](SEMANTIC_CI.md#continuous-fuzzing)).
 
-- **Admission** (`native-admission-v6`) is decided from the case alone, before any native run: its
-  emitter, the Core operations of its program, and the adapter's reading of the source, which
-  must be one contract with functions only, no storage field and `uint256` parameters. A
-  memory-array source must not use std's array traits. Cases that are not admitted are counted
-  by reason.
+- **Admission** (`native-admission-v9`) is decided from the case alone, before any native run: its
+  emitter and the adapter's reading of the source, which must be one contract with functions
+  only, no storage field, and parameters and a result of the twelve fixed-width types (or a
+  `word` result). Calldata out of a parameter type's range is not admitted, since Lean's entry
+  takes typed values. A source bundle's entry must sit at its root. A memory-array source must
+  not use std's array traits. Cases that are not admitted are counted by reason.
 - **Comparison** (`native-compare-v1`): a returned Word against direct Core's, and the revert data
   of a native panic, which the native session decodes, against direct Core's revert output. Out of
   fuel and timeouts are inconclusive.
@@ -1999,8 +2003,8 @@ or CI job runs it, and the fuzz driver runs it only with
   finding under a stable signature, with a request that `semantic-native-tool` replays. The known
   differences from upstream (row 1's open `Typedef` call, which also rejects an unannotated
   `let m = [];`, row 4's array operations on an open base, local lambda generalization, `bool ==`,
-  `!=` at types without a builtin, reads of uninitialized locals) are findings under their own
-  labels.
+  `!=` at types without a builtin, reads of uninitialized locals, a conversion's revert on a
+  word that is not canonical for its type) are findings under their own labels.
 - `--check` prints the identity of every tool, script and corpus a run reads. A run whose identity
   changes while it runs does not pass.
 
