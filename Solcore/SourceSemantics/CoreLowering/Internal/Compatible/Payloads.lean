@@ -186,11 +186,13 @@ theorem MetadataRep.word_equality_iff {registry : SourceCoreRawMetadata.Registry
     (first : MetadataRep registry left a) (second : MetadataRep registry right b) :
     (a == b) = decide (left = right) := SourceCoreRawMetadata.Registry.word_equality_iff first.lookup second.lookup
 
-/-- The Core type of a view: a memory array's cell, or a slice's product of a view with the words of its
-start and its length. No comparison takes one. -/
+/-- The Core type of a view: a memory array's cell, a slice's product of a view with the words of its
+start and its length, or a memref's product of an array's cell with the word of its position. No
+comparison takes one. -/
 inductive ViewCarrier : Ty → Prop where
   | cell (contents : Ty) : ViewCarrier (.cell contents)
   | slice {base : Ty} (inner : ViewCarrier base) : ViewCarrier (.product base (.product .word .word))
+  | memref (contents : Ty) : ViewCarrier (.product (.cell contents) .word)
 
 mutual
   inductive ValueRep (checked : SourceCoreCompatibleCatalog.Checked) (registry : SourceCoreRawMetadata.Registry)
@@ -266,6 +268,20 @@ mutual
           (.arraySlice base start length)
           (.pair value (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length))))
           (.product type (.product .word .word))
+    /-- A memref is its array's Core cell, as the array's reference is, with the word of its position,
+    which is within a word. -/
+    | memref {element : TypeSystem.Ty} {location : Dynamic.Location} {position : Nat} {target : Location}
+        {payload : Ty} {identity : DataTypeId}
+        (elementProjection : checked.catalog.project element = .ok payload)
+        (identityEq : checked.catalog.identity? (.mapping (.constructor (.builtin .word)) element) = some identity)
+        (mapped : mapping[location.index]? = some target)
+        (typed : world[target]? = some (.product .word (.product payload (.namedData identity))))
+        (bounded : position < wordModulus) :
+        ValueRep checked registry functions mapping world (TypeSystem.Ty.memref element)
+          (.memref element location position)
+          (.pair (.cellRef (.product .word (.product payload (.namedData identity))) target)
+            (.word (Word.ofNatModulo position)))
+          (.product (.cell (.product .word (.product payload (.namedData identity)))) .word)
   inductive ValuesRep (checked : SourceCoreCompatibleCatalog.Checked) (registry : SourceCoreRawMetadata.Registry)
       {ambient : AmbientDefinitions checked.catalog.definitions}
       (functions : FunctionModel checked.catalog ambient) (mapping : LocationMap) (world : StoreTyping) :
@@ -321,6 +337,9 @@ theorem ValueRep.projection {sourceType : TypeSystem.Ty} {source : Dynamic.Value
   | arraySlice _ _ _ ih =>
     simp [TypeSystem.Ty.arraySlice, SourceCoreCompatibleCatalog.Catalog.project, SourceCoreRawMetadata.runtimeType,
       ih, bind, Except.bind, pure, Except.pure]
+  | memref elementProjection identityEq _ _ _ =>
+    simp [TypeSystem.Ty.memref, SourceCoreCompatibleCatalog.Catalog.project, SourceCoreRawMetadata.runtimeType,
+      elementProjection, identityEq, bind, Except.bind, pure, Except.pure]
   | proxy _ identity _ => simp [SourceCoreCompatibleCatalog.Catalog.project, identity]
   | constructed _ _ _ projected => exact projected
   | compatible same _ ih =>
@@ -359,6 +378,7 @@ theorem ValueRep.runtime_hasType {sourceType : TypeSystem.Ty} {source : Dynamic.
   | compatible _ _ ih => exact ih
   | arrayRef _ _ _ typed => exact .cellRef typed
   | arraySlice _ _ _ ih => exact .pair ih (.pair .word .word)
+  | memref _ _ _ typed _ => exact .pair (.cellRef typed) .word
   | mappingValue _ _ _ _ registered _ _ entries fallback =>
     exact .pair .word (.pair fallback (OrderedMapping.encode_hasType (registered.extend_definitions ambient.basePrefix) _ entries))
   | nil => exact .nil
@@ -398,6 +418,8 @@ theorem ValueRep.extend {futureRegistry : SourceCoreRawMetadata.Registry} {futur
   | arrayRef elementProjection identityEq mapped typed =>
     exact .arrayRef elementProjection identityEq (maps.lookup mapped) (worlds.lookup typed)
   | arraySlice _ bounded view ih => exact .arraySlice ih bounded view
+  | memref elementProjection identityEq mapped typed bounded =>
+    exact .memref elementProjection identityEq (maps.lookup mapped) (worlds.lookup typed) bounded
   | mappingValue header identity key value registered _ _ entries fallback =>
     exact .mappingValue (header.extend metadata) identity key value registered entries fallback
   | nil => exact .nil
@@ -510,7 +532,7 @@ private theorem unsigned_word_fields {sourceType : TypeSystem.Ty} {type : TypeSy
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | word | integer | product | function | proxy | mappingValue | arrayRef | arraySlice =>
+  | unit | bool | word | integer | product | function | proxy | mappingValue | arrayRef | arraySlice | memref =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial
@@ -532,7 +554,7 @@ private theorem word_view_fields {sourceType : TypeSystem.Ty}
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | integer | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice =>
+  | unit | bool | integer | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice | memref =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial
@@ -863,7 +885,7 @@ theorem ValueRep.mapping_shape {sourceType : TypeSystem.Ty} {source : Dynamic.Va
   induction related using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True)
     (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | fixed | product | proxy | constructed | arrayRef | arraySlice =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | arrayRef | arraySlice | memref =>
     intro _ _ _ impossible; cases impossible
   | function related =>
     intro _ _ _ impossible
@@ -942,6 +964,8 @@ theorem ValueRep.map_functions {checked : SourceCoreCompatibleCatalog.Checked}
   | compatible same _ ih => exact .compatible same ih
   | arrayRef elementProjection identityEq mapped typed => exact .arrayRef elementProjection identityEq mapped typed
   | arraySlice _ bounded view ih => exact .arraySlice ih bounded view
+  | memref elementProjection identityEq mapped typed bounded =>
+    exact .memref elementProjection identityEq mapped typed bounded
   | mappingValue header identity key value registered _ _ entries fallback =>
     exact .mappingValue header identity key value registered entries fallback
   | nil => exact .nil

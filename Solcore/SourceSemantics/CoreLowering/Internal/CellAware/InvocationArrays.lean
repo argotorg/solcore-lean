@@ -49,8 +49,33 @@ theorem arrayRef_fields {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {v
     intro _ _ impossible
     have shape := functions.source_function related
     cases shape <;> cases impossible
-  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arraySlice =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arraySlice | memref =>
     intro _ _ impossible
+    cases impossible
+  | nil | cons | empty | entry | absent | present => trivial
+
+/-- An array's reference and a position within a word make a memref, at a memref type of the reference's
+element, of the reference's Core cell with the position's word. -/
+theorem memref_of_arrayRef {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value : Value} {type : Ty}
+    (related : ValueRep checked registry functions mapping world sourceType source value type) :
+    ∀ {element : TypeSystem.Ty} {location : Dynamic.Location} {position : Nat}, source = .arrayRef element location →
+      position < wordModulus →
+      ValueRep checked registry functions mapping world (TypeSystem.Ty.memref element)
+        (.memref element location position) (.pair value (.word (Word.ofNatModulo position))) (.product type .word) := by
+  induction related using ValueRep.rec
+    (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True)
+    (motive_4 := fun _ _ _ _ => True) with
+  | arrayRef elementProjection identityEq mapped typed =>
+    intro _ _ _ same bounded
+    cases same
+    exact .memref elementProjection identityEq mapped typed bounded
+  | compatible _ _ ih => exact ih
+  | function related =>
+    intro _ _ _ impossible
+    have shape := functions.source_function related
+    cases shape <;> cases impossible
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arraySlice | memref =>
+    intro _ _ _ impossible
     cases impossible
   | nil | cons | empty | entry | absent | present => trivial
 
@@ -81,7 +106,7 @@ theorem arraySlice_fields {sourceType : TypeSystem.Ty} {source : Dynamic.Value} 
     intro _ _ _ impossible
     have shape := functions.source_function related
     cases shape <;> cases impossible
-  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | memref =>
     intro _ _ _ impossible
     cases impossible
   | nil | cons | empty | entry | absent | present => trivial
@@ -107,10 +132,10 @@ theorem array_source {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {valu
     cases elementProjected : checked.catalog.project element <;>
       simp [elementProjected, bind, Except.bind] at arrayed
     split at arrayed <;> simp [pure, Except.pure, throw, throwThe] at arrayed
-  | unit | bool | word | integer | fixed | product | function | proxy | mappingValue | arraySlice =>
+  | unit | bool | word | integer | fixed | product | function | proxy | mappingValue | arraySlice | memref =>
     intro _ view
-    simp [TypeSystem.Ty.array, TypeSystem.Ty.arraySlice, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.word,
-      TypeSystem.Ty.integer, TypeSystem.Ty.fixed, SourceCoreRawMetadata.runtimeType] at view
+    simp [TypeSystem.Ty.array, TypeSystem.Ty.arraySlice, TypeSystem.Ty.memref, TypeSystem.Ty.unit, TypeSystem.Ty.bool,
+      TypeSystem.Ty.word, TypeSystem.Ty.integer, TypeSystem.Ty.fixed, SourceCoreRawMetadata.runtimeType] at view
   | nil | cons | empty | entry | absent | present => trivial
 
 /-- A value at a slice type is a slice. -/
@@ -133,10 +158,10 @@ theorem slice_source {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {valu
       at sliced
     cases baseProjected : checked.catalog.project base <;>
       simp [baseProjected, bind, Except.bind, pure, Except.pure] at sliced
-  | unit | bool | word | integer | fixed | product | function | proxy | mappingValue | arrayRef =>
+  | unit | bool | word | integer | fixed | product | function | proxy | mappingValue | arrayRef | memref =>
     intro _ view
-    simp [TypeSystem.Ty.array, TypeSystem.Ty.arraySlice, TypeSystem.Ty.unit, TypeSystem.Ty.bool, TypeSystem.Ty.word,
-      TypeSystem.Ty.integer, TypeSystem.Ty.fixed, SourceCoreRawMetadata.runtimeType] at view
+    simp [TypeSystem.Ty.array, TypeSystem.Ty.arraySlice, TypeSystem.Ty.memref, TypeSystem.Ty.unit, TypeSystem.Ty.bool,
+      TypeSystem.Ty.word, TypeSystem.Ty.integer, TypeSystem.Ty.fixed, SourceCoreRawMetadata.runtimeType] at view
   | nil | cons | empty | entry | absent | present => trivial
 
 /-- An array index's value is a word, at Core type `word`. -/
@@ -163,7 +188,7 @@ theorem index_word_fields {indexType : TypeSystem.Ty} {source : Dynamic.Value} {
       · rw [← checked.catalog.project_runtimeType, view]; rfl
       · rw [← checked.catalog.project_runtimeType, view]; rfl
     cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | integer | product | function | proxy | mappingValue | arrayRef | arraySlice =>
+  | unit | bool | integer | product | function | proxy | mappingValue | arrayRef | arraySlice | memref =>
     intro view
     rcases view with view | ⟨_, view⟩ <;> cases view
   | nil | cons | empty | entry | absent | present => trivial

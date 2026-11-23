@@ -472,7 +472,7 @@ theorem builtin_member
     cases same
     exact builtin_own_type (function_builtin related function rfl)
   | compatible _ _ ih => exact ih
-  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | arraySlice =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | arraySlice | memref =>
     intro function impossible; cases impossible
   | nil | cons | empty | entry | absent | present => trivial
 

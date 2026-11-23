@@ -358,6 +358,7 @@ theorem Carrier.product_contract_shape {profile : Bool} {left right : Ty}
       cases shape with
       | cell => rfl
       | slice inner => cases inner <;> rfl
+      | memref => rfl
     | product head tail =>
       cases head with
       | unit | bool | word | integer | product | namedData | mapping | contracted => rfl
@@ -481,6 +482,7 @@ theorem _root_.Solcore.SourceSemantics.CoreLowering.CompatiblePayload.ViewCarrie
   cases shape with
   | cell => rfl
   | slice inner => cases inner <;> rfl
+  | memref => rfl
 
 theorem _root_.Solcore.SourceSemantics.CoreLowering.CompatiblePayload.ViewCarrier.not_contract {type : Ty} (shape : CompatiblePayload.ViewCarrier type) :
     SourceCoreDataEquality.isCallableContractType type = false := by
@@ -490,6 +492,8 @@ theorem _root_.Solcore.SourceSemantics.CoreLowering.CompatiblePayload.ViewCarrie
     cases inner with
     | cell => rfl
     | slice inner => cases inner <;> rfl
+    | memref => rfl
+  | memref => rfl
 
 /-- No comparison is generated at a view's type. -/
 theorem _root_.Solcore.SourceSemantics.CoreLowering.CompatiblePayload.ViewCarrier.compareType_refused {catalog : Catalog} {type : Ty} (shape : CompatiblePayload.ViewCarrier type) :
@@ -515,6 +519,22 @@ theorem _root_.Solcore.SourceSemantics.CoreLowering.CompatiblePayload.ViewCarrie
           ↓reduceIte] using accepted
       obtain ⟨_, firstCompiled, _⟩ := bind_ok generated
       exact ih firstCompiled
+  | memref contents =>
+    intro fuel depth left right compiled accepted
+    cases fuel with
+    | zero => simp [compareType] at accepted
+    | succ fuel =>
+      have noMapping := (CompatiblePayload.ViewCarrier.memref contents).not_mapping (catalog := catalog)
+      have noContract := (CompatiblePayload.ViewCarrier.memref contents).not_contract
+      have generated : (show Except Error Expr from do
+          let first ← compareType fuel catalog depth (.cell contents) (.first left) (.first right)
+          let second ← compareType fuel catalog depth .word (.second left) (.second right)
+          pure (.ifE first second (.bool false))) = .ok compiled := by
+        simpa only [compareType, noMapping, noContract, Bool.false_eq_true, Bool.and_false, ↓reduceIte] using accepted
+      obtain ⟨_, firstCompiled, _⟩ := bind_ok generated
+      cases fuel with
+      | zero => simp [compareType] at firstCompiled
+      | succ fuel => simp [compareType, isMappingCarrier] at firstCompiled
 
 theorem tree_of_compareType {catalog : Catalog} {registry : Registry}
     {identities : Dynamic.Value → Word → Prop} {helperFuel : Nat} {bodies : List Expr}
@@ -810,6 +830,7 @@ theorem ValueRep.observation {checked : SourceCoreCompatibleCatalog.Checked} {re
   | compatible _ _ ih => exact ih
   | arrayRef => exact .view (.cell _)
   | arraySlice _ _ view _ => exact .view (.slice view)
+  | memref => exact .view (.memref _)
   | nil => exact ⟨.unit, .nil, .unit⟩
   | @cons sourceType source value type sourceTypes sources values types head tail first rest =>
     obtain ⟨packed, packing, observed⟩ := rest
@@ -1269,7 +1290,7 @@ structure Fields (checked : SourceCoreCompatibleCatalog.Checked) (registry : Reg
         Fields checked registry functions mapping world sourceKey sourceValue sources header layout entries fallback := by
   induction related using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | fixed | product | proxy | constructed | arrayRef | arraySlice =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | arrayRef | arraySlice | memref =>
     intro _ _ _ impossible; cases impossible
   | function related =>
     intro _ _ _ impossible
@@ -1382,7 +1403,7 @@ theorem constructor_fields {expected : TypeSystem.Ty} {source : Dynamic.Value} {
         ConstructorFields checked registry functions mapping world expected metadata tag id sources values types := by
   induction related using ValueRep.rec
     (motive_2 := fun _ _ _ _ _ => True) (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | fixed | product | proxy | mappingValue | arrayRef | arraySlice =>
+  | unit | bool | word | integer | fixed | product | proxy | mappingValue | arrayRef | arraySlice | memref =>
     intro _ _ impossible; cases impossible
   | function related =>
     intro _ _ impossible
@@ -3476,6 +3497,7 @@ theorem ValueRep.source_runtimeView {checked : SourceCoreCompatibleCatalog.Check
     | intro typed view =>
       exact .intro typed (view.trans (runtimeType_eq_of_metadata same.symm))
   | arrayRef => exact (Dynamic.ValueRuntimeType.arrayRef _ _).matches
+  | memref => exact (Dynamic.ValueRuntimeType.memref _ _ _).matches
   | arraySlice _ _ _ ih =>
     cases ih with
     | intro typed view =>
@@ -3513,7 +3535,7 @@ theorem word_fields {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {value
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | integer | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice =>
+  | unit | bool | integer | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice | memref =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial
@@ -3533,7 +3555,7 @@ theorem integer_fields {sourceType : TypeSystem.Ty} {source : Dynamic.Value} {va
         rw [← checked.catalog.project_runtimeType, view]
         rfl
       cases Except.ok.inj (projected.symm.trans scalar)
-  | unit | bool | word | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice =>
+  | unit | bool | word | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice | memref =>
       intro view
       cases view
   | nil | cons | empty | entry | absent | present => trivial
@@ -4095,6 +4117,7 @@ private theorem represents_shape {sourceType : TypeSystem.Ty} {source : Dynamic.
     exact ⟨carrier, projected, .compatible same shaped⟩
   | arrayRef => exact fun free => absurd free (SourceCoreRootTypes.ViewFree.not_array _)
   | arraySlice => exact fun free => absurd free (SourceCoreRootTypes.ViewFree.not_arraySlice _)
+  | memref => exact fun free => absurd free (SourceCoreRootTypes.ViewFree.not_memref _)
   | nil => exact .nil
   | cons _ _ head tail =>
     rename_i free

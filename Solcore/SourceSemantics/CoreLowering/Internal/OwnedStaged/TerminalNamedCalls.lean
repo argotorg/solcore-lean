@@ -1712,7 +1712,7 @@ theorem global_representation
       intro function selected
       obtain ⟨originalType, original, rawType⟩ := ih function selected
       exact ⟨originalType, original, same.trans rawType⟩
-  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | arraySlice =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | arraySlice | memref =>
       intro function impossible
       cases impossible
   | nil | cons | empty | entry | absent | present => trivial

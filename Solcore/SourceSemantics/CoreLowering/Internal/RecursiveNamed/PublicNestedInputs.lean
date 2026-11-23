@@ -120,6 +120,7 @@ private theorem product_rep {expected a b : TypeSystem.Ty} {source : Dynamic.Val
   | fixed value => cases nativeEq
   | arrayRef => cases nativeEq
   | arraySlice => cases view
+  | memref => cases view
   | product first second _ _ =>
       cases nativeEq
       have types := TypeSystem.Ty.product.inj view
@@ -402,6 +403,7 @@ theorem product_rep {expected a b : TypeSystem.Ty} {source : Dynamic.Value}
   | fixed value => cases nativeEq
   | arrayRef => cases nativeEq
   | arraySlice => cases view
+  | memref => cases view
   | product first second _ _ =>
       cases nativeEq
       have types := TypeSystem.Ty.product.inj view
@@ -553,7 +555,7 @@ private theorem source_constructor {sourceType : TypeSystem.Ty} {source : Dynami
       ∃ metadata payloads, source = .constructed metadata payloads := by
   induction related using ValueRep.rec (motive_2 := fun _ _ _ _ _ => True)
     (motive_3 := fun _ _ _ _ _ _ _ => True) (motive_4 := fun _ _ _ _ => True) with
-  | unit | bool | word | integer | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice => intro _ _ impossible; cases impossible
+  | unit | bool | word | integer | fixed | product | function | proxy | mappingValue | arrayRef | arraySlice | memref => intro _ _ impossible; cases impossible
   | constructed => intro _ _ _; exact ⟨_, _, rfl⟩
   | compatible same _ ih => intro _ _ view; exact ih (by rw [← same]; exact view)
   | nil | cons | empty | entry | absent | present => trivial

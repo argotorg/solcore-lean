@@ -84,7 +84,7 @@ theorem prepared_builtin
   | compatible same _ ih =>
     intro function selected
     exact .compatible same (ih function selected)
-  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | arraySlice =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | arraySlice | memref =>
     intro function impossible; cases impossible
   | nil | cons | empty | entry | absent | present => trivial
 
@@ -164,7 +164,7 @@ theorem prepared_origin
       exact CallableIndexedOwnedContextualCalleeStageReceipts.function_origin
         (CallableIndexedOwnedContextualCellOrigins.FunctionOrigins.builtin member)
   | compatible _ _ ih => exact ih
-  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | arraySlice =>
+  | unit | bool | word | integer | fixed | product | proxy | constructed | mappingValue | arrayRef | arraySlice | memref =>
     intro impossible; cases impossible
   | nil | cons | empty | entry | absent | present => trivial
 
