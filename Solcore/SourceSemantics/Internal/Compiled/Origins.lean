@@ -128,9 +128,11 @@ theorem compileChecked_worklist {program : CheckedProgram} {seeds : List SourceC
           · split at afterLinking
             · obtain ⟨roots, _, afterRoots⟩ := bind_ok _ _ _ afterLinking
               split at afterRoots
-              · cases afterRoots
-                exact ⟨requests, ran⟩
               · simp [throw, throwThe, MonadExceptOf.throw] at afterRoots
+              · split at afterRoots
+                · cases afterRoots
+                  exact ⟨requests, ran⟩
+                · simp [throw, throwThe, MonadExceptOf.throw] at afterRoots
             · simp [throw, throwThe, MonadExceptOf.throw] at afterLinking
 
 theorem compileChecked_local_instances {program : CheckedProgram} {seeds : List SourceCoreCompiler.Seed}

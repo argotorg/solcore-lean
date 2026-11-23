@@ -1422,8 +1422,10 @@ theorem compiler_plan {program : CheckedProgram} {seeds : List SourceCoreCompile
         · split at accepted
           · obtain ⟨roots, _, accepted⟩ := bind_ok accepted
             split at accepted
-            · cases accepted; exact ⟨requests, worklist⟩
             · simp [throw, throwThe, MonadExceptOf.throw] at accepted
+            · split at accepted
+              · cases accepted; exact ⟨requests, worklist⟩
+              · simp [throw, throwThe, MonadExceptOf.throw] at accepted
           · simp [throw, throwThe, MonadExceptOf.throw] at accepted
 
 theorem public_origins {program : CheckedProgram} {seeds : List SourceCompiler.Seed}

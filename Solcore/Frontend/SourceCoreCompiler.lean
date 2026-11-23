@@ -1,5 +1,6 @@
 import Solcore.Frontend.SourceCoreUnified
 import Solcore.Frontend.SourceCore.Internal.DirectLinking
+import Solcore.Frontend.SourceCore.RootTypes
 
 /-!
 # Core compiler
@@ -47,6 +48,9 @@ inductive Error where
   | root (key : Key) (error : SourceCompilationPlan.Error)
   | rootCountMismatch (expected actual : Nat)
   | rootOrderMismatch
+  /-- A root's parameter or result type has no public value: it holds a memory array, a slice or a
+  memref (`SourceCoreRootTypes.holdsView`). -/
+  | rootWithoutPublicValue (key : Key) (type : TypeSystem.Ty)
   deriving Repr
 
 /-- Metadata comes from the exact original canonical specialization in this
@@ -61,6 +65,9 @@ def Root.inputTypes {plan : Plan} (root : Root plan) : List TypeSystem.Ty :=
   root.specialized.function.typedBody.inputs.map (·.scheme.body)
 def Root.resultType {plan : Plan} (root : Root plan) : TypeSystem.Ty :=
   root.specialized.function.inferredBodyType
+/-- A root's parameter types, then its result type. -/
+def Root.types {plan : Plan} (root : Root plan) : List TypeSystem.Ty :=
+  root.inputTypes ++ [root.resultType]
 
 /-- A root has an actual source-plan receipt, including its raw source types. -/
 theorem Root.source_metadata {plan : Plan} (root : Root plan) :
@@ -81,6 +88,9 @@ structure Compiled where private mk ::
         orderedRoots.map (·.key) = artifact.keys
   private validated : SourceCompilationPlan.validateExecutablePlanEvidence
     sourceProgram sourcePlan = .ok ()
+  /-- Every root's parameter and result types have public values. -/
+  private publicTypes : ∀ root ∈ orderedRoots, ∀ type ∈ root.types,
+    SourceCoreRootTypes.holdsView sourceProgram.signatures type = false
 
 /-- The cached code is the exact artifact used by all owned sessions opened
 from this compilation. This accessor never compiles a root again. -/
@@ -106,6 +116,11 @@ theorem Compiled.no_artifact_empty (compiled : Compiled) (empty : compiled.artif
   simpa only [empty, Compiled.roots, Compiled.plan] using matched
 theorem Compiled.plan_validated (compiled : Compiled) :
     SourceCompilationPlan.validateExecutablePlanEvidence compiled.program compiled.plan = .ok () := compiled.validated
+/-- A root holds no memory array, slice or memref in its parameter or result types. -/
+theorem Compiled.root_types_public (compiled : Compiled) {root : Root compiled.plan}
+    (member : root ∈ compiled.roots) :
+    ∀ type ∈ root.types, SourceCoreRootTypes.holdsView compiled.program.signatures type = false :=
+  compiled.publicTypes root member
 
 private def requests (program : CheckedProgram) (seeds : List Seed) :
     Except Error (List SourceSpecializationWorklist.Request) :=
@@ -116,6 +131,20 @@ private def root (plan : Plan) (seed : Seed) (key : Key) : Except Error (Root pl
   match selected : SourceCompilationPlan.exactSpecialization plan key with
   | .error error => .error (.root key error)
   | .ok specialized => .ok ⟨seed, key, specialized, selected⟩
+
+/-- A root's types, with its key, that have no public value. -/
+private def viewTypes (signatures : ProgramSignatures) {plan : Plan} (roots : List (Root plan)) :
+    List (Key × TypeSystem.Ty) :=
+  (roots.flatMap fun root => root.types.map fun type => (root.key, type)).filter
+    fun entry => SourceCoreRootTypes.holdsView signatures entry.2
+
+private theorem public_of_viewTypes {signatures : ProgramSignatures} {plan : Plan} {roots : List (Root plan)}
+    (none : viewTypes signatures roots = []) :
+    ∀ root ∈ roots, ∀ type ∈ root.types, SourceCoreRootTypes.holdsView signatures type = false := by
+  intro root member type typeMember
+  have absent := List.filter_eq_nil_iff.mp none (root.key, type)
+    (List.mem_flatMap.mpr ⟨root, member, List.mem_map.mpr ⟨type, typeMember, rfl⟩⟩)
+  simpa using absent
 
 /-- Check each seed and discover one canonical frontier, then prepare one Core
 artifact. Duplicate requested roots keep their positions in the root list. -/
@@ -132,7 +161,7 @@ def compileChecked (program : CheckedProgram) (seeds : List Seed) (options : Opt
   | .ok () =>
     if seeds = [] then
       if empty : plan.seedKeys = [] then
-        pure ⟨program, plan, none, [], ⟨rfl, empty⟩, validated⟩
+        pure ⟨program, plan, none, [], ⟨rfl, empty⟩, validated, by intro _ member; cases member⟩
       else throw (.rootCountMismatch 0 plan.seedKeys.length)
     else
       let cached ← match accepted : SourceCoreUnifiedCompilation.prepare program plan options.compilationFuel with
@@ -142,10 +171,13 @@ def compileChecked (program : CheckedProgram) (seeds : List Seed) (options : Opt
               cached.compilationFuel = options.compilationFuel})
       if seeds.length = cached.val.keys.length then
         let roots ← (seeds.zip cached.val.keys).mapM fun (seed, key) => root plan seed key
-        if ordered : roots.map (·.key) = cached.val.keys then
-          pure ⟨program, plan, some cached.val, roots,
-            ⟨cached.property.1, cached.property.2.1, ordered⟩, validated⟩
-        else throw .rootOrderMismatch
+        match views : viewTypes program.signatures roots with
+        | (key, type) :: _ => throw (.rootWithoutPublicValue key type)
+        | [] =>
+          if ordered : roots.map (·.key) = cached.val.keys then
+            pure ⟨program, plan, some cached.val, roots,
+              ⟨cached.property.1, cached.property.2.1, ordered⟩, validated, public_of_viewTypes views⟩
+          else throw .rootOrderMismatch
       else throw (.rootCountMismatch seeds.length cached.val.keys.length)
 
 def compile (raw : Workspace.RawWorkspace) (seeds : List Seed) (options : Options := {}) :
@@ -185,9 +217,11 @@ theorem compileChecked_program {program : CheckedProgram} {seeds : List Seed} {o
         · split at accepted
           · obtain ⟨roots, _, accepted⟩ := bind_ok accepted
             split at accepted
-            · cases accepted
-              rfl
             · simp [throw, throwThe, MonadExceptOf.throw] at accepted
+            · split at accepted
+              · cases accepted
+                rfl
+              · simp [throw, throwThe, MonadExceptOf.throw] at accepted
           · simp [throw, throwThe, MonadExceptOf.throw] at accepted
 
 /-- Raw compilation retains actual checking provenance. This statement does

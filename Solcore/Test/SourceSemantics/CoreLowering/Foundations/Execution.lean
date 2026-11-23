@@ -419,7 +419,44 @@ example {raw : Workspace.RawWorkspace} {seeds : List Seed} {options : Options} {
 example (compiled : Compiled) (empty : compiled.artifact? = none) :
     compiled.roots = [] ∧ compiled.plan.seedKeys = [] := compiled.no_artifact_empty empty
 
+/-- Roots whose parameter or result types hold a memory array, a slice or a memref: directly, in a
+tuple, a type argument, an enum's payload, an enum named in one, or a function type. -/
+private def viewRootWorkspace : Workspace.RawWorkspace := {
+  entry := "main.solc", externalLibraries := [], mainSources := [{path := "main.solc", content := "pragma solcore;\n" ++ String.intercalate "\n" [
+    "enum Box { Hold(uint256[]) }",
+    "enum Wrap<t> { Wrapped(t) }",
+    "enum Nest { Nested(Box) }",
+    "function arrayResult() returns (uint256[]) { return new uint256[](2); }",
+    "function arrayParameter(xs: uint256[]) returns (Word) { return 0; }",
+    "function sliceParameter(s: arraySlice<uint256[]>) returns (Word) { return 0; }",
+    "function memrefParameter(r: memref<uint256>) returns (Word) { return 0; }",
+    "function tupleResult() returns ((uint256[], Word)) { return (new uint256[](2), 1); }",
+    "function fieldResult() returns (Box) { return .Hold(new uint256[](2)); }",
+    "function argumentResult() returns (Wrap<uint256[]>) { return .Wrapped(new uint256[](2)); }",
+    "function nestedResult() returns (Nest) { return .Nested(.Hold(new uint256[](2))); }",
+    "function functionResult() returns (function(uint256[]) returns (Word)) { return lam(xs: uint256[]) { return 0; }; }",
+    "function wrapper(n: uint256) returns (uint256) { let a: uint256[] = new uint256[](n); return a.length(); }",
+    "function wordWrap() returns (Wrap<Word>) { return .Wrapped(1); }"
+  ]}] }
+
+/-- A root's signature takes no array, slice or memref anywhere (the memory arrays note, decision 5):
+the compiler rejects each such root, and compiles word roots over arrays and enums of words. -/
+private def testViewRoots : IO Unit := do
+  let program ← get "view root checking" (checkProgram viewRootWorkspace)
+  for name in ["arrayResult", "arrayParameter", "sliceParameter", "memrefParameter", "tupleResult",
+      "fieldResult", "argumentResult", "nestedResult", "functionResult"] do
+    let id ← declaration program name
+    match compileChecked program [Seed.declaration id] options with
+    | .error (.rootWithoutPublicValue _ _) => pure ()
+    | other => throw (IO.userError s!"a root holding a view was not rejected: {name}, compiled {other.toOption.isSome}")
+  for name in ["wrapper", "wordWrap"] do
+    let id ← declaration program name
+    let compiled ← get s!"word root {name}" (compileChecked program [Seed.declaration id] options)
+    require (compiled.rootCount == 1) s!"word root {name} lost its root"
+  IO.println "ROOT_PUBLIC_TYPES_PASS: roots holding a memory array, a slice or a memref, through tuples, type arguments, enum payloads and function types, rejected; word roots over arrays compiled"
+
 def run : IO Unit := do
+  testViewRoots
   let program ← get "single Core checking" (checkProgram workspace)
   let identity ← declaration program "identity"
   let mapping ← declaration program "mappingEcho"
