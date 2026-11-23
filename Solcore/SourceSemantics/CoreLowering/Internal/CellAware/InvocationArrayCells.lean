@@ -6,8 +6,8 @@ import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationArrays
 The heads of the array forms that allocate a fresh array on both sides, with the array's cell in the
 whole-cell heap relation, its Core layout registered (`DefaultLayouts`), and the default element: zero, or
 one fresh empty array, the Core default's last cell after the Core-only cells of its own element's default
-(`CellAwareArrayCells.default_preserve`). Main declarations: `CellAwareInvocationArrayBounds.new_preserves`
-and `new_reflects`.
+(`CellAwareArrayCells.default_preserve`). Main declarations: `CellAwareInvocationArrayBounds.new_preserves`,
+`literal_preserves` and their `reflects`.
 -/
 
 section
@@ -623,6 +623,509 @@ theorem new_reflects [RecursiveStageMeaning.FaultTokens faults] {children : Gene
             .arrayResult occurrence rfl (.cons firstTrace .nil) (.newArrayTooLong (by omega)),
             .fault (RecursiveStageMeaning.FaultTokens.panic _), keyHeaps, maps, worlds, frame, heapMetadata, effect,
             reached, related⟩
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationArrayBounds
+end
+
+section
+/-! A literal's entries: each element at its own position, and the elements' values at one type. -/
+set_option autoImplicit false
+set_option maxHeartbeats 4000000
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareArrayCells
+open Core Frontend SourceInference GeneralHeap CompatiblePayload CompatibleArrayEvaluation
+
+/-- A literal's entries hold each element at its own position. -/
+theorem literal_lookup : ∀ (values : List Value) (index position : Nat), index + values.length ≤ wordModulus →
+    (below : position < values.length) →
+    OrderedMapping.lookupEntries GenericHeap.arrayKeyEqual (.word (Word.ofNatModulo (index + position)))
+      (literalEntries index values) = some values[position]
+  | [], _, _, _, below => absurd below (Nat.not_lt_zero _)
+  | value :: rest, index, 0, _, _ => by
+    simp [literalEntries, OrderedMapping.lookupEntries, GenericHeap.arrayKeyEqual]
+  | value :: rest, index, position + 1, small, below => by
+    simp only [List.length_cons] at small below
+    have different : Word.ofNatModulo (index + (position + 1)) ≠ Word.ofNatModulo index := by
+      intro same
+      have values := congrArg Fin.val same
+      rw [CellAwareArrayReads.ofNatModulo_val (by omega), CellAwareArrayReads.ofNatModulo_val (by omega)] at values
+      omega
+    have rest' := literal_lookup rest (index + 1) position (by omega) (by omega)
+    rw [show index + 1 + position = index + (position + 1) by omega] at rest'
+    simp only [literalEntries, OrderedMapping.lookupEntries, GenericHeap.arrayKeyEqual, Value.word.injEq, different,
+      decide_false, Bool.false_eq_true, ↓reduceIte, List.getElem_cons_succ]
+    exact rest'
+
+theorem literal_keys : ∀ (values : List Value) (index : Nat) (key value : Value),
+    (key, value) ∈ literalEntries index values →
+      ∃ position, position < values.length ∧ key = .word (Word.ofNatModulo (index + position))
+  | [], _, _, _, member => by cases member
+  | head :: rest, index, key, value, member => by
+    simp only [literalEntries, List.mem_cons, Prod.mk.injEq] at member
+    rcases member with ⟨rfl, rfl⟩ | member
+    · exact ⟨0, by simp, by simp⟩
+    · obtain ⟨position, below, rfl⟩ := literal_keys rest (index + 1) key value member
+      exact ⟨position + 1, by simp; omega, by rw [show index + (position + 1) = index + 1 + position by omega]⟩
+
+theorem literal_values : ∀ (values : List Value) (index : Nat) (key value : Value),
+    (key, value) ∈ literalEntries index values → value ∈ values
+  | [], _, _, _, member => by cases member
+  | head :: rest, index, key, value, member => by
+    simp only [literalEntries, List.mem_cons, Prod.mk.injEq] at member
+    rcases member with ⟨rfl, rfl⟩ | member
+    · exact List.mem_cons_self
+    · exact List.mem_cons_of_mem _ (literal_values rest (index + 1) key value member)
+
+section Values
+variable {catalog : SourceCoreDataCatalog.Catalog} {projects : GenericHeap.Projection} {definitions : DataEnvironment}
+  {model : GenericHeap.PayloadModel catalog projects definitions} {mapping : LocationMap} {world : StoreTyping}
+
+/-- Values at one Source and one Core type: each element's representation, and each Core value's type. -/
+theorem values_uniform {element : TypeSystem.Ty} {payload : Ty} {sourceTypes : List TypeSystem.Ty} {types : List Ty}
+    {sources : List Dynamic.Value} {values : List Value}
+    (represented : DataExpressionSequence.Values model mapping world sourceTypes types sources values)
+    (sameSource : ∀ type ∈ sourceTypes, type = element) (sameCore : ∀ type ∈ types, type = payload) :
+    sources.length = values.length ∧
+      (∀ position (below : position < sources.length) (core : position < values.length),
+        model.Represents mapping world element sources[position] values[position] payload) ∧
+      ∀ value ∈ values, RuntimeValueHasType world value payload definitions := by
+  induction represented with
+  | nil => exact ⟨rfl, fun _ below => absurd below (Nat.not_lt_zero _), fun _ member => by cases member⟩
+  | @cons sourceType type source value _ _ _ _ head tail ih =>
+    have headSource := sameSource sourceType List.mem_cons_self
+    have headCore := sameCore type List.mem_cons_self
+    subst headSource headCore
+    obtain ⟨lengths, rest, typed⟩ :=
+      ih (fun other member => sameSource other (List.mem_cons_of_mem _ member))
+        (fun other member => sameCore other (List.mem_cons_of_mem _ member))
+    refine ⟨by simp [lengths], ?_, ?_⟩
+    · intro position below core
+      cases position with
+      | zero => exact head
+      | succ position => exact rest position (by simpa using below) (by simpa using core)
+    · intro other member
+      rcases List.mem_cons.mp member with rfl | member
+      · exact model.runtime_hasType head
+      · exact typed other member
+
+end Values
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareArrayCells
+end
+
+section
+/-! A literal: its elements, packed as a call's arguments are, then the default and the array's cell. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxHeartbeats 4000000
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationArrayBounds
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
+open CellAwareInvocationExpressionBounds CellAwareArraySourceInversion CompatibleArrayEvaluation
+open CellAwareArrayCells DataPatternValues
+open GenericExpressionMeaning (agree_prefix rename_prefix)
+universe u
+
+/-- A literal is of `T[]`, and its elements of `T`. -/
+theorem literal_source_types {source : TypedSource} {context : SourceSemantics.Context} {id : ExpressionId}
+    {element : TypeSystem.Ty} {elements : List ExpressionId} {node : ExpressionNode}
+    (unique : NodeOccurrencesUnique source) (found : source.lookupExpression? id = some node)
+    (form : node.form = .arrayLiteral element elements) (coercions : node.coercions = [])
+    (typed : ExpressionHasType source context id node.type) :
+    node.type = TypeSystem.Ty.array element ∧
+      ExpressionsHaveTypes source context elements (List.replicate elements.length element) := by
+  generalize typeEq : node.type = type at typed
+  cases typed with
+  | @intro _ _ actualNode rawType plan contains raw _ _ _ valid =>
+    have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+    subst actualNode
+    have path := valid.outputPath
+    rw [coercions] at path
+    cases path
+    rw [form] at raw
+    generalize resultEq : node.type = result at raw
+    cases raw with
+    | arrayLiteral _ elementsTyped => exact ⟨rfl, elementsTyped⟩
+
+theorem tree_types {source : TypedSource} {certificate : GenericExpressionMeaning.Certificate}
+    {scope : SourceCoreLocalCell.Scope} {ids : List ExpressionId} {types : List TypeSystem.Ty}
+    {codes : List SourceCoreBasic.LoweredExpr}
+    (tree : DataExpressionSequence.Tree source certificate scope ids types codes) {element : TypeSystem.Ty}
+    (typed : ∀ id ∈ ids, ∀ node, source.lookupExpression? id = some node → node.type = element) :
+    ∀ type ∈ types, type = element := by
+  induction tree with
+  | nil => intro _ member; cases member
+  | single found _ =>
+    intro type member
+    simp only [List.mem_singleton] at member
+    subst member
+    exact typed _ (by simp) _ found
+  | cons found _ _ ih =>
+    intro type member
+    rcases List.mem_cons.mp member with rfl | member
+    · exact typed _ List.mem_cons_self _ found
+    · exact ih (fun inner innerMember node innerFound => typed inner (List.mem_cons_of_mem _ innerMember) node innerFound)
+        type member
+
+theorem tree_length {source : TypedSource} {certificate : GenericExpressionMeaning.Certificate}
+    {scope : SourceCoreLocalCell.Scope} {ids : List ExpressionId} {types : List TypeSystem.Ty}
+    {codes : List SourceCoreBasic.LoweredExpr}
+    (tree : DataExpressionSequence.Tree source certificate scope ids types codes) : ids.length = codes.length := by
+  induction tree with
+  | nil => rfl
+  | single => rfl
+  | cons _ _ _ ih => simp [ih]
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled program)}
+  {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+  (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
+  (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {receiving : SourceCoreRawMetadata.Registry}
+  {bodyRelation : ActualBodyInvocation.BodyRelation}
+  {attachment : optParam
+    (Dynamic.GeneralizedClosure → SourceCoreLocalPolymorphism.Binding → TypeSystem.Substitution → Prop)
+    (fun _ _ _ => True)}
+  {index : ActualBodyInvocation.Index compiled bodyRelation}
+  {context : SourceSemantics.Context} {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
+  (faults : RecursiveStageMeaning.FaultRep)
+  (unique : NodeOccurrencesUnique invocation.source)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
+  (runtime : Dynamic.SourceRuntimeValid program context invocation.source)
+  (covers : invocation.evidence.Covers context)
+  {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
+  {lowered : SourceCoreBasic.LoweredExpr}
+
+local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- A literal's head: its elements' meanings, packed as a call's arguments are, then the default element and
+one fresh array of the elements on both sides. -/
+theorem literal_preserves [RecursiveStageMeaning.FaultTokens faults]
+    {children : GenericExpressionMeaning.Certificate}
+    {element : TypeSystem.Ty} {elements : List ExpressionId} {sourceTypes : List TypeSystem.Ty}
+    {codes : List SourceCoreBasic.LoweredExpr} {payload : Ty} {identity : DataTypeId} {default : Expr}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (CompatibleExpressionArrays.arrayType payload identity))
+    (form : node.form = .arrayLiteral element elements)
+    (sequence : DataExpressionSequence.Tree invocation.source children scope elements sourceTypes codes)
+    (codeTypes : ∀ code ∈ codes, code.type = payload) (short : elements.length < wordModulus)
+    (projected : compiled.compatible.checked.catalog.project (TypeSystem.Ty.array element) =
+      .ok (CompatibleExpressionArrays.arrayType payload identity))
+    (defined : SourceCoreCompatibleDataExpressions.arrayDefault compiled.compatible.checked.catalog element = some default)
+    (layouts : DefaultLayouts compiled.compatible.checked.catalog
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions (TypeSystem.Ty.array element))
+    (code : lowered = ⟨CompatibleExpressionArrays.arrayType payload identity,
+      SourceCoreDataExpressions.arrayLiteral (CompatibleExpressionArrays.arrayLayout payload identity) default
+        (SourceCoreCalls.packArguments codes).expression codes.length⟩)
+    (size : Nat)
+    (childMeaning : PreservesBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    PreservesAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ outcome after environments heaps locals agrees actualTyped initial admitted authority
+    physical owner ownerFrame trace
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨nodeType, elementsTyped⟩ := literal_source_types unique found form metadata.coercions sourceTyped
+  have sourceTypesEq := tree_types sequence fun element' member node' found' =>
+    (CellAwareArraySourceInversion.typed_type unique found' (replicate_typed elementsTyped element' member)).symm
+  have coreTypesEq : ∀ type ∈ codes.map (·.type), type = payload := by
+    intro type member
+    obtain ⟨code, codeMember, rfl⟩ := List.mem_map.mp member
+    exact codeTypes code codeMember
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have typing : ExpressionsHaveTypes invocation.source context elements originalTypes := by
+    rw [form] at operandTyped
+    exact operandTyped
+  obtain ⟨elementProjected, identified⟩ := array_parts projected
+  cases layouts with
+  | scalar notArray => exact absurd rfl (notArray element)
+  | array registeredAll elementLayouts =>
+  have registered := registeredAll payload identity elementProjected identified
+  have raw : ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreDataExpressions.arrayLiteral
+        (CompatibleExpressionArrays.arrayLayout payload identity) default
+        (SourceCoreCalls.packArguments codes).expression codes.length).rename ξ) value finalStore ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (CompatibleExpressionArrays.arrayType payload identity) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    rw [arrayLiteral_rename, arrayDefault_rename defined]
+    cases CellAwareArraySourceInversion.children unique found form rfl trace with
+    | fault failed smaller =>
+      obtain ⟨token, finalStore, finalMap, finalWorld, evaluated, matched, finalHeaps, maps, worlds, frame,
+        heapMetadata, effect, reached, related, _⟩ :=
+        CellAwareInvocationExpressionSequence.preserves_fault bridge size sequence unique typing childMeaning
+          environments heaps locals agrees actualTyped initial admitted authority physical owner ownerFrame failed
+          (Nat.le_of_lt smaller)
+      exact ⟨_, finalStore, finalMap, finalWorld, arrayLiteral_failure evaluated, .fault matched, finalHeaps, maps,
+        worlds, frame, heapMetadata, effect, reached, related⟩
+    | @result _ sources _ _ _ evaluated result smaller =>
+      obtain ⟨coreValues, keyStore, keyMap, keyWorld, elementsEval, represented, keyHeaps, maps, worlds, frame,
+        heapMetadata, effect, reached, related, _⟩ :=
+        CellAwareInvocationExpressionSequence.preserves_values bridge size sequence unique typing childMeaning
+          environments heaps locals agrees actualTyped initial admitted authority physical owner ownerFrame evaluated
+          (Nat.le_of_lt smaller)
+      obtain ⟨lengths, elementReps, coreTyped⟩ := values_uniform represented sourceTypesEq coreTypesEq
+      have codesLength : codes.length = coreValues.length := by simpa using represented.length.2
+      rw [codesLength]
+      cases result with
+      | arrayLiteral allocates =>
+        obtain ⟨defaultValue, cells, defaultWorld, defaultEval, defaultWorlds, storeTyped, defaultTyped⟩ :=
+          default_runs defined elementProjected elementLayouts (packValues coreValues :: actual)
+            keyHeaps.runtime_hasTypes
+        have defaultHeaps := CellMappingHeap.heap_append keyHeaps defaultWorlds storeTyped
+        have contents : GenericHeap.ArrayContents model keyMap defaultWorld element sources payload identity
+            defaultValue (literalEntries 0 coreValues) :=
+          { projection := elementProjected
+            registered := registered
+            bounded := by rw [lengths, ← codesLength, ← tree_length sequence]; exact short
+            default_typed := defaultTyped
+            keys := fun key value member => by
+              obtain ⟨position, below, rfl⟩ := literal_keys coreValues 0 key value member
+              exact ⟨position, by omega, by simp⟩
+            entries_typed := fun key value member =>
+              (coreTyped value (literal_values coreValues 0 key value member)).weaken defaultWorlds
+            represented := fun position below => by
+              have core : position < coreValues.length := by omega
+              have entry : GenericHeap.arrayEntry (literalEntries 0 coreValues) defaultValue position =
+                  coreValues[position] := by
+                unfold GenericHeap.arrayEntry
+                have looked := literal_lookup coreValues 0 position (by
+                  have bound := short
+                  rw [tree_length sequence, codesLength] at bound
+                  omega) core
+                simp only [Nat.zero_add] at looked
+                rw [looked]
+                rfl
+              rw [entry]
+              exact ValueRep.extend (elementReps position below core) (.refl _) (.refl _) defaultWorlds }
+        have cellRep : GenericHeap.ArrayCellRepresents model keyMap defaultWorld
+            ⟨.arrayObject element, some (.arrayObject element sources), none⟩
+            (.pair (.word (Word.ofNatModulo coreValues.length)) (.pair defaultValue
+              (OrderedMapping.encode (GenericHeap.arrayLayout payload identity) (literalEntries 0 coreValues))))
+            (.product .word (.product payload (.namedData identity))) :=
+          ⟨element, sources, payload, identity, defaultValue, literalEntries 0 coreValues, rfl, by rw [lengths], rfl,
+            contents⟩
+        obtain ⟨finalHeaps, mapped, typed⟩ := defaultHeaps.allocate_array cellRep allocates
+        have coreRun := arrayLiteral_evaluates (layout := CompatibleExpressionArrays.arrayLayout payload identity)
+          elementsEval (by rw [arrayDefault_weaken defined]; exact defaultEval)
+        have extended : (keyStore ++ cells ++ [.pair (.word (Word.ofNatModulo coreValues.length)) (.pair defaultValue
+            (OrderedMapping.encode (GenericHeap.arrayLayout payload identity) (literalEntries 0 coreValues)))]) =
+            keyStore ++ (cells ++ [.pair (.word (Word.ofNatModulo coreValues.length)) (.pair defaultValue
+              (OrderedMapping.encode (GenericHeap.arrayLayout payload identity) (literalEntries 0 coreValues)))]) := by
+          simp
+        have finalFrame : AdministrativePreserved keyMap keyStore (keyMap ++ [(keyStore ++ cells).length])
+            (keyStore ++ cells ++ [.pair (.word (Word.ofNatModulo coreValues.length)) (.pair defaultValue
+              (OrderedMapping.encode (GenericHeap.arrayLayout payload identity) (literalEntries 0 coreValues)))]) :=
+          (CellMappingHeap.administrative_append keyMap keyStore cells).trans
+            (AdministrativePreserved.allocate keyMap (keyStore ++ cells) _)
+        have finalMaps : LocationMap.Extends keyMap (keyMap ++ [(keyStore ++ cells).length]) := ⟨_, rfl⟩
+        have finalWorlds : WorldExtends keyWorld
+            (defaultWorld ++ [.product .word (.product payload (.namedData identity))]) :=
+          defaultWorlds.trans ⟨_, rfl⟩
+        have finalMetadata := Dynamic.HeapMetadataExtend.of_allocation allocates
+        let suffixPool : State headers keys ⟨scope, keyMap ++ [(keyStore ++ cells).length],
+            defaultWorld ++ [.product .word (.product payload (.namedData identity))], _,
+            keyStore ++ cells ++ [.pair (.word (Word.ofNatModulo coreValues.length)) (.pair defaultValue
+              (OrderedMapping.encode (GenericHeap.arrayLayout payload identity) (literalEntries 0 coreValues)))],
+            canonical⟩ :=
+          (bridge.pool reached).extend finalMaps finalWorlds finalFrame finalMetadata
+        obtain ⟨returned, _returnedPool, returnedRelated⟩ := bridge.restore reached suffixPool
+          finalMaps finalWorlds finalFrame finalMetadata (Relates.of_records_eq rfl)
+        refine ⟨_, _, _, _, coreRun,
+          .value (by rw [nodeType]; exact .arrayRef elementProjected identified mapped typed),
+          finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, frame.trans finalFrame,
+          heapMetadata.trans finalMetadata, effect.trans ?_, returned, callerProtocol.trans related returnedRelated⟩
+        rw [extended]
+        exact CellAwareScopeAuthority.Effect.append _ _ finalMetadata finalMaps finalWorlds
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- A literal's head, reflected: the packed elements' Core run gives their Source runs, and the rest is the
+Source's allocation. -/
+theorem literal_reflects [RecursiveStageMeaning.FaultTokens faults]
+    {children : GenericExpressionMeaning.Certificate}
+    {element : TypeSystem.Ty} {elements : List ExpressionId} {sourceTypes : List TypeSystem.Ty}
+    {codes : List SourceCoreBasic.LoweredExpr} {payload : Ty} {identity : DataTypeId} {default : Expr}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (CompatibleExpressionArrays.arrayType payload identity))
+    (form : node.form = .arrayLiteral element elements)
+    (sequence : DataExpressionSequence.Tree invocation.source children scope elements sourceTypes codes)
+    (codeTypes : ∀ code ∈ codes, code.type = payload) (short : elements.length < wordModulus)
+    (projected : compiled.compatible.checked.catalog.project (TypeSystem.Ty.array element) =
+      .ok (CompatibleExpressionArrays.arrayType payload identity))
+    (defined : SourceCoreCompatibleDataExpressions.arrayDefault compiled.compatible.checked.catalog element = some default)
+    (layouts : DefaultLayouts compiled.compatible.checked.catalog
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions (TypeSystem.Ty.array element))
+    (code : lowered = ⟨CompatibleExpressionArrays.arrayType payload identity,
+      SourceCoreDataExpressions.arrayLiteral (CompatibleExpressionArrays.arrayLayout payload identity) default
+        (SourceCoreCalls.packArguments codes).expression codes.length⟩)
+    (size : Nat)
+    (childMeaning : ReflectsBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    ReflectsAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ value finalStore environments heaps locals agrees actualTyped initial admitted
+    authority physical owner ownerFrame evaluated
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨nodeType, elementsTyped⟩ := literal_source_types unique found form metadata.coercions sourceTyped
+  have sourceTypesEq := tree_types sequence fun element' member node' found' =>
+    (CellAwareArraySourceInversion.typed_type unique found' (replicate_typed elementsTyped element' member)).symm
+  have coreTypesEq : ∀ type ∈ codes.map (·.type), type = payload := by
+    intro type member
+    obtain ⟨code, codeMember, rfl⟩ := List.mem_map.mp member
+    exact codeTypes code codeMember
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have typing : ExpressionsHaveTypes invocation.source context elements originalTypes := by
+    rw [form] at operandTyped
+    exact operandTyped
+  obtain ⟨elementProjected, identified⟩ := array_parts projected
+  cases layouts with
+  | scalar notArray => exact absurd rfl (notArray element)
+  | array registeredAll elementLayouts =>
+  have registered := registeredAll payload identity elementProjected identified
+  have occurrence : Staging.Recursive.Occurrence invocation id (.arrayLiteral element elements) :=
+    ⟨_, lookupExpression?_sound metadata.found, form, metadata.requirements, metadata.coercions⟩
+  have raw : ∃ sourceSize outcome after finalMap finalWorld,
+      Staging.Recursive.Size.Expression program registry sourceSize invocation context environment before id
+        outcome after ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (CompatibleExpressionArrays.arrayType payload identity) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    change EvaluationSize size actual store ((SourceCoreDataExpressions.arrayLiteral
+      (CompatibleExpressionArrays.arrayLayout payload identity) default
+      (SourceCoreCalls.packArguments codes).expression codes.length).rename ξ) value finalStore at evaluated
+    rw [arrayLiteral_rename, arrayDefault_rename defined] at evaluated
+    have complete := evaluated.sound
+    unfold SourceCoreDataExpressions.arrayLiteral at evaluated
+    cases evaluated with
+    | caseLeft firstEvaluation branch =>
+      obtain ⟨sourceSize, sourceOutcome, after, finalMap, finalWorld, sourceTrace, represented, finalHeaps, maps,
+        worlds, frame, heapMetadata, effect, reached, related, _⟩ :=
+        CellAwareInvocationExpressionSequence.reflects bridge _ sequence unique typing childMeaning environments
+          heaps locals agrees actualTyped initial admitted authority physical owner ownerFrame firstEvaluation
+          (by omega)
+      cases represented with
+      | fault matched =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
+          (arrayLiteral_failure (layout := CompatibleExpressionArrays.arrayLayout payload identity) (default := default)
+            (count := codes.length) firstEvaluation.sound)
+        exact ⟨_, _, after, finalMap, finalWorld, .arrayFault occurrence rfl sourceTrace, .fault matched, finalHeaps,
+          maps, worlds, frame, heapMetadata, effect, reached, related⟩
+    | caseRight firstEvaluation branch =>
+      obtain ⟨keyStore, firstRun⟩ : ∃ keyStore, EvaluationSize _ actual store _ _ keyStore := ⟨_, firstEvaluation⟩
+      obtain ⟨sourceSize, sourceOutcome, after, keyMap, keyWorld, sourceTrace, represented, keyHeaps, maps,
+        worlds, frame, heapMetadata, effect, reached, related, _⟩ :=
+        CellAwareInvocationExpressionSequence.reflects bridge _ sequence unique typing childMeaning environments
+          heaps locals agrees actualTyped initial admitted authority physical owner ownerFrame firstRun (by omega)
+      cases represented with
+      | @values sources coreValues represented =>
+        obtain ⟨lengths, elementReps, coreTyped⟩ := values_uniform represented sourceTypesEq coreTypesEq
+        have codesLength : codes.length = coreValues.length := by simpa using represented.length.2
+        rw [codesLength] at complete
+        have elementsEval := firstRun.sound
+        have allocates := Dynamic.Heap.Allocates.append (heap := after)
+          (type := TypeSystem.Ty.arrayObject element) (value := some (.arrayObject element sources))
+        obtain ⟨defaultValue, cells, defaultWorld, defaultEval, defaultWorlds, storeTyped, defaultTyped⟩ :=
+          default_runs defined elementProjected elementLayouts (packValues coreValues :: actual)
+            keyHeaps.runtime_hasTypes
+        have defaultHeaps := CellMappingHeap.heap_append keyHeaps defaultWorlds storeTyped
+        have contents : GenericHeap.ArrayContents model keyMap defaultWorld element sources payload identity
+            defaultValue (literalEntries 0 coreValues) :=
+          { projection := elementProjected
+            registered := registered
+            bounded := by rw [lengths, ← codesLength, ← tree_length sequence]; exact short
+            default_typed := defaultTyped
+            keys := fun key value member => by
+              obtain ⟨position, below, rfl⟩ := literal_keys coreValues 0 key value member
+              exact ⟨position, by omega, by simp⟩
+            entries_typed := fun key value member =>
+              (coreTyped value (literal_values coreValues 0 key value member)).weaken defaultWorlds
+            represented := fun position below => by
+              have core : position < coreValues.length := by omega
+              have entry : GenericHeap.arrayEntry (literalEntries 0 coreValues) defaultValue position =
+                  coreValues[position] := by
+                unfold GenericHeap.arrayEntry
+                have looked := literal_lookup coreValues 0 position (by
+                  have bound := short
+                  rw [tree_length sequence, codesLength] at bound
+                  omega) core
+                simp only [Nat.zero_add] at looked
+                rw [looked]
+                rfl
+              rw [entry]
+              exact ValueRep.extend (elementReps position below core) (.refl _) (.refl _) defaultWorlds }
+        have cellRep : GenericHeap.ArrayCellRepresents model keyMap defaultWorld
+            ⟨.arrayObject element, some (.arrayObject element sources), none⟩
+            (.pair (.word (Word.ofNatModulo coreValues.length)) (.pair defaultValue
+              (OrderedMapping.encode (GenericHeap.arrayLayout payload identity) (literalEntries 0 coreValues))))
+            (.product .word (.product payload (.namedData identity))) :=
+          ⟨element, sources, payload, identity, defaultValue, literalEntries 0 coreValues, rfl, by rw [lengths], rfl,
+            contents⟩
+        obtain ⟨finalHeaps, mapped, typed⟩ := defaultHeaps.allocate_array cellRep allocates
+        have coreRun := arrayLiteral_evaluates (layout := CompatibleExpressionArrays.arrayLayout payload identity)
+          elementsEval (by rw [arrayDefault_weaken defined]; exact defaultEval)
+        have extended : (keyStore ++ cells ++ [.pair (.word (Word.ofNatModulo coreValues.length)) (.pair defaultValue
+            (OrderedMapping.encode (GenericHeap.arrayLayout payload identity) (literalEntries 0 coreValues)))]) =
+            keyStore ++ (cells ++ [.pair (.word (Word.ofNatModulo coreValues.length)) (.pair defaultValue
+              (OrderedMapping.encode (GenericHeap.arrayLayout payload identity) (literalEntries 0 coreValues)))]) := by
+          simp
+        have finalFrame : AdministrativePreserved keyMap keyStore (keyMap ++ [(keyStore ++ cells).length])
+            (keyStore ++ cells ++ [.pair (.word (Word.ofNatModulo coreValues.length)) (.pair defaultValue
+              (OrderedMapping.encode (GenericHeap.arrayLayout payload identity) (literalEntries 0 coreValues)))]) :=
+          (CellMappingHeap.administrative_append keyMap keyStore cells).trans
+            (AdministrativePreserved.allocate keyMap (keyStore ++ cells) _)
+        have finalMaps : LocationMap.Extends keyMap (keyMap ++ [(keyStore ++ cells).length]) := ⟨_, rfl⟩
+        have finalWorlds : WorldExtends keyWorld
+            (defaultWorld ++ [.product .word (.product payload (.namedData identity))]) :=
+          defaultWorlds.trans ⟨_, rfl⟩
+        have finalMetadata := Dynamic.HeapMetadataExtend.of_allocation allocates
+        let suffixPool : State headers keys ⟨scope, keyMap ++ [(keyStore ++ cells).length],
+            defaultWorld ++ [.product .word (.product payload (.namedData identity))], _,
+            keyStore ++ cells ++ [.pair (.word (Word.ofNatModulo coreValues.length)) (.pair defaultValue
+              (OrderedMapping.encode (GenericHeap.arrayLayout payload identity) (literalEntries 0 coreValues)))],
+            canonical⟩ :=
+          (bridge.pool reached).extend finalMaps finalWorlds finalFrame finalMetadata
+        obtain ⟨returned, _returnedPool, returnedRelated⟩ := bridge.restore reached suffixPool
+          finalMaps finalWorlds finalFrame finalMetadata (Relates.of_records_eq rfl)
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete coreRun
+        refine ⟨_, _, _, _, _, .arrayResult occurrence rfl sourceTrace (.arrayLiteral allocates),
+          .value (by rw [nodeType]; exact .arrayRef elementProjected identified mapped typed),
+          finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, frame.trans finalFrame,
+          heapMetadata.trans finalMetadata, effect.trans ?_, returned, callerProtocol.trans related returnedRelated⟩
+        rw [extended]
+        exact CellAwareScopeAuthority.Effect.append _ _ finalMetadata finalMaps finalWorlds
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
     frame, heapMetadata, effect, reached, related⟩ := raw
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
