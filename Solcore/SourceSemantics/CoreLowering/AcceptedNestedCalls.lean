@@ -1,4 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedConstructors
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationArrayCells
 
 /-!
 # Accepted bodies: direct calls and conversions inside expressions
@@ -384,6 +385,109 @@ inductive NestedTree (whole : SourceCoreUnifiedCompilation.Compiled)
       NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id
         ⟨.namedData tag.owner,
           SourceCoreCompatibleDataExpressions.construct tag header (SourceCoreCalls.packArguments codes).expression⟩
+  | arrayLength {id node base baseNode first lowered}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node .word)
+      (form : node.form = .arrayLength base) (baseFound : source.lookupExpression? base = some baseNode)
+      (code : (∃ rest, first.type = .cell (.product .word rest) ∧
+          lowered = ⟨.word, SourceCoreDataExpressions.arrayLength first.expression⟩) ∨
+        (∃ view, first.type = .product view (.product .word .word) ∧
+          lowered = ⟨.word, SourceCoreDataExpressions.sliceLength first.expression⟩))
+      (baseTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope base first) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id lowered
+  | arrayIndex {id node base subscript baseNode subscriptNode depth fuel layout comparison first second}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node layout.valueType)
+      (form : node.form = .arrayIndex base subscript) (baseFound : source.lookupExpression? base = some baseNode)
+      (subscriptFound : source.lookupExpression? subscript = some subscriptNode)
+      (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+      (prepared : SourceCoreCompatibleDataEquality.prepare fuel whole.compatible.checked
+        (.constructor (.builtin .word)) = .ok comparison)
+      (baseTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope base first) (subscriptTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope subscript second) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id ⟨layout.valueType,
+        SourceCoreDataExpressions.viewIndex layout comparison.expression depth first.expression second.expression⟩
+  | sliceRange {id node base start stop baseNode startNode stopNode depth layout first startCode stopCode}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node
+        (.product first.type (.product .word .word)))
+      (form : node.form = .arraySlice base (some start) (some stop))
+      (baseFound : source.lookupExpression? base = some baseNode)
+      (startFound : source.lookupExpression? start = some startNode)
+      (stopFound : source.lookupExpression? stop = some stopNode)
+      (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+      (baseTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope base first) (startTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope start startCode) (stopTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope stop stopCode) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id ⟨.product first.type (.product .word .word),
+        SourceCoreDataExpressions.arraySlice first.type depth first.expression (some startCode.expression)
+          (some stopCode.expression)⟩
+  | sliceFrom {id node base bound baseNode boundNode depth layout first boundCode}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node
+        (.product first.type (.product .word .word)))
+      (form : node.form = .arraySlice base (some bound) none)
+      (baseFound : source.lookupExpression? base = some baseNode)
+      (boundFound : source.lookupExpression? bound = some boundNode)
+      (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+      (baseTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope base first) (boundTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope bound boundCode) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id ⟨.product first.type (.product .word .word),
+        SourceCoreDataExpressions.arraySlice first.type depth first.expression (some boundCode.expression) none⟩
+  | sliceTo {id node base bound baseNode boundNode depth layout first boundCode}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node
+        (.product first.type (.product .word .word)))
+      (form : node.form = .arraySlice base none (some bound))
+      (baseFound : source.lookupExpression? base = some baseNode)
+      (boundFound : source.lookupExpression? bound = some boundNode)
+      (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+      (baseTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope base first) (boundTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope bound boundCode) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id ⟨.product first.type (.product .word .word),
+        SourceCoreDataExpressions.arraySlice first.type depth first.expression none (some boundCode.expression)⟩
+  | sliceWhole {id node base baseNode depth layout first}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node
+        (.product first.type (.product .word .word)))
+      (form : node.form = .arraySlice base none none)
+      (baseFound : source.lookupExpression? base = some baseNode)
+      (shaped : SourceCoreDataExpressions.viewShape? first.type = some (depth, layout))
+      (baseTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope base first) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id ⟨.product first.type (.product .word .word),
+        SourceCoreDataExpressions.arraySlice first.type depth first.expression none none⟩
+  | newArray {id node element length lengthNode payload identity default first}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node
+        (CompatibleExpressionArrays.arrayType payload identity))
+      (form : node.form = .newArray element length)
+      (lengthFound : source.lookupExpression? length = some lengthNode)
+      (projected : whole.compatible.checked.catalog.project (TypeSystem.Ty.array element) =
+        .ok (CompatibleExpressionArrays.arrayType payload identity))
+      (defined : SourceCoreCompatibleDataExpressions.arrayDefault whole.compatible.checked.catalog element =
+        some default)
+      (layouts : CellAwareArrayCells.DefaultLayouts whole.compatible.checked.catalog
+        (CallableIndexedAmbient.ambientDefinitions whole.indexed).definitions (TypeSystem.Ty.array element))
+      (lengthTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope length first) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id ⟨CompatibleExpressionArrays.arrayType payload identity,
+        SourceCoreDataExpressions.newArray (CompatibleExpressionArrays.arrayLayout payload identity) default
+          first.expression⟩
+  | arrayLiteral {id node element elements payload identity default codes}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node
+        (CompatibleExpressionArrays.arrayType payload identity))
+      (form : node.form = .arrayLiteral element elements) (lengths : elements.length = codes.length)
+      (found : ∀ element ∈ elements, ∃ node, source.lookupExpression? element = some node)
+      (codeTypes : ∀ code ∈ codes, code.type = payload) (short : elements.length < Core.wordModulus)
+      (projected : whole.compatible.checked.catalog.project (TypeSystem.Ty.array element) =
+        .ok (CompatibleExpressionArrays.arrayType payload identity))
+      (defined : SourceCoreCompatibleDataExpressions.arrayDefault whole.compatible.checked.catalog element =
+        some default)
+      (layouts : CellAwareArrayCells.DefaultLayouts whole.compatible.checked.catalog
+        (CallableIndexedAmbient.ambientDefinitions whole.indexed).definitions (TypeSystem.Ty.array element))
+      (elementTrees : ∀ pair ∈ elements.zip codes, NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope pair.1 pair.2) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id ⟨CompatibleExpressionArrays.arrayType payload identity,
+        SourceCoreDataExpressions.arrayLiteral (CompatibleExpressionArrays.arrayLayout payload identity) default
+          (SourceCoreCalls.packArguments codes).expression codes.length⟩
+  | copy {id node element slice sliceNode sliceBase sliceStart sliceStop valueType dataType comparison fuel first}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node
+        (.cell (.product .word (.product valueType (.namedData dataType)))))
+      (form : node.form = .toArray element slice) (sliceFound : source.lookupExpression? slice = some sliceNode)
+      (sliceForm : sliceNode.form = .arraySlice sliceBase sliceStart sliceStop)
+      (shaped : SourceCoreDataExpressions.viewShape? first.type = some (0 + 1, ⟨.word, valueType, dataType⟩))
+      (prepared : SourceCoreCompatibleDataEquality.prepare fuel whole.compatible.checked
+        (.constructor (.builtin .word)) = .ok comparison)
+      (sliceTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope slice first) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id ⟨.cell (.product .word (.product valueType (.namedData dataType))),
+        SourceCoreDataExpressions.sliceCopy ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1) first.type
+          first.expression⟩
 
 section Embedding
 variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
@@ -476,6 +580,14 @@ theorem projected
   | constructor receipt _ _ _ _ _ =>
     cases Option.some.inj (found.symm.trans receipt.metadata.found)
     exact receipt.metadata.projected
+  | arrayLength metadata _ _ code _ =>
+    cases Option.some.inj (found.symm.trans metadata.found)
+    rcases code with ⟨_, _, rfl⟩ | ⟨_, _, rfl⟩ <;> exact metadata.projected
+  | arrayIndex metadata _ _ _ _ _ _ _ | sliceRange metadata _ _ _ _ _ _ _ _ | sliceFrom metadata _ _ _ _ _ _
+  | sliceTo metadata _ _ _ _ _ _ | sliceWhole metadata _ _ _ _ | newArray metadata _ _ _ _ _ _
+  | arrayLiteral metadata _ _ _ _ _ _ _ _ _ | copy metadata _ _ _ _ _ _ =>
+    cases Option.some.inj (found.symm.trans metadata.found)
+    exact metadata.projected
 
 /-- The receipts of typed sites have the projections of the sites' types as
 their native types. -/
@@ -1387,6 +1499,140 @@ theorem preserves_nested_tree [RecursiveStageMeaning.FaultTokens faults]
       unique selectedBodies runtime covers receipt form ranges size ordered childMeaning ⟨rfl, rfl, rfl⟩ nodeFound
       typed environments heaps locals agrees actualTyped initial admitted authority physical frameOwner ownerFrame
       trace
+  | @arrayLength id node base baseNode first lowered metadata form baseFound code baseTree ih =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Point scope base first) faults size :=
+      fun childSize smaller => ih childSize (fun header member admitted below less =>
+        applications header member admitted below (Nat.lt_trans less smaller))
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.length_preserves callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      ⟨rfl, rfl, rfl⟩ code size children ⟨rfl, rfl, rfl⟩
+  | @arrayIndex id node base subscript baseNode subscriptNode depth fuel layout comparison first second metadata
+      form baseFound subscriptFound shaped prepared baseTree subscriptTree baseIH subscriptIH =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base subscript first second) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl left => obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr right => obtain ⟨rfl, rfl⟩ := right; intro _; exact subscriptIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.index_preserves callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      subscriptFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ shaped prepared rfl size children ⟨rfl, rfl, rfl⟩
+  | @sliceRange id node base start stop baseNode startNode stopNode depth layout first startCode stopCode metadata
+      form baseFound startFound stopFound shaped baseTree startTree stopTree baseIH startIH stopIH =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Three scope base start stop first startCode stopCode) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      rcases alternative with left | middle | right
+      · obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := middle; intro _; exact startIH childSize below ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := right; intro _; exact stopIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.slice_range_preserves callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      startFound stopFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr (.inl ⟨rfl, rfl⟩)⟩ ⟨rfl, .inr (.inr ⟨rfl, rfl⟩)⟩ shaped
+      rfl size children ⟨rfl, rfl, rfl⟩
+  | @sliceFrom id node base bound baseNode boundNode depth layout first boundCode metadata form baseFound
+      boundFound shaped baseTree boundTree baseIH boundIH =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base bound first boundCode) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl left => obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr right => obtain ⟨rfl, rfl⟩ := right; intro _; exact boundIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.slice_from_preserves callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      boundFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ shaped rfl size children ⟨rfl, rfl, rfl⟩
+  | @sliceTo id node base bound baseNode boundNode depth layout first boundCode metadata form baseFound
+      boundFound shaped baseTree boundTree baseIH boundIH =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base bound first boundCode) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl left => obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr right => obtain ⟨rfl, rfl⟩ := right; intro _; exact boundIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.slice_to_preserves callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      boundFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ shaped rfl size children ⟨rfl, rfl, rfl⟩
+  | @sliceWhole id node base baseNode depth layout first metadata form baseFound shaped baseTree ih =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Point scope base first) faults size :=
+      fun childSize smaller => ih childSize (fun header member admitted below less =>
+        applications header member admitted below (Nat.lt_trans less smaller))
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.slice_whole_preserves callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      ⟨rfl, rfl, rfl⟩ shaped rfl size children ⟨rfl, rfl, rfl⟩
+  | @newArray id node element length lengthNode payload identity default first metadata form lengthFound projected
+      defined layouts lengthTree ih =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Point scope length first) faults size :=
+      fun childSize smaller => ih childSize (fun header member admitted below less =>
+        applications header member admitted below (Nat.lt_trans less smaller))
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.new_preserves callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form lengthFound
+      ⟨rfl, rfl, rfl⟩ projected defined layouts rfl size children ⟨rfl, rfl, rfl⟩
+  | @arrayLiteral id node element elements payload identity default codes metadata form lengths found codeTypes
+      short projected defined layouts elementTrees ih =>
+    intro size applications
+    obtain ⟨_storedTypes, sequence⟩ := DataExpressionSequence.Tree.of_children
+      (arguments_rel (source := invocation.source) (scope := scope) lengths found)
+    have childMeaning : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Arguments scope elements codes) faults size := by
+      intro smaller less current member memberCode inside _
+      obtain ⟨currentEq, inside⟩ := inside
+      subst current
+      exact ih (member, memberCode) inside smaller
+        (fun header headerMember headerAdmitted below belowLess =>
+          applications header headerMember headerAdmitted below (Nat.lt_trans belowLess less))
+        ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.literal_preserves callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form sequence
+      codeTypes short projected defined layouts rfl size childMeaning ⟨rfl, rfl, rfl⟩
+  | @copy id node element slice sliceNode sliceBase sliceStart sliceStop valueType dataType comparison fuel first
+      metadata form sliceFound sliceForm shaped prepared sliceTree ih =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Point scope slice first) faults size :=
+      fun childSize smaller => ih childSize (fun header member admitted below less =>
+        applications header member admitted below (Nat.lt_trans less smaller))
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.copy_preserves callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form sliceFound
+      ⟨rfl, rfl, rfl⟩ shaped prepared rfl size children ⟨rfl, rfl, rfl⟩
 
 include callerBridge keyPhysical cache faithful functionLeaves functionTypes included extension sameLedger uninitialized
   missing
@@ -1639,6 +1885,140 @@ theorem reflects_nested_tree [RecursiveStageMeaning.FaultTokens faults]
       unique selectedBodies runtime covers receipt form ranges size ordered childMeaning ⟨rfl, rfl, rfl⟩ nodeFound
       typed environments heaps locals agrees actualTyped initial admitted authority physical frameOwner ownerFrame
       completed
+  | @arrayLength id node base baseNode first lowered metadata form baseFound code baseTree ih =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Point scope base first) faults size :=
+      fun childSize smaller => ih childSize (fun header member admitted below less =>
+        applications header member admitted below (Nat.lt_trans less smaller))
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.length_reflects callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      ⟨rfl, rfl, rfl⟩ code size children ⟨rfl, rfl, rfl⟩
+  | @arrayIndex id node base subscript baseNode subscriptNode depth fuel layout comparison first second metadata
+      form baseFound subscriptFound shaped prepared baseTree subscriptTree baseIH subscriptIH =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base subscript first second) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl left => obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr right => obtain ⟨rfl, rfl⟩ := right; intro _; exact subscriptIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.index_reflects callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      subscriptFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ shaped prepared rfl size children ⟨rfl, rfl, rfl⟩
+  | @sliceRange id node base start stop baseNode startNode stopNode depth layout first startCode stopCode metadata
+      form baseFound startFound stopFound shaped baseTree startTree stopTree baseIH startIH stopIH =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Three scope base start stop first startCode stopCode) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      rcases alternative with left | middle | right
+      · obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := middle; intro _; exact startIH childSize below ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := right; intro _; exact stopIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.slice_range_reflects callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      startFound stopFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr (.inl ⟨rfl, rfl⟩)⟩ ⟨rfl, .inr (.inr ⟨rfl, rfl⟩)⟩ shaped
+      rfl size children ⟨rfl, rfl, rfl⟩
+  | @sliceFrom id node base bound baseNode boundNode depth layout first boundCode metadata form baseFound
+      boundFound shaped baseTree boundTree baseIH boundIH =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base bound first boundCode) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl left => obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr right => obtain ⟨rfl, rfl⟩ := right; intro _; exact boundIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.slice_from_reflects callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      boundFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ shaped rfl size children ⟨rfl, rfl, rfl⟩
+  | @sliceTo id node base bound baseNode boundNode depth layout first boundCode metadata form baseFound
+      boundFound shaped baseTree boundTree baseIH boundIH =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base bound first boundCode) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl left => obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr right => obtain ⟨rfl, rfl⟩ := right; intro _; exact boundIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.slice_to_reflects callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      boundFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr ⟨rfl, rfl⟩⟩ shaped rfl size children ⟨rfl, rfl, rfl⟩
+  | @sliceWhole id node base baseNode depth layout first metadata form baseFound shaped baseTree ih =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Point scope base first) faults size :=
+      fun childSize smaller => ih childSize (fun header member admitted below less =>
+        applications header member admitted below (Nat.lt_trans less smaller))
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.slice_whole_reflects callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form baseFound
+      ⟨rfl, rfl, rfl⟩ shaped rfl size children ⟨rfl, rfl, rfl⟩
+  | @newArray id node element length lengthNode payload identity default first metadata form lengthFound projected
+      defined layouts lengthTree ih =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Point scope length first) faults size :=
+      fun childSize smaller => ih childSize (fun header member admitted below less =>
+        applications header member admitted below (Nat.lt_trans less smaller))
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.new_reflects callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form lengthFound
+      ⟨rfl, rfl, rfl⟩ projected defined layouts rfl size children ⟨rfl, rfl, rfl⟩
+  | @arrayLiteral id node element elements payload identity default codes metadata form lengths found codeTypes
+      short projected defined layouts elementTrees ih =>
+    intro size applications
+    obtain ⟨_storedTypes, sequence⟩ := DataExpressionSequence.Tree.of_children
+      (arguments_rel (source := invocation.source) (scope := scope) lengths found)
+    have childMeaning : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Arguments scope elements codes) faults size := by
+      intro smaller less current member memberCode inside _
+      obtain ⟨currentEq, inside⟩ := inside
+      subst current
+      exact ih (member, memberCode) inside smaller
+        (fun header headerMember headerAdmitted below belowLess =>
+          applications header headerMember headerAdmitted below (Nat.lt_trans belowLess less))
+        ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.literal_reflects callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form sequence
+      codeTypes short projected defined layouts rfl size childMeaning ⟨rfl, rfl, rfl⟩
+  | @copy id node element slice sliceNode sliceBase sliceStart sliceStop valueType dataType comparison fuel first
+      metadata form sliceFound sliceForm shaped prepared sliceTree ih =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Point scope slice first) faults size :=
+      fun childSize smaller => ih childSize (fun header member admitted below less =>
+        applications header member admitted below (Nat.lt_trans less smaller))
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.copy_reflects callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form sliceFound sliceForm
+      ⟨rfl, rfl, rfl⟩ shaped prepared rfl size children ⟨rfl, rfl, rfl⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedBounds
 end
