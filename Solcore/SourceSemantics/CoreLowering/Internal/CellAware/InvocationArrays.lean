@@ -507,7 +507,7 @@ local notation "cells" => GeneralizedLocalDescriptorHeap.cellModel
 
 include prepared in
 /-- A Source read through a view, on its representation: the Core read through as many slices, at an
-element that represents the Source's; it appends only the lookup's cells. -/
+element that represents the Source's in the world it starts from; it appends only the lookup's cells. -/
 theorem reads_preserve {environment : Environment} {context : Core.Context}
     (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
     (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
@@ -522,7 +522,7 @@ theorem reads_preserve {environment : Environment} {context : Core.Context}
       ∃ result final futureWorld suffix,
         ViewReads comparison layout environment store depth coreView (Word.ofNatModulo position)
           (.inRight .word result) final ∧
-        ValueRep checked registry functions mapping futureWorld elementType element result layout.valueType ∧
+        ValueRep checked registry functions mapping world elementType element result layout.valueType ∧
         GenericHeap.CellHeapRepresents cells mapping futureWorld heap final ∧
         WorldExtends world futureWorld ∧ AdministrativePreserved mapping store mapping final ∧
         final = store ++ suffix := by
@@ -601,7 +601,7 @@ theorem reads_preserve {environment : Environment} {context : Core.Context}
           have same := runtime.symm.trans arrayView
           simpa [TypeSystem.Ty.array, SourceCoreRawMetadata.runtimeType] using same
         exact ⟨_, _, futureWorld, suffix, .array coreRead wordBelow wordKeys,
-          (ValueRep.compatible sameRuntime elementRep).extend (.refl _) (.refl _) worlds, futureHeaps, worlds,
+          ValueRep.compatible sameRuntime elementRep, futureHeaps, worlds,
           unchanged, appended⟩
       | slice _ =>
         have impossible := runtime.symm.trans arrayView
@@ -1402,7 +1402,8 @@ theorem index_preserves [RecursiveStageMeaning.FaultTokens faults] {children : G
               (.refl _) suffixWorlds suffixFrame (.refl _) (Relates.of_records_eq rfl)
             exact ⟨_, _, keyMap, futureWorld,
               CellAwareArrayReads.viewIndex_reads prepared keyType firstEval secondEval coreReads,
-              .value elementRep, finalHeaps, firstMaps.trans maps, (firstWorlds.trans worlds).trans suffixWorlds,
+              .value (elementRep.extend (.refl _) (.refl _) suffixWorlds), finalHeaps, firstMaps.trans maps,
+              (firstWorlds.trans worlds).trans suffixWorlds,
               (firstFrame.trans frame).trans suffixFrame, firstMetadata.trans heapMetadata,
               (firstEffect.trans effect).trans (CellAwareScopeAuthority.Effect.append
                 (instances := GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment) _ suffix
@@ -1560,7 +1561,8 @@ theorem index_reflects [RecursiveStageMeaning.FaultTokens faults] {children : Ge
                 (.refl _) suffixWorlds suffixFrame (.refl _) (Relates.of_records_eq rfl)
               exact ⟨_, _, after, keyMap, futureWorld,
                 .arrayResult occurrence rfl (.cons firstTrace (.cons secondTrace .nil)) (.arrayIndex reads),
-                .value elementRep, finalHeaps, firstMaps.trans maps, (firstWorlds.trans worlds).trans suffixWorlds,
+                .value (elementRep.extend (.refl _) (.refl _) suffixWorlds), finalHeaps, firstMaps.trans maps,
+                (firstWorlds.trans worlds).trans suffixWorlds,
                 (firstFrame.trans frame).trans suffixFrame, firstMetadata.trans heapMetadata,
                 (firstEffect.trans effect).trans (CellAwareScopeAuthority.Effect.append
                   (instances := GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment) _ suffix

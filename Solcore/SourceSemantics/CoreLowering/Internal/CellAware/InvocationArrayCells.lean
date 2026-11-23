@@ -7,7 +7,7 @@ The heads of the array forms that allocate a fresh array on both sides, with the
 whole-cell heap relation, its Core layout registered (`DefaultLayouts`), and the default element: zero, or
 one fresh empty array, the Core default's last cell after the Core-only cells of its own element's default
 (`CellAwareArrayCells.default_preserve`). Main declarations: `CellAwareInvocationArrayBounds.new_preserves`,
-`literal_preserves` and their `reflects`.
+`literal_preserves`, `copy_preserves` for `toArray(a[s:e])`, and their `reflects`.
 -/
 
 section
@@ -1126,6 +1126,900 @@ theorem literal_reflects [RecursiveStageMeaning.FaultTokens faults]
           heapMetadata.trans finalMetadata, effect.trans ?_, returned, callerProtocol.trans related returnedRelated⟩
         rw [extended]
         exact CellAwareScopeAuthority.Effect.append _ _ finalMetadata finalMaps finalWorlds
+  obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationArrayBounds
+end
+
+section
+/-! The copy helper's code typed in its own environment, and a Source copy of a slice's elements as the
+helper's reads, each through the slice, on a store that keeps the heap's cells. -/
+set_option autoImplicit false
+set_option maxHeartbeats 4000000
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareArrayCells
+open Core Frontend SourceInference GeneralHeap CompatiblePayload CompatibleArrayEvaluation
+
+theorem viewShape_zero {type : Ty} {layout : OrderedMapping.Layout}
+    (shaped : SourceCoreDataExpressions.viewShape? type = some (0, layout)) :
+    type = .cell (.product .word (.product layout.valueType layout.type)) ∧ layout.keyType = .word := by
+  induction type using SourceCoreDataExpressions.viewShape?.induct generalizing layout with
+  | case1 =>
+    simp only [SourceCoreDataExpressions.viewShape?, Option.some.injEq, Prod.mk.injEq] at shaped
+    obtain ⟨_, rfl⟩ := shaped
+    exact ⟨rfl, rfl⟩
+  | case2 base ih =>
+    simp only [SourceCoreDataExpressions.viewShape?] at shaped
+    cases inner : SourceCoreDataExpressions.viewShape? base <;> simp [inner] at shaped
+  | case3 => simp [SourceCoreDataExpressions.viewShape?] at shaped
+
+theorem viewShape_succ {type : Ty} {depth : Nat} {layout : OrderedMapping.Layout}
+    (shaped : SourceCoreDataExpressions.viewShape? type = some (depth + 1, layout)) :
+    ∃ base, type = .product base (.product .word .word) ∧
+      SourceCoreDataExpressions.viewShape? base = some (depth, layout) := by
+  induction type using SourceCoreDataExpressions.viewShape?.induct generalizing depth layout with
+  | case1 =>
+    simp only [SourceCoreDataExpressions.viewShape?, Option.some.injEq, Prod.mk.injEq] at shaped
+    omega
+  | case2 base ih =>
+    simp only [SourceCoreDataExpressions.viewShape?] at shaped
+    cases inner : SourceCoreDataExpressions.viewShape? base with
+    | none => simp [inner] at shaped
+    | some pair =>
+      obtain ⟨innerDepth, innerLayout⟩ := pair
+      simp [inner] at shaped
+      obtain ⟨rfl, rfl⟩ := shaped
+      exact ⟨base, rfl, inner⟩
+  | case3 => simp [SourceCoreDataExpressions.viewShape?] at shaped
+
+theorem viewShape_wellFormed {definitions : DataEnvironment} {layout : OrderedMapping.Layout}
+    (registered : layout.Registered definitions) :
+    ∀ {depth : Nat} {type : Ty}, SourceCoreDataExpressions.viewShape? type = some (depth, layout) →
+      Ty.WellFormed definitions type
+  | 0, type, shaped => by
+    obtain ⟨rfl, _⟩ := viewShape_zero shaped
+    exact .cell (.product .word (.product registered.valueWellFormed registered.typeWellFormed))
+  | depth + 1, type, shaped => by
+    obtain ⟨base, rfl, inner⟩ := viewShape_succ shaped
+    exact .product (viewShape_wellFormed registered inner) (.product .word .word)
+
+section Typing
+variable {definitions : DataEnvironment} {layout : OrderedMapping.Layout} {comparison : Expr}
+  (registered : layout.Registered definitions)
+
+include registered in
+theorem arrayIndex_hasType {context : Core.Context} {base index : Expr}
+    (comparisonTyped : HasType context comparison layout.comparisonType definitions)
+    (baseTyped : HasType context base
+      (LanguageResult.resultType (.cell (.product .word (.product layout.valueType layout.type)))) definitions)
+    (indexTyped : HasType context index (LanguageResult.resultType .word) definitions)
+    (keyType : layout.keyType = .word) :
+    HasType context (SourceCoreDataExpressions.arrayIndex layout comparison base index)
+      (LanguageResult.resultType layout.valueType) definitions := by
+  have first : HasType (.cell (.product .word (.product layout.valueType layout.type)) :: context)
+      (comparison.weakenAt 0) layout.comparisonType definitions := by
+    simpa [Context.insertAt] using
+      comparisonTyped.weakenAt (inserted := .cell (.product .word (.product layout.valueType layout.type))) 0
+  have second : HasType (.word :: .cell (.product .word (.product layout.valueType layout.type)) :: context)
+      ((comparison.weakenAt 0).weakenAt 0) layout.comparisonType definitions := by
+    simpa [Context.insertAt] using first.weakenAt (inserted := .word) 0
+  have indexWeak : HasType (.cell (.product .word (.product layout.valueType layout.type)) :: context)
+      (index.weakenAt 0) (LanguageResult.resultType .word) definitions := by
+    simpa [Context.insertAt] using
+      indexTyped.weakenAt (inserted := .cell (.product .word (.product layout.valueType layout.type))) 0
+  unfold SourceCoreDataExpressions.arrayIndex
+  apply LanguageResult.bind_hasType registered.valueWellFormed baseTyped
+  apply LanguageResult.bind_hasType registered.valueWellFormed indexWeak
+  apply HasType.ifE (HasType.wordLt (.var rfl) (.first (.loadCell (.var rfl))))
+  · apply LanguageResult.bind_hasType registered.valueWellFormed
+      (OrderedMapping.lookup_hasType registered second (.second (.second (.loadCell (.var rfl))))
+        (by rw [keyType]; exact .var rfl))
+    exact .caseE (.var rfl) (LanguageResult.success_hasType (.first (.second (.loadCell (.var rfl)))))
+      (LanguageResult.success_hasType (.var rfl))
+  · exact LanguageResult.failure_hasType registered.valueWellFormed .word
+
+include registered in
+theorem viewRead_hasType {context : Core.Context}
+    (comparisonTyped : HasType context comparison layout.comparisonType definitions) :
+    ∀ (depth : Nat) {view position : Expr} {viewType : Ty},
+      SourceCoreDataExpressions.viewShape? viewType = some (depth, layout) →
+      HasType context view viewType definitions → HasType context position .word definitions →
+      HasType context (SourceCoreDataExpressions.viewRead layout comparison depth view position)
+        (LanguageResult.resultType layout.valueType) definitions
+  | 0, view, position, viewType, shaped, viewTyped, positionTyped => by
+    obtain ⟨rfl, keyType⟩ := viewShape_zero shaped
+    exact arrayIndex_hasType registered comparisonTyped (LanguageResult.success_hasType viewTyped)
+      (LanguageResult.success_hasType positionTyped) keyType
+  | depth + 1, view, position, viewType, shaped, viewTyped, positionTyped => by
+    obtain ⟨base, rfl, inner⟩ := viewShape_succ shaped
+    unfold SourceCoreDataExpressions.viewRead
+    apply HasType.ifE (HasType.wordLt positionTyped (.second (.second viewTyped)))
+    · exact viewRead_hasType comparisonTyped depth inner (.first viewTyped)
+        (.binary (.first (.second viewTyped)) positionTyped)
+    · exact LanguageResult.failure_hasType registered.valueWellFormed .word
+
+theorem viewLength_hasType {context : Core.Context} :
+    ∀ {depth : Nat} {view : Expr} {viewType : Ty},
+      SourceCoreDataExpressions.viewShape? viewType = some (depth, layout) →
+      HasType context view viewType definitions →
+      HasType context (SourceCoreDataExpressions.viewLength depth view) .word definitions
+  | 0, view, viewType, shaped, viewTyped => by
+    obtain ⟨rfl, _⟩ := viewShape_zero shaped
+    exact .first (.loadCell viewTyped)
+  | depth + 1, view, viewType, shaped, viewTyped => by
+    obtain ⟨base, rfl, _⟩ := viewShape_succ shaped
+    exact .second (.second viewTyped)
+
+include registered in
+/-- The copy helper's body is typed in its own environment: the slice and the position, and its cell. -/
+theorem sliceCopyBody_hasType {depth : Nat} {sliceType : Ty} {context : Core.Context}
+    (shaped : SourceCoreDataExpressions.viewShape? sliceType = some (depth, layout)) (keyType : layout.keyType = .word)
+    (comparisonTyped : HasType (.product sliceType .word ::
+      OptionalCell.referenceType (OrderedMapping.helperType (.product sliceType .word) layout.type) :: context)
+      comparison layout.comparisonType definitions) :
+    HasType (.product sliceType .word ::
+        OptionalCell.referenceType (OrderedMapping.helperType (.product sliceType .word) layout.type) :: context)
+      (SourceCoreDataExpressions.sliceCopyBody layout comparison depth sliceType)
+      (LanguageResult.resultType layout.type) definitions := by
+  have sliceWellFormed := viewShape_wellFormed registered shaped
+  unfold SourceCoreDataExpressions.sliceCopyBody
+  apply HasType.ifE (HasType.wordLt (.second (.var rfl)) (viewLength_hasType shaped (.first (.var rfl))))
+  · apply LanguageResult.bind_hasType registered.typeWellFormed
+      (viewRead_hasType registered comparisonTyped depth shaped (.first (.var rfl)) (.second (.var rfl)))
+    apply LanguageResult.bind_hasType registered.typeWellFormed
+      (OrderedMapping.invoke_hasType (.product sliceWellFormed .word) registered.typeWellFormed (.var rfl)
+        (.pair (.first (.var rfl)) (.binary (.second (.var rfl)) .word)))
+    exact LanguageResult.success_hasType
+      (OrderedMapping.cons_hasType registered (by rw [keyType]; exact .second (.var rfl)) (.var rfl) (.var rfl))
+  · exact LanguageResult.success_hasType (OrderedMapping.empty_hasType registered _)
+
+end Typing
+
+section Copies
+variable {checked : SourceCoreCompatibleCatalog.Checked} {fuel : Nat}
+  {comparison : SourceCoreCompatibleDataEquality.Prepared checked} {layout : OrderedMapping.Layout}
+
+/-- A read through a view runs the same way on a store that keeps its cells, in any environment. -/
+theorem ViewReads.transport {environment environment' : Environment} {store store' : Store} {depth : Nat}
+    {view : Value} {position : Word} {result : Value} {final : Store}
+    (reads : CompatibleArrayEvaluation.ViewReads comparison layout environment store depth view position result final)
+    (agree : ∀ location value, store.read? location = some value → store'.read? location = some value) :
+    ∃ final', CompatibleArrayEvaluation.ViewReads comparison layout environment' store' depth view position result
+      final' := by
+  induction reads with
+  | array read below wordKeys => exact ⟨_, .array (agree _ _ read) below wordKeys⟩
+  | arrayOutside read beyond => exact ⟨_, .arrayOutside (agree _ _ read) beyond⟩
+  | slice below _ ih =>
+    obtain ⟨final', innerRead⟩ := ih
+    exact ⟨final', .slice below innerRead⟩
+  | sliceOutside beyond => exact ⟨_, .sliceOutside beyond⟩
+
+/-- A read through a view only appends cells. -/
+theorem ViewReads.appends {environment : Environment} {store : Store} {depth : Nat}
+    {view : Value} {position : Word} {result : Value} {final : Store}
+    (reads : CompatibleArrayEvaluation.ViewReads comparison layout environment store depth view position result final) :
+    ∃ suffix, final = store ++ suffix := by
+  induction reads with
+  | @array type location length position default entries read below wordKeys =>
+    obtain ⟨suffix, appended, _⟩ := CompatibleMappingComparison.helper_store_extension comparison
+      (.word position :: .cellRef type location :: environment) store layout.lookupParameter layout.lookupResult
+      (OrderedMapping.lookupBody layout)
+      (.pair (OrderedMapping.encode layout entries) (.pair (.word position)
+        (CompatibleMappingComparison.comparator comparison (.word position :: .cellRef type location :: environment)
+          store)))
+    exact ⟨suffix, appended⟩
+  | arrayOutside => exact ⟨[], by simp⟩
+  | slice _ _ ih => exact ih
+  | sliceOutside => exact ⟨[], by simp⟩
+
+theorem CopyReads.appends {depth : Nat} {sliceValue : Value} {length : Word} {self : Value}
+    {captured : Environment} {position : Word} {store : Store} {entries : OrderedMapping.Entries} {final : Store}
+    (copies : CompatibleArrayEvaluation.CopyReads comparison layout depth sliceValue length self captured position store
+      entries final) :
+    ∃ suffix, final = store ++ suffix := by
+  induction copies with
+  | done => exact ⟨[], by simp⟩
+  | next _ reads _ ih =>
+    obtain ⟨first, rfl⟩ := ViewReads.appends reads
+    obtain ⟨rest, rfl⟩ := ih
+    exact ⟨first ++ rest, by simp⟩
+
+variable {registry : SourceCoreRawMetadata.Registry}
+  {ambient : AmbientDefinitions checked.catalog.definitions} {functions : FunctionModel checked.catalog ambient}
+  {instances : GeneralizedLocalDescriptorHeap.InstanceModel ambient.definitions}
+  {mapping : LocationMap} {world : StoreTyping} {heap : Dynamic.Heap} {store : Store}
+  (prepared : SourceCoreCompatibleDataEquality.prepare fuel checked (.constructor (.builtin .word)) = .ok comparison)
+
+local notation "cells" => GeneralizedLocalDescriptorHeap.cellModel
+  (CompatibleAmbientHeap.payloadModel checked registry functions) instances
+
+include prepared in
+/-- A Source copy of a view's elements, on its representation: the copy helper's reads from the same position,
+on a store that keeps the heap's cells, to the entries of each element at its own position. -/
+theorem copies_preserve {environment : Environment} {context : Core.Context}
+    (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
+    (environmentTyped : RuntimeEnvironmentHasTypes world environment context ambient.definitions)
+    {view : Dynamic.Value} {position count : Nat} {values : List Dynamic.Value}
+    (copies : Dynamic.ViewCopies heap view position count values) :
+    ∀ {repType viewType elementType : TypeSystem.Ty} {coreView : Value} {coreType : Ty} {depth : Nat}
+      {self : Value} {captured : Environment} {copyStore : Store} {length : Nat},
+      ValueRep checked registry functions mapping world repType view coreView coreType →
+      SourceCoreRawMetadata.runtimeType repType = SourceCoreRawMetadata.runtimeType viewType →
+      ViewElement viewType elementType →
+      SourceCoreDataExpressions.viewShape? coreType = some (depth, layout) →
+      position + count = length → length < wordModulus →
+      (∀ location value, store.read? location = some value → copyStore.read? location = some value) →
+      ∃ coreValues final,
+        CompatibleArrayEvaluation.CopyReads comparison layout depth coreView (Word.ofNatModulo length) self captured
+          (Word.ofNatModulo position) copyStore (literalEntries position coreValues) final ∧
+        coreValues.length = values.length ∧
+        (∀ index (below : index < values.length) (core : index < coreValues.length),
+          ValueRep checked registry functions mapping world elementType values[index] coreValues[index]
+            layout.valueType) ∧
+        (∃ suffix, final = copyStore ++ suffix) := by
+  induction copies with
+  | @nil position =>
+    intro repType viewType elementType coreView coreType depth self captured copyStore length rep runtime elementOf
+      shape total small agree
+    refine ⟨[], copyStore, .done ?_, rfl, fun _ below => absurd below (Nat.not_lt_zero _), ⟨[], by simp⟩⟩
+    intro below
+    have := (CellAwareArrayReads.ofNatModulo_lt (by omega) small).mp below
+    omega
+  | @cons position count value values reads rest ih =>
+    intro repType viewType elementType coreView coreType depth self captured copyStore length rep runtime elementOf
+      shape total small agree
+    obtain ⟨result, _, _, _, coreReads, elementRep, _, _, _, _⟩ :=
+      CellAwareArrayReads.reads_preserve prepared heaps environmentTyped reads rep runtime elementOf shape (by omega)
+    obtain ⟨middle, transported⟩ := ViewReads.transport (environment' := .pair coreView
+      (.word (Word.ofNatModulo position)) :: self :: captured) coreReads agree
+    obtain ⟨coreValues, final, more, lengths, restReps, appended⟩ :=
+      ih rep runtime elementOf shape (by omega) small (fun location value read =>
+        transported.keeps (agree location value read))
+    rw [← CellAwareArrayReads.ofNatModulo_add] at more
+    obtain ⟨first, rfl⟩ := ViewReads.appends transported
+    obtain ⟨rest, rfl⟩ := appended
+    refine ⟨result :: coreValues, _, .next ((CellAwareArrayReads.ofNatModulo_lt (by omega) small).mpr (by omega))
+      transported more, by simp [lengths], ?_, ⟨first ++ rest, by simp⟩⟩
+    intro index below core
+    cases index with
+    | zero => exact elementRep
+    | succ index => exact restReps index (by simpa using below) (by simpa using core)
+
+end Copies
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareArrayCells
+end
+
+section
+/-! A slice within an array copies its elements on the Source side. -/
+set_option autoImplicit false
+set_option maxHeartbeats 4000000
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareArrayCells
+open Core Frontend SourceInference GeneralHeap CompatiblePayload CompatibleArrayEvaluation
+
+theorem ViewCopies.length {heap : Dynamic.Heap} {view : Dynamic.Value} {position count : Nat}
+    {values : List Dynamic.Value} (copies : Dynamic.ViewCopies heap view position count values) :
+    values.length = count := by
+  induction copies with
+  | nil => rfl
+  | cons _ _ ih => simp [ih]
+
+/-- A slice of an array within its length copies: each position below the slice's length reads the array. -/
+theorem copies_exist {heap : Dynamic.Heap} {element : TypeSystem.Ty} {location : Dynamic.Location}
+    {cell : Dynamic.Cell} {elements : List Dynamic.Value} (read : Dynamic.Heap.Reads heap location cell)
+    (stored : cell.value = some (.arrayObject element elements)) {start length : Nat}
+    (within : start + length ≤ elements.length) :
+    ∀ count position, position + count = length →
+      ∃ values, Dynamic.ViewCopies heap (.arraySlice (.arrayRef element location) start length) position count values
+  | 0, _, _ => ⟨[], .nil⟩
+  | count + 1, position, total => by
+    obtain ⟨values, rest⟩ := copies_exist read stored within count (position + 1) (by omega)
+    have below : start + position < elements.length := by omega
+    exact ⟨_, .cons (.slice (by omega) (.array read stored (List.getElem?_eq_getElem below))) rest⟩
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareArrayCells
+end
+
+section
+/-! `toArray(a[s:e])`: the slice, whose bounds check gives the copy within the array, then the copy helper
+and the array's cell. -/
+set_option autoImplicit false
+set_option Elab.async false
+set_option maxHeartbeats 4000000
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationArrayBounds
+open Core Frontend SourceInference GeneralHeap ReadOnly CompatiblePayload CoreProof
+open CallableIndexedOwnedFunctionState CallableIndexedOwnedSourceAdmission
+open CellAwareInvocationExpressionBounds CellAwareArraySourceInversion CompatibleArrayEvaluation
+open CellAwareArrayCells
+open GenericExpressionMeaning (agree_prefix rename_prefix)
+universe u
+
+/-- `toArray(s)` is of `T[]`, for a slice of a view of `T`s. -/
+theorem copy_source_types {source : TypedSource} {context : SourceSemantics.Context} {id slice : ExpressionId}
+    {element : TypeSystem.Ty} {node : ExpressionNode} (unique : NodeOccurrencesUnique source)
+    (found : source.lookupExpression? id = some node) (form : node.form = .toArray element slice)
+    (coercions : node.coercions = []) (typed : ExpressionHasType source context id node.type) :
+    node.type = TypeSystem.Ty.array element ∧ ∃ baseType,
+      ExpressionHasType source context slice (TypeSystem.Ty.arraySlice baseType) ∧ ViewElement baseType element := by
+  generalize typeEq : node.type = type at typed
+  cases typed with
+  | @intro _ _ actualNode rawType plan contains raw _ _ _ valid =>
+    have same := Option.some.inj ((lookupExpression?_complete unique contains).symm.trans found)
+    subst actualNode
+    have path := valid.outputPath
+    rw [coercions] at path
+    cases path
+    rw [form] at raw
+    generalize resultEq : node.type = result at raw
+    cases raw with
+    | toArray sliceTyped view => exact ⟨rfl, _, sliceTyped, view⟩
+
+/-- A slice the Source made is within its base: its start and length stay within the base's length. -/
+theorem slice_bound {program : Program} {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
+    {context : SourceSemantics.Context} {environment : Dynamic.Environment} {before after : Dynamic.Heap}
+    {size : Nat} {slice base : ExpressionId} {start stop : Option ExpressionId} {sliceNode : ExpressionNode}
+    {view : Dynamic.Value} {first length : Nat}
+    (unique : NodeOccurrencesUnique invocation.source)
+    (found : invocation.source.lookupExpression? slice = some sliceNode)
+    (form : sliceNode.form = .arraySlice base start stop)
+    (trace : Staging.Recursive.Size.Expression program registry size invocation context environment before slice
+      (.value (.arraySlice view first length)) after) :
+    ∃ count, Dynamic.ViewLength after view count ∧ first + length ≤ count := by
+  cases CellAwareArraySourceInversion.children unique found form rfl trace with
+  | result _ result _ =>
+    cases result with
+    | arraySlice counted _ ordered within => exact ⟨_, counted, by omega⟩
+
+theorem base_runtime {sliceType baseRepType baseType : TypeSystem.Ty}
+    (sliceRuntime : SourceCoreRawMetadata.runtimeType sliceType =
+      SourceCoreRawMetadata.runtimeType (TypeSystem.Ty.arraySlice baseRepType))
+    (sliceTypeEq : TypeSystem.Ty.arraySlice baseType = sliceType) :
+    SourceCoreRawMetadata.runtimeType baseRepType = SourceCoreRawMetadata.runtimeType baseType := by
+  subst sliceTypeEq
+  have same := sliceRuntime.symm
+  simp only [TypeSystem.Ty.arraySlice, SourceCoreRawMetadata.runtimeType, TypeSystem.Ty.application.injEq,
+    true_and] at same
+  exact same
+
+private theorem closedTyped {expression : Expr} {type : Ty} {definitions : DataEnvironment}
+    (typed : HasType [] expression type definitions) (context : Core.Context) :
+    HasType context expression type definitions := by
+  have extended := typed.rename (mapping := Renaming.id) (target := context) (by intro index type found; cases found)
+  simpa using extended
+
+variable {compiled : SourceCoreUnifiedCompilation.Compiled} {program : Program}
+  {headers : List (CallableIndexedOwnedFunctionValues.Header compiled program)}
+  {keys : List (CallableIndexedOwnedFunctionValues.Key compiled program)}
+  {callerProtocol : ProtectedStateTransition.Protocol.{u, 0} (Records keys)}
+  (bridge : CallableIndexedOwnedNamedCallerProtocol.Carrier (headers := headers) (fun _ => True) callerProtocol)
+  (functions : FunctionModel compiled.compatible.checked.catalog (CallableIndexedAmbient.ambientDefinitions compiled.indexed))
+  {receiving : SourceCoreRawMetadata.Registry}
+  {bodyRelation : ActualBodyInvocation.BodyRelation}
+  {attachment : optParam
+    (Dynamic.GeneralizedClosure → SourceCoreLocalPolymorphism.Binding → TypeSystem.Substitution → Prop)
+    (fun _ _ _ => True)}
+  {index : ActualBodyInvocation.Index compiled bodyRelation}
+  {context : SourceSemantics.Context} {registry : Staging.Recursive.Registry} {invocation : Staging.Recursive.Scope}
+  (faults : RecursiveStageMeaning.FaultRep)
+  (unique : NodeOccurrencesUnique invocation.source)
+  (selectedBodies : Staging.Recursive.SelectedPreservation.SelectedBodies program registry)
+  (runtime : Dynamic.SourceRuntimeValid program context invocation.source)
+  (covers : invocation.evidence.Covers context)
+  {scope : SourceCoreLocalCell.Scope} {id : ExpressionId} {node : ExpressionNode}
+  {first lowered : SourceCoreBasic.LoweredExpr}
+
+local notation "model" => CompatibleAmbientHeap.payloadModel compiled.compatible.checked receiving functions
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- `toArray(a[s:e])`'s head: the slice's meaning, then its elements' copy through the helper and one fresh
+array of the slice's length on both sides. -/
+theorem copy_preserves [RecursiveStageMeaning.FaultTokens faults] {children : GenericExpressionMeaning.Certificate}
+    {element : TypeSystem.Ty} {slice : ExpressionId} {sliceNode : ExpressionNode} {valueType : Ty}
+    {dataType : DataTypeId} {comparison : SourceCoreCompatibleDataEquality.Prepared compiled.compatible.checked}
+    {fuel : Nat}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (.cell (.product .word (.product valueType (.namedData dataType)))))
+    (form : node.form = .toArray element slice)
+    (sliceFound : invocation.source.lookupExpression? slice = some sliceNode)
+    (firstChild : children scope slice first)
+    (shaped : SourceCoreDataExpressions.viewShape? first.type = some (0 + 1, ⟨.word, valueType, dataType⟩))
+    (prepared : SourceCoreCompatibleDataEquality.prepare fuel compiled.compatible.checked
+      (.constructor (.builtin .word)) = .ok comparison)
+    (code : lowered = ⟨.cell (.product .word (.product valueType (.namedData dataType))),
+      SourceCoreDataExpressions.sliceCopy ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1) first.type
+        first.expression⟩)
+    (size : Nat)
+    (childMeaning : PreservesBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    PreservesAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ outcome after environments heaps locals agrees actualTyped initial admitted authority
+    physical owner ownerFrame trace
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨nodeType, baseType, sliceTypedAt, sliceView⟩ :=
+    copy_source_types unique found form metadata.coercions sourceTyped
+  have sliceTypeEq := CellAwareArraySourceInversion.typed_type unique sliceFound sliceTypedAt
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have sliceTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change slice ∈ [slice]; simp) sliceFound
+  have firstIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ firstChild _ sliceFound sliceTyped
+  have projected := metadata.projected
+  rw [nodeType] at projected
+  obtain ⟨elementProjected, identified⟩ := array_parts (payload := valueType) (identity := dataType) projected
+  obtain ⟨sliceBase, sliceTypeShape, baseShape⟩ := viewShape_succ shaped
+  obtain ⟨baseEq, _⟩ := viewShape_zero baseShape
+  have comparisonTyped : ∀ context : Core.Context, HasType context comparison.expression
+      (OrderedMapping.Layout.comparisonType ⟨.word, valueType, dataType⟩)
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions := by
+    intro context
+    have closed := closedTyped (comparison.typed.extend_definitions
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed).basePrefix) context
+    rw [(word_comparison prepared).1] at closed
+    simpa only [Core.OrderedMapping.Layout.comparisonType, SourceCoreCompatibleDataEquality.comparatorType,
+      SourceCoreDataEquality.comparatorType] using closed
+  have raw : ∃ value finalStore finalMap finalWorld,
+      Evaluates actual store ((SourceCoreDataExpressions.sliceCopy ⟨.word, valueType, dataType⟩
+        comparison.expression (0 + 1) first.type first.expression).rename ξ) value finalStore ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (.cell (.product .word (.product valueType (.namedData dataType)))) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    rw [sliceCopy_rename, closed_rename comparison.typed]
+    cases CellAwareArraySourceInversion.children unique found form rfl trace with
+    | fault failed smaller =>
+      obtain ⟨childSize, childSmaller, childTrace⟩ := single_fault failed
+      obtain ⟨_, finalStore, finalMap, finalWorld, firstEval, represented, finalHeaps, maps, worlds, frame,
+        heapMetadata, effect, reached, related, _⟩ :=
+        firstIH childSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+          owner ownerFrame childTrace
+      cases represented with
+      | fault matched =>
+        exact ⟨_, finalStore, finalMap, finalWorld, sliceCopy_failure firstEval, .fault matched, finalHeaps,
+          maps, worlds, frame, heapMetadata, effect, reached, related⟩
+    | result evaluated result smaller =>
+      obtain ⟨childSize, sliceSource, childSmaller, rfl, childTrace⟩ := single_values evaluated
+      obtain ⟨_, keyStore, keyMap, keyWorld, firstEval, represented, keyHeaps, maps, worlds, frame, heapMetadata,
+        effect, reached, related, _⟩ :=
+        firstIH childSize (by omega) environments heaps locals agrees actualTyped initial admitted authority physical
+          owner ownerFrame childTrace
+      cases represented with
+      | @value _ coreSlice payload =>
+        cases result with
+        | @toArray _ _ _ _ view start length values location copies allocates =>
+          obtain ⟨baseRepType, baseValue, baseCore, rfl, coreTypeEq, baseRep, bounded, _, sliceRuntime⟩ :=
+            arraySlice_fields payload rfl
+          rw [sliceTypeShape] at coreTypeEq
+          obtain ⟨baseCoreEq, -⟩ := Ty.product.inj coreTypeEq
+          subst baseCoreEq
+          subst baseEq
+          cases sliceView with
+          | slice innerView =>
+            obtain ⟨_, _, _, rfl⟩ := slice_source baseRep (base_runtime sliceRuntime sliceTypeEq)
+            obtain ⟨_, _, _, _, impossible, _⟩ := arraySlice_fields baseRep rfl
+            cases impossible
+          | array =>
+            obtain ⟨arrayElement, arrayLocation, rfl⟩ := array_source baseRep (base_runtime sliceRuntime sliceTypeEq)
+            obtain ⟨target, payloadT, identityT, rfl, cellTypeEq, mapped, typed, _⟩ := arrayRef_fields baseRep rfl
+            simp only [OrderedMapping.Layout.type, Ty.cell.injEq, Ty.product.injEq, Ty.namedData.injEq,
+              true_and] at cellTypeEq
+            obtain ⟨samePayload, sameIdentity⟩ := cellTypeEq
+            subst payloadT identityT
+            obtain ⟨arrayCell, arrayValue, arraySourceRead, arrayRead, stands⟩ := keyHeaps.cells mapped
+            cases stands with
+            | optional optionalTyped _ =>
+              have impossible := optionalTyped.symm.trans typed
+              simp [Core.OptionalCell.cellType] at impossible
+            | array cellTyped arrayed =>
+              obtain ⟨element', elements', payload', identity', default, entries, cellEq, valueEq, typeEq', contents⟩ :=
+                arrayed
+              subst cellEq valueEq
+              rw [typeEq'] at cellTyped
+              have sameType := Option.some.inj (cellTyped.symm.trans typed)
+              simp only [Ty.product.injEq, Ty.namedData.injEq, true_and] at sameType
+              obtain ⟨samePayload', sameIdentity'⟩ := sameType
+              subst payload' identity'
+              have registered := contents.registered
+              have sliceWellFormed := viewShape_wellFormed registered shaped
+              have agree : ∀ location value, keyStore.read? location = some value →
+                  (WordMapping.installedStore keyStore (.product first.type .word)
+                    (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩)
+                    (SourceCoreDataExpressions.sliceCopyBody ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1)
+                      first.type)
+                    (.pair (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                      (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length)))) (.word Word.zero))
+                    (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                      (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length))) :: actual)).read?
+                    location = some value := by
+                intro location value read
+                simp only [WordMapping.installedStore, Store.read?] at read ⊢
+                rw [List.getElem?_append_left (List.getElem?_eq_some_iff.mp read).1]
+                exact read
+              obtain ⟨coreValues, final, copiesCore, lengths, elementReps, appended⟩ :=
+                copies_preserve prepared keyHeaps (actualTyped.weaken worlds) copies payload
+                  (viewType := TypeSystem.Ty.arraySlice (TypeSystem.Ty.array element)) (by rw [← sliceTypeEq])
+                  (.slice (.array element)) shaped (Nat.zero_add _) (by omega) agree
+              rw [← CellAwareArrayReads.zero_ofNatModulo] at copiesCore
+              have coreRun := sliceCopy_evaluates (layout := ⟨.word, valueType, dataType⟩) prepared rfl (depth := 0)
+                firstEval .array arrayRead copiesCore
+              have installed : WordMapping.Installed
+                  (WordMapping.installedStore keyStore (.product first.type .word)
+                    (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩)
+                    (SourceCoreDataExpressions.sliceCopyBody ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1)
+                      first.type)
+                    (.pair (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                      (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length)))) (.word Word.zero))
+                    (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                      (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length))) :: actual))
+                  (.product first.type .word) (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩)
+                  (SourceCoreDataExpressions.sliceCopyBody ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1)
+                    first.type) keyStore.length
+                  (.pair (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                      (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length)))) (.word Word.zero) ::
+                    .pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                      (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length))) :: actual) := by
+                simp [WordMapping.Installed, WordMapping.installedStore, Store.read?]
+              have helperEval := runHelper_evaluates (.pair (Evaluates.var (index := 0) rfl) .word)
+                (sliceCopyBody_evaluates prepared rfl copiesCore installed)
+              obtain ⟨suffix, appendedEq⟩ := appended
+              have helperTyped : HasType (first.type :: actualContext)
+                  (OrderedMapping.runHelper (.product first.type .word)
+                    (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩)
+                    (SourceCoreDataExpressions.sliceCopyBody ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1)
+                      first.type) (.pair (.var 0) (.word Word.zero)))
+                  (LanguageResult.resultType (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩))
+                  (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions :=
+                OrderedMapping.runHelper_hasType (.product sliceWellFormed .word) registered.typeWellFormed
+                  (.pair (.var rfl) .word) (sliceCopyBody_hasType registered shaped rfl (comparisonTyped _))
+              have finalAppended : final = keyStore ++ ([.inRight .unit (WordMapping.closure (.product first.type .word)
+                  (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩)
+                  (SourceCoreDataExpressions.sliceCopyBody ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1)
+                    first.type) keyStore.length
+                  (.pair (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                      (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length)))) (.word Word.zero) ::
+                    .pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                      (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length))) :: actual))] ++
+                  suffix) := by
+                rw [appendedEq]
+                simp [WordMapping.installedStore]
+              obtain ⟨futureWorld, frameWorlds, futureHeaps, _, helperFrame⟩ :=
+                CellMappingHeap.evaluation_preserves_frame keyHeaps (.cons payload.runtime_hasType
+                  (actualTyped.weaken worlds)) helperTyped helperEval finalAppended
+              have valuesLength := ViewCopies.length copies
+              have cellRep : GenericHeap.ArrayCellRepresents model keyMap futureWorld
+                  ⟨.arrayObject element, some (.arrayObject element values), none⟩
+                  (.pair (.word (Word.ofNatModulo length)) (.pair default
+                    (OrderedMapping.encode (GenericHeap.arrayLayout valueType dataType) (literalEntries 0 coreValues))))
+                  (.product .word (.product valueType (.namedData dataType))) :=
+                ⟨element, values, valueType, dataType, default, literalEntries 0 coreValues, rfl,
+                  by rw [valuesLength], rfl,
+                  { projection := elementProjected
+                    registered := registered
+                    bounded := by rw [valuesLength]; omega
+                    default_typed := contents.default_typed.weaken frameWorlds
+                    keys := fun key value member => by
+                      obtain ⟨position, below, rfl⟩ := literal_keys coreValues 0 key value member
+                      exact ⟨position, by omega, by simp⟩
+                    entries_typed := fun key value member => by
+                      obtain ⟨index, below, rfl⟩ := List.mem_iff_getElem.mp
+                        (literal_values coreValues 0 key value member)
+                      exact ((elementReps index (by omega) below).runtime_hasType).weaken frameWorlds
+                    represented := fun position below => by
+                      have core : position < coreValues.length := by omega
+                      have entry : GenericHeap.arrayEntry (literalEntries 0 coreValues) default position =
+                          coreValues[position] := by
+                        unfold GenericHeap.arrayEntry
+                        have looked := literal_lookup coreValues 0 position (by omega) core
+                        simp only [Nat.zero_add] at looked
+                        rw [looked]
+                        rfl
+                      rw [entry]
+                      exact ValueRep.extend (elementReps position below core) (.refl _) (.refl _) frameWorlds }⟩
+              obtain ⟨finalHeaps, mappedNew, typedNew⟩ := futureHeaps.allocate_array cellRep allocates
+              have finalFrame := helperFrame.trans (AdministrativePreserved.allocate keyMap final
+                (.pair (.word (Word.ofNatModulo length)) (.pair default
+                  (OrderedMapping.encode (GenericHeap.arrayLayout valueType dataType) (literalEntries 0 coreValues)))))
+              have finalMaps : LocationMap.Extends keyMap (keyMap ++ [final.length]) := ⟨_, rfl⟩
+              have finalWorlds : WorldExtends keyWorld
+                  (futureWorld ++ [.product .word (.product valueType (.namedData dataType))]) :=
+                frameWorlds.trans ⟨_, rfl⟩
+              have finalMetadata := Dynamic.HeapMetadataExtend.of_allocation allocates
+              let suffixPool : State headers keys ⟨scope, keyMap ++ [final.length],
+                  futureWorld ++ [.product .word (.product valueType (.namedData dataType))], _,
+                  (final.allocate (.pair (.word (Word.ofNatModulo length)) (.pair default
+                    (OrderedMapping.encode (GenericHeap.arrayLayout valueType dataType)
+                      (literalEntries 0 coreValues))))).1, canonical⟩ :=
+                (bridge.pool reached).extend finalMaps finalWorlds finalFrame finalMetadata
+              obtain ⟨returned, _returnedPool, returnedRelated⟩ := bridge.restore reached suffixPool
+                finalMaps finalWorlds finalFrame finalMetadata (Relates.of_records_eq rfl)
+              refine ⟨_, _, _, _, coreRun,
+                .value (by rw [nodeType]; exact .arrayRef elementProjected identified mappedNew typedNew),
+                finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, frame.trans finalFrame,
+                heapMetadata.trans finalMetadata, effect.trans ?_, returned,
+                callerProtocol.trans related returnedRelated⟩
+              subst finalAppended
+              rw [List.append_assoc]
+              exact CellAwareScopeAuthority.Effect.append _ _ finalMetadata finalMaps finalWorlds
+  obtain ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related⟩ := raw
+  exact ⟨value, finalStore, finalMap, finalWorld, evaluated, represented, finalHeaps, maps, worlds,
+    frame, heapMetadata, effect, reached, related,
+    SelectedStagedPostAdmission.after_expression_sized initial reached admitted selectedBodies runtime covers locals
+      sourceTyped trace frame⟩
+
+include bridge functions faults unique selectedBodies runtime covers in
+/-- `toArray(a[s:e])`'s head, reflected: the slice's Core run gives its Source run, whose bounds check gives
+the copy within the array, and the rest is the Source's copy and allocation. -/
+theorem copy_reflects [RecursiveStageMeaning.FaultTokens faults] {children : GenericExpressionMeaning.Certificate}
+    {element : TypeSystem.Ty} {slice : ExpressionId} {sliceNode : ExpressionNode} {valueType : Ty}
+    {dataType : DataTypeId} {comparison : SourceCoreCompatibleDataEquality.Prepared compiled.compatible.checked}
+    {fuel : Nat}
+    (metadata : CompatibleExpressionReads.Metadata compiled.compatible.checked invocation.source id node
+      (.cell (.product .word (.product valueType (.namedData dataType)))))
+    (form : node.form = .toArray element slice)
+    (sliceFound : invocation.source.lookupExpression? slice = some sliceNode)
+    {sliceBase : ExpressionId} {sliceStart sliceStop : Option ExpressionId}
+    (sliceForm : sliceNode.form = .arraySlice sliceBase sliceStart sliceStop)
+    (firstChild : children scope slice first)
+    (shaped : SourceCoreDataExpressions.viewShape? first.type = some (0 + 1, ⟨.word, valueType, dataType⟩))
+    (prepared : SourceCoreCompatibleDataEquality.prepare fuel compiled.compatible.checked
+      (.constructor (.builtin .word)) = .ok comparison)
+    (code : lowered = ⟨.cell (.product .word (.product valueType (.namedData dataType))),
+      SourceCoreDataExpressions.sliceCopy ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1) first.type
+        first.expression⟩)
+    (size : Nat)
+    (childMeaning : ReflectsBelow (attachment := attachment) bridge context model index registry invocation
+      children faults size) :
+    ReflectsAt (attachment := attachment) bridge context model index registry invocation (Point scope id lowered)
+      faults size := by
+  intro current child code' point root found sourceTyped mapping world administrative environment canonical actual
+    actualContext before store ξ value finalStore environments heaps locals agrees actualTyped initial admitted
+    authority physical owner ownerFrame evaluated
+  obtain ⟨sameScope, sameId, sameCode⟩ := point
+  subst current; subst child; subst code'; subst code
+  cases Option.some.inj (found.symm.trans metadata.found)
+  obtain ⟨nodeType, baseType, sliceTypedAt, sliceView⟩ :=
+    copy_source_types unique found form metadata.coercions sourceTyped
+  have sliceTypeEq := CellAwareArraySourceInversion.typed_type unique sliceFound sliceTypedAt
+  obtain ⟨originalTypes, operandTyped⟩ := ProtectedStateExpressionOperandTyping.operand_types unique found sourceTyped
+  have sliceTyped := CallableIndexedOwnedAdmittedExpressionSequence.member_expression_typed unique operandTyped
+    (by rw [form]; change slice ∈ [slice]; simp) sliceFound
+  have firstIH := fun n (bound : n < size) => @childMeaning n bound _ _ _ firstChild _ sliceFound sliceTyped
+  have projected := metadata.projected
+  rw [nodeType] at projected
+  obtain ⟨elementProjected, identified⟩ := array_parts (payload := valueType) (identity := dataType) projected
+  obtain ⟨sliceBase, sliceTypeShape, baseShape⟩ := viewShape_succ shaped
+  obtain ⟨baseEq, _⟩ := viewShape_zero baseShape
+  have comparisonTyped : ∀ context : Core.Context, HasType context comparison.expression
+      (OrderedMapping.Layout.comparisonType ⟨.word, valueType, dataType⟩)
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions := by
+    intro context
+    have closed := closedTyped (comparison.typed.extend_definitions
+      (CallableIndexedAmbient.ambientDefinitions compiled.indexed).basePrefix) context
+    rw [(word_comparison prepared).1] at closed
+    simpa only [Core.OrderedMapping.Layout.comparisonType, SourceCoreCompatibleDataEquality.comparatorType,
+      SourceCoreDataEquality.comparatorType] using closed
+  have occurrence : Staging.Recursive.Occurrence invocation id (.toArray element slice) :=
+    ⟨_, lookupExpression?_sound metadata.found, form, metadata.requirements, metadata.coercions⟩
+  have raw : ∃ sourceSize outcome after finalMap finalWorld,
+      Staging.Recursive.Size.Expression program registry sourceSize invocation context environment before id
+        outcome after ∧
+      RecursiveStageMeaning.ResultRepresentsFor model finalMap finalWorld node.type
+        (.cell (.product .word (.product valueType (.namedData dataType)))) faults outcome value ∧
+      GenericHeap.CellHeapRepresents (GeneralizedLocalDescriptorHeap.cellModel model
+        (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)) finalMap finalWorld after finalStore ∧
+      LocationMap.Extends mapping finalMap ∧ WorldExtends world finalWorld ∧
+      AdministrativePreserved mapping store finalMap finalStore ∧ Dynamic.HeapMetadataExtend before after ∧
+      CellAwareScopeAuthority.Effect (GeneralizedLocalAcceptedInstances.modelWith compiled.indexed attachment)
+        mapping world before store finalMap finalWorld after finalStore ∧
+      ∃ reached : callerProtocol.State ⟨scope, finalMap, finalWorld, after, finalStore, canonical⟩,
+        callerProtocol.Relates initial reached := by
+    change EvaluationSize size actual store ((SourceCoreDataExpressions.sliceCopy ⟨.word, valueType, dataType⟩
+      comparison.expression (0 + 1) first.type first.expression).rename ξ) value finalStore at evaluated
+    rw [sliceCopy_rename, closed_rename comparison.typed] at evaluated
+    have complete := evaluated.sound
+    unfold SourceCoreDataExpressions.sliceCopy at evaluated
+    cases evaluated with
+    | caseLeft firstEvaluation branch =>
+      obtain ⟨firstSize, firstOutcome, after, finalMap, finalWorld, firstTrace, represented, finalHeaps, maps, worlds,
+        frame, heapMetadata, effect, reached, related, _post⟩ :=
+        firstIH _ (by omega) environments heaps locals agrees actualTyped initial admitted authority physical owner
+          ownerFrame firstEvaluation
+      cases represented with
+      | fault matched =>
+        obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete
+          (sliceCopy_failure (layout := ⟨.word, valueType, dataType⟩) (comparison := comparison) (depth := 0 + 1)
+            (sliceType := first.type) firstEvaluation.sound)
+        exact ⟨_, _, after, finalMap, finalWorld, .arrayFault occurrence rfl (.headFault firstTrace),
+          .fault matched, finalHeaps, maps, worlds, frame, heapMetadata, effect, reached, related⟩
+    | caseRight firstEvaluation branch =>
+      obtain ⟨keyStore, firstRun⟩ : ∃ keyStore, EvaluationSize _ actual store _ _ keyStore := ⟨_, firstEvaluation⟩
+      obtain ⟨firstSize, firstOutcome, after, keyMap, keyWorld, firstTrace, represented, keyHeaps, maps,
+        worlds, frame, heapMetadata, effect, reached, related, _post⟩ :=
+        firstIH _ (by omega) environments heaps locals agrees actualTyped initial admitted authority physical owner
+          ownerFrame firstRun
+      have firstEval := firstRun.sound
+      cases represented with
+      | @value sliceSource coreSlice payload =>
+        obtain ⟨view, start, length, rfl⟩ := slice_source payload (by rw [← sliceTypeEq])
+        obtain ⟨count, counted, inside⟩ := slice_bound unique sliceFound sliceForm firstTrace
+        obtain ⟨baseRepType, baseValue, baseCore, rfl, coreTypeEq, baseRep, bounded, _, sliceRuntime⟩ :=
+          arraySlice_fields payload rfl
+        rw [sliceTypeShape] at coreTypeEq
+        obtain ⟨baseCoreEq, -⟩ := Ty.product.inj coreTypeEq
+        subst baseCoreEq
+        subst baseEq
+        cases sliceView with
+        | slice innerView =>
+          obtain ⟨_, _, _, rfl⟩ := slice_source baseRep (base_runtime sliceRuntime sliceTypeEq)
+          obtain ⟨_, _, _, _, impossible, _⟩ := arraySlice_fields baseRep rfl
+          cases impossible
+        | array =>
+          obtain ⟨arrayElement, arrayLocation, rfl⟩ := array_source baseRep (base_runtime sliceRuntime sliceTypeEq)
+          obtain ⟨target, payloadT, identityT, rfl, cellTypeEq, mapped, typed, _⟩ := arrayRef_fields baseRep rfl
+          simp only [OrderedMapping.Layout.type, Ty.cell.injEq, Ty.product.injEq, Ty.namedData.injEq,
+            true_and] at cellTypeEq
+          obtain ⟨samePayload, sameIdentity⟩ := cellTypeEq
+          subst payloadT identityT
+          obtain ⟨arrayCell, arrayValue, arraySourceRead, arrayRead, stands⟩ := keyHeaps.cells mapped
+          cases stands with
+          | optional optionalTyped _ =>
+            have impossible := optionalTyped.symm.trans typed
+            simp [Core.OptionalCell.cellType] at impossible
+          | array cellTyped arrayed =>
+            obtain ⟨element', elements', payload', identity', default, entries, cellEq, valueEq, typeEq', contents⟩ :=
+              arrayed
+            subst cellEq valueEq
+            rw [typeEq'] at cellTyped
+            have sameType := Option.some.inj (cellTyped.symm.trans typed)
+            simp only [Ty.product.injEq, Ty.namedData.injEq, true_and] at sameType
+            obtain ⟨samePayload', sameIdentity'⟩ := sameType
+            subst payload' identity'
+            cases counted with
+            | @array _ _ countCell countElements countRead countStored =>
+            have sameCell := Dynamic.Heap.Reads.functional countRead arraySourceRead
+            subst sameCell
+            simp only [Option.some.injEq, Dynamic.Value.arrayObject.injEq] at countStored
+            obtain ⟨sameElement, sameElements⟩ := countStored
+            subst element' countElements
+            obtain ⟨values, copies⟩ := copies_exist arraySourceRead rfl (start := start) (length := length)
+              (by omega) length 0 (by omega)
+            have allocates := Dynamic.Heap.Allocates.append (heap := after)
+              (type := TypeSystem.Ty.arrayObject element) (value := some (.arrayObject element values))
+            have registered := contents.registered
+            have sliceWellFormed := viewShape_wellFormed registered shaped
+            have agree : ∀ location value, keyStore.read? location = some value →
+                (WordMapping.installedStore keyStore (.product first.type .word)
+                  (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩)
+                  (SourceCoreDataExpressions.sliceCopyBody ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1)
+                    first.type)
+                  (.pair (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                    (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length)))) (.word Word.zero))
+                  (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                    (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length))) :: actual)).read?
+                  location = some value := by
+              intro location value read
+              simp only [WordMapping.installedStore, Store.read?] at read ⊢
+              rw [List.getElem?_append_left (List.getElem?_eq_some_iff.mp read).1]
+              exact read
+            obtain ⟨coreValues, final, copiesCore, lengths, elementReps, appended⟩ :=
+              copies_preserve prepared keyHeaps (actualTyped.weaken worlds) copies payload
+                (viewType := TypeSystem.Ty.arraySlice (TypeSystem.Ty.array element)) (by rw [← sliceTypeEq])
+                (.slice (.array element)) shaped (Nat.zero_add _) (by omega) agree
+            rw [← CellAwareArrayReads.zero_ofNatModulo] at copiesCore
+            have coreRun := sliceCopy_evaluates (layout := ⟨.word, valueType, dataType⟩) prepared rfl (depth := 0)
+              firstEval .array arrayRead copiesCore
+            have installed : WordMapping.Installed
+                (WordMapping.installedStore keyStore (.product first.type .word)
+                  (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩)
+                  (SourceCoreDataExpressions.sliceCopyBody ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1)
+                    first.type)
+                  (.pair (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                    (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length)))) (.word Word.zero))
+                  (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                    (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length))) :: actual))
+                (.product first.type .word) (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩)
+                (SourceCoreDataExpressions.sliceCopyBody ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1)
+                  first.type) keyStore.length
+                (.pair (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                    (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length)))) (.word Word.zero) ::
+                  .pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                    (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length))) :: actual) := by
+              simp [WordMapping.Installed, WordMapping.installedStore, Store.read?]
+            have helperEval := runHelper_evaluates (.pair (Evaluates.var (index := 0) rfl) .word)
+              (sliceCopyBody_evaluates prepared rfl copiesCore installed)
+            obtain ⟨suffix, appendedEq⟩ := appended
+            have helperTyped : HasType (first.type :: actualContext)
+                (OrderedMapping.runHelper (.product first.type .word)
+                  (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩)
+                  (SourceCoreDataExpressions.sliceCopyBody ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1)
+                    first.type) (.pair (.var 0) (.word Word.zero)))
+                (LanguageResult.resultType (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩))
+                (CallableIndexedAmbient.ambientDefinitions compiled.indexed).definitions :=
+              OrderedMapping.runHelper_hasType (.product sliceWellFormed .word) registered.typeWellFormed
+                (.pair (.var rfl) .word) (sliceCopyBody_hasType registered shaped rfl (comparisonTyped _))
+            have finalAppended : final = keyStore ++ ([.inRight .unit (WordMapping.closure (.product first.type .word)
+                (OrderedMapping.Layout.type ⟨.word, valueType, dataType⟩)
+                (SourceCoreDataExpressions.sliceCopyBody ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1)
+                  first.type) keyStore.length
+                (.pair (.pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                    (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length)))) (.word Word.zero) ::
+                  .pair (.cellRef (.product .word (.product valueType (.namedData dataType))) target)
+                    (.pair (.word (Word.ofNatModulo start)) (.word (Word.ofNatModulo length))) :: actual))] ++
+                suffix) := by
+              rw [appendedEq]
+              simp [WordMapping.installedStore]
+            obtain ⟨futureWorld, frameWorlds, futureHeaps, _, helperFrame⟩ :=
+              CellMappingHeap.evaluation_preserves_frame keyHeaps (.cons payload.runtime_hasType
+                (actualTyped.weaken worlds)) helperTyped helperEval finalAppended
+            have valuesLength := ViewCopies.length copies
+            have cellRep : GenericHeap.ArrayCellRepresents model keyMap futureWorld
+                ⟨.arrayObject element, some (.arrayObject element values), none⟩
+                (.pair (.word (Word.ofNatModulo length)) (.pair default
+                  (OrderedMapping.encode (GenericHeap.arrayLayout valueType dataType) (literalEntries 0 coreValues))))
+                (.product .word (.product valueType (.namedData dataType))) :=
+              ⟨element, values, valueType, dataType, default, literalEntries 0 coreValues, rfl,
+                by rw [valuesLength], rfl,
+                { projection := elementProjected
+                  registered := registered
+                  bounded := by rw [valuesLength]; omega
+                  default_typed := contents.default_typed.weaken frameWorlds
+                  keys := fun key value member => by
+                    obtain ⟨position, below, rfl⟩ := literal_keys coreValues 0 key value member
+                    exact ⟨position, by omega, by simp⟩
+                  entries_typed := fun key value member => by
+                    obtain ⟨index, below, rfl⟩ := List.mem_iff_getElem.mp
+                      (literal_values coreValues 0 key value member)
+                    exact ((elementReps index (by omega) below).runtime_hasType).weaken frameWorlds
+                  represented := fun position below => by
+                    have core : position < coreValues.length := by omega
+                    have entry : GenericHeap.arrayEntry (literalEntries 0 coreValues) default position =
+                        coreValues[position] := by
+                      unfold GenericHeap.arrayEntry
+                      have looked := literal_lookup coreValues 0 position (by omega) core
+                      simp only [Nat.zero_add] at looked
+                      rw [looked]
+                      rfl
+                    rw [entry]
+                    exact ValueRep.extend (elementReps position below core) (.refl _) (.refl _) frameWorlds }⟩
+            obtain ⟨finalHeaps, mappedNew, typedNew⟩ := futureHeaps.allocate_array cellRep allocates
+            have finalFrame := helperFrame.trans (AdministrativePreserved.allocate keyMap final
+              (.pair (.word (Word.ofNatModulo length)) (.pair default
+                (OrderedMapping.encode (GenericHeap.arrayLayout valueType dataType) (literalEntries 0 coreValues)))))
+            have finalMaps : LocationMap.Extends keyMap (keyMap ++ [final.length]) := ⟨_, rfl⟩
+            have finalWorlds : WorldExtends keyWorld
+                (futureWorld ++ [.product .word (.product valueType (.namedData dataType))]) :=
+              frameWorlds.trans ⟨_, rfl⟩
+            have finalMetadata := Dynamic.HeapMetadataExtend.of_allocation allocates
+            let suffixPool : State headers keys ⟨scope, keyMap ++ [final.length],
+                futureWorld ++ [.product .word (.product valueType (.namedData dataType))], _,
+                (final.allocate (.pair (.word (Word.ofNatModulo length)) (.pair default
+                  (OrderedMapping.encode (GenericHeap.arrayLayout valueType dataType)
+                    (literalEntries 0 coreValues))))).1, canonical⟩ :=
+              (bridge.pool reached).extend finalMaps finalWorlds finalFrame finalMetadata
+            obtain ⟨returned, _returnedPool, returnedRelated⟩ := bridge.restore reached suffixPool
+              finalMaps finalWorlds finalFrame finalMetadata (Relates.of_records_eq rfl)
+            obtain ⟨rfl, rfl⟩ := evaluation_deterministic complete coreRun
+            refine ⟨_, _, _, _, _, .arrayResult occurrence rfl (.cons firstTrace .nil) (.toArray copies allocates),
+              .value (by rw [nodeType]; exact .arrayRef elementProjected identified mappedNew typedNew),
+              finalHeaps, maps.trans finalMaps, worlds.trans finalWorlds, frame.trans finalFrame,
+              heapMetadata.trans finalMetadata, effect.trans ?_, returned,
+              callerProtocol.trans related returnedRelated⟩
+            subst finalAppended
+            rw [List.append_assoc]
+            exact CellAwareScopeAuthority.Effect.append _ _ finalMetadata finalMaps finalWorlds
   obtain ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
     frame, heapMetadata, effect, reached, related⟩ := raw
   exact ⟨sourceSize, outcome, after, finalMap, finalWorld, trace, represented, finalHeaps, maps, worlds,
