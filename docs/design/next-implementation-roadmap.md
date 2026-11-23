@@ -98,10 +98,9 @@ obligations. None follows from agreement in a test corpus.
   beyond the recorded shapes; and other dynamic return values.
 - **Impl checks Lean lacks.** Upstream accepts, under `pragma no-bounded-variable-condition`, a
   condition whose variable is not in its impl's head (`SC0214`). Lean refuses it either way, since
-  an impl's parameters all occur in its head. Lean also accepts overlapping ordinary impls, which
-  upstream refuses (`SC0218`). And Lean holds a function type's parameters as one product, so for
-  `SC0213` it counts `function(a, b)` as one tuple parameter and `function()` as `()`. It accepts
-  the two heads of those forms that upstream refuses.
+  an impl's parameters all occur in its head. And Lean holds a function type's parameters as one
+  product, so for `SC0213` it counts `function(a, b)` as one tuple parameter and `function()` as
+  `()`. It accepts the two heads of those forms that upstream refuses.
 
 ### Known upstream findings
 
@@ -251,27 +250,36 @@ Where the two differ on what a program means or on whether it is accepted, Lean 
 that general language design supports, and upstream is not followed by default. The differences
 below come from running upstream's own test programs through Lean's native frontend.
 
-- **Lean follows upstream.** Done: an unqualified constructor head in a pattern (`case None`)
-  is refused unless it is a same-name or builtin constructor, a same-name constructor may be
-  written bare in an expression, a call of a name that a function or a builtin takes calls it
-  before a constructor that shares its type's name, as a bare name does, upstream's primitive
-  `primAddWord` is a name for the builtin, two modules exported under one alias are refused
-  (`SC0112`), `.true` and `.false` are the booleans where an expected `bool` reaches them, and
-  a match is exhaustive where its arms together cover the scrutinee's type, a tuple pattern in
-  parentheses among them. To come, each as a checker rule:
+- **Lean follows upstream.** Done:
+  - an unqualified constructor head in a pattern (`case None`) is refused unless it is a
+    same-name or builtin constructor, and a same-name constructor may be written bare in an
+    expression;
+  - a call of a name that a function or a builtin takes calls it before a constructor that
+    shares its type's name, as a bare name does;
+  - upstream's primitive `primAddWord` is a name for the builtin;
+  - two modules exported under one alias are refused (`SC0112`);
+  - `.true` and `.false` are the booleans where an expected `bool` reaches them;
+  - a match is exhaustive where its arms together cover the scrutinee's type, a tuple pattern
+    in parentheses among them;
+  - a statement after a `return` in its sequence is refused (`SC0222`), and a block that ends
+    in a `return` may be followed by more statements;
+  - two ordinary impls of a trait are refused where their main types unify, among the impls a
+    module sees, with aliases expanded and the occurs check, and with the other arguments and
+    the conditions not compared (`SC0218`).
+
+  To come, each as a checker rule:
   - `.true` or `.false` as a call's argument, a tuple's element or an operand of `&&` or
     `||`, where Lean's inference passes no expected type yet;
   - an unannotated lambda's result, and `returns (a, b)` for a trait's one tuple result;
-  - two implementations of one trait at one main type are refused (`SC0218`), Lean's `Coerce`
-    compared on both of its arguments;
-  - a weak trait argument is taken from the one implementation that fixes it;
-  - statements after a `return` are refused (`SC0222`).
+  - a weak trait argument is taken from the one implementation that fixes it.
 
   `case .true` and `case .false` wait for a case of the Source's pattern relation.
 - **Lean keeps its own rule:**
   - mutually recursive data is accepted, as directly recursive data is;
   - a binder repeated in one pattern and cyclic superclasses are refused;
   - an implementation's type parameter that occurs nowhere is refused;
+  - a two-parameter trait named `Coerce` gives implicit coercions, which upstream does not
+    have, and two of its impls overlap only where both arguments unify;
   - a function type holds its parameters as one product, so a function of one pair takes two
     arguments;
   - `@T` is Lean's builtin proxy, whatever `Proxy` a program declares;
