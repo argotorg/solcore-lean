@@ -185,8 +185,9 @@ The last two are recorded without investigation, and the generators avoid them.
    follows upstream's export checks (`SC0111` to `SC0115`) and `SC0116`, std's modules by
    their export tables, which hold each std name's origin and the constructors a std type
    shows. A std name that a user module re-exports binds on through its importers,
-   `std.opcodes`' functions to their builtins. Next come a qualified function as a value and
-   a nested plain import's full path, which upstream accepts.
+   `std.opcodes`' functions to their builtins. A function of any imported module is named
+   qualified as a value as in a call, and a plain import of a nested path names its module
+   by its full path too.
 
 ### Then
 
