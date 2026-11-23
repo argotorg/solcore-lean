@@ -7,9 +7,11 @@ A function of an imported module named qualified as a value is the reference its
 gives, as upstream resolves a qualified name in a value as in a callee: through a plain or
 namespace import, a module alias, a wildcard or selected re-export and a nested import's last
 component, at a typed or untyped local, generic at a typed local, and passed to a generic function
-(`testValues`). Each case is a source upstream's pinned checker was probed with, and gives
-upstream's verdict; an accepted one runs at 9 and 2^256 − 1 and gives the results upstream's
-checked Hull gives.
+(`testValues`). A plain import of a nested path names its module by its last component and by the
+full path it is seen by, a leading `lib` dropped, in calls, values, types, constructors and
+patterns, and under the full path a module alias of the module (`testFullPaths`). Each case is a
+source upstream's pinned checker was probed with, and gives upstream's verdict; an accepted one
+runs at 9 and 2^256 − 1 and gives the results upstream's checked Hull gives.
 -/
 
 set_option autoImplicit false
@@ -39,17 +41,37 @@ private def libraries : List Workspace.RawSourceFile := [
   { path := "lib5.solc", content := "pragma solcore;\nexport lib;" },
   { path := "relay.solc", content := "pragma solcore;\nexport lib as L;" },
   { path := "relaystd.solc", content := "pragma solcore;\nexport std.opcodes.{ div };" },
-  { path := "pkg/mod.solc", content :=
-      "pragma solcore;\nexport { g };\nfunction g(x: word) returns (word) { return x; }" }]
+  { path := "pkg/mod.solc", content := String.intercalate "\n" [
+      "pragma solcore;",
+      "export { g, T, Shape(*), toWord };",
+      "function g(x: word) returns (word) { return x; }",
+      "type T = word;",
+      "enum Shape { Dot, Line }",
+      "function toWord(s: Shape) returns (word) {",
+      "  match (s) { case Shape.Dot { return 1; } case Shape.Line { return 2; } }",
+      "}"] },
+  { path := "pkg/lt.solc", content :=
+      "pragma solcore;\nexport { g };\nfunction g(x: word) returns (word) { return 7; }" },
+  { path := "pkg/relay.solc", content := "pragma solcore;\nexport lib.lib as L;" },
+  { path := "a/b/c.solc", content :=
+      "pragma solcore;\nexport { g };\nfunction g(x: word) returns (word) { return x; }" },
+  { path := "other/mod.solc", content :=
+      "pragma solcore;\nexport { g };\nfunction g(x: word) returns (word) { return 5; }" }]
+
+/-- A module named like the directory `pkg`. -/
+private def pkgModule : List Workspace.RawSourceFile := [
+  { path := "pkg.solc", content :=
+      "pragma solcore;\nexport { h };\nfunction h(x: word) returns (word) { return 3; }" }]
 
 /-- A body that starts with `{` is `main`'s statements, any other the expression it returns. -/
-private def workspace (imports declarations : List String) (body : String) :
-    Workspace.RawWorkspace := {
+private def workspace (imports declarations : List String) (body : String)
+    (modules : List Workspace.RawSourceFile := []) : Workspace.RawWorkspace := {
   entry := "main.solc"
   mainSources := [
     { path := "main.solc", content := String.intercalate "\n" (["pragma solcore;"] ++ imports ++
         declarations ++ [s!"function main(a0: word) returns (word) " ++
-          (if body.startsWith "{" then body else s!"\{ return {body}; }")]) }] ++ libraries
+          (if body.startsWith "{" then body else s!"\{ return {body}; }")]) }] ++ libraries ++
+    modules
   externalLibraries := []
 }
 
@@ -88,8 +110,8 @@ private def runMain (raw : Workspace.RawWorkspace) (inputs : List Nat) :
   return .ok results
 
 private def expectResults (label : String) (imports declarations : List String) (body : String)
-    (expected : List Nat) : IO Unit := do
-  let found ← runMain (workspace imports declarations body) [9, maximum]
+    (expected : List Nat) (modules : List Workspace.RawSourceFile := []) : IO Unit := do
+  let found ← runMain (workspace imports declarations body modules) [9, maximum]
   assertTrue (match found with | .ok results => results == expected | .error _ => false)
     s!"{label}: expected {expected}, got {reprStr found}"
 
@@ -156,8 +178,54 @@ private def testValues : IO Unit := do
     "check"
   expectRefused "a type" ["import lib;"] [apply1] "apply1(lib.Color, a0)" "check"
 
+/-- A nested plain import's full path, accepted with upstream's results beside its last component,
+and the paths upstream refuses: the first component alone or as a value, the last two of three,
+the path of a namespace import, `lib` before an absolute path, and a local of the first
+component's name, which upstream's `SC0121` refuses beside a function too. -/
+private def testFullPaths : IO Unit := do
+  let same := [9, maximum]
+  expectResults "a call" ["import pkg.mod;"] [] "pkg.mod.g(a0)" same
+  expectResults "the last component" ["import pkg.mod;"] [] "mod.g(a0)" same
+  expectResults "a value" ["import pkg.mod;"] [apply1] "apply1(pkg.mod.g, a0)" same
+  expectResults "three components" ["import a.b.c;"] [] "a.b.c.g(a0)" same
+  expectResults "three components, the last" ["import a.b.c;"] [] "c.g(a0)" same
+  expectResults "two imports sharing a first component" ["import pkg.mod;", "import pkg.lt;"] []
+    "pkg.lt.g(pkg.mod.g(a0))" [7, 7]
+  expectResults "a type" ["import pkg.mod;"] [] "{ let s: pkg.mod.T = a0; return s; }" same
+  expectResults "a type in a signature" ["import pkg.mod;"]
+    ["function first(x: pkg.mod.T) returns (pkg.mod.T) { return x; }"] "first(a0)" same
+  expectResults "a constructor" ["import pkg.mod;"] [] "pkg.mod.toWord(pkg.mod.Shape.Line)" [2, 2]
+  expectResults "a constructor pattern" ["import pkg.mod;"] []
+    ("{ match (pkg.mod.Shape.Line) { case pkg.mod.Shape.Dot { return 1; } " ++
+      "case pkg.mod.Shape.Line { return 2; } } }") [2, 2]
+  expectResults "a module alias under the full path" ["import pkg.relay;"] []
+    "pkg.relay.L.add(a0, 4)" [4, 4]
+  expectResults "a module alias under the last component" ["import pkg.relay;"] []
+    "relay.L.add(a0, 4)" [4, 4]
+  expectResults "an absolute lib path, the path it is seen by" ["import lib.pkg.mod;"] []
+    "pkg.mod.g(a0)" same
+  expectResults "a module beside its directory" ["import pkg;", "import pkg.mod;"] []
+    "pkg.h(pkg.mod.g(a0))" [3, 3] pkgModule
+  expectResults "a namespace alias named like the first component"
+    ["import pkg.mod;", "import * as pkg from lib;"] [] "pkg.f(pkg.mod.g(a0))" same
+  expectResults "beside a selected import of the module"
+    ["import pkg.mod;", "import { g } from pkg.mod;"] [] "pkg.mod.g(g(a0))" same
+  expectResults "a namespace import's alias" ["import * as M from pkg.mod;"] [] "M.g(a0)" same
+  expectRefused "the first component alone" ["import pkg.mod;"] [] "pkg.g(a0)" "check"
+  expectRefused "the first component as a value" ["import pkg.mod;"] [apply1] "apply1(pkg, a0)"
+    "check"
+  expectRefused "the last two of three" ["import a.b.c;"] [] "b.c.g(a0)" "check"
+  expectRefused "a namespace import's path" ["import * as M from pkg.mod;"] [] "pkg.mod.g(a0)"
+    "check"
+  expectRefused "lib before an absolute path" ["import lib.pkg.mod;"] [] "lib.pkg.mod.g(a0)" "check"
+  expectRefused "a local named like the first component" ["import pkg.mod;"] []
+    "{ let pkg: word = a0; return pkg.mod.g(a0); }" "check"
+  expectRefused "a function named like the first component" ["import pkg.mod;"]
+    ["function pkg(x: word) returns (word) { return x; }"] "mod.g(a0)" "load"
+
 def run : IO Unit := do
   testValues
+  testFullPaths
   IO.println "qualified names of user modules: upstream's forms and results GREEN"
 
 end Tests.QualifiedNames

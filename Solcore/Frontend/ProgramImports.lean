@@ -19,10 +19,13 @@ set_option autoImplicit false
 
 namespace Solcore.Frontend
 
-/-- One imported namespace spelling and the module it denotes. -/
+/-- One imported namespace spelling and the module it denotes. A plain import of a nested path
+binds its last component and, as upstream binds both, the full path it is seen by (`path`). -/
 structure ProgramImportedNamespace where
   localName : String
   target : Workspace.ModuleId
+  /-- The full path, for a plain import of two or more components seen; otherwise empty. -/
+  path : List String := []
   deriving Repr, DecidableEq
 
 /-- One unqualified imported type spelling. -/
@@ -251,11 +254,23 @@ private def selectedDeclarationsList
 private def defaultNamespaceName (path : Syntax.ModulePath) : String :=
   (programImportModuleComponents path).getLast!
 
+/-- The full path a plain import binds: the components it is seen by, a leading `lib` and an
+external library's name dropped where more follow, as upstream's `visible_module_segments`; empty
+where one component is seen, as the last component is that path. -/
+private def seenNamespacePath (path : Syntax.ModulePath) : List String :=
+  let components := programImportModuleComponents path
+  let seen :=
+    if components.length > 1 &&
+        (path.value.externalMarker.isSome || components.head? == some "lib") then
+      components.drop 1
+    else components
+  if seen.length > 1 then seen else []
+
 private def addNamespace
     (visibility : ProgramImports) (localName : String)
-    (target : Workspace.ModuleId) : ProgramImports := {
+    (target : Workspace.ModuleId) (path : List String := []) : ProgramImports := {
   visibility with
-  namespaces := visibility.namespaces ++ [{ localName, target }]
+  namespaces := visibility.namespaces ++ [{ localName, target, path }]
 }
 
 private def importedTypeKeyEq
@@ -377,8 +392,11 @@ private def processImport
       match resolveProgramImportModule environment importer path with
       | .error error => ([error], visibility, [])
       | .ok target =>
-          ([], addRelayedQualified interfaces target [defaultNamespaceName path]
-            (addNamespace visibility (defaultNamespaceName path) target), [])
+          let seen := seenNamespacePath path
+          let visibility := addRelayedQualified interfaces target [defaultNamespaceName path]
+            (addNamespace visibility (defaultNamespaceName path) target seen)
+          ([], if seen.isEmpty then visibility
+            else addRelayedQualified interfaces target seen visibility, [])
   | .namespace path alias =>
       match resolveProgramImportModule environment importer path with
       | .error error => ([error], visibility, [])
@@ -520,20 +538,32 @@ def modulesNamed (visibility : ProgramImports) (name : String) :
   (visibility.namespaces.filterMap fun imported =>
     if imported.localName == name then some imported.target else none).eraseDups
 
-/-- Whether the first component denotes an imported module namespace. -/
+/-- Whether the first component denotes an imported module namespace, or begins the full path of a
+nested plain import. -/
 def hasNamespaceRoot (visibility : ProgramImports) : List String → Bool
   | [] => false
-  | root :: _ => !(visibility.modulesNamed root).isEmpty
+  | root :: _ => !(visibility.modulesNamed root).isEmpty ||
+      visibility.namespaces.any fun imported => imported.path.head? == some root
 
-/-- Follow an imported namespace and then any public module re-export bindings. -/
+/-- The modules a path reaches from modules through their public module re-export bindings. -/
+def followModulePath (visibility : ProgramImports) (targets : List Workspace.ModuleId)
+    (path : List String) : List Workspace.ModuleId :=
+  path.foldl (fun targets component =>
+    (targets.flatMap fun target =>
+      visibility.publicInterfaces.modulesNamed target component).eraseDups) targets
+
+/-- Follow an imported namespace, by its spelling or by a nested plain import's full path, and then
+any public module re-export bindings. -/
 def namespacePathTargets (visibility : ProgramImports) :
     List String → List Workspace.ModuleId
   | [] => []
   | root :: rest =>
-      rest.foldl (fun targets component =>
-        (targets.flatMap fun target =>
-          visibility.publicInterfaces.modulesNamed target component).eraseDups)
-        (visibility.modulesNamed root)
+      (visibility.followModulePath (visibility.modulesNamed root) rest ++
+        visibility.namespaces.flatMap fun imported =>
+          if !imported.path.isEmpty && imported.path.isPrefixOf (root :: rest) then
+            visibility.followModulePath [imported.target]
+              ((root :: rest).drop imported.path.length)
+          else []).eraseDups
 
 /-- Public declarations reached through an imported/re-exported module path. -/
 def declarationsInNamespacePathNamed
