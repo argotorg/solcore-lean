@@ -6,8 +6,9 @@ import Solcore.Frontend.SourceCompiler
 The user's rule of 2026-11-23 ("使用箇所に絞る"): an operator that Lean takes as its builtin at
 `word` or a fixed-width type is refused where a program's implementation of its trait there gives
 it a second meaning (`builtinOperatorMeetsImplementation`), whether the use runs or not. The trait
-must declare the operator's method and be one that upstream's lookup reaches: in the module's
-scope, or through its imports, plain ones included (`testRefusedUses`). An implementation of
+must declare the operator's method and be one that upstream's lookup reaches under the
+operator's trait name: in the module's scope, or through its imports, plain ones included, under
+the name a scope sees it by, an alias among them (`testRefusedUses`). An implementation of
 `Shl` or `Shr` at one of those types is refused where it is declared, as Lean's shifts never take
 it (`testRefusedShifts`). Generic code, which runs the implementation as upstream does, a trait of
 the operator's name without its method, a program's own type and `bool`, where Lean has no
@@ -163,6 +164,22 @@ private def testRefusedUses : IO Unit := do
       "function f(x: word) returns (word) { return x; }"])]
   expectRefused "the trait two imports away" ["import mid;"] "return a0 + 1;" ["meets Add"]
     [("mid.solc", ["import lib;", "export { g };", "function g(x: word) returns (word) { return x; }"]),
+      ("lib.solc", ["export { Add };", addTrait, addFirst])]
+  let plus := ("lib.solc", ["export { Plus };",
+    "trait Plus<a> { function add(x: a, y: a) returns (a); }",
+    "impl Plus<word> { function add(x: word, y: word) returns (word) { return x; } }"])
+  expectRefused "a trait imported as Add" ["import { Plus as Add } from lib;"] "return a0 + 1;"
+    ["meets Add"] [plus]
+  expectRefused "a trait imported as Add one import further" ["import mid;"] "return a0 + 1;"
+    ["meets Add"]
+    [("mid.solc", ["import { Plus as Add } from lib;", "export { g };",
+      "function g(x: word) returns (word) { return x; }"]), plus]
+  expectRefused "Add imported as Plus" ["import { Add as Plus } from lib;"] "return a0 + 1;"
+    ["meets Add"] lib
+  expectRefused "Add imported as Plus one import further" ["import mid;"] "return a0 + 1;"
+    ["meets Add"]
+    [("mid.solc", ["import { Add as Plus } from lib;", "export { g };",
+      "function g(x: word) returns (word) { return x; }"]),
       ("lib.solc", ["export { Add };", addTrait, addFirst])]
 
 /-- `Shl` and `Shr` implementations at a builtin type, refused where they are declared. -/

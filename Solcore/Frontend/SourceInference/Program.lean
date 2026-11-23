@@ -838,31 +838,35 @@ def compoundBinaryOperator? : Syntax.ValueAssignOp → Option Syntax.BinaryOp
   | .uncheckedModulo => some .uncheckedModulo
   | .equal | .shiftLeft | .shiftRight => none
 
-/-- Whether a module's scope sees a trait: declared there, or bound there by an import. -/
+/-- Whether a module's scope sees a trait under a name: declared there with it, or bound there
+under it by an import, an alias among them. -/
 def traitInModuleScope (environment : ProgramEnvironment) (module : Workspace.ModuleId)
-    (trait : Resolved.DeclarationId) (name : String) : Bool :=
-  decide (trait.moduleId = module) ||
+    (trait : Resolved.DeclarationId) (declaredName name : String) : Bool :=
+  (decide (trait.moduleId = module) && declaredName == name) ||
     match buildProgramImports environment module with
     | .ok visibility => (visibility.traitsNamed name).any fun declaration =>
         decide (declaration.id = trait)
     | .error _ => false
 
-/-- Whether upstream's lookup of an operator's trait method reaches a trait from a module
-(`lookup_operator_class_method`): the module's own scope, else the scope of each module it
-imports, whatever the import's form (`lookup_imported_operator_class_method`), together with the
-modules that one imports, whose names its imports qualify (`unique_visible_class_method`). -/
+/-- Whether upstream's lookup of an operator's trait method under the operator's trait name
+reaches a trait from a module (`lookup_operator_class_method`): the module's own scope, else the
+scope of each module it imports, whatever the import's form
+(`lookup_imported_operator_class_method`), together with the modules that one imports, whose
+names its imports qualify (`unique_visible_class_method`). A trait counts under the name a scope
+sees it by, so an alias does. -/
 def operatorTraitReachable (environment : ProgramEnvironment) (module : Workspace.ModuleId)
-    (trait : Resolved.DeclarationId) (name : String) : Bool :=
-  traitInModuleScope environment module trait name ||
+    (trait : Resolved.DeclarationId) (declaredName name : String) : Bool :=
+  traitInModuleScope environment module trait declaredName name ||
     (environment.importedModules module).any fun imported =>
-      traitInModuleScope environment imported trait name ||
+      traitInModuleScope environment imported trait declaredName name ||
         (environment.importedModules imported).any fun further =>
-          decide (trait.moduleId = further)
+          decide (trait.moduleId = further) && declaredName == name
 
 /-- The implementation that meets an operator's builtin at `operand`, if any: one at `operand`
-or at a type parameter, of a trait named `traitName` that declares `methodName` and that
-upstream's lookup reaches from the module being checked (`operatorTraitReachable`). A trait of
-that name without the method gives the operator no second meaning. -/
+or at a type parameter, of a trait that declares `methodName` and that upstream's lookup reaches
+from the module being checked under the name `traitName` (`operatorTraitReachable`), declared so
+or imported under it. A trait of that name without the method gives the operator no second
+meaning. -/
 def builtinOperatorMeeting? (context : Context) (traitName methodName : String) (operand : Ty) :
     Option ProgramImplementationSignature :=
   if !builtinOperatorOperand operand then none
@@ -874,11 +878,10 @@ def builtinOperatorMeeting? (context : Context) (traitName methodName : String) 
       atOperand && (match implementation.head.trait with
         | .builtin _ => false
         | .declaration trait =>
-            context.signatures.traits.any (fun signature =>
-              decide (signature.id = trait) && signature.name == traitName &&
-                signature.methods.any (·.name == methodName)) &&
-              operatorTraitReachable context.environment context.scope.currentModule trait
-                traitName)
+            (context.signatures.traits.find? fun signature => decide (signature.id = trait)).any
+              fun signature => signature.methods.any (·.name == methodName) &&
+                operatorTraitReachable context.environment context.scope.currentModule trait
+                  signature.name traitName)
 
 /-- Refuse a use that took an operator's builtin at `operand` where a program's implementation
 meets it (`builtinOperatorMeeting?`). -/
