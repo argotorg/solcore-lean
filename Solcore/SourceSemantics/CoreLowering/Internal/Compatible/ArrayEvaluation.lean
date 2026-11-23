@@ -814,5 +814,214 @@ theorem arrayDefault_weaken {catalog : SourceCoreCompatibleCatalog.Catalog} {ele
   rw [← Expr.rename_insertion]
   exact arrayDefault_rename defined _
 
+
+/-! ### Copies of slices -/
+
+/-- A helper's invocation whose body may grow the store. -/
+theorem invoke_evaluates {environment captured : Environment} {store final : Store} {parameter result : Ty}
+    {body reference argument : Expr} {location : Location} {input output : Value}
+    (referenceEvaluated : Evaluates environment store reference
+      (.cellRef (OptionalCell.cellType (WordMapping.helperType parameter result)) location) store)
+    (installed : WordMapping.Installed store parameter result body location captured)
+    (argumentEvaluated : Evaluates (WordMapping.closure parameter result body location captured :: environment)
+      store (argument.weakenAt 0) input store)
+    (bodyEvaluated : Evaluates
+      (input :: .cellRef (OptionalCell.cellType (WordMapping.helperType parameter result)) location :: captured)
+      store body output final) :
+    Evaluates environment store (WordMapping.invoke parameter result reference argument) output final :=
+  Evaluates.caseRight (OptionalCell.read_success Word.zero referenceEvaluated installed)
+    (.apply (.var rfl) argumentEvaluated bodyEvaluated)
+
+/-- A helper's run whose body may grow the store. -/
+theorem runHelper_evaluates {environment : Environment} {initialStore argumentStore final : Store}
+    {parameter result : Ty} {body argument : Expr} {input output : Value}
+    (argumentEvaluated : Evaluates environment initialStore argument input argumentStore)
+    (bodyEvaluated : Evaluates
+      (input :: .cellRef (OptionalCell.cellType (WordMapping.helperType parameter result)) argumentStore.length ::
+        input :: environment)
+      (WordMapping.installedStore argumentStore parameter result body input environment) body output final) :
+    Evaluates environment initialStore (WordMapping.runHelper parameter result body argument) output final := by
+  apply Evaluates.letE argumentEvaluated
+  apply Evaluates.letE (OptionalCell.allocate_evaluates _ _ _)
+  apply Evaluates.letE (bodyStore := WordMapping.installedStore argumentStore parameter result body input environment)
+  · apply Evaluates.storeCell (oldValue := .inLeft (WordMapping.helperType parameter result) .unit) (.var rfl)
+    · simp [Store.read?]
+    · exact .inRight .lambda
+    · simp [Store.write?, WordMapping.installedStore, WordMapping.closure]
+  · apply invoke_evaluates (body := body) (captured := input :: environment) (.var rfl)
+    · simp [WordMapping.Installed, WordMapping.installedStore, Store.read?]
+    · simpa [Expr.weakenAt] using (Evaluates.var (by rfl))
+    · exact bodyEvaluated
+
+section CopyReads
+variable {checked : SourceCoreCompatibleCatalog.Checked} {fuel : Nat}
+  {comparison : SourceCoreCompatibleDataEquality.Prepared checked} {layout : OrderedMapping.Layout}
+
+/-- A read through views keeps every earlier cell. -/
+theorem ViewReads.keeps {environment : Environment} {store : Store} {depth : Nat} {viewValue : Value}
+    {position : Word} {result : Value} {final : Store}
+    (reads : ViewReads comparison layout environment store depth viewValue position result final)
+    {location : Location} {value : Value} (read : store.read? location = some value) :
+    final.read? location = some value := by
+  induction reads with
+  | array => exact lookupStore_read read
+  | arrayOutside => exact read
+  | slice _ _ ih => exact ih
+  | sliceOutside => exact read
+
+/-- The reads of a slice's copy from `position` on, each through the slice in the copy helper's own
+environment, with the stores between them. -/
+inductive CopyReads (comparison : SourceCoreCompatibleDataEquality.Prepared checked) (layout : OrderedMapping.Layout)
+    (depth : Nat) (sliceValue : Value) (length : Word) (self : Value) (captured : Environment) :
+    Word → Store → OrderedMapping.Entries → Store → Prop where
+  | done {position : Word} {store : Store} (beyond : ¬ position < length) :
+      CopyReads comparison layout depth sliceValue length self captured position store [] store
+  | next {position : Word} {store middle final : Store} {element : Value} {rest : OrderedMapping.Entries}
+      (below : position < length)
+      (read : ViewReads comparison layout (.pair sliceValue (.word position) :: self :: captured) store depth
+        sliceValue position (.inRight .word element) middle)
+      (more : CopyReads comparison layout depth sliceValue length self captured (position.add (Word.ofNatModulo 1))
+        middle rest final) :
+      CopyReads comparison layout depth sliceValue length self captured position store
+        ((.word position, element) :: rest) final
+
+theorem CopyReads.keeps {depth : Nat} {sliceValue : Value} {length : Word} {self : Value} {captured : Environment}
+    {position : Word} {store : Store} {entries : OrderedMapping.Entries} {final : Store}
+    (copies : CopyReads comparison layout depth sliceValue length self captured position store entries final)
+    {location : Location} {value : Value} (read : store.read? location = some value) :
+    final.read? location = some value := by
+  induction copies with
+  | done => exact read
+  | next _ reads _ ih => exact ih (reads.keeps read)
+
+/-- The memory array under a view inside `depth` slices. -/
+inductive ViewArray : Nat → Value → Value → Prop where
+  | array {value : Value} : ViewArray 0 value value
+  | slice {depth : Nat} {inner start length array : Value} (under : ViewArray depth inner array) :
+      ViewArray (depth + 1) (.pair inner (.pair start length)) array
+
+theorem ViewArray.selects {depth : Nat} {view array : Value} (arrayed : ViewArray depth view array)
+    {environment : Environment} {expression : Expr} (selected : DataEquality.Selects environment expression view) :
+    DataEquality.Selects environment (SourceCoreDataExpressions.viewArray depth expression) array := by
+  induction arrayed generalizing expression with
+  | array => exact selected
+  | slice _ ih => exact ih selected.first
+
+variable (prepared : SourceCoreCompatibleDataEquality.prepare fuel checked (.constructor (.builtin .word)) = .ok comparison)
+  (keyType : layout.keyType = .word)
+
+include prepared keyType in
+/-- The copy helper's body from `position` on: each element below the slice's length, read through the slice,
+then the elements after it, each at its own position. -/
+theorem sliceCopyBody_evaluates {depth : Nat} {sliceType : Ty} {inner : Value} {start length : Word}
+    {location : Location} {captured : Environment} {position : Word} {store : Store}
+    {entries : OrderedMapping.Entries} {final : Store}
+    (copies : CopyReads comparison layout (depth + 1) (.pair inner (.pair (.word start) (.word length))) length
+      (.cellRef (OptionalCell.cellType (WordMapping.helperType (.product sliceType .word) layout.type)) location)
+      captured position store entries final)
+    (installed : WordMapping.Installed store (.product sliceType .word) layout.type
+      (SourceCoreDataExpressions.sliceCopyBody layout comparison.expression (depth + 1) sliceType) location captured) :
+    Evaluates (.pair (.pair inner (.pair (.word start) (.word length))) (.word position) ::
+        .cellRef (OptionalCell.cellType (WordMapping.helperType (.product sliceType .word) layout.type)) location ::
+        captured)
+      store (SourceCoreDataExpressions.sliceCopyBody layout comparison.expression (depth + 1) sliceType)
+      (.inRight .word (OrderedMapping.encode layout entries)) final := by
+  induction copies with
+  | @done position store beyond =>
+    unfold SourceCoreDataExpressions.sliceCopyBody
+    simp only [SourceCoreDataExpressions.viewLength]
+    apply Evaluates.ifFalse
+    · simpa only [beyond, decide_false] using
+        wordLt_evaluates (store := store)
+          (environment := .pair (.pair inner (.pair (.word start) (.word length))) (.word position) ::
+            .cellRef (OptionalCell.cellType (WordMapping.helperType (.product sliceType .word) layout.type)) location ::
+            captured)
+          (left := .second (.var 0)) (right := .second (.second (.first (.var 0))))
+          (weakened := .second (.second (.first (.var 1)))) (by simp [Expr.weakenAt]) (.second (.var rfl))
+          (.second (.second (.first (.var rfl))))
+    · exact .inRight (.construct .unit)
+  | @next position store middle final element rest below reads more ih =>
+    unfold SourceCoreDataExpressions.sliceCopyBody
+    simp only [SourceCoreDataExpressions.viewLength]
+    apply Evaluates.ifTrue
+    · simpa only [below, decide_true] using
+        wordLt_evaluates (store := store)
+          (environment := .pair (.pair inner (.pair (.word start) (.word length))) (.word position) ::
+            .cellRef (OptionalCell.cellType (WordMapping.helperType (.product sliceType .word) layout.type)) location ::
+            captured)
+          (left := .second (.var 0)) (right := .second (.second (.first (.var 0))))
+          (weakened := .second (.second (.first (.var 1)))) (by simp [Expr.weakenAt]) (.second (.var rfl))
+          (.second (.second (.first (.var rfl))))
+    · apply LanguageResult.bind_success _
+        (viewRead_evaluates prepared keyType reads (.first (.var rfl)) (.select (.second (.var rfl))))
+      have installedMiddle := reads.keeps installed
+      apply LanguageResult.bind_success _ (invoke_evaluates (.var rfl) installedMiddle _ (ih installedMiddle))
+      · exact .inRight (.construct (.pair (.pair (.second (.var rfl)) (.var rfl)) (.var rfl)))
+      · simp only [Expr.weakenAt]
+        exact .pair (.first (.var rfl)) (.binary (.second (.var rfl)) .word rfl)
+
+theorem sliceCopy_failure {environment : Environment} {before after : Store} {depth : Nat} {sliceType : Ty}
+    {slice : Expr} {type : Ty} {reason : Word}
+    (failed : Evaluates environment before slice (.inLeft type (.word reason)) after) :
+    Evaluates environment before
+      (SourceCoreDataExpressions.sliceCopy layout comparison.expression depth sliceType slice)
+      (.inLeft (.cell (.product .word (.product layout.valueType layout.type))) (.word reason)) after := by
+  unfold SourceCoreDataExpressions.sliceCopy
+  exact LanguageResult.bind_failure _ failed
+
+include prepared keyType in
+/-- `toArray(s)` on a slice inside `depth + 1` slices: the slice's run, the copy helper over each position
+below its length, then one new cell of its length, its array's default element and the copied entries. -/
+theorem sliceCopy_evaluates {environment : Environment} {before after : Store} {depth : Nat} {sliceType : Ty}
+    {slice : Expr} {inner : Value} {start length : Word} {arrayType : Ty} {arrayLocation : Location}
+    {count : Word} {default rest : Value} {entries : OrderedMapping.Entries} {final : Store}
+    (evaluated : Evaluates environment before slice
+      (.inRight .word (.pair inner (.pair (.word start) (.word length)))) after)
+    (arrayed : ViewArray depth inner (.cellRef arrayType arrayLocation))
+    (arrayRead : after.read? arrayLocation = some (.pair (.word count) (.pair default rest)))
+    (copies : CopyReads comparison layout (depth + 1) (.pair inner (.pair (.word start) (.word length))) length
+      (.cellRef (OptionalCell.cellType (WordMapping.helperType (.product sliceType .word) layout.type)) after.length)
+      (.pair (.pair inner (.pair (.word start) (.word length))) (.word Word.zero) ::
+        .pair inner (.pair (.word start) (.word length)) :: environment) Word.zero
+      (WordMapping.installedStore after (.product sliceType .word) layout.type
+        (SourceCoreDataExpressions.sliceCopyBody layout comparison.expression (depth + 1) sliceType)
+        (.pair (.pair inner (.pair (.word start) (.word length))) (.word Word.zero))
+        (.pair inner (.pair (.word start) (.word length)) :: environment))
+      entries final) :
+    Evaluates environment before
+      (SourceCoreDataExpressions.sliceCopy layout comparison.expression (depth + 1) sliceType slice)
+      (.inRight .word (.cellRef (.product .word (.product layout.valueType layout.type)) final.length))
+      (final ++ [.pair (.word length) (.pair default (OrderedMapping.encode layout entries))]) := by
+  unfold SourceCoreDataExpressions.sliceCopy
+  simp only [CompatibleMapping.Transport.expression_weaken]
+  apply LanguageResult.bind_success _ evaluated
+  have installed : WordMapping.Installed
+      (WordMapping.installedStore after (.product sliceType .word) layout.type
+        (SourceCoreDataExpressions.sliceCopyBody layout comparison.expression (depth + 1) sliceType)
+        (.pair (.pair inner (.pair (.word start) (.word length))) (.word Word.zero))
+        (.pair inner (.pair (.word start) (.word length)) :: environment))
+      (.product sliceType .word) layout.type
+      (SourceCoreDataExpressions.sliceCopyBody layout comparison.expression (depth + 1) sliceType) after.length
+      (.pair (.pair inner (.pair (.word start) (.word length))) (.word Word.zero) ::
+        .pair inner (.pair (.word start) (.word length)) :: environment) := by
+    simp [WordMapping.Installed, WordMapping.installedStore, Store.read?]
+  apply LanguageResult.bind_success _
+    (runHelper_evaluates (.pair (.var rfl) .word) (sliceCopyBody_evaluates prepared keyType copies installed))
+  have kept : (WordMapping.installedStore after (.product sliceType .word) layout.type
+      (SourceCoreDataExpressions.sliceCopyBody layout comparison.expression (depth + 1) sliceType)
+      (.pair (.pair inner (.pair (.word start) (.word length))) (.word Word.zero))
+      (.pair inner (.pair (.word start) (.word length)) :: environment)).read? arrayLocation =
+        some (.pair (.word count) (.pair default rest)) := by
+    have bound : arrayLocation < after.length := (List.getElem?_eq_some_iff.mp arrayRead).1
+    simp only [WordMapping.installedStore, Store.read?] at arrayRead ⊢
+    rw [List.getElem?_append_left bound]
+    exact arrayRead
+  have finalRead := copies.keeps kept
+  exact .inRight (.newCell (.pair ((ViewLength.slice).evaluates (.var rfl))
+    (.pair (.first (.second (.loadCell (((ViewArray.slice arrayed).selects (.var rfl)).evaluates final) finalRead)))
+      (.var rfl))))
+
+end CopyReads
+
 end Solcore.SourceSemantics.CoreLowering.CompatibleArrayEvaluation
 end
