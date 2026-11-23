@@ -119,8 +119,17 @@ class AdmissionTests(unittest.TestCase):
         constructor = SOURCE.replace("{\n    // the", "{\n    constructor() { }\n    // the")
         self.assertEqual(reason(constructor), "contract member")
         self.assertEqual(reason(SOURCE + "\ncontract Other {\n}\n"), "contract shape")
-        self.assertEqual(reason(SOURCE.replace("input: uint256", "input: int16")), "parameters or result")
+        self.assertEqual(reason(SOURCE.replace("input: uint256", "input: bool")), "parameters or result")
         self.assertEqual(reason(SOURCE.replace("returns (uint256)", "returns (bool)")), "parameters or result")
+        # The twelve types: a parameter by `Typedef.abs` at a local of its type, a result by `Typedef.rep`.
+        typed = native.lift(SOURCE.replace("input: uint256", "input: int16").replace("returns (uint256)",
+                                                                                     "returns (uint8)"), "run")
+        self.assertIsNone(typed["reason"])
+        self.assertEqual(typed["types"], ["int16"])
+        self.assertTrue(typed["source"].endswith(
+            "function sc_native_run(sc_native_a0: word) returns (word) {\n"
+            "    let sc_native_p0: int16 = Typedef.abs(sc_native_a0);\n"
+            "    return Typedef.rep(run(sc_native_p0));\n}\n"))
         self.assertEqual(reason(SOURCE, "missing"), "parameters or result")
         self.assertEqual(reason(SOURCE.replace("sc_fn0(sc_x)", "sc_native_run(sc_x)")), "contract shape")
 
@@ -161,6 +170,16 @@ class AdmissionTests(unittest.TestCase):
                          "admitted")
         self.assertEqual(decided(emitter="solcore-source-enums-v2", program={"tag": "case"}), "admitted")
         self.assertEqual(decided(signature="run(uint8)"), "parameters or result")
+        signed = SOURCE.replace("input: uint256", "input: int16")
+        self.assertEqual(decided(source=signed, signature="run(int16)", data=calldata(2**15 - 1)), "admitted")
+        self.assertEqual(decided(source=signed, signature="run(int16)", data=calldata(2**256 - 2**15)), "admitted")
+        self.assertEqual(decided(source=signed, signature="run(int16)", data=calldata(2**15)), "calldata range")
+        self.assertEqual(decided(source=signed, signature="run(int16)", data=calldata(2**256 - 2**15 - 1)),
+                         "calldata range")
+        narrow = SOURCE.replace("input: uint256", "input: uint8")
+        self.assertEqual(decided(source=narrow, signature="run(uint8)", data=calldata(255)), "admitted")
+        self.assertEqual(decided(source=narrow, signature="run(uint8)", data=calldata(256)), "calldata range")
+        self.assertEqual(decided(source=signed, signature="run(uint256)"), "parameters or result")
         self.assertEqual(decided(data=calldata(7, 8)), "calldata")
         bundle = make_case()
         bundle["sourceBundle"] = {"entry": "main.sol", "files": []}
@@ -233,6 +252,10 @@ class ComparisonTests(unittest.TestCase):
                                             "output": self.PANIC.upper().replace("0X", "0x")}), {"verdict": "agree"})
         self.assertEqual(compare(reverted, {"status": "reverted", "error": "dirtyHigherBitsForInteger",
                                             "output": "0x6cc54a63"})["native"], "reverted:0x6cc54a63")
+        self.assertEqual(compare(self.RETURNED, {"status": "reverted", "error": "dirtyHigherBitsForInteger",
+                                                 "output": "0x6cc54a63"}),
+                         {"verdict": "mismatch", "core": "returned", "native": "reverted:0x6cc54a63",
+                          "label": "dirty-conversion"})
         self.assertEqual(compare(self.RETURNED, {"status": "failed", "error": "uninitializedLocal"}),
                          {"verdict": "mismatch", "core": "returned", "native": "failed:uninitializedLocal",
                           "label": "uninitialized-local"})
@@ -273,7 +296,9 @@ class ComparisonTests(unittest.TestCase):
             self.assertEqual(native.rejection_label("inference", found), label)
         self.assertIsNone(native.rejection_label("signatures", 'unknownVariable "ne"'))
         self.assertEqual(set(native.KNOWN), {"open-typedef-call", "open-array-base", "generalized-lambda-parameter",
-                                             "bool-equality", "not-equal", "uninitialized-local"})
+                                             "bool-equality", "not-equal", "uninitialized-local",
+                                             "dirty-conversion"})
+        self.assertEqual(set(native.MISMATCH_LABELS.values()) - set(native.KNOWN), set())
 
 
 STUB = """#!/usr/bin/env python3
@@ -391,7 +416,7 @@ class RunTests(unittest.TestCase):
                                 "--profile", "runtime-word"])
         check = json.loads(output.getvalue())
         self.assertEqual((code, check["status"], sorted(check["corpora"])), (0, "ready", ["runtime-word"]))
-        self.assertEqual(check["versions"], {"admission": "native-admission-v6", "adapter": "native-lift-v3",
+        self.assertEqual(check["versions"], {"admission": "native-admission-v7", "adapter": "native-lift-v4",
                                              "comparison": "native-compare-v1"})
         self.assertEqual(sorted(check["scripts"]), sorted(native.SCRIPTS))
         args, _ = native.parse_args(["--check", "--mode", "random", "--seed", "5"])

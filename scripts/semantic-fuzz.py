@@ -269,7 +269,10 @@ NATIVE_CLASSES = tuple(({"backend": NATIVE, "category": category, "stage": stage
      "Lean has no `!=` at a type without a builtin one, which upstream takes from std's `ne` (semantic-native.py)"),
     ("native-mismatch", "execution", "uninitialized-local",
      "Lean faults on a read of an uninitialized local, which upstream reads as zero (source semantics, uninitialized "
-     "locals)")))
+     "locals)"),
+    ("native-mismatch", "execution", "dirty-conversion",
+     "Lean's conversion to one of the twelve fixed-width types reverts with `DirtyHigherBitsForInteger()` on a word "
+     "that is not canonical for the type, where upstream keeps the raw word (integer note, accepted difference 1)")))
 KNOWN = {canonical_id(key): label for key, label in KNOWN_FINDINGS} | \
     {canonical_id(key): label for key, _, _, label in MISMATCH_CLASSES} | \
     {canonical_id(key): label for key, _, label in FIXTURE_MISMATCH_CLASSES} | \

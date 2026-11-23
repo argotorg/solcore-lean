@@ -9,13 +9,14 @@ session decodes to upstream's revert data, with the revert's output.
 
 Admission is a versioned predicate decided before the native tool runs. It reads the case's
 provenance (its emitter and the Core operations of its program), the adapter's reading of the source
-(one contract with functions only, no storage field, `uint256` parameters) and, for memory arrays,
-the source's array forms (std's array traits are not admitted). The adapter keeps the source's
-imports of `std.opcodes`, whose pure functions the native frontend provides, and adds std's own
-`tobool` where the source calls it and defines none. Cases that are not admitted are counted by
-reason. A native rejection, crash or different observation of an admitted case is a finding, never
-an exclusion; the known differences from upstream are findings under their own labels. Out of fuel
-and timeouts are inconclusive.
+(one contract with functions only, no storage field, parameters and a result of the twelve
+fixed-width types or a Word result, calldata in the parameters' ranges) and, for memory arrays, the
+source's array forms (std's array traits are not admitted). The adapter keeps the source's imports
+of `std.opcodes`, whose pure functions the native frontend provides, and adds std's own `tobool`
+where the source calls it and defines none. Cases that are not admitted are counted by reason. A
+native rejection, crash or different observation of an admitted case is a finding, never an
+exclusion; the known differences from upstream are findings under their own labels. Out of fuel and
+timeouts are inconclusive.
 
 Cases come from the pure runner's own preparation (`semantic-campaign.py`, with the arguments
 `semantic-suite.py` gives each profile), for the fixed corpora or a seeded random draw; preparation
@@ -55,8 +56,8 @@ runner = suite.pure_campaign
 SCHEMA = "solcore-lean.semantic-native.v1"
 REQUEST_SCHEMA = "solcore-lean.semantic-native-request.v1"
 RESULT_SCHEMA = "solcore-lean.semantic-native-result.v1"
-ADMISSION = "native-admission-v6"
-ADAPTER = "native-lift-v3"
+ADMISSION = "native-admission-v7"
+ADAPTER = "native-lift-v4"
 COMPARISON = "native-compare-v1"
 TOOL = ROOT / ".lake/build/bin/semantic-native-tool"
 SCRIPTS = ("semantic-native.py", "semantic-suite.py", "semantic-campaign.py", "semantic-differential.py",
@@ -87,6 +88,10 @@ EMITTERS = {
     "solcore-source-closure-factories-v2": frozenset(),
     "solcore-source-memory-arrays-v2": frozenset(),
 }
+# The twelve fixed-width types a method's parameters and result may have, each with whether it is unsigned and its
+# width. The entry takes a parameter of one of them by `Typedef.abs` at a local of its type, as a call's argument has no
+# expected type in Lean's inference, and gives such a result by `Typedef.rep`; `uint256` keeps v2's `uint256(...)`.
+FIXED_TYPES = {f"{sign}int{width}": (sign == "u", width) for sign in ("u", "") for width in (8, 16, 32, 64, 128, 256)}
 # A call of std's `tobool(x: word) returns (bool)`, which the G0-derived emitters wrap around `sgt`'s word: std is not
 # a module of the native load, so where a source calls it and does not define it, the adapter adds std's own
 # definition, as `std/std.sol` has it at the pin (`d1b5ac28`).
@@ -133,6 +138,9 @@ KNOWN = {
     "bool-equality": "`==` on `bool`, which Lean does not provide",
     "not-equal": "`!=` at a type with no builtin `!=`, which upstream takes from std's `ne`",
     "uninitialized-local": "a read of an uninitialized local, which Lean faults on and upstream reads as zero",
+    "dirty-conversion": "the integer types note's accepted difference 1: a conversion to one of the twelve types "
+                        "reverts with `DirtyHigherBitsForInteger()` on a word that is not canonical for the type, "
+                        "where upstream keeps the raw word",
 }
 
 STD_IMPORT = re.compile(r"^[ \t]*import\b[^;\n]*\bstd\b[^;\n]*;[ \t]*$", re.M)
@@ -270,10 +278,12 @@ def array_forms(source: str) -> dict[str, list[str]]:
 
 
 def lift(source: str, method: str) -> dict:
-    """native-lift-v3 on a case's source: its std imports other than those of `std.opcodes` dropped, each line kept
+    """native-lift-v4 on a case's source: its std imports other than those of `std.opcodes` dropped, each line kept
     as an empty line, and its one contract's functions moved to the top level without their visibility and
     mutability words; std's own `tobool` appended where the code calls it and defines none; then a Word entry of
-    `method` appended. Gives the lifted source and the entry's name, or the reason it cannot."""
+    `method` appended, which takes each parameter of the twelve types by `Typedef.abs` at a local of its type (a
+    `uint256` one by `uint256`) and gives such a result by `Typedef.rep`. Gives the lifted source, the entry's name
+    and the parameters' types, or the reason it cannot."""
     text = STD_IMPORT.sub(lambda match: match.group(0) if STD_OPCODES_IMPORT.search(match.group(0)) else "", source)
     contracts = list(CONTRACT.finditer(text))
     if len(contracts) != 1:
@@ -307,17 +317,32 @@ def lift(source: str, method: str) -> dict:
     parameters = [item.strip() for item in header.group(1).split(",") if item.strip()]
     types = [item.split(":", 1)[1].strip() if ":" in item else "" for item in parameters]
     result = header.group(2)
-    if any(item != "uint256" for item in types) or result not in ("uint256", "word"):
+    if any(item not in FIXED_TYPES for item in types) or (result not in FIXED_TYPES and result != "word"):
         return {"reason": "parameters or result", "detail": f"({', '.join(types)}) -> {result}"}
     entry = WRAPPER + method
     if re.search(r"\b" + re.escape(entry) + r"\b", source):
         return {"reason": "contract shape", "detail": f"the source already names {entry}"}
     names = [f"{WRAPPER}a{index}" for index in range(len(types))]
-    call = f"{method}({', '.join(f'uint256({name})' for name in names)})"
-    body = f"return Typedef.rep({call});" if result == "uint256" else f"return {call};"
+    locals_ = "".join(f"    let {WRAPPER}p{index}: {kind} = Typedef.abs({name});\n"
+                      for index, (name, kind) in enumerate(zip(names, types)) if kind != "uint256")
+    values = [f"uint256({name})" if kind == "uint256" else f"{WRAPPER}p{index}"
+              for index, (name, kind) in enumerate(zip(names, types))]
+    call = f"{method}({', '.join(values)})"
+    body = f"return Typedef.rep({call});" if result != "word" else f"return {call};"
     entry_text = (f"\nfunction {entry}({', '.join(f'{name}: word' for name in names)}) returns (word) {{\n"
-                  f"    {body}\n}}\n")
-    return {"reason": None, "source": lifted + entry_text, "function": entry, "parameters": len(types)}
+                  f"{locals_}    {body}\n}}\n")
+    return {"reason": None, "source": lifted + entry_text, "function": entry, "parameters": len(types),
+            "types": types}
+
+
+def abi_encodes(word: int, kind: str) -> bool:
+    """Whether a calldata word is the ABI encoding of a value of one of the twelve types: an unsigned value below
+    2^width, or a signed one sign-extended from its width."""
+    unsigned, width = FIXED_TYPES[kind]
+    if unsigned:
+        return word < 2 ** width
+    low = word % 2 ** width
+    return word == (low - 2 ** width if low >= 2 ** (width - 1) else low) % 2 ** 256
 
 
 def arguments(contract: dict, count: int) -> list[str] | None:
@@ -335,7 +360,7 @@ def arguments(contract: dict, count: int) -> list[str] | None:
 
 
 def admission(case: dict) -> dict:
-    """native-admission-v6, decided from the case alone before any native run: the program the native tool reads
+    """native-admission-v7, decided from the case alone before any native run: the program the native tool reads
     with the case's arguments, or the first reason in a fixed order that the case is not admitted."""
     def refuse(reason: str, detail=None) -> dict:
         return {"admitted": False, "reason": reason, "detail": detail}
@@ -356,11 +381,15 @@ def admission(case: dict) -> dict:
     lifted = lift(case["source"], method)
     if lifted["reason"]:
         return refuse(lifted["reason"], lifted.get("detail"))
-    if contract.get("signature") != f"{method}({','.join(['uint256'] * lifted['parameters'])})":
+    if contract.get("signature") != f"{method}({','.join(lifted['types'])})":
         return refuse("parameters or result", contract.get("signature"))
     words = arguments(contract, lifted["parameters"])
     if words is None:
         return refuse("calldata")
+    # Lean's entry takes typed values: calldata that the ABI decoder would refuse for its type has no native run.
+    outside = [kind for word, kind in zip(words, lifted["types"]) if not abi_encodes(int(word), kind)]
+    if outside:
+        return refuse("calldata range", ", ".join(outside))
     forms = array_forms(case["source"]) if emitter in ARRAY_EMITTERS else {}
     for reason in ARRAY_REASONS:
         if reason in forms:
@@ -405,6 +434,10 @@ def observed(observation: dict) -> str:
     return str(status)
 
 
+# The known differences a native run's error names, where direct Core gave another observation.
+MISMATCH_LABELS = {"uninitializedLocal": "uninitialized-local", "dirtyHigherBitsForInteger": "dirty-conversion"}
+
+
 def compare(core: dict, observation: dict) -> dict:
     """native-compare-v1: one input's verdict, `agree`, `mismatch`, `rejected` or `inconclusive`, with its reason."""
     status = observation.get("status")
@@ -423,7 +456,7 @@ def compare(core: dict, observation: dict) -> dict:
         return {"verdict": "agree"}
     core_class = "returned" if core["status"] == "returned" else "reverted:" + str(core.get("output", ""))[:10].lower()
     return {"verdict": "mismatch", "core": core_class, "native": observed(observation),
-            "label": "uninitialized-local" if observation.get("error") == "uninitializedLocal" else None}
+            "label": MISMATCH_LABELS.get(observation.get("error"))}
 
 
 def run_tool(tool: Path, program: dict, inputs: list[list[str]], work: Path, timeout: float) -> dict:
