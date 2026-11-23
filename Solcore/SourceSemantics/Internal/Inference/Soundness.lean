@@ -6476,8 +6476,10 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
       Detail.inferMatchCasesFuel fuel context scrutinee.type expectedReturn
         hiddenState.lexicalScope arms.value.cases hiddenState = .ok checked ∧
       (checked.hasWildcard || false ||
-        Detail.exhaustsNominalConstructors context checked.state
-          scrutinee.type checked.cases) = true ∧
+        (Detail.exhaustsNominalConstructors context checked.state
+            scrutinee.type checked.cases ||
+          Detail.coversMatchCases context checked.state
+            scrutinee.type checked.cases)) = true ∧
       result = {
         id
         type := if checked.allReturn then
@@ -6526,6 +6528,8 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
       expectedReturn outerScope arms.value.cases state
     if checked.hasWildcard = false ∧
         Detail.exhaustsNominalConstructors context checked.state
+          scrutinee.type checked.cases = false ∧
+        Detail.coversMatchCases context checked.state
           scrutinee.type checked.cases = false then
       throw (Frontend.SourceInference.Error.nonExhaustiveMatch statement.span)
     else
@@ -6560,8 +6564,10 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
         Detail.inferMatchCasesFuel fuel context scrutinee.type expectedReturn
           hiddenState.lexicalScope arms.value.cases hiddenState = .ok checked ∧
         (checked.hasWildcard || false ||
-          Detail.exhaustsNominalConstructors context checked.state
-            scrutinee.type checked.cases) = true ∧
+          (Detail.exhaustsNominalConstructors context checked.state
+              scrutinee.type checked.cases ||
+            Detail.coversMatchCases context checked.state
+              scrutinee.type checked.cases)) = true ∧
         result = {
           id
           type := if checked.allReturn then
@@ -6619,7 +6625,9 @@ theorem inferStatementFuel_success_matchWithoutDefault_facts
           rw [← resultEq]
           refine ⟨hiddenScrutinee, hiddenState, checked, rfl,
             checkedSuccess, ?_, ?_, ?_⟩
-          · cases wildcardEq : checked.hasWildcard <;> simp_all
+          · cases wildcardEq : checked.hasWildcard <;>
+              cases nominalEq : Detail.exhaustsNominalConstructors context checked.state
+                scrutinee.type checked.cases <;> simp_all
           · simp
           · simpa using
               (recordNode_containsStatement checked.state _ roots)
@@ -7963,8 +7971,275 @@ theorem matchExhaustiveWithoutDefault_of_nominal
       exact ⟨instantiation, instructions, resolutionEq, constructorEq,
         constructorArgumentsIrrefutable_sound irrefutable⟩
 
+section Coverage
+
+open TypeSystem
+
+/-- A pattern's coverage row is the program its matching decodes at its source's root arity. -/
+theorem matchPatternResolutionInstructions_rootArity (pattern : TypedMatchPattern) :
+    matchPatternResolutionInstructions pattern.resolution pattern.source.rootArity =
+      pattern.coverageRow := by
+  rcases pattern with ⟨source, type, resolution, requirements⟩
+  cases resolution <;> rfl
+
+/-- A product type's elements, as coverage reads them. -/
+theorem productElements?_sound :
+    ∀ {count : Nat} {type : Ty} {elements : List Ty},
+      Detail.productElements? count type = some elements →
+        type = Ty.productMany elements ∧ elements.length = count
+  | 0, type, elements, found => by
+      unfold Detail.productElements? at found
+      by_cases unit : type = Ty.unit
+      · simp only [unit, if_true, Option.some.injEq] at found
+        subst found
+        exact ⟨unit, rfl⟩
+      · simp [unit] at found
+  | 1, type, elements, found => by
+      simp only [Detail.productElements?, Option.some.injEq] at found
+      subst found
+      exact ⟨rfl, rfl⟩
+  | count + 2, type, elements, found => by
+      cases type
+      case product head tail =>
+        simp only [Detail.productElements?] at found
+        cases rest : Detail.productElements? (count + 1) tail with
+        | none => simp [rest] at found
+        | some tailElements =>
+            simp only [rest, Option.map_some, Option.some.injEq] at found
+            subst found
+            obtain ⟨tailEq, tailLength⟩ := productElements?_sound rest
+            cases tailElements with
+            | nil => simp at tailLength
+            | cons first more =>
+                refine ⟨?_, by simp [tailLength]⟩
+                rw [tailEq]
+                rfl
+      all_goals simp [Detail.productElements?] at found
+
+/-- Any split coverage takes is one of `RowsCover`'s, at the column's closed type. -/
+theorem coverageSplit?_sound
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State} {type : Ty} {types : List Ty}
+    {rows : List (List MatchPatternInstruction)}
+    {branches : List (List Ty × List (List MatchPatternInstruction))}
+    {outer : Substitution} {target : SourceSemantics.Context}
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (extension : outer.SemanticallyExtends state.inference.substitution)
+    (split : Detail.coverageSplit? inferenceContext state type types rows = some branches)
+    (covered : ∀ branch, branch ∈ branches →
+      RowsCover target (branch.1.map outer.apply)
+        (branch.2.map (List.map (MatchPatternInstruction.applySubstitution outer)))) :
+    RowsCover target (outer.apply type :: types.map outer.apply)
+      (rows.map (List.map (MatchPatternInstruction.applySubstitution outer))) := by
+  have resolvedByOuter : outer.apply (state.resolve type) = outer.apply type := by
+    simpa [Frontend.SourceInference.State.resolve, TypeSystem.InferState.resolve] using
+      extension type
+  have keeps := FlexibleSubstitution.MatchPatternInstruction.applySubstitution_keepsHeads outer
+  unfold Detail.coverageSplit? at split
+  by_cases isBool : state.resolve type = Ty.bool
+  · simp only [isBool, if_true] at split
+    by_cases heads :
+        (Detail.coverageHeadsBool true rows && Detail.coverageHeadsBool false rows) = true
+    · simp only [heads, if_true, Option.some.injEq] at split
+      subst split
+      have typeEq : outer.apply type = Ty.bool := by
+        rw [← resolvedByOuter, isBool]
+        rfl
+      rw [typeEq]
+      refine .booleans ?_ ?_
+      · rw [InstructionMapKeepsHeads.filterMap_commute (keeps.boolRow true)]
+        exact covered (types, rows.filterMap (coverageBoolRow true)) (by simp)
+      · rw [InstructionMapKeepsHeads.filterMap_commute (keeps.boolRow false)]
+        exact covered (types, rows.filterMap (coverageBoolRow false)) (by simp)
+    · simp [heads] at split
+  · simp only [isBool, if_false] at split
+    by_cases isWord : state.resolve type = Ty.fixed .uint256
+    · simp only [isWord, if_true] at split
+      by_cases heads : Detail.coverageHeadsWord rows = true
+      · simp only [heads, if_true, Option.some.injEq] at split
+        subst split
+        have typeEq : outer.apply type = Ty.fixed .uint256 := by
+          rw [← resolvedByOuter, isWord]
+          rfl
+        rw [typeEq]
+        refine .word ?_
+        rw [InstructionMapKeepsHeads.filterMap_commute keeps.wordRow]
+        simpa using covered (Ty.word :: types, rows.filterMap coverageWordRow) (by simp)
+      · simp [heads] at split
+    · simp only [isWord, if_false] at split
+      cases tupleHead : Detail.coverageHeadsTuple? rows with
+      | some arity =>
+          simp only [tupleHead] at split
+          cases found : Detail.productElements? arity (state.resolve type) with
+          | none => simp [found] at split
+          | some elements =>
+              simp only [found, Option.map_some, Option.some.injEq] at split
+              subst split
+              obtain ⟨resolvedEq, lengthEq⟩ := productElements?_sound found
+              have typeEq : outer.apply type = Ty.productMany (elements.map outer.apply) := by
+                rw [← resolvedByOuter, resolvedEq, FlexibleSubstitution.apply_productMany]
+              rw [typeEq]
+              refine .tuple ?_
+              rw [List.length_map, lengthEq,
+                InstructionMapKeepsHeads.filterMap_commute (keeps.tupleRow arity),
+                ← List.map_append]
+              exact covered (elements ++ types, rows.filterMap (coverageTupleRow arity))
+                (by simp)
+      | none =>
+          simp only [tupleHead] at split
+          cases parts : Detail.nominalTypeParts? (state.resolve type) with
+          | none => simp [parts] at split
+          | some pair =>
+              rcases pair with ⟨declaration, arguments⟩
+              simp only [parts] at split
+              cases found : inferenceContext.signatures.dataType? declaration with
+              | none => simp [found] at split
+              | some dataType =>
+                  simp only [found] at split
+                  by_cases complete :
+                      (decide (arguments.length = dataType.parameters.length) &&
+                        dataType.constructors.all fun constructor =>
+                          Detail.coverageHeadsConstructor constructor.id rows) = true
+                  · simp only [complete, if_true, Option.some.injEq] at split
+                    subst split
+                    have argumentsLength : arguments.length = dataType.parameters.length := by
+                      simp only [Bool.and_eq_true, decide_eq_true_eq] at complete
+                      exact complete.1
+                    have rawFound : inferenceContext.signatures.dataTypes.find?
+                        (fun candidate => decide (candidate.id = declaration)) =
+                          some dataType := by
+                      simpa [ProgramSignatures.dataType?] using found
+                    have dataTypeMember : dataType ∈ target.signatures.dataTypes := by
+                      rw [signatures_eq]
+                      exact List.mem_of_find?_eq_some rawFound
+                    have dataTypeId : dataType.id = declaration :=
+                      of_decide_eq_true (List.find?_some
+                        (p := fun candidate : ProgramDataSignature =>
+                          decide (candidate.id = declaration)) rawFound)
+                    have parametersNodup :=
+                      (catalog.data_semantic dataType dataTypeMember).parameters_nodup
+                    have mappedLength :
+                        (arguments.map outer.apply).length = dataType.parameters.length := by
+                      simpa using argumentsLength
+                    have typeEq : outer.apply type =
+                        Ty.nominal dataType.id (arguments.map outer.apply) := by
+                      rw [← resolvedByOuter, Detail.nominalTypeParts?_success_reconstruct parts,
+                        StructuralSubstitution.applyFlexible_nominal, dataTypeId]
+                    rw [typeEq]
+                    refine .constructors dataTypeMember
+                      (ParameterSubstitution.exact_zip parametersNodup mappedLength)
+                      (by rw [ParameterSubstitution.orderedArguments_zip parametersNodup
+                        mappedLength]) ?_
+                    intro constructor constructorMember
+                    have branch := covered _
+                      (List.mem_map.mpr ⟨constructor, constructorMember, rfl⟩)
+                    have payloadWellFormed :=
+                      (catalog.data_semantic dataType dataTypeMember).constructor_payloads
+                        constructor constructorMember
+                    have fieldsEq :
+                        (constructor.payloadTypes.map
+                            (TypeSystem.ParameterSubstitution.apply
+                              (dataType.parameters.zip arguments))).map outer.apply =
+                          constructor.payloadTypes.map
+                            (TypeSystem.ParameterSubstitution.apply
+                              (dataType.parameters.zip (arguments.map outer.apply))) := by
+                      have composed :=
+                        FlexibleSubstitution.TypesWellScoped.applyFlexible_composeParameters
+                          (context := signatureContext target.signatures dataType.id
+                            dataType.parameters)
+                          outer (dataType.parameters.zip arguments)
+                          (ParameterSubstitution.exact_zip parametersNodup argumentsLength)
+                          (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+                            payloadWellFormed)
+                      rw [composed]
+                      congr 2
+                      simp [FlexibleSubstitution.ParameterSubstitution.mapRange, List.zip_map_right]
+                    simp only [Detail.instantiateDataConstructor, List.map_append] at branch
+                    rw [fieldsEq] at branch
+                    rw [InstructionMapKeepsHeads.filterMap_commute
+                      (keeps.constructorRow constructor.id constructor.payloadTypes.length)]
+                    exact branch
+                  · simp [complete] at split
+
+/-- A positive coverage check is `RowsCover` at the closed column types. -/
+theorem rowsCoverFuel_sound
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {outer : Substitution} {target : SourceSemantics.Context}
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (extension : outer.SemanticallyExtends state.inference.substitution) :
+    ∀ {fuel : Nat} {types : List Ty} {rows : List (List MatchPatternInstruction)},
+      Detail.rowsCoverFuel inferenceContext state fuel types rows = true →
+        RowsCover target (types.map outer.apply)
+          (rows.map (List.map (MatchPatternInstruction.applySubstitution outer)))
+  | 0, _, _, accepted => by simp [Detail.rowsCoverFuel] at accepted
+  | fuel + 1, [], rows, accepted => by
+      simp only [Detail.rowsCoverFuel, List.any_eq_true, List.isEmpty_iff] at accepted
+      obtain ⟨row, member, rowEq⟩ := accepted
+      subst rowEq
+      exact .done (List.mem_map.mpr ⟨[], member, rfl⟩)
+  | fuel + 1, type :: types, rows, accepted => by
+      simp only [Detail.rowsCoverFuel] at accepted
+      cases split : Detail.coverageSplit? inferenceContext state type types rows with
+      | none =>
+          simp only [split] at accepted
+          refine .default ?_
+          rw [InstructionMapKeepsHeads.filterMap_commute
+            (FlexibleSubstitution.MatchPatternInstruction.applySubstitution_keepsHeads outer).defaultRow]
+          exact rowsCoverFuel_sound catalog signatures_eq extension accepted
+      | some branches =>
+          simp only [split] at accepted
+          refine coverageSplit?_sound catalog signatures_eq extension split ?_
+          intro branch member
+          exact rowsCoverFuel_sound catalog signatures_eq extension
+            (List.all_eq_true.mp accepted branch member)
+
+/-- A positive coverage check constructs upstream's coverage witness after closing the scrutinee
+and every retained case. -/
+theorem matchExhaustiveWithoutDefault_of_coverage
+    {inferenceContext : Frontend.SourceInference.Context}
+    {state : Frontend.SourceInference.State}
+    {scrutineeType : Ty} {cases : List TypedMatchCase}
+    {outer : Substitution} {target : SourceSemantics.Context}
+    (catalog : SignatureCatalogWellFormed target.signatures)
+    (signatures_eq : target.signatures = inferenceContext.signatures)
+    (extension : outer.SemanticallyExtends state.inference.substitution)
+    (accepted : Detail.coversMatchCases inferenceContext state scrutineeType cases = true) :
+    MatchExhaustive target (outer.apply scrutineeType)
+      (cases.map (TypedMatchCase.applySubstitution outer)) none := by
+  unfold Detail.coversMatchCases at accepted
+  cases empty : cases.isEmpty with
+  | true => simp [empty] at accepted
+  | false =>
+      simp only [empty, Bool.false_eq_true, if_false] at accepted
+      refine .covered ?_
+      have covers := rowsCoverFuel_sound catalog signatures_eq extension accepted
+      have rowsEq :
+          ((cases.map fun arm => arm.pattern.coverageRow).map
+              (List.map (MatchPatternInstruction.applySubstitution outer))) =
+            (cases.map (TypedMatchCase.applySubstitution outer)).map fun matchCase =>
+              matchPatternResolutionInstructions matchCase.pattern.resolution
+                matchCase.pattern.source.rootArity := by
+        simp only [List.map_map]
+        apply List.map_congr_left
+        intro matchCase _
+        show matchCase.pattern.coverageRow.map
+            (MatchPatternInstruction.applySubstitution outer) =
+          matchPatternResolutionInstructions
+            (matchCase.pattern.resolution.applySubstitution outer)
+            matchCase.pattern.source.rootArity
+        rw [← matchPatternResolutionInstructions_rootArity,
+          FlexibleSubstitution.matchPatternResolutionInstructions_applySubstitution]
+      rw [rowsEq] at covers
+      simpa using covers
+
+end Coverage
+
 /-- The default-free executable guard is sound whether it succeeds through a
-typed catch-all arm or through complete nominal-constructor coverage. -/
+typed catch-all arm, through complete nominal-constructor coverage or through upstream's
+coverage. -/
 theorem matchExhaustiveWithoutDefault_of_guard
     {fuel : Nat} {inferenceContext : Frontend.SourceInference.Context}
     {scrutineeType expectedReturn : TypeSystem.Ty}
@@ -7987,12 +8262,14 @@ theorem matchExhaustiveWithoutDefault_of_guard
     (extension : outer.SemanticallyExtends
       checked.state.inference.substitution)
     (guard : (checked.hasWildcard || false ||
-      Detail.exhaustsNominalConstructors inferenceContext checked.state
-        scrutineeType checked.cases) = true) :
+      (Detail.exhaustsNominalConstructors inferenceContext checked.state
+          scrutineeType checked.cases ||
+        Detail.coversMatchCases inferenceContext checked.state
+          scrutineeType checked.cases)) = true) :
     MatchExhaustive target (outer.apply scrutineeType)
       (checked.cases.map (TypedMatchCase.applySubstitution outer)) none := by
   simp only [Bool.or_false] at guard
-  rcases Bool.or_eq_true_iff.mp guard with hasWildcard | nominallyExhaustive
+  rcases Bool.or_eq_true_iff.mp guard with hasWildcard | constructorsExhaustive
   · obtain ⟨matchCase, matchCaseMember, catchall⟩ :=
       Detail.inferMatchCasesFuel_success_hasWildcard_member casesSuccess
         hasWildcard
@@ -8003,8 +8280,10 @@ theorem matchExhaustiveWithoutDefault_of_guard
       MatchCasesHaveType.pattern_type_of_mem casesTyping substitutedMember
     exact .catchall substitutedMember
       (typedPatternIsCatchall_true_sound patternTyping catchall)
-  · exact matchExhaustiveWithoutDefault_of_nominal catalog signatures_eq
-      scrutineeAdmissible extension nominallyExhaustive
+  · rcases Bool.or_eq_true_iff.mp constructorsExhaustive with nominallyExhaustive | covered
+    · exact matchExhaustiveWithoutDefault_of_nominal catalog signatures_eq
+        scrutineeAdmissible extension nominallyExhaustive
+    · exact matchExhaustiveWithoutDefault_of_coverage catalog signatures_eq extension covered
 
 /-- A retained default-free match is typed from its finalized scrutinee and
 explicit cases.  Case agreement transports the executable all-return flag,

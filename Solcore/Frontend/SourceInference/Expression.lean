@@ -1936,6 +1936,108 @@ def exhaustsNominalConstructors (context : Context) (state : State)
           dataType.constructors.all fun constructor =>
             covered.contains constructor.id
 
+/-- Whether the boolean `value` heads some row of a column. -/
+def coverageHeadsBool (value : Bool) (rows : List (List MatchPatternInstruction)) : Bool :=
+  rows.any fun row =>
+    match row with
+    | .boolLiteral literal :: _ => decide (literal = value)
+    | _ => false
+
+/-- Whether `uint256(p)` heads some row of a column. -/
+def coverageHeadsWord (rows : List (List MatchPatternInstruction)) : Bool :=
+  rows.any fun row =>
+    match row with
+    | .uint256Word :: _ => true
+    | _ => false
+
+/-- The arity of the first tuple that heads a row of a column. -/
+def coverageHeadsTuple? (rows : List (List MatchPatternInstruction)) : Option Nat :=
+  rows.findSome? fun row =>
+    match row with
+    | .tuple count :: _ => some count
+    | _ => none
+
+/-- Whether a constructor heads some row of a column. -/
+def coverageHeadsConstructor (constructor : ProgramDataConstructorId)
+    (rows : List (List MatchPatternInstruction)) : Bool :=
+  rows.any fun row =>
+    match row with
+    | .constructor instantiation _ :: _ => decide (instantiation.constructor = constructor)
+    | _ => false
+
+/-- The `count` elements of a product type. -/
+def productElements? : Nat → Ty → Option (List Ty)
+  | 0, type => if type = Ty.unit then some [] else none
+  | 1, type => some [type]
+  | count + 2, type =>
+      match type with
+      | .product head tail => (productElements? (count + 1) tail).map (head :: ·)
+      | _ => none
+
+/-- How coverage splits a column of type `type`: the columns and rows of each branch, when the
+column's heads name every constructor of its type (both booleans, a tuple, `uint256`'s word or
+every constructor of a data type); none when only its catch-all rows go on. -/
+def coverageSplit? (context : Context) (state : State) (type : Ty) (types : List Ty)
+    (rows : List (List MatchPatternInstruction)) :
+    Option (List (List Ty × List (List MatchPatternInstruction))) :=
+  let resolved := state.resolve type
+  if resolved = Ty.bool then
+    if coverageHeadsBool true rows && coverageHeadsBool false rows then
+      some [(types, rows.filterMap (coverageBoolRow true)),
+        (types, rows.filterMap (coverageBoolRow false))]
+    else none
+  else if resolved = Ty.fixed .uint256 then
+    if coverageHeadsWord rows then
+      some [(Ty.word :: types, rows.filterMap coverageWordRow)]
+    else none
+  else
+    match coverageHeadsTuple? rows with
+    | some arity =>
+        (productElements? arity resolved).map fun elements =>
+          [(elements ++ types, rows.filterMap (coverageTupleRow arity))]
+    | none =>
+        match nominalTypeParts? resolved with
+        | none => none
+        | some (declaration, arguments) =>
+            match context.signatures.dataType? declaration with
+            | none => none
+            | some dataType =>
+                if arguments.length = dataType.parameters.length &&
+                    dataType.constructors.all fun constructor =>
+                      coverageHeadsConstructor constructor.id rows then
+                  some (dataType.constructors.map fun constructor =>
+                    ((instantiateDataConstructor dataType constructor arguments).payloadTypes ++
+                        types,
+                      rows.filterMap
+                        (coverageConstructorRow constructor.id constructor.payloadTypes.length)))
+                else none
+
+/-- Maranget's usefulness check of a catch-all row against rows of pattern programs, as
+`RowsCover` states it: a column splits when its heads name every constructor of its type, and
+otherwise only its catch-all rows go on. -/
+def rowsCoverFuel (context : Context) (state : State) :
+    Nat → List Ty → List (List MatchPatternInstruction) → Bool
+  | 0, _, _ => false
+  | _ + 1, [], rows => rows.any List.isEmpty
+  | fuel + 1, type :: types, rows =>
+      match coverageSplit? context state type types rows with
+      | some branches =>
+          branches.all fun branch => rowsCoverFuel context state fuel branch.1 branch.2
+      | none => rowsCoverFuel context state fuel types (rows.filterMap coverageDefaultRow)
+
+/-- Fuel for coverage: each split consumes a head that is not a catch-all, and each column a
+split adds is one of its children, so the square of the rows' size bounds a check's depth. -/
+def coverageFuel (rows : List (List MatchPatternInstruction)) : Nat :=
+  let size := (rows.map List.length).sum + 2
+  size * size
+
+/-- The cases of a match cover its scrutinee's type, as upstream's coverage decides it. -/
+def coversMatchCases (context : Context) (state : State) (scrutineeType : Ty)
+    (cases : List TypedMatchCase) : Bool :=
+  if cases.isEmpty then false else
+  let rows := cases.map fun arm => arm.pattern.coverageRow
+  rowsCoverFuel context state (coverageFuel rows) [scrutineeType] rows
+
 private def statementIsMatch (statement : Syntax.Statement) : Bool :=
   match statement.value with
   | .matchWith .. => true
@@ -2890,7 +2992,8 @@ mutual
                 pure (some (inferred.statements, inferred.sawReturn),
                   inferred.state.restoreLexicalScope outerScope)
           let exhaustive := checked.hasWildcard || defaultBody.isSome ||
-            exhaustsNominalConstructors context state scrutinee.type checked.cases
+            (exhaustsNominalConstructors context state scrutinee.type checked.cases ||
+              coversMatchCases context state scrutinee.type checked.cases)
           if !exhaustive then
             throw (.nonExhaustiveMatch statement.span)
           else

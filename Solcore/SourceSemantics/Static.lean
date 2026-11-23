@@ -304,6 +304,44 @@ def PatternCoversConstructor (pattern : TypedMatchPattern)
     PatternInstructionsIrrefutable instructions
       instantiation.payloadTypes.length []
 
+/-- Rows of pattern programs cover a vector of column types, as Maranget's usefulness algorithm
+decides exhaustiveness: with no column left, some row is empty; otherwise the first column is
+covered by its catch-all rows alone, or it splits over every constructor of its data type, both
+booleans, a tuple's elements or `uint256`'s word. -/
+inductive RowsCover (context : Context) :
+    List TypeSystem.Ty → List (List MatchPatternInstruction) → Prop where
+  | done {rows : List (List MatchPatternInstruction)} (member : [] ∈ rows) :
+      RowsCover context [] rows
+  | default {type : TypeSystem.Ty} {types : List TypeSystem.Ty}
+      {rows : List (List MatchPatternInstruction)}
+      (rest : RowsCover context types (rows.filterMap coverageDefaultRow)) :
+      RowsCover context (type :: types) rows
+  | constructors {dataType : ProgramDataSignature}
+      {substitution : TypeSystem.ParameterSubstitution} {type : TypeSystem.Ty}
+      {types : List TypeSystem.Ty} {rows : List (List MatchPatternInstruction)}
+      (cataloged : dataType ∈ context.signatures.dataTypes)
+      (substitution_exact : ParameterSubstitution.Exact substitution dataType.parameters)
+      (type_eq : type = TypeSystem.Ty.nominal dataType.id
+        (ParameterSubstitution.orderedArguments substitution dataType.parameters))
+      (each : ∀ constructor, constructor ∈ dataType.constructors →
+        RowsCover context
+          (constructor.payloadTypes.map (TypeSystem.ParameterSubstitution.apply substitution) ++
+            types)
+          (rows.filterMap (coverageConstructorRow constructor.id constructor.payloadTypes.length))) :
+      RowsCover context (type :: types) rows
+  | booleans {types : List TypeSystem.Ty} {rows : List (List MatchPatternInstruction)}
+      (onTrue : RowsCover context types (rows.filterMap (coverageBoolRow true)))
+      (onFalse : RowsCover context types (rows.filterMap (coverageBoolRow false))) :
+      RowsCover context (TypeSystem.Ty.bool :: types) rows
+  | tuple {elementTypes types : List TypeSystem.Ty} {rows : List (List MatchPatternInstruction)}
+      (elements : RowsCover context (elementTypes ++ types)
+        (rows.filterMap (coverageTupleRow elementTypes.length))) :
+      RowsCover context (TypeSystem.Ty.productMany elementTypes :: types) rows
+  | word {types : List TypeSystem.Ty} {rows : List (List MatchPatternInstruction)}
+      (argument : RowsCover context (TypeSystem.Ty.word :: types)
+        (rows.filterMap coverageWordRow)) :
+      RowsCover context (TypeSystem.Ty.fixed .uint256 :: types) rows
+
 /-- Exhaustiveness accepted by the declarative resolved-source semantics. -/
 inductive MatchExhaustive (context : Context) (scrutineeType : TypeSystem.Ty)
     (cases : List TypedMatchCase) : Option (List StatementId) → Prop where
@@ -326,6 +364,14 @@ inductive MatchExhaustive (context : Context) (scrutineeType : TypeSystem.Ty)
       (covered : ∀ constructor, constructor ∈ dataType.constructors →
         ∃ matchCase ∈ cases,
           PatternCoversConstructor matchCase.pattern constructor.id) :
+      MatchExhaustive context scrutineeType cases none
+  /-- Upstream's coverage: the arms' pattern programs, each root taking the children its source
+  spells, cover the scrutinee's type (Maranget's usefulness of a catch-all row). -/
+  | covered
+      (rows_cover : RowsCover context [scrutineeType]
+        (cases.map fun matchCase =>
+          matchPatternResolutionInstructions matchCase.pattern.resolution
+            matchCase.pattern.source.rootArity)) :
       MatchExhaustive context scrutineeType cases none
 
 /-- Legacy body-result flag used by the resolved carrier. -/

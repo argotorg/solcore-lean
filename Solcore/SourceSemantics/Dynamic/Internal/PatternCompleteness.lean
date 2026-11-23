@@ -784,6 +784,559 @@ mutual
 
 end
 
+/-- A value of `bool` is a boolean. -/
+theorem ValueHasType.bool_value
+    {context : Context} {heap : Heap} {value : Value}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (typed : ValueHasType context heap value .bool) :
+    ∃ literal, value = .bool literal := by
+  generalize type_eq : Ty.bool = type at typed
+  cases typed with
+  | bool literal => exact ⟨literal, rfl⟩
+  | unit => simp [Ty.unit, Ty.bool] at type_eq
+  | word => simp [Ty.bool, Ty.word] at type_eq
+  | fixed => simp [Ty.bool, Ty.fixed] at type_eq
+  | integer => simp [Ty.bool, Ty.integer] at type_eq
+  | product => cases type_eq
+  | proxy => cases type_eq
+  | constructed valid arguments_typed =>
+      cases valid with
+      | intro dataType signature dataType_mem signature_mem signature_owner
+          constructor_eq substitution_exact substitution_range payloadTypes_eq
+          resultType_eq =>
+          rw [resultType_eq] at type_eq
+          exact (nominal_ne_of_head _ _ _
+            (by simp [Ty.bool, applicationHead]) type_eq.symm).elim
+  | mapping => cases type_eq
+  | closure => cases type_eq
+  | global valid evidence_covers =>
+      rcases global_type_eq_function catalog valid with
+        ⟨parameter, result, function_eq⟩
+      rw [function_eq] at type_eq
+      cases type_eq
+  | builtin function =>
+      rw [BuiltinFunctionId.type] at type_eq
+      cases type_eq
+  | arrayRef => simp [Ty.bool, Ty.array] at type_eq
+  | arrayObject => simp [Ty.bool, Ty.arrayObject] at type_eq
+  | arraySlice => simp [Ty.bool, Ty.arraySlice] at type_eq
+  | memref => simp [Ty.bool, Ty.memref] at type_eq
+  | comptime => cases type_eq
+
+/-- Typed value vectors concatenate at the concatenated types. -/
+theorem ValuesHaveTypes.append
+    {context : Context} {heap : Heap} :
+    ∀ {front back : List Value} {frontTypes backTypes : List Ty},
+      ValuesHaveTypes context heap front frontTypes →
+      ValuesHaveTypes context heap back backTypes →
+      ValuesHaveTypes context heap (front ++ back) (frontTypes ++ backTypes)
+  | _, _, _, _, .nil, back => back
+  | _, _, _, _, .cons head tail, back => .cons head (ValuesHaveTypes.append tail back)
+
+/-- Typed pattern sequences concatenate, the second consuming what the first leaves. -/
+theorem PatternInstructionsHaveTypes.append
+    {context : Context} :
+    ∀ {instructions middle rest : List MatchPatternInstruction}
+      {front back : List Ty} {frontRequirements backRequirements : List RequirementId}
+      {frontBinders backBinders : List TypedBinder},
+      PatternInstructionsHaveTypes context instructions front frontRequirements frontBinders
+        middle →
+      PatternInstructionsHaveTypes context middle back backRequirements backBinders rest →
+      PatternInstructionsHaveTypes context instructions (front ++ back)
+        (frontRequirements ++ backRequirements) (frontBinders ++ backBinders) rest
+  | _, _, _, _, _, _, _, _, _, .nil, back => by simpa using back
+  | _, _, _, _, _, _, _, _, _, .cons head tail, back => by
+      simpa [List.append_assoc] using
+        (PatternInstructionsHaveTypes.cons head (PatternInstructionsHaveTypes.append tail back))
+
+/-- One wildcard per column types at those columns, with no requirement and no binder. -/
+theorem PatternInstructionsHaveTypes.replicate_wildcard
+    {context : Context} :
+    ∀ (types : List Ty) (rest : List MatchPatternInstruction),
+      PatternInstructionsHaveTypes context
+        (List.replicate types.length .wildcard ++ rest) types [] [] rest
+  | [], _ => .nil
+  | _ :: types, rest => by
+      simp only [List.length_cons, List.replicate_succ, List.cons_append]
+      exact PatternInstructionsHaveTypes.cons PatternInstructionHasType.wildcard
+        (PatternInstructionsHaveTypes.replicate_wildcard (context := context) types rest)
+
+/-- Leading wildcards match their values and bind nothing, so they can be dropped. -/
+theorem PatternInstructionsMatch.drop_wildcards
+    {context : Context} :
+    ∀ {front back : List Value} {rest out : List MatchPatternInstruction}
+      {bindings : List (TypedBinder × Value)},
+      PatternInstructionsMatch context (front ++ back)
+        (List.replicate front.length .wildcard ++ rest) bindings out →
+      PatternInstructionsMatch context back rest bindings out
+  | [], _, _, _, _, matched => by simpa using matched
+  | value :: front, back, rest, out, bindings, matched => by
+      simp only [List.cons_append, List.length_cons, List.replicate_succ] at matched
+      cases matched with
+      | cons head tail =>
+          cases head with
+          | wildcard => simpa using PatternInstructionsMatch.drop_wildcards tail
+
+/-- A match of concatenated values splits where the values do. -/
+theorem PatternInstructionsMatch.append_split
+    {context : Context} :
+    ∀ {front back : List Value} {instructions rest : List MatchPatternInstruction}
+      {bindings : List (TypedBinder × Value)},
+      PatternInstructionsMatch context (front ++ back) instructions bindings rest →
+      ∃ middle frontBindings backBindings,
+        PatternInstructionsMatch context front instructions frontBindings middle ∧
+        PatternInstructionsMatch context back middle backBindings rest ∧
+        bindings = frontBindings ++ backBindings
+  | [], _, instructions, _, bindings, matched => ⟨instructions, [], bindings, .nil, matched, rfl⟩
+  | value :: front, back, instructions, rest, bindings, matched => by
+      cases matched with
+      | cons head tail =>
+          rename_i afterHead headBindings tailBindings
+          obtain ⟨middle, frontBindings, backBindings, frontMatch, backMatch, bindingsEq⟩ :=
+            PatternInstructionsMatch.append_split tail
+          exact ⟨middle, headBindings ++ frontBindings, backBindings,
+            .cons head frontMatch, backMatch, by simp [bindingsEq]⟩
+
+
+/-- An admissible instantiation of a cataloged constructor at the nominal type of a substitution
+has that constructor's payload types under the substitution. -/
+theorem DataConstructorInstantiation.Admissible.payloadTypes_eq_of_resultType_eq
+    {context : Context} {instantiation : DataConstructorInstantiation}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (admissible : DataConstructorInstantiation.Admissible context instantiation)
+    {dataType : ProgramDataSignature} {substitution : TypeSystem.ParameterSubstitution}
+    {constructor : ProgramDataConstructorSignature}
+    (cataloged : dataType ∈ context.signatures.dataTypes)
+    (constructorMem : constructor ∈ dataType.constructors)
+    (exact : ParameterSubstitution.Exact substitution dataType.parameters)
+    (constructor_eq : instantiation.constructor = constructor.id)
+    (result_eq : instantiation.resultType = Ty.nominal dataType.id
+      (ParameterSubstitution.orderedArguments substitution dataType.parameters)) :
+    instantiation.payloadTypes =
+      constructor.payloadTypes.map (TypeSystem.ParameterSubstitution.apply substitution) := by
+  cases admissible with
+  | intro instData instSignature instDataMem instSignatureMem instOwner
+      instConstructorEq instExact instRange instPayloadEq instResultEq =>
+    have signatureIdEq : instSignature.id = constructor.id :=
+      instConstructorEq.symm.trans constructor_eq
+    have dataIdEq : instData.id = dataType.id := by
+      exact instOwner.symm.trans
+        ((congrArg ProgramDataConstructorId.dataType signatureIdEq).trans
+          ((catalog.data_semantic dataType cataloged).constructor_owners constructor constructorMem))
+    have dataEq : instData = dataType :=
+      StructuralSubstitution.eq_of_mem_of_mapped_nodup catalog.data_ids
+        instDataMem cataloged dataIdEq
+    subst instData
+    have constructorIdSublist :
+        (dataType.constructors.map fun signature => signature.id).Sublist
+          (context.signatures.dataTypes.flatMap fun dataType =>
+            dataType.constructors.map fun signature => signature.id) :=
+      sublist_flatMap_of_mem
+        (fun dataType => dataType.constructors.map fun signature => signature.id)
+        cataloged
+    have constructorIdsNodup :
+        (dataType.constructors.map fun signature => signature.id).Nodup :=
+      constructorIdSublist.nodup catalog.constructor_ids
+    have signatureEq : instSignature = constructor :=
+      StructuralSubstitution.eq_of_mem_of_mapped_nodup constructorIdsNodup
+        instSignatureMem constructorMem signatureIdEq
+    subst instSignature
+    have nominalEq :
+        Ty.nominal dataType.id
+            (ParameterSubstitution.orderedArguments
+              instantiation.parameterSubstitution dataType.parameters) =
+          Ty.nominal dataType.id
+            (ParameterSubstitution.orderedArguments substitution dataType.parameters) :=
+      instResultEq.symm.trans result_eq
+    have orderedArgumentsEq := (nominal_injective nominalEq).2
+    have payloadWellFormed :=
+      (catalog.data_semantic dataType cataloged).constructor_payloads
+        constructor constructorMem
+    rw [instPayloadEq]
+    apply List.map_congr_left
+    intro payload payloadMem
+    exact
+      StructuralSubstitution.TypeWellScoped.applyParameters_eq_of_orderedArguments_eq
+        (context := signatureContext context.signatures dataType.id dataType.parameters)
+        (flexibleVariables := []) instantiation.parameterSubstitution substitution
+        (by
+          simpa [signatureContext, Context.ofSignatures,
+            Context.forDeclaration, Context.withAssumptions] using instExact)
+        (by
+          simpa [signatureContext, Context.ofSignatures,
+            Context.forDeclaration, Context.withAssumptions] using exact)
+        orderedArgumentsEq
+        (payloadWellFormed payload payloadMem).typeWellScoped
+
+/-- A typed row's head and the rest of its row. -/
+private theorem row_cons_typed
+    {context : Context} {row : List MatchPatternInstruction} {type : Ty} {types : List Ty}
+    {requirements : List RequirementId} {binders : List TypedBinder}
+    (typed : PatternInstructionsHaveTypes context row (type :: types) requirements binders []) :
+    ∃ afterHead headRequirements headBinders tailRequirements tailBinders,
+      PatternInstructionHasType context row type headRequirements headBinders afterHead ∧
+      PatternInstructionsHaveTypes context afterHead types tailRequirements tailBinders [] := by
+  cases typed with
+  | cons head tail => exact ⟨_, _, _, _, _, head, tail⟩
+
+/-- The default specialization of a typed row is typed at the remaining columns. -/
+theorem coverageDefaultRow_typed
+    {context : Context} {row row' : List MatchPatternInstruction} {type : Ty} {types : List Ty}
+    (typed : ∃ requirements binders,
+      PatternInstructionsHaveTypes context row (type :: types) requirements binders [])
+    (specialized : coverageDefaultRow row = some row') :
+    ∃ requirements binders,
+      PatternInstructionsHaveTypes context row' types requirements binders [] := by
+  obtain ⟨_, _, typed⟩ := typed
+  obtain ⟨afterHead, _, _, _, _, head, tail⟩ := row_cons_typed typed
+  cases row with
+  | nil => simp [coverageDefaultRow] at specialized
+  | cons instruction rest =>
+      cases instruction <;> simp [coverageDefaultRow] at specialized
+      all_goals subst specialized
+      all_goals cases head
+      all_goals exact ⟨_, _, tail⟩
+
+/-- A boolean specialization of a typed row is typed at the remaining columns. -/
+theorem coverageBoolRow_typed
+    {context : Context} {value : Bool} {row row' : List MatchPatternInstruction}
+    {types : List Ty}
+    (typed : ∃ requirements binders,
+      PatternInstructionsHaveTypes context row (Ty.bool :: types) requirements binders [])
+    (specialized : coverageBoolRow value row = some row') :
+    ∃ requirements binders,
+      PatternInstructionsHaveTypes context row' types requirements binders [] := by
+  obtain ⟨_, _, typed⟩ := typed
+  obtain ⟨afterHead, _, _, _, _, head, tail⟩ := row_cons_typed typed
+  cases row with
+  | nil => simp [coverageBoolRow] at specialized
+  | cons instruction rest =>
+      cases instruction <;> simp [coverageBoolRow] at specialized
+      all_goals
+        first
+          | (obtain ⟨_, rfl⟩ := specialized)
+          | subst specialized
+      all_goals cases head
+      all_goals exact ⟨_, _, tail⟩
+
+/-- The word specialization of a typed row at `uint256` is typed at the word and the remaining
+columns. -/
+theorem coverageWordRow_typed
+    {context : Context} {row row' : List MatchPatternInstruction} {types : List Ty}
+    (typed : ∃ requirements binders,
+      PatternInstructionsHaveTypes context row (Ty.fixed .uint256 :: types) requirements binders [])
+    (specialized : coverageWordRow row = some row') :
+    ∃ requirements binders,
+      PatternInstructionsHaveTypes context row' (Ty.word :: types) requirements binders [] := by
+  obtain ⟨_, _, typed⟩ := typed
+  obtain ⟨afterHead, _, _, _, _, head, tail⟩ := row_cons_typed typed
+  cases row with
+  | nil => simp [coverageWordRow] at specialized
+  | cons instruction rest =>
+      cases instruction <;> simp [coverageWordRow] at specialized
+      all_goals subst specialized
+      · cases head
+        exact ⟨_, _, .cons .wildcard tail⟩
+      · cases head
+        exact ⟨_, _, .cons .wildcard tail⟩
+      · generalize typeEq : Ty.fixed FixedInteger.uint256 = columnType at head
+        cases head with
+        | uint256Word argument =>
+            exact ⟨_, _, PatternInstructionsHaveTypes.append argument tail⟩
+
+/-- The tuple specialization of a typed row is typed at the tuple's elements and the remaining
+columns. -/
+theorem coverageTupleRow_typed
+    {context : Context} {elementTypes : List Ty} {row row' : List MatchPatternInstruction}
+    {types : List Ty}
+    (typed : ∃ requirements binders,
+      PatternInstructionsHaveTypes context row (Ty.productMany elementTypes :: types)
+        requirements binders [])
+    (specialized : coverageTupleRow elementTypes.length row = some row') :
+    ∃ requirements binders,
+      PatternInstructionsHaveTypes context row' (elementTypes ++ types) requirements binders [] := by
+  obtain ⟨_, _, typed⟩ := typed
+  obtain ⟨afterHead, _, _, _, _, head, tail⟩ := row_cons_typed typed
+  cases row with
+  | nil => simp [coverageTupleRow] at specialized
+  | cons instruction rest =>
+      cases instruction <;> simp [coverageTupleRow] at specialized
+      · subst specialized
+        cases head
+        exact ⟨_, _, PatternInstructionsHaveTypes.append
+          (PatternInstructionsHaveTypes.replicate_wildcard elementTypes _) tail⟩
+      · subst specialized
+        cases head
+        exact ⟨_, _, PatternInstructionsHaveTypes.append
+          (PatternInstructionsHaveTypes.replicate_wildcard elementTypes _) tail⟩
+      · rename_i count
+        obtain ⟨countEq, rfl⟩ := specialized
+        generalize typeEq : Ty.productMany elementTypes = columnType at head
+        cases head with
+        | tuple arity elements =>
+            rename_i actualTypes
+            have sameTypes : actualTypes = elementTypes :=
+              Ty.productMany_inj (by rw [← arity, countEq]) typeEq.symm
+            subst sameTypes
+            exact ⟨_, _, PatternInstructionsHaveTypes.append elements tail⟩
+
+/-- A constructor's specialization of a typed row at its data type is typed at the constructor's
+payloads under the type's substitution and the remaining columns. -/
+theorem coverageConstructorRow_typed
+    {context : Context} (catalog : SignatureCatalogWellFormed context.signatures)
+    {dataType : ProgramDataSignature} {substitution : TypeSystem.ParameterSubstitution}
+    {constructor : ProgramDataConstructorSignature}
+    {row row' : List MatchPatternInstruction} {types : List Ty}
+    (cataloged : dataType ∈ context.signatures.dataTypes)
+    (constructorMem : constructor ∈ dataType.constructors)
+    (exact : ParameterSubstitution.Exact substitution dataType.parameters)
+    (typed : ∃ requirements binders,
+      PatternInstructionsHaveTypes context row
+        (Ty.nominal dataType.id
+          (ParameterSubstitution.orderedArguments substitution dataType.parameters) :: types)
+        requirements binders [])
+    (specialized :
+      coverageConstructorRow constructor.id constructor.payloadTypes.length row = some row') :
+    ∃ requirements binders,
+      PatternInstructionsHaveTypes context row'
+        (constructor.payloadTypes.map (TypeSystem.ParameterSubstitution.apply substitution) ++
+          types) requirements binders [] := by
+  obtain ⟨_, _, typed⟩ := typed
+  obtain ⟨afterHead, _, _, _, _, head, tail⟩ := row_cons_typed typed
+  have wildcards := PatternInstructionsHaveTypes.replicate_wildcard (context := context)
+    (constructor.payloadTypes.map (TypeSystem.ParameterSubstitution.apply substitution))
+  simp only [List.length_map] at wildcards
+  cases row with
+  | nil => simp [coverageConstructorRow] at specialized
+  | cons instruction rest =>
+      cases instruction <;> simp [coverageConstructorRow] at specialized
+      · subst specialized
+        cases head
+        exact ⟨_, _, PatternInstructionsHaveTypes.append (wildcards _) tail⟩
+      · subst specialized
+        cases head
+        exact ⟨_, _, PatternInstructionsHaveTypes.append (wildcards _) tail⟩
+      · rename_i instantiation count
+        obtain ⟨constructorEq, rfl⟩ := specialized
+        generalize typeEq : Ty.nominal dataType.id
+          (ParameterSubstitution.orderedArguments substitution dataType.parameters) =
+            columnType at head
+        cases head with
+        | constructor valid arity arguments =>
+            have payloadEq :=
+              DataConstructorInstantiation.Admissible.payloadTypes_eq_of_resultType_eq
+                catalog valid cataloged constructorMem exact constructorEq typeEq.symm
+            rw [payloadEq] at arguments
+            exact ⟨_, _, PatternInstructionsHaveTypes.append arguments tail⟩
+
+
+/-- Rows that cover a vector of column types match every vector of values of those types: the
+completeness of the coverage judgment. -/
+theorem RowsCover.complete
+    {context : Context} {heap : Heap}
+    (catalog : SignatureCatalogWellFormed context.signatures) :
+    ∀ {types : List Ty} {rows : List (List MatchPatternInstruction)},
+      RowsCover context types rows →
+      (∀ row, row ∈ rows → ∃ requirements binders,
+        PatternInstructionsHaveTypes context row types requirements binders []) →
+      ∀ {values : List Value}, ValuesHaveTypes context heap values types →
+      ∃ row, row ∈ rows ∧ ∃ bindings, PatternInstructionsMatch context values row bindings [] := by
+  intro types rows covers
+  induction covers with
+  | done member =>
+      intro _ values typed
+      cases typed
+      exact ⟨[], member, [], .nil⟩
+  | default rest ih =>
+      intro rowsTyped values typed
+      cases typed with
+      | cons headTyped tailTyped =>
+          obtain ⟨row', rowMem', bindings, matched⟩ := ih
+            (fun row' member => by
+              obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp member
+              exact coverageDefaultRow_typed (rowsTyped row rowMem) specialized)
+            tailTyped
+          obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp rowMem'
+          cases row with
+          | nil => simp [coverageDefaultRow] at specialized
+          | cons instruction rest =>
+              cases instruction <;> simp [coverageDefaultRow] at specialized
+              · subst specialized
+                exact ⟨_, rowMem, _, .cons .wildcard matched⟩
+              · subst specialized
+                exact ⟨_, rowMem, _, .cons .binder matched⟩
+  | @constructors dataType substitution type types rows cataloged exact type_eq each ih =>
+      intro rowsTyped values typed
+      subst type_eq
+      cases typed with
+      | cons headTyped tailTyped =>
+          obtain ⟨actual, payloads, value_eq, actualValid, payloadsTyped, actualResultEq⟩ :=
+            headTyped.nominal_value catalog
+          subst value_eq
+          have actualValidCopy := actualValid
+          cases actualValid with
+          | intro actualData actualSignature actualDataMem actualSignatureMem actualOwner
+              actualConstructorEq actualExact actualRange actualPayloadEq actualResultEq' =>
+            have nominalEq := actualResultEq'.symm.trans actualResultEq
+            have dataIdEq := (nominal_injective nominalEq).1
+            have dataEq : actualData = dataType :=
+              StructuralSubstitution.eq_of_mem_of_mapped_nodup catalog.data_ids
+                actualDataMem cataloged dataIdEq
+            subst actualData
+            have payloadEq :=
+              DataConstructorInstantiation.Admissible.payloadTypes_eq_of_resultType_eq
+                catalog actualValidCopy.toAdmissible cataloged actualSignatureMem exact
+                actualConstructorEq actualResultEq
+            have payloadsTyped' : ValuesHaveTypes context heap payloads
+                (actualSignature.payloadTypes.map
+                  (TypeSystem.ParameterSubstitution.apply substitution)) := by
+              rw [← payloadEq]
+              exact payloadsTyped
+            obtain ⟨row', rowMem', bindings, matched⟩ := ih actualSignature actualSignatureMem
+              (fun row' member => by
+                obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp member
+                exact coverageConstructorRow_typed catalog cataloged actualSignatureMem exact
+                  (rowsTyped row rowMem) specialized)
+              (ValuesHaveTypes.append payloadsTyped' tailTyped)
+            obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp rowMem'
+            have payloadsLength : payloads.length = actualSignature.payloadTypes.length := by
+              simpa using payloadsTyped'.length_eq
+            cases row with
+            | nil => simp [coverageConstructorRow] at specialized
+            | cons instruction rest =>
+                cases instruction <;> simp [coverageConstructorRow] at specialized
+                · subst specialized
+                  rw [← payloadsLength] at matched
+                  exact ⟨_, rowMem, _,
+                    .cons .wildcard (PatternInstructionsMatch.drop_wildcards matched)⟩
+                · subst specialized
+                  rw [← payloadsLength] at matched
+                  exact ⟨_, rowMem, _,
+                    .cons .binder (PatternInstructionsMatch.drop_wildcards matched)⟩
+                · rename_i expected count
+                  obtain ⟨constructorEq, rfl⟩ := specialized
+                  obtain ⟨middle, frontBindings, backBindings, frontMatch, backMatch,
+                      bindingsEq⟩ := PatternInstructionsMatch.append_split matched
+                  obtain ⟨_, _, rowTyped⟩ := rowsTyped _ rowMem
+                  obtain ⟨afterHead, _, _, _, _, head, _⟩ := row_cons_typed rowTyped
+                  generalize typeEq : Ty.nominal dataType.id
+                    (ParameterSubstitution.orderedArguments substitution dataType.parameters) =
+                      columnType at head
+                  cases head with
+                  | constructor expectedValid arity arguments =>
+                      have agreement :=
+                        DataConstructorInstantiation.Valid.agrees_of_constructor_eq_of_result_eq
+                          catalog actualValidCopy expectedValid
+                          (actualConstructorEq.trans constructorEq.symm)
+                          (actualResultEq.trans typeEq)
+                      have dynamicArity : payloads.length = count :=
+                        payloadsTyped.length_eq.trans
+                          ((congrArg List.length agreement.payload_types_eq).trans arity.symm)
+                      exact ⟨_, rowMem, _,
+                        .cons (.constructor agreement dynamicArity frontMatch) backMatch⟩
+  | booleans onTrue onFalse ihTrue ihFalse =>
+      intro rowsTyped values typed
+      cases typed with
+      | cons headTyped tailTyped =>
+          obtain ⟨literal, value_eq⟩ := headTyped.bool_value catalog
+          subst value_eq
+          cases literal with
+          | true =>
+              obtain ⟨row', rowMem', bindings, matched⟩ := ihTrue
+                (fun row' member => by
+                  obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp member
+                  exact coverageBoolRow_typed (rowsTyped row rowMem) specialized)
+                tailTyped
+              obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp rowMem'
+              cases row with
+              | nil => simp [coverageBoolRow] at specialized
+              | cons instruction rest =>
+                  cases instruction <;> simp [coverageBoolRow] at specialized
+                  · subst specialized
+                    exact ⟨_, rowMem, _, .cons .wildcard matched⟩
+                  · subst specialized
+                    exact ⟨_, rowMem, _, .cons .binder matched⟩
+                  · obtain ⟨rfl, rfl⟩ := specialized
+                    exact ⟨_, rowMem, _, .cons .boolLiteral matched⟩
+          | false =>
+              obtain ⟨row', rowMem', bindings, matched⟩ := ihFalse
+                (fun row' member => by
+                  obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp member
+                  exact coverageBoolRow_typed (rowsTyped row rowMem) specialized)
+                tailTyped
+              obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp rowMem'
+              cases row with
+              | nil => simp [coverageBoolRow] at specialized
+              | cons instruction rest =>
+                  cases instruction <;> simp [coverageBoolRow] at specialized
+                  · subst specialized
+                    exact ⟨_, rowMem, _, .cons .wildcard matched⟩
+                  · subst specialized
+                    exact ⟨_, rowMem, _, .cons .binder matched⟩
+                  · obtain ⟨rfl, rfl⟩ := specialized
+                    exact ⟨_, rowMem, _, .cons .boolLiteral matched⟩
+  | @tuple elementTypes types rows elements ih =>
+      intro rowsTyped values typed
+      cases typed with
+      | cons headTyped tailTyped =>
+          obtain ⟨elementValues, packed, elementsTyped⟩ := ValuesPack.exists_typed catalog headTyped
+          obtain ⟨row', rowMem', bindings, matched⟩ := ih
+            (fun row' member => by
+              obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp member
+              exact coverageTupleRow_typed (rowsTyped row rowMem) specialized)
+            (ValuesHaveTypes.append elementsTyped tailTyped)
+          obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp rowMem'
+          have elementsLength : elementValues.length = elementTypes.length :=
+            elementsTyped.length_eq
+          cases row with
+          | nil => simp [coverageTupleRow] at specialized
+          | cons instruction rest =>
+              cases instruction <;> simp [coverageTupleRow] at specialized
+              · subst specialized
+                rw [← elementsLength] at matched
+                exact ⟨_, rowMem, _,
+                  .cons .wildcard (PatternInstructionsMatch.drop_wildcards matched)⟩
+              · subst specialized
+                rw [← elementsLength] at matched
+                exact ⟨_, rowMem, _,
+                  .cons .binder (PatternInstructionsMatch.drop_wildcards matched)⟩
+              · rename_i count
+                obtain ⟨countEq, rfl⟩ := specialized
+                obtain ⟨middle, frontBindings, backBindings, frontMatch, backMatch, _⟩ :=
+                  PatternInstructionsMatch.append_split matched
+                exact ⟨_, rowMem, _,
+                  .cons (.tuple packed (elementsLength.trans countEq.symm) frontMatch) backMatch⟩
+  | word argument ih =>
+      intro rowsTyped values typed
+      cases typed with
+      | cons headTyped tailTyped =>
+          obtain ⟨word, value_eq⟩ := headTyped.fixed_value catalog
+          subst value_eq
+          obtain ⟨row', rowMem', bindings, matched⟩ := ih
+            (fun row' member => by
+              obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp member
+              exact coverageWordRow_typed (rowsTyped row rowMem) specialized)
+            (.cons (.word word) tailTyped)
+          obtain ⟨row, rowMem, specialized⟩ := List.mem_filterMap.mp rowMem'
+          cases row with
+          | nil => simp [coverageWordRow] at specialized
+          | cons instruction rest =>
+              cases instruction <;> simp [coverageWordRow] at specialized
+              · subst specialized
+                cases matched with
+                | cons head tail =>
+                    cases head
+                    exact ⟨_, rowMem, _, .cons .wildcard tail⟩
+              · subst specialized
+                cases matched with
+                | cons head tail =>
+                    cases head
+                    exact ⟨_, rowMem, _, .cons .binder tail⟩
+              · subst specialized
+                obtain ⟨middle, frontBindings, backBindings, frontMatch, backMatch, _⟩ :=
+                  PatternInstructionsMatch.append_split (front := [.word word]) matched
+                exact ⟨_, rowMem, _, .cons (.uint256Word frontMatch) backMatch⟩
+
 namespace MatchPatternSourceRepresents
 
 /-- The retained pattern source determines the root arity used to decode its
@@ -808,6 +1361,15 @@ theorem rootArity_eq
   | group _ induction =>
       cases right_represents with
       | group inner => exact induction inner
+
+/-- The root arity a pattern's source represents is the one it spells. -/
+theorem rootArity_eq_source {context : Context} {source : MatchPatternSource}
+    {resolution : MatchPatternResolution} {rootArity : Nat}
+    (represents : MatchPatternSourceRepresents context source resolution rootArity) :
+    rootArity = source.rootArity := by
+  induction represents with
+  | group _ induction => exact induction
+  | _ => rfl
 
 end MatchPatternSourceRepresents
 
@@ -1063,6 +1625,45 @@ theorem noBranch_impossible_of_exhaustive
                     actual_result_eq coversActual with
                 ⟨bindings, matched⟩
               exact selected.excludes_member_match member matched
+  | covered rows_cover =>
+      have rows_typed : ∀ row, row ∈ (cases.map fun matchCase =>
+          matchPatternResolutionInstructions matchCase.pattern.resolution
+            matchCase.pattern.source.rootArity) →
+          ∃ requirements binders,
+            PatternInstructionsHaveTypes context row [scrutineeType] requirements binders [] := by
+        intro row member
+        rcases List.mem_map.mp member with ⟨matchCase, case_member, rfl⟩
+        rcases
+            Solcore.SourceSemantics.Dynamic.MatchCasesHaveType.member cases_typed
+              case_member with
+          ⟨facts, case_typed⟩
+        cases case_typed with
+        | intro pattern_typed binders_extend body_type =>
+            have arity_eq :=
+              Solcore.SourceSemantics.Dynamic.MatchPatternSourceRepresents.rootArity_eq_source
+                pattern_typed.source_represents
+            have resolution_type := pattern_typed.resolution_type
+            unfold MatchPatternResolutionHasType at resolution_type
+            rw [arity_eq] at resolution_type
+            exact ⟨_, _, by
+              simpa using PatternInstructionsHaveTypes.cons resolution_type .nil⟩
+      rcases RowsCover.complete catalog rows_cover rows_typed (.cons value_typed .nil) with
+        ⟨row, member, bindings, matched⟩
+      rcases List.mem_map.mp member with ⟨matchCase, case_member, rfl⟩
+      rcases
+          Solcore.SourceSemantics.Dynamic.MatchCasesHaveType.member cases_typed
+            case_member with
+        ⟨facts, case_typed⟩
+      cases case_typed with
+      | intro pattern_typed binders_extend body_type =>
+          cases matched with
+          | cons head_match tail_match =>
+              cases tail_match
+              have source_represents := pattern_typed.source_represents
+              rw [Solcore.SourceSemantics.Dynamic.MatchPatternSourceRepresents.rootArity_eq_source
+                source_represents] at source_represents
+              exact selected.excludes_member_match case_member
+                (.intro source_represents head_match)
 
 end MatchCasesSelect
 

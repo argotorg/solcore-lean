@@ -949,6 +949,19 @@ def binderIds (instructions : List MatchPatternInstruction) :
 
 end MatchPatternInstruction
 
+namespace MatchPatternSource
+
+/-- The children a pattern's root takes, as its source spells them. -/
+def rootArity : MatchPatternSource → Nat
+  | .wildcard _ _ => 0
+  | .integerLiteral _ _ => 0
+  | .binder _ _ => 0
+  | .constructor _ _ _ _ argumentCount => argumentCount
+  | .group _ inner => inner.rootArity
+  | .tuple _ elementCount => elementCount
+
+end MatchPatternSource
+
 namespace TypedMatchPattern
 
 /-- Binder identities introduced by a resolved pattern root and its flat
@@ -960,7 +973,59 @@ def binderIds (pattern : TypedMatchPattern) : List Resolved.LocalId :=
   | .constructor _ arguments | .tuple arguments | .uint256Word arguments =>
       MatchPatternInstruction.binderIds arguments
 
+/-- A pattern's program, its root taking the children its source spells: one row of coverage. -/
+def coverageRow (pattern : TypedMatchPattern) : List MatchPatternInstruction :=
+  match pattern.resolution with
+  | .wildcard => [.wildcard]
+  | .integerLiteral source resolution => [.integerLiteral source resolution]
+  | .binder binder => [.binder binder]
+  | .constructor instantiation arguments =>
+      .constructor instantiation pattern.source.rootArity :: arguments
+  | .tuple elements => .tuple pattern.source.rootArity :: elements
+  | .uint256Word argument => .uint256Word :: argument
+  | .boolLiteral value => [.boolLiteral value]
+
 end TypedMatchPattern
+
+/-- A coverage row whose head is a catch-all, without that head: the rows Maranget's default
+matrix keeps for a column. -/
+def coverageDefaultRow : List MatchPatternInstruction → Option (List MatchPatternInstruction)
+  | .wildcard :: rest => some rest
+  | .binder _ :: rest => some rest
+  | _ => none
+
+/-- A coverage row specialized to one constructor: that constructor's head gives its children,
+and a catch-all one wildcard per payload. -/
+def coverageConstructorRow (constructor : ProgramDataConstructorId) (arity : Nat) :
+    List MatchPatternInstruction → Option (List MatchPatternInstruction)
+  | .wildcard :: rest => some (List.replicate arity .wildcard ++ rest)
+  | .binder _ :: rest => some (List.replicate arity .wildcard ++ rest)
+  | .constructor instantiation _ :: rest =>
+      if instantiation.constructor = constructor then some rest else none
+  | _ => none
+
+/-- A coverage row specialized to one boolean. -/
+def coverageBoolRow (value : Bool) :
+    List MatchPatternInstruction → Option (List MatchPatternInstruction)
+  | .wildcard :: rest => some rest
+  | .binder _ :: rest => some rest
+  | .boolLiteral literal :: rest => if literal = value then some rest else none
+  | _ => none
+
+/-- A coverage row specialized to the tuple of a column's arity. -/
+def coverageTupleRow (arity : Nat) :
+    List MatchPatternInstruction → Option (List MatchPatternInstruction)
+  | .wildcard :: rest => some (List.replicate arity .wildcard ++ rest)
+  | .binder _ :: rest => some (List.replicate arity .wildcard ++ rest)
+  | .tuple count :: rest => if count = arity then some rest else none
+  | _ => none
+
+/-- A coverage row specialized to `uint256`'s word. -/
+def coverageWordRow : List MatchPatternInstruction → Option (List MatchPatternInstruction)
+  | .wildcard :: rest => some (.wildcard :: rest)
+  | .binder _ :: rest => some (.wildcard :: rest)
+  | .uint256Word :: rest => some rest
+  | _ => none
 
 namespace ForItemForm
 

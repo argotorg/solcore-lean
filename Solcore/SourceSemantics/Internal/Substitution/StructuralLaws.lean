@@ -24,6 +24,215 @@ lemmas below use these facts to transport source typing derivations.
 
 set_option autoImplicit false
 
+namespace Solcore.SourceSemantics
+
+open Frontend
+open Frontend.SourceInference
+open TypeSystem
+
+/-- An instruction map that keeps every instruction's head: what a substitution of types does
+to a pattern program. -/
+structure InstructionMapKeepsHeads (map : MatchPatternInstruction → MatchPatternInstruction) :
+    Prop where
+  wildcard : map .wildcard = .wildcard
+  binder : ∀ binder, ∃ binder', map (.binder binder) = .binder binder'
+  integerLiteral : ∀ source resolution, ∃ resolution',
+    map (.integerLiteral source resolution) = .integerLiteral source resolution'
+  constructor : ∀ instantiation count, ∃ instantiation',
+    map (.constructor instantiation count) = .constructor instantiation' count ∧
+      instantiation'.constructor = instantiation.constructor
+  tuple : ∀ count, map (.tuple count) = .tuple count
+  uint256Word : map .uint256Word = .uint256Word
+  boolLiteral : ∀ value, map (.boolLiteral value) = .boolLiteral value
+
+namespace InstructionMapKeepsHeads
+
+variable {map : MatchPatternInstruction → MatchPatternInstruction}
+
+theorem filterMap_commute
+    {specialize : List MatchPatternInstruction → Option (List MatchPatternInstruction)}
+    (commute : ∀ row, specialize (row.map map) = (specialize row).map (List.map map)) :
+    ∀ rows : List (List MatchPatternInstruction),
+      (rows.map (List.map map)).filterMap specialize =
+        (rows.filterMap specialize).map (List.map map)
+  | [] => rfl
+  | row :: rows => by
+      simp only [List.map_cons, List.filterMap_cons, commute]
+      cases specialize row <;> simp [filterMap_commute commute rows]
+
+theorem defaultRow (keeps : InstructionMapKeepsHeads map) (row : List MatchPatternInstruction) :
+    coverageDefaultRow (row.map map) = (coverageDefaultRow row).map (List.map map) := by
+  cases row with
+  | nil => rfl
+  | cons instruction rest =>
+      cases instruction with
+      | wildcard => simp [coverageDefaultRow, keeps.wildcard]
+      | binder binder =>
+          obtain ⟨binder', mapped⟩ := keeps.binder binder
+          simp [coverageDefaultRow, mapped]
+      | integerLiteral source resolution =>
+          obtain ⟨resolution', mapped⟩ := keeps.integerLiteral source resolution
+          simp [coverageDefaultRow, mapped]
+      | constructor instantiation count =>
+          obtain ⟨instantiation', mapped, _⟩ := keeps.constructor instantiation count
+          simp [coverageDefaultRow, mapped]
+      | tuple count => simp [coverageDefaultRow, keeps.tuple]
+      | uint256Word => simp [coverageDefaultRow, keeps.uint256Word]
+      | boolLiteral value => simp [coverageDefaultRow, keeps.boolLiteral]
+
+theorem constructorRow (keeps : InstructionMapKeepsHeads map)
+    (constructor : ProgramDataConstructorId) (arity : Nat) (row : List MatchPatternInstruction) :
+    coverageConstructorRow constructor arity (row.map map) =
+      (coverageConstructorRow constructor arity row).map (List.map map) := by
+  cases row with
+  | nil => rfl
+  | cons instruction rest =>
+      cases instruction with
+      | wildcard => simp [coverageConstructorRow, keeps.wildcard]
+      | binder binder =>
+          obtain ⟨binder', mapped⟩ := keeps.binder binder
+          simp [coverageConstructorRow, mapped, keeps.wildcard]
+      | integerLiteral source resolution =>
+          obtain ⟨resolution', mapped⟩ := keeps.integerLiteral source resolution
+          simp [coverageConstructorRow, mapped]
+      | constructor instantiation count =>
+          obtain ⟨instantiation', mapped, constructorEq⟩ := keeps.constructor instantiation count
+          by_cases same : instantiation.constructor = constructor <;>
+            simp [coverageConstructorRow, mapped, constructorEq, same]
+      | tuple count => simp [coverageConstructorRow, keeps.tuple]
+      | uint256Word => simp [coverageConstructorRow, keeps.uint256Word]
+      | boolLiteral value => simp [coverageConstructorRow, keeps.boolLiteral]
+
+theorem boolRow (keeps : InstructionMapKeepsHeads map) (value : Bool)
+    (row : List MatchPatternInstruction) :
+    coverageBoolRow value (row.map map) = (coverageBoolRow value row).map (List.map map) := by
+  cases row with
+  | nil => rfl
+  | cons instruction rest =>
+      cases instruction with
+      | wildcard => simp [coverageBoolRow, keeps.wildcard]
+      | binder binder =>
+          obtain ⟨binder', mapped⟩ := keeps.binder binder
+          simp [coverageBoolRow, mapped]
+      | integerLiteral source resolution =>
+          obtain ⟨resolution', mapped⟩ := keeps.integerLiteral source resolution
+          simp [coverageBoolRow, mapped]
+      | constructor instantiation count =>
+          obtain ⟨instantiation', mapped, _⟩ := keeps.constructor instantiation count
+          simp [coverageBoolRow, mapped]
+      | tuple count => simp [coverageBoolRow, keeps.tuple]
+      | uint256Word => simp [coverageBoolRow, keeps.uint256Word]
+      | boolLiteral literal =>
+          by_cases same : literal = value <;> simp [coverageBoolRow, keeps.boolLiteral, same]
+
+theorem tupleRow (keeps : InstructionMapKeepsHeads map) (arity : Nat)
+    (row : List MatchPatternInstruction) :
+    coverageTupleRow arity (row.map map) = (coverageTupleRow arity row).map (List.map map) := by
+  cases row with
+  | nil => rfl
+  | cons instruction rest =>
+      cases instruction with
+      | wildcard => simp [coverageTupleRow, keeps.wildcard]
+      | binder binder =>
+          obtain ⟨binder', mapped⟩ := keeps.binder binder
+          simp [coverageTupleRow, mapped, keeps.wildcard]
+      | integerLiteral source resolution =>
+          obtain ⟨resolution', mapped⟩ := keeps.integerLiteral source resolution
+          simp [coverageTupleRow, mapped]
+      | constructor instantiation count =>
+          obtain ⟨instantiation', mapped, _⟩ := keeps.constructor instantiation count
+          simp [coverageTupleRow, mapped]
+      | tuple count =>
+          by_cases same : count = arity <;> simp [coverageTupleRow, keeps.tuple, same]
+      | uint256Word => simp [coverageTupleRow, keeps.uint256Word]
+      | boolLiteral value => simp [coverageTupleRow, keeps.boolLiteral]
+
+theorem wordRow (keeps : InstructionMapKeepsHeads map) (row : List MatchPatternInstruction) :
+    coverageWordRow (row.map map) = (coverageWordRow row).map (List.map map) := by
+  cases row with
+  | nil => rfl
+  | cons instruction rest =>
+      cases instruction with
+      | wildcard => simp [coverageWordRow, keeps.wildcard]
+      | binder binder =>
+          obtain ⟨binder', mapped⟩ := keeps.binder binder
+          simp [coverageWordRow, mapped, keeps.wildcard]
+      | integerLiteral source resolution =>
+          obtain ⟨resolution', mapped⟩ := keeps.integerLiteral source resolution
+          simp [coverageWordRow, mapped]
+      | constructor instantiation count =>
+          obtain ⟨instantiation', mapped, _⟩ := keeps.constructor instantiation count
+          simp [coverageWordRow, mapped]
+      | tuple count => simp [coverageWordRow, keeps.tuple]
+      | uint256Word => simp [coverageWordRow, keeps.uint256Word]
+      | boolLiteral value => simp [coverageWordRow, keeps.boolLiteral]
+
+end InstructionMapKeepsHeads
+
+/-- Coverage is kept by a map of types and instructions that keeps the builtin types, products,
+each data type's nominal shape and its constructors' fields, and every instruction's head. -/
+theorem RowsCover.transport
+    {source target : Context}
+    (signatures_eq : target.signatures = source.signatures)
+    {typeMap : Ty → Ty} {instructionMap : MatchPatternInstruction → MatchPatternInstruction}
+    (keeps : InstructionMapKeepsHeads instructionMap)
+    (bool_eq : typeMap Ty.bool = Ty.bool)
+    (word_eq : typeMap Ty.word = Ty.word)
+    (uint256_eq : typeMap (Ty.fixed .uint256) = Ty.fixed .uint256)
+    (product_eq : ∀ types, typeMap (Ty.productMany types) = Ty.productMany (types.map typeMap))
+    (nominal_eq : ∀ dataType, dataType ∈ source.signatures.dataTypes →
+      ∀ substitution, ParameterSubstitution.Exact substitution dataType.parameters →
+        ∃ substitution', ParameterSubstitution.Exact substitution' dataType.parameters ∧
+          typeMap (Ty.nominal dataType.id
+              (ParameterSubstitution.orderedArguments substitution dataType.parameters)) =
+            Ty.nominal dataType.id
+              (ParameterSubstitution.orderedArguments substitution' dataType.parameters) ∧
+          ∀ constructor, constructor ∈ dataType.constructors →
+            (constructor.payloadTypes.map (TypeSystem.ParameterSubstitution.apply substitution)).map
+                typeMap =
+              constructor.payloadTypes.map (TypeSystem.ParameterSubstitution.apply substitution')) :
+    ∀ {types : List Ty} {rows : List (List MatchPatternInstruction)},
+      RowsCover source types rows →
+      RowsCover target (types.map typeMap) (rows.map (List.map instructionMap)) := by
+  intro types rows covers
+  induction covers with
+  | done member => exact .done (List.mem_map.mpr ⟨[], member, rfl⟩)
+  | default rest ih =>
+      apply RowsCover.default
+      rw [InstructionMapKeepsHeads.filterMap_commute keeps.defaultRow]
+      exact ih
+  | @constructors dataType substitution type types rows cataloged exact type_eq each ih =>
+      obtain ⟨substitution', exact', typeEq, fieldsEq⟩ :=
+        nominal_eq dataType cataloged substitution exact
+      subst type_eq
+      simp only [List.map_cons]
+      rw [typeEq]
+      refine .constructors (signatures_eq ▸ cataloged) exact' rfl ?_
+      intro constructor constructorMem
+      have mapped := ih constructor constructorMem
+      rw [List.map_append, fieldsEq constructor constructorMem] at mapped
+      rw [InstructionMapKeepsHeads.filterMap_commute
+        (keeps.constructorRow constructor.id constructor.payloadTypes.length)]
+      exact mapped
+  | booleans onTrue onFalse ihTrue ihFalse =>
+      simp only [List.map_cons, bool_eq]
+      exact .booleans
+        (by rw [InstructionMapKeepsHeads.filterMap_commute (keeps.boolRow true)]; exact ihTrue)
+        (by rw [InstructionMapKeepsHeads.filterMap_commute (keeps.boolRow false)]; exact ihFalse)
+  | @tuple elementTypes types rows elements ih =>
+      simp only [List.map_cons, product_eq]
+      apply RowsCover.tuple
+      rw [List.length_map, InstructionMapKeepsHeads.filterMap_commute
+        (keeps.tupleRow elementTypes.length), ← List.map_append]
+      exact ih
+  | word argument ih =>
+      simp only [List.map_cons, uint256_eq]
+      apply RowsCover.word
+      rw [InstructionMapKeepsHeads.filterMap_commute keeps.wordRow]
+      simpa [word_eq] using ih
+
+end Solcore.SourceSemantics
+
 namespace Solcore.SourceSemantics.StructuralSubstitution
 
 open Frontend
@@ -4333,10 +4542,46 @@ theorem PatternCoversConstructor.applyParameters
       (StructuralSubstitution.PatternInstructionsIrrefutable.applyParameters
         irrefutable)
 
+/-- A rigid substitution of a pattern program keeps every instruction's head. -/
+theorem applyMatchPatternInstruction_keepsHeads (substitution : TypeSystem.ParameterSubstitution) :
+    InstructionMapKeepsHeads (applyMatchPatternInstruction substitution) where
+  wildcard := rfl
+  binder _ := ⟨_, rfl⟩
+  integerLiteral _ _ := ⟨_, rfl⟩
+  constructor _ _ := ⟨_, rfl, rfl⟩
+  tuple _ := rfl
+  uint256Word := rfl
+  boolLiteral _ := rfl
+
+/-- A rigid substitution keeps coverage: a data type's constructors' fields follow its
+substitution, whose range the substitution maps. -/
+theorem RowsCover.applyParameters {context : Context}
+    (catalog : SignatureCatalogWellFormed context.signatures)
+    (substitution : TypeSystem.ParameterSubstitution)
+    {types : List Ty} {rows : List (List MatchPatternInstruction)}
+    (covers : RowsCover context types rows) :
+    RowsCover (applyContext substitution context) (types.map substitution.apply)
+      (rows.map (List.map (applyMatchPatternInstruction substitution))) := by
+  refine RowsCover.transport (source := context)
+    (target := applyContext substitution context) rfl
+    (applyMatchPatternInstruction_keepsHeads substitution)
+    rfl rfl rfl (StructuralSubstitution.apply_productMany substitution) ?_ covers
+  intro dataType cataloged inner exact
+  refine ⟨StructuralSubstitution.ParameterSubstitution.mapRange substitution inner,
+    StructuralSubstitution.ParameterSubstitution.Exact.mapRange substitution exact, ?_, ?_⟩
+  · rw [StructuralSubstitution.apply_nominal,
+      StructuralSubstitution.ParameterSubstitution.orderedArguments_mapRange exact]
+  · intro constructor constructorMem
+    exact StructuralSubstitution.TypesWellFormed.applyParameters_compose
+      (context := signatureContext context.signatures dataType.id dataType.parameters)
+      substitution inner exact
+      ((catalog.data_semantic dataType cataloged).constructor_payloads constructor constructorMem)
+
 theorem MatchExhaustive.applyParameters
     {substitution : ParameterSubstitution} {context : Context}
     {scrutineeType : Ty} {cases : List TypedMatchCase}
     {defaultBody : Option (List StatementId)}
+    (catalog : SignatureCatalogWellFormed context.signatures)
     (exhaustive : MatchExhaustive context scrutineeType cases defaultBody) :
     MatchExhaustive (applyContext substitution context)
       (substitution.apply scrutineeType)
@@ -4363,6 +4608,20 @@ theorem MatchExhaustive.applyParameters
           List.mem_map.mpr ⟨matchCase, matchCaseMem, rfl⟩,
           StructuralSubstitution.PatternCoversConstructor.applyParameters
             covers⟩
+  | covered rowsCover =>
+      refine .covered ?_
+      have mapped := RowsCover.applyParameters catalog substitution rowsCover
+      have rowsEq :
+          ((cases.map fun matchCase =>
+              matchPatternResolutionInstructions matchCase.pattern.resolution
+                matchCase.pattern.source.rootArity).map
+            (List.map (applyMatchPatternInstruction substitution))) =
+            (cases.map (applyTypedMatchCase substitution)).map fun matchCase =>
+              matchPatternResolutionInstructions matchCase.pattern.resolution
+                matchCase.pattern.source.rootArity := by
+        simp [List.map_map, Function.comp_def, applyTypedMatchCase, applyTypedMatchPattern]
+      rw [rowsEq] at mapped
+      simpa using mapped
 
 @[simp] theorem localSchemeTemplateIds_applyBinder
     (substitution : ParameterSubstitution) (binder : TypedBinder) :
@@ -5553,7 +5812,7 @@ theorem StatementsHaveType.applyParameters
         (by simpa [applyMatchResolution,
           StructuralSubstitution.flatMap_patternRequirements_applyTypedMatchCases]
           using requirementsEq)
-        (StructuralSubstitution.MatchExhaustive.applyParameters exhaustive)
+        (StructuralSubstitution.MatchExhaustive.applyParameters catalog exhaustive)
         (by
           calc
             mergeBodyControls
@@ -12403,13 +12662,53 @@ theorem PatternCoversConstructor.applySubstitution
   · simpa [DataConstructorInstantiation.applySubstitution] using
       (PatternInstructionsIrrefutable.applySubstitution irrefutable)
 
-/-- Flexible substitution preserves all three exhaustiveness witnesses:
-default, catch-all, and complete constructor coverage. -/
+/-- A flexible substitution of a pattern program keeps every instruction's head. -/
+theorem MatchPatternInstruction.applySubstitution_keepsHeads (substitution : Substitution) :
+    InstructionMapKeepsHeads (MatchPatternInstruction.applySubstitution substitution) where
+  wildcard := rfl
+  binder _ := ⟨_, rfl⟩
+  integerLiteral _ _ := ⟨_, rfl⟩
+  constructor _ _ := ⟨_, rfl, rfl⟩
+  tuple _ := rfl
+  uint256Word := rfl
+  boolLiteral _ := rfl
+
+/-- A flexible substitution that closes a context keeps coverage. -/
+theorem RowsCover.applySubstitution
+    {substitution : Substitution} {closedVariables : List TypeVarId} {source target : Context}
+    (catalog : SignatureCatalogWellFormed source.signatures)
+    (closes : ContextCloses substitution closedVariables source target)
+    {types : List Ty} {rows : List (List MatchPatternInstruction)}
+    (covers : RowsCover source types rows) :
+    RowsCover target (types.map substitution.apply)
+      (rows.map (List.map (MatchPatternInstruction.applySubstitution substitution))) := by
+  have signaturesEq : target.signatures = source.signatures := by
+    rw [← closes.target_eq]
+    rfl
+  refine RowsCover.transport signaturesEq
+    (MatchPatternInstruction.applySubstitution_keepsHeads substitution)
+    rfl rfl rfl (FlexibleSubstitution.apply_productMany substitution) ?_ covers
+  intro dataType cataloged inner exact
+  refine ⟨FlexibleSubstitution.ParameterSubstitution.mapRange substitution inner,
+    FlexibleSubstitution.ParameterSubstitution.Exact.mapRange substitution exact, ?_, ?_⟩
+  · rw [StructuralSubstitution.applyFlexible_nominal,
+      FlexibleSubstitution.ParameterSubstitution.orderedArguments_mapRange substitution exact]
+  · intro constructor constructorMem
+    exact FlexibleSubstitution.TypesWellScoped.applyFlexible_composeParameters
+      (context := signatureContext source.signatures dataType.id dataType.parameters)
+      substitution inner exact
+      (StructuralSubstitution.TypesWellFormed.toTypesWellScoped
+        ((catalog.data_semantic dataType cataloged).constructor_payloads constructor
+          constructorMem))
+
+/-- Flexible substitution preserves every exhaustiveness witness: default, catch-all, complete
+constructor coverage and upstream's coverage. -/
 theorem MatchExhaustive.applySubstitution
     {substitution : Substitution} {closedVariables : List TypeVarId}
     {source target : Context} {scrutineeType : Ty}
     {cases : List TypedMatchCase}
     {defaultBody : Option (List StatementId)}
+    (catalog : SignatureCatalogWellFormed source.signatures)
     (closes : ContextCloses substitution closedVariables source target)
     (exhaustive : MatchExhaustive source scrutineeType cases defaultBody) :
     MatchExhaustive target (substitution.apply scrutineeType)
@@ -12436,6 +12735,21 @@ theorem MatchExhaustive.applySubstitution
         exact ⟨matchCase.applySubstitution substitution,
           List.mem_map.mpr ⟨matchCase, matchCaseMem, rfl⟩,
           PatternCoversConstructor.applySubstitution covers⟩
+  | covered rowsCover =>
+      refine .covered ?_
+      have mapped := RowsCover.applySubstitution catalog closes rowsCover
+      have rowsEq :
+          ((cases.map fun matchCase =>
+              matchPatternResolutionInstructions matchCase.pattern.resolution
+                matchCase.pattern.source.rootArity).map
+            (List.map (MatchPatternInstruction.applySubstitution substitution))) =
+            (cases.map (TypedMatchCase.applySubstitution substitution)).map fun matchCase =>
+              matchPatternResolutionInstructions matchCase.pattern.resolution
+                matchCase.pattern.source.rootArity := by
+        simp [List.map_map, Function.comp_def, TypedMatchCase.applySubstitution,
+          TypedMatchPattern.applySubstitution]
+      rw [rowsEq] at mapped
+      simpa using mapped
 
 /-- Flexible instantiation transports the complete mutually recursive source
 typing derivation.  Every motive quantifies over its target context because
@@ -13017,7 +13331,7 @@ theorem StatementsHaveType.applySubstitution
         (casesInduction targetContext catalog contextValid)
         (by simpa [MatchResolution.applySubstitution,
           flatMap_patternRequirements_applySubstitution] using requirementsEq)
-        (MatchExhaustive.applySubstitution contextValid.closes exhaustive)
+        (MatchExhaustive.applySubstitution catalog contextValid.closes exhaustive)
         (by
           calc
             mergeBodyControls

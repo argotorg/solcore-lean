@@ -2278,7 +2278,8 @@ private def finishMatch (fuel : Nat) (context : SourceInference.Context)
       let inferred ← inferStatementsFuel fuel context body.value expectedReturn checked.state
       pure (some (inferred.statements,inferred.sawReturn),inferred.state.restoreLexicalScope outerScope)
   let exhaustive := checked.hasWildcard || defaultBody.isSome ||
-    exhaustsNominalConstructors context state scrutinee.type checked.cases
+    (exhaustsNominalConstructors context state scrutinee.type checked.cases ||
+      coversMatchCases context state scrutinee.type checked.cases)
   if !exhaustive then throw (.nonExhaustiveMatch statement.span) else
     let requirements := checked.cases.flatMap fun arm => arm.pattern.requirements
     let defaultStatements := defaultBody.map (·.1)

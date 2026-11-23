@@ -12,7 +12,7 @@ forms. They stay apart from the typed runtime tests, whose imports bring a secon
 
 section
 -- leanmerge: from Solcore.Test.SourceInferenceEmptyMatchGuard
-/-! Regression: nominal exhaustiveness must not accept an empty arm list by
+/-! Regression: nominal exhaustiveness and coverage must not accept an empty arm list by
 vacuous quantification over an empty constructor catalog. -/
 
 set_option autoImplicit false
@@ -23,6 +23,10 @@ open Solcore.Frontend Solcore.Frontend.SourceInference Solcore.TypeSystem
 
 example (context : Context) (state : State) (scrutineeType : Ty) :
     Detail.exhaustsNominalConstructors context state scrutineeType [] = false := by
+  rfl
+
+example (context : Context) (state : State) (scrutineeType : Ty) :
+    Detail.coversMatchCases context state scrutineeType [] = false := by
   rfl
 
 end Tests.SourceInferenceEmptyMatchGuard

@@ -1495,7 +1495,9 @@ theorem statement_match_without_default_for
         simp [empty] at member
     have nominalFalse : Detail.exhaustsNominalConstructors inferenceContext checked.state
         scrutinee.type checked.cases = false := by simp [empty, Detail.exhaustsNominalConstructors]
-    simp [wildcardFalse, nominalFalse] at guardPassed
+    have coversFalse : Detail.coversMatchCases inferenceContext checked.state
+        scrutinee.type checked.cases = false := by simp [empty, Detail.coversMatchCases]
+    simp [wildcardFalse, nominalFalse, coversFalse] at guardPassed
   have factsNonempty := matchCasesHaveType_facts_ne_nil_of_cases_ne_nil casesTyping (by simpa using casesNonempty)
   obtain ⟨summary, merged⟩ := mergeBodyControls_withoutDefault_eq_some_of_ne_nil caseFacts factsNonempty
   have signatures : target.signatures = inferenceContext.signatures :=

@@ -1005,7 +1005,10 @@ theorem actualMatchWithoutDefault
     have nominalFalse : Detail.exhaustsNominalConstructors
         inferenceContext checked.state scrutinee.type checked.cases = false := by
       simp [checkedNil, Detail.exhaustsNominalConstructors]
-    simp [wildcardFalse, nominalFalse] at guardPassed
+    have coversFalse : Detail.coversMatchCases
+        inferenceContext checked.state scrutinee.type checked.cases = false := by
+      simp [checkedNil, Detail.coversMatchCases]
+    simp [wildcardFalse, nominalFalse, coversFalse] at guardPassed
   have scrutineeProperties := inferMatchScrutineesFuel_inferenceProperties
     allocatedReady signatureFormation functionsCanonical scrutineeSuccess
   have scrutineeInvariant :

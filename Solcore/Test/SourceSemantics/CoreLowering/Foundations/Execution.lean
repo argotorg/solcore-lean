@@ -5258,10 +5258,9 @@ private def boolPatternNames : List String :=
 
 /-- The boolean literal pattern through the public API: each arm runs for its own boolean, a
 repeated `true` binds nothing, and a group and a `let`-bound scrutinee take `bool`. A match on `bool`
-with no catch-all, `m4`, and one that splits a payload's boolean, `m8`, are refused as
-non-exhaustive until upstream's coverage joins `MatchExhaustive`; `m9`, which upstream refuses,
-and upstream's `typeck/tuple_nested_nonexhaustive` are refused, and `true` at `Word` is a type
-error. -/
+with no catch-all, `m4`, and one that splits a payload's boolean, `m8`, run in the coverage
+test; `m9`, which upstream refuses, and upstream's `typeck/tuple_nested_nonexhaustive` are
+refused, and `true` at `Word` is a type error. -/
 def runBoolPatterns : IO Unit := do
   let program ← get "bool pattern check" (checkProgram boolPatternWorkspace)
   let seeds ← boolPatternNames.mapM (seed program)
@@ -5285,12 +5284,6 @@ def runBoolPatterns : IO Unit := do
     require (completed.value == expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
     session := completed.session
   let _ := session
-  -- `m4` and `m8` with no catch-all, which upstream accepts, wait for upstream's coverage.
-  rejectedByInference "m4, a bool match with no catch-all"
-    ["function flag(a: Bool) returns (Word) { match (a) { case true { return 1; } case false { return 2; } } }"]
-  rejectedByInference "m8, a payload's boolean split with no catch-all"
-    ["enum Pair<a> { Pair(Bool, a) }",
-      "function pair(p: Pair<Word>) returns (Word) { match (p) { case Pair.Pair(true, x) { return x; } case Pair.Pair(false, x) { return x + 100; } } }"]
   -- Upstream refuses these two (`SC0302`).
   rejectedByInference "m9, a payload's false missing"
     ["enum Pair<a> { Pair(Bool, a) }",
@@ -5299,7 +5292,7 @@ def runBoolPatterns : IO Unit := do
     ["function nested(p: ((), (Bool, Word))) returns (Word) { match (p) { case ((), (true, x)) { return x; } } }"]
   rejectedByInference "true at Word"
     ["function bad(x: Word) returns (Word) { match (x) { case true { return 1; } case _ { return 0; } } }"]
-  IO.println "SOURCE_CORE_BOOL_PATTERNS_PASS: case true and case false through the public API, each arm for its own boolean in a bool match and in a payload as the m4c and m8c probes give upstream's 2, a repeated true in a tuple binding nothing, a group and a let-bound scrutinee taking bool; m4 and m8 with no catch-all refused until upstream's coverage, m9 and tuple_nested_nonexhaustive refused as upstream refuses them, and true at Word rejected"
+  IO.println "SOURCE_CORE_BOOL_PATTERNS_PASS: case true and case false through the public API, each arm for its own boolean in a bool match and in a payload as the m4c and m8c probes give upstream's 2, a repeated true in a tuple binding nothing, a group and a let-bound scrutinee taking bool; m9 and tuple_nested_nonexhaustive refused as upstream refuses them, and true at Word rejected"
 
 /-- Upstream's reading of a bare name in a pattern, after `true` and `false`: a constructor that
 shares its type's name is that constructor, as `same-name-ctor-pattern` measures it; any other
@@ -5500,6 +5493,107 @@ def runConstructorNames : IO Unit := do
   rejectedByInference "a bare same-name constructor with a payload"
     ["enum Box { Box(Word) }", "function main() returns (Word) { let make = Box; return 1; }"]
   IO.println "SOURCE_CORE_CONSTRUCTOR_NAMES_PASS: constructor names as upstream reads them through the public API, an unqualified same-name head running as its type's constructor, a head spelled like upstream's builtin inl left to the scrutinee's type and leading dots unchanged, any other unqualified head refused as upstream's SC0106 refuses it, in the module and through a selected and a plain import, a same-name head refused at another type, and a bare same-name constructor running as that constructor with no payload, as a value, an argument, a payload and a generic, through a selected and a wildcard import, under a local, a parameter and a function of that name, and unknown through a plain or an opaque import, for another constructor's name or with a payload"
+
+/-- Upstream's coverage, as `MatchExhaustive.covered` states it: the arms cover the scrutinee's
+type with no catch-all. `flag` and `pair` are the probes `m4` and `m8`, `held` is `x19`'s nested
+same-name constructor, `both` the boolean matrix of `c3`, `firstOf` the parenthesized tuple of
+`c4`, `unwrap` the payload split of `c5`, `wordOrFlag` a `uint256(w)` beside a boolean, and `just`
+a generic payload at `Bool`. -/
+private def coverageWorkspace : Workspace.RawWorkspace := workspaceOf [
+  "enum Pair<a> { Pair(Bool, a) }",
+  "enum thing { thing }",
+  "enum Holder { Holder(thing, Word) }",
+  "enum Opt { None, Some(Word) }",
+  "enum Wrap { Wrap(Opt) }",
+  "enum Maybe<a> { Nothing, Just(a) }",
+  "function flag(a: Bool) returns (Word) { match (a) { case true { return 1; } case false { return 2; } } }",
+  "function pair(p: Pair<Word>) returns (Word) { match (p) { case Pair.Pair(true, x) { return x; } case Pair.Pair(false, x) { return 9; } } }",
+  "function held(h: Holder) returns (Word) { match (h) { case Holder.Holder(thing.thing, w) { return w; } } }",
+  "function both(a: Bool, b: Bool) returns (Word) { match (a, b) { case (true, true) { return 1; } case (true, false) { return 2; } case (false, _) { return 3; } } }",
+  "function firstOf(p: (Word, Word)) returns (Word) { match (p) { case ((head, _)) { return head; } } }",
+  "function unwrap(w: Wrap) returns (Word) { match (w) { case Wrap.Wrap(Opt.None) { return 0; } case Wrap.Wrap(Opt.Some(v)) { return v; } } }",
+  "function wordOrFlag(x: uint256, b: Bool) returns (Word) { match (x, b) { case (uint256(w), true) { return w; } case (_, false) { return 5; } } }",
+  "function just(m: Maybe<Bool>) returns (Word) { match (m) { case Maybe.Just(true) { return 1; } case Maybe.Just(false) { return 2; } case Maybe.Nothing { return 3; } } }",
+  "function pairTrue() returns (Word) { return pair(Pair.Pair(true, 6)); }",
+  "function pairFalse() returns (Word) { return pair(Pair.Pair(false, 6)); }",
+  "function heldTwo() returns (Word) { return held(Holder.Holder(thing.thing, 2)); }",
+  "function firstPair() returns (Word) { return firstOf((7, 8)); }",
+  "function unwrapNone() returns (Word) { return unwrap(Wrap.Wrap(Opt.None)); }",
+  "function unwrapSome() returns (Word) { return unwrap(Wrap.Wrap(Opt.Some(4))); }",
+  "function justTrue() returns (Word) { return just(Maybe.Just(true)); }",
+  "function justFalse() returns (Word) { return just(Maybe.Just(false)); }",
+  "function nothing() returns (Word) { let m: Maybe<Bool> = Maybe.Nothing; return just(m); }"]
+
+private def coverageNames : List String :=
+  ["flag", "both", "wordOrFlag", "pairTrue", "pairFalse", "heldTwo", "firstPair", "unwrapNone",
+    "unwrapSome", "justTrue", "justFalse", "nothing"]
+
+/-- Inference refuses the program as a match that its arms do not cover. -/
+private def refusedNonExhaustive (label : String) (workspace : Workspace.RawWorkspace) : IO Unit :=
+  match checkProgram workspace with
+  | .ok _ => throw (IO.userError s!"{label} was accepted")
+  | .error [.inference failure] =>
+      if failure.error matches .nonExhaustiveMatch _ then pure ()
+      else throw (IO.userError s!"{label} gave {reprStr failure.error}")
+  | .error errors => throw (IO.userError s!"{label} gave {reprStr errors}")
+
+private def partialFlagLibrary : String :=
+  "export { flag(on), makeOff };\nenum flag { on, off }\nfunction makeOff() returns (flag) { return flag.off; }"
+
+/-- Upstream's coverage through the public API: matches that only their arms together cover run each
+arm, and the ones upstream refuses as not covered (`SC0302`) or for a hidden constructor with no
+catch-all at its column (`SC0223`) are refused, a hidden column covered through another column
+accepted. -/
+def runMatchCoverage : IO Unit := do
+  let program ← get "coverage check" (checkProgram coverageWorkspace)
+  let seeds ← coverageNames.mapM (seed program)
+  let compiled ← get "coverage compilation"
+    (compile coverageWorkspace seeds {specializationBudget := 256, compilationFuel := 1000})
+  let key (name : String) : IO Key := match coverageNames.findIdx? (· == name) with
+    | some index => match compiled.keys[index]? with
+      | some key => pure key
+      | none => throw (IO.userError s!"coverage root {name} missing")
+    | none => throw (IO.userError s!"coverage {name} unknown")
+  let mut session ← boot (← compiled.open)
+  let cases : List (String × List Value × Value) := [
+    ("flag", [boolean true], word 1), ("flag", [boolean false], word 2),
+    ("both", [boolean true, boolean true], word 1), ("both", [boolean true, boolean false], word 2),
+    ("both", [boolean false, boolean true], word 3),
+    ("wordOrFlag", [word 3, boolean true], word 3), ("wordOrFlag", [word 3, boolean false], word 5),
+    ("pairTrue", [], word 6), ("pairFalse", [], word 9), ("heldTwo", [], word 2),
+    ("firstPair", [], word 7), ("unwrapNone", [], word 0), ("unwrapSome", [], word 4),
+    ("justTrue", [], word 1), ("justFalse", [], word 2), ("nothing", [], word 3)]
+  for (name, arguments, expected) in cases do
+    let completed ← execute session (← key name) arguments
+    require (completed.value == expected) s!"{name} on {reprStr arguments} gave {reprStr completed.value}"
+    session := completed.session
+  let _ := session
+  -- A column with a hidden constructor, covered through the other column (`h6`).
+  match checkProgram (libraryWorkspace
+      "import { flag, makeOff } from lib;\nfunction pick(f: flag, b: Bool) returns (Word) { match (f, b) { case (flag.on, _) { return 1; } case (_, true) { return 2; } case (_, false) { return 3; } } }"
+      partialFlagLibrary) with
+  | .ok _ => pure ()
+  | .error errors => throw (IO.userError s!"a hidden column covered through another gave {reprStr errors}")
+  -- Upstream refuses these (`SC0302`).
+  refusedNonExhaustive "a boolean pair missing (false, true)" (workspaceOf [
+    "function pick(a: Bool, b: Bool) returns (Word) { match (a, b) { case (true, true) { return 1; } case (true, false) { return 2; } case (false, false) { return 3; } } }"])
+  refusedNonExhaustive "a payload's Some missing" (workspaceOf ["enum Opt { None, Some(Word) }",
+    "enum Wrap { Wrap(Opt) }",
+    "function get(w: Wrap) returns (Word) { match (w) { case Wrap.Wrap(Opt.None) { return 0; } } }"])
+  refusedNonExhaustive "word literals with no catch-all" (workspaceOf [
+    "function f(w: Word) returns (Word) { match (w) { case 0 { return 1; } case 1 { return 2; } } }"])
+  refusedNonExhaustive "a generic payload's false missing" (workspaceOf ["enum Maybe<a> { Nothing, Just(a) }",
+    "function f(m: Maybe<Bool>) returns (Word) { match (m) { case Maybe.Just(true) { return 1; } case Maybe.Nothing { return 3; } } }"])
+  refusedNonExhaustive "a uint256 beside a boolean missing (_, false)" (workspaceOf [
+    "function f(x: uint256, b: Bool) returns (Word) { match (x, b) { case (uint256(w), true) { return w; } } }"])
+  -- Upstream refuses these for the hidden constructor (`SC0223`).
+  refusedNonExhaustive "a hidden constructor's type, its visible one only" (libraryWorkspace
+    "import { flag, makeOff } from lib;\nfunction pick(f: flag) returns (Word) { match (f) { case flag.on { return 1; } } }"
+    partialFlagLibrary)
+  refusedNonExhaustive "a hidden column with no catch-all" (libraryWorkspace
+    "import { flag, makeOff } from lib;\nfunction pick(f: flag, b: Bool) returns (Word) { match (f, b) { case (flag.on, _) { return 1; } } }"
+    partialFlagLibrary)
+  IO.println "SOURCE_CORE_MATCH_COVERAGE_PASS: upstream's coverage through the public API, matches that only their arms together cover running each arm, a bool match and a payload's boolean split (m4, m8), a nested same-name constructor (x19), a boolean matrix, a parenthesized tuple, a payload split over its constructors, a uint256 word beside a boolean and a generic payload at Bool, a hidden column covered through another accepted, and refused as upstream refuses them: a missing boolean pair, a payload's missing constructor, word literals, a generic payload's missing false, a uint256 column's missing boolean, and a hidden constructor's type with no catch-all at its column"
 
 /-- Step 8e's fixture: the functions of upstream's `checked-arith`,
 `unchecked-scope`, `shift-operators`, `int-ops` and `issue92-checked-defaults`
@@ -6374,6 +6468,7 @@ def run : IO Unit := do
   runBoolPatterns
   runBareNamePatterns
   runConstructorNames
+  runMatchCoverage
   runUpstreamFixtures
   runUpstreamArrayFixtures
   runArrayElementCases
