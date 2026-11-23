@@ -108,7 +108,7 @@ The statements use these definitions, all in `Internal/`:
 | Definition | Reading | File |
 | --- | --- | --- |
 | `DataHeap.EnvRepresents` | A Source environment and its Core slots | `Data/HeapsAndBindings` |
-| `GenericHeap.CellHeapRepresents`, `GenericHeap.HeapRepresents` | The heap relation, over whole cells or payloads | `Foundations/GenericHeaps` |
+| `GenericHeap.CellHeapRepresents`, `GenericHeap.HeapRepresents` | The heap relation, over whole cells or payloads. The whole-cell relation also relates an array object's cell to its Core cell, the length, a default and the entries, through the cell model's `Array` (`ArrayCellRepresents`) | `Foundations/GenericHeaps` |
 | `GeneralHeap.LocationMap.Extends`, `GeneralHeap.AdministrativePreserved` | The location map grows; administrative cells keep their values | `Foundations/Heaps` |
 | `ProtectedStateTransition.Protocol` | A state witness carried from child to child | `Protected/StateAllocation` |
 | `CallableIndexedOwnedFunctionValues.OwnedKey` | The immutable key of a function value | `Owned/FunctionValuesAndState` |
@@ -251,7 +251,8 @@ work, under "Remaining work for the second goal". In short:
 - Row 4's memory arrays, slices and memrefs compile through the compatible profile and stay
   outside `StaticProfile` and the meaning proofs
   ([decision 6](../design/memory-arrays-slices.md#6-meaning-proofs)). Relating array objects to
-  their Core cells, and slices and memrefs to their Core products, is a later unit.
+  their Core cells, and slices and memrefs to their Core products, is under way: the staged
+  traces and the whole-cell heap relation have the arrays, and the heads do not yet.
 
 ## Pitfalls
 

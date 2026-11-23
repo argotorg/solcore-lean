@@ -461,10 +461,10 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
     `Dynamic.HeapWellTyped`, `Dynamic.Heap.Allocates` and `Dynamic.Heap.AllocatesCopy` keep their
     text ([source-semantics.md](../guide/source-semantics.md#dynamic-semantics) names them).
   - The whole-language theorems `Dynamic.WholeLanguagePreservation` and
-    `ProgramWellFormed.wholeLanguagePreservation` keep their text and cover arrays. The staged ones,
-    `Staging.Recursive.SelectedPreservation.expression` and
-    `Staging.Recursive.FaultPreservation.expression`, keep their text and reach the array forms
-    and element writes.
+    `ProgramWellFormed.wholeLanguagePreservation` keep their text and cover arrays. The staged ones
+    reach the array forms and element writes: `Staging.Recursive.FaultPreservation.expression`
+    keeps its text, and `Staging.Recursive.SelectedPreservation.expression` gains one clause,
+    that a run which does not fault keeps every array object's length (`KeepsLengths`).
   - README's Proof status sentence on the source semantics' type preservation stays true, and
     nothing in the build-on table changes.
 - **Statements under byte memory.** `Dynamic.ValueHasType` and `Dynamic.HeapWellTyped` would take
@@ -522,6 +522,7 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
 ### 5. Arrays at the public API
 
 - **Decided:** a root whose signature mentions an array or a slice is rejected.
+- **Not enforced yet.** Such a root still compiles. The check is being added.
 - **Other option: a new public value form**, a list of elements, for array arguments and results.
 - **Upstream.** [The ABI of `T[]`](#abi).
 - **Statements under the decision.** None.
@@ -533,12 +534,14 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
 
 - **Decided: compiled, outside the meaning proofs in row 4**, as row 1's conversions were. The
   proofs for arrays become a later unit, which relates array objects to their Core cells.
-- **That unit is under way.** The staged traces have the array forms and the element writes.
+- **That unit is under way.** The staged traces have the array forms and the element writes, the
+  selected preservation keeps every array object's length, and the whole-cell relation holds
+  array objects through `CellModel.Array`.
   The unit takes a memref only as the operand of a load or a store, and `toArray` only of
   slices made where it is called: the Source has no rule for a load, a store or a copy out of
   bounds, and the bound of a stored memref or slice would be an invariant over the heap. The
   relation that gains the array objects is the whole-cell `GenericHeap.CellHeapRepresents`;
-  `HeapRepresents` keeps its text.
+  `HeapRepresents`, `ordinaryHeap_iff` and `finiteHeap_iff` keep their text.
 - **Other option: prove the lowering of arrays in row 4.**
 - **Statements under the decision.** Nothing in README, its Proof status or the build-on table
   changes. [What remains](../guide/core-lowering.md#what-remains) in core-lowering.md has arrays.
@@ -691,8 +694,9 @@ rejection in 22 to 24, as it could the open `Typedef` call. Nothing schedules it
   connected, and the ABI wrapper takes static words only ([README](../../README.md#proof-status)).
 - **The meaning proofs for arrays** ([decision 6](#6-meaning-proofs)). The unit that relates array
   objects to their Core cells is under way, and changes the build-on statements that decision 6
-  lists. The staged traces have the array forms and the element writes; the heap relation, the
-  compiler receipts and the heads follow. Arrays stay outside `StaticProfile`.
+  lists. The staged traces have the array forms and the element writes, and the whole-cell heap
+  relation has the array objects; the payload cases, the compiler receipts and the heads follow.
+  Arrays stay outside `StaticProfile`.
 - **User collections indexed through `RValueIdxAccess`.** They need std's traits, and `Typedef` at
   a type parameter, which is row 1's open gap. Generic code over std's `Length` (`where c: Length`)
   waits for the same: Lean declares neither trait, so both are rejected with `unknownTrait`.

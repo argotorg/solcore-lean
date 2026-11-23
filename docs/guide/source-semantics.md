@@ -82,7 +82,7 @@ not the complement of success.
 | [Internal/Compiled](../../Solcore/SourceSemantics/Internal/Compiled), [Internal/Prepared](../../Solcore/SourceSemantics/Internal/Prepared) | What the compiler's selected bodies and prepared plans keep, from `BodySelection` and `Finalization` to `BodyAssembly` and `Barriers` |
 | [Internal/Execution](../../Solcore/SourceSemantics/Internal/Execution) | The call tree of successful inference: `CallGraph`, `CallInputs`, `Reads`, `NodeShapes`, progress, binder retention, generalization events |
 | [Internal/Formation](../../Solcore/SourceSemantics/Internal/Formation), [Internal/Checking](../../Solcore/SourceSemantics/Internal/Checking) | Formation under the final substitution (`Normalized*`, `Requirements`, `CoercionTargets`); typing certificates of selected bodies |
-| [Staging/Internal](../../Solcore/SourceSemantics/Staging/Internal) | `TraceSize` (the sizes the staged inductions use) and the cases of staged preservation: `SelectedContracts`, `SelectedPreservation`, `FaultCalls`, `FaultStatements` |
+| [Staging/Internal](../../Solcore/SourceSemantics/Staging/Internal) | `TraceSize` (the sizes the staged inductions use) and the cases of staged preservation: `SelectedContracts`, `SelectedPreservation`, `FaultCalls`, `FaultStatements`, and `KeptLengths` (no staged step changes an array object's length) |
 | [Dynamic/Internal](../../Solcore/SourceSemantics/Dynamic/Internal) | `ControlTransfer`, `PatternCompleteness` |
 
 ## Definitions and theorems you build on
@@ -97,7 +97,7 @@ Premises matter: several results are conditional on purpose.
 | `Dynamic.FunctionStatementsExecute.noEscapedControl` | A complete typed function body cannot leave a `break` or `continue` | `Internal/Owned/BodyReadyState` of Core lowering |
 | `Staging.Recursive.Expression`, `Staging.Recursive.Statements`, `Staging.Recursive.Applies` | Staged traces of a finite profile | The statements of Core lowering's theorems |
 | `Staging.Recursive.Expression.value_plain`, `Staging.Recursive.Expressions.values_plain` | A staged trace means an ordinary run | Core lowering, tests |
-| `Staging.Recursive.SelectedPreservation.expression`, `.statements`, `.applies` | Staged runs preserve heap typing for a registry of selected bodies (`SelectedBodies`), without whole-program validity | Core lowering's `CellAware`, `Selected` and `Generalized` families |
+| `Staging.Recursive.SelectedPreservation.expression`, `.statements`, `.applies` | Staged runs preserve heap typing for a registry of selected bodies (`SelectedBodies`), without whole-program validity, and a run that does not fault keeps every array object's length (`KeepsLengths`) | Core lowering's `CellAware`, `Selected` and `Generalized` families |
 | `Staging.Recursive.FaultPreservation.expression`, `.statements` | Faulting staged runs preserve heap typing, given `ProgramWellFormed` | — |
 | `StructuralSubstitution.BodyHasType.applyParameters`, `FlexibleSubstitution.BodyHasType.applySubstitution`, `Dynamic.FunctionInstantiates.hasType` | Typing survives rigid and flexible substitution; an instantiated body has its substituted type | Inference soundness, preservation |
 | `programWellFormed_ofCheckProgram_statements` | Checker success and statement typing of every body give `ProgramWellFormed` | Core lowering's test fixtures build `wellFormed` with it |

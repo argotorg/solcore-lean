@@ -77,8 +77,8 @@ obligations. None follows from agreement in a test corpus.
     deployment, the rest of inline Yul, object linking, and then divergence and reverse
     correspondence.
 - **Upstream's match rules**: row 13, the literal `lidx` index, the declaration checks, the
-  boolean patterns and the bare-name rule are done; constructor names and match exhaustiveness
-  follow
+  boolean patterns, the bare-name rule and constructor names are done; match exhaustiveness
+  follows
   ([the upstream table](#following-upstreams-semantics-the-next-units)).
 - **Lean's native frontend as a fourth path**: the harness and the fuzz driver's `native` run kind
   compare the admitted pure cases with direct Core, memory arrays with their slices and memrefs
@@ -136,10 +136,13 @@ The last two are recorded without investigation, and the generators avoid them.
    conditions are checked where it is declared, as upstream's `SC0219`, `SC0212` and `SC0213` do,
    with its two pragmas. A `true` or `false` pattern is the boolean, as upstream reads it, and
    so is any other bare name in a pattern: a constructor that shares its type's name is that
-   constructor, and another visible constructor's spelling is refused (`SC0106`). Next come
-   constructor names ([where Lean and upstream differ](#where-lean-and-upstream-differ)), then
-   a match's exhaustiveness: today Lean counts constructors only for a scrutinee of a nominal
-   type, so an exhaustive match over a pair or on `bool` needs a `_` arm.
+   constructor, and another visible constructor's spelling is refused (`SC0106`). A constructor
+   head written unqualified follows upstream too: one that shares its type's name is that
+   type's constructor, one spelled like upstream's builtin `inl`, `inr` or `pair` is left to
+   the scrutinee's type, and any other is refused. In an expression, a bare name that no local,
+   parameter, function or builtin takes is the constructor that shares its type's name. Next
+   comes a match's exhaustiveness: today Lean counts constructors only for a scrutinee of a
+   nominal type, so an exhaustive match over a pair or on `bool` needs a `_` arm.
 
    Lean's `&&` and `||` are builtins, as upstream's are: they take `bool` operands,
    short-circuit, and never call a program's own or an imported `and` or `or`. Next comes a
@@ -151,9 +154,10 @@ The last two are recorded without investigation, and the generators avoid them.
    call-containing rows are lifted, with assignments and in-place `~` through mapping indices,
    loops, tuples beyond pairs and constructor applications. Memory arrays are under way
    ([decision 6](memory-arrays-slices.md#6-meaning-proofs)): the staged traces have the array
-   forms and the element writes, and next the heap relation relates an array object to its
-   Core cell. This unit takes a memref only as the operand of a load or a store, and
-   `toArray` only of slices made where it is called.
+   forms and the element writes, the selected preservation keeps every array object's length,
+   and the whole-cell heap relation relates an array object to its Core cell. Next come the
+   payload cases, the compiler receipts and the heads. This unit takes a memref only as the
+   operand of a load or a store, and `toArray` only of slices made where it is called.
 3. **Lean's native frontend as a fourth differential path.** The harness runs the admitted pure
    cases through the native pipeline, alone or as the fuzz driver's `native` run kind, memory
    arrays with their slices and memrefs among them. Lean's imports follow upstream's `SC0108`,
@@ -239,16 +243,17 @@ Where the two differ on what a program means or on whether it is accepted, Lean 
 that general language design supports, and upstream is not followed by default. The differences
 below come from running upstream's own test programs through Lean's native frontend.
 
-- **Lean follows upstream**, each as a checker rule to come:
-  - an unqualified constructor head in a pattern (`case None`) is refused unless it is a
-    same-name constructor, and a same-name constructor may be written bare in an expression;
+- **Lean follows upstream.** Done: an unqualified constructor head in a pattern (`case None`)
+  is refused unless it is a same-name or builtin constructor, a same-name constructor may be
+  written bare in an expression, and upstream's primitive `primAddWord` is a name for the
+  builtin. To come, each as a checker rule:
+  - a call of a name that is both a function and a same-name constructor calls the function;
   - a tuple pattern in parentheses, `.true` and `.false`, an unannotated lambda's result, and
     `returns (a, b)` for a trait's one tuple result are accepted;
   - a weak trait argument is taken from the one implementation that fixes it;
   - a type parameter that nothing fixes (`SC0299`) and statements after a `return` (`SC0222`)
     are refused;
-  - upstream's primitive `primAddWord` is a name for the builtin, and two modules exported
-    under one alias are refused (`SC0112`).
+  - two modules exported under one alias are refused (`SC0112`).
 - **Lean keeps its own rule:**
   - mutually recursive data is accepted, as directly recursive data is;
   - a binder repeated in one pattern and cyclic superclasses are refused;
@@ -259,10 +264,13 @@ below come from running upstream's own test programs through Lean's native front
 - **Lean differs from both** in one place. At a builtin type, Lean applies its builtin operator
   where the type is known, and runs a program's implementation of the operator's trait in
   generic code, where upstream always runs the implementation. A program that has both can
-  mean two things. Lean will refuse it, and the form of that rule is being decided.
-- **To measure first:** the spellings `Word` and `Bool` beside `word` and `bool`, two functions
-  of one name (`SC0108`), a runtime value at a `comptime` parameter (`SC0240`), and compound
-  assignment through a program's operator trait.
+  mean two things. Lean will refuse the operator where it is applied at a builtin type while a
+  visible implementation of its trait at that type provides the operator's method, and an
+  implementation of `Shl` or `Shr` at a builtin type where it is declared, since Lean never
+  runs one. Generic code keeps the program's implementation, as upstream runs it.
+- **To measure first:** the spellings `Word`, `Bool` and `Unit` beside `word`, `bool` and `()`,
+  two functions of one name (`SC0108`), a runtime value at a `comptime` parameter (`SC0240`),
+  and compound assignment through a program's operator trait.
 
 ## Handoff rules
 
