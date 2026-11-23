@@ -73,12 +73,13 @@ local notation "cells" => GeneralizedLocalDescriptorHeap.cellModel
   (CompatibleAmbientHeap.payloadModel checked registry functions) instances
 
 include prepared in
-/-- `CanStore.store`'s step on its representation, after the memref's and the value's runs: the array's Core
-cell takes the value's entry at the position, after the insert's Core-only cells, as the Source replaces the
-element in its cell; the cells stay related, and the write keeps every located generalized local. -/
-theorem store_preserve (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
-    {outer : Environment} {context : Core.Context}
-    (outerTyped : RuntimeEnvironmentHasTypes world outer context ambient.definitions)
+/-- A write of an element's value into its array's Core cell, from any stack whose top is the value and in which
+`arrayExpr` loads the array's cell and `keyExpr` gives the position: the cell takes the value's entry at the
+position, after the insert's Core-only cells, as the Source replaces the element in its cell; the cells stay
+related, and the write keeps every located generalized local. -/
+theorem store_preserve_at (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
+    {stack : Environment} {context : Core.Context}
+    (stackTyped : RuntimeEnvironmentHasTypes world stack context ambient.definitions)
     {element valueType : TypeSystem.Ty} {location : Dynamic.Location} {cell : Dynamic.Cell}
     {elements updated : List Dynamic.Value} {position : Word} {stored : Dynamic.Value} {after : Dynamic.Heap}
     (read : Dynamic.Heap.Reads heap location cell) (current : cell.value = some (.arrayObject element elements))
@@ -89,14 +90,21 @@ theorem store_preserve (heaps : GenericHeap.CellHeapRepresents cells mapping wor
     (typed : world[target]? = some (.product .word (.product payload (.namedData identity))))
     {coreStored : Value}
     (storedRep : ValueRep checked registry functions mapping world valueType stored coreStored payload)
-    (sameRuntime : SourceCoreRawMetadata.runtimeType element = SourceCoreRawMetadata.runtimeType valueType) :
+    (sameRuntime : SourceCoreRawMetadata.runtimeType element = SourceCoreRawMetadata.runtimeType valueType)
+    {arrayExpr keyExpr : Expr}
+    (arrayLoad : ∀ {current : Store} {value : Value}, current.read? target = some value →
+      Evaluates stack current (.loadCell arrayExpr) value current)
+    (arrayTyped : HasType context arrayExpr (.cell (.product .word (.product payload (.namedData identity))))
+      ambient.definitions)
+    (keyEvaluated : ∀ current : Store, Evaluates stack current keyExpr (.word position) current)
+    (keyTyped : HasType context keyExpr .word ambient.definitions)
+    (storedAt : stack[0]? = some coreStored) (storedTyped : context[0]? = some payload) :
     ∃ length default entries suffix futureWorld,
       store.read? target = some (.pair (.word length) (.pair default
         (OrderedMapping.encode ⟨.word, payload, identity⟩ entries))) ∧
       (∀ key value, (key, value) ∈ entries → ∃ word, key = .word word) ∧
-      CompatibleMappingComparison.insertStore comparison ⟨.word, payload, identity⟩
-        (coreStored :: .pair (.cellRef (.product .word (.product payload (.namedData identity))) target)
-          (.word position) :: outer) store entries (.word position) coreStored = store ++ suffix ∧
+      CompatibleMappingComparison.insertStore comparison ⟨.word, payload, identity⟩ stack store entries
+        (.word position) coreStored = store ++ suffix ∧
       GenericHeap.CellHeapRepresents cells mapping futureWorld after
         ((store ++ suffix).set target (.pair (.word length) (.pair default (OrderedMapping.encode
           ⟨.word, payload, identity⟩ (OrderedMapping.insertEntries GenericHeap.arrayKeyEqual (.word position)
@@ -133,43 +141,32 @@ theorem store_preserve (heaps : GenericHeap.CellHeapRepresents cells mapping wor
       intro key value member
       obtain ⟨_, _, same⟩ := contents.keys key value member
       exact ⟨_, same⟩
-    let stack : Environment :=
-      coreStored :: .pair (.cellRef (.product .word (.product payload (.namedData identity))) target) (.word position) ::
-        outer
     have inserted : Evaluates stack store
         (OrderedMapping.insert ⟨.word, payload, identity⟩ comparison.expression
-          (.second (.second (.loadCell (.first (.var 1))))) (.second (.var 1)) (.var 0))
+          (.second (.second (.loadCell arrayExpr))) keyExpr (.var 0))
         (.inRight .word (OrderedMapping.encode ⟨.word, payload, identity⟩
           (OrderedMapping.insertEntries GenericHeap.arrayKeyEqual (.word position) coreStored entries)))
         (CompatibleMappingComparison.insertStore comparison ⟨.word, payload, identity⟩ stack store entries
           (.word position) coreStored) :=
       OrderedMapping.insert_evaluates (environment := stack)
-        (mapping := .second (.second (.loadCell (.first (.var 1))))) (keyExpr := .second (.var 1))
+        (mapping := .second (.second (.loadCell arrayExpr))) (keyExpr := keyExpr)
         (valueExpr := .var 0) (keyEqual := comparison.expression) entries (.word position) coreStored
         (CompatibleMappingComparison.comparator comparison stack store) GenericHeap.arrayKeyEqual
-        (.second (.second (.loadCell (.first (.var rfl)) coreRead))) (.second (.var rfl)) (.var rfl)
+        (.second (.second (arrayLoad coreRead))) (keyEvaluated store) (.var storedAt)
         (CompatibleEquality.prepared_evaluates_exact comparison stack store)
         (word_comparisons prepared rfl stack store wordKeys position _)
-    have comparisonTyped : HasType (payload ::
-          .product (.cell (.product .word (.product payload (.namedData identity)))) .word :: context)
-        comparison.expression (OrderedMapping.Layout.comparisonType ⟨.word, payload, identity⟩)
-        ambient.definitions := by
-      have closed := closed_typed (comparison.typed.extend_definitions ambient.basePrefix)
-        (payload :: .product (.cell (.product .word (.product payload (.namedData identity)))) .word :: context)
+    have comparisonTyped : HasType context comparison.expression
+        (OrderedMapping.Layout.comparisonType ⟨.word, payload, identity⟩) ambient.definitions := by
+      have closed := closed_typed (comparison.typed.extend_definitions ambient.basePrefix) context
       rw [(word_comparison prepared).1] at closed
       simpa only [Core.OrderedMapping.Layout.comparisonType, SourceCoreCompatibleDataEquality.comparatorType,
         SourceCoreDataEquality.comparatorType] using closed
-    have insertTyped : HasType (payload ::
-          .product (.cell (.product .word (.product payload (.namedData identity)))) .word :: context)
+    have insertTyped : HasType context
         (OrderedMapping.insert ⟨.word, payload, identity⟩ comparison.expression
-          (.second (.second (.loadCell (.first (.var 1))))) (.second (.var 1)) (.var 0))
+          (.second (.second (.loadCell arrayExpr))) keyExpr (.var 0))
         (LanguageResult.resultType (OrderedMapping.Layout.type ⟨.word, payload, identity⟩)) ambient.definitions :=
       OrderedMapping.insert_hasType contents.registered comparisonTyped
-        (.second (.second (.loadCell (.first (.var rfl))))) (.second (.var rfl)) (.var rfl)
-    have stackTyped : RuntimeEnvironmentHasTypes world stack
-        (payload :: .product (.cell (.product .word (.product payload (.namedData identity)))) .word :: context)
-        ambient.definitions :=
-      .cons storedRep.runtime_hasType (.cons (.pair (.cellRef typed) .word) outerTyped)
+        (.second (.second (.loadCell arrayTyped))) keyTyped (.var storedTyped)
     obtain ⟨suffix, appended, _⟩ := CompatibleMappingComparison.helper_store_extension comparison stack store
       (OrderedMapping.Layout.insertParameter ⟨.word, payload, identity⟩)
       (OrderedMapping.Layout.type ⟨.word, payload, identity⟩) (OrderedMapping.insertBody ⟨.word, payload, identity⟩)
@@ -209,6 +206,49 @@ theorem store_preserve (heaps : GenericHeap.CellHeapRepresents cells mapping wor
         finalHeaps, worlds, unchanged.trans (AdministrativePreserved.write (List.mem_of_getElem? mapped) nativeWritten),
         (CellAwareScopeAuthority.Effect.append (instances := instances) store suffix (.refl _) (.refl _) worlds).trans
           (write_effect futureHeaps.injective sourceRead rfl mapped written nativeWritten)⟩
+
+include prepared in
+/-- `CanStore.store`'s step on its representation, after the memref's and the value's runs: the array's Core
+cell takes the value's entry at the position, after the insert's Core-only cells, as the Source replaces the
+element in its cell; the cells stay related, and the write keeps every located generalized local. -/
+theorem store_preserve (heaps : GenericHeap.CellHeapRepresents cells mapping world heap store)
+    {outer : Environment} {context : Core.Context}
+    (outerTyped : RuntimeEnvironmentHasTypes world outer context ambient.definitions)
+    {element valueType : TypeSystem.Ty} {location : Dynamic.Location} {cell : Dynamic.Cell}
+    {elements updated : List Dynamic.Value} {position : Word} {stored : Dynamic.Value} {after : Dynamic.Heap}
+    (read : Dynamic.Heap.Reads heap location cell) (current : cell.value = some (.arrayObject element elements))
+    (replace : Dynamic.ValuesReplaceAt elements position.val stored updated)
+    (written : Dynamic.Heap.Writes heap location (some (.arrayObject element updated)) after)
+    {target : Location} {payload : Ty} {identity : DataTypeId}
+    (mapped : mapping[location.index]? = some target)
+    (typed : world[target]? = some (.product .word (.product payload (.namedData identity))))
+    {coreStored : Value}
+    (storedRep : ValueRep checked registry functions mapping world valueType stored coreStored payload)
+    (sameRuntime : SourceCoreRawMetadata.runtimeType element = SourceCoreRawMetadata.runtimeType valueType) :
+    ∃ length default entries suffix futureWorld,
+      store.read? target = some (.pair (.word length) (.pair default
+        (OrderedMapping.encode ⟨.word, payload, identity⟩ entries))) ∧
+      (∀ key value, (key, value) ∈ entries → ∃ word, key = .word word) ∧
+      CompatibleMappingComparison.insertStore comparison ⟨.word, payload, identity⟩
+        (coreStored :: .pair (.cellRef (.product .word (.product payload (.namedData identity))) target)
+          (.word position) :: outer) store entries (.word position) coreStored = store ++ suffix ∧
+      GenericHeap.CellHeapRepresents cells mapping futureWorld after
+        ((store ++ suffix).set target (.pair (.word length) (.pair default (OrderedMapping.encode
+          ⟨.word, payload, identity⟩ (OrderedMapping.insertEntries GenericHeap.arrayKeyEqual (.word position)
+            coreStored entries))))) ∧
+      WorldExtends world futureWorld ∧
+      AdministrativePreserved mapping store mapping
+        ((store ++ suffix).set target (.pair (.word length) (.pair default (OrderedMapping.encode
+          ⟨.word, payload, identity⟩ (OrderedMapping.insertEntries GenericHeap.arrayKeyEqual (.word position)
+            coreStored entries))))) ∧
+      CellAwareScopeAuthority.Effect instances mapping world heap store mapping futureWorld after
+        ((store ++ suffix).set target (.pair (.word length) (.pair default (OrderedMapping.encode
+          ⟨.word, payload, identity⟩ (OrderedMapping.insertEntries GenericHeap.arrayKeyEqual (.word position)
+            coreStored entries))))) := by
+  exact store_preserve_at prepared (arrayExpr := .first (.var 1)) (keyExpr := .second (.var 1)) heaps
+    (.cons storedRep.runtime_hasType (.cons (.pair (.cellRef typed) .word) outerTyped))
+      read current replace written mapped typed storedRep sameRuntime (fun read => .loadCell (.first (.var rfl)) read)
+      (.first (.var rfl)) (fun _ => .second (.var rfl)) (.second (.var rfl)) rfl rfl
 
 end Stores
 
