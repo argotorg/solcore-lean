@@ -1,5 +1,5 @@
 import Solcore.SourceSemantics.CoreLowering.AcceptedConstructors
-import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationArrayCells
+import Solcore.SourceSemantics.CoreLowering.Internal.CellAware.InvocationArrayMemrefs
 
 /-!
 # Accepted bodies: direct calls and conversions inside expressions
@@ -356,6 +356,177 @@ end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedArraySites
 end
 
 section
+/-! `CanStore.load(lidx(a, i))` and `CanStore.store(lidx(a, i), v)` in named-row bodies as compiler sites:
+the memref is made on the spot, and the `CanStore` node and its `lidx` are each a site as an array form is,
+so the named policy declines both and reads both as the compatible reader. `memrefSite?` recognizes one on
+an actually compiled row. -/
+set_option autoImplicit false
+set_option Elab.async false
+namespace Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedMemrefSites
+open Core Frontend SourceInference
+open CallableIndexedNamedGeneration (Prepared Compilation context representation)
+open GeneralizedLocalInitializerCompilation (namedPolicy)
+
+/-- A `CanStore` node whose memref `reference` is `lidx(base, subscript)`, in a named-row body. -/
+structure MemrefSite {checked : SourceCoreCompatibleCatalog.Checked}
+    (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
+    (source : TypedSource) (id reference : ExpressionId) where
+  node : ExpressionNode
+  found : source.lookupExpression? id = some node
+  coercions : node.coercions = []
+  requirements : node.requirements = []
+  notInitializer : prepared.base.locals.bindings.find? (fun binding =>
+    decide (binding.caller = named.signature.key ∧ binding.initializer = id)) = none
+  base : ExpressionId
+  subscript : ExpressionId
+  referenceNode : ExpressionNode
+  referenceFound : source.lookupExpression? reference = some referenceNode
+  referenceForm : referenceNode.form = .elementRef base subscript
+  referenceCoercions : referenceNode.coercions = []
+  referenceRequirements : referenceNode.requirements = []
+  referenceNotInitializer : prepared.base.locals.bindings.find? (fun binding =>
+    decide (binding.caller = named.signature.key ∧ binding.initializer = reference)) = none
+  assumptions : named.specialized.assumptions = []
+
+/-- The forms of a memref composite's two nodes. -/
+inductive Form : ExpressionForm → Prop where
+  | load (reference : ExpressionId) : Form (.memrefLoad reference)
+  | store (reference value : ExpressionId) : Form (.memrefStore reference value)
+  | element (base subscript : ExpressionId) : Form (.elementRef base subscript)
+
+variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
+  {named : SourceCoreGeneralFunctions.Function} {source : TypedSource} {id reference : ExpressionId}
+
+private theorem contextual_of {node : ExpressionNode} {form : ExpressionForm}
+    (found : source.lookupExpression? id = some node) (formEq : node.form = form) (shape : Form form) :
+    SourceCoreGeneralFunctions.contextualSource prepared.base.sourceProgram
+      (context prepared named).plan prepared.base.locals named.signature.key none source id = .ok source := by
+  cases shape <;> simp [SourceCoreGeneralFunctions.contextualSource, found, formEq]
+
+private theorem ordinary_nil {node : ExpressionNode} (requirements : node.requirements = [])
+    (coercions : node.coercions = []) : SourceCompilationPlan.ordinaryOwnedRequirements? node = some [] := by
+  unfold SourceCompilationPlan.ordinaryOwnedRequirements?
+  rw [requirements, coercions]
+  rfl
+
+private theorem evidence_none_of {node : ExpressionNode} {form : ExpressionForm}
+    (found : source.lookupExpression? id = some node) (formEq : node.form = form) (shape : Form form)
+    (requirements : node.requirements = []) (coercions : node.coercions = [])
+    (assumptions : named.specialized.assumptions = [])
+    (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat) (scope : SourceCoreLocalCell.Scope)
+    (reasonAt : ExpressionId → Word) :
+    SourceCoreEvidence.lowerWithProjector prepared.base.sourceProgram
+      ((representation prepared).atContext named.signature.key []).expressions.projectType
+      named.specialized (context prepared named) child budget source scope id reasonAt
+      (SourceCoreGeneralFunctions.callablePolicy prepared.base.callableContext []) = .ok none := by
+  cases shape <;>
+    simp [SourceCoreEvidence.lowerWithProjector, ordinary_nil requirements coercions, found, formEq, requirements,
+      coercions, assumptions]
+
+variable {diagnostics : SourceCoreDataPlaceFaultSites.Program} {code : Expr}
+  (compiled : Compilation prepared named diagnostics code)
+
+private theorem special_of {node : ExpressionNode} {form : ExpressionForm}
+    (found : source.lookupExpression? id = some node) (formEq : node.form = form) (shape : Form form)
+    (requirements : node.requirements = []) (coercions : node.coercions = [])
+    (notInitializer : prepared.base.locals.bindings.find? (fun binding =>
+      decide (binding.caller = named.signature.key ∧ binding.initializer = id)) = none)
+    (assumptions : named.specialized.assumptions = []) (rootFuel : Nat)
+    (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat) (scope : SourceCoreLocalCell.Scope)
+    (reasonAt : ExpressionId → Word) :
+    CallableIndexedOwnedContextualLambdaPolicyRecipes.special compiled rootFuel
+      (context prepared named) child budget source scope id reasonAt = .ok none := by
+  unfold CallableIndexedOwnedContextualLambdaPolicyRecipes.special
+  have ownerEq : (context prepared named).owner = named.signature.key := rfl
+  simp only [ownerEq, contextual_of found formEq shape, bind, Except.bind, pure, Except.pure, found,
+    notInitializer, Option.filter_none]
+  rw [evidence_none_of found formEq shape requirements coercions assumptions child budget scope reasonAt]
+  cases shape <;> simp [formEq]
+
+private theorem read_of {node : ExpressionNode} {form : ExpressionForm}
+    (found : source.lookupExpression? id = some node) (formEq : node.form = form) (shape : Form form)
+    (rootFuel : Nat) :
+    (namedPolicy compiled rootFuel).readExpression source id =
+      SourceCoreCompatibleDataExpressions.readExpression checked source id := by
+  simp only [namedPolicy, contextual_of found formEq shape, bind, Except.bind]
+  rfl
+
+/-- The named policy's special callback declines the `CanStore` node. -/
+theorem special (site : MemrefSite prepared named source id reference) {form : ExpressionForm}
+    (formEq : site.node.form = form) (shape : Form form) (rootFuel : Nat)
+    (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat) (scope : SourceCoreLocalCell.Scope)
+    (reasonAt : ExpressionId → Word) :
+    CallableIndexedOwnedContextualLambdaPolicyRecipes.special compiled rootFuel
+      (context prepared named) child budget source scope id reasonAt = .ok none :=
+  special_of compiled site.found formEq shape site.requirements site.coercions site.notInitializer site.assumptions
+    rootFuel child budget scope reasonAt
+
+theorem read (site : MemrefSite prepared named source id reference) {form : ExpressionForm}
+    (formEq : site.node.form = form) (shape : Form form) (rootFuel : Nat) :
+    (namedPolicy compiled rootFuel).readExpression source id =
+      SourceCoreCompatibleDataExpressions.readExpression checked source id :=
+  read_of compiled site.found formEq shape rootFuel
+
+/-- The named policy's special callback declines the `lidx` node. -/
+theorem reference_special (site : MemrefSite prepared named source id reference) (rootFuel : Nat)
+    (child : SourceCoreFunctions.ExpressionLowerer) (budget : Nat) (scope : SourceCoreLocalCell.Scope)
+    (reasonAt : ExpressionId → Word) :
+    CallableIndexedOwnedContextualLambdaPolicyRecipes.special compiled rootFuel
+      (context prepared named) child budget source scope reference reasonAt = .ok none :=
+  special_of compiled site.referenceFound site.referenceForm (.element _ _) site.referenceRequirements
+    site.referenceCoercions site.referenceNotInitializer site.assumptions rootFuel child budget scope reasonAt
+
+theorem reference_read (site : MemrefSite prepared named source id reference) (rootFuel : Nat) :
+    (namedPolicy compiled rootFuel).readExpression source reference =
+      SourceCoreCompatibleDataExpressions.readExpression checked source reference :=
+  read_of compiled site.referenceFound site.referenceForm (.element _ _) rootFuel
+
+/-- Proof-producing recognition of a memref composite at `id` whose memref is `reference`. -/
+def memrefSite? (prepared : Prepared checked) (named : SourceCoreGeneralFunctions.Function)
+    (source : TypedSource) (id reference : ExpressionId) : Option (MemrefSite prepared named source id reference) :=
+  match found : source.lookupExpression? id, referenceFound : source.lookupExpression? reference with
+  | some node, some referenceNode =>
+    match coercions : node.coercions, requirements : node.requirements,
+        referenceCoercions : referenceNode.coercions, referenceRequirements : referenceNode.requirements with
+    | [], [], [], [] =>
+      match referenceForm : referenceNode.form with
+      | .elementRef base subscript =>
+        match initializer : prepared.base.locals.bindings.find? (fun binding =>
+              decide (binding.caller = named.signature.key ∧ binding.initializer = id)),
+            referenceInitializer : prepared.base.locals.bindings.find? (fun binding =>
+              decide (binding.caller = named.signature.key ∧ binding.initializer = reference)),
+            assumptions : named.specialized.assumptions with
+        | none, none, [] =>
+          some ⟨node, found, coercions, requirements, initializer, base, subscript, referenceNode, referenceFound,
+            referenceForm, referenceCoercions, referenceRequirements, referenceInitializer, assumptions⟩
+        | _, _, _ => none
+      | _ => none
+    | _, _, _, _ => none
+  | _, _ => none
+
+/-- A memref site depends on its row only through the row's key and its empty assumptions. -/
+def transport {first second : SourceCoreGeneralFunctions.Function}
+    (keyEq : first.signature.key = second.signature.key) (assumptions : second.specialized.assumptions = [])
+    (site : MemrefSite prepared first source id reference) : MemrefSite prepared second source id reference where
+  node := site.node
+  found := site.found
+  coercions := site.coercions
+  requirements := site.requirements
+  notInitializer := keyEq ▸ site.notInitializer
+  base := site.base
+  subscript := site.subscript
+  referenceNode := site.referenceNode
+  referenceFound := site.referenceFound
+  referenceForm := site.referenceForm
+  referenceCoercions := site.referenceCoercions
+  referenceRequirements := site.referenceRequirements
+  referenceNotInitializer := keyEq ▸ site.referenceNotInitializer
+  assumptions := assumptions
+
+end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedMemrefSites
+end
+
+section
 /-! Direct calls and conversions inside the expressions of named-row bodies.
 `Nested` closes the first subset's forms, direct calls, builtin conversions,
 calls of builtin closures, tuples and the memory array forms under one another:
@@ -386,6 +557,7 @@ open CellAwareInvocationAcceptedBuiltinSites (BuiltinSite)
 open CellAwareInvocationAcceptedTupleSites (TupleSite)
 open CellAwareInvocationAcceptedConstructorSites (ConstructorSite)
 open CellAwareInvocationAcceptedArraySites (ArraySite)
+open CellAwareInvocationAcceptedMemrefSites (MemrefSite)
 open CallableIndexedOwnedPreparedStagedDirectCallCertificates (Receipt Monomorphic)
 open CallableIndexedOwnedPreparedStagedDirectCallAuthority (Port)
 
@@ -445,6 +617,15 @@ inductive Nested {checked : SourceCoreCompatibleCatalog.Checked}
       (children : ∀ child ∈ (Staging.Recursive.arrayChildren form).getD [],
         Nested prepared named source called child) :
       Nested prepared named source called id
+  | memrefLoad {id reference} (site : MemrefSite prepared named source id reference)
+      (form : site.node.form = .memrefLoad reference)
+      (first : Nested prepared named source called site.base)
+      (second : Nested prepared named source called site.subscript) : Nested prepared named source called id
+  | memrefStore {id reference value} (site : MemrefSite prepared named source id reference)
+      (form : site.node.form = .memrefStore reference value)
+      (first : Nested prepared named source called site.base)
+      (second : Nested prepared named source called site.subscript)
+      (third : Nested prepared named source called value) : Nested prepared named source called id
 
 /-- Static receipts at nested sites. The forms of the first subset keep the
 receipts of `CellAwareInvocationAcceptedExpressionTrees.Tree` with nested
@@ -705,6 +886,48 @@ inductive NestedTree (whole : SourceCoreUnifiedCompilation.Compiled)
       NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id ⟨.cell (.product .word (.product valueType (.namedData dataType))),
         SourceCoreDataExpressions.sliceCopy ⟨.word, valueType, dataType⟩ comparison.expression (0 + 1) first.type
           first.expression⟩
+  | memrefLoad {id node reference referenceNode base subscript baseNode subscriptNode layout comparison fuel first
+      second}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node layout.valueType)
+      (form : node.form = .memrefLoad reference)
+      (referenceMetadata : CompatibleExpressionReads.Metadata whole.compatible.checked source reference referenceNode
+        (.product first.type .word))
+      (referenceForm : referenceNode.form = .elementRef base subscript)
+      (baseFound : source.lookupExpression? base = some baseNode)
+      (subscriptFound : source.lookupExpression? subscript = some subscriptNode)
+      (shaped : SourceCoreDataExpressions.viewShape? first.type = some (0, layout))
+      (prepared : SourceCoreCompatibleDataEquality.prepare fuel whole.compatible.checked
+        (.constructor (.builtin .word)) = .ok comparison)
+      (baseTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope base
+        first)
+      (subscriptTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope
+        subscript second) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id
+        ⟨layout.valueType, SourceCoreDataExpressions.memrefLoad layout comparison.expression
+          (SourceCoreDataExpressions.elementRef layout first.expression second.expression)⟩
+  | memrefStore {id node reference value referenceNode base subscript baseNode subscriptNode valueNode layout
+      comparison fuel first second third}
+      (metadata : CompatibleExpressionReads.Metadata whole.compatible.checked source id node .unit)
+      (form : node.form = .memrefStore reference value)
+      (referenceMetadata : CompatibleExpressionReads.Metadata whole.compatible.checked source reference referenceNode
+        (.product first.type .word))
+      (referenceForm : referenceNode.form = .elementRef base subscript)
+      (baseFound : source.lookupExpression? base = some baseNode)
+      (subscriptFound : source.lookupExpression? subscript = some subscriptNode)
+      (valueFound : source.lookupExpression? value = some valueNode)
+      (shaped : SourceCoreDataExpressions.viewShape? first.type = some (0, layout))
+      (valueType : third.type = layout.valueType)
+      (prepared : SourceCoreCompatibleDataEquality.prepare fuel whole.compatible.checked
+        (.constructor (.builtin .word)) = .ok comparison)
+      (baseTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope base
+        first)
+      (subscriptTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope
+        subscript second)
+      (valueTree : NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope
+        value third) :
+      NestedTree whole headers called compilation readFuel solved source sourceContext reasonAt scope id
+        ⟨.unit, SourceCoreDataExpressions.memrefStore layout comparison.expression
+          (SourceCoreDataExpressions.elementRef layout first.expression second.expression) third.expression⟩
 
 section Embedding
 variable {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Prepared checked}
@@ -744,6 +967,7 @@ theorem nested_found {id : ExpressionId} (nested : Nested prepared named source 
   | tuple site _ => exact ⟨_, site.found⟩
   | constructor site _ => exact ⟨_, site.found⟩
   | array site _ => exact ⟨_, site.found⟩
+  | memrefLoad site _ _ _ | memrefStore site _ _ _ _ => exact ⟨_, site.found⟩
 
 end Embedding
 
@@ -803,7 +1027,8 @@ theorem projected
     rcases code with ⟨_, _, rfl⟩ | ⟨_, _, rfl⟩ <;> exact metadata.projected
   | arrayIndex metadata _ _ _ _ _ _ _ | sliceRange metadata _ _ _ _ _ _ _ _ | sliceFrom metadata _ _ _ _ _ _
   | sliceTo metadata _ _ _ _ _ _ | sliceWhole metadata _ _ _ _ | newArray metadata _ _ _ _ _ _
-  | arrayLiteral metadata _ _ _ _ _ _ _ _ _ | copy metadata _ _ _ _ _ _ =>
+  | arrayLiteral metadata _ _ _ _ _ _ _ _ _ | copy metadata _ _ _ _ _ _ | memrefLoad metadata _ _ _ _ _ _ _ _ _
+  | memrefStore metadata _ _ _ _ _ _ _ _ _ _ _ _ =>
     cases Option.some.inj (found.symm.trans metadata.found)
     exact metadata.projected
 
@@ -993,6 +1218,19 @@ private theorem slice_shape {catalog : SourceCoreCompatibleCatalog.Catalog} {arr
       rw [computed] at shaped
       cases shaped
       exact ⟨rfl, _, _, rfl⟩
+
+/-- A memref's layout is its array's. -/
+private theorem memref_layout {type : Ty} {layout layout' : OrderedMapping.Layout}
+    (shaped : SourceCoreDataExpressions.viewShape? type = some (0, layout'))
+    (memrefShaped : SourceCoreDataExpressions.memrefLayout? (.product type .word) = some layout) :
+    layout = layout' := by
+  obtain ⟨rfl, keyType⟩ := CellAwareArrayCells.viewShape_zero shaped
+  cases layout' with
+  | mk keyType' valueType dataType =>
+    simp only at keyType
+    subst keyType
+    simp only [SourceCoreDataExpressions.memrefLayout?, OrderedMapping.Layout.type, Option.some.injEq] at memrefShaped
+    exact memrefShaped.symm
 
 private theorem bound_some {lower : ExpressionId → Except SourceCoreBasic.Error SourceCoreBasic.LoweredExpr}
     {bound : ExpressionId} {codes : Option SourceCoreBasic.LoweredExpr}
@@ -1474,6 +1712,90 @@ theorem of_nested {id : ExpressionId}
         rw [sliceType] at sliceProjected
         obtain ⟨rfl, valueType, dataType, rfl⟩ := slice_shape sliceProjected shaped
         exact .copy metadata formEq sliceFound sliceForm shaped prepared sliceTree
+  | @memrefLoad id reference site form first second firstIH secondIH =>
+    have same := Option.some.inj (site.found.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      obtain ⟨layout, comparison, referenceCode, rfl, metadata, referenceGenerated, memrefShaped, prepared⟩ :=
+        CompatibleExpressionArrays.memrefLoad_of_functions (policy := namedPolicy generation rootFuel)
+          (body := namedLowerBody generation) (context := context whole.indexed named)
+          (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt) site.found
+          (fun child budget => CellAwareInvocationAcceptedMemrefSites.special generation site form (.load _) rootFuel
+            child budget scope reasonAt)
+          (CellAwareInvocationAcceptedMemrefSites.read generation site form (.load _) rootFuel)
+          (GeneralizedLocalInitializerCompilation.namedPolicy_recipe generation rootFuel).leafLowerer accepted form
+      cases fuel with
+      | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at referenceGenerated
+      | succ fuel =>
+        obtain ⟨layout', firstCode, secondCode, rfl, referenceMetadata, firstGenerated, shaped, secondGenerated, _⟩ :=
+          CompatibleExpressionArrays.elementRef_of_functions (policy := namedPolicy generation rootFuel)
+            (body := namedLowerBody generation) (context := context whole.indexed named)
+            (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt) site.referenceFound
+            (fun child budget => CellAwareInvocationAcceptedMemrefSites.reference_special generation site rootFuel
+              child budget scope reasonAt)
+            (CellAwareInvocationAcceptedMemrefSites.reference_read generation site rootFuel)
+            (GeneralizedLocalInitializerCompilation.namedPolicy_recipe generation rootFuel).leafLowerer
+            referenceGenerated site.referenceForm
+        obtain rfl := memref_layout shaped memrefShaped
+        have referenceTyped := CellAwareInvocationArrayBounds.load_source_types unique site.found form site.coercions
+          typed
+        obtain ⟨baseTyped, _, subscriptTyped, _⟩ := CellAwareInvocationArrayBounds.reference_source_types unique
+          site.referenceFound site.referenceForm site.referenceCoercions referenceTyped
+        obtain ⟨baseNode, baseContains, baseNodeType⟩ := baseTyped.stored_type
+        obtain ⟨subscriptNode, subscriptContains, subscriptNodeType⟩ := subscriptTyped.stored_type
+        have baseFound := lookupExpression?_complete unique baseContains
+        have subscriptFound := lookupExpression?_complete unique subscriptContains
+        rw [← baseNodeType] at baseTyped
+        rw [← subscriptNodeType] at subscriptTyped
+        exact .memrefLoad metadata form referenceMetadata site.referenceForm baseFound subscriptFound shaped prepared
+          (firstIH baseFound baseTyped firstGenerated) (secondIH subscriptFound subscriptTyped secondGenerated)
+  | @memrefStore id reference value site form first second third firstIH secondIH thirdIH =>
+    have same := Option.some.inj (site.found.symm.trans found)
+    subst node
+    cases fuel with
+    | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at accepted
+    | succ fuel =>
+      obtain ⟨layout, comparison, referenceCode, valueCode, rfl, metadata, referenceGenerated, memrefShaped,
+          valueGenerated, valueType, prepared⟩ :=
+        CompatibleExpressionArrays.memrefStore_of_functions (policy := namedPolicy generation rootFuel)
+          (body := namedLowerBody generation) (context := context whole.indexed named)
+          (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt) site.found
+          (fun child budget => CellAwareInvocationAcceptedMemrefSites.special generation site form (.store _ _)
+            rootFuel child budget scope reasonAt)
+          (CellAwareInvocationAcceptedMemrefSites.read generation site form (.store _ _) rootFuel)
+          (GeneralizedLocalInitializerCompilation.namedPolicy_recipe generation rootFuel).leafLowerer accepted form
+      obtain ⟨_, _, referenceTyped, valueTyped⟩ := CellAwareInvocationArrayBounds.store_source_types unique site.found
+        form site.coercions typed
+      obtain ⟨valueNode, valueContains, valueNodeType⟩ := valueTyped.stored_type
+      have valueFound := lookupExpression?_complete unique valueContains
+      rw [← valueNodeType] at valueTyped
+      have valueTree := thirdIH valueFound valueTyped valueGenerated
+      cases fuel with
+      | zero => simp [SourceCoreFunctions.lowerExpressionWithPolicy] at referenceGenerated
+      | succ fuel =>
+        obtain ⟨layout', firstCode, secondCode, rfl, referenceMetadata, firstGenerated, shaped, secondGenerated, _⟩ :=
+          CompatibleExpressionArrays.elementRef_of_functions (policy := namedPolicy generation rootFuel)
+            (body := namedLowerBody generation) (context := context whole.indexed named)
+            (values := .initial whole.compatible.checked) (scope := scope) (reasonAt := reasonAt) site.referenceFound
+            (fun child budget => CellAwareInvocationAcceptedMemrefSites.reference_special generation site rootFuel
+              child budget scope reasonAt)
+            (CellAwareInvocationAcceptedMemrefSites.reference_read generation site rootFuel)
+            (GeneralizedLocalInitializerCompilation.namedPolicy_recipe generation rootFuel).leafLowerer
+            referenceGenerated site.referenceForm
+        obtain rfl := memref_layout shaped memrefShaped
+        obtain ⟨baseTyped, _, subscriptTyped, _⟩ := CellAwareInvocationArrayBounds.reference_source_types unique
+          site.referenceFound site.referenceForm site.referenceCoercions referenceTyped
+        obtain ⟨baseNode, baseContains, baseNodeType⟩ := baseTyped.stored_type
+        obtain ⟨subscriptNode, subscriptContains, subscriptNodeType⟩ := subscriptTyped.stored_type
+        have baseFound := lookupExpression?_complete unique baseContains
+        have subscriptFound := lookupExpression?_complete unique subscriptContains
+        rw [← baseNodeType] at baseTyped
+        rw [← subscriptNodeType] at subscriptTyped
+        exact .memrefStore metadata form referenceMetadata site.referenceForm baseFound subscriptFound valueFound shaped
+          valueType prepared (firstIH baseFound baseTyped firstGenerated)
+          (secondIH subscriptFound subscriptTyped secondGenerated) valueTree
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedTrees
 end
@@ -2039,6 +2361,48 @@ theorem preserves_nested_tree [RecursiveStageMeaning.FaultTokens faults]
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareInvocationArrayBounds.copy_preserves callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form sliceFound
       ⟨rfl, rfl, rfl⟩ shaped prepared rfl size children ⟨rfl, rfl, rfl⟩
+  | @memrefLoad id node reference referenceNode base subscript baseNode subscriptNode layout comparison fuel first
+      second metadata form referenceMetadata referenceForm baseFound subscriptFound shaped prepared baseTree
+      subscriptTree baseIH subscriptIH =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base subscript first second) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl left => obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr right => obtain ⟨rfl, rfl⟩ := right; intro _; exact subscriptIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.load_preserves callerBridge.forgetSlots functions faults unique selectedBodies
+      runtime covers metadata form referenceMetadata referenceForm baseFound subscriptFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩
+      ⟨rfl, .inr ⟨rfl, rfl⟩⟩ shaped prepared rfl size children ⟨rfl, rfl, rfl⟩
+  | @memrefStore id node reference value referenceNode base subscript baseNode subscriptNode valueNode layout
+      comparison fuel first second third metadata form referenceMetadata referenceForm baseFound subscriptFound
+      valueFound shaped valueType prepared baseTree subscriptTree valueTree baseIH subscriptIH valueIH =>
+    intro size applications
+    have children : PreservesBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Three scope base subscript value first second third) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.PreservesBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      rcases alternative with left | middle | right
+      · obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := middle; intro _; exact subscriptIH childSize below ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := right; intro _; exact valueIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.store_preserves callerBridge.forgetSlots functions faults unique selectedBodies
+      runtime covers metadata form referenceMetadata referenceForm baseFound subscriptFound valueFound
+      ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr (.inl ⟨rfl, rfl⟩)⟩ ⟨rfl, .inr (.inr ⟨rfl, rfl⟩)⟩ shaped valueType prepared
+      rfl size children ⟨rfl, rfl, rfl⟩
 
 include callerBridge keyPhysical cache faithful functionLeaves functionTypes included extension sameLedger uninitialized
   missing
@@ -2425,6 +2789,48 @@ theorem reflects_nested_tree [RecursiveStageMeaning.FaultTokens faults]
     obtain ⟨rfl, rfl, rfl⟩ := point
     exact CellAwareInvocationArrayBounds.copy_reflects callerBridge.forgetSlots functions faults unique selectedBodies runtime covers metadata form sliceFound sliceForm
       ⟨rfl, rfl, rfl⟩ shaped prepared rfl size children ⟨rfl, rfl, rfl⟩
+  | @memrefLoad id node reference referenceNode base subscript baseNode subscriptNode layout comparison fuel first
+      second metadata form referenceMetadata referenceForm baseFound subscriptFound shaped prepared baseTree
+      subscriptTree baseIH subscriptIH =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Two scope base subscript first second) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      cases alternative with
+      | inl left => obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      | inr right => obtain ⟨rfl, rfl⟩ := right; intro _; exact subscriptIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.load_reflects callerBridge.forgetSlots functions faults unique selectedBodies
+      runtime covers metadata form referenceMetadata referenceForm baseFound subscriptFound ⟨rfl, .inl ⟨rfl, rfl⟩⟩
+      ⟨rfl, .inr ⟨rfl, rfl⟩⟩ shaped prepared rfl size children ⟨rfl, rfl, rfl⟩
+  | @memrefStore id node reference value referenceNode base subscript baseNode subscriptNode valueNode layout
+      comparison fuel first second third metadata form referenceMetadata referenceForm baseFound subscriptFound
+      valueFound shaped valueType prepared baseTree subscriptTree valueTree baseIH subscriptIH valueIH =>
+    intro size applications
+    have children : ReflectsBelow (attachment := attachment) callerBridge.forgetSlots context valueModel index
+        registry invocation (Three scope base subscript value first second third) faults size := by
+      intro childSize smaller current child code point
+      have below : ∀ header, header ∈ headers → called header.instantiation →
+          CellAwareInvocationAcceptedDirectCalls.ReflectsBelow (attachment := attachment) (headers := headers)
+            (keys := keys) valueModel registry faults header childSize :=
+        fun header member admitted below less => applications header member admitted below (Nat.lt_trans less smaller)
+      obtain ⟨rfl, alternative⟩ := point
+      rcases alternative with left | middle | right
+      · obtain ⟨rfl, rfl⟩ := left; intro _; exact baseIH childSize below ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := middle; intro _; exact subscriptIH childSize below ⟨rfl, rfl, rfl⟩
+      · obtain ⟨rfl, rfl⟩ := right; intro _; exact valueIH childSize below ⟨rfl, rfl, rfl⟩
+    intro current expression code' point
+    obtain ⟨rfl, rfl, rfl⟩ := point
+    exact CellAwareInvocationArrayBounds.store_reflects callerBridge.forgetSlots functions faults unique selectedBodies
+      runtime covers metadata form referenceMetadata referenceForm baseFound subscriptFound valueFound
+      ⟨rfl, .inl ⟨rfl, rfl⟩⟩ ⟨rfl, .inr (.inl ⟨rfl, rfl⟩)⟩ ⟨rfl, .inr (.inr ⟨rfl, rfl⟩)⟩ shaped valueType prepared
+      rfl size children ⟨rfl, rfl, rfl⟩
 
 end Solcore.SourceSemantics.CoreLowering.CellAwareInvocationAcceptedNestedBounds
 end
@@ -2960,11 +3366,35 @@ def nested? {checked : SourceCoreCompatibleCatalog.Checked} (prepared : Prepared
                 pure ⟨.constructor site arguments⟩
               | none =>
                 match CellAwareInvocationAcceptedArraySites.arraySite? prepared named source id with
-                | none => none
                 | some ⟨form, site⟩ => do
                   let ⟨children⟩ ← all? (nested? prepared named source called fuel)
                     ((Staging.Recursive.arrayChildren form).getD [])
                   pure ⟨.array site children⟩
+                | none =>
+                  match found : source.lookupExpression? id with
+                  | none => none
+                  | some node =>
+                    match form : node.form with
+                    | .memrefLoad reference =>
+                      match CellAwareInvocationAcceptedMemrefSites.memrefSite? prepared named source id reference with
+                      | none => none
+                      | some site => do
+                        let ⟨first⟩ ← nested? prepared named source called fuel site.base
+                        let ⟨second⟩ ← nested? prepared named source called fuel site.subscript
+                        pure ⟨.memrefLoad site
+                          ((congrArg ExpressionNode.form (Option.some.inj (site.found.symm.trans found))).trans form)
+                          first second⟩
+                    | .memrefStore reference value =>
+                      match CellAwareInvocationAcceptedMemrefSites.memrefSite? prepared named source id reference with
+                      | none => none
+                      | some site => do
+                        let ⟨first⟩ ← nested? prepared named source called fuel site.base
+                        let ⟨second⟩ ← nested? prepared named source called fuel site.subscript
+                        let ⟨third⟩ ← nested? prepared named source called fuel value
+                        pure ⟨.memrefStore site
+                          ((congrArg ExpressionNode.form (Option.some.inj (site.found.symm.trans found))).trans form)
+                          first second third⟩
+                    | _ => none
 
 /-- An expression node of the check: a nested site, a reference site, or the
 callee of a conversion. -/
@@ -3063,6 +3493,11 @@ theorem transport {checked : SourceCoreCompatibleCatalog.Checked} {prepared : Pr
     exact .constructor (CellAwareInvocationAcceptedConstructorSites.transport keyEq assumptions site) arguments
   | array site _ children =>
     exact .array (CellAwareInvocationAcceptedArraySites.transport keyEq assumptions site) children
+  | memrefLoad site form _ _ first second =>
+    exact .memrefLoad (CellAwareInvocationAcceptedMemrefSites.transport keyEq assumptions site) form first second
+  | memrefStore site form _ _ _ first second third =>
+    exact .memrefStore (CellAwareInvocationAcceptedMemrefSites.transport keyEq assumptions site) form first second
+      third
 
 /-- A named row whose every expression node is a nested site, a reference site
 or a conversion's callee has every accepted expression a nested site. -/

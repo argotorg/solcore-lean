@@ -1080,6 +1080,39 @@ private theorem arguments_value {scope : Staging.Recursive.Scope} {bound : Nat} 
           simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
           omega) tail)
 
+/-- The value execution of a memref composite's `lidx` is a staged execution,
+given those of its array and its index. -/
+private theorem reference_value {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
+    (unique : NodeOccurrencesUnique scope.source) {bound : Nat} {id reference : ExpressionId}
+    (site : CellAwareInvocationAcceptedMemrefSites.MemrefSite prepared named scope.source id reference)
+    (first : ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+      SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
+        site.base value after →
+      Staging.Recursive.Expression program registry scope context environment before site.base (.value value) after)
+    (second : ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+      SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
+        site.subscript value after →
+      Staging.Recursive.Expression program registry scope context environment before site.subscript (.value value)
+        after) :
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+      SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
+        reference value after →
+      Staging.Recursive.Expression program registry scope context environment before reference (.value value) after := by
+  intro size context environment before after value within trace
+  obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.referenceFound site.referenceCoercions
+    (fun name binder same => by rw [site.referenceForm] at same; cases same) trace
+  rw [site.referenceForm, site.referenceRequirements] at raw
+  cases raw with
+  | elementRef _ baseEvaluates subscriptEvaluates counted inside =>
+    simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+    exact .arrayResult ⟨site.referenceNode, lookupExpression?_sound site.referenceFound, site.referenceForm,
+        site.referenceRequirements, site.referenceCoercions⟩ rfl
+      (.cons (first (by omega) baseEvaluates) (.cons (second (by omega) subscriptEvaluates) .nil))
+      (.elementRef counted inside)
+
 /-- A sized value execution of a nested site is a staged execution with the
 same value and heap, given the lifting of the admitted callee bodies below a
 bound of its size. -/
@@ -1383,6 +1416,29 @@ theorem nested_value {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         exact .arrayResult occurrence rfl
           (.cons (children slice (by simp [Staging.Recursive.arrayChildren]) (by omega) first) .nil)
           (.toArray copies allocates)
+  | @memrefLoad id reference site form _ _ first second =>
+    intro size context environment before after value within trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, site.requirements] at raw
+    cases raw with
+    | memrefLoad _ referenceEvaluates reads =>
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+      exact .arrayResult ⟨site.node, lookupExpression?_sound site.found, form, site.requirements, site.coercions⟩ rfl
+        (.cons (reference_value prepared unique site first second (by omega) referenceEvaluates) .nil)
+        (.memrefLoad reads)
+  | @memrefStore id reference value site form _ _ _ first second third =>
+    intro size context environment before after result within trace
+    obtain ⟨formSize, formBelow, raw⟩ := form_below unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, site.requirements] at raw
+    cases raw with
+    | memrefStore _ referenceEvaluates valueEvaluates read current replace write =>
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+      exact .arrayResult ⟨site.node, lookupExpression?_sound site.found, form, site.requirements, site.coercions⟩ rfl
+        (.cons (reference_value prepared unique site first second (by omega) referenceEvaluates)
+          (.cons (third (by omega) valueEvaluates) .nil))
+        (.memrefStore read current replace write)
 
 /-- The value lifting of every nested site below a size, given the lifting of
 the callee bodies below it. -/
@@ -1699,6 +1755,67 @@ private theorem arguments_fault {scope : Staging.Recursive.Scope} {bound : Nat} 
           (fun argument member => faults argument (List.mem_cons_of_mem _ member)) (by
           simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at within
           omega) signatures expressible tail)
+
+/-- The fault execution of a memref composite's `lidx` is a staged fault
+execution, given the value and fault liftings of its array and its index. -/
+private theorem reference_fault {named : SourceCoreGeneralFunctions.Function} {scope : Staging.Recursive.Scope}
+    (unique : NodeOccurrencesUnique scope.source) {bound : Nat} {id reference : ExpressionId}
+    (site : CellAwareInvocationAcceptedMemrefSites.MemrefSite prepared named scope.source id reference)
+    (firstValue : ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+      SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
+        site.base value after →
+      Staging.Recursive.Expression program registry scope context environment before site.base (.value value) after)
+    (secondValue : ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {value : Dynamic.Value}, size ≤ bound →
+      SourceExecutionSize.ExpressionEvaluates program size context scope.evidence scope.source environment before
+        site.subscript value after →
+      Staging.Recursive.Expression program registry scope context environment before site.subscript (.value value)
+        after)
+    (firstFault : ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}, size ≤ bound →
+      context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before
+        site.base reason after →
+      Staging.Recursive.Expression program registry scope context environment before site.base
+        (.fault (.semantic reason)) after)
+    (secondFault : ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}, size ≤ bound →
+      context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before
+        site.subscript reason after →
+      Staging.Recursive.Expression program registry scope context environment before site.subscript
+        (.fault (.semantic reason)) after) :
+    ∀ {size : Nat} {context : SourceSemantics.Context} {environment : Dynamic.Environment}
+      {before after : Dynamic.Heap} {reason : Dynamic.SemanticFault}, size ≤ bound →
+      context.signatures = program.signatures → Expressible reason →
+      SourceExecutionSize.ExpressionFaults program size context scope.evidence scope.source environment before
+        reference reason after →
+      Staging.Recursive.Expression program registry scope context environment before reference
+        (.fault (.semantic reason)) after := by
+  intro size context environment before after reason within signatures expressible trace
+  have occurrence : Staging.Recursive.Occurrence scope reference (.elementRef site.base site.subscript) :=
+    ⟨site.referenceNode, lookupExpression?_sound site.referenceFound, site.referenceForm, site.referenceRequirements,
+      site.referenceCoercions⟩
+  obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.referenceFound site.referenceCoercions
+    (fun name binder same => by rw [site.referenceForm] at same; cases same) trace
+  rw [site.referenceForm, site.referenceRequirements] at raw
+  cases raw with
+  | elementRefBase _ failed =>
+    simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+    exact .arrayFault occurrence rfl (.headFault (firstFault (by omega) signatures expressible failed))
+  | elementRefIndex _ evaluated failed =>
+    simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+    exact .arrayFault occurrence rfl (.tailFault (firstValue (by omega) evaluated)
+      (.headFault (secondFault (by omega) signatures expressible failed)))
+  | elementRefIndexType _ first second notWord actual =>
+    simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+    exact .arrayResult occurrence rfl (.cons (firstValue (by omega) first) (.cons (secondValue (by omega) second) .nil))
+      (.elementRefIndexType notWord actual)
+  | elementRefOutOfBounds _ first second outside =>
+    simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+    exact .arrayResult occurrence rfl (.cons (firstValue (by omega) first) (.cons (secondValue (by omega) second) .nil))
+      (.elementRefOutOfBounds outside)
 
 /-- A sized fault execution of a nested site with an expressible reason, at a
 context with the program's signatures, is a staged fault execution with the
@@ -2200,6 +2317,39 @@ theorem nested_fault {named : SourceCoreGeneralFunctions.Function} {scope : Stag
         exact .arrayFault occurrence rfl
           (.headFault (children slice (by simp [Staging.Recursive.arrayChildren]) (by omega) signatures
             expressible failed))
+  | @memrefLoad id reference site form firstNested secondNested first second =>
+    intro size context environment before after reason within signatures expressible trace
+    have occurrence : Staging.Recursive.Occurrence scope id (.memrefLoad reference) :=
+      ⟨site.node, lookupExpression?_sound site.found, form, site.requirements, site.coercions⟩
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, site.requirements] at raw
+    cases raw with
+    | memrefLoadReference _ failed =>
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+      exact .arrayFault occurrence rfl (.headFault (reference_fault prepared unique site
+        (nested_value prepared unique bodies firstNested) (nested_value prepared unique bodies secondNested) first
+        second (by omega) signatures expressible failed))
+  | @memrefStore id reference value site form firstNested secondNested thirdNested first second third =>
+    intro size context environment before after reason within signatures expressible trace
+    have occurrence : Staging.Recursive.Occurrence scope id (.memrefStore reference value) :=
+      ⟨site.node, lookupExpression?_sound site.found, form, site.requirements, site.coercions⟩
+    obtain ⟨formSize, formBelow, raw⟩ := form_fault unique site.found site.coercions
+      (fun name binder same => by rw [form] at same; cases same) trace
+    rw [form, site.requirements] at raw
+    cases raw with
+    | memrefStoreReference _ failed =>
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+      exact .arrayFault occurrence rfl (.headFault (reference_fault prepared unique site
+        (nested_value prepared unique bodies firstNested) (nested_value prepared unique bodies secondNested) first
+        second (by omega) signatures expressible failed))
+    | memrefStoreValue _ referenceEvaluates failed =>
+      simp only [SourceExecutionSize.stepSize, List.sum_cons, List.sum_nil] at formBelow
+      exact .arrayFault occurrence rfl (.tailFault
+        (CellAwareInvocationAcceptedCallLifting.reference_value prepared unique site
+          (nested_value prepared unique bodies firstNested) (nested_value prepared unique bodies secondNested)
+          (by omega) referenceEvaluates)
+        (.headFault (third (by omega) signatures expressible failed)))
 
 /-- The fault lifting of every nested site below a size, given that the
 Source's direct calls have plain callees and the value and fault liftings of
