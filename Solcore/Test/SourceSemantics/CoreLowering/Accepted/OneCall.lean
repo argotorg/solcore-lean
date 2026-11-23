@@ -21,7 +21,7 @@ declares a local mapping, complements `table[value]` in place and returns it, `b
 `for (let go: bool = true; go; go = false) { continue; }` before it does, `tripled` returns
 `(value, value, value)`, a tuple beyond pairs, and `boxed` returns `.Item(value)`, an application of
 the constructor of the program's enum `Box`. Runtime checks place
-every expression node of the seventeen rows among the nested sites that call `identity`'s
+every expression node of the twenty-one rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
@@ -42,6 +42,12 @@ eight bits, and at any other word the conversion fails. At the faulting words of
 `shifted` and `flipped` the row's original Source execution faults, its staged fault trace is lifted
 from it, and the call root's failure theorem applies: the actual resumption fails with a token that
 represents the Source fault.
+
+Of the memory array rows, `filled` returns the length of `new Word[](uint256(value))`, `listed` the element of
+`[value, value, value]` at `value`, `sliced` the element of the slice `[value, value, value][uint256(value):]`
+at `value` and `copied` the element of `toArray([value, value, value][:])` at `value`. The call root's
+reflection applies to them at every word: from `2^251 − 1` `new` panics with `0x41`; a read outside its array
+or slice, or a slice's start outside its array, panics with `0x32`.
 
 Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.twice_source`,
@@ -78,12 +84,13 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedRepresentationRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedFixedCompoundRuntime.run`,
 `Tests.SourceCoreAcceptedOneCall.AcceptedFixedShiftRuntime.run`,
-`Tests.SourceCoreAcceptedOneCall.AcceptedFixedBitNotRuntime.run` and
-`Tests.SourceCoreAcceptedOneCall.AcceptedFaultRuntime.run`.
+`Tests.SourceCoreAcceptedOneCall.AcceptedFixedBitNotRuntime.run`,
+`Tests.SourceCoreAcceptedOneCall.AcceptedFaultRuntime.run` and
+`Tests.SourceCoreAcceptedOneCall.AcceptedArrayRuntime.run`.
 -/
 
 section
-/-! The program and the declarative typing of its seventeen functions, constructed
+/-! The program and the declarative typing of its twenty-one functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -117,7 +124,11 @@ def workspace : Workspace.RawWorkspace := {
       "return value; }",
     "function tripled(value: Word) returns ((Word, Word, Word)) { return (value, value, value); }",
     "enum Box { Item(Word) }",
-    "function boxed(value: Word) returns (Box) { return .Item(value); }" ]}] }
+    "function boxed(value: Word) returns (Box) { return .Item(value); }",
+    "function filled(value: Word) returns (uint256) { return Length.length(new Word[](uint256(value))); }",
+    "function listed(value: Word) returns (Word) { return [value, value, value][value]; }",
+    "function sliced(value: Word) returns (Word) { return [value, value, value][uint256(value):][value]; }",
+    "function copied(value: Word) returns (Word) { return toArray([value, value, value][:])[value]; }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -2251,6 +2262,463 @@ def observeBoxed (function : CheckedFunction) (signature : ProgramFunctionSignat
         constructorSignature, List.mem_of_find?_eq_some dataFound, List.mem_of_find?_eq_some constructorFound,
         owner, constructorEq, dataParameters, payload, result⟩
 
+/-- The nodes of `filled`'s body: a read of its parameter, its conversion to `uint256`, the new
+array of that length, the array's length and its return, found by following the statement graph. -/
+structure FilledParts (source : TypedSource) where
+  binder : TypedBinder
+  statement : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement statement.id]
+  statementFound : source.lookupStatement? statement.id = some statement
+  read : Tests.SourceCoreNamedBranch.Read source binder .word
+  converted : Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedFromWord ⟨false, .w256⟩) read.node.id
+  created : Tests.SourceCoreOperatorCalls.TypedNode source (TypeSystem.Ty.array .word)
+  createdForm : created.node.form = .newArray .word converted.value.node.id
+  measured : Tests.SourceCoreOperatorCalls.TypedNode source (.fixed ⟨false, .w256⟩)
+  measuredForm : measured.node.form = .arrayLength created.node.id
+  statementForm : statement.form = .returnStmt (some measured.node.id)
+
+def observeFilledParts (source : TypedSource) : IO (FilledParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "filled input")
+  let [.statement statementId] := source.roots | throw (IO.userError "filled roots")
+  let some statement := source.lookupStatement? statementId | throw (IO.userError "filled statement")
+  let .returnStmt (some measuredId) := statement.form | throw (IO.userError "filled return")
+  let some measuredNode := source.lookupExpression? measuredId | throw (IO.userError "filled result")
+  let .arrayLength createdId := measuredNode.form | throw (IO.userError "filled length form")
+  let some createdNode := source.lookupExpression? createdId | throw (IO.userError "filled new")
+  let .newArray _ convertedId := createdNode.form | throw (IO.userError "filled new form")
+  let some convertedNode := source.lookupExpression? convertedId | throw (IO.userError "filled conversion")
+  let .call calleeId [readId] _ := convertedNode.form | throw (IO.userError "filled conversion form")
+  let some calleeNode := source.lookupExpression? calleeId | throw (IO.userError "filled callee")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "filled read")
+  let read ← Tests.SourceCoreNamedBranch.observeRead source binder readNode .word
+  let converted ← observeConversion source (.fixedFromWord ⟨false, .w256⟩) read.node.id calleeNode convertedNode
+  let created ← Tests.SourceCoreOperatorCalls.observeNode source createdNode (TypeSystem.Ty.array .word)
+  let ⟨createdForm⟩ ← observed (created.node.form = .newArray .word converted.value.node.id) "filled createdForm"
+  let measured ← Tests.SourceCoreOperatorCalls.observeNode source measuredNode (.fixed ⟨false, .w256⟩)
+  let ⟨measuredForm⟩ ← observed (measured.node.form = .arrayLength created.node.id) "filled measuredForm"
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "filled inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "filled roots shape"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement) "filled statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some measured.node.id)) "filled statementForm"
+  return ⟨binder, statement, inputs, roots, statementFound, read, converted, created, createdForm, measured,
+    measuredForm, statementForm⟩
+
+/-- `filled`'s body: the return of the length of `new Word[](uint256(value))`. -/
+structure FilledShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : FilledParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.fixed ⟨false, .w256⟩]
+  binderRequirements : parts.binder.schemeRequirements = []
+  statementType : parts.statement.type = .fixed ⟨false, .w256⟩
+theorem FilledShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : FilledShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.statement.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .fixed ⟨false, .w256⟩, hasValue := true, sawReturn := true, control := .returned}
+  refine ⟨BodyFacts.singleton facts, rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have wide : TypeAdmissible lexical (.fixed ⟨false, .w256⟩) := ⟨binders, .builtin (.fixed ⟨false, .w256⟩)⟩
+    have array : TypeAdmissible lexical (TypeSystem.Ty.array .word) := ⟨binders, .array (.builtin .word)⟩
+    have slice : TypeAdmissible lexical (TypeSystem.Ty.arraySlice (TypeSystem.Ty.array .word)) :=
+      ⟨binders, .arraySlice (.array (.builtin .word))⟩
+    have read := shape.parts.read.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have converted := shape.parts.converted.typed rfl wide read
+    have createdTyped := shape.parts.created.ordinary array (by
+      rw [shape.parts.createdForm]
+      exact .newArray rfl word converted)
+    have measuredTyped := shape.parts.measured.ordinary wide (by
+      rw [shape.parts.measuredForm]
+      exact .arrayLength createdTyped (.array .word))
+    exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.parts.statementFound)
+      shape.parts.statementForm measuredTyped shape.statementType)⟩
+
+def observeFilled (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (FilledShape function signature) := do
+  let parts ← observeFilledParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "filled parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "filled inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.fixed ⟨false, .w256⟩]) "filled returns"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "filled binderRequirements"
+  let ⟨statementType⟩ ← observed (parts.statement.type = .fixed ⟨false, .w256⟩) "filled statementType"
+  return ⟨parts, parameters, inputTypes, returns, binderRequirements, statementType⟩
+
+/-- The nodes of `listed`'s body: three reads of its parameter in a literal, a fourth as the index,
+the read of the literal there and its return, found by following the statement graph. -/
+structure ListedParts (source : TypedSource) where
+  binder : TypedBinder
+  statement : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement statement.id]
+  statementFound : source.lookupStatement? statement.id = some statement
+  first : Tests.SourceCoreNamedBranch.Read source binder .word
+  second : Tests.SourceCoreNamedBranch.Read source binder .word
+  third : Tests.SourceCoreNamedBranch.Read source binder .word
+  literal : Tests.SourceCoreOperatorCalls.TypedNode source (TypeSystem.Ty.array .word)
+  literalForm : literal.node.form = .arrayLiteral .word [first.node.id, second.node.id, third.node.id]
+  index : Tests.SourceCoreNamedBranch.Read source binder .word
+  read : Tests.SourceCoreOperatorCalls.TypedNode source .word
+  readForm : read.node.form = .arrayIndex literal.node.id index.node.id
+  statementForm : statement.form = .returnStmt (some read.node.id)
+
+def observeListedParts (source : TypedSource) : IO (ListedParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "listed input")
+  let [.statement statementId] := source.roots | throw (IO.userError "listed roots")
+  let some statement := source.lookupStatement? statementId | throw (IO.userError "listed statement")
+  let .returnStmt (some readId) := statement.form | throw (IO.userError "listed return")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "listed result")
+  let .arrayIndex literalId indexId := readNode.form | throw (IO.userError "listed read form")
+  let some literalNode := source.lookupExpression? literalId | throw (IO.userError "listed literal")
+  let some indexNode := source.lookupExpression? indexId | throw (IO.userError "listed index")
+  let .arrayLiteral _ [firstId, secondId, thirdId] := literalNode.form | throw (IO.userError "listed literal form")
+  let some firstNode := source.lookupExpression? firstId | throw (IO.userError "listed first")
+  let some secondNode := source.lookupExpression? secondId | throw (IO.userError "listed second")
+  let some thirdNode := source.lookupExpression? thirdId | throw (IO.userError "listed third")
+  let first ← Tests.SourceCoreNamedBranch.observeRead source binder firstNode .word
+  let second ← Tests.SourceCoreNamedBranch.observeRead source binder secondNode .word
+  let third ← Tests.SourceCoreNamedBranch.observeRead source binder thirdNode .word
+  let literal ← Tests.SourceCoreOperatorCalls.observeNode source literalNode (TypeSystem.Ty.array .word)
+  let ⟨literalForm⟩ ← observed (literal.node.form = .arrayLiteral .word [first.node.id, second.node.id, third.node.id])
+    "listed literalForm"
+  let index ← Tests.SourceCoreNamedBranch.observeRead source binder indexNode .word
+  let read ← Tests.SourceCoreOperatorCalls.observeNode source readNode .word
+  let ⟨readForm⟩ ← observed (read.node.form = .arrayIndex literal.node.id index.node.id) "listed readForm"
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "listed inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "listed roots shape"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement) "listed statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some read.node.id)) "listed statementForm"
+  return ⟨binder, statement, inputs, roots, statementFound, first, second, third, literal, literalForm, index, read,
+    readForm, statementForm⟩
+
+/-- `listed`'s body: the return of `[value, value, value][value]`. -/
+structure ListedShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : ListedParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  binderRequirements : parts.binder.schemeRequirements = []
+  statementType : parts.statement.type = .word
+theorem ListedShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : ListedShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.statement.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := true, control := .returned}
+  refine ⟨BodyFacts.singleton facts, rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have wide : TypeAdmissible lexical (.fixed ⟨false, .w256⟩) := ⟨binders, .builtin (.fixed ⟨false, .w256⟩)⟩
+    have array : TypeAdmissible lexical (TypeSystem.Ty.array .word) := ⟨binders, .array (.builtin .word)⟩
+    have slice : TypeAdmissible lexical (TypeSystem.Ty.arraySlice (TypeSystem.Ty.array .word)) :=
+      ⟨binders, .arraySlice (.array (.builtin .word))⟩
+    have literalTyped := shape.parts.literal.ordinary array (by
+      rw [shape.parts.literalForm]
+      exact .arrayLiteral word
+        (.cons (shape.parts.first.typed scheme shape.binderRequirements word head.local_self
+            head.local_scheme_requirements_self)
+          (.cons (shape.parts.second.typed scheme shape.binderRequirements word head.local_self
+              head.local_scheme_requirements_self)
+            (.cons (shape.parts.third.typed scheme shape.binderRequirements word head.local_self
+                head.local_scheme_requirements_self) (.nil _)))))
+    have indexTyped := shape.parts.index.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have readTyped := shape.parts.read.ordinary word (by
+      rw [shape.parts.readForm]
+      exact .arrayIndex literalTyped (.array .word) indexTyped .word)
+    exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.parts.statementFound)
+      shape.parts.statementForm readTyped shape.statementType)⟩
+
+def observeListed (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (ListedShape function signature) := do
+  let parts ← observeListedParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "listed parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "listed inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "listed returns"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "listed binderRequirements"
+  let ⟨statementType⟩ ← observed (parts.statement.type = .word) "listed statementType"
+  return ⟨parts, parameters, inputTypes, returns, binderRequirements, statementType⟩
+
+/-- The nodes of `sliced`'s body: three reads of its parameter in a literal, a fourth converted to
+`uint256` as the slice's start, a fifth as the index, the read through the slice there and its return,
+found by following the statement graph. -/
+structure SlicedParts (source : TypedSource) where
+  binder : TypedBinder
+  statement : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement statement.id]
+  statementFound : source.lookupStatement? statement.id = some statement
+  first : Tests.SourceCoreNamedBranch.Read source binder .word
+  second : Tests.SourceCoreNamedBranch.Read source binder .word
+  third : Tests.SourceCoreNamedBranch.Read source binder .word
+  literal : Tests.SourceCoreOperatorCalls.TypedNode source (TypeSystem.Ty.array .word)
+  literalForm : literal.node.form = .arrayLiteral .word [first.node.id, second.node.id, third.node.id]
+  bound : Tests.SourceCoreNamedBranch.Read source binder .word
+  converted : Tests.SourceCoreBuiltinCalls.BuiltinCall source (.fixedFromWord ⟨false, .w256⟩) bound.node.id
+  slice : Tests.SourceCoreOperatorCalls.TypedNode source (TypeSystem.Ty.arraySlice (TypeSystem.Ty.array .word))
+  sliceForm : slice.node.form = .arraySlice literal.node.id (some converted.value.node.id) none
+  index : Tests.SourceCoreNamedBranch.Read source binder .word
+  read : Tests.SourceCoreOperatorCalls.TypedNode source .word
+  readForm : read.node.form = .arrayIndex slice.node.id index.node.id
+  statementForm : statement.form = .returnStmt (some read.node.id)
+
+def observeSlicedParts (source : TypedSource) : IO (SlicedParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "sliced input")
+  let [.statement statementId] := source.roots | throw (IO.userError "sliced roots")
+  let some statement := source.lookupStatement? statementId | throw (IO.userError "sliced statement")
+  let .returnStmt (some readId) := statement.form | throw (IO.userError "sliced return")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "sliced result")
+  let .arrayIndex sliceId indexId := readNode.form | throw (IO.userError "sliced read form")
+  let some sliceNode := source.lookupExpression? sliceId | throw (IO.userError "sliced slice")
+  let some indexNode := source.lookupExpression? indexId | throw (IO.userError "sliced index")
+  let .arraySlice literalId (some convertedId) none := sliceNode.form | throw (IO.userError "sliced slice form")
+  let some literalNode := source.lookupExpression? literalId | throw (IO.userError "sliced literal")
+  let some convertedNode := source.lookupExpression? convertedId | throw (IO.userError "sliced conversion")
+  let .call calleeId [boundId] _ := convertedNode.form | throw (IO.userError "sliced conversion form")
+  let some calleeNode := source.lookupExpression? calleeId | throw (IO.userError "sliced callee")
+  let some boundNode := source.lookupExpression? boundId | throw (IO.userError "sliced bound")
+  let .arrayLiteral _ [firstId, secondId, thirdId] := literalNode.form | throw (IO.userError "sliced literal form")
+  let some firstNode := source.lookupExpression? firstId | throw (IO.userError "sliced first")
+  let some secondNode := source.lookupExpression? secondId | throw (IO.userError "sliced second")
+  let some thirdNode := source.lookupExpression? thirdId | throw (IO.userError "sliced third")
+  let first ← Tests.SourceCoreNamedBranch.observeRead source binder firstNode .word
+  let second ← Tests.SourceCoreNamedBranch.observeRead source binder secondNode .word
+  let third ← Tests.SourceCoreNamedBranch.observeRead source binder thirdNode .word
+  let literal ← Tests.SourceCoreOperatorCalls.observeNode source literalNode (TypeSystem.Ty.array .word)
+  let ⟨literalForm⟩ ← observed (literal.node.form = .arrayLiteral .word [first.node.id, second.node.id, third.node.id])
+    "sliced literalForm"
+  let bound ← Tests.SourceCoreNamedBranch.observeRead source binder boundNode .word
+  let converted ← observeConversion source (.fixedFromWord ⟨false, .w256⟩) bound.node.id calleeNode convertedNode
+  let slice ← Tests.SourceCoreOperatorCalls.observeNode source sliceNode
+    (TypeSystem.Ty.arraySlice (TypeSystem.Ty.array .word))
+  let ⟨sliceForm⟩ ← observed (slice.node.form = .arraySlice literal.node.id (some converted.value.node.id) none)
+    "sliced sliceForm"
+  let index ← Tests.SourceCoreNamedBranch.observeRead source binder indexNode .word
+  let read ← Tests.SourceCoreOperatorCalls.observeNode source readNode .word
+  let ⟨readForm⟩ ← observed (read.node.form = .arrayIndex slice.node.id index.node.id) "sliced readForm"
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "sliced inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "sliced roots shape"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement) "sliced statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some read.node.id)) "sliced statementForm"
+  return ⟨binder, statement, inputs, roots, statementFound, first, second, third, literal, literalForm, bound,
+    converted, slice, sliceForm, index, read, readForm, statementForm⟩
+
+/-- `sliced`'s body: the return of `[value, value, value][uint256(value):][value]`. -/
+structure SlicedShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : SlicedParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  binderRequirements : parts.binder.schemeRequirements = []
+  statementType : parts.statement.type = .word
+theorem SlicedShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : SlicedShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.statement.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := true, control := .returned}
+  refine ⟨BodyFacts.singleton facts, rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have wide : TypeAdmissible lexical (.fixed ⟨false, .w256⟩) := ⟨binders, .builtin (.fixed ⟨false, .w256⟩)⟩
+    have array : TypeAdmissible lexical (TypeSystem.Ty.array .word) := ⟨binders, .array (.builtin .word)⟩
+    have slice : TypeAdmissible lexical (TypeSystem.Ty.arraySlice (TypeSystem.Ty.array .word)) :=
+      ⟨binders, .arraySlice (.array (.builtin .word))⟩
+    have literalTyped := shape.parts.literal.ordinary array (by
+      rw [shape.parts.literalForm]
+      exact .arrayLiteral word
+        (.cons (shape.parts.first.typed scheme shape.binderRequirements word head.local_self
+            head.local_scheme_requirements_self)
+          (.cons (shape.parts.second.typed scheme shape.binderRequirements word head.local_self
+              head.local_scheme_requirements_self)
+            (.cons (shape.parts.third.typed scheme shape.binderRequirements word head.local_self
+                head.local_scheme_requirements_self) (.nil _)))))
+    have boundTyped := shape.parts.bound.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have converted := shape.parts.converted.typed rfl wide boundTyped
+    have sliceTyped := shape.parts.slice.ordinary slice (by
+      rw [shape.parts.sliceForm]
+      exact .arraySlice rfl literalTyped (.cons converted (.nil _)))
+    have indexTyped := shape.parts.index.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have readTyped := shape.parts.read.ordinary word (by
+      rw [shape.parts.readForm]
+      exact .arrayIndex sliceTyped (.slice (.array .word)) indexTyped .word)
+    exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.parts.statementFound)
+      shape.parts.statementForm readTyped shape.statementType)⟩
+
+def observeSliced (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (SlicedShape function signature) := do
+  let parts ← observeSlicedParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "sliced parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "sliced inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "sliced returns"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "sliced binderRequirements"
+  let ⟨statementType⟩ ← observed (parts.statement.type = .word) "sliced statementType"
+  return ⟨parts, parameters, inputTypes, returns, binderRequirements, statementType⟩
+
+/-- The nodes of `copied`'s body: three reads of its parameter in a literal, its whole slice, the
+slice's copy, a fourth read as the index, the read of the copy there and its return, found by following
+the statement graph. -/
+structure CopiedParts (source : TypedSource) where
+  binder : TypedBinder
+  statement : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement statement.id]
+  statementFound : source.lookupStatement? statement.id = some statement
+  first : Tests.SourceCoreNamedBranch.Read source binder .word
+  second : Tests.SourceCoreNamedBranch.Read source binder .word
+  third : Tests.SourceCoreNamedBranch.Read source binder .word
+  literal : Tests.SourceCoreOperatorCalls.TypedNode source (TypeSystem.Ty.array .word)
+  literalForm : literal.node.form = .arrayLiteral .word [first.node.id, second.node.id, third.node.id]
+  slice : Tests.SourceCoreOperatorCalls.TypedNode source (TypeSystem.Ty.arraySlice (TypeSystem.Ty.array .word))
+  sliceForm : slice.node.form = .arraySlice literal.node.id none none
+  copy : Tests.SourceCoreOperatorCalls.TypedNode source (TypeSystem.Ty.array .word)
+  copyForm : copy.node.form = .toArray .word slice.node.id
+  index : Tests.SourceCoreNamedBranch.Read source binder .word
+  read : Tests.SourceCoreOperatorCalls.TypedNode source .word
+  readForm : read.node.form = .arrayIndex copy.node.id index.node.id
+  statementForm : statement.form = .returnStmt (some read.node.id)
+
+def observeCopiedParts (source : TypedSource) : IO (CopiedParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "copied input")
+  let [.statement statementId] := source.roots | throw (IO.userError "copied roots")
+  let some statement := source.lookupStatement? statementId | throw (IO.userError "copied statement")
+  let .returnStmt (some readId) := statement.form | throw (IO.userError "copied return")
+  let some readNode := source.lookupExpression? readId | throw (IO.userError "copied result")
+  let .arrayIndex copyId indexId := readNode.form | throw (IO.userError "copied read form")
+  let some copyNode := source.lookupExpression? copyId | throw (IO.userError "copied copy")
+  let some indexNode := source.lookupExpression? indexId | throw (IO.userError "copied index")
+  let .toArray _ sliceId := copyNode.form | throw (IO.userError "copied copy form")
+  let some sliceNode := source.lookupExpression? sliceId | throw (IO.userError "copied slice")
+  let .arraySlice literalId none none := sliceNode.form | throw (IO.userError "copied slice form")
+  let some literalNode := source.lookupExpression? literalId | throw (IO.userError "copied literal")
+  let .arrayLiteral _ [firstId, secondId, thirdId] := literalNode.form | throw (IO.userError "copied literal form")
+  let some firstNode := source.lookupExpression? firstId | throw (IO.userError "copied first")
+  let some secondNode := source.lookupExpression? secondId | throw (IO.userError "copied second")
+  let some thirdNode := source.lookupExpression? thirdId | throw (IO.userError "copied third")
+  let first ← Tests.SourceCoreNamedBranch.observeRead source binder firstNode .word
+  let second ← Tests.SourceCoreNamedBranch.observeRead source binder secondNode .word
+  let third ← Tests.SourceCoreNamedBranch.observeRead source binder thirdNode .word
+  let literal ← Tests.SourceCoreOperatorCalls.observeNode source literalNode (TypeSystem.Ty.array .word)
+  let ⟨literalForm⟩ ← observed (literal.node.form = .arrayLiteral .word [first.node.id, second.node.id, third.node.id])
+    "copied literalForm"
+  let slice ← Tests.SourceCoreOperatorCalls.observeNode source sliceNode
+    (TypeSystem.Ty.arraySlice (TypeSystem.Ty.array .word))
+  let ⟨sliceForm⟩ ← observed (slice.node.form = .arraySlice literal.node.id none none) "copied sliceForm"
+  let copy ← Tests.SourceCoreOperatorCalls.observeNode source copyNode (TypeSystem.Ty.array .word)
+  let ⟨copyForm⟩ ← observed (copy.node.form = .toArray .word slice.node.id) "copied copyForm"
+  let index ← Tests.SourceCoreNamedBranch.observeRead source binder indexNode .word
+  let read ← Tests.SourceCoreOperatorCalls.observeNode source readNode .word
+  let ⟨readForm⟩ ← observed (read.node.form = .arrayIndex copy.node.id index.node.id) "copied readForm"
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "copied inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement statement.id]) "copied roots shape"
+  let ⟨statementFound⟩ ← observed (source.lookupStatement? statement.id = some statement) "copied statementFound"
+  let ⟨statementForm⟩ ← observed (statement.form = .returnStmt (some read.node.id)) "copied statementForm"
+  return ⟨binder, statement, inputs, roots, statementFound, first, second, third, literal, literalForm, slice,
+    sliceForm, copy, copyForm, index, read, readForm, statementForm⟩
+
+/-- `copied`'s body: the return of `toArray([value, value, value][:])[value]`. -/
+structure CopiedShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : CopiedParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  binderRequirements : parts.binder.schemeRequirements = []
+  statementType : parts.statement.type = .word
+theorem CopiedShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : CopiedShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.statement.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := true, control := .returned}
+  refine ⟨BodyFacts.singleton facts, rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have wide : TypeAdmissible lexical (.fixed ⟨false, .w256⟩) := ⟨binders, .builtin (.fixed ⟨false, .w256⟩)⟩
+    have array : TypeAdmissible lexical (TypeSystem.Ty.array .word) := ⟨binders, .array (.builtin .word)⟩
+    have slice : TypeAdmissible lexical (TypeSystem.Ty.arraySlice (TypeSystem.Ty.array .word)) :=
+      ⟨binders, .arraySlice (.array (.builtin .word))⟩
+    have literalTyped := shape.parts.literal.ordinary array (by
+      rw [shape.parts.literalForm]
+      exact .arrayLiteral word
+        (.cons (shape.parts.first.typed scheme shape.binderRequirements word head.local_self
+            head.local_scheme_requirements_self)
+          (.cons (shape.parts.second.typed scheme shape.binderRequirements word head.local_self
+              head.local_scheme_requirements_self)
+            (.cons (shape.parts.third.typed scheme shape.binderRequirements word head.local_self
+                head.local_scheme_requirements_self) (.nil _)))))
+    have sliceTyped := shape.parts.slice.ordinary slice (by
+      rw [shape.parts.sliceForm]
+      exact .arraySlice rfl literalTyped (.nil _))
+    have copyTyped := shape.parts.copy.ordinary array (by
+      rw [shape.parts.copyForm]
+      exact .toArray sliceTyped (.array .word))
+    have indexTyped := shape.parts.index.typed scheme shape.binderRequirements word head.local_self
+      head.local_scheme_requirements_self
+    have readTyped := shape.parts.read.ordinary word (by
+      rw [shape.parts.readForm]
+      exact .arrayIndex copyTyped (.array .word) indexTyped .word)
+    exact ⟨_, .singleton (.returnValue (lookupStatement?_sound shape.parts.statementFound)
+      shape.parts.statementForm readTyped shape.statementType)⟩
+
+def observeCopied (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (CopiedShape function signature) := do
+  let parts ← observeCopiedParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "copied parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "copied inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "copied returns"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "copied binderRequirements"
+  let ⟨statementType⟩ ← observed (parts.statement.type = .word) "copied statementType"
+  return ⟨parts, parameters, inputTypes, returns, binderRequirements, statementType⟩
+
 /-- Two members of a list of signatures whose ids are distinct are equal when
 their ids are. -/
 private theorem signature_of_id {signatures : List ProgramFunctionSignature}
@@ -2278,10 +2746,12 @@ def observeWellFormed {program : CheckedProgram}
   match functions : program.functions, signatures : program.signatures.functions with
   | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction,
       shiftedFunction, flippedFunction, tailedFunction, storedFunction, summedFunction, zeroedFunction,
-      invertedFunction, brokenFunction, countedFunction, tripledFunction, boxedFunction],
+      invertedFunction, brokenFunction, countedFunction, tripledFunction, boxedFunction,
+      filledFunction, listedFunction, slicedFunction, copiedFunction],
     [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature,
       shiftedSignature, flippedSignature, tailedSignature, storedSignature, summedSignature, zeroedSignature,
-      invertedSignature, brokenSignature, countedSignature, tripledSignature, boxedSignature] =>
+      invertedSignature, brokenSignature, countedSignature, tripledSignature, boxedSignature,
+      filledSignature, listedSignature, slicedSignature, copiedSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
@@ -2299,6 +2769,10 @@ def observeWellFormed {program : CheckedProgram}
     let countedShape ← observeCounted countedFunction countedSignature
     let tripledShape ← observeTripled tripledFunction tripledSignature
     let boxedShape ← observeBoxed boxedFunction boxedSignature program.signatures.dataTypes
+    let filledShape ← observeFilled filledFunction filledSignature
+    let listedShape ← observeListed listedFunction listedSignature
+    let slicedShape ← observeSliced slicedFunction slicedSignature
+    let copiedShape ← observeCopied copiedFunction copiedSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -2323,6 +2797,14 @@ def observeWellFormed {program : CheckedProgram}
       "calls tripledDeclaration"
     let ⟨boxedDeclaration⟩ ← observed (boxedFunction.declaration = boxedSignature.id)
       "calls boxedDeclaration"
+    let ⟨filledDeclaration⟩ ← observed (filledFunction.declaration = filledSignature.id)
+      "calls filledDeclaration"
+    let ⟨listedDeclaration⟩ ← observed (listedFunction.declaration = listedSignature.id)
+      "calls listedDeclaration"
+    let ⟨slicedDeclaration⟩ ← observed (slicedFunction.declaration = slicedSignature.id)
+      "calls slicedDeclaration"
+    let ⟨copiedDeclaration⟩ ← observed (copiedFunction.declaration = copiedSignature.id)
+      "calls copiedDeclaration"
     let ⟨distinct⟩ ← observed ((program.signatures.functions.map (·.id)).Nodup) "calls distinct signatures"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
@@ -2333,7 +2815,7 @@ def observeWellFormed {program : CheckedProgram}
           signature_of_id distinct candidateMember signatureMember (declared.symm.trans same)
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
         rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-          | rfl
+          | rfl | rfl | rfl | rfl | rfl
         · obtain rfl := selects (by simp [signatures]) identityDeclaration
           exact identityShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) relayDeclaration
@@ -2368,6 +2850,14 @@ def observeWellFormed {program : CheckedProgram}
           exact tripledShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) boxedDeclaration
           exact boxedShape.statementTyping program.signatures rfl
+        · obtain rfl := selects (by simp [signatures]) filledDeclaration
+          exact filledShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) listedDeclaration
+          exact listedShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) slicedDeclaration
+          exact slicedShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) copiedDeclaration
+          exact copiedShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -2376,7 +2866,7 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the seventeen functions and their original Source
+/-! The cache rows of the twenty-one functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `tailed` ends in the direct call of `identity` with
@@ -2385,8 +2875,10 @@ where its assignment put it, `summed` returns the integer sum of its parameter's
 `zeroed` returns the opcode `iszero` on its parameter, `inverted` returns the complement of the default
 word from the index of its local mapping where its in-place `~` put it, `broken` and `counted` return
 their parameter after their loops, `counted`'s after one iteration, `tripled` returns the triple of its
-parameter, `boxed` returns `Item` applied to it, `narrow` returns the conversion of
-its parameter,
+parameter, `boxed` returns `Item` applied to it, `filled` returns the length of a new array of its parameter's
+length, `listed` its literal's element at its parameter, `sliced` its literal's slice's element there,
+`copied` the element of its whole slice's copy there,
+`narrow` returns the conversion of its parameter,
 and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
 a given body invocation. At a word not canonical for `uint8` the conversions of `narrow`, `doubled`,
 `shifted` and `flipped` fault with the dirty-integer reason, and at a canonical word whose double is
@@ -2702,6 +3194,46 @@ structure BoxedBody (source : TypedSource) where
 def observeBoxedBody (source : TypedSource) : IO (BoxedBody source) := do
   let parts ← observeBoxedParts source
   let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "boxed row binderScheme"
+  return ⟨parts, binderScheme⟩
+
+/-- `filled`'s cache row: the nodes of its body and its `Word` parameter. -/
+structure FilledBody (source : TypedSource) where
+  parts : FilledParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeFilledBody (source : TypedSource) : IO (FilledBody source) := do
+  let parts ← observeFilledParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "filled row binderScheme"
+  return ⟨parts, binderScheme⟩
+
+/-- `listed`'s cache row: the nodes of its body and its `Word` parameter. -/
+structure ListedBody (source : TypedSource) where
+  parts : ListedParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeListedBody (source : TypedSource) : IO (ListedBody source) := do
+  let parts ← observeListedParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "listed row binderScheme"
+  return ⟨parts, binderScheme⟩
+
+/-- `sliced`'s cache row: the nodes of its body and its `Word` parameter. -/
+structure SlicedBody (source : TypedSource) where
+  parts : SlicedParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeSlicedBody (source : TypedSource) : IO (SlicedBody source) := do
+  let parts ← observeSlicedParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "sliced row binderScheme"
+  return ⟨parts, binderScheme⟩
+
+/-- `copied`'s cache row: the nodes of its body and its `Word` parameter. -/
+structure CopiedBody (source : TypedSource) where
+  parts : CopiedParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeCopiedBody (source : TypedSource) : IO (CopiedBody source) := do
+  let parts ← observeCopiedParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "copied row binderScheme"
   return ⟨parts, binderScheme⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
@@ -3365,7 +3897,7 @@ end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the sixteen rows among the nested sites or their callees
+every expression node of the twenty-one rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
 receipts. The original Source executions of `relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`,
@@ -4822,6 +5354,110 @@ def run : IO Unit := do
   IO.println "ACCEPTED_FAULT_PUBLIC_PASS"
 
 end AcceptedFaultRuntime
+
+namespace AcceptedArrayRuntime
+
+/-- The actual resumption returned the word `expected`, or failed with the panic of code `expected`. -/
+def expect {artifact : SourceCoreExecution.Artifact} (outcome : SourceCoreExecution.Outcome artifact)
+    (expected : Except UInt8 Word) (row : String) : IO Unit :=
+  match expected, outcome with
+  | .ok value, .succeeded returned =>
+    unless returned.value == .word value do throw (IO.userError s!"accepted array output of {row} changed")
+  | .error code, .failed reason _ =>
+    unless reason == SourceCorePanics.reason code do throw (IO.userError s!"accepted array panic of {row} changed")
+  | _, _ => throw (IO.userError s!"accepted array outcome of {row} changed")
+
+/-- At `filled`, `Length.length(new Word[](uint256(value)))`: below `2^251 − 1` the actual resumption returns the
+length, and from it `new` panics with `0x41`. The call root's reflection applies at every word. -/
+def runFilled (observed : Observed) : IO Unit := do
+  let filled ← observeRow observed.fixture "filled"
+  let filledBody ← observeFilledBody filled.original.function.typedBody
+  let cases : List (Word × Except UInt8 Word) :=
+    [(Word.zero, .ok Word.zero), (Word.ofNatModulo 3, .ok (Word.ofNatModulo 3)),
+     (Word.ofNatModulo (2 ^ 251 - 2), .ok (Word.ofNatModulo (2 ^ 251 - 2))),
+     (Word.ofNatModulo (2 ^ 251 - 1), .error SourceCorePanics.allocation),
+     (Word.maximum, .error SourceCorePanics.allocation)]
+  for entry in cases do
+    let started ← observeStarted observed.fixture filled.original.key [.word entry.1]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole filled),
+        Nonempty (AcceptedReflection selected entry.1 started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select filled
+      exact ⟨whole, selected, accepted_reflection selected observed.calls entry.1 observed.wellFormed started
+        observed.callableProfile filledBody.parts.inputs filledBody.binderScheme⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    expect result.val entry.2 "filled"
+
+/-- At `listed`, `[value, value, value][value]`: below 3 the actual resumption returns the element, the parameter, and
+from 3 the read panics with `0x32`. The call root's reflection applies at every word. -/
+def runListed (observed : Observed) : IO Unit := do
+  let listed ← observeRow observed.fixture "listed"
+  let listedBody ← observeListedBody listed.original.function.typedBody
+  let cases : List (Word × Except UInt8 Word) :=
+    [(Word.zero, .ok Word.zero), (Word.ofNatModulo 2, .ok (Word.ofNatModulo 2)),
+     (Word.ofNatModulo 3, .error SourceCorePanics.outOfBounds),
+     (Word.ofNatModulo 7, .error SourceCorePanics.outOfBounds)]
+  for entry in cases do
+    let started ← observeStarted observed.fixture listed.original.key [.word entry.1]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole listed),
+        Nonempty (AcceptedReflection selected entry.1 started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select listed
+      exact ⟨whole, selected, accepted_reflection selected observed.calls entry.1 observed.wellFormed started
+        observed.callableProfile listedBody.parts.inputs listedBody.binderScheme⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    expect result.val entry.2 "listed"
+
+/-- At `sliced`, `[value, value, value][uint256(value):][value]`: below 2 the read through the slice returns the
+parameter, from 2 it is outside the slice, and from 4 the slice's start is outside the array, each `0x32`. The call root's reflection applies at every word. -/
+def runSliced (observed : Observed) : IO Unit := do
+  let sliced ← observeRow observed.fixture "sliced"
+  let slicedBody ← observeSlicedBody sliced.original.function.typedBody
+  let cases : List (Word × Except UInt8 Word) :=
+    [(Word.zero, .ok Word.zero), (Word.ofNatModulo 1, .ok (Word.ofNatModulo 1)),
+     (Word.ofNatModulo 2, .error SourceCorePanics.outOfBounds),
+     (Word.ofNatModulo 3, .error SourceCorePanics.outOfBounds),
+     (Word.ofNatModulo 4, .error SourceCorePanics.outOfBounds)]
+  for entry in cases do
+    let started ← observeStarted observed.fixture sliced.original.key [.word entry.1]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole sliced),
+        Nonempty (AcceptedReflection selected entry.1 started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select sliced
+      exact ⟨whole, selected, accepted_reflection selected observed.calls entry.1 observed.wellFormed started
+        observed.callableProfile slicedBody.parts.inputs slicedBody.binderScheme⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    expect result.val entry.2 "sliced"
+
+/-- At `copied`, `toArray([value, value, value][:])[value]`: below 3 the read of the copy returns the parameter, and
+from 3 it panics with `0x32`. The call root's reflection applies at every word. -/
+def runCopied (observed : Observed) : IO Unit := do
+  let copied ← observeRow observed.fixture "copied"
+  let copiedBody ← observeCopiedBody copied.original.function.typedBody
+  let cases : List (Word × Except UInt8 Word) :=
+    [(Word.zero, .ok Word.zero), (Word.ofNatModulo 2, .ok (Word.ofNatModulo 2)),
+     (Word.ofNatModulo 3, .error SourceCorePanics.outOfBounds)]
+  for entry in cases do
+    let started ← observeStarted observed.fixture copied.original.key [.word entry.1]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole copied),
+        Nonempty (AcceptedReflection selected entry.1 started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select copied
+      exact ⟨whole, selected, accepted_reflection selected observed.calls entry.1 observed.wellFormed started
+        observed.callableProfile copiedBody.parts.inputs copiedBody.binderScheme⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    expect result.val entry.2 "copied"
+
+/-- The memory array rows `filled`, `listed`, `sliced` and `copied`. -/
+def run : IO Unit := do
+  let observed ← observe
+  runFilled observed
+  runListed observed
+  runSliced observed
+  runCopied observed
+  IO.println "ACCEPTED_ARRAY_PUBLIC_PASS"
+
+end AcceptedArrayRuntime
 
 end Tests.SourceCoreAcceptedOneCall
 end
