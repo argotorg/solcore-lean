@@ -21,7 +21,7 @@ declares a local mapping, complements `table[value]` in place and returns it, `b
 `for (let go: bool = true; go; go = false) { continue; }` before it does, `tripled` returns
 `(value, value, value)`, a tuple beyond pairs, and `boxed` returns `.Item(value)`, an application of
 the constructor of the program's enum `Box`. Runtime checks place
-every expression node of the twenty-one rows among the nested sites that call `identity`'s
+every expression node of the twenty-two rows among the nested sites that call `identity`'s
 instantiation or their callees, and each statement list in the supported
 shape. With the complete inventory the rows make a family and give
 the admitted callee's static receipts. The original Source executions of
@@ -45,9 +45,11 @@ represents the Source fault.
 
 Of the memory array rows, `filled` returns the length of `new Word[](uint256(value))`, `listed` the element of
 `[value, value, value]` at `value`, `sliced` the element of the slice `[value, value, value][uint256(value):]`
-at `value` and `copied` the element of `toArray([value, value, value][:])` at `value`. The call root's
-reflection applies to them at every word: from `2^251 − 1` `new` panics with `0x41`; a read outside its array
-or slice, or a slice's start outside its array, panics with `0x32`.
+at `value`, `copied` the element of `toArray([value, value, value][:])` at `value`, and `referenced` stores its
+parameter through `lidx(a, value)` into its local `a`, the literal `[value, value, value]`, and returns
+`CanStore.load(lidx(a, value))`. The call root's reflection applies to them at every word: from `2^251 − 1`
+`new` panics with `0x41`; a read outside its array or slice, a slice's start outside its array, or a memref's
+index outside its array panics with `0x32`.
 
 Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 `Tests.SourceCoreAcceptedOneCall.twice_source`,
@@ -90,7 +92,7 @@ Main declarations: `Tests.SourceCoreAcceptedOneCall.relay_source`,
 -/
 
 section
-/-! The program and the declarative typing of its twenty-one functions, constructed
+/-! The program and the declarative typing of its twenty-two functions, constructed
 from checked source observations. -/
 set_option autoImplicit false
 set_option Elab.async false
@@ -128,7 +130,9 @@ def workspace : Workspace.RawWorkspace := {
     "function filled(value: Word) returns (uint256) { return Length.length(new Word[](uint256(value))); }",
     "function listed(value: Word) returns (Word) { return [value, value, value][value]; }",
     "function sliced(value: Word) returns (Word) { return [value, value, value][uint256(value):][value]; }",
-    "function copied(value: Word) returns (Word) { return toArray([value, value, value][:])[value]; }" ]}] }
+    "function copied(value: Word) returns (Word) { return toArray([value, value, value][:])[value]; }",
+    "function referenced(value: Word) returns (Word) { let a: Word[] = [value, value, value]; " ++
+      "CanStore.store(lidx(a, value), value); return CanStore.load(lidx(a, value)); }" ]}] }
 
 def options : SourceCoreCompiler.Options :=
   {checkingFuel := 1000, compilationFuel := 1000, specializationBudget := 128}
@@ -2719,6 +2723,237 @@ def observeCopied (function : CheckedFunction) (signature : ProgramFunctionSigna
   let ⟨statementType⟩ ← observed (parts.statement.type = .word) "copied statementType"
   return ⟨parts, parameters, inputTypes, returns, binderRequirements, statementType⟩
 
+/-- The nodes of `referenced`'s body: its local `a` initialized by a literal of three reads of its
+parameter, `CanStore.store(lidx(a, value), value)` and the return of `CanStore.load(lidx(a, value))`, found
+by following the statement graph. -/
+structure ReferencedParts (source : TypedSource) where
+  binder : TypedBinder
+  target : TypedBinder
+  initialized : StatementNode
+  stored : StatementNode
+  returned : StatementNode
+  inputs : source.inputs = [binder]
+  roots : source.roots = [.statement initialized.id, .statement stored.id, .statement returned.id]
+  initializedFound : source.lookupStatement? initialized.id = some initialized
+  storedFound : source.lookupStatement? stored.id = some stored
+  returnedFound : source.lookupStatement? returned.id = some returned
+  first : Tests.SourceCoreNamedBranch.Read source binder .word
+  second : Tests.SourceCoreNamedBranch.Read source binder .word
+  third : Tests.SourceCoreNamedBranch.Read source binder .word
+  literal : Tests.SourceCoreOperatorCalls.TypedNode source (TypeSystem.Ty.array .word)
+  literalForm : literal.node.form = .arrayLiteral .word [first.node.id, second.node.id, third.node.id]
+  initializedForm : initialized.form = .letDecl target (some literal.node.id)
+  storeArray : Tests.SourceCoreNamedBranch.Read source target (TypeSystem.Ty.array .word)
+  storeIndex : Tests.SourceCoreNamedBranch.Read source binder .word
+  storeReference : Tests.SourceCoreOperatorCalls.TypedNode source (TypeSystem.Ty.memref .word)
+  storeReferenceForm : storeReference.node.form = .elementRef storeArray.node.id storeIndex.node.id
+  storeValue : Tests.SourceCoreNamedBranch.Read source binder .word
+  store : Tests.SourceCoreOperatorCalls.TypedNode source .unit
+  storeForm : store.node.form = .memrefStore storeReference.node.id storeValue.node.id
+  storedForm : stored.form = .expression store.node.id true
+  loadArray : Tests.SourceCoreNamedBranch.Read source target (TypeSystem.Ty.array .word)
+  loadIndex : Tests.SourceCoreNamedBranch.Read source binder .word
+  loadReference : Tests.SourceCoreOperatorCalls.TypedNode source (TypeSystem.Ty.memref .word)
+  loadReferenceForm : loadReference.node.form = .elementRef loadArray.node.id loadIndex.node.id
+  load : Tests.SourceCoreOperatorCalls.TypedNode source .word
+  loadForm : load.node.form = .memrefLoad loadReference.node.id
+  returnedForm : returned.form = .returnStmt (some load.node.id)
+
+def observeReferencedParts (source : TypedSource) : IO (ReferencedParts source) := do
+  let [binder] := source.inputs | throw (IO.userError "referenced input")
+  let [.statement initializedId, .statement storedId, .statement returnedId] := source.roots
+    | throw (IO.userError "referenced roots")
+  let some initialized := source.lookupStatement? initializedId | throw (IO.userError "referenced let")
+  let some stored := source.lookupStatement? storedId | throw (IO.userError "referenced store statement")
+  let some returned := source.lookupStatement? returnedId | throw (IO.userError "referenced return")
+  let .letDecl target (some literalId) := initialized.form | throw (IO.userError "referenced let form")
+  let .expression storeId true := stored.form | throw (IO.userError "referenced store statement form")
+  let .returnStmt (some loadId) := returned.form | throw (IO.userError "referenced return form")
+  let some literalNode := source.lookupExpression? literalId | throw (IO.userError "referenced literal")
+  let .arrayLiteral _ [firstId, secondId, thirdId] := literalNode.form
+    | throw (IO.userError "referenced literal form")
+  let some firstNode := source.lookupExpression? firstId | throw (IO.userError "referenced first")
+  let some secondNode := source.lookupExpression? secondId | throw (IO.userError "referenced second")
+  let some thirdNode := source.lookupExpression? thirdId | throw (IO.userError "referenced third")
+  let some storeNode := source.lookupExpression? storeId | throw (IO.userError "referenced store")
+  let .memrefStore storeReferenceId storeValueId := storeNode.form | throw (IO.userError "referenced store form")
+  let some storeReferenceNode := source.lookupExpression? storeReferenceId
+    | throw (IO.userError "referenced store memref")
+  let .elementRef storeArrayId storeIndexId := storeReferenceNode.form
+    | throw (IO.userError "referenced store memref form")
+  let some storeArrayNode := source.lookupExpression? storeArrayId | throw (IO.userError "referenced store array")
+  let some storeIndexNode := source.lookupExpression? storeIndexId | throw (IO.userError "referenced store index")
+  let some storeValueNode := source.lookupExpression? storeValueId | throw (IO.userError "referenced store value")
+  let some loadNode := source.lookupExpression? loadId | throw (IO.userError "referenced load")
+  let .memrefLoad loadReferenceId := loadNode.form | throw (IO.userError "referenced load form")
+  let some loadReferenceNode := source.lookupExpression? loadReferenceId
+    | throw (IO.userError "referenced load memref")
+  let .elementRef loadArrayId loadIndexId := loadReferenceNode.form
+    | throw (IO.userError "referenced load memref form")
+  let some loadArrayNode := source.lookupExpression? loadArrayId | throw (IO.userError "referenced load array")
+  let some loadIndexNode := source.lookupExpression? loadIndexId | throw (IO.userError "referenced load index")
+  let first ← Tests.SourceCoreNamedBranch.observeRead source binder firstNode .word
+  let second ← Tests.SourceCoreNamedBranch.observeRead source binder secondNode .word
+  let third ← Tests.SourceCoreNamedBranch.observeRead source binder thirdNode .word
+  let literal ← Tests.SourceCoreOperatorCalls.observeNode source literalNode (TypeSystem.Ty.array .word)
+  let ⟨literalForm⟩ ← observed (literal.node.form = .arrayLiteral .word [first.node.id, second.node.id, third.node.id])
+    "referenced literalForm"
+  let storeArray ← Tests.SourceCoreNamedBranch.observeRead source target storeArrayNode (TypeSystem.Ty.array .word)
+  let storeIndex ← Tests.SourceCoreNamedBranch.observeRead source binder storeIndexNode .word
+  let storeReference ← Tests.SourceCoreOperatorCalls.observeNode source storeReferenceNode
+    (TypeSystem.Ty.memref .word)
+  let ⟨storeReferenceForm⟩ ← observed
+    (storeReference.node.form = .elementRef storeArray.node.id storeIndex.node.id) "referenced storeReferenceForm"
+  let storeValue ← Tests.SourceCoreNamedBranch.observeRead source binder storeValueNode .word
+  let store ← Tests.SourceCoreOperatorCalls.observeNode source storeNode .unit
+  let ⟨storeForm⟩ ← observed (store.node.form = .memrefStore storeReference.node.id storeValue.node.id)
+    "referenced storeForm"
+  let loadArray ← Tests.SourceCoreNamedBranch.observeRead source target loadArrayNode (TypeSystem.Ty.array .word)
+  let loadIndex ← Tests.SourceCoreNamedBranch.observeRead source binder loadIndexNode .word
+  let loadReference ← Tests.SourceCoreOperatorCalls.observeNode source loadReferenceNode
+    (TypeSystem.Ty.memref .word)
+  let ⟨loadReferenceForm⟩ ← observed
+    (loadReference.node.form = .elementRef loadArray.node.id loadIndex.node.id) "referenced loadReferenceForm"
+  let load ← Tests.SourceCoreOperatorCalls.observeNode source loadNode .word
+  let ⟨loadForm⟩ ← observed (load.node.form = .memrefLoad loadReference.node.id) "referenced loadForm"
+  let ⟨inputs⟩ ← observed (source.inputs = [binder]) "referenced inputs"
+  let ⟨roots⟩ ← observed (source.roots = [.statement initialized.id, .statement stored.id, .statement returned.id])
+    "referenced roots shape"
+  let ⟨initializedFound⟩ ← observed (source.lookupStatement? initialized.id = some initialized)
+    "referenced initializedFound"
+  let ⟨storedFound⟩ ← observed (source.lookupStatement? stored.id = some stored) "referenced storedFound"
+  let ⟨returnedFound⟩ ← observed (source.lookupStatement? returned.id = some returned) "referenced returnedFound"
+  let ⟨initializedForm⟩ ← observed (initialized.form = .letDecl target (some literal.node.id))
+    "referenced initializedForm"
+  let ⟨storedForm⟩ ← observed (stored.form = .expression store.node.id true) "referenced storedForm"
+  let ⟨returnedForm⟩ ← observed (returned.form = .returnStmt (some load.node.id)) "referenced returnedForm"
+  return ⟨binder, target, initialized, stored, returned, inputs, roots, initializedFound, storedFound,
+    returnedFound, first, second, third, literal, literalForm, initializedForm, storeArray, storeIndex,
+    storeReference, storeReferenceForm, storeValue, store, storeForm, storedForm, loadArray, loadIndex,
+    loadReference, loadReferenceForm, load, loadForm, returnedForm⟩
+
+/-- `referenced`'s body: `let a: Word[] = [value, value, value]`, `CanStore.store(lidx(a, value), value)` and
+the return of `CanStore.load(lidx(a, value))`. -/
+structure ReferencedShape (function : CheckedFunction) (signature : ProgramFunctionSignature) where
+  parts : ReferencedParts function.typedBody
+  parameters : signature.scheme.parameters = []
+  inputTypes : signature.parameterTypes = [.word]
+  returns : signature.returnTypes = [.word]
+  binderRequirements : parts.binder.schemeRequirements = []
+  targetScheme : parts.target.scheme = .mono (TypeSystem.Ty.array .word)
+  targetRequirements : parts.target.schemeRequirements = []
+  targetOwner : parts.target.id.owner = function.typedBody.owner
+  targetDistinct : parts.target.id ≠ parts.binder.id
+  initializedType : parts.initialized.type = .unit
+  storedType : parts.stored.type = .unit
+  returnedType : parts.returned.type = .word
+
+theorem ReferencedShape.statementTyping {function : CheckedFunction} {signature : ProgramFunctionSignature}
+    (shape : ReferencedShape function signature) (signatures : ProgramSignatures) :
+    CheckedBodyStatementsHaveType signatures signature function := by
+  intro statements roots
+  have same : statements = [shape.parts.initialized.id, shape.parts.stored.id, shape.parts.returned.id] :=
+    statementRoots_injective (roots.symm.trans shape.parts.roots)
+  subst statements
+  rw [shape.returns]
+  let facts : StatementFacts := {type := .word, hasValue := true, sawReturn := true, control := .returned}
+  let ordinary : StatementFacts := {type := .unit, hasValue := false, sawReturn := false, control := .ordinary .unit}
+  refine ⟨BodyFacts.cons ordinary (BodyFacts.cons ordinary (BodyFacts.singleton facts)), rfl, ?_⟩
+  intro lexical extension
+  rw [shape.parts.inputs, shape.inputTypes] at extension
+  cases extension with
+  | cons scheme head tail =>
+    cases tail
+    have binders : TypeParameterBindersWellFormed lexical := by
+      rw [TypeParameterBindersWellFormed, head.context_fields.2.2.1]
+      simp [checkedBodyContext, declarationContext, Context.ofSignatures, Context.forDeclaration,
+        Context.withAssumptions, Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.parameters]
+    have word : TypeAdmissible lexical .word := ⟨binders, .builtin .word⟩
+    have array : TypeAdmissible lexical (TypeSystem.Ty.array .word) := ⟨binders, .array (.builtin .word)⟩
+    have literalTyped := shape.parts.literal.ordinary array (by
+      rw [shape.parts.literalForm]
+      exact .arrayLiteral word
+        (.cons (shape.parts.first.typed scheme shape.binderRequirements word head.local_self
+            head.local_scheme_requirements_self)
+          (.cons (shape.parts.second.typed scheme shape.binderRequirements word head.local_self
+              head.local_scheme_requirements_self)
+            (.cons (shape.parts.third.typed scheme shape.binderRequirements word head.local_self
+                head.local_scheme_requirements_self) (.nil _)))))
+    let locals := lexical.withLocal shape.parts.target.id shape.parts.target.scheme shape.parts.target.schemeRequirements
+    have targetExtended : BinderExtends function.typedBody.owner lexical shape.parts.target locals := by
+      apply BinderExtends.intro
+      · exact {
+          owned := shape.targetOwner
+          scheme := shape.targetScheme.symm ▸ SchemeWellFormed.monoAdmissible array
+          quantified_fresh := by rw [shape.targetScheme]; simp [SchemeQuantifiersFresh, TypeSystem.Scheme.mono]
+          monomorphic_requirements_empty := fun _ => shape.targetRequirements }
+      · cases head
+        simp [LocalFresh, Context.withLocal, checkedBodyContext, declarationContext,
+          Context.ofSignatures, Context.forDeclaration, Context.withAssumptions,
+          Context.withSolvedRequirements, Context.withResidualTypeVariables, shape.targetDistinct]
+    have initializedTyped : StatementHasType function.typedBody ⟨.word, 0⟩ lexical
+        shape.parts.initialized.id locals ordinary := by
+      apply StatementHasType.letInitialized (lookupStatement?_sound shape.parts.initializedFound)
+        shape.parts.initializedForm
+      · simpa only [shape.targetScheme, TypeSystem.Scheme.mono] using literalTyped
+      · rw [shape.targetScheme]; rfl
+      · rw [shape.targetScheme]; rfl
+      · exact targetExtended
+      · exact shape.initializedType
+    have localWord : TypeAdmissible locals .word := ⟨binders, .builtin .word⟩
+    have localUnit : TypeAdmissible locals .unit := ⟨binders, .builtin .unit⟩
+    have localArray : TypeAdmissible locals (TypeSystem.Ty.array .word) := ⟨binders, .array (.builtin .word)⟩
+    have localMemref : TypeAdmissible locals (TypeSystem.Ty.memref .word) := ⟨binders, .memref (.builtin .word)⟩
+    have parameterLookup : locals.LocalLookup shape.parts.binder.id shape.parts.binder.scheme :=
+      .tail shape.targetDistinct head.local_self
+    have parameterRequirements :
+        locals.LocalSchemeRequirementsLookup shape.parts.binder.id shape.parts.binder.schemeRequirements :=
+      .tail shape.targetDistinct head.local_scheme_requirements_self
+    have storeArrayTyped := shape.parts.storeArray.typed shape.targetScheme shape.targetRequirements localArray
+      targetExtended.local_self targetExtended.local_scheme_requirements_self
+    have storeIndexTyped := shape.parts.storeIndex.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have storeReferenceTyped := shape.parts.storeReference.ordinary localMemref (by
+      rw [shape.parts.storeReferenceForm]
+      exact .elementRef storeArrayTyped storeIndexTyped .word)
+    have storeValueTyped := shape.parts.storeValue.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have storeTyped := shape.parts.store.ordinary localUnit (by
+      rw [shape.parts.storeForm]
+      exact .memrefStore storeReferenceTyped storeValueTyped)
+    have storedTyped : StatementHasType function.typedBody ⟨.word, 0⟩ locals shape.parts.stored.id locals ordinary :=
+      .expressionDiscard (lookupStatement?_sound shape.parts.storedFound) shape.parts.storedForm storeTyped
+        shape.storedType
+    have loadArrayTyped := shape.parts.loadArray.typed shape.targetScheme shape.targetRequirements localArray
+      targetExtended.local_self targetExtended.local_scheme_requirements_self
+    have loadIndexTyped := shape.parts.loadIndex.typed scheme shape.binderRequirements localWord parameterLookup
+      parameterRequirements
+    have loadReferenceTyped := shape.parts.loadReference.ordinary localMemref (by
+      rw [shape.parts.loadReferenceForm]
+      exact .elementRef loadArrayTyped loadIndexTyped .word)
+    have loadTyped := shape.parts.load.ordinary localWord (by
+      rw [shape.parts.loadForm]
+      exact .memrefLoad loadReferenceTyped)
+    exact ⟨_, .cons initializedTyped (.cons storedTyped (.singleton (.returnValue
+      (lookupStatement?_sound shape.parts.returnedFound) shape.parts.returnedForm loadTyped shape.returnedType)))⟩
+
+def observeReferenced (function : CheckedFunction) (signature : ProgramFunctionSignature) :
+    IO (ReferencedShape function signature) := do
+  let parts ← observeReferencedParts function.typedBody
+  let ⟨parameters⟩ ← observed (signature.scheme.parameters = []) "referenced parameters"
+  let ⟨inputTypes⟩ ← observed (signature.parameterTypes = [.word]) "referenced inputTypes"
+  let ⟨returns⟩ ← observed (signature.returnTypes = [.word]) "referenced returns"
+  let ⟨binderRequirements⟩ ← observed (parts.binder.schemeRequirements = []) "referenced binderRequirements"
+  let ⟨targetScheme⟩ ← observed (parts.target.scheme = .mono (TypeSystem.Ty.array .word)) "referenced targetScheme"
+  let ⟨targetRequirements⟩ ← observed (parts.target.schemeRequirements = []) "referenced targetRequirements"
+  let ⟨targetOwner⟩ ← observed (parts.target.id.owner = function.typedBody.owner) "referenced targetOwner"
+  let ⟨targetDistinct⟩ ← observed (parts.target.id ≠ parts.binder.id) "referenced targetDistinct"
+  let ⟨initializedType⟩ ← observed (parts.initialized.type = .unit) "referenced initializedType"
+  let ⟨storedType⟩ ← observed (parts.stored.type = .unit) "referenced storedType"
+  let ⟨returnedType⟩ ← observed (parts.returned.type = .word) "referenced returnedType"
+  return ⟨parts, parameters, inputTypes, returns, binderRequirements, targetScheme, targetRequirements, targetOwner,
+    targetDistinct, initializedType, storedType, returnedType⟩
+
 /-- Two members of a list of signatures whose ids are distinct are equal when
 their ids are. -/
 private theorem signature_of_id {signatures : List ProgramFunctionSignature}
@@ -2747,11 +2982,11 @@ def observeWellFormed {program : CheckedProgram}
   | [identityFunction, relayFunction, twiceFunction, narrowFunction, roundTripFunction, doubledFunction,
       shiftedFunction, flippedFunction, tailedFunction, storedFunction, summedFunction, zeroedFunction,
       invertedFunction, brokenFunction, countedFunction, tripledFunction, boxedFunction,
-      filledFunction, listedFunction, slicedFunction, copiedFunction],
+      filledFunction, listedFunction, slicedFunction, copiedFunction, referencedFunction],
     [identitySignature, relaySignature, twiceSignature, narrowSignature, roundTripSignature, doubledSignature,
       shiftedSignature, flippedSignature, tailedSignature, storedSignature, summedSignature, zeroedSignature,
       invertedSignature, brokenSignature, countedSignature, tripledSignature, boxedSignature,
-      filledSignature, listedSignature, slicedSignature, copiedSignature] =>
+      filledSignature, listedSignature, slicedSignature, copiedSignature, referencedSignature] =>
     let identityShape ← Tests.SourceCoreOperatorCalls.observeIdentity identityFunction identitySignature
     let relayShape ← observeRelay relayFunction relaySignature identitySignature
     let twiceShape ← observeTwice twiceFunction twiceSignature identitySignature
@@ -2773,6 +3008,7 @@ def observeWellFormed {program : CheckedProgram}
     let listedShape ← observeListed listedFunction listedSignature
     let slicedShape ← observeSliced slicedFunction slicedSignature
     let copiedShape ← observeCopied copiedFunction copiedSignature
+    let referencedShape ← observeReferenced referencedFunction referencedSignature
     let ⟨methods⟩ ← observed (program.methods = []) "calls methods"
     let ⟨identityDeclaration⟩ ← observed (identityFunction.declaration = identitySignature.id)
       "calls identityDeclaration"
@@ -2805,6 +3041,8 @@ def observeWellFormed {program : CheckedProgram}
       "calls slicedDeclaration"
     let ⟨copiedDeclaration⟩ ← observed (copiedFunction.declaration = copiedSignature.id)
       "calls copiedDeclaration"
+    let ⟨referencedDeclaration⟩ ← observed (referencedFunction.declaration = referencedSignature.id)
+      "calls referencedDeclaration"
     let ⟨distinct⟩ ← observed ((program.signatures.functions.map (·.id)).Nodup) "calls distinct signatures"
     let deep : CheckedProgramBodiesHaveStatementTyping program options.checkingFuel := {
       functions := by
@@ -2815,7 +3053,7 @@ def observeWellFormed {program : CheckedProgram}
           signature_of_id distinct candidateMember signatureMember (declared.symm.trans same)
         simp only [functions, List.mem_cons, List.not_mem_nil, or_false] at member
         rcases member with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
-          | rfl | rfl | rfl | rfl | rfl
+          | rfl | rfl | rfl | rfl | rfl | rfl
         · obtain rfl := selects (by simp [signatures]) identityDeclaration
           exact identityShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) relayDeclaration
@@ -2858,6 +3096,8 @@ def observeWellFormed {program : CheckedProgram}
           exact slicedShape.statementTyping program.signatures
         · obtain rfl := selects (by simp [signatures]) copiedDeclaration
           exact copiedShape.statementTyping program.signatures
+        · obtain rfl := selects (by simp [signatures]) referencedDeclaration
+          exact referencedShape.statementTyping program.signatures
       methods := by intro method member; simp only [methods, List.not_mem_nil] at member }
     return ⟨programWellFormed_ofCheckProgram_statements checked deep⟩
   | _, _ => throw (IO.userError "calls declaration count")
@@ -2866,7 +3106,7 @@ end Tests.SourceCoreAcceptedOneCall
 end
 
 section
-/-! The cache rows of the twenty-one functions and their original Source
+/-! The cache rows of the twenty-two functions and their original Source
 executions: `identity` returns its parameter, `relay` returns the direct call
 of `identity` with its parameter, `twice` returns the direct call of
 `identity` with that call, `tailed` ends in the direct call of `identity` with
@@ -2877,7 +3117,8 @@ word from the index of its local mapping where its in-place `~` put it, `broken`
 their parameter after their loops, `counted`'s after one iteration, `tripled` returns the triple of its
 parameter, `boxed` returns `Item` applied to it, `filled` returns the length of a new array of its parameter's
 length, `listed` its literal's element at its parameter, `sliced` its literal's slice's element there,
-`copied` the element of its whole slice's copy there,
+`copied` the element of its whole slice's copy there, `referenced` the element it stored through a memref into
+its local literal,
 `narrow` returns the conversion of its parameter,
 and `roundTrip` the word of that value, at a word canonical for `uint8`. Each call's global application is
 a given body invocation. At a word not canonical for `uint8` the conversions of `narrow`, `doubled`,
@@ -3234,6 +3475,16 @@ structure CopiedBody (source : TypedSource) where
 def observeCopiedBody (source : TypedSource) : IO (CopiedBody source) := do
   let parts ← observeCopiedParts source
   let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "copied row binderScheme"
+  return ⟨parts, binderScheme⟩
+
+/-- `referenced`'s cache row: the nodes of its body and its `Word` parameter. -/
+structure ReferencedBody (source : TypedSource) where
+  parts : ReferencedParts source
+  binderScheme : parts.binder.scheme = .mono .word
+
+def observeReferencedBody (source : TypedSource) : IO (ReferencedBody source) := do
+  let parts ← observeReferencedParts source
+  let ⟨binderScheme⟩ ← observed (parts.binder.scheme = .mono .word) "referenced row binderScheme"
   return ⟨parts, binderScheme⟩
 
 /-- The read of a parameter at the next cell of a heap. -/
@@ -3897,7 +4148,7 @@ end
 
 section
 /-! The accepted-body public theorems at the call root. Runtime checks place
-every expression node of the twenty-one rows among the nested sites or their callees
+every expression node of the twenty-two rows among the nested sites or their callees
 and each statement list in the supported shape; the complete inventory turns
 them into the rows of a family and gives the admitted callee's static
 receipts. The original Source executions of `relay`, `twice`, `tailed`, `stored`, `summed`, `zeroed`,
@@ -5448,13 +5699,35 @@ def runCopied (observed : Observed) : IO Unit := do
     let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
     expect result.val entry.2 "copied"
 
-/-- The memory array rows `filled`, `listed`, `sliced` and `copied`. -/
+/-- At `referenced`, `CanStore.store(lidx(a, value), value)` then `CanStore.load(lidx(a, value))` on the literal
+`a`: below 3 the actual resumption returns the stored parameter, and from 3 the store's `lidx` panics with
+`0x32`. The call root's reflection applies at every word. -/
+def runReferenced (observed : Observed) : IO Unit := do
+  let referenced ← observeRow observed.fixture "referenced"
+  let referencedBody ← observeReferencedBody referenced.original.function.typedBody
+  let cases : List (Word × Except UInt8 Word) :=
+    [(Word.zero, .ok Word.zero), (Word.ofNatModulo 2, .ok (Word.ofNatModulo 2)),
+     (Word.ofNatModulo 3, .error SourceCorePanics.outOfBounds),
+     (Word.ofNatModulo 7, .error SourceCorePanics.outOfBounds)]
+  for entry in cases do
+    let started ← observeStarted observed.fixture referenced.original.key [.word entry.1]
+    have _plan : ∃ (whole : WholeInventory observed.fixture) (selected : SelectedInventory whole referenced),
+        Nonempty (AcceptedReflection selected entry.1 started) := by
+      obtain ⟨whole⟩ := observed.fixture.inventory observed.cache observed.wellFormed
+      obtain ⟨selected⟩ := whole.select referenced
+      exact ⟨whole, selected, accepted_reflection selected observed.calls entry.1 observed.wellFormed started
+        observed.callableProfile referencedBody.parts.inputs referencedBody.binderScheme⟩
+    let result ← started.call.checkpoint.resumeWithReceipt runOptions.executionFuel runOptions.outputValidationFuel
+    expect result.val entry.2 "referenced"
+
+/-- The memory array rows `filled`, `listed`, `sliced`, `copied` and `referenced`. -/
 def run : IO Unit := do
   let observed ← observe
   runFilled observed
   runListed observed
   runSliced observed
   runCopied observed
+  runReferenced observed
   IO.println "ACCEPTED_ARRAY_PUBLIC_PASS"
 
 end AcceptedArrayRuntime
