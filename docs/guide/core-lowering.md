@@ -39,8 +39,8 @@ API, and families with a finite profile.
 | [AcceptedConversions](../../Solcore/SourceSemantics/CoreLowering/AcceptedConversions.lean) | The builtin conversions as compiler sites: the native check, the compiler's receipt, the dirty-integer revert's token law (`CellAwareInvocationAcceptedConversionFaults.DirtyToken`) and the head |
 | [AcceptedBuiltins](../../Solcore/SourceSemantics/CoreLowering/AcceptedBuiltins.lean) | The builtin closures as compiler sites of named-row bodies, and the cell-aware head of their calls (`CellAwareInvocationAcceptedBuiltins.preserves`, `reflects`) |
 | [AcceptedConstructors](../../Solcore/SourceSemantics/CoreLowering/AcceptedConstructors.lean) | Constructor applications as compiler sites of named-row bodies, and the cell-aware head of an application (`CellAwareInvocationAcceptedConstructors.preserves`, `reflects`) |
-| [AcceptedNestedCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedNestedCalls.lean) | Direct calls, the builtin conversions, mapping indices, builtin closures with their calls, tuples beyond pairs and constructor applications inside expressions and as arguments (`CellAwareInvocationAcceptedNestedTrees.Nested`), their closure and check, and the closure of a family of rows by strong induction on the grade |
-| [AcceptedCallLifting](../../Solcore/SourceSemantics/CoreLowering/AcceptedCallLifting.lean) | Staged traces lifted from Source for bodies with direct calls, the builtin conversions, mapping indices and builtin closures at any expression position and assignments through mapping indices, by strong induction on the size of the original derivation (`CellAwareInvocationAcceptedCallLifting.body`), and their fault executions (`CellAwareInvocationAcceptedFaultLifting.body_fault`) |
+| [AcceptedNestedCalls](../../Solcore/SourceSemantics/CoreLowering/AcceptedNestedCalls.lean) | Direct calls, the builtin conversions, mapping indices, builtin closures with their calls, tuples beyond pairs, constructor applications and the memory array forms (`ArraySite`, `MemrefSite`) inside expressions and as arguments (`CellAwareInvocationAcceptedNestedTrees.Nested`), their closure and check, and the closure of a family of rows by strong induction on the grade |
+| [AcceptedCallLifting](../../Solcore/SourceSemantics/CoreLowering/AcceptedCallLifting.lean) | Staged traces lifted from Source for bodies with direct calls, the builtin conversions, mapping indices, builtin closures and the memory array forms at any expression position and assignments through mapping indices, by strong induction on the size of the original derivation (`CellAwareInvocationAcceptedCallLifting.body`), and their fault executions (`CellAwareInvocationAcceptedFaultLifting.body_fault`) |
 | [AcceptedPublicRoots](../../Solcore/SourceSemantics/CoreLowering/AcceptedPublicRoots.lean) | Accepted bodies at the actual public start |
 | [PublicSupport](../../Solcore/SourceSemantics/CoreLowering/PublicSupport.lean) | `CompilerProgramStaticProfile.StaticProfile`, program support, `SelectedCompilationPublicSessionState.State` |
 | [PublicSessions](../../Solcore/SourceSemantics/CoreLowering/PublicSessions.lean), [PublicSessionOutcomes](../../Solcore/SourceSemantics/CoreLowering/PublicSessionOutcomes.lean) | From actual compilation to an issued session, and one call of it in both directions |
@@ -55,7 +55,7 @@ Each directory is one family, merged by topic; each file opens with a module doc
 | --- | --- |
 | `Foundations/` | Heaps and location maps, Core evaluation and renaming, function values and calls, capture copies, primitive expressions, sizes of Source executions (`SourceExecutionSize`) |
 | `Data/` | Payloads, places, patterns, mappings and equality on Core data; `DataHeap.EnvRepresents` |
-| `Compatible/` | The source-compatible profile: expressions, places, matches, mappings, assignments, statements |
+| `Compatible/` | The source-compatible profile: expressions, places, matches, mappings, assignments, statements; the compiler's receipts of the memory array forms and their Core runs (`ExpressionArrays`, `ArrayEvaluation`) |
 | `Statements/` | Statement, loop and match meaning on the typed and generic carriers; named and builtin calls |
 | `Protected/` | Contracts that carry a state witness (`ProtectedStateTransition`) through expressions, statements and loops |
 | `Diagnostics/` | Emitted diagnostic plans and reached fault paths |
@@ -65,7 +65,7 @@ Each directory is one family, merged by topic; each file opens with a module doc
 | `RecursiveNamed/` | The finite named-call catalog, the staged profile's primitives and calls, and their public results |
 | `Generalized/` | Generalized local functions: compilation, formation, reads and body meaning |
 | `Accepted/` | Accepted expressions and programs, invocation allocation, scoped Source bodies |
-| `CellAware/` | Bodies over heaps that mix value cells and function descriptors: invocations, scopes, Source lifting, public handles |
+| `CellAware/` | Bodies over heaps that mix value cells and function descriptors: invocations, scopes, Source lifting, public handles; the heads of the memory array forms (`InvocationArrays`, `InvocationArrayCells`, `InvocationArrayMemrefs`) |
 | `Selected/` | Selected compilations: admission, calls, public steps, and lifting to staged Source |
 
 **Words.** Names are systematic:
@@ -252,7 +252,8 @@ work, under "Remaining work for the second goal". In short:
   outside `StaticProfile` and the meaning proofs
   ([decision 6](../design/memory-arrays-slices.md#6-meaning-proofs)). Relating array objects to
   their Core cells, and slices and memrefs to their Core products, is under way: the staged
-  traces and the whole-cell heap relation have the arrays, and the heads do not yet.
+  traces, the heap and payload relations, the compiler receipts and the heads have the arrays,
+  and the accepted rows do not yet.
 
 ## Pitfalls
 

@@ -158,10 +158,12 @@ The last two are recorded without investigation, and the generators avoid them.
    loops, tuples beyond pairs and constructor applications. Memory arrays are under way
    ([decision 6](memory-arrays-slices.md#6-meaning-proofs)): the staged traces have the array
    forms and the element writes, the selected preservation keeps every array object's length,
-   and the whole-cell heap relation relates an array object to its Core cell. Next come the
-   payload cases, the compiler receipts and the heads. This unit takes a memref only as the
+   the heap and payload relations relate array objects and views to their Core cells, and the
+   compiler's receipts and the cell-aware heads take the array forms as nested sites. Next
+   come the accepted rows and a head for `lidx` alone. This unit takes a memref only as the
    operand of a load or a store, and `toArray` only of slices made where it is called. The
-   public compiler rejects a root whose signature holds an array, a slice or a memref
+   public compiler rejects a root whose signature holds an array, a slice or a memref, and a
+   session does not call a handle whose type holds one
    ([decision 5](memory-arrays-slices.md#5-arrays-at-the-public-api)).
 3. **Lean's native frontend as a fourth differential path.** The harness runs the admitted pure
    cases through the native pipeline, alone or as the fuzz driver's `native` run kind, memory
@@ -253,16 +255,22 @@ below come from running upstream's own test programs through Lean's native front
   written bare in an expression, a call of a name that a function or a builtin takes calls it
   before a constructor that shares its type's name, as a bare name does, upstream's primitive
   `primAddWord` is a name for the builtin, two modules exported under one alias are refused
-  (`SC0112`), and a match is exhaustive where its arms together cover the scrutinee's type, a
-  tuple pattern in parentheses among them. To come, each as a checker rule:
-  - `.true` and `.false`, an unannotated lambda's result, and `returns (a, b)` for a trait's
-    one tuple result are accepted;
+  (`SC0112`), `.true` and `.false` are the booleans where an expected `bool` reaches them, and
+  a match is exhaustive where its arms together cover the scrutinee's type, a tuple pattern in
+  parentheses among them. To come, each as a checker rule:
+  - `.true` or `.false` as a call's argument, a tuple's element or an operand of `&&` or
+    `||`, where Lean's inference passes no expected type yet;
+  - an unannotated lambda's result, and `returns (a, b)` for a trait's one tuple result;
+  - two implementations of one trait at one main type are refused (`SC0218`), Lean's `Coerce`
+    compared on both of its arguments;
   - a weak trait argument is taken from the one implementation that fixes it;
-  - a type parameter that nothing fixes (`SC0299`) and statements after a `return` (`SC0222`)
-    are refused.
+  - statements after a `return` are refused (`SC0222`).
+
+  `case .true` and `case .false` wait for a case of the Source's pattern relation.
 - **Lean keeps its own rule:**
   - mutually recursive data is accepted, as directly recursive data is;
   - a binder repeated in one pattern and cyclic superclasses are refused;
+  - an implementation's type parameter that occurs nowhere is refused;
   - a function type holds its parameters as one product, so a function of one pair takes two
     arguments;
   - `@T` is Lean's builtin proxy, whatever `Proxy` a program declares;
@@ -282,7 +290,9 @@ below come from running upstream's own test programs through Lean's native front
   two functions of one name (`SC0108`), a runtime value at a `comptime` parameter (`SC0240`),
   and two uses that Lean refuses where upstream runs the implementation: compound assignment
   at a type variable or at a program's own type, and an operator in generic code whose trait
-  an import renames.
+  an import renames. Also `let` generalization: upstream leaves a `let`'s open type for later
+  statements to fix and refuses it where nothing does (`SC0299`), and Lean generalizes it, so
+  a type that nothing fixes is refused only where specialization reaches it.
 
 ## Handoff rules
 

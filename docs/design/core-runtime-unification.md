@@ -68,7 +68,10 @@ values, sessions and checkpoints as
   copies its captured locals when it is created and again at each call
   ([closure captures](../guide/source-semantics.md#closures-capture-by-value)). Source mapping
   values here are local language data; they are not an assertion that native contract storage is
-  connected to the account-world runtime.
+  connected to the account-world runtime. Memory arrays, slices and memrefs have no public
+  value: a root whose signature holds one is rejected, and a handle whose type holds one is
+  issued but not called
+  ([decision 5](memory-arrays-slices.md#5-arrays-at-the-public-api)).
 
 ## Established proof connections
 
@@ -248,7 +251,9 @@ Direct calls are in [AcceptedCalls](../../Solcore/SourceSemantics/CoreLowering/A
   builtin values, which the family derives from the callable profile. So are tuples of more
   than two elements (`Nested.tuple`), as compiler sites of their own (`TupleSite`), since the
   first subset's sites stop at pairs, and constructor applications (`Nested.constructor`), as
-  compiler sites whose parameter substitution is closed (`ConstructorSite`).
+  compiler sites whose parameter substitution is closed (`ConstructorSite`). So are the memory
+  array forms (`Nested.array`, over `ArraySite`), and a load or a store through a `lidx` made
+  on the spot (`Nested.memrefLoad`, `Nested.memrefStore`, over `MemrefSite`).
 - **Authority.** `CellAwareInvocationAcceptedCallAuthority` derives `Ports` from a complete
   inventory: a call receipt's global slot names an indexed function, and the inventory's header for
   that index gives the `Port`.

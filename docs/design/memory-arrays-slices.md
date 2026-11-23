@@ -524,7 +524,10 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
 - **Decided:** a root whose signature mentions an array or a slice is rejected.
 - **Enforced.** `SourceCoreCompiler.compileChecked` rejects a root whose parameter or result
   type holds a memory array, a slice or a memref anywhere, through type arguments, tuples,
-  function types and the payloads of the enums it names (`Error.rootWithoutPublicValue`).
+  function types and the payloads of the enums it names (`Error.rootWithoutPublicValue`). A
+  session refuses to prepare such a root (`ErrorCode.rootWithoutPublicValue`), and refuses a
+  call of a handle whose type holds one before it encodes the input
+  (`ErrorCode.handleWithoutPublicValue`); `session.named` still issues such a handle.
 - **Other option: a new public value form**, a list of elements, for array arguments and results.
 - **Upstream.** [The ABI of `T[]`](#abi).
 - **Statements under the decision.** None.
@@ -538,7 +541,13 @@ Decision 2 changes a result only for lengths just below 2^251 − 1 (difference 
   proofs for arrays become a later unit, which relates array objects to their Core cells.
 - **That unit is under way.** The staged traces have the array forms and the element writes, the
   selected preservation keeps every array object's length, and the whole-cell relation holds
-  array objects through `CellModel.Array`.
+  array objects through `CellModel.Array`. The payload relation has array references and
+  slices, the compiler's array cases have their receipts, and the cell-aware heads take
+  lengths, reads (through slices too), the four shapes of a slice, `new`, literals,
+  `toArray(a[s:e])`, and `CanStore.load(lidx(a, i))` and `CanStore.store(lidx(a, i), v)` with
+  the `lidx` made on the spot. `new` and literals need their default elements' layouts
+  registered, which the site check reads. The array forms are nested sites; the accepted
+  rows that run them follow.
   The unit takes a memref only as the operand of a load or a store, and `toArray` only of
   slices made where it is called: the Source has no rule for a load, a store or a copy out of
   bounds, and the bound of a stored memref or slice would be an invariant over the heap. The
@@ -696,9 +705,9 @@ rejection in 22 to 24, as it could the open `Typedef` call. Nothing schedules it
   connected, and the ABI wrapper takes static words only ([README](../../README.md#proof-status)).
 - **The meaning proofs for arrays** ([decision 6](#6-meaning-proofs)). The unit that relates array
   objects to their Core cells is under way, and changes the build-on statements that decision 6
-  lists. The staged traces have the array forms and the element writes, and the whole-cell heap
-  relation has the array objects; the payload cases, the compiler receipts and the heads follow.
-  Arrays stay outside `StaticProfile`.
+  lists. The staged traces, the whole-cell heap relation, the payload relation, the compiler
+  receipts and the heads have the array forms; the accepted rows and a head for `lidx` alone
+  follow. Arrays stay outside `StaticProfile`.
 - **User collections indexed through `RValueIdxAccess`.** They need std's traits, and `Typedef` at
   a type parameter, which is row 1's open gap. Generic code over std's `Length` (`where c: Length`)
   waits for the same: Lean declares neither trait, so both are rejected with `unknownTrait`.
