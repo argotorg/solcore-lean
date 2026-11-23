@@ -5825,6 +5825,68 @@ def runLeadingDotBooleans : IO Unit := do
     ["function bad() returns (Word) { let b: Bool = .true(1); return 1; }"]
   IO.println "SOURCE_CORE_LEADING_DOT_BOOLEANS_PASS: .true and .false through the public API, the booleans where an expected bool reaches them (a condition, a loop's condition, an annotated let, a result, an assignment, a conditional's condition and () after the name), and refused with no expected type, at Word, at a generic parameter, as an operand of == or ! and with an argument, as upstream refuses them (SC0224)"
 
+/-- The number of overlaps that checking reports for a program at the signatures (`SC0218`),
+whatever else it reports there; `none` when it reports something else, or accepts it. -/
+private def overlapCount (workspace : Workspace.RawWorkspace) : Option Nat :=
+  match checkProgram workspace with
+  | .ok _ => some 0
+  | .error errors =>
+      let overlaps := errors.filter fun
+        | .signature (.overlappingImplementation _ _) => true
+        | _ => false
+      if errors.all (fun | .signature _ => true | _ => false) then some overlaps.length else none
+
+private def expectOverlaps (label : String) (count : Nat) (workspace : Workspace.RawWorkspace) :
+    IO Unit :=
+  match overlapCount workspace with
+  | some actual => require (actual == count) s!"{label}: {actual} overlaps, not {count}"
+  | none => throw (IO.userError s!"{label}: refused away from the signatures")
+
+/-- Upstream's `SC0218` through the public API: two ordinary implementations of one trait whose
+subjects unify, aliases expanded and with the occurs check, the trait's other arguments and the
+conditions not compared, are refused at the later one, among those its module sees; defaults are
+left out; Lean's own `Coerce` is compared on both its arguments. -/
+def runOverlappingImplementations : IO Unit := do
+  let trait := "trait C<A> {}"
+  let list := "enum List<A> { Nil, Cons(A, List<A>) }"
+  let pair := "enum Pair<A, B> { Pair(A, B) }"
+  expectOverlaps "one head twice" 1 (workspaceOf [trait, "impl C<Word> {}", "impl C<Word> {}"])
+  expectOverlaps "a generic head beside a closed one" 1
+    (workspaceOf [trait, "impl<A> C<A> {}", "impl C<Word> {}"])
+  expectOverlaps "a list beside one of its instances" 1
+    (workspaceOf [trait, list, "impl<A> C<List<A>> {}", "impl C<List<Word>> {}"])
+  expectOverlaps "two pair shapes" 1
+    (workspaceOf [trait, pair, "impl<A, B> C<Pair<A, B>> {}", "impl<A> C<Pair<A, A>> {}"])
+  expectOverlaps "a generic tuple beside a closed one" 1
+    (workspaceOf [trait, "impl<A, B> C<(A, B)> {}", "impl C<(Word, Bool)> {}"])
+  expectOverlaps "an alias beside its type" 1
+    (workspaceOf [trait, "type W = Word;", "impl C<W> {}", "impl C<Word> {}"])
+  expectOverlaps "heads whose conditions differ" 1
+    (workspaceOf [trait, list, "trait D<A> {}", "impl<A> C<List<A>> where A: D {}",
+      "impl C<List<Word>> {}"])
+  expectOverlaps "two later heads beside a generic one" 2
+    (workspaceOf [trait, "impl<A> C<A> {}", "impl C<Word> {}", "impl C<Bool> {}"])
+  expectOverlaps "one subject with two other arguments" 1
+    (workspaceOf ["trait Conv<A, B> {}", "enum A { Only }", "enum B { Only }", "enum Dead { Only }",
+      "impl Conv<A, B> {}", "impl Conv<A, Dead> {}"])
+  expectOverlaps "one coercion twice" 1
+    (workspaceOf ["trait Coerce<From, To> {}", "enum A { Only }", "enum B { Only }",
+      "impl Coerce<A, B> {}", "impl Coerce<A, B> {}"])
+  expectOverlaps "an imported head beside a local one" 1
+    (libraryWorkspace "import { C, T } from lib;\nimpl C<T> {}"
+      "export { C, T };\ntrait C<A> {}\nenum T { Only }\nimpl C<T> {}")
+  -- Accepted: distinct heads, the occurs check, a default beside an ordinary head, and Lean's
+  -- `Coerce` from one source to two targets.
+  expectOverlaps "two closed heads" 0 (workspaceOf [trait, "impl C<Word> {}", "impl C<Bool> {}"])
+  expectOverlaps "heads that the occurs check keeps apart" 0
+    (workspaceOf [trait, list, pair, "impl<A> C<Pair<A, A>> {}", "impl<B> C<Pair<B, List<B>>> {}"])
+  expectOverlaps "a default beside an ordinary head" 0
+    (workspaceOf [trait, "default impl<A> C<A> {}", "impl C<Word> {}"])
+  expectOverlaps "one source coerced to two targets" 0
+    (workspaceOf ["trait Coerce<From, To> {}", "enum A { Only }", "enum B { Only }",
+      "enum Dead { Only }", "impl Coerce<A, B> {}", "impl Coerce<A, Dead> {}"])
+  IO.println "SOURCE_CORE_OVERLAPPING_IMPLEMENTATIONS_PASS: upstream's SC0218 through the public API, ordinary implementations of one trait refused at the later one where their subjects unify (one head twice, a generic head, a list and a pair shape, a tuple, an alias, different conditions, three heads reported twice, one subject with two other arguments, and an imported head beside a local one), and accepted with distinct heads, through the occurs check and beside a default, with Lean's own Coerce compared on both arguments, refusing one coercion twice and accepting one source coerced to two targets"
+
 /-- A block that ends in a `return`, with statements after it, and a `return` last in its branch:
 both accepted, as upstream accepts them, and the block returns early. -/
 private def nonFinalReturnWorkspace : Workspace.RawWorkspace := workspaceOf [
@@ -6769,6 +6831,7 @@ def run : IO Unit := do
   runCallLookup
   runLeadingDotBooleans
   runNonFinalReturns
+  runOverlappingImplementations
   runUpstreamFixtures
   runUpstreamArrayFixtures
   runArrayElementCases

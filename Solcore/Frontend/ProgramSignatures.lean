@@ -1234,6 +1234,10 @@ inductive ProgramSignatureError where
   same trait while one of the two has no where predicates (`SC0247`). -/
   | overlappingDefaultImplementation
       (implementation overlaps : Resolved.DeclarationId)
+  /-- An ordinary implementation whose head overlaps one that its module sees of the same
+  trait (`SC0218`). -/
+  | overlappingImplementation
+      (implementation overlaps : Resolved.DeclarationId)
   /-- An implementation away from its trait's module and from the module of the
   type at its subject's coherence head (`SC0246`). -/
   | orphanImplementation (implementation : Resolved.DeclarationId)
@@ -1280,6 +1284,7 @@ private def programSignatureErrorDeclaration :
   | .traitCatalogUnavailable implementation _ => implementation
   | .implementationParameterNotInHead implementation _ => implementation
   | .overlappingDefaultImplementation implementation _ => implementation
+  | .overlappingImplementation implementation _ => implementation
   | .orphanImplementation implementation => implementation
   | .invalidDefaultImplementation implementation => implementation
   | .coverageCondition implementation _ => implementation
@@ -2796,6 +2801,51 @@ private def seenModules (edges : Workspace.ModuleId → List Workspace.ModuleId)
       let added := ((seen.flatMap edges).filter fun id => !seen.contains id).eraseDups
       if added.isEmpty then seen else seenModules edges fuel (seen ++ added)
 
+/-- Whether two ordinary heads of one trait overlap as upstream's `SC0218` reads them: their
+subjects unify once both heads' parameters are apart (`implementationHeadsOverlap`). Lean's own
+`Coerce`, a two-parameter trait of that name, is the one exception: its target is an input of the
+coercion search, so its argument must unify as well. -/
+private def ordinaryHeadsOverlap (traits : List ProgramTraitSignature)
+    (first second : ProgramImplementationSignature) : Bool :=
+  let conventionalCoerce := traits.any fun trait =>
+    first.head.trait.declaration? == some trait.id && trait.name == "Coerce" &&
+      trait.parameters.length == 2
+  if conventionalCoerce then
+    let left := TypedTraitResolution.freshenRuleFor first.implRule second.head
+    let right := TypedTraitResolution.freshenRuleFor second.implRule left.head
+    match TypeSystem.Unification.unifyTypes
+        (.product left.head.subject (TypeSystem.Ty.productMany left.head.arguments))
+        (.product right.head.subject (TypeSystem.Ty.productMany right.head.arguments)) with
+    | .ok _ => true
+    | .error _ => false
+  else implementationHeadsOverlap first second
+
+/-- Upstream's `SC0218` (`check_overlapping_instance`): an ordinary implementation whose head
+overlaps an ordinary one of the same trait that its module sees. Those are the ones declared
+before it in its module, and those of every module that it sees through its imports and
+re-exports (`instance_import_modules`), as upstream compares them; defaults are left to `SC0247`.
+Each is reported once, at the later head, and in an import cycle each module reports its own. -/
+private def overlappingImplementationErrors (environment : ProgramEnvironment)
+    (traits : List ProgramTraitSignature)
+    (implementations : List ProgramImplementationSignature) :
+    List ProgramSignatureError :=
+  let edges (id : Workspace.ModuleId) : List Workspace.ModuleId :=
+    match environment.modules.find? fun module => decide (module.id = id) with
+    | some module => moduleInstanceEdges environment module
+    | none => []
+  let fuel := environment.modules.length + 1
+  let indexed := (implementations.filter fun implementation => !implementation.isDefault).zipIdx
+  indexed.filterMap fun (implementation, index) =>
+    let module := implementation.id.moduleId
+    let seen := (seenModules edges fuel [module]).filter fun id => !decide (id = module)
+    let prior := indexed.filter fun (candidate, candidateIndex) =>
+      decide (candidate.head.trait = implementation.head.trait) &&
+        ((decide (candidate.id.moduleId = module) && decide (candidateIndex < index)) ||
+          seen.contains candidate.id.moduleId)
+    (prior.find? fun (candidate, _) => ordinaryHeadsOverlap traits implementation candidate).map
+      fun (candidate, _) =>
+        ProgramSignatureError.overlappingImplementation implementation.id candidate.id
+
 /-- The declared type at a subject's coherence head: a nominal type's
 declaration, after a product's first component, recursively. -/
 private def coherenceTypeDeclaration? : TypeSystem.Ty → Option Resolved.DeclarationId
@@ -3053,6 +3103,7 @@ def buildProgramSignatures (environment : ProgramEnvironment) :
     | _ => true
   let collectedErrors := traitState.errors ++ nonCascadingErrors ++
     overlappingDefaultErrors [] state.implementations ++
+    overlappingImplementationErrors environment traitState.traits state.implementations ++
     orphanImplementationErrors environment state.implementations ++
     implementationConditionErrors environment state.implementations ++
     shiftImplementationErrors traitState.traits state.implementations

@@ -553,8 +553,11 @@ private def testDefensiveProfileRejections : IO Unit := do
       s!"non-closed evidence goal had the wrong rejection: {reprStr error}")
   | .ok _ => throw (IO.userError "non-closed evidence goal was accepted")
 
+/-- Two ordinary implementations of one head are refused where they are declared, as upstream's
+`SC0218` refuses them, at the later one. So no checked program holds two implementations that
+decide one goal. -/
 private def testAmbiguousEvidenceRejection : IO Unit := do
-  let program ← checkedProgramOf (String.intercalate "\n" [
+  match checkProgram (singleSourceWorkspace (String.intercalate "\n" [
     "trait Add<T> { function add(left: T, right: T) returns (T); }",
     "impl Add<Word> {",
     "  function add(left: Word, right: Word) returns (Word) { return left; }",
@@ -562,23 +565,13 @@ private def testAmbiguousEvidenceRejection : IO Unit := do
     "impl Add<Word> {",
     "  function add(left: Word, right: Word) returns (Word) { return right; }",
     "}"
-  ])
-  let (first, second) ← match program.signatures.implementations with
-    | [first, second] => pure (first, second)
-    | implementations => throw (IO.userError
-        s!"expected two overlapping implementations, found {implementations.length}")
-  let forged : TypedTraitResolution.Evidence :=
-    .byImpl first.head first.id []
-  match ExecutableImplMethods.checkMethodWithArity program forged 1 "add" with
-  | .error (.evidenceResolutionInconclusive
-      (.ambiguous goal firstId secondId)) =>
-      assertTrue (decide (goal = first.head ∧ firstId = first.id ∧
-          secondId = second.id))
-        "ambiguous evidence rejection lost its goal or implementation order"
-  | .error error => throw (IO.userError
-      s!"forged overlapping evidence had the wrong rejection: {reprStr error}")
-  | .ok _ => throw (IO.userError
-      "forged evidence bypassed an ambiguous implementation catalog")
+  ])) with
+  | .error [.signature (.overlappingImplementation implementation overlaps)] =>
+      assertTrue (decide (overlaps.declarationIndex < implementation.declarationIndex))
+        "the overlap was reported away from the later implementation"
+  | .error errors => throw (IO.userError
+      s!"overlapping implementations had the wrong refusal: {reprStr errors}")
+  | .ok _ => throw (IO.userError "overlapping implementations were accepted")
 
 private def testGenericImplementationSpecialization : IO Unit := do
   let program ← checkedProgramOf (String.intercalate "\n" [
@@ -1402,7 +1395,7 @@ private def inconclusiveTraitWorkspace : Workspace.RawWorkspace := {
 
 private def testInconclusive : IO Unit := do
   match checkProgram inconclusiveTraitWorkspace with
-  | .error [.inconclusive _ (.ambiguous _ _ _)] => pure ()
+  | .error [.signature (.overlappingImplementation _ _)] => pure ()
   | .error errors => throw (IO.userError
       s!"overlapping impls had the wrong failure class: {reprStr errors}")
   | .ok _ => throw (IO.userError "overlapping Add implementations were selected")
@@ -2223,10 +2216,9 @@ private def testMethodInconclusive : IO Unit := do
       "  }",
       "}"
     ])) with
-  | .error [.methodInconclusive method (.ambiguous _ _ _)] =>
-      assertTrue (decide (method.implementation.declarationIndex = 6 ∧
-          method.methodIndex = 0))
-        "inconclusive method search lost the selected method identity"
+  | .error [.signature (.overlappingImplementation implementation overlaps)] =>
+      assertTrue (decide (overlaps.declarationIndex < implementation.declarationIndex))
+        "the overlap was reported away from the later implementation"
   | .error errors => throw (IO.userError
       s!"ambiguous method obligation had the wrong classification: {reprStr errors}")
   | .ok _ => throw (IO.userError
@@ -4762,11 +4754,11 @@ private def testDeclarationConditions : IO Unit := do
         "trait C<A, B, D> {}", "impl<A, B> C<List<B>, A, List<A>> {}",
         "impl<X> C<X, Word, Word> where X: C<Word, Word> {}"])]) with
   | .error errors =>
-      -- Upstream also reports the two heads' overlap (`SC0218`), which Lean
-      -- does not check.
-      assertTrue (errors.length == 2 &&
+      -- And the two heads' overlap (`SC0218`), as upstream reports it.
+      assertTrue (errors.length == 3 &&
           errors.any (fun | .signature (.coverageCondition _ _) => true | _ => false) &&
-          errors.any (fun | .signature (.pattersonCondition _) => true | _ => false))
+          errors.any (fun | .signature (.pattersonCondition _) => true | _ => false) &&
+          errors.any (fun | .signature (.overlappingImplementation _ _) => true | _ => false))
         s!"imported_pragma_does_not_suppress_local gave {reprStr errors}"
   | .ok _ => throw (IO.userError "imported_pragma_does_not_suppress_local was accepted")
   -- The measure: `T[]` as std's `memory<DynArray<T>>`, a pair as std's pair,

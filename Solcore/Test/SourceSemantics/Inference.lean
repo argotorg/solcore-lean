@@ -2718,11 +2718,12 @@ private def testInconclusiveCoercion : IO Unit := do
     "function accept(value: Box) returns (Box) { return value; }",
     "function reject(value: Word) returns (Box) { return accept(value); }"
   ]
+  -- One `Coerce` head twice is refused where it is declared (`SC0218`).
   match SourceInference.loadAndCheckProgram (workspace source) with
   | .error errors =>
       assertTrue (errors.any fun error => match error with
-        | .body { error := .inconclusiveTrait (.ambiguous _ _ _), .. } => true
-        | _ => false) "overlapping coercion implementations lost ambiguity"
+        | .signatures (.overlappingImplementation _ _) => true
+        | _ => false) "overlapping coercion implementations were not refused"
   | .ok _ => throw (IO.userError "ambiguous coercion implementation was selected")
 
 private def testUnsolvedCoercionMethodPredicate : IO Unit := do

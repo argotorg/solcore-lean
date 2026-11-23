@@ -646,6 +646,9 @@ private def testDefaultImplementationCoercionPriority : IO Unit := do
   | .ok _ => throw (IO.userError
       "a failed ordinary coercion premise fell back to the default tier")
 
+/-- An irrelevant branch on which two equal-length paths reach one type (`A` to `Dead` through
+`Left` and through `Right`) does not block the unique path to the target. The branch cannot be one
+`Coerce` head twice, which `SC0218` refuses where it is declared. -/
 private def testIrrelevantAmbiguousBranchDoesNotBlock : IO Unit := do
   let fixture ← check (String.intercalate "\n" [
     "trait Coerce<From, To> {}",
@@ -653,8 +656,12 @@ private def testIrrelevantAmbiguousBranchDoesNotBlock : IO Unit := do
     "enum B { Only }",
     "enum C { Only }",
     "enum Dead { Only }",
-    "impl Coerce<A, Dead> {}",
-    "impl Coerce<A, Dead> {}",
+    "enum Left { Only }",
+    "enum Right { Only }",
+    "impl Coerce<A, Left> {}",
+    "impl Coerce<A, Right> {}",
+    "impl Coerce<Left, Dead> {}",
+    "impl Coerce<Right, Dead> {}",
     "impl Coerce<A, B> {}",
     "impl Coerce<B, C> {}",
     "function accept(value: C) returns (C) { return value; }",
@@ -670,7 +677,7 @@ private def testIrrelevantAmbiguousBranchDoesNotBlock : IO Unit := do
   assertTrue (decide (convert.predicates = [first, second]))
     "an irrelevant ambiguous branch blocked the unique coercion path"
   match implementationIds fixture.environment, convert.evidence with
-  | _ :: _ :: firstImpl :: secondImpl :: [],
+  | _ :: _ :: _ :: _ :: firstImpl :: secondImpl :: [],
       firstEvidence :: secondEvidence :: [] =>
       assertTrue (isImplementationEvidence first firstImpl firstEvidence &&
           isImplementationEvidence second secondImpl secondEvidence)
@@ -821,12 +828,14 @@ private def testAmbiguousDirectPathDoesNotFallBack : IO Unit := do
     "function accept(value: C) returns (C) { return value; }",
     "function convert(value: A) returns (C) { return accept(value); }"
   ]
+  -- A direct path's ambiguity, one `Coerce` head twice, is refused where it is declared
+  -- (`SC0218`), so no checked program falls back from it to a longer path.
   match SourceInference.loadAndCheckProgram (workspace source) with
   | .error errors =>
-      assertTrue (hasBodyError errors fun error => match error with
-        | .inconclusiveTrait _ => true
+      assertTrue (errors.any fun error => match error with
+        | .signatures (.overlappingImplementation _ _) => true
         | _ => false)
-        "an ambiguous direct coercion incorrectly fell back to a longer path"
+        "an ambiguous direct coercion was not refused where it is declared"
   | .ok _ =>
       throw (IO.userError "an ambiguous direct coercion was silently selected")
 
